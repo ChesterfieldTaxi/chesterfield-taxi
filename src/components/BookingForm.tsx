@@ -4,6 +4,7 @@ import LocationStep from './booking/LocationStep';
 import PassengerStep from './booking/PassengerStep';
 import VehicleStep from './booking/VehicleStep';
 import PaymentStep from './booking/PaymentStep';
+import TripOptionsStep from './booking/TripOptionsStep';
 import '../styles/BookingForm.css';
 
 const BookingForm: React.FC = () => {
@@ -21,21 +22,83 @@ const BookingForm: React.FC = () => {
         setBoosterSeats,
         setVehicleType,
         setPaymentMethod,
+        setAccountNumber,
+        setAuthCode,
+        setOrganizationName,
         setNotes,
         setIsReturnTrip,
         setReturnDateTime,
         setReturnLocations,
-        setIsRepeat,
-        setRepeatFrequency,
-        setRepeatEnds,
-        setRepeatEndDate,
         resetForm
     } = useBookingForm();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+    const validateBooking = () => {
+        const errors: string[] = [];
+
+        // Time Validation
+        if (!booking.isNow && !booking.pickupDateTime) {
+            errors.push('Please select a pickup time.');
+        }
+
+        // Location Validation
+        if (booking.locations.length < 2) {
+            errors.push('Please enter at least a pickup and dropoff location.');
+        }
+        if (!booking.locations[0].address) {
+            errors.push('Pickup location is required.');
+        }
+        if (!booking.locations[booking.locations.length - 1].address) {
+            errors.push('Dropoff location is required.');
+        }
+
+        // Passenger Validation
+        const mainPassenger = booking.passengers[0];
+        if (!mainPassenger.name || !mainPassenger.phone || !mainPassenger.email) {
+            errors.push('Please fill in the primary passenger contact details.');
+        }
+
+        // Payment Validation
+        if (booking.paymentMethod === 'account') {
+            if (!booking.accountNumber || !booking.authCode || !booking.organizationName) {
+                errors.push('Please complete all account details.');
+            }
+        }
+
+        return errors;
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('Booking Request:', booking);
-        alert('Booking submitted! Check console for details.');
+        const errors = validateBooking();
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const response = await fetch('/.netlify/functions/submit-booking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(booking),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                alert(`Booking submitted successfully! Reference: ${result.reference}`);
+                resetForm();
+            } else {
+                throw new Error('Submission failed');
+            }
+        } catch (error) {
+            console.error('Error submitting booking:', error);
+            alert('Failed to submit booking. Please try again or call us.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -94,22 +157,6 @@ const BookingForm: React.FC = () => {
                         setPickupDateTime={setPickupDateTime}
                         locations={booking.locations}
                         setLocations={setLocations}
-
-                        isReturnTrip={booking.isReturnTrip}
-                        setIsReturnTrip={setIsReturnTrip}
-                        returnDateTime={booking.returnDateTime}
-                        setReturnDateTime={setReturnDateTime}
-                        returnLocations={booking.returnLocations}
-                        setReturnLocations={setReturnLocations}
-
-                        isRepeat={booking.isRepeat}
-                        setIsRepeat={setIsRepeat}
-                        repeatFrequency={booking.repeatFrequency}
-                        setRepeatFrequency={setRepeatFrequency}
-                        repeatEnds={booking.repeatEnds}
-                        setRepeatEnds={setRepeatEnds}
-                        repeatEndDate={booking.repeatEndDate}
-                        setRepeatEndDate={setRepeatEndDate}
                     />
 
                     <PassengerStep
@@ -134,9 +181,24 @@ const BookingForm: React.FC = () => {
                         setVehicleType={setVehicleType}
                     />
 
+                    <TripOptionsStep
+                        isReturnTrip={booking.isReturnTrip}
+                        setIsReturnTrip={setIsReturnTrip}
+                        returnDateTime={booking.returnDateTime}
+                        setReturnDateTime={setReturnDateTime}
+                        returnLocations={booking.returnLocations}
+                        setReturnLocations={setReturnLocations}
+                    />
+
                     <PaymentStep
                         paymentMethod={booking.paymentMethod}
                         setPaymentMethod={setPaymentMethod}
+                        accountNumber={booking.accountNumber}
+                        setAccountNumber={setAccountNumber}
+                        authCode={booking.authCode}
+                        setAuthCode={setAuthCode}
+                        organizationName={booking.organizationName}
+                        setOrganizationName={setOrganizationName}
                         notes={booking.notes}
                         setNotes={setNotes}
                     />
@@ -146,7 +208,9 @@ const BookingForm: React.FC = () => {
                     <div className="price-estimate">~$40</div>
                     <div className="form-actions">
                         <button type="button" className="btn-clear" onClick={resetForm}>Clear</button>
-                        <button type="submit" className="btn-book">Book</button>
+                        <button type="submit" className="btn-book" disabled={isSubmitting}>
+                            {isSubmitting ? 'Booking...' : 'Book'}
+                        </button>
                     </div>
                 </div>
             </form>

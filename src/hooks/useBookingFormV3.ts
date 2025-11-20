@@ -1,0 +1,325 @@
+import { useState, useMemo } from 'react';
+import type { BookingDetails } from '../types/pricing';
+import { usePricingRules } from './usePricingRules';
+import { calculateFare } from '../utils/pricingEngine';
+
+export interface Location {
+    id: string;
+    address: string;
+    type: 'pickup' | 'dropoff' | 'stop';
+    isAirport: boolean;
+    placeId?: string;
+    coordinates?: { lat: number; lng: number };
+    flightDetails?: {
+        airline: string;
+        flightNumber: string;
+        origin?: string;
+    };
+}
+
+interface BookingFormV3State {
+    // Locations
+    pickup: Location | null;
+    dropoff: Location | null;
+    stops: Location[];
+
+    // Distance (from Google Maps API)
+    distanceInYards: number;
+
+    // Vehicle & Passengers
+    vehicleType: 'Sedan' | 'SUV' | 'Minivan' | 'Any';
+    passengerCount: number;
+    luggageCount: number;
+    carSeats: {
+        infant: number;
+        toddler: number;
+        booster: number;
+    };
+
+    // Time
+    isNow: boolean;
+    pickupDateTime: Date;
+
+    // Special requests
+    specialRequests: string[];
+    gateCode: string;
+
+    // Return trip
+    isReturnTrip: boolean;
+    returnDateTime: Date | null;
+
+    // Payment
+    paymentMethod: 'cash' | 'account';
+    accountNumber: string;
+    authCode: string;
+    driverNotes: string;
+
+    // Contact
+    name: string;
+    phone: string;
+    email: string;
+}
+
+export function useBookingFormV3() {
+    const { rules, loading: rulesLoading } = usePricingRules(true);
+
+    const [state, setState] = useState<BookingFormV3State>({
+        pickup: null,
+        dropoff: null,
+        stops: [],
+        distanceInYards: 0,
+        vehicleType: 'Any',
+        passengerCount: 1,
+        luggageCount: 1,
+        carSeats: { infant: 0, toddler: 0, booster: 0 },
+        isNow: true,
+        pickupDateTime: new Date(),
+        specialRequests: [],
+        gateCode: '',
+        isReturnTrip: false,
+        returnDateTime: null,
+        paymentMethod: 'cash',
+        accountNumber: '',
+        authCode: '',
+        driverNotes: '',
+        name: '',
+        phone: '',
+        email: ''
+    });
+
+    // Auto-select Minivan if car seats are selected
+    const effectiveVehicleType = useMemo(() => {
+        const totalCarSeats = state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster;
+        if (totalCarSeats > 0) {
+            return 'Minivan';
+        }
+        return state.vehicleType;
+    }, [state.carSeats, state.vehicleType]);
+
+    // Calculate fare in real-time
+    const fareBreakdown = useMemo(() => {
+        if (!rules || state.distanceInYards === 0) return null;
+
+        const booking: BookingDetails = {
+            tripType: state.pickup?.isAirport || state.dropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
+            distanceInYards: state.distanceInYards,
+            vehicleType: effectiveVehicleType,
+            passengerCount: state.passengerCount,
+            luggageCount: state.luggageCount,
+            carSeats: state.carSeats,
+            specialRequests: state.specialRequests,
+            isAirport: state.pickup?.isAirport || state.dropoff?.isAirport || false,
+            pickupDateTime: state.pickupDateTime
+        };
+
+        return calculateFare(booking, rules);
+    }, [rules, state, effectiveVehicleType]);
+
+    // Setters
+    // Mock airport detection
+    const detectAirport = (address: string): boolean => {
+        const lower = address.toLowerCase();
+        return lower.includes('airport') || lower.includes('stl') || lower.includes('mci') || lower.includes('terminal');
+    };
+
+    const setPickup = (location: Location | null) => setState(prev => ({
+        ...prev,
+        pickup: location ? { ...location, isAirport: detectAirport(location.address) } : null
+    }));
+
+    const setDropoff = (location: Location | null) => setState(prev => ({
+        ...prev,
+        dropoff: location ? { ...location, isAirport: detectAirport(location.address) } : null
+    }));
+    const setStops = (stops: Location[]) => setState(prev => ({ ...prev, stops }));
+    const setDistance = (yards: number) => setState(prev => ({ ...prev, distanceInYards: yards }));
+
+    const addStop = () => {
+        setState(prev => ({
+            ...prev,
+            stops: [
+                ...prev.stops,
+                {
+                    id: Math.random().toString(36).substr(2, 9),
+                    address: '',
+                    type: 'stop',
+                    isAirport: false
+                }
+            ]
+        }));
+    };
+
+    const removeStop = (id: string) => {
+        setState(prev => ({
+            ...prev,
+            stops: prev.stops.filter(stop => stop.id !== id)
+        }));
+    };
+
+    const updateStop = (id: string, updates: Partial<Location>) => {
+        setState(prev => ({
+            ...prev,
+            stops: prev.stops.map(stop => stop.id === id ? { ...stop, ...updates } : stop)
+        }));
+    };
+
+    const swapLocations = () => {
+        setState(prev => ({
+            ...prev,
+            pickup: prev.dropoff ? { ...prev.dropoff, type: 'pickup' } : null,
+            dropoff: prev.pickup ? { ...prev.pickup, type: 'dropoff' } : null
+        }));
+    };
+
+    const reorderStops = (startIndex: number, endIndex: number) => {
+        setState(prev => {
+            const result = Array.from(prev.stops);
+            const [removed] = result.splice(startIndex, 1);
+            result.splice(endIndex, 0, removed);
+            return { ...prev, stops: result };
+        });
+    };
+
+    const reorderLocations = (startIndex: number, endIndex: number) => {
+        setState(prev => {
+            // Create a combined array of all locations
+            // We ensure pickup and dropoff exist or create placeholders if they don't (though they should in this flow)
+            const pickup = prev.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false };
+            const dropoff = prev.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false };
+
+            const allLocations = [pickup, ...prev.stops, dropoff];
+
+            // Perform the reorder
+            const [movedItem] = allLocations.splice(startIndex, 1);
+            allLocations.splice(endIndex, 0, movedItem);
+
+            // Reassign types based on new positions
+            const newPickup = { ...allLocations[0], type: 'pickup' as const };
+            const newDropoff = { ...allLocations[allLocations.length - 1], type: 'dropoff' as const };
+            const newStops = allLocations.slice(1, -1).map(loc => ({ ...loc, type: 'stop' as const }));
+
+            return {
+                ...prev,
+                pickup: newPickup,
+                dropoff: newDropoff,
+                stops: newStops
+            };
+        });
+    };
+
+    const setVehicleType = (type: 'Sedan' | 'SUV' | 'Minivan' | 'Any') => setState(prev => ({ ...prev, vehicleType: type }));
+    const setPassengerCount = (count: number) => setState(prev => ({ ...prev, passengerCount: Math.max(1, count) }));
+    const setLuggageCount = (count: number) => setState(prev => ({ ...prev, luggageCount: Math.max(0, count) }));
+
+    const setCarSeats = (type: 'infant' | 'toddler' | 'booster', count: number) => {
+        setState(prev => ({
+            ...prev,
+            carSeats: { ...prev.carSeats, [type]: Math.max(0, count) }
+        }));
+    };
+
+    const toggleSpecialRequest = (requestId: string) => {
+        setState(prev => ({
+            ...prev,
+            specialRequests: prev.specialRequests.includes(requestId)
+                ? prev.specialRequests.filter(id => id !== requestId)
+                : [...prev.specialRequests, requestId]
+        }));
+    };
+
+    const setIsNow = (isNow: boolean) => setState(prev => ({ ...prev, isNow }));
+    const setPickupDateTime = (date: Date) => setState(prev => ({ ...prev, pickupDateTime: date }));
+    const setIsReturnTrip = (isReturn: boolean) => setState(prev => ({ ...prev, isReturnTrip: isReturn }));
+    const setReturnDateTime = (date: Date | null) => setState(prev => ({ ...prev, returnDateTime: date }));
+
+    const setPaymentMethod = (method: 'cash' | 'account') => setState(prev => ({ ...prev, paymentMethod: method }));
+    const setName = (name: string) => setState(prev => ({ ...prev, name }));
+    const setPhone = (phone: string) => setState(prev => ({ ...prev, phone }));
+    const setEmail = (email: string) => setState(prev => ({ ...prev, email }));
+    const setDriverNotes = (notes: string) => setState(prev => ({ ...prev, driverNotes: notes }));
+    const setGateCode = (code: string) => setState(prev => ({ ...prev, gateCode: code }));
+
+    const resetForm = () => {
+        setState({
+            pickup: null,
+            dropoff: null,
+            stops: [],
+            distanceInYards: 0,
+            vehicleType: 'Any',
+            passengerCount: 1,
+            luggageCount: 1,
+            carSeats: { infant: 0, toddler: 0, booster: 0 },
+            isNow: true,
+            pickupDateTime: new Date(),
+            specialRequests: [],
+            gateCode: '',
+            isReturnTrip: false,
+            returnDateTime: null,
+            paymentMethod: 'cash',
+            accountNumber: '',
+            authCode: '',
+            driverNotes: '',
+            name: '',
+            phone: '',
+            email: ''
+        });
+    };
+
+    const setFlightDetails = (locationType: 'pickup' | 'dropoff', details: { airline: string; flightNumber: string; origin?: string }) => {
+        setState(prev => {
+            const location = prev[locationType];
+            if (!location) return prev;
+            return {
+                ...prev,
+                [locationType]: { ...location, flightDetails: details }
+            };
+        });
+    };
+
+    return {
+        // State
+        state,
+        effectiveVehicleType,
+        fareBreakdown,
+        rulesLoading,
+
+        // Location setters
+        setPickup,
+        setDropoff,
+        setStops,
+        addStop,
+        removeStop,
+        updateStop,
+        swapLocations,
+        reorderStops,
+        reorderLocations,
+        setDistance,
+        setFlightDetails,
+
+        // Vehicle & passenger setters
+        setVehicleType,
+        setPassengerCount,
+        setLuggageCount,
+        setCarSeats,
+
+        // Time setters
+        setIsNow,
+        setPickupDateTime,
+        setIsReturnTrip,
+        setReturnDateTime,
+
+        // Special request setters
+        toggleSpecialRequest,
+        setGateCode,
+
+        // Payment & contact setters
+        setPaymentMethod,
+        setName,
+        setPhone,
+        setEmail,
+        setDriverNotes,
+
+        // Utility
+        resetForm
+    };
+}

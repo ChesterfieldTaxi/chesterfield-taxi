@@ -6,6 +6,15 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Location } from '../../types/booking';
 import DateTimePicker from './DateTimePicker';
 
+const PREDEFINED_LOCATIONS = [
+    "St. Louis Lambert International Airport (STL)",
+    "Spirit of St. Louis Airport (SUS)",
+    "Chesterfield Mall",
+    "Downtown St. Louis",
+    "West County Center",
+    "Missouri Botanical Garden"
+];
+
 interface LocationStepProps {
     isNow: boolean;
     setIsNow: (isNow: boolean) => void;
@@ -13,24 +22,6 @@ interface LocationStepProps {
     setPickupDateTime: (date: Date) => void;
     locations: Location[];
     setLocations: (locations: Location[]) => void;
-
-    // Return Trip Props
-    isReturnTrip: boolean;
-    setIsReturnTrip: (isReturn: boolean) => void;
-    returnDateTime: Date | null;
-    setReturnDateTime: (date: Date) => void;
-    returnLocations: Location[];
-    setReturnLocations: (locations: Location[]) => void;
-
-    // Repeat Trip Props
-    isRepeat: boolean;
-    setIsRepeat: (isRepeat: boolean) => void;
-    repeatFrequency: 'daily' | 'weekly' | 'monthly';
-    setRepeatFrequency: (freq: 'daily' | 'weekly' | 'monthly') => void;
-    repeatEnds: 'on_date' | 'after_occurrences' | 'never';
-    setRepeatEnds: (ends: 'on_date' | 'after_occurrences' | 'never') => void;
-    repeatEndDate: Date | null;
-    setRepeatEndDate: (date: Date) => void;
 }
 
 // Sortable Item Component
@@ -40,9 +31,10 @@ interface SortableLocationItemProps {
     locationsLength: number;
     handleLocationChange: (id: string, field: string, value: any) => void;
     removeStop: (id: string) => void;
+    showDragHandle: boolean;
 }
 
-const SortableLocationItem = ({ loc, index, locationsLength, handleLocationChange, removeStop }: SortableLocationItemProps) => {
+const SortableLocationItem = ({ loc, index, locationsLength, handleLocationChange, removeStop, showDragHandle }: SortableLocationItemProps) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: loc.id });
 
     const style = {
@@ -61,8 +53,15 @@ const SortableLocationItem = ({ loc, index, locationsLength, handleLocationChang
 
     return (
         <div ref={setNodeRef} style={style} className="location-group">
-            <div className="control-handle" {...attributes} {...listeners}>
-                <span className="material-symbols-outlined drag-handle">drag_indicator</span>
+            <div className="control-handle" {...attributes} {...listeners} style={{ visibility: showDragHandle ? 'visible' : 'hidden' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="drag-handle-icon" style={{ color: '#9ca3af', cursor: 'grab' }}>
+                    <circle cx="9" cy="12" r="1" />
+                    <circle cx="9" cy="5" r="1" />
+                    <circle cx="9" cy="19" r="1" />
+                    <circle cx="15" cy="12" r="1" />
+                    <circle cx="15" cy="5" r="1" />
+                    <circle cx="15" cy="19" r="1" />
+                </svg>
             </div>
             <div className="location-icon-wrapper">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="location-icon" style={{ color: iconColor }}>
@@ -74,6 +73,7 @@ const SortableLocationItem = ({ loc, index, locationsLength, handleLocationChang
                     placeholder={isPickup ? 'Pickup Location' : isDropoff ? 'Dropoff Location' : `Stop ${index}`}
                     value={loc.address}
                     onChange={(e) => handleLocationChange(loc.id, 'address', e.target.value)}
+                    list="predefined-locations"
                 />
             </div>
             <button
@@ -88,9 +88,7 @@ const SortableLocationItem = ({ loc, index, locationsLength, handleLocationChang
 };
 
 const LocationStep: React.FC<LocationStepProps> = ({
-    isNow, setIsNow, pickupDateTime, setPickupDateTime, locations, setLocations,
-    isReturnTrip, setIsReturnTrip, returnDateTime, setReturnDateTime, returnLocations, setReturnLocations,
-    isRepeat, setIsRepeat, repeatFrequency, setRepeatFrequency, repeatEnds, setRepeatEnds, repeatEndDate, setRepeatEndDate
+    isNow, setIsNow, pickupDateTime, setPickupDateTime, locations, setLocations
 }) => {
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -100,16 +98,17 @@ const LocationStep: React.FC<LocationStepProps> = ({
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (active.id !== over?.id) {
-            setLocations((items: Location[]) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over?.id);
-                const newItems = arrayMove(items, oldIndex, newIndex);
-                // Update types based on new positions
-                return newItems.map((item, index) => ({
-                    ...item,
-                    type: index === 0 ? 'pickup' : index === newItems.length - 1 ? 'dropoff' : 'stop'
-                }));
-            });
+            const newItems = arrayMove(locations,
+                locations.findIndex((item) => item.id === active.id),
+                locations.findIndex((item) => item.id === over?.id)
+            );
+
+            const updatedItems = newItems.map((item, index) => ({
+                ...item,
+                type: (index === 0 ? 'pickup' : index === newItems.length - 1 ? 'dropoff' : 'stop') as 'pickup' | 'dropoff' | 'stop'
+            }));
+
+            setLocations(updatedItems);
         }
     };
 
@@ -143,13 +142,24 @@ const LocationStep: React.FC<LocationStepProps> = ({
         setLocations(locations.filter(loc => loc.id !== id));
     };
 
+    const handleSwap = () => {
+        if (locations.length === 2) {
+            const newLocations = [
+                { ...locations[1], type: 'pickup' as const },
+                { ...locations[0], type: 'dropoff' as const }
+            ];
+            setLocations(newLocations);
+        }
+    };
+
     // Helper to render flight info if needed
     const renderFlightInfo = (locs: Location[], handler: (id: string, field: string, val: any) => void) => {
-        const airportLoc = locs.find(l => l.isAirport);
-        if (!airportLoc) return null;
+        // Only show flight info if PICKUP is an airport
+        const pickupLoc = locs[0];
+        if (!pickupLoc || !pickupLoc.isAirport) return null;
 
         return (
-            <div className="flight-info-section visible">
+            <div className="flight-info-section visible slide-out">
                 <div className="form-section-header" style={{ color: 'var(--color-primary)', marginTop: '0.5rem' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '1.2em', verticalAlign: 'middle', marginRight: '4px' }}>flight</span>
                     Airport Details
@@ -159,15 +169,15 @@ const LocationStep: React.FC<LocationStepProps> = ({
                         type="text"
                         className="form-input"
                         placeholder="Airline"
-                        value={airportLoc.airline || ''}
-                        onChange={(e) => handler(airportLoc.id, 'airline', e.target.value)}
+                        value={pickupLoc.airline || ''}
+                        onChange={(e) => handler(pickupLoc.id, 'airline', e.target.value)}
                     />
                     <input
                         type="text"
                         className="form-input"
                         placeholder="Flight Number"
-                        value={airportLoc.flightNumber || ''}
-                        onChange={(e) => handler(airportLoc.id, 'flightNumber', e.target.value)}
+                        value={pickupLoc.flightNumber || ''}
+                        onChange={(e) => handler(pickupLoc.id, 'flightNumber', e.target.value)}
                     />
                 </div>
             </div>
@@ -176,6 +186,10 @@ const LocationStep: React.FC<LocationStepProps> = ({
 
     return (
         <div className="form-section">
+            <datalist id="predefined-locations">
+                {PREDEFINED_LOCATIONS.map((loc, i) => <option key={i} value={loc} />)}
+            </datalist>
+
             {/* Time Selection */}
             <div className="time-toggle mb-2">
                 <div className="toggle-switch" onClick={() => setIsNow(!isNow)}>
@@ -194,20 +208,51 @@ const LocationStep: React.FC<LocationStepProps> = ({
 
             {/* Locations with DnD */}
             <div className="form-group-box">
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={locations} strategy={verticalListSortingStrategy}>
-                        {locations.map((loc, index) => (
-                            <SortableLocationItem
-                                key={loc.id}
-                                loc={loc}
-                                index={index}
-                                locationsLength={locations.length}
-                                handleLocationChange={handleLocationChange}
-                                removeStop={removeStop}
-                            />
-                        ))}
-                    </SortableContext>
-                </DndContext>
+                <div className="relative">
+                    {/* Swap Button - Only visible when 2 locations */}
+                    {locations.length === 2 && (
+                        <button
+                            type="button"
+                            className="swap-btn"
+                            onClick={handleSwap}
+                            style={{
+                                position: 'absolute',
+                                left: '-10px', // Position to the left of the inputs
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                zIndex: 10,
+                                background: 'transparent',
+                                border: 'none',
+                                width: '24px',
+                                height: '24px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: '#9ca3af' // Match placeholder/icon color
+                            }}
+                            title="Swap locations"
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>swap_vert</span>
+                        </button>
+                    )}
+
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={locations} strategy={verticalListSortingStrategy}>
+                            {locations.map((loc, index) => (
+                                <SortableLocationItem
+                                    key={loc.id}
+                                    loc={loc}
+                                    index={index}
+                                    locationsLength={locations.length}
+                                    handleLocationChange={handleLocationChange}
+                                    removeStop={removeStop}
+                                    showDragHandle={locations.length > 2}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
+                </div>
 
                 <div className="flex justify-between items-center mt-1">
                     <div className="text-sm text-gray-500">
@@ -218,83 +263,9 @@ const LocationStep: React.FC<LocationStepProps> = ({
 
                 {renderFlightInfo(locations, handleLocationChange)}
             </div>
-
-            {/* Return Trip */}
-            <div className="mt-2">
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                    <input type="checkbox" checked={isReturnTrip} onChange={(e) => setIsReturnTrip(e.target.checked)} />
-                    Book Return Trip
-                </label>
-
-                {isReturnTrip && (
-                    <div className="form-group-box mt-2" style={{ borderLeft: '3px solid var(--color-primary)' }}>
-                        <div className="mb-2">
-                            <DateTimePicker value={returnDateTime} onChange={setReturnDateTime} placeholder="Select return time" />
-                        </div>
-                        {returnLocations.map((loc, index) => (
-                            <div key={loc.id} className="location-group">
-                                <div className="location-icon-wrapper">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="location-icon" style={{
-                                        color: index === 0 ? 'var(--color-success)' : index === returnLocations.length - 1 ? 'var(--color-error)' : '#9ca3af'
-                                    }}>
-                                        {index === 0 || index === returnLocations.length - 1
-                                            ? <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></>
-                                            : <circle cx="12" cy="12" r="1.5"></circle>
-                                        }
-                                    </svg>
-                                    <input
-                                        type="text"
-                                        className="form-input location-input"
-                                        value={loc.address}
-                                        readOnly // Auto-filled from main trip
-                                        style={{ backgroundColor: '#f3f4f6' }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Repeat Trip */}
-            <div className="mt-2">
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                    <input type="checkbox" checked={isRepeat} onChange={(e) => setIsRepeat(e.target.checked)} />
-                    Repeat This Trip
-                </label>
-
-                {isRepeat && (
-                    <div className="form-group-box mt-2">
-                        <div className="grid grid-cols-2 gap-2">
-                            <select
-                                className="form-input"
-                                value={repeatFrequency}
-                                onChange={(e) => setRepeatFrequency(e.target.value as any)}
-                            >
-                                <option value="daily">Daily</option>
-                                <option value="weekly">Weekly</option>
-                                <option value="monthly">Monthly</option>
-                            </select>
-                            <select
-                                className="form-input"
-                                value={repeatEnds}
-                                onChange={(e) => setRepeatEnds(e.target.value as any)}
-                            >
-                                <option value="on_date">Ends on date</option>
-                                <option value="after_occurrences">Ends after...</option>
-                                <option value="never">Never ends</option>
-                            </select>
-                        </div>
-                        {repeatEnds === 'on_date' && (
-                            <div className="mt-2">
-                                <DateTimePicker value={repeatEndDate} onChange={setRepeatEndDate} placeholder="Select end date" showTimePicker={false} />
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
         </div>
     );
 };
 
 export default LocationStep;
+

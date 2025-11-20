@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { initialBookingRequest } from '../types/booking';
 import type { BookingRequest, Location, PassengerGroup, VehicleType, PaymentMethodType } from '../types/booking';
 
@@ -37,36 +37,32 @@ export const useBookingForm = () => {
 
     const setVehicleType = (type: VehicleType) => setBooking((prev: BookingRequest) => ({ ...prev, vehicleType: type }));
     const setPaymentMethod = (method: PaymentMethodType) => setBooking((prev: BookingRequest) => ({ ...prev, paymentMethod: method }));
+    const setAccountNumber = (val: string) => setBooking((prev: BookingRequest) => ({ ...prev, accountNumber: val }));
+    const setAuthCode = (val: string) => setBooking((prev: BookingRequest) => ({ ...prev, authCode: val }));
+    const setOrganizationName = (val: string) => setBooking((prev: BookingRequest) => ({ ...prev, organizationName: val }));
     const setNotes = (notes: string) => setBooking((prev: BookingRequest) => ({ ...prev, notes }));
 
     // Return Trip Logic
     const setIsReturnTrip = (isReturn: boolean) => {
         setBooking((prev: BookingRequest) => {
             let returnLocations = prev.returnLocations;
-            if (isReturn && returnLocations.length === 0) {
-                // Initialize return locations by reversing current locations
+            if (isReturn) {
+                // Always auto-reverse current locations when enabling return trip
                 returnLocations = [...prev.locations].reverse().map((loc, index) => ({
                     ...loc,
                     id: Math.random().toString(36).substr(2, 9),
-                    type: index === 0 ? 'pickup' : index === prev.locations.length - 1 ? 'dropoff' : 'stop'
+                    type: index === 0 ? 'pickup' : index === prev.locations.length - 1 ? 'dropoff' : 'stop',
+                    // Reset airport status for return trip locations unless we want to infer it (e.g. dropoff at airport = pickup from airport)
+                    // For now, let's keep it simple and just copy address.
+                    address: loc.address,
+                    isAirport: false // Reset airport flag for return trip to avoid auto-showing flight info incorrectly
                 }));
             }
             return { ...prev, isReturnTrip: isReturn, returnLocations };
         });
     };
-    const setReturnDateTime = (date: Date) => setBooking((prev: BookingRequest) => ({ ...prev, returnDateTime: date }));
+    const setReturnDateTime = (date: Date | null) => setBooking((prev: BookingRequest) => ({ ...prev, returnDateTime: date }));
     const setReturnLocations = (locations: Location[]) => setBooking((prev: BookingRequest) => ({ ...prev, returnLocations: locations }));
-
-    // Repeat Trip Logic
-    const setIsRepeat = (isRepeat: boolean) => setBooking((prev: BookingRequest) => ({ ...prev, isRepeat }));
-    const setRepeatFrequency = (freq: 'daily' | 'weekly' | 'monthly') => setBooking((prev: BookingRequest) => ({ ...prev, repeatFrequency: freq }));
-    const setRepeatEnds = (ends: 'on_date' | 'after_occurrences' | 'never') => setBooking((prev: BookingRequest) => ({ ...prev, repeatEnds: ends }));
-    const setRepeatEndDate = (date: Date) => setBooking((prev: BookingRequest) => ({ ...prev, repeatEndDate: date }));
-
-    // Airport Detection Logic - Placeholder
-    // In a real app, you'd check for 'airport' in the address string or use Google Places API types
-    // For now, we'll handle this in the component's onChange handler or let the user toggle it manually if needed
-
 
     const resetForm = () => setBooking(initialBookingRequest);
 
@@ -84,14 +80,13 @@ export const useBookingForm = () => {
         setBoosterSeats,
         setVehicleType,
         setPaymentMethod,
+        setAccountNumber,
+        setAuthCode,
+        setOrganizationName,
         setNotes,
         setIsReturnTrip,
         setReturnDateTime,
         setReturnLocations,
-        setIsRepeat,
-        setRepeatFrequency,
-        setRepeatEnds,
-        setRepeatEndDate,
         resetForm
     };
 };
