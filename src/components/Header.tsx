@@ -1,0 +1,158 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import '../styles/global.css';
+
+const Header: React.FC = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  return (
+    <header className="header">
+      <div className="container header-container">
+        <Link to="/" className="logo-container">
+          <div className="logo-title">CHESTERFIELD TAXI AND CAR SERVICE</div>
+          <div className="logo-subtitle">Chesterfield Car Service, LLC</div>
+        </Link>
+
+        <button className="mobile-menu-btn" onClick={toggleMenu} aria-label="Toggle menu">
+          <span className={`hamburger ${isMenuOpen ? 'open' : ''}`}></span>
+        </button>
+
+        <nav className={`nav-menu ${isMenuOpen ? 'open' : ''}`}>
+          <Link to="/" className="nav-link" onClick={() => setIsMenuOpen(false)}>Home</Link>
+          <Link to="/services" className="nav-link" onClick={() => setIsMenuOpen(false)}>Services</Link>
+          <Link to="/fleet" className="nav-link" onClick={() => setIsMenuOpen(false)}>Fleet</Link>
+          <Link to="/about" className="nav-link" onClick={() => setIsMenuOpen(false)}>About</Link>
+          <Link to="/careers" className="nav-link" onClick={() => setIsMenuOpen(false)}>Careers</Link>
+          <Link to="/contact" className="nav-link" onClick={() => setIsMenuOpen(false)}>Contact</Link>
+          <Link to="/reservations" className="btn btn-primary nav-cta" onClick={() => setIsMenuOpen(false)}>Book Now</Link>
+        </nav>
+      </div>
+      <style>{`
+        .header {
+          background-color: var(--color-background); /* White background for letterhead style */
+          color: var(--color-text);
+          padding: var(--spacing-md) 0;
+          position: sticky;
+          top: 0;
+          z-index: 1000;
+          box-shadow: var(--shadow-md);
+          border-bottom: 4px solid var(--color-primary); /* Divider line */
+        }
+
+        .header-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .logo-container {
+          display: flex;
+          flex-direction: column;
+          text-decoration: none;
+        }
+
+        .logo-title {
+          font-family: var(--font-family-sans); /* Inter */
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: var(--color-primary);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .logo-subtitle {
+          font-family: var(--font-family-sans);
+          font-size: 0.8rem;
+          color: var(--color-text);
+          font-weight: 400;
+        }
+
+        .nav-menu {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-lg);
+        }
+
+        .nav-link {
+          color: var(--color-text);
+          font-weight: 500;
+          transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+          color: var(--color-primary);
+        }
+
+        .mobile-menu-btn {
+          display: none;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: var(--spacing-xs);
+        }
+
+        .hamburger {
+          display: block;
+          width: 24px;
+          height: 2px;
+          background-color: var(--color-text);
+          position: relative;
+          transition: all 0.3s;
+        }
+
+        .hamburger::before,
+        .hamburger::after {
+          content: '';
+          position: absolute;
+          width: 24px;
+          height: 2px;
+          background-color: var(--color-text);
+          transition: all 0.3s;
+        }
+
+        .hamburger::before { top: -8px; }
+        .hamburger::after { top: 8px; }
+
+        @media (max-width: 768px) {
+          .mobile-menu-btn {
+            display: block;
+          }
+
+          .nav-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--color-background);
+            flex-direction: column;
+            padding: var(--spacing-lg);
+            gap: var(--spacing-md);
+            transform: translateY(-100%);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+            z-index: -1;
+            border-bottom: 1px solid var(--color-border);
+            box-shadow: var(--shadow-md);
+          }
+
+          .nav-menu.open {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+          }
+          
+          .hamburger.open { background-color: transparent; }
+          .hamburger.open::before { transform: rotate(45deg); top: 0; }
+          .hamburger.open::after { transform: rotate(-45deg); top: 0; }
+        }
+      `}</style>
+    </header>
+  );
+};
+
+export default Header;

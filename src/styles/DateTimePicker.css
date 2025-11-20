@@ -1,0 +1,145 @@
+/* DateTimePicker.css */
+.dtp-container {
+    position: absolute;
+    z-index: 50;
+    background-color: white;
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-md);
+    font-family: var(--font-family-sans);
+    width: 340px;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    display: none;
+}
+
+.dtp-container.visible {
+    display: block;
+}
+
+.dtp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--spacing-sm);
+}
+
+.dtp-nav-button {
+    padding: var(--spacing-sm);
+    border-radius: 50%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text);
+}
+
+.dtp-nav-button:hover {
+    background-color: var(--color-background-alt);
+}
+
+.dtp-month-year {
+    font-weight: 600;
+    font-size: 1.125rem;
+    text-align: center;
+}
+
+.dtp-datepicker-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0;
+}
+
+.dtp-datepicker-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 38px;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 0.9rem;
+}
+
+.dtp-datepicker-cell:not(.disabled):not(.selected):hover {
+    background-color: var(--color-background-alt);
+}
+
+.dtp-datepicker-cell.day-name {
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: #64748b;
+    cursor: default;
+}
+
+.dtp-datepicker-cell.selected {
+    background-color: var(--color-primary);
+    color: white;
+    font-weight: 500;
+}
+
+.dtp-datepicker-cell.today {
+    border: 1px solid var(--color-primary);
+}
+
+.dtp-time-footer {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--color-border);
+}
+
+.dtp-time-select-group {
+    display: flex;
+    align-items: center;
+    column-gap: 0.25rem;
+}
+
+.dtp-time-select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: white;
+    font-size: 0.875rem;
+}
+
+.dtp-ampm-toggle {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: white;
+    cursor: pointer;
+    font-weight: 500;
+    width: 50px;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.dtp-apply-button {
+    background-color: var(--color-primary);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+.dtp-apply-button:hover {
+    background-color: var(--color-primary-dark);
+}
+
+.dtp-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.dtp-input {
+    width: 100%;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background-color: white;
+    font-family: inherit;
+}
