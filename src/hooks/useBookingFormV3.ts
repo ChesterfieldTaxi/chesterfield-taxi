@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { BookingDetails } from '../types/pricing';
 import { usePricingRules } from './usePricingRules';
 import { calculateFare } from '../utils/pricingEngine';
@@ -8,8 +8,17 @@ export interface Location {
     address: string;
     type: 'pickup' | 'dropoff' | 'stop';
     isAirport: boolean;
+    isValidated: boolean; // true when selected from autocomplete (admin or Google)
+    name?: string; // Display name for named locations (e.g. "Lambert Airport")
+
+    // Admin location data
+    adminLocationId?: string; // set when selected from admin locations
+
+    // Google Places data
     placeId?: string;
     coordinates?: { lat: number; lng: number };
+
+    // Flight info (for airports)
     flightDetails?: {
         airline: string;
         flightNumber: string;
@@ -93,6 +102,48 @@ export function useBookingFormV3() {
         email: ''
     });
 
+    // Auto-populate return trip locations when enabled (reverse of main trip)
+    useEffect(() => {
+        if (state.isReturnTrip && state.pickup && state.dropoff) {
+            // Only auto-populate if return locations are not manually set
+            const hasManualReturn = state.returnPickup?.isValidated && state.returnDropoff?.isValidated;
+
+            if (!hasManualReturn) {
+                setState(prev => {
+                    // Swap pickup/dropoff for return trip and clear flight details
+                    const newReturnPickup: Location = {
+                        ...prev.dropoff!,
+                        id: 'return-pickup',
+                        type: 'pickup',
+                        flightDetails: undefined // Clear flight info for user to re-enter
+                    };
+
+                    const newReturnDropoff: Location = {
+                        ...prev.pickup!,
+                        id: 'return-dropoff',
+                        type: 'dropoff',
+                        flightDetails: undefined // Clear flight info for user to re-enter
+                    };
+
+                    return {
+                        ...prev,
+                        returnPickup: newReturnPickup,
+                        returnDropoff: newReturnDropoff
+                    };
+                });
+            }
+        } else if (!state.isReturnTrip) {
+            // Clear return locations when return trip is disabled
+            setState(prev => ({
+                ...prev,
+                returnPickup: null,
+                returnDropoff: null,
+                returnDateTime: null
+            }));
+        }
+    }, [state.isReturnTrip, state.pickup?.address, state.dropoff?.address]);
+
+
     // Auto-select Minivan if car seats are selected
     const effectiveVehicleType = useMemo(() => {
         const totalCarSeats = state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster;
@@ -130,12 +181,12 @@ export function useBookingFormV3() {
 
     const setPickup = (location: Location | null) => setState(prev => ({
         ...prev,
-        pickup: location ? { ...location, isAirport: detectAirport(location.address) } : null
+        pickup: location ? { ...location, isAirport: location.isAirport ?? detectAirport(location.address) } : null
     }));
 
     const setDropoff = (location: Location | null) => setState(prev => ({
         ...prev,
-        dropoff: location ? { ...location, isAirport: detectAirport(location.address) } : null
+        dropoff: location ? { ...location, isAirport: location.isAirport ?? detectAirport(location.address) } : null
     }));
     const setStops = (stops: Location[]) => setState(prev => ({ ...prev, stops }));
     const setDistance = (yards: number) => setState(prev => ({ ...prev, distanceInYards: yards }));
@@ -149,7 +200,8 @@ export function useBookingFormV3() {
                     id: Math.random().toString(36).substr(2, 9),
                     address: '',
                     type: 'stop',
-                    isAirport: false
+                    isAirport: false,
+                    isValidated: false // Manual entry, not validated yet
                 }
             ]
         }));
@@ -190,8 +242,8 @@ export function useBookingFormV3() {
         setState(prev => {
             // Create a combined array of all locations
             // We ensure pickup and dropoff exist or create placeholders if they don't (though they should in this flow)
-            const pickup = prev.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false };
-            const dropoff = prev.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false };
+            const pickup = prev.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false, isValidated: false };
+            const dropoff = prev.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false, isValidated: false };
 
             const allLocations = [pickup, ...prev.stops, dropoff];
 

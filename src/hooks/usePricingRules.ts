@@ -31,3 +31,20 @@ export function usePricingRules(useMock = true) {
 
     return { rules, loading, error };
 }
+
+/**
+ * Get vehicle configuration from pricing rules
+ * Returns vehicle types with their passenger counts and additional fees
+ */
+export function getVehicleConfig(rules: PricingRules | null) {
+    if (!rules) return null;
+
+    return Object.entries(rules.vehicleModifiers)
+        .filter(([_, config]) => config.enabled)
+        .map(([id, config]) => ({
+            id: id as 'Sedan' | 'SUV' | 'Minivan' | 'Any',
+            name: config.name,
+            maxPassengers: config.maxPassengers,
+            additionalFee: config.modifier.amount
+        }));
+}

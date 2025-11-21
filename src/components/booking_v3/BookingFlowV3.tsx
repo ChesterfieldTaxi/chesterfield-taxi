@@ -7,18 +7,19 @@ import { VehicleSelectorV3 } from './VehicleSelectorV3';
 import { SpecialRequestsV3 } from './SpecialRequestsV3';
 import { ReturnTripV3 } from './ReturnTripV3';
 import { ContactPaymentV3 } from './ContactPaymentV3';
+import { FlightInfoV3 } from './FlightInfoV3';
 
 /**
  * Section Wrapper with light gray background
  */
-const SectionWrapper: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
     <section style={{ marginBottom: '1rem' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
             {title}
         </h2>
         <div style={{
             backgroundColor: '#f9fafb',
-            padding: '1rem',
+            padding: '0.75rem',
             borderRadius: '8px',
             border: '1px solid #e5e7eb'
         }}>
@@ -46,7 +47,6 @@ export const BookingFlowV3: React.FC = () => {
         setGateCode,
         setIsReturnTrip,
         setReturnDateTime,
-        setReturnRouteType,
         setReturnPickup,
         setReturnDropoff,
         setReturnFlightDetails,
@@ -64,81 +64,6 @@ export const BookingFlowV3: React.FC = () => {
         setDropoff,
         setFlightDetails
     } = useBookingFormV3();
-
-    // Helper for Flight Info UI
-    const FlightInfoSection = ({
-        details,
-        onChange
-    }: {
-        details?: { airline: string; flightNumber: string; origin?: string },
-        onChange: (details: { airline: string; flightNumber: string; origin?: string }) => void
-    }) => (
-        <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            backgroundColor: '#eff6ff', // blue-50
-            borderRadius: '8px',
-            border: '1px solid #bfdbfe' // blue-200
-        }}>
-            <h4 style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#1e40af', // blue-800
-                marginBottom: '0.75rem',
-                marginTop: 0
-            }}>
-                Flight Info (Pickup)
-            </h4>
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: '0.75rem'
-            }}>
-                <input
-                    type="text"
-                    value={details?.airline || ''}
-                    onChange={(e) => onChange({ ...details, airline: e.target.value, flightNumber: details?.flightNumber || '', origin: details?.origin || '' })}
-                    placeholder="Airline"
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '16px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        outline: 'none'
-                    }}
-                />
-                <input
-                    type="text"
-                    value={details?.flightNumber || ''}
-                    onChange={(e) => onChange({ ...details, airline: details?.airline || '', flightNumber: e.target.value, origin: details?.origin || '' })}
-                    placeholder="Flight #"
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '16px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        outline: 'none'
-                    }}
-                />
-                <input
-                    type="text"
-                    value={details?.origin || ''}
-                    onChange={(e) => onChange({ ...details, airline: details?.airline || '', flightNumber: details?.flightNumber || '', origin: e.target.value })}
-                    placeholder="Origin"
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '16px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        outline: 'none'
-                    }}
-                />
-            </div>
-        </div>
-    );
 
     // TODO: Calculate prices for each vehicle type
     const vehiclePrices = fareBreakdown ? {
@@ -165,7 +90,12 @@ export const BookingFlowV3: React.FC = () => {
                 </p>
 
                 {/* Step 1: Time */}
-                <SectionWrapper title="When do you need a ride?">
+                <SectionWrapper title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Pickup Time
+                        {(state.isNow || state.pickupDateTime) && <span style={{ color: '#059669' }}>✅</span>}
+                    </div>
+                }>
                     <TimeSelectorV3
                         isNow={state.isNow}
                         pickupDateTime={state.pickupDateTime}
@@ -175,11 +105,16 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 2: Locations */}
-                <SectionWrapper title="Where are you going?">
+                <SectionWrapper title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Trip Details
+                        {state.pickup?.isValidated && state.dropoff?.isValidated && state.stops.every(stop => stop.isValidated) && <span style={{ color: '#059669' }}>✅</span>}
+                    </div>
+                }>
                     {/* Locations Grid */}
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: '40px 1fr 40px',
+                        gridTemplateColumns: '28px 1fr 28px',
                         gap: '0.5rem',
                         alignItems: 'center',
                         marginBottom: '0.75rem'
@@ -224,11 +159,18 @@ export const BookingFlowV3: React.FC = () => {
                                 {/* Pickup Input */}
                                 <div style={{ gridColumn: '2' }}>
                                     <LocationInputV3
-                                        value={state.pickup?.address || ''}
-                                        onChange={(val) => setPickup({ ...state.pickup, address: val, type: 'pickup', isAirport: false, id: state.pickup?.id || 'pickup' })}
+                                        value={state.pickup?.name || state.pickup?.address || ''}
+                                        onChange={(locationUpdate) => setPickup({
+                                            ...state.pickup,
+                                            ...locationUpdate,
+                                            type: 'pickup',
+                                            id: state.pickup?.id || 'pickup',
+                                            address: locationUpdate.address || state.pickup?.address || '',
+                                            isAirport: locationUpdate.isAirport ?? state.pickup?.isAirport ?? false,
+                                            isValidated: locationUpdate.isValidated ?? false
+                                        })}
                                         placeholder="Pickup location"
                                         type="pickup"
-                                        isAirport={state.pickup?.isAirport}
                                     />
                                 </div>
                                 <div style={{ gridColumn: '3' }}></div>
@@ -236,11 +178,18 @@ export const BookingFlowV3: React.FC = () => {
                                 {/* Dropoff Input */}
                                 <div style={{ gridColumn: '2' }}>
                                     <LocationInputV3
-                                        value={state.dropoff?.address || ''}
-                                        onChange={(val) => setDropoff({ ...state.dropoff, address: val, type: 'dropoff', isAirport: false, id: state.dropoff?.id || 'dropoff' })}
+                                        value={state.dropoff?.name || state.dropoff?.address || ''}
+                                        onChange={(locationUpdate) => setDropoff({
+                                            ...state.dropoff,
+                                            ...locationUpdate,
+                                            type: 'dropoff',
+                                            id: state.dropoff?.id || 'dropoff',
+                                            address: locationUpdate.address || state.dropoff?.address || '',
+                                            isAirport: locationUpdate.isAirport ?? state.dropoff?.isAirport ?? false,
+                                            isValidated: locationUpdate.isValidated ?? false
+                                        })}
                                         placeholder="Dropoff location"
                                         type="dropoff"
-                                        isAirport={state.dropoff?.isAirport}
                                     />
                                 </div>
                                 <div style={{ gridColumn: '3' }}></div>
@@ -249,9 +198,9 @@ export const BookingFlowV3: React.FC = () => {
                             /* Multi-stop Case */
                             <>
                                 {[
-                                    { ...state.pickup, _type: 'pickup' as const, _index: 0 },
+                                    { ...(state.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false, isValidated: false }), _type: 'pickup' as const, _index: 0 },
                                     ...state.stops.map((s, i) => ({ ...s, _type: 'stop' as const, _index: i + 1 })),
-                                    { ...state.dropoff, _type: 'dropoff' as const, _index: state.stops.length + 1 }
+                                    { ...(state.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false, isValidated: false }), _type: 'dropoff' as const, _index: state.stops.length + 1 }
                                 ].map((location, index, array) => {
                                     const isFirst = index === 0;
                                     const isLast = index === array.length - 1;
@@ -299,19 +248,34 @@ export const BookingFlowV3: React.FC = () => {
                                             {/* Col 2: Input */}
                                             <div>
                                                 <LocationInputV3
-                                                    value={location.address || ''}
-                                                    onChange={(val) => {
+                                                    value={location.name || location.address || ''}
+                                                    onChange={(locationUpdate) => {
                                                         if (location._type === 'pickup') {
-                                                            setPickup({ ...state.pickup, address: val, type: 'pickup', isAirport: false, id: state.pickup?.id || 'pickup' });
+                                                            setPickup({
+                                                                ...state.pickup,
+                                                                ...locationUpdate,
+                                                                type: 'pickup',
+                                                                id: state.pickup?.id || 'pickup',
+                                                                address: locationUpdate.address || state.pickup?.address || '',
+                                                                isAirport: locationUpdate.isAirport ?? state.pickup?.isAirport ?? false,
+                                                                isValidated: locationUpdate.isValidated ?? false
+                                                            });
                                                         } else if (location._type === 'dropoff') {
-                                                            setDropoff({ ...state.dropoff, address: val, type: 'dropoff', isAirport: false, id: state.dropoff?.id || 'dropoff' });
+                                                            setDropoff({
+                                                                ...state.dropoff,
+                                                                ...locationUpdate,
+                                                                type: 'dropoff',
+                                                                id: state.dropoff?.id || 'dropoff',
+                                                                address: locationUpdate.address || state.dropoff?.address || '',
+                                                                isAirport: locationUpdate.isAirport ?? state.dropoff?.isAirport ?? false,
+                                                                isValidated: locationUpdate.isValidated ?? false
+                                                            });
                                                         } else {
-                                                            updateStop(location.id, { address: val });
+                                                            updateStop(location.id, locationUpdate);
                                                         }
                                                     }}
                                                     placeholder={isFirst ? "Pickup location" : isLast ? "Dropoff location" : "Stop location"}
                                                     type={visualType}
-                                                    isAirport={location.isAirport}
                                                 />
                                             </div>
 
@@ -371,17 +335,30 @@ export const BookingFlowV3: React.FC = () => {
                         Add Stop
                     </button>
 
-                    {/* Flight Info - Only for Pickup if Airport */}
+                    {/* Flight Info - For Pickup if Airport */}
                     {state.pickup?.isAirport && (
-                        <FlightInfoSection
+                        <FlightInfoV3
                             details={state.pickup.flightDetails}
                             onChange={(d) => setFlightDetails('pickup', d)}
+                        />
+                    )}
+
+                    {/* Flight Info - For Dropoff if Airport */}
+                    {state.dropoff?.isAirport && (
+                        <FlightInfoV3
+                            details={state.dropoff.flightDetails}
+                            onChange={(d) => setFlightDetails('dropoff', d)}
                         />
                     )}
                 </SectionWrapper>
 
                 {/* Step 3: Passengers & Luggage */}
-                <SectionWrapper title="Passengers & Luggage">
+                <SectionWrapper title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Passengers & Luggage
+                        <span style={{ color: '#059669' }}>✅</span>
+                    </div>
+                }>
                     <PassengerCounterV3
                         passengerCount={state.passengerCount}
                         luggageCount={state.luggageCount}
@@ -393,7 +370,12 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 4: Vehicle */}
-                <SectionWrapper title="Choose Your Vehicle">
+                <SectionWrapper title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Vehicle Preference (Optional)
+                        {state.vehicleType !== 'Any' && <span style={{ color: '#059669' }}>✅</span>}
+                    </div>
+                }>
                     <VehicleSelectorV3
                         selectedVehicle={state.vehicleType}
                         onSelect={setVehicleType}
@@ -430,17 +412,13 @@ export const BookingFlowV3: React.FC = () => {
                     <ReturnTripV3
                         isReturnTrip={state.isReturnTrip}
                         returnDateTime={state.returnDateTime}
-                        returnRouteType={state.returnRouteType}
                         returnPickup={state.returnPickup}
                         returnDropoff={state.returnDropoff}
                         onIsReturnTripChange={setIsReturnTrip}
                         onReturnDateTimeChange={setReturnDateTime}
-                        onReturnRouteTypeChange={setReturnRouteType}
                         onReturnPickupChange={setReturnPickup}
                         onReturnDropoffChange={setReturnDropoff}
                         onReturnFlightDetailsChange={setReturnFlightDetails}
-                        pickupLocation={state.pickup?.address || ''}
-                        dropoffLocation={state.dropoff?.address || ''}
                         isRouteComplete={!!(state.pickup?.address && state.dropoff?.address)}
                     />
                 </SectionWrapper>

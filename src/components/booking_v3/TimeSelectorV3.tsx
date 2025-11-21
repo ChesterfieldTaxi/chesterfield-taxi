@@ -3,7 +3,7 @@ import DateTimePicker from '../booking/DateTimePicker';
 
 interface TimeSelectorV3Props {
     isNow: boolean;
-    pickupDateTime: Date;
+    pickupDateTime: Date | null;
     onIsNowChange: (isNow: boolean) => void;
     onDateTimeChange: (date: Date) => void;
 }
@@ -50,8 +50,8 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
                         padding: '0.5rem 1.25rem',
                         border: 'none',
                         borderRadius: '4px',
-                        backgroundColor: !isNow ? 'white' : 'transparent',
-                        color: !isNow ? '#111827' : '#6b7280',
+                        backgroundColor: !isNow ? '#2563eb' : 'transparent',
+                        color: !isNow ? 'white' : '#6b7280',
                         fontWeight: 600,
                         fontSize: '16px',
                         cursor: 'pointer',
@@ -62,6 +62,16 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
                     Schedule
                 </button>
             </div>
+
+            {/* ASAP Feedback */}
+            {isNow && (
+                <div style={{ fontSize: '13px', color: '#059669', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Pickup in ~15-20 mins
+                </div>
+            )}
 
             {/* DateTime Picker - inline when Schedule is selected */}
             {!isNow && (

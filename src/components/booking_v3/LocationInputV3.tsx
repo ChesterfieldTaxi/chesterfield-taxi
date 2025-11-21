@@ -1,24 +1,23 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { useGooglePlacesAutocomplete, type PlaceResult } from '../../hooks/useGooglePlacesAutocomplete';
-import { STL_LANDMARKS } from '../../data/stlLandmarks';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AutocompleteDropdown } from './AutocompleteDropdown';
+import { searchAdminLocations, type AdminLocation } from '../../config/adminLocations';
+import { useGooglePlaces } from '../../hooks/useGooglePlaces';
+import type { Location } from '../../hooks/useBookingFormV3';
 
 interface LocationInputV3Props {
     value: string;
-    onChange: (value: string, placeData?: Partial<PlaceResult>) => void;
+    onChange: (location: Partial<Location>) => void;
     placeholder: string;
     type: 'pickup' | 'dropoff' | 'stop';
     showDragHandle?: boolean;
     onRemove?: () => void;
-    // Flight info props are no longer used for rendering inside, but kept for interface compatibility if needed upstream, 
-    // though we should probably remove them if they are truly unused. 
-    // For now, I'll keep them optional but unused to avoid breaking parent usage immediately.
     isAirport?: boolean;
-    flightDetails?: { airline: string; flightNumber: string; origin?: string };
-    onFlightDetailsChange?: (details: { airline: string; flightNumber: string; origin?: string }) => void;
+    disabled?: boolean;
 }
 
 /**
- * Clean professional location input matching V2 design with focus-within styling
+ * Location input with hybrid autocomplete (admin locations + Google Places)
+ * Replaces old implementation with new validated location approach
  */
 export const LocationInputV3: React.FC<LocationInputV3Props> = ({
     value,
@@ -26,51 +25,83 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
     placeholder,
     type,
     showDragHandle = false,
-    onRemove
+    onRemove,
+    disabled = false
 }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-    const [showLandmarks, setShowLandmarks] = useState(false);
-    const [filteredLandmarks, setFilteredLandmarks] = useState<typeof STL_LANDMARKS>([]);
+    const [inputValue, setInputValue] = useState(value);
+    const [isOpen, setIsOpen] = useState(false);
+    const { predictions, loading, searchPlaces, getPlaceDetails } = useGooglePlaces();
 
-    // Filter landmarks based on input value
+    // Sync inputValue with value prop
     useEffect(() => {
-        if (!value || value.length < 2) {
-            // Show airports when no input
-            setFilteredLandmarks(STL_LANDMARKS.filter(l => l.isAirport));
-        } else {
-            const lower = value.toLowerCase();
-            setFilteredLandmarks(
-                STL_LANDMARKS.filter(landmark =>
-                    landmark.shortName.toLowerCase().includes(lower) ||
-                    landmark.name.toLowerCase().includes(lower)
-                )
-            );
-        }
+        setInputValue(value);
     }, [value]);
 
-    const handlePlaceSelected = useCallback((place: PlaceResult) => {
-        setShowLandmarks(false);
-        onChange(place.address, {
-            coordinates: place.coordinates,
-            placeId: place.placeId,
-            isAirport: place.isAirport
-        });
-    }, [onChange]);
+    // Search admin locations
+    const adminResults = useMemo(() => {
+        return searchAdminLocations(inputValue);
+    }, [inputValue]);
 
-    const handleLandmarkClick = (landmark: typeof STL_LANDMARKS[0]) => {
-        setShowLandmarks(false);
-        onChange(landmark.shortName, {
-            coordinates: landmark.coordinates,
-            placeId: landmark.placeId,
-            isAirport: landmark.isAirport
+    // Trigger Google Places search
+    useEffect(() => {
+        if (inputValue && inputValue.length >= 3 && !disabled) {
+            searchPlaces(inputValue);
+        }
+    }, [inputValue, searchPlaces, disabled]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setInputValue(val);
+        if (!disabled) {
+            setIsOpen(true);
+
+            // Mark as unvalidated while typing
+            onChange({
+                address: val,
+                name: undefined, // Clear display name when typing manually
+                isValidated: false
+            });
+        }
+    };
+
+    const handleSelectAdmin = (adminLoc: AdminLocation) => {
+        setInputValue(adminLoc.name);
+        setIsOpen(false);
+
+        onChange({
+            address: adminLoc.address,
+            name: adminLoc.name, // Set display name
+            type,
+            isAirport: adminLoc.type === 'airport',
+            isValidated: true,
+            adminLocationId: adminLoc.id,
+            coordinates: adminLoc.coordinates
         });
     };
 
-    useGooglePlacesAutocomplete({
-        inputRef,
-        onPlaceSelected: handlePlaceSelected,
-        enabled: !showLandmarks // Disable Google Places when showing custom landmarks
-    });
+    const handleSelectGoogle = async (prediction: any) => {
+        // Show full description immediately
+        setInputValue(prediction.description);
+        setIsOpen(false);
+
+        // Fetch details for coordinates and types
+        const details = await getPlaceDetails(prediction.place_id);
+
+        // Check for airport type
+        const isAirportType = details?.types?.includes('airport');
+        const isAirportString = prediction.description.toLowerCase().includes('airport');
+        const isAirport = isAirportType || isAirportString;
+
+        onChange({
+            address: prediction.description, // FULL address
+            name: prediction.structured_formatting.main_text, // Set display name (e.g. "Eiffel Tower")
+            type,
+            isAirport,
+            isValidated: true,
+            placeId: prediction.place_id,
+            coordinates: details?.coordinates
+        });
+    };
 
     const getIcon = () => {
         switch (type) {
@@ -119,7 +150,7 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                     </div>
                 )}
 
-                {/* Input with Icon - flatter, more compact design */}
+                {/* Input with Icon */}
                 <div
                     style={{
                         flex: 1,
@@ -128,12 +159,13 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         alignItems: 'center',
                         border: '1px solid #d1d5db',
                         borderRadius: '4px',
-                        backgroundColor: 'white',
+                        backgroundColor: disabled ? '#f3f4f6' : 'white',
                         padding: '0.625rem 0.75rem',
-                        transition: 'border-color 0.2s'
+                        transition: 'border-color 0.2s',
+                        cursor: disabled ? 'not-allowed' : 'text'
                     }}
                     onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6';
+                        if (!disabled) e.currentTarget.style.borderColor = '#3b82f6';
                     }}
                     onBlur={(e) => {
                         e.currentTarget.style.borderColor = '#d1d5db';
@@ -143,22 +175,68 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         {getIcon()}
                     </div>
                     <input
-                        ref={inputRef}
                         type="text"
-                        value={value}
-                        onChange={(e) => onChange(e.target.value)}
-                        onFocus={() => setShowLandmarks(true)}
-                        onBlur={() => setTimeout(() => setShowLandmarks(false), 200)} // Delay to allow click
+                        value={inputValue}
+                        onChange={handleInputChange}
+                        onFocus={() => !disabled && setIsOpen(true)}
+                        onBlur={() => setTimeout(() => setIsOpen(false), 200)} // Delay to allow click
                         placeholder={placeholder}
+                        disabled={disabled}
                         style={{
                             flex: 1,
                             border: 'none',
                             outline: 'none',
                             fontSize: '16px',
                             padding: 0,
+                            paddingRight: inputValue ? '24px' : 0, // Space for clear button
                             backgroundColor: 'transparent',
-                            boxShadow: 'none'
+                            boxShadow: 'none',
+                            cursor: disabled ? 'not-allowed' : 'text'
                         }}
+                    />
+
+                    {/* Clear Button */}
+                    {inputValue && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setInputValue('');
+                                onChange({
+                                    address: '',
+                                    isValidated: false
+                                });
+                            }}
+                            style={{
+                                position: 'absolute',
+                                right: '8px',
+                                padding: '2px',
+                                border: 'none',
+                                background: 'none',
+                                cursor: 'pointer',
+                                color: '#9ca3af',
+                                display: 'flex',
+                                alignItems: 'center',
+                                transition: 'color 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#6b7280'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* Autocomplete Dropdown */}
+                    <AutocompleteDropdown
+                        adminResults={adminResults}
+                        googleResults={predictions}
+                        onSelectAdmin={handleSelectAdmin}
+                        onSelectGoogle={handleSelectGoogle}
+                        isOpen={isOpen}
+                        loading={loading}
                     />
                 </div>
 
@@ -184,55 +262,6 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                     </button>
                 )}
             </div>
-
-            {/* Custom Landmarks Dropdown */}
-            {showLandmarks && filteredLandmarks.length > 0 && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    backgroundColor: 'white',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    marginTop: '4px',
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    zIndex: 1000
-                }}>
-                    {filteredLandmarks.map((landmark, index) => (
-                        <div
-                            key={index}
-                            onClick={() => handleLandmarkClick(landmark)}
-                            style={{
-                                padding: '0.5rem 0.75rem',
-                                cursor: 'pointer',
-                                borderBottom: index < filteredLandmarks.length - 1 ? '1px solid #f3f4f6' : 'none',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                fontSize: '16px',
-                                transition: 'background-color 0.15s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                        >
-                            {landmark.isAirport ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                    <circle cx="12" cy="10" r="3"></circle>
-                                </svg>
-                            ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="#9ca3af">
-                                    <circle cx="12" cy="12" r="8"></circle>
-                                </svg>
-                            )}
-                            <span>{landmark.shortName}</span>
-                        </div>
-                    ))}
-                </div>
-            )}
         </div>
     );
 };

@@ -17,10 +17,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
     const [selectedDate, setSelectedDate] = useState<Date | null>(value);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Time state
-    const [hour, setHour] = useState(12);
-    const [minute, setMinute] = useState(0);
-    const [ampm, setAmpm] = useState<'AM' | 'PM'>('AM');
+    // Time state - no defaults, must be explicitly selected
+    const [hour, setHour] = useState<number | null>(null);
+    const [minute, setMinute] = useState<number | null>(null);
+    const [ampm, setAmpm] = useState<'AM' | 'PM' | null>(null);
 
     useEffect(() => {
         if (value) {
@@ -49,8 +49,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
 
     const handleDateClick = (date: Date) => {
         const newDate = new Date(date);
-        // Preserve time if already selected
-        if (showTimePicker) {
+        // Don't auto-populate time - let user explicitly select it
+        // Only preserve time if already selected
+        if (showTimePicker && hour !== null && minute !== null && ampm !== null) {
             let h = hour;
             if (ampm === 'PM' && h < 12) h += 12;
             if (ampm === 'AM' && h === 12) h = 0;
@@ -64,15 +65,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
     };
 
     const handleApply = () => {
-        if (selectedDate) {
+        if (selectedDate && hour !== null && minute !== null && ampm !== null) {
             const finalDate = new Date(selectedDate);
             let h = hour;
             if (ampm === 'PM' && h < 12) h += 12;
             if (ampm === 'AM' && h === 12) h = 0;
             finalDate.setHours(h, minute);
             onChange(finalDate);
+            setIsVisible(false);
         }
-        setIsVisible(false);
     };
 
     const navigateMonth = (direction: number) => {
@@ -116,8 +117,18 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
 
     const formatDisplayDate = (date: Date | null) => {
         if (!date) return '';
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        // Format as: Friday, Nov 21, 2025 at 9:35 AM
+        const options: Intl.DateTimeFormatOptions = {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        };
+        const dateStr = date.toLocaleDateString('en-US', options);
+
         if (!showTimePicker) return dateStr;
+
         const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         return `${dateStr} at ${timeStr}`;
     };
@@ -154,9 +165,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                         <div className="dtp-time-select-group">
                             <select
                                 className="dtp-time-select"
-                                value={hour}
-                                onChange={(e) => setHour(Number(e.target.value))}
+                                value={hour ?? ''}
+                                onChange={(e) => {
+                                    setHour(Number(e.target.value));
+                                    // Initialize minute and ampm with defaults if not set
+                                    if (minute === null) setMinute(0);
+                                    if (ampm === null) setAmpm('AM');
+                                }}
                             >
+                                <option value="" disabled>HH</option>
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
                                     <option key={h} value={h}>{h}</option>
                                 ))}
@@ -164,18 +181,30 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                             <span>:</span>
                             <select
                                 className="dtp-time-select"
-                                value={minute}
-                                onChange={(e) => setMinute(Number(e.target.value))}
+                                value={minute ?? ''}
+                                onChange={(e) => {
+                                    setMinute(Number(e.target.value));
+                                    // Initialize hour and ampm with defaults if not set
+                                    if (hour === null) setHour(12);
+                                    if (ampm === null) setAmpm('AM');
+                                }}
                             >
+                                <option value="" disabled>MM</option>
                                 {Array.from({ length: 12 }, (_, i) => i * 5).map(m => (
                                     <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
                                 ))}
                             </select>
                             <button
                                 className="dtp-ampm-toggle"
-                                onClick={() => setAmpm(ampm === 'AM' ? 'PM' : 'AM')}
+                                onClick={() => {
+                                    const newAmpm = ampm === 'AM' ? 'PM' : ampm === 'PM' ? 'AM' : 'AM';
+                                    setAmpm(newAmpm);
+                                    // Initialize hour and minute with defaults if not set
+                                    if (hour === null) setHour(12);
+                                    if (minute === null) setMinute(0);
+                                }}
                             >
-                                {ampm}
+                                {ampm ?? 'AM'}
                             </button>
                         </div>
                         <button className="dtp-apply-button" onClick={handleApply}>Apply</button>

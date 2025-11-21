@@ -64,7 +64,7 @@
         "Sedan": {
             "name": "Sedan",
             "enabled": true,
-            "maxPassengers": 4,
+            "maxPassengers": 3,
             "modifier": {
                 "type": "fixed",
                 "amount": 0
@@ -73,7 +73,7 @@
         "SUV": {
             "name": "SUV",
             "enabled": true,
-            "maxPassengers": 4,
+            "maxPassengers": 5,
             "modifier": {
                 "type": "fixed",
                 "amount": 10
@@ -82,7 +82,7 @@
         "Minivan": {
             "name": "Minivan",
             "enabled": true,
-            "maxPassengers": 6,
+            "maxPassengers": 4,
             "modifier": {
                 "type": "fixed",
                 "amount": 10

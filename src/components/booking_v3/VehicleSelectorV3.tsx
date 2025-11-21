@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePricingRules, getVehicleConfig } from '../../hooks/usePricingRules';
 
 interface VehicleSelectorV3Props {
     selectedVehicle: 'Sedan' | 'SUV' | 'Minivan' | 'Any';
@@ -13,7 +14,7 @@ interface VehicleSelectorV3Props {
 }
 
 /**
- * Vehicle selector with live pricing - Professional minimal design
+ * Vehicle selector with modern card design and icons
  */
 export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     selectedVehicle,
@@ -21,36 +22,20 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     disabled = false,
     prices
 }) => {
-    // Reordered with "Any" first (top-left position)
-    const vehicles = [
-        {
-            id: 'Any' as const,
-            name: 'Any Available',
-            passengers: '1-4',
-            description: 'Best price, fastest pickup'
-        },
-        {
-            id: 'Sedan' as const,
-            name: 'Sedan',
-            passengers: '1-4',
-            description: 'Perfect for individuals or small groups'
-        },
-        {
-            id: 'SUV' as const,
-            name: 'SUV',
-            passengers: '1-4',
-            description: 'Spacious and comfortable ride'
-        },
-        {
-            id: 'Minivan' as const,
-            name: 'Minivan',
-            passengers: '1-6',
-            description: 'Great for larger groups and families'
-        }
-    ];
+    const { rules } = usePricingRules();
+    const vehicleConfig = getVehicleConfig(rules);
+
+    // Filter out 'Any' and only show selectable vehicles
+    const vehicles = (vehicleConfig || []).filter(v => v.id !== 'Any').map(v => ({
+        id: v.id,
+        name: v.name,
+        passengers: `1-${v.maxPassengers}`,
+        additionalFee: v.additionalFee,
+        icon: <img src={`/vehicles/${v.id.toLowerCase()}.png`} alt={v.name} style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
+    }));
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
             {vehicles.map(vehicle => {
                 const isSelected = selectedVehicle === vehicle.id;
                 const price = prices?.[vehicle.id];
@@ -59,64 +44,83 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                     <button
                         key={vehicle.id}
                         type="button"
-                        onClick={() => onSelect(vehicle.id)}
+                        onClick={() => onSelect(isSelected ? 'Any' : vehicle.id)}
                         disabled={disabled}
+                        className="vehicle-card"
                         style={{
-                            padding: '1.25rem',
-                            border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`,
-                            borderRadius: '8px',
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            padding: '1rem',
+                            border: isSelected ? '2px solid #2563eb' : '2px solid transparent',
+                            borderRadius: '12px',
                             backgroundColor: isSelected ? '#eff6ff' : 'white',
                             cursor: disabled ? 'not-allowed' : 'pointer',
                             textAlign: 'left',
-                            transition: 'all 0.2s',
-                            opacity: disabled ? 0.6 : 1
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            boxShadow: isSelected ? '0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06)' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                            opacity: disabled ? 0.6 : 1,
+                            minHeight: '140px'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!disabled && !isSelected) {
+                                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!disabled && !isSelected) {
+                                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
+                            }
                         }}
                     >
-                        {/* Vehicle Name */}
+                        {/* Icon */}
                         <div style={{
-                            fontWeight: 600,
-                            fontSize: '16px',
-                            marginBottom: '0.375rem',
-                            color: isSelected ? '#2563eb' : '#111827'
-                        }}>
-                            {vehicle.name}
-                        </div>
-
-                        {/* Capacity */}
-                        <div style={{
-                            fontSize: '13px',
-                            color: '#6b7280',
-                            marginBottom: '0.5rem',
+                            marginBottom: '0.75rem',
+                            width: '100%',
                             display: 'flex',
+                            justifyContent: 'center',
                             alignItems: 'center',
-                            gap: '0.375rem'
+                            height: '120px', // Fixed height for image area
+                            overflow: 'hidden'
                         }}>
-                            <span style={{ fontSize: '16px' }}>👥</span>
-                            <span>{vehicle.passengers}</span>
+                            {vehicle.icon}
                         </div>
 
-                        {/* Description */}
-                        <div style={{
-                            fontSize: '12px',
-                            color: '#9ca3af',
-                            lineHeight: '1.4'
-                        }}>
-                            {vehicle.description}
-                        </div>
-
-                        {/* Price */}
-                        {price !== undefined && (
+                        {/* Content */}
+                        <div style={{ width: '100%' }}>
                             <div style={{
-                                marginTop: '1rem',
-                                paddingTop: '1rem',
-                                borderTop: '1px solid #e5e7eb',
-                                fontSize: '20px',
-                                fontWeight: 700,
-                                color: isSelected ? '#2563eb' : '#111827'
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '0.25rem'
                             }}>
-                                ${price}
+                                <span style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>{vehicle.name}</span>
                             </div>
-                        )}
+
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontSize: '13px',
+                                color: '#6b7280',
+                                marginBottom: '0.5rem'
+                            }}>
+                                <span>👥 {vehicle.passengers}</span>
+                            </div>
+
+                            {/* Price */}
+                            {price !== undefined && (
+                                <div style={{
+                                    fontSize: '18px',
+                                    fontWeight: 700,
+                                    color: isSelected ? '#2563eb' : '#111827',
+                                    marginTop: 'auto'
+                                }}>
+                                    ${price}
+                                </div>
+                            )}
+                        </div>
                     </button>
                 );
             })}
