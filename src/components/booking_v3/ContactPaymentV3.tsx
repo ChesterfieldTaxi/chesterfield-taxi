@@ -4,12 +4,12 @@ interface ContactPaymentV3Props {
     name: string;
     phone: string;
     email: string;
-    paymentMethod: 'cash' | 'account';
+    paymentMethod: 'cash' | 'account' | 'prepaid';
     driverNotes: string;
     onNameChange: (name: string) => void;
     onPhoneChange: (phone: string) => void;
     onEmailChange: (email: string) => void;
-    onPaymentMethodChange: (method: 'cash' | 'account') => void;
+    onPaymentMethodChange: (method: 'cash' | 'account' | 'prepaid') => void;
     onDriverNotesChange: (notes: string) => void;
 }
 
@@ -30,14 +30,14 @@ const InputWithIcon: React.FC<{
         <div style={{
             display: 'flex',
             alignItems: 'center',
-            border: `2px solid ${isFocused ? '#3b82f6' : '#d1d5db'}`,
-            borderRadius: '6px',
+            border: `1px solid ${isFocused ? '#3b82f6' : '#d1d5db'}`,
+            borderRadius: '4px',
             backgroundColor: 'white',
             padding: '0.625rem 0.75rem',
             transition: 'border-color 0.2s',
             ...style
         }}>
-            <div style={{ marginRight: '0.625rem', display: 'flex', alignItems: 'center', color: '#9ca3af' }}>
+            <div style={{ marginRight: '0.5rem', display: 'flex', alignItems: 'center', color: '#9ca3af' }}>
                 {icon}
             </div>
             <input
@@ -51,7 +51,7 @@ const InputWithIcon: React.FC<{
                     flex: 1,
                     border: 'none',
                     outline: 'none',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     padding: 0,
                     backgroundColor: 'transparent',
                     boxShadow: 'none'
@@ -123,7 +123,7 @@ export const ContactPaymentV3: React.FC<ContactPaymentV3Props> = ({
 
             {/* Payment Method */}
             <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px' }}>
                     Payment Method
                 </label>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -134,11 +134,11 @@ export const ContactPaymentV3: React.FC<ContactPaymentV3Props> = ({
                             flex: 1,
                             padding: '0.625rem',
                             border: `2px solid ${paymentMethod === 'cash' ? '#2563eb' : '#e5e7eb'}`,
-                            borderRadius: '6px',
+                            borderRadius: '4px',
                             backgroundColor: paymentMethod === 'cash' ? '#eff6ff' : 'white',
                             color: paymentMethod === 'cash' ? '#2563eb' : '#6b7280',
                             fontWeight: 500,
-                            fontSize: '14px',
+                            fontSize: '16px',
                             cursor: 'pointer',
                             transition: 'all 0.2s'
                         }}
@@ -152,23 +152,69 @@ export const ContactPaymentV3: React.FC<ContactPaymentV3Props> = ({
                             flex: 1,
                             padding: '0.625rem',
                             border: `2px solid ${paymentMethod === 'account' ? '#2563eb' : '#e5e7eb'}`,
-                            borderRadius: '6px',
+                            borderRadius: '4px',
                             backgroundColor: paymentMethod === 'account' ? '#eff6ff' : 'white',
                             color: paymentMethod === 'account' ? '#2563eb' : '#6b7280',
                             fontWeight: 500,
-                            fontSize: '14px',
+                            fontSize: '16px',
                             cursor: 'pointer',
                             transition: 'all 0.2s'
                         }}
                     >
                         Account
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => onPaymentMethodChange('prepaid')}
+                        style={{
+                            flex: 1,
+                            padding: '0.625rem',
+                            border: `2px solid ${paymentMethod === 'prepaid' ? '#2563eb' : '#e5e7eb'}`,
+                            borderRadius: '4px',
+                            backgroundColor: paymentMethod === 'prepaid' ? '#eff6ff' : 'white',
+                            color: paymentMethod === 'prepaid' ? '#2563eb' : '#6b7280',
+                            fontWeight: 500,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        Prepaid
+                    </button>
                 </div>
+
+                {/* Account & Prepaid Details (placeholder) */}
+                {paymentMethod === 'account' && (
+                    <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.625rem 0.75rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '4px',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <p style={{ color: '#6b7280', fontSize: '12px', margin: 0 }}>
+                            Account details will be added later.
+                        </p>
+                    </div>
+                )}
+                {paymentMethod === 'prepaid' && (
+                    <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.625rem 0.75rem',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '4px',
+                        border: '1px solid #e5e7eb'
+                    }}>
+                        <p style={{ color: '#6b7280', fontSize: '12px', margin: 0 }}>
+                            Prepaid information will be added later.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Driver Notes */}
             <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px' }}>
                     Notes for Driver (optional)
                 </label>
                 <textarea
@@ -179,9 +225,9 @@ export const ContactPaymentV3: React.FC<ContactPaymentV3Props> = ({
                     style={{
                         width: '100%',
                         padding: '0.625rem 0.75rem',
-                        border: '2px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '16px',
                         fontFamily: 'inherit',
                         resize: 'vertical',
                         outline: 'none',

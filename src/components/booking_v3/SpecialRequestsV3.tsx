@@ -34,7 +34,7 @@ export const SpecialRequestsV3: React.FC<SpecialRequestsV3Props> = ({
                             style={{
                                 padding: '0.625rem 1rem',
                                 border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`,
-                                borderRadius: '6px',
+                                borderRadius: '4px',
                                 backgroundColor: isSelected ? '#eff6ff' : 'white',
                                 color: isSelected ? '#2563eb' : '#6b7280',
                                 fontWeight: 500,
@@ -68,7 +68,7 @@ export const SpecialRequestsV3: React.FC<SpecialRequestsV3Props> = ({
                         width: '100%',
                         padding: '0.625rem',
                         border: '1px solid #d1d5db',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         fontSize: '14px'
                     }}
                 />

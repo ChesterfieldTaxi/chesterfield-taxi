@@ -14,7 +14,7 @@ interface PassengerCounterProps {
 }
 
 /**
- * Passengers, luggage, and car seat counters - Professional minimal design
+ * Compact passengers, luggage, and car seat counters - Grid layout for desktop
  */
 export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
     passengerCount,
@@ -36,8 +36,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
             onClick={onClick}
             disabled={disabled}
             style={{
-                width: '32px',
-                height: '32px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '50%',
                 border: '1px solid #d1d5db',
                 background: disabled ? '#f3f4f6' : 'white',
@@ -46,7 +46,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 600,
-                fontSize: '16px',
+                fontSize: '18px',
                 color: disabled ? '#9ca3af' : '#111827'
             }}
         >
@@ -56,24 +56,28 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
 
     const Counter: React.FC<{
         label: string;
+        icon?: React.ReactNode;
         value: number;
         onIncrement: () => void;
         onDecrement: () => void;
         min?: number;
-    }> = ({ label, value, onIncrement, onDecrement, min = 0 }) => (
+    }> = ({ label, icon, value, onIncrement, onDecrement, min = 0 }) => (
         <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '1rem',
+            padding: '0.75rem 0.875rem',
             backgroundColor: 'white',
             border: '1px solid #e5e7eb',
-            borderRadius: '8px'
+            borderRadius: '4px'
         }}>
-            <div style={{ fontWeight: 500, fontSize: '14px' }}>{label}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {icon && <span style={{ color: '#6b7280', display: 'flex' }}>{icon}</span>}
+                <span style={{ fontWeight: 500, fontSize: '16px' }}>{label}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <CounterButton onClick={onDecrement} disabled={value <= min}>−</CounterButton>
-                <div style={{ minWidth: '24px', textAlign: 'center', fontWeight: 600 }}>{value}</div>
+                <div style={{ minWidth: '28px', textAlign: 'center', fontWeight: 600, fontSize: '16px' }}>{value}</div>
                 <CounterButton onClick={onIncrement}>+</CounterButton>
             </div>
         </div>
@@ -82,22 +86,41 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
     const totalCarSeats = carSeats.infant + carSeats.toddler + carSeats.booster;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <Counter
-                label="Passengers"
-                value={passengerCount}
-                onIncrement={() => onPassengerChange(passengerCount + 1)}
-                onDecrement={() => onPassengerChange(passengerCount - 1)}
-                min={1}
-            />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {/* Passengers & Luggage - Side by side on desktop */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <Counter
+                    label="Passengers"
+                    icon={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    }
+                    value={passengerCount}
+                    onIncrement={() => onPassengerChange(passengerCount + 1)}
+                    onDecrement={() => onPassengerChange(passengerCount - 1)}
+                    min={1}
+                />
 
-            <Counter
-                label="Luggage"
-                value={luggageCount}
-                onIncrement={() => onLuggageChange(luggageCount + 1)}
-                onDecrement={() => onLuggageChange(luggageCount - 1)}
-                min={0}
-            />
+                <Counter
+                    label="Luggage"
+                    icon={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17 21v-2a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v2"></path>
+                            <path d="M7 21v-2a1 1 0 0 0-1-1v-1a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v1a1 1 0 0 0-1 1v2"></path>
+                            <rect x="5" y="5" width="14" height="12" rx="1"></rect>
+                            <path d="M9 5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                        </svg>
+                    }
+                    value={luggageCount}
+                    onIncrement={() => onLuggageChange(luggageCount + 1)}
+                    onDecrement={() => onLuggageChange(luggageCount - 1)}
+                    min={0}
+                />
+            </div>
 
             {/* Car Seats Toggle */}
             <button
@@ -107,19 +130,19 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '1rem',
+                    padding: '0.75rem 0.875rem',
                     backgroundColor: showCarSeats || totalCarSeats > 0 ? '#eff6ff' : 'white',
                     border: `1px solid ${showCarSeats || totalCarSeats > 0 ? '#bfdbfe' : '#e5e7eb'}`,
-                    borderRadius: '8px',
+                    borderRadius: '4px',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'all 0.2s',
                     fontWeight: 500,
-                    fontSize: '14px'
+                    fontSize: '16px'
                 }}
             >
                 <span>
-                    Car Seats {totalCarSeats > 0 && `(${totalCarSeats})`}
+                    🚼 Car Seats {totalCarSeats > 0 && `(${totalCarSeats})`}
                 </span>
                 <span style={{
                     fontSize: '12px',
@@ -134,13 +157,12 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
             {/* Car Seats Section (Collapsible) */}
             {showCarSeats && (
                 <div style={{
-                    marginTop: '-0.5rem',
-                    padding: '1rem',
+                    padding: '0.625rem',
                     backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
+                    borderRadius: '4px',
                     border: '1px solid #e5e7eb'
                 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
                         <Counter
                             label="Infant (0-1yr)"
                             value={carSeats.infant}
@@ -165,11 +187,11 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
 
                     {totalCarSeats > 0 && (
                         <div style={{
-                            marginTop: '0.75rem',
-                            padding: '0.75rem',
+                            marginTop: '0.5rem',
+                            padding: '0.5rem',
                             backgroundColor: '#fef3c7',
-                            borderRadius: '6px',
-                            fontSize: '12px',
+                            borderRadius: '4px',
+                            fontSize: '13px',
                             color: '#92400e',
                             border: '1px solid #fde68a'
                         }}>

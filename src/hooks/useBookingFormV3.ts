@@ -47,6 +47,9 @@ interface BookingFormV3State {
     // Return trip
     isReturnTrip: boolean;
     returnDateTime: Date | null;
+    returnRouteType: 'reverse' | 'custom';
+    returnPickup: Location | null;
+    returnDropoff: Location | null;
 
     // Payment
     paymentMethod: 'cash' | 'account';
@@ -72,12 +75,15 @@ export function useBookingFormV3() {
         passengerCount: 1,
         luggageCount: 1,
         carSeats: { infant: 0, toddler: 0, booster: 0 },
-        isNow: true,
+        isNow: false, // Default to schedule mode
         pickupDateTime: new Date(),
         specialRequests: [],
         gateCode: '',
         isReturnTrip: false,
         returnDateTime: null,
+        returnRouteType: 'reverse',
+        returnPickup: null,
+        returnDropoff: null,
         paymentMethod: 'cash',
         accountNumber: '',
         authCode: '',
@@ -231,6 +237,30 @@ export function useBookingFormV3() {
     const setPickupDateTime = (date: Date) => setState(prev => ({ ...prev, pickupDateTime: date }));
     const setIsReturnTrip = (isReturn: boolean) => setState(prev => ({ ...prev, isReturnTrip: isReturn }));
     const setReturnDateTime = (date: Date | null) => setState(prev => ({ ...prev, returnDateTime: date }));
+    const setReturnRouteType = (type: 'reverse' | 'custom') => setState(prev => ({ ...prev, returnRouteType: type }));
+    const setReturnPickup = (location: Location | null) => setState(prev => ({
+        ...prev,
+        returnPickup: location ? { ...location, isAirport: detectAirport(location.address) } : null
+    }));
+    const setReturnDropoff = (location: Location | null) => setState(prev => ({
+        ...prev,
+        returnDropoff: location ? { ...location, isAirport: detectAirport(location.address) } : null
+    }));
+    const setReturnFlightDetails = (locationType: 'pickup' | 'dropoff', details: { airline: string; flightNumber: string; origin?: string }) => {
+        setState(prev => {
+            if (locationType === 'pickup') {
+                return {
+                    ...prev,
+                    returnPickup: prev.returnPickup ? { ...prev.returnPickup, flightDetails: details } : null
+                };
+            } else {
+                return {
+                    ...prev,
+                    returnDropoff: prev.returnDropoff ? { ...prev.returnDropoff, flightDetails: details } : null
+                };
+            }
+        });
+    };
 
     const setPaymentMethod = (method: 'cash' | 'account') => setState(prev => ({ ...prev, paymentMethod: method }));
     const setName = (name: string) => setState(prev => ({ ...prev, name }));
@@ -255,6 +285,9 @@ export function useBookingFormV3() {
             gateCode: '',
             isReturnTrip: false,
             returnDateTime: null,
+            returnRouteType: 'reverse',
+            returnPickup: null,
+            returnDropoff: null,
             paymentMethod: 'cash',
             accountNumber: '',
             authCode: '',
@@ -307,6 +340,10 @@ export function useBookingFormV3() {
         setPickupDateTime,
         setIsReturnTrip,
         setReturnDateTime,
+        setReturnRouteType,
+        setReturnPickup,
+        setReturnDropoff,
+        setReturnFlightDetails,
 
         // Special request setters
         toggleSpecialRequest,

@@ -175,7 +175,11 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 2: Locations */}
-                <SectionWrapper title="Where are you going?">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Where are you going?PLACEHOLDER_LOCATIONS
+                    </h2>
+
                     {/* Locations Grid */}
                     <div style={{
                         display: 'grid',
@@ -378,10 +382,13 @@ export const BookingFlowV3: React.FC = () => {
                             onChange={(d) => setFlightDetails('pickup', d)}
                         />
                     )}
-                </SectionWrapper>
+                </section>
 
                 {/* Step 3: Passengers & Luggage */}
-                <SectionWrapper title="Passengers & Luggage">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Passengers & Luggage
+                    </h2>
                     <PassengerCounterV3
                         passengerCount={state.passengerCount}
                         luggageCount={state.luggageCount}
@@ -390,10 +397,13 @@ export const BookingFlowV3: React.FC = () => {
                         onLuggageChange={setLuggageCount}
                         onCarSeatChange={setCarSeats}
                     />
-                </SectionWrapper>
+                </section>
 
                 {/* Step 4: Vehicle */}
-                <SectionWrapper title="Choose Your Vehicle">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Choose Your Vehicle
+                    </h2>
                     <VehicleSelectorV3
                         selectedVehicle={state.vehicleType}
                         onSelect={setVehicleType}
@@ -413,20 +423,26 @@ export const BookingFlowV3: React.FC = () => {
                             <strong>Note:</strong> Minivan required for car seats
                         </div>
                     )}
-                </SectionWrapper>
+                </section>
 
                 {/* Step 5: Special Requests */}
-                <SectionWrapper title="Special Requests">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Special Requests
+                    </h2>
                     <SpecialRequestsV3
                         selectedRequests={state.specialRequests}
                         onToggleRequest={toggleSpecialRequest}
                         gateCode={state.gateCode}
                         onGateCodeChange={setGateCode}
                     />
-                </SectionWrapper>
+                </section>
 
                 {/* Step 6: Return Trip */}
-                <SectionWrapper title="Return Trip">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Return Trip
+                    </h2>
                     <ReturnTripV3
                         isReturnTrip={state.isReturnTrip}
                         returnDateTime={state.returnDateTime}
@@ -443,10 +459,13 @@ export const BookingFlowV3: React.FC = () => {
                         dropoffLocation={state.dropoff?.address || ''}
                         isRouteComplete={!!(state.pickup?.address && state.dropoff?.address)}
                     />
-                </SectionWrapper>
+                </section>
 
                 {/* Step 7: Contact & Payment */}
-                <SectionWrapper title="Contact & Payment">
+                <section style={{ marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
+                        Contact & Payment
+                    </h2>
                     <ContactPaymentV3
                         name={state.name}
                         phone={state.phone}
@@ -459,7 +478,7 @@ export const BookingFlowV3: React.FC = () => {
                         onPaymentMethodChange={setPaymentMethod}
                         onDriverNotesChange={setDriverNotes}
                     />
-                </SectionWrapper>
+                </section>
             </div>
 
             {/* Sticky Price Footer - Centered with Max-Width */}
@@ -512,3 +531,4 @@ export const BookingFlowV3: React.FC = () => {
         </div>
     );
 };
+

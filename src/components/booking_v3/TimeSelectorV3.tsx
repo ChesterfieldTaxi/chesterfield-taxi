@@ -15,28 +15,30 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
     onDateTimeChange
 }) => {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Now/Later Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* iOS-style Segmented Button */}
             <div style={{
-                display: 'flex',
-                gap: '0.5rem',
+                display: 'inline-flex',
+                gap: '0.25rem',
                 padding: '0.25rem',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px'
+                backgroundColor: '#e5e7eb',
+                borderRadius: '6px',
+                flexShrink: 0
             }}>
                 <button
                     type="button"
                     onClick={() => onIsNowChange(true)}
                     style={{
-                        flex: 1,
-                        padding: '0.75rem',
+                        padding: '0.5rem 1.25rem',
                         border: 'none',
-                        borderRadius: '6px',
-                        backgroundColor: isNow ? '#2563eb' : 'transparent',
-                        color: isNow ? 'white' : '#6b7280',
+                        borderRadius: '4px',
+                        backgroundColor: isNow ? 'white' : 'transparent',
+                        color: isNow ? '#111827' : '#6b7280',
                         fontWeight: 600,
+                        fontSize: '16px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        boxShadow: isNow ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                     }}
                 >
                     Now
@@ -45,32 +47,25 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
                     type="button"
                     onClick={() => onIsNowChange(false)}
                     style={{
-                        flex: 1,
-                        padding: '0.75rem',
+                        padding: '0.5rem 1.25rem',
                         border: 'none',
-                        borderRadius: '6px',
-                        backgroundColor: !isNow ? '#2563eb' : 'transparent',
-                        color: !isNow ? 'white' : '#6b7280',
+                        borderRadius: '4px',
+                        backgroundColor: !isNow ? 'white' : 'transparent',
+                        color: !isNow ? '#111827' : '#6b7280',
                         fontWeight: 600,
+                        fontSize: '16px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        boxShadow: !isNow ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                     }}
                 >
                     Schedule
                 </button>
             </div>
 
-            {/* Custom DateTime Picker (only show when "Later" is selected) */}
+            {/* DateTime Picker - inline when Schedule is selected */}
             {!isNow && (
-                <div style={{
-                    padding: '1rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb'
-                }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
-                        Pickup Date & Time
-                    </label>
+                <div style={{ flex: 1, minWidth: '250px' }}>
                     <DateTimePicker
                         value={pickupDateTime}
                         onChange={onDateTimeChange}

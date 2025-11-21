@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { useGooglePlacesAutocomplete, type PlaceResult } from '../../hooks/useGooglePlacesAutocomplete';
+import { STL_LANDMARKS } from '../../data/stlLandmarks';
 
 interface LocationInputV3Props {
     value: string;
-    onChange: (value: string) => void;
+    onChange: (value: string, placeData?: Partial<PlaceResult>) => void;
     placeholder: string;
     type: 'pickup' | 'dropoff' | 'stop';
     showDragHandle?: boolean;
@@ -26,6 +28,50 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
     showDragHandle = false,
     onRemove
 }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [showLandmarks, setShowLandmarks] = useState(false);
+    const [filteredLandmarks, setFilteredLandmarks] = useState<typeof STL_LANDMARKS>([]);
+
+    // Filter landmarks based on input value
+    useEffect(() => {
+        if (!value || value.length < 2) {
+            // Show airports when no input
+            setFilteredLandmarks(STL_LANDMARKS.filter(l => l.isAirport));
+        } else {
+            const lower = value.toLowerCase();
+            setFilteredLandmarks(
+                STL_LANDMARKS.filter(landmark =>
+                    landmark.shortName.toLowerCase().includes(lower) ||
+                    landmark.name.toLowerCase().includes(lower)
+                )
+            );
+        }
+    }, [value]);
+
+    const handlePlaceSelected = useCallback((place: PlaceResult) => {
+        setShowLandmarks(false);
+        onChange(place.address, {
+            coordinates: place.coordinates,
+            placeId: place.placeId,
+            isAirport: place.isAirport
+        });
+    }, [onChange]);
+
+    const handleLandmarkClick = (landmark: typeof STL_LANDMARKS[0]) => {
+        setShowLandmarks(false);
+        onChange(landmark.shortName, {
+            coordinates: landmark.coordinates,
+            placeId: landmark.placeId,
+            isAirport: landmark.isAirport
+        });
+    };
+
+    useGooglePlacesAutocomplete({
+        inputRef,
+        onPlaceSelected: handlePlaceSelected,
+        enabled: !showLandmarks // Disable Google Places when showing custom landmarks
+    });
+
     const getIcon = () => {
         switch (type) {
             case 'pickup':
@@ -73,15 +119,15 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                     </div>
                 )}
 
-                {/* Input with Icon - focus-within for whole box highlight */}
+                {/* Input with Icon - flatter, more compact design */}
                 <div
                     style={{
                         flex: 1,
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
-                        border: '2px solid #d1d5db',
-                        borderRadius: '6px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
                         backgroundColor: 'white',
                         padding: '0.625rem 0.75rem',
                         transition: 'border-color 0.2s'
@@ -93,20 +139,22 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         e.currentTarget.style.borderColor = '#d1d5db';
                     }}
                 >
-                    <div style={{ marginRight: '0.625rem', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ marginRight: '0.5rem', display: 'flex', alignItems: 'center' }}>
                         {getIcon()}
                     </div>
                     <input
+                        ref={inputRef}
                         type="text"
-                        list="airport-suggestions"
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
+                        onFocus={() => setShowLandmarks(true)}
+                        onBlur={() => setTimeout(() => setShowLandmarks(false), 200)} // Delay to allow click
                         placeholder={placeholder}
                         style={{
                             flex: 1,
                             border: 'none',
                             outline: 'none',
-                            fontSize: '14px',
+                            fontSize: '16px',
                             padding: 0,
                             backgroundColor: 'transparent',
                             boxShadow: 'none'
@@ -137,17 +185,54 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                 )}
             </div>
 
-            {/* Datalist for testing */}
-            <datalist id="airport-suggestions">
-                <option value="St. Louis Lambert International Airport (STL)" />
-                <option value="Kansas City International Airport (MCI)" />
-                <option value="Spirit of St. Louis Airport (SUS)" />
-                <option value="Busch Stadium" />
-                <option value="Gateway Arch" />
-                <option value="Union Station" />
-                <option value="Missouri Botanical Garden" />
-                <option value="Forest Park" />
-            </datalist>
+            {/* Custom Landmarks Dropdown */}
+            {showLandmarks && filteredLandmarks.length > 0 && (
+                <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'white',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    marginTop: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    zIndex: 1000
+                }}>
+                    {filteredLandmarks.map((landmark, index) => (
+                        <div
+                            key={index}
+                            onClick={() => handleLandmarkClick(landmark)}
+                            style={{
+                                padding: '0.5rem 0.75rem',
+                                cursor: 'pointer',
+                                borderBottom: index < filteredLandmarks.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '16px',
+                                transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                        >
+                            {landmark.isAirport ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                            ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="#9ca3af">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                </svg>
+                            )}
+                            <span>{landmark.shortName}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
