@@ -47,7 +47,7 @@ interface BookingFormV3State {
 
     // Time
     isNow: boolean;
-    pickupDateTime: Date;
+    pickupDateTime: Date | null;
 
     // Special requests
     specialRequests: string[];
@@ -85,7 +85,7 @@ export function useBookingFormV3() {
         luggageCount: 1,
         carSeats: { infant: 0, toddler: 0, booster: 0 },
         isNow: false, // Default to schedule mode
-        pickupDateTime: new Date(),
+        pickupDateTime: null, // No default - user must select
         specialRequests: [],
         gateCode: '',
         isReturnTrip: false,
@@ -166,7 +166,7 @@ export function useBookingFormV3() {
             carSeats: state.carSeats,
             specialRequests: state.specialRequests,
             isAirport: state.pickup?.isAirport || state.dropoff?.isAirport || false,
-            pickupDateTime: state.pickupDateTime
+            pickupDateTime: state.pickupDateTime || new Date() // Fallback for pricing calculation only
         };
 
         return calculateFare(booking, rules);
