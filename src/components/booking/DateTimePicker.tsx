@@ -26,14 +26,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
         if (value) {
             setSelectedDate(value);
             setCurrentDate(value);
-            let h = value.getHours();
-            const m = value.getMinutes();
-            const ap = h >= 12 ? 'PM' : 'AM';
-            h = h % 12;
-            h = h ? h : 12;
-            setHour(h);
-            setMinute(m);
-            setAmpm(ap);
+            // DO NOT auto-populate time - force user to select explicitly
+            // Time state remains null until user selects
         }
     }, [value]);
 

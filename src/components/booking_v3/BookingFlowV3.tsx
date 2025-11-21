@@ -342,14 +342,6 @@ export const BookingFlowV3: React.FC = () => {
                             onChange={(d) => setFlightDetails('pickup', d)}
                         />
                     )}
-
-                    {/* Flight Info - For Dropoff if Airport */}
-                    {state.dropoff?.isAirport && (
-                        <FlightInfoV3
-                            details={state.dropoff.flightDetails}
-                            onChange={(d) => setFlightDetails('dropoff', d)}
-                        />
-                    )}
                 </SectionWrapper>
 
                 {/* Step 3: Passengers & Luggage */}
