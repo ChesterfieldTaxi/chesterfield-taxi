@@ -1,7 +1,6 @@
 import React from 'react';
 import DateTimePicker from '../booking/DateTimePicker';
 import { TripRouteV3 } from './TripRouteV3';
-import { FlightInfoV3 } from './FlightInfoV3';
 import type { Location } from '../../hooks/useBookingFormV3';
 
 interface ReturnTripV3Props {

@@ -15,7 +15,7 @@ const variantStyles: Record<ToastVariant, {
     bg: string;
     border: string;
     text: string;
-    icon: JSX.Element;
+    icon: React.JSX.Element;
 }> = {
     success: {
         bg: '#d1fae5',

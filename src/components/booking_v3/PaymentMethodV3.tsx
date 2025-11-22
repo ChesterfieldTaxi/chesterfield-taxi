@@ -2,7 +2,6 @@ import React from 'react';
 import {
     PAYMENT_METHODS,
     getPaymentMethod,
-    getDefaultPaymentMethod,
     PaymentData,
     PaymentMethodType
 } from './payment_methods';
@@ -27,15 +26,20 @@ export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
     // Handle payment method change
     const handleMethodChange = (newMethod: PaymentMethodType) => {
         // Create appropriate initial data for the new method
-        const newData: PaymentData = {
-            method: newMethod,
-            timestamp: new Date()
-        } as PaymentData;
+        let newData: PaymentData;
 
-        // Preserve any existing data if switching back
         if (newMethod === 'corporate_account') {
-            newData.accountNumber = '';
-            newData.authorizationCode = '';
+            newData = {
+                method: 'corporate_account',
+                timestamp: new Date(),
+                accountNumber: '',
+                authorizationCode: ''
+            };
+        } else {
+            newData = {
+                method: newMethod,
+                timestamp: new Date()
+            } as PaymentData;
         }
 
         onChange(newData);

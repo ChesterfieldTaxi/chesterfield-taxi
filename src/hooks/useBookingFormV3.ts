@@ -28,7 +28,7 @@ export interface Location {
     };
 }
 
-interface BookingFormV3State {
+export interface BookingFormV3State {
     // Locations
     pickup: Location | null;
     dropoff: Location | null;

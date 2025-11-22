@@ -8,13 +8,13 @@
  * Future: Firestore implementation (production-ready)
  */
 
-import type { BookingFormState } from '../../hooks/useBookingFormV3';
+import type { BookingFormV3State } from '../../hooks/useBookingFormV3';
 
-export interface BookingData extends Omit<BookingFormState, 'isNow'> {
-    referenceNumber: string;
-    status: 'pending' | 'confirmed' | 'assigned' | 'completed' | 'cancelled';
-    submittedAt: Date;
-    confirmedAt?: Date;
+export interface BookingData extends Omit<BookingFormV3State, 'isNow'> {
+  referenceNumber: string;
+  status: 'pending' | 'confirmed' | 'assigned' | 'completed' | 'cancelled';
+  submittedAt: Date;
+  confirmedAt?: Date;
 }
 
 /**
@@ -22,21 +22,21 @@ export interface BookingData extends Omit<BookingFormState, 'isNow'> {
  * All implementations must conform to this contract
  */
 export interface BookingService {
-    /**
-     * Submit a new booking request
-     * @returns Reference number for tracking
-     */
-    submitBooking(data: Partial<BookingFormState>): Promise<{ referenceNumber: string }>;
+  /**
+   * Submit a new booking request
+   * @returns Reference number for tracking
+   */
+  submitBooking(data: Partial<BookingFormV3State>): Promise<{ referenceNumber: string }>;
 
-    /**
-     * Retrieve booking by reference number
-     */
-    getBooking(referenceNumber: string): Promise<BookingData | null>;
+  /**
+   * Retrieve booking by reference number
+   */
+  getBooking(referenceNumber: string): Promise<BookingData | null>;
 
-    /**
-     * Get bookings by phone number (for tracking)
-     */
-    getBookingsByPhone(phone: string): Promise<BookingData[]>;
+  /**
+   * Get bookings by phone number (for tracking)
+   */
+  getBookingsByPhone(phone: string): Promise<BookingData[]>;
 }
 
 /**
@@ -44,10 +44,10 @@ export interface BookingService {
  * Format: YYYYMMDD-XXXX (e.g., 20251122-A3F9)
  */
 const generateReferenceNumber = (): string => {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `${dateStr}-${random}`;
+  const date = new Date();
+  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${dateStr}-${random}`;
 };
 
 /**
@@ -57,56 +57,56 @@ const generateReferenceNumber = (): string => {
  * Persists across page reloads but limited to single browser.
  */
 class LocalBookingService implements BookingService {
-    private readonly STORAGE_KEY = 'chesterfield_bookings';
+  private readonly STORAGE_KEY = 'chesterfield_bookings';
 
-    async submitBooking(data: Partial<BookingFormState>): Promise<{ referenceNumber: string }> {
-        const referenceNumber = generateReferenceNumber();
+  async submitBooking(data: Partial<BookingFormV3State>): Promise<{ referenceNumber: string }> {
+    const referenceNumber = generateReferenceNumber();
 
-        const booking: BookingData = {
-            ...data as BookingFormState,
-            referenceNumber,
-            status: 'pending',
-            submittedAt: new Date(),
-        };
+    const booking: BookingData = {
+      ...data as BookingFormV3State,
+      referenceNumber,
+      status: 'pending',
+      submittedAt: new Date(),
+    };
 
-        // Get existing bookings
-        const bookings = this.getAllBookings();
-        bookings.push(booking);
+    // Get existing bookings
+    const bookings = this.getAllBookings();
+    bookings.push(booking);
 
-        // Save to localStorage
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookings));
+    // Save to localStorage
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookings));
 
-        // Simulate network delay (realistic UX)
-        await new Promise(resolve => setTimeout(resolve, 500));
+    // Simulate network delay (realistic UX)
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-        return { referenceNumber };
+    return { referenceNumber };
+  }
+
+  async getBooking(referenceNumber: string): Promise<BookingData | null> {
+    const bookings = this.getAllBookings();
+    return bookings.find(b => b.referenceNumber === referenceNumber) || null;
+  }
+
+  async getBookingsByPhone(phone: string): Promise<BookingData[]> {
+    const bookings = this.getAllBookings();
+    return bookings.filter(b => b.phone === phone);
+  }
+
+  private getAllBookings(): BookingData[] {
+    const stored = localStorage.getItem(this.STORAGE_KEY);
+    if (!stored) return [];
+
+    try {
+      return JSON.parse(stored).map((b: any) => ({
+        ...b,
+        submittedAt: new Date(b.submittedAt),
+        confirmedAt: b.confirmedAt ? new Date(b.confirmedAt) : undefined,
+      }));
+    } catch (error) {
+      console.error('[BookingService] Failed to parse bookings:', error);
+      return [];
     }
-
-    async getBooking(referenceNumber: string): Promise<BookingData | null> {
-        const bookings = this.getAllBookings();
-        return bookings.find(b => b.referenceNumber === referenceNumber) || null;
-    }
-
-    async getBookingsByPhone(phone: string): Promise<BookingData[]> {
-        const bookings = this.getAllBookings();
-        return bookings.filter(b => b.phone === phone);
-    }
-
-    private getAllBookings(): BookingData[] {
-        const stored = localStorage.getItem(this.STORAGE_KEY);
-        if (!stored) return [];
-
-        try {
-            return JSON.parse(stored).map((b: any) => ({
-                ...b,
-                submittedAt: new Date(b.submittedAt),
-                confirmedAt: b.confirmedAt ? new Date(b.confirmedAt) : undefined,
-            }));
-        } catch (error) {
-            console.error('[BookingService] Failed to parse bookings:', error);
-            return [];
-        }
-    }
+  }
 }
 
 /**
@@ -121,11 +121,11 @@ import { db } from '../../config/firebase';
 class FirestoreBookingService implements BookingService {
   private readonly COLLECTION = 'bookings';
 
-  async submitBooking(data: Partial<BookingFormState>): Promise<{ referenceNumber: string }> {
+  async submitBooking(data: Partial<BookingFormV3State>): Promise<{ referenceNumber: string }> {
     const referenceNumber = generateReferenceNumber();
     
     const booking: BookingData = {
-      ...data as BookingFormState,
+      ...data as BookingFormV3State,
       referenceNumber,
       status: 'pending',
       submittedAt: new Date(),
