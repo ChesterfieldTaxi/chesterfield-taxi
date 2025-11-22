@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import type { BookingDetails } from '../types/pricing';
-import type { PaymentData } from '../components/booking_v3/payment_methods';
+import { BookingDetails } from '../types/pricing';
+import { PaymentData } from '../components/booking_v3/payment_methods';
 import { usePricingRules } from './usePricingRules';
 import { calculateFare } from '../utils/pricingEngine';
 import { reverseTrip } from '../utils/tripReversal';

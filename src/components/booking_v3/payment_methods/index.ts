@@ -5,7 +5,7 @@
 
 import { CashPaymentForm } from './CashPaymentForm';
 import { CorporateAccountPaymentForm } from './CorporateAccountPaymentForm';
-import type { PaymentMethodType, PaymentMethodConfig } from './types';
+import { PaymentMethodType, PaymentMethodConfig } from './types';
 
 /**
  * Registry of all payment methods
@@ -71,4 +71,4 @@ export function getDefaultPaymentMethod(): PaymentMethodType {
 }
 
 // Re-export types for convenience
-export type { PaymentMethodType, PaymentMethodConfig, PaymentData, PaymentFormProps } from './types';
+export { PaymentMethodType, PaymentMethodConfig, PaymentData, PaymentFormProps } from './types';

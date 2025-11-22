@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PaymentFormProps, CashPaymentData } from './types';
+import { PaymentFormProps, CashPaymentData } from './types';
 
 /**
  * Cash/Card Payment Form

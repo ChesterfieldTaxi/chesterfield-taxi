@@ -3,8 +3,8 @@ import {
     PAYMENT_METHODS,
     getPaymentMethod,
     getDefaultPaymentMethod,
-    type PaymentData,
-    type PaymentMethodType
+    PaymentData,
+    PaymentMethodType
 } from './payment_methods';
 
 interface PaymentMethodV3Props {
