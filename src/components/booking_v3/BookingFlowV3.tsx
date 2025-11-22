@@ -53,6 +53,8 @@ export const BookingFlowV3: React.FC = () => {
         setPhone,
         setEmail,
         setPaymentMethod,
+        setAccountNumber,
+        setAuthCode,
         setDriverNotes,
         addStop,
         removeStop,
@@ -215,11 +217,15 @@ export const BookingFlowV3: React.FC = () => {
                         phone={state.phone}
                         email={state.email}
                         paymentMethod={state.paymentMethod}
+                        accountNumber={state.accountNumber}
+                        authCode={state.authCode}
                         driverNotes={state.driverNotes}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}
                         onPaymentMethodChange={setPaymentMethod}
+                        onAccountNumberChange={setAccountNumber}
+                        onAuthCodeChange={setAuthCode}
                         onDriverNotesChange={setDriverNotes}
                     />
                 </SectionWrapper>

@@ -411,6 +411,8 @@ export function useBookingFormV3() {
     const setName = (name: string) => setState(prev => ({ ...prev, name }));
     const setPhone = (phone: string) => setState(prev => ({ ...prev, phone }));
     const setEmail = (email: string) => setState(prev => ({ ...prev, email }));
+    const setAccountNumber = (accountNumber: string) => setState(prev => ({ ...prev, accountNumber }));
+    const setAuthCode = (authCode: string) => setState(prev => ({ ...prev, authCode }));
     const setDriverNotes = (notes: string) => setState(prev => ({ ...prev, driverNotes: notes }));
     const setGateCode = (code: string) => setState(prev => ({ ...prev, gateCode: code }));
 
@@ -507,6 +509,8 @@ export function useBookingFormV3() {
         setName,
         setPhone,
         setEmail,
+        setAccountNumber,
+        setAuthCode,
         setDriverNotes,
 
         // Utility
