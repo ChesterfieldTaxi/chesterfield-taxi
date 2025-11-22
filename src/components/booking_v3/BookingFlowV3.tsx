@@ -1,13 +1,12 @@
 import React from 'react';
 import { useBookingFormV3 } from '../../hooks/useBookingFormV3';
-import { LocationInputV3 } from './LocationInputV3';
+import { TripDetailsV3 } from './TripDetailsV3';
 import { TimeSelectorV3 } from './TimeSelectorV3';
 import { PassengerCounterV3 } from './PassengerCounterV3';
 import { VehicleSelectorV3 } from './VehicleSelectorV3';
 import { SpecialRequestsV3 } from './SpecialRequestsV3';
 import { ReturnTripV3 } from './ReturnTripV3';
 import { ContactPaymentV3 } from './ContactPaymentV3';
-import { FlightInfoV3 } from './FlightInfoV3';
 
 /**
  * Section Wrapper with light gray background
@@ -62,7 +61,13 @@ export const BookingFlowV3: React.FC = () => {
         reorderLocations,
         setPickup,
         setDropoff,
-        setFlightDetails
+        setFlightDetails,
+        returnStops,
+        addReturnStop,
+        removeReturnStop,
+        updateReturnStop,
+        reorderReturnStops,
+        syncReturnTripFromMain
     } = useBookingFormV3();
 
     // TODO: Calculate prices for each vehicle type
@@ -111,237 +116,19 @@ export const BookingFlowV3: React.FC = () => {
                         {state.pickup?.isValidated && state.dropoff?.isValidated && state.stops.every(stop => stop.isValidated) && <span style={{ color: '#059669' }}>✅</span>}
                     </div>
                 }>
-                    {/* Locations Grid */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '28px 1fr 28px',
-                        gap: '0.5rem',
-                        alignItems: 'center',
-                        marginBottom: '0.75rem'
-                    }}>
-
-                        {state.stops.length === 0 ? (
-                            /* Simple Case: Pickup & Dropoff */
-                            <>
-                                {/* Swap Button - Spans 2 rows in Col 1 */}
-                                <div style={{
-                                    gridColumn: '1',
-                                    gridRow: 'span 2',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    height: '100%'
-                                }}>
-                                    <button
-                                        type="button"
-                                        onClick={swapLocations}
-                                        style={{
-                                            backgroundColor: 'white',
-                                            border: '1px solid #e5e7eb',
-                                            borderRadius: '50%',
-                                            width: '32px',
-                                            height: '32px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            cursor: 'pointer',
-                                            color: '#6b7280',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                        }}
-                                        title="Swap locations"
-                                    >
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                {/* Pickup Input */}
-                                <div style={{ gridColumn: '2' }}>
-                                    <LocationInputV3
-                                        value={state.pickup?.name || state.pickup?.address || ''}
-                                        onChange={(locationUpdate) => setPickup({
-                                            ...state.pickup,
-                                            ...locationUpdate,
-                                            type: 'pickup',
-                                            id: state.pickup?.id || 'pickup',
-                                            address: locationUpdate.address || state.pickup?.address || '',
-                                            isAirport: locationUpdate.isAirport ?? state.pickup?.isAirport ?? false,
-                                            isValidated: locationUpdate.isValidated ?? false
-                                        })}
-                                        placeholder="Pickup location"
-                                        type="pickup"
-                                    />
-                                </div>
-                                <div style={{ gridColumn: '3' }}></div>
-
-                                {/* Dropoff Input */}
-                                <div style={{ gridColumn: '2' }}>
-                                    <LocationInputV3
-                                        value={state.dropoff?.name || state.dropoff?.address || ''}
-                                        onChange={(locationUpdate) => setDropoff({
-                                            ...state.dropoff,
-                                            ...locationUpdate,
-                                            type: 'dropoff',
-                                            id: state.dropoff?.id || 'dropoff',
-                                            address: locationUpdate.address || state.dropoff?.address || '',
-                                            isAirport: locationUpdate.isAirport ?? state.dropoff?.isAirport ?? false,
-                                            isValidated: locationUpdate.isValidated ?? false
-                                        })}
-                                        placeholder="Dropoff location"
-                                        type="dropoff"
-                                    />
-                                </div>
-                                <div style={{ gridColumn: '3' }}></div>
-                            </>
-                        ) : (
-                            /* Multi-stop Case */
-                            <>
-                                {[
-                                    { ...(state.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false, isValidated: false }), _type: 'pickup' as const, _index: 0 },
-                                    ...state.stops.map((s, i) => ({ ...s, _type: 'stop' as const, _index: i + 1 })),
-                                    { ...(state.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false, isValidated: false }), _type: 'dropoff' as const, _index: state.stops.length + 1 }
-                                ].map((location, index, array) => {
-                                    const isFirst = index === 0;
-                                    const isLast = index === array.length - 1;
-                                    const visualType = isFirst ? 'pickup' : isLast ? 'dropoff' : 'stop';
-
-                                    return (
-                                        <React.Fragment key={location.id || `loc-${index}`}>
-                                            {/* Col 1: Drag Handle */}
-                                            <div
-                                                draggable
-                                                onDragStart={(e) => {
-                                                    e.dataTransfer.setData('text/plain', index.toString());
-                                                    e.dataTransfer.effectAllowed = 'move';
-                                                }}
-                                                onDragOver={(e) => {
-                                                    e.preventDefault();
-                                                    e.dataTransfer.dropEffect = 'move';
-                                                }}
-                                                onDrop={(e) => {
-                                                    e.preventDefault();
-                                                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-                                                    if (fromIndex !== index) {
-                                                        reorderLocations(fromIndex, index);
-                                                    }
-                                                }}
-                                                style={{
-                                                    cursor: 'grab',
-                                                    display: 'flex',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center',
-                                                    color: '#9ca3af',
-                                                    height: '100%'
-                                                }}
-                                            >
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                    <circle cx="9" cy="5" r="1.5"></circle>
-                                                    <circle cx="9" cy="12" r="1.5"></circle>
-                                                    <circle cx="9" cy="19" r="1.5"></circle>
-                                                    <circle cx="15" cy="5" r="1.5"></circle>
-                                                    <circle cx="15" cy="12" r="1.5"></circle>
-                                                    <circle cx="15" cy="19" r="1.5"></circle>
-                                                </svg>
-                                            </div>
-
-                                            {/* Col 2: Input */}
-                                            <div>
-                                                <LocationInputV3
-                                                    value={location.name || location.address || ''}
-                                                    onChange={(locationUpdate) => {
-                                                        if (location._type === 'pickup') {
-                                                            setPickup({
-                                                                ...state.pickup,
-                                                                ...locationUpdate,
-                                                                type: 'pickup',
-                                                                id: state.pickup?.id || 'pickup',
-                                                                address: locationUpdate.address || state.pickup?.address || '',
-                                                                isAirport: locationUpdate.isAirport ?? state.pickup?.isAirport ?? false,
-                                                                isValidated: locationUpdate.isValidated ?? false
-                                                            });
-                                                        } else if (location._type === 'dropoff') {
-                                                            setDropoff({
-                                                                ...state.dropoff,
-                                                                ...locationUpdate,
-                                                                type: 'dropoff',
-                                                                id: state.dropoff?.id || 'dropoff',
-                                                                address: locationUpdate.address || state.dropoff?.address || '',
-                                                                isAirport: locationUpdate.isAirport ?? state.dropoff?.isAirport ?? false,
-                                                                isValidated: locationUpdate.isValidated ?? false
-                                                            });
-                                                        } else {
-                                                            updateStop(location.id, locationUpdate);
-                                                        }
-                                                    }}
-                                                    placeholder={isFirst ? "Pickup location" : isLast ? "Dropoff location" : "Stop location"}
-                                                    type={visualType}
-                                                />
-                                            </div>
-
-                                            {/* Col 3: Remove Button (only for stops) */}
-                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                                {!isFirst && !isLast && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeStop(location.id)}
-                                                        style={{
-                                                            padding: '0.25rem',
-                                                            border: 'none',
-                                                            background: 'none',
-                                                            cursor: 'pointer',
-                                                            color: '#ef4444', // Red for remove
-                                                            display: 'flex',
-                                                            alignItems: 'center'
-                                                        }}
-                                                        title="Remove stop"
-                                                    >
-                                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                        </svg>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </>
-                        )}
-                    </div>
-
-                    {/* Add Stop Button */}
-                    <button
-                        type="button"
-                        onClick={addStop}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            fontSize: '16px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0',
-                            marginLeft: '40px' // Align with input column
-                        }}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Stop
-                    </button>
-
-                    {/* Flight Info - For Pickup if Airport */}
-                    {state.pickup?.isAirport && (
-                        <FlightInfoV3
-                            details={state.pickup.flightDetails}
-                            onChange={(d) => setFlightDetails('pickup', d)}
-                        />
-                    )}
+                    <TripDetailsV3
+                        pickup={state.pickup}
+                        dropoff={state.dropoff}
+                        stops={state.stops}
+                        onPickupChange={setPickup}
+                        onDropoffChange={setDropoff}
+                        onStopChange={updateStop}
+                        onAddStop={addStop}
+                        onRemoveStop={removeStop}
+                        onSwapLocations={swapLocations}
+                        onReorderStops={reorderLocations}
+                        onFlightDetailsChange={setFlightDetails}
+                    />
                 </SectionWrapper>
 
                 {/* Step 3: Passengers & Luggage */}
@@ -411,6 +198,12 @@ export const BookingFlowV3: React.FC = () => {
                         onReturnPickupChange={setReturnPickup}
                         onReturnDropoffChange={setReturnDropoff}
                         onReturnFlightDetailsChange={setReturnFlightDetails}
+                        returnStops={returnStops}
+                        addReturnStop={addReturnStop}
+                        removeReturnStop={removeReturnStop}
+                        updateReturnStop={updateReturnStop}
+                        reorderReturnStops={reorderReturnStops}
+                        syncReturnTripFromMain={syncReturnTripFromMain}
                         isRouteComplete={!!(state.pickup?.address && state.dropoff?.address)}
                     />
                 </SectionWrapper>

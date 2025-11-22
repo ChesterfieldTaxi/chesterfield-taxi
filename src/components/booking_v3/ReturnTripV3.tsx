@@ -1,6 +1,6 @@
 import React from 'react';
 import DateTimePicker from '../booking/DateTimePicker';
-import { LocationInputV3 } from './LocationInputV3';
+import { TripRouteV3 } from './TripRouteV3';
 import { FlightInfoV3 } from './FlightInfoV3';
 import type { Location } from '../../hooks/useBookingFormV3';
 
@@ -9,6 +9,7 @@ interface ReturnTripV3Props {
     returnDateTime: Date | null;
     returnPickup: Location | null;
     returnDropoff: Location | null;
+    returnStops: Location[];
 
     // Validation
     isRouteComplete: boolean;  // true when original pickup & dropoff are filled
@@ -18,6 +19,11 @@ interface ReturnTripV3Props {
     onReturnPickupChange: (location: Location | null) => void;
     onReturnDropoffChange: (location: Location | null) => void;
     onReturnFlightDetailsChange: (locationType: 'pickup' | 'dropoff', details: { airline: string; flightNumber: string; origin?: string }) => void;
+    addReturnStop: () => void;
+    removeReturnStop: (id: string) => void;
+    updateReturnStop: (id: string, updates: Partial<Location>) => void;
+    reorderReturnStops: (fromIndex: number, toIndex: number) => void;
+    syncReturnTripFromMain: () => void;
 }
 
 export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
@@ -25,12 +31,18 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
     returnDateTime,
     returnPickup,
     returnDropoff,
+    returnStops = [],
     isRouteComplete,
     onIsReturnTripChange,
     onReturnDateTimeChange,
     onReturnPickupChange,
     onReturnDropoffChange,
-    onReturnFlightDetailsChange
+    onReturnFlightDetailsChange,
+    addReturnStop,
+    removeReturnStop,
+    updateReturnStop,
+    reorderReturnStops,
+    syncReturnTripFromMain
 }) => {
 
 
@@ -102,11 +114,11 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                     borderRadius: '8px',
                     border: '1px solid #bfdbfe',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
+                    flexDirection: 'column'
+                    // gap removed to reduce whitespace
                 }}>
                     {/* Date & Time - Moved to top */}
-                    <div>
+                    <div style={{ marginBottom: '1rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '14px', color: '#1e40af' }}>
                             Return Date & Time
                         </label>
@@ -118,108 +130,65 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                         />
                     </div>
 
-                    {/* Return Locations Grid - Matching Trip Details */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '28px 1fr 28px',
-                        gap: '0.5rem',
-                        alignItems: 'center',
-                        marginBottom: '0.75rem'
-                    }}>
-                        {/* Swap Button - Spans 2 rows in Col 1 */}
-                        <div style={{
-                            gridColumn: '1',
-                            gridRow: 'span 2',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            height: '100%'
-                        }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    // Swap return pickup and dropoff
-                                    const temp = returnPickup;
-                                    onReturnPickupChange(returnDropoff);
-                                    onReturnDropoffChange(temp);
-                                }}
-                                style={{
-                                    backgroundColor: 'white',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '50%',
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    color: '#6b7280',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                }}
-                                title="Swap return locations"
-                            >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Return Pickup Input */}
-                        <div style={{ gridColumn: '2' }}>
-                            <LocationInputV3
-                                value={returnPickup?.name || returnPickup?.address || ''}
-                                onChange={(locationUpdate) => onReturnPickupChange({
-                                    ...returnPickup,
-                                    ...locationUpdate,
-                                    type: 'pickup',
-                                    id: returnPickup?.id || 'return-pickup',
-                                    address: locationUpdate.address || returnPickup?.address || '',
-                                    isAirport: locationUpdate.isAirport ?? returnPickup?.isAirport ?? false,
-                                    isValidated: locationUpdate.isValidated ?? false
-                                })}
-                                placeholder="Return pickup location"
-                                type="pickup"
-                                isAirport={returnPickup?.isAirport}
-                            />
-                        </div>
-                        <div style={{ gridColumn: '3' }}></div>
-
-                        {/* Return Dropoff Input */}
-                        <div style={{ gridColumn: '2' }}>
-                            <LocationInputV3
-                                value={returnDropoff?.name || returnDropoff?.address || ''}
-                                onChange={(locationUpdate) => onReturnDropoffChange({
-                                    ...returnDropoff,
-                                    ...locationUpdate,
-                                    type: 'dropoff',
-                                    id: returnDropoff?.id || 'return-dropoff',
-                                    address: locationUpdate.address || returnDropoff?.address || '',
-                                    isAirport: locationUpdate.isAirport ?? returnDropoff?.isAirport ?? false,
-                                    isValidated: locationUpdate.isValidated ?? false
-                                })}
-                                placeholder="Return dropoff location"
-                                type="dropoff"
-                                isAirport={returnDropoff?.isAirport}
-                            />
-                        </div>
-                        <div style={{ gridColumn: '3' }}></div>
-                    </div>
-
-                    {/* Flight Info for Return Pickup (if airport) */}
-                    {returnPickup?.isAirport && (
-                        <FlightInfoV3
-                            details={returnPickup.flightDetails}
-                            onChange={(details) => onReturnFlightDetailsChange('pickup', details)}
-                        />
+                    {/* Sync Button */}
+                    {isRouteComplete && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                console.log('[ReturnTripV3] Syncing return trip from main trip');
+                                syncReturnTripFromMain();
+                            }}
+                            style={{
+                                padding: '0.5rem 0.75rem',
+                                backgroundColor: '#f3f4f6',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                color: '#374151',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#e5e7eb';
+                                e.currentTarget.style.borderColor = '#9ca3af';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                            }}
+                            title="Copy locations from main trip in reverse order"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            Copy from Main Trip
+                        </button>
                     )}
 
-                    {/* Flight Info for Return Dropoff (if airport) */}
-                    {returnDropoff?.isAirport && (
-                        <FlightInfoV3
-                            details={returnDropoff.flightDetails}
-                            onChange={(details) => onReturnFlightDetailsChange('dropoff', details)}
-                        />
-                    )}
+                    {/* Return Trip Route */}
+                    <TripRouteV3
+                        pickup={returnPickup}
+                        dropoff={returnDropoff}
+                        stops={returnStops}
+                        onPickupChange={onReturnPickupChange}
+                        onDropoffChange={onReturnDropoffChange}
+                        onStopChange={updateReturnStop}
+                        onAddStop={addReturnStop}
+                        onRemoveStop={removeReturnStop}
+                        onSwapLocations={() => {
+                            const temp = returnPickup;
+                            onReturnPickupChange(returnDropoff);
+                            onReturnDropoffChange(temp);
+                        }}
+                        onReorderStops={reorderReturnStops}
+                        onFlightDetailsChange={onReturnFlightDetailsChange}
+                        placeholderPrefix="Return"
+                    />
                 </div>
             )}
         </div>

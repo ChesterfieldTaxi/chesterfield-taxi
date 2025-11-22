@@ -70,7 +70,7 @@ export const mockPricingRules: PricingRules = {
         Sedan: {
             name: "Sedan",
             enabled: true,
-            maxPassengers: 3,
+            maxPassengers: 4,
             modifier: {
                 type: "fixed",
                 amount: 0
@@ -79,7 +79,7 @@ export const mockPricingRules: PricingRules = {
         SUV: {
             name: "SUV",
             enabled: true,
-            maxPassengers: 5,
+            maxPassengers: 4,
             modifier: {
                 type: "fixed",
                 amount: 10
@@ -88,7 +88,7 @@ export const mockPricingRules: PricingRules = {
         Minivan: {
             name: "Minivan",
             enabled: true,
-            maxPassengers: 5,
+            maxPassengers: 6,
             modifier: {
                 type: "fixed",
                 amount: 10

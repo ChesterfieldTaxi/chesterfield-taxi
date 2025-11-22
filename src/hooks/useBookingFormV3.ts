@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import type { BookingDetails } from '../types/pricing';
 import { usePricingRules } from './usePricingRules';
 import { calculateFare } from '../utils/pricingEngine';
+import { reverseTrip } from '../utils/tripReversal';
 
 export interface Location {
     id: string;
@@ -59,9 +60,11 @@ interface BookingFormV3State {
     returnRouteType: 'reverse' | 'custom';
     returnPickup: Location | null;
     returnDropoff: Location | null;
+    returnStops: Location[];
 
     // Payment
-    paymentMethod: 'cash' | 'account';
+    paymentMethod: 'cash' | 'account' | 'prepaid';
+
     accountNumber: string;
     authCode: string;
     driverNotes: string;
@@ -93,6 +96,7 @@ export function useBookingFormV3() {
         returnRouteType: 'reverse',
         returnPickup: null,
         returnDropoff: null,
+        returnStops: [],
         paymentMethod: 'cash',
         accountNumber: '',
         authCode: '',
@@ -125,10 +129,19 @@ export function useBookingFormV3() {
                         flightDetails: undefined // Clear flight info for user to re-enter
                     };
 
+                    // Reverse stops for return trip
+                    const newReturnStops: Location[] = [...prev.stops].reverse().map((stop, index) => ({
+                        ...stop,
+                        id: `return-stop-${index}`,
+                        type: 'stop',
+                        flightDetails: undefined // Clear flight details
+                    }));
+
                     return {
                         ...prev,
                         returnPickup: newReturnPickup,
-                        returnDropoff: newReturnDropoff
+                        returnDropoff: newReturnDropoff,
+                        returnStops: newReturnStops
                     };
                 });
             }
@@ -138,10 +151,11 @@ export function useBookingFormV3() {
                 ...prev,
                 returnPickup: null,
                 returnDropoff: null,
+                returnStops: [],
                 returnDateTime: null
             }));
         }
-    }, [state.isReturnTrip, state.pickup?.address, state.dropoff?.address]);
+    }, [state.isReturnTrip, state.pickup?.address, state.dropoff?.address, state.stops.length]);
 
 
     // Auto-select Minivan if car seats are selected
@@ -314,7 +328,86 @@ export function useBookingFormV3() {
         });
     };
 
-    const setPaymentMethod = (method: 'cash' | 'account') => setState(prev => ({ ...prev, paymentMethod: method }));
+    // Return trip stop management
+    const addReturnStop = () => {
+        setState(prev => ({
+            ...prev,
+            returnStops: [
+                ...prev.returnStops,
+                {
+                    id: `return-stop-${Math.random().toString(36).substr(2, 9)}`,
+                    address: '',
+                    type: 'stop',
+                    isAirport: false,
+                    isValidated: false
+                }
+            ]
+        }));
+    };
+
+    const removeReturnStop = (id: string) => {
+        setState(prev => ({
+            ...prev,
+            returnStops: prev.returnStops.filter(stop => stop.id !== id)
+        }));
+    };
+
+    const updateReturnStop = (id: string, updates: Partial<Location>) => {
+        setState(prev => ({
+            ...prev,
+            returnStops: prev.returnStops.map(stop =>
+                stop.id === id ? { ...stop, ...updates, isAirport: updates.isAirport ?? detectAirport(updates.address || stop.address) } : stop
+            )
+        }));
+    };
+
+    const reorderReturnStops = (fromIndex: number, toIndex: number) => {
+        setState(prev => {
+            const pickup = prev.returnPickup || { id: 'return-pickup', address: '', type: 'pickup', isAirport: false, isValidated: false };
+            const dropoff = prev.returnDropoff || { id: 'return-dropoff', address: '', type: 'dropoff', isAirport: false, isValidated: false };
+
+            const allLocations = [pickup, ...prev.returnStops, dropoff];
+
+            // Perform the reorder
+            const [movedItem] = allLocations.splice(fromIndex, 1);
+            allLocations.splice(toIndex, 0, movedItem);
+
+            // Reassign types based on new positions
+            const newReturnPickup = { ...allLocations[0], type: 'pickup' as const };
+            const newReturnDropoff = { ...allLocations[allLocations.length - 1], type: 'dropoff' as const };
+            const newReturnStops = allLocations.slice(1, -1).map(loc => ({ ...loc, type: 'stop' as const }));
+
+            return {
+                ...prev,
+                returnPickup: newReturnPickup,
+                returnDropoff: newReturnDropoff,
+                returnStops: newReturnStops
+            };
+        });
+    };
+
+
+    /**
+     * Syncs return trip from main trip by reversing the route
+     * Uses pure reverseTrip utility for business logic
+     */
+    const syncReturnTripFromMain = () => {
+        const reversed = reverseTrip({
+            pickup: state.pickup,
+            dropoff: state.dropoff,
+            stops: state.stops
+        });
+
+        setState(prev => ({
+            ...prev,
+            returnPickup: reversed.pickup,
+            returnDropoff: reversed.dropoff,
+            returnStops: reversed.stops
+        }));
+    };
+
+
+    const setPaymentMethod = (method: 'cash' | 'account' | 'prepaid') => setState(prev => ({ ...prev, paymentMethod: method }));
     const setName = (name: string) => setState(prev => ({ ...prev, name }));
     const setPhone = (phone: string) => setState(prev => ({ ...prev, phone }));
     const setEmail = (email: string) => setState(prev => ({ ...prev, email }));
@@ -340,6 +433,7 @@ export function useBookingFormV3() {
             returnRouteType: 'reverse',
             returnPickup: null,
             returnDropoff: null,
+            returnStops: [],
             paymentMethod: 'cash',
             accountNumber: '',
             authCode: '',
@@ -396,6 +490,13 @@ export function useBookingFormV3() {
         setReturnPickup,
         setReturnDropoff,
         setReturnFlightDetails,
+        addReturnStop,
+        removeReturnStop,
+        updateReturnStop,
+        reorderReturnStops,
+        syncReturnTripFromMain,
+        returnStops: state.returnStops,
+
 
         // Special request setters
         toggleSpecialRequest,
