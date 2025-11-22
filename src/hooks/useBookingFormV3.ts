@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { BookingDetails } from '../types/pricing';
+import type { PaymentData } from '../components/booking_v3/payment_methods';
 import { usePricingRules } from './usePricingRules';
 import { calculateFare } from '../utils/pricingEngine';
 import { reverseTrip } from '../utils/tripReversal';
@@ -62,17 +63,14 @@ interface BookingFormV3State {
     returnDropoff: Location | null;
     returnStops: Location[];
 
-    // Payment
-    paymentMethod: 'cash' | 'account' | 'prepaid';
-
-    accountNumber: string;
-    authCode: string;
-    driverNotes: string;
+    // Payment (uses discriminated union)
+    payment: PaymentData;
 
     // Contact
     name: string;
     phone: string;
     email: string;
+    driverNotes: string;
 }
 
 export function useBookingFormV3() {
@@ -97,13 +95,14 @@ export function useBookingFormV3() {
         returnPickup: null,
         returnDropoff: null,
         returnStops: [],
-        paymentMethod: 'cash',
-        accountNumber: '',
-        authCode: '',
-        driverNotes: '',
+        payment: {
+            method: 'cash',
+            timestamp: new Date()
+        },
         name: '',
         phone: '',
-        email: ''
+        email: '',
+        driverNotes: ''
     });
 
     // Auto-populate return trip locations when enabled (reverse of main trip)
@@ -407,12 +406,11 @@ export function useBookingFormV3() {
     };
 
 
-    const setPaymentMethod = (method: 'cash' | 'account' | 'prepaid') => setState(prev => ({ ...prev, paymentMethod: method }));
+    // Payment setter (uses PaymentData type)
+    const setPayment = (payment: PaymentData) => setState(prev => ({ ...prev, payment }));
     const setName = (name: string) => setState(prev => ({ ...prev, name }));
     const setPhone = (phone: string) => setState(prev => ({ ...prev, phone }));
     const setEmail = (email: string) => setState(prev => ({ ...prev, email }));
-    const setAccountNumber = (accountNumber: string) => setState(prev => ({ ...prev, accountNumber }));
-    const setAuthCode = (authCode: string) => setState(prev => ({ ...prev, authCode }));
     const setDriverNotes = (notes: string) => setState(prev => ({ ...prev, driverNotes: notes }));
     const setGateCode = (code: string) => setState(prev => ({ ...prev, gateCode: code }));
 
@@ -436,13 +434,14 @@ export function useBookingFormV3() {
             returnPickup: null,
             returnDropoff: null,
             returnStops: [],
-            paymentMethod: 'cash',
-            accountNumber: '',
-            authCode: '',
-            driverNotes: '',
+            payment: {
+                method: 'cash',
+                timestamp: new Date()
+            },
             name: '',
             phone: '',
-            email: ''
+            email: '',
+            driverNotes: ''
         });
     };
 
@@ -505,12 +504,10 @@ export function useBookingFormV3() {
         setGateCode,
 
         // Payment & contact setters
-        setPaymentMethod,
+        setPayment,
         setName,
         setPhone,
         setEmail,
-        setAccountNumber,
-        setAuthCode,
         setDriverNotes,
 
         // Utility

@@ -1,161 +1,129 @@
 import React from 'react';
+import {
+    PAYMENT_METHODS,
+    getPaymentMethod,
+    getDefaultPaymentMethod,
+    type PaymentData,
+    type PaymentMethodType
+} from './payment_methods';
 
 interface PaymentMethodV3Props {
-    paymentMethod: 'cash' | 'account' | 'prepaid';
-    accountNumber: string;
-    authCode: string;
-    onPaymentMethodChange: (method: 'cash' | 'account' | 'prepaid') => void;
-    onAccountNumberChange: (accountNumber: string) => void;
-    onAuthCodeChange: (authCode: string) => void;
+    value: PaymentData;
+    onChange: (data: PaymentData) => void;
 }
 
 /**
- * Payment method selection component
- * Supports Cash/Card, Account, and Prepaid payment methods
+ * Payment Method Container Component
+ * Dynamically renders payment form based on selected method
  */
 export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
-    paymentMethod,
-    accountNumber,
-    authCode,
-    onPaymentMethodChange,
-    onAccountNumberChange,
-    onAuthCodeChange
+    value,
+    onChange
 }) => {
+    const [isValid, setIsValid] = React.useState(true);
+    const currentMethod = value.method;
+    const methodConfig = getPaymentMethod(currentMethod);
+
+    // Handle payment method change
+    const handleMethodChange = (newMethod: PaymentMethodType) => {
+        // Create appropriate initial data for the new method
+        const newData: PaymentData = {
+            method: newMethod,
+            timestamp: new Date()
+        } as PaymentData;
+
+        // Preserve any existing data if switching back
+        if (newMethod === 'corporate_account') {
+            newData.accountNumber = '';
+            newData.authorizationCode = '';
+        }
+
+        onChange(newData);
+    };
+
+    // Get the appropriate payment form component
+    const PaymentForm = methodConfig?.component;
+
     return (
         <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px' }}>
+            {/* Payment Method Selector */}
+            <label style={{
+                display: 'block',
+                marginBottom: '0.5rem',
+                fontWeight: 500,
+                fontSize: '16px',
+                color: '#111827'
+            }}>
                 Payment Method
             </label>
 
-            {/* Payment Method Buttons */}
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                    type="button"
-                    onClick={() => onPaymentMethodChange('cash')}
-                    style={{
-                        flex: 1,
-                        padding: '0.625rem',
-                        border: `2px solid ${paymentMethod === 'cash' ? '#2563eb' : '#e5e7eb'}`,
-                        borderRadius: '4px',
-                        backgroundColor: paymentMethod === 'cash' ? '#eff6ff' : 'white',
-                        color: paymentMethod === 'cash' ? '#2563eb' : '#6b7280',
-                        fontWeight: 500,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Cash/Card
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => onPaymentMethodChange('account')}
-                    style={{
-                        flex: 1,
-                        padding: '0.625rem',
-                        border: `2px solid ${paymentMethod === 'account' ? '#2563eb' : '#e5e7eb'}`,
-                        borderRadius: '4px',
-                        backgroundColor: paymentMethod === 'account' ? '#eff6ff' : 'white',
-                        color: paymentMethod === 'account' ? '#2563eb' : '#6b7280',
-                        fontWeight: 500,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Account
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => onPaymentMethodChange('prepaid')}
-                    style={{
-                        flex: 1,
-                        padding: '0.625rem',
-                        border: `2px solid ${paymentMethod === 'prepaid' ? '#2563eb' : '#e5e7eb'}`,
-                        borderRadius: '4px',
-                        backgroundColor: paymentMethod === 'prepaid' ? '#eff6ff' : 'white',
-                        color: paymentMethod === 'prepaid' ? '#2563eb' : '#6b7280',
-                        fontWeight: 500,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Prepaid
-                </button>
+            <div style={{
+                display: 'flex',
+                gap: '0.75rem',
+                marginBottom: '1rem',
+                flexWrap: 'wrap'
+            }}>
+                {PAYMENT_METHODS.filter(m => m.enabled !== false).map((method) => (
+                    <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => handleMethodChange(method.id)}
+                        title={method.description}
+                        style={{
+                            flex: '1 1 auto',
+                            minWidth: '120px',
+                            padding: '0.625rem 0.875rem',
+                            border: `2px solid ${currentMethod === method.id ? '#2563eb' : '#e5e7eb'}`,
+                            borderRadius: '6px',
+                            backgroundColor: currentMethod === method.id ? '#eff6ff' : 'white',
+                            color: currentMethod === method.id ? '#2563eb' : '#6b7280',
+                            fontWeight: 500,
+                            fontSize: '15px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            outline: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (currentMethod !== method.id) {
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                                e.currentTarget.style.backgroundColor = '#f9fafb';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (currentMethod !== method.id) {
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                e.currentTarget.style.backgroundColor = 'white';
+                            }
+                        }}
+                    >
+                        {method.label}
+                    </button>
+                ))}
             </div>
 
-            {/* Account Details */}
-            {paymentMethod === 'account' && (
-                <div style={{
-                    marginTop: '0.75rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                    animation: 'fadeIn 0.3s ease-out'
-                }}>
-                    <input
-                        type="text"
-                        value={accountNumber}
-                        onChange={(e) => onAccountNumberChange(e.target.value)}
-                        placeholder="Account Number"
-                        style={{
-                            width: '100%',
-                            padding: '0.625rem 0.75rem',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            fontSize: '16px',
-                            transition: 'border-color 0.2s ease',
-                            outline: 'none'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                        onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                    />
-                    <input
-                        type="text"
-                        value={authCode}
-                        onChange={(e) => onAuthCodeChange(e.target.value)}
-                        placeholder="Authorization Code"
-                        style={{
-                            width: '100%',
-                            padding: '0.625rem 0.75rem',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            fontSize: '16px',
-                            transition: 'border-color 0.2s ease',
-                            outline: 'none'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                        onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+            {/* Dynamic Payment Form */}
+            {PaymentForm && (
+                <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                    <PaymentForm
+                        value={value}
+                        onChange={onChange}
+                        onValidate={setIsValid}
                     />
                 </div>
             )}
 
-            {/* Prepaid Details */}
-            {paymentMethod === 'prepaid' && (
+            {/* Validation feedback (for future use) */}
+            {!isValid && methodConfig?.requiresAuth && (
                 <div style={{
                     marginTop: '0.75rem',
-                    animation: 'fadeIn 0.3s ease-out'
+                    padding: '0.625rem 0.75rem',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: '#991b1b'
                 }}>
-                    <input
-                        type="text"
-                        value={authCode}
-                        onChange={(e) => onAuthCodeChange(e.target.value)}
-                        placeholder="Prepaid Voucher Code"
-                        style={{
-                            width: '100%',
-                            padding: '0.625rem 0.75rem',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            fontSize: '16px',
-                            transition: 'border-color 0.2s ease',
-                            outline: 'none'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                        onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                    />
+                    Please complete all required fields
                 </div>
             )}
         </div>
