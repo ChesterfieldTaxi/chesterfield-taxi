@@ -6,7 +6,8 @@ import { PassengerCounterV3 } from './PassengerCounterV3';
 import { VehicleSelectorV3 } from './VehicleSelectorV3';
 import { SpecialRequestsV3 } from './SpecialRequestsV3';
 import { ReturnTripV3 } from './ReturnTripV3';
-import { ContactPaymentV3 } from './ContactPaymentV3';
+import { ContactInfoV3 } from './ContactInfoV3';
+import { PaymentMethodV3 } from './PaymentMethodV3';
 
 /**
  * Section Wrapper with light gray background
@@ -210,23 +211,29 @@ export const BookingFlowV3: React.FC = () => {
                     />
                 </SectionWrapper>
 
-                {/* Step 7: Contact & Payment */}
-                <SectionWrapper title="Contact & Payment">
-                    <ContactPaymentV3
+                {/* Step 7: Contact Information */}
+                <SectionWrapper title="Contact Information">
+                    <ContactInfoV3
                         name={state.name}
                         phone={state.phone}
                         email={state.email}
-                        paymentMethod={state.paymentMethod}
-                        accountNumber={state.accountNumber}
-                        authCode={state.authCode}
                         driverNotes={state.driverNotes}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}
+                        onDriverNotesChange={setDriverNotes}
+                    />
+                </SectionWrapper>
+
+                {/* Step 8: Payment Method */}
+                <SectionWrapper title="Payment Method">
+                    <PaymentMethodV3
+                        paymentMethod={state.paymentMethod}
+                        accountNumber={state.accountNumber}
+                        authCode={state.authCode}
                         onPaymentMethodChange={setPaymentMethod}
                         onAccountNumberChange={setAccountNumber}
                         onAuthCodeChange={setAuthCode}
-                        onDriverNotesChange={setDriverNotes}
                     />
                 </SectionWrapper>
             </div>
