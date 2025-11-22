@@ -94,7 +94,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     ...locationUpdate,
                                     type: 'pickup',
                                     id: pickup?.id || 'pickup',
-                                    address: locationUpdate.address || pickup?.address || '',
+                                    address: locationUpdate.address !== undefined ? locationUpdate.address : (pickup?.address || ''),
                                     isAirport: locationUpdate.isAirport ?? pickup?.isAirport ?? false,
                                     isValidated: locationUpdate.isValidated ?? false
                                 })}
@@ -113,7 +113,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     ...locationUpdate,
                                     type: 'dropoff',
                                     id: dropoff?.id || 'dropoff',
-                                    address: locationUpdate.address || dropoff?.address || '',
+                                    address: locationUpdate.address !== undefined ? locationUpdate.address : (dropoff?.address || ''),
                                     isAirport: locationUpdate.isAirport ?? dropoff?.isAirport ?? false,
                                     isValidated: locationUpdate.isValidated ?? false
                                 })}
@@ -185,7 +185,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                                         ...locationUpdate,
                                                         type: 'pickup',
                                                         id: pickup?.id || 'pickup',
-                                                        address: locationUpdate.address || pickup?.address || '',
+                                                        address: locationUpdate.address !== undefined ? locationUpdate.address : (pickup?.address || ''),
                                                         isAirport: locationUpdate.isAirport ?? pickup?.isAirport ?? false,
                                                         isValidated: locationUpdate.isValidated ?? false
                                                     });
@@ -195,7 +195,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                                         ...locationUpdate,
                                                         type: 'dropoff',
                                                         id: dropoff?.id || 'dropoff',
-                                                        address: locationUpdate.address || dropoff?.address || '',
+                                                        address: locationUpdate.address !== undefined ? locationUpdate.address : (dropoff?.address || ''),
                                                         isAirport: locationUpdate.isAirport ?? dropoff?.isAirport ?? false,
                                                         isValidated: locationUpdate.isValidated ?? false
                                                     });

@@ -200,10 +200,17 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         <button
                             type="button"
                             onClick={() => {
+                                console.log('[LocationInputV3] Clearing location', { type, previousValue: inputValue });
                                 setInputValue('');
                                 onChange({
                                     address: '',
-                                    isValidated: false
+                                    name: undefined,
+                                    isValidated: false,
+                                    isAirport: false,
+                                    adminLocationId: undefined,
+                                    placeId: undefined,
+                                    coordinates: undefined,
+                                    flightDetails: undefined
                                 });
                             }}
                             style={{
@@ -213,18 +220,18 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                                 border: 'none',
                                 background: 'none',
                                 cursor: 'pointer',
-                                color: '#9ca3af',
+                                color: '#ef4444',
                                 display: 'flex',
                                 alignItems: 'center',
                                 transition: 'color 0.15s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#6b7280'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#ef4444'}
+                            title="Clear location"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="15" y1="9" x2="9" y2="15"></line>
-                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
                             </svg>
                         </button>
                     )}
