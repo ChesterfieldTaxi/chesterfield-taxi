@@ -8,6 +8,7 @@ import { SpecialRequestsV3 } from './SpecialRequestsV3';
 import { ReturnTripV3 } from './ReturnTripV3';
 import { ContactInfoV3 } from './ContactInfoV3';
 import { PaymentMethodV3 } from './PaymentMethodV3';
+import { StickyPriceFooter } from './StickyPriceFooter';
 
 /**
  * Section Wrapper with light gray background
@@ -53,8 +54,9 @@ export const BookingFlowV3: React.FC = () => {
         setName,
         setPhone,
         setEmail,
-        setPayment,
         setDriverNotes,
+        setConsentGiven,
+        setPayment,
         addStop,
         removeStop,
         updateStop,
@@ -68,8 +70,20 @@ export const BookingFlowV3: React.FC = () => {
         removeReturnStop,
         updateReturnStop,
         reorderReturnStops,
-        syncReturnTripFromMain
+        syncReturnTripFromMain,
+        isCalculatingPrice,
+        isSubmitting,
+        setIsSubmitting
     } = useBookingFormV3();
+
+    const handleBookRide = async () => {
+        setIsSubmitting(true);
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setIsSubmitting(false);
+        alert('Booking Request Received! (This is a demo)');
+        console.log('Booking submitted:', state);
+    };
 
     // TODO: Calculate prices for each vehicle type
     const vehiclePrices = fareBreakdown ? {
@@ -216,10 +230,12 @@ export const BookingFlowV3: React.FC = () => {
                         phone={state.phone}
                         email={state.email}
                         driverNotes={state.driverNotes}
+                        consentGiven={state.consentGiven}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}
                         onDriverNotesChange={setDriverNotes}
+                        onConsentChange={setConsentGiven}
                     />
                 </SectionWrapper>
 
@@ -232,53 +248,13 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
             </div>
 
-            {/* Sticky Price Footer - Centered with Max-Width */}
-            <div style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                display: 'flex',
-                justifyContent: 'center',
-                backgroundColor: 'white',
-                borderTop: '1px solid #e5e7eb',
-                padding: '0.875rem 1rem',
-                boxShadow: '0 -2px 10px rgba(0,0,0,0.08)',
-                zIndex: 100
-            }}>
-                <div style={{
-                    width: '100%',
-                    maxWidth: '600px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                }}>
-                    <div>
-                        <div style={{ fontSize: '11px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 500 }}>Estimated Total</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>
-                            {fareBreakdown ? `$${fareBreakdown.total}` : '--'}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        style={{
-                            padding: '0.75rem 2rem',
-                            backgroundColor: '#10b981',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '15px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}
-                    >
-                        Book Ride
-                    </button>
-                </div>
-            </div>
+            {/* Sticky Price Footer */}
+            <StickyPriceFooter
+                total={fareBreakdown?.total || 0}
+                isLoading={isCalculatingPrice}
+                isSubmitting={isSubmitting}
+                onBookClick={handleBookRide}
+            />
         </div>
     );
 };

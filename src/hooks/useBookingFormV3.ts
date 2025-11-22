@@ -4,6 +4,7 @@ import { PaymentData } from '../components/booking_v3/payment_methods';
 import { usePricingRules } from './usePricingRules';
 import { calculateFare } from '../utils/pricingEngine';
 import { reverseTrip } from '../utils/tripReversal';
+import { calculateRouteDistance } from '../services/distanceCalculator';
 
 export interface Location {
     id: string;
@@ -36,6 +37,8 @@ export interface BookingFormV3State {
 
     // Distance (from Google Maps API)
     distanceInYards: number;
+    isCalculatingPrice: boolean;
+    isSubmitting: boolean;
 
     // Vehicle & Passengers
     vehicleType: 'Sedan' | 'SUV' | 'Minivan' | 'Any';
@@ -71,6 +74,7 @@ export interface BookingFormV3State {
     phone: string;
     email: string;
     driverNotes: string;
+    consentGiven: boolean;
 }
 
 export function useBookingFormV3() {
@@ -81,6 +85,8 @@ export function useBookingFormV3() {
         dropoff: null,
         stops: [],
         distanceInYards: 0,
+        isCalculatingPrice: false,
+        isSubmitting: false,
         vehicleType: 'Any',
         passengerCount: 1,
         luggageCount: 1,
@@ -102,7 +108,8 @@ export function useBookingFormV3() {
         name: '',
         phone: '',
         email: '',
-        driverNotes: ''
+        driverNotes: '',
+        consentGiven: false
     });
 
     // Auto-populate return trip locations when enabled (reverse of main trip)
@@ -155,6 +162,43 @@ export function useBookingFormV3() {
             }));
         }
     }, [state.isReturnTrip, state.pickup?.address, state.dropoff?.address, state.stops.length]);
+
+    // Calculate distance when locations change
+    useEffect(() => {
+        const calculateDistance = async () => {
+            // Need both pickup and dropoff with coordinates to calculate
+            if (!state.pickup?.coordinates || !state.dropoff?.coordinates) {
+                setDistance(0);
+                return;
+            }
+
+            setState(prev => ({ ...prev, isCalculatingPrice: true }));
+
+            try {
+                const pickupPoint = { coordinates: state.pickup.coordinates };
+                const dropoffPoint = { coordinates: state.dropoff.coordinates };
+                const stopPoints = state.stops
+                    .filter(s => s.coordinates)
+                    .map(s => ({ coordinates: s.coordinates! }));
+
+                const distance = await calculateRouteDistance(pickupPoint, dropoffPoint, stopPoints);
+                setDistance(distance);
+            } catch (error) {
+                console.error('Error calculating distance:', error);
+                setDistance(0);
+            } finally {
+                setState(prev => ({ ...prev, isCalculatingPrice: false }));
+            }
+        };
+
+        // Debounce API calls
+        const timer = setTimeout(calculateDistance, 1000);
+        return () => clearTimeout(timer);
+    }, [
+        state.pickup?.placeId,
+        state.dropoff?.placeId,
+        state.stops.map(s => s.placeId).join(',')
+    ]);
 
 
     // Auto-select Minivan if car seats are selected
@@ -412,6 +456,7 @@ export function useBookingFormV3() {
     const setPhone = (phone: string) => setState(prev => ({ ...prev, phone }));
     const setEmail = (email: string) => setState(prev => ({ ...prev, email }));
     const setDriverNotes = (notes: string) => setState(prev => ({ ...prev, driverNotes: notes }));
+    const setConsentGiven = (consent: boolean) => setState(prev => ({ ...prev, consentGiven: consent }));
     const setGateCode = (code: string) => setState(prev => ({ ...prev, gateCode: code }));
 
     const resetForm = () => {
@@ -420,6 +465,8 @@ export function useBookingFormV3() {
             dropoff: null,
             stops: [],
             distanceInYards: 0,
+            isCalculatingPrice: false,
+            isSubmitting: false,
             vehicleType: 'Any',
             passengerCount: 1,
             luggageCount: 1,
@@ -441,7 +488,8 @@ export function useBookingFormV3() {
             name: '',
             phone: '',
             email: '',
-            driverNotes: ''
+            driverNotes: '',
+            consentGiven: false
         });
     };
 
@@ -462,6 +510,8 @@ export function useBookingFormV3() {
         effectiveVehicleType,
         fareBreakdown,
         rulesLoading,
+        isCalculatingPrice: state.isCalculatingPrice,
+        isSubmitting: state.isSubmitting,
 
         // Location setters
         setPickup,
@@ -509,6 +559,8 @@ export function useBookingFormV3() {
         setPhone,
         setEmail,
         setDriverNotes,
+        setConsentGiven,
+        setIsSubmitting: (isSubmitting: boolean) => setState(prev => ({ ...prev, isSubmitting })),
 
         // Utility
         resetForm

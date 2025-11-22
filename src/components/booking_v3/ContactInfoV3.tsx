@@ -5,10 +5,12 @@ interface ContactInfoV3Props {
     phone: string;
     email: string;
     driverNotes: string;
+    consentGiven: boolean;
     onNameChange: (name: string) => void;
     onPhoneChange: (phone: string) => void;
     onEmailChange: (email: string) => void;
     onDriverNotesChange: (notes: string) => void;
+    onConsentChange: (consent: boolean) => void;
 }
 
 /**
@@ -65,10 +67,12 @@ export const ContactInfoV3: React.FC<ContactInfoV3Props> = ({
     phone,
     email,
     driverNotes,
+    consentGiven,
     onNameChange,
     onPhoneChange,
     onEmailChange,
-    onDriverNotesChange
+    onDriverNotesChange,
+    onConsentChange
 }) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -138,6 +142,55 @@ export const ContactInfoV3: React.FC<ContactInfoV3Props> = ({
                     onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
                     onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
                 />
+            </div>
+
+            {/* Consent Checkbox - TCPA Compliance */}
+            <div style={{ marginTop: '0.5rem' }}>
+                <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    padding: '0.75rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb'
+                }}>
+                    < input
+                        type="checkbox"
+                        checked={consentGiven}
+                        onChange={(e) => onConsentChange(e.target.checked)}
+                        required
+                        style={{
+                            marginTop: '0.25rem',
+                            width: '16px',
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: '#2563eb'
+                        }}
+                    />
+                    <span style={{
+                        fontSize: '13px',
+                        lineHeight: '1.5',
+                        color: '#374151'
+                    }}>
+                        I agree to receive booking confirmations, updates, and service notifications
+                        via phone, email, or SMS. Standard message rates may apply.{' '}
+                        <a
+                            href="/privacy-policy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                color: '#2563eb',
+                                textDecoration: 'underline',
+                                fontWeight: 500
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            Privacy Policy
+                        </a>
+                    </span>
+                </label>
             </div>
         </div>
     );

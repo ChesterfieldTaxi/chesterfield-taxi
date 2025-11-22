@@ -195,6 +195,28 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         }}
                     />
 
+                    {/* Loading Spinner */}
+                    {loading && (
+                        <div style={{
+                            position: 'absolute',
+                            right: inputValue ? '32px' : '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            animation: 'spin 1s linear infinite',
+                            pointerEvents: 'none'
+                        }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75"></path>
+                            </svg>
+                        </div>
+                    )}
+                    <style>{`
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    `}</style>
+
                     {/* Clear Button */}
                     {inputValue && (
                         <button

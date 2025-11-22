@@ -3,7 +3,6 @@ import Layout from './components/Layout';
 
 import Home from './pages/Home';
 import Services from './pages/Services';
-import Reservations from './pages/Reservations';
 import ReservationsV2 from './pages/ReservationsV2';
 import { PricingTest } from './pages/PricingTest';
 import ReservationsV3 from './pages/ReservationsV3';
@@ -12,16 +11,9 @@ import About from './pages/About';
 import Careers from './pages/Careers';
 import Contact from './pages/Contact';
 import Legal from './pages/Legal';
-
-// Placeholder pages
-// const Home = () => <div className="container section"><h2>Home Page</h2></div>;
-// const Services = () => <div className="container section"><h2>Services Page</h2></div>;
-// const Reservations = () => <div className="container section"><h2>Reservations Page</h2></div>;
-// const Fleet = () => <div className="container section"><h2>Fleet Page</h2></div>;
-// const About = () => <div className="container section"><h2>About Page</h2></div>;
-// const Careers = () => <div className="container section"><h2>Careers Page</h2></div>;
-// const Contact = () => <div className="container section"><h2>Contact Page</h2></div>;
-// const Legal = () => <div className="container section"><h2>Legal Page</h2></div>;
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import { HelpFAB } from './shared/components/HelpFAB';
 
 function App() {
   return (
@@ -30,7 +22,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="services" element={<Services />} />
-          <Route path="reservations" element={<Reservations />} />
+          <Route path="reservations" element={<ReservationsV3 />} />
           <Route path="v2" element={<ReservationsV2 />} />
           <Route path="v3" element={<ReservationsV3 />} />
           <Route path="pricing-test" element={<PricingTest />} />
@@ -39,8 +31,11 @@ function App() {
           <Route path="careers" element={<Careers />} />
           <Route path="contact" element={<Contact />} />
           <Route path="legal" element={<Legal />} />
+          <Route path="privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="terms-of-service" element={<TermsOfService />} />
         </Route>
       </Routes>
+      <HelpFAB />
     </BrowserRouter>
   );
 }

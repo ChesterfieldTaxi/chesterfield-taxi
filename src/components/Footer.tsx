@@ -42,8 +42,8 @@ const Footer: React.FC = () => {
           <div className="footer-col">
             <h4>Legal</h4>
             <ul className="footer-links">
-              <li><Link to="/legal">Privacy Policy</Link></li>
-              <li><Link to="/legal">Terms of Service</Link></li>
+              <li><Link to="/privacy-policy">Privacy Policy</Link></li>
+              <li><Link to="/terms-of-service">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

@@ -1,17 +1,20 @@
 import React from 'react';
 import Header from './Header';
 import Footer from './Footer';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 const Layout: React.FC = () => {
-    return (
-        <div className="layout">
-            <Header />
-            <main className="main-content">
-                <Outlet />
-            </main>
-            <Footer />
-            <style>{`
+  const location = useLocation();
+  const hideFooter = ['/reservations', '/v2', '/v3'].includes(location.pathname);
+
+  return (
+    <div className="layout">
+      <Header />
+      <main className="main-content">
+        <Outlet />
+      </main>
+      {!hideFooter && <Footer />}
+      <style>{`
         .layout {
           display: flex;
           flex-direction: column;
@@ -21,8 +24,8 @@ const Layout: React.FC = () => {
           flex: 1;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default Layout;
