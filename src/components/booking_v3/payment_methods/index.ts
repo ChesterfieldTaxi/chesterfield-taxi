@@ -71,4 +71,4 @@ export function getDefaultPaymentMethod(): PaymentMethodType {
 }
 
 // Re-export types for convenience
-export { PaymentMethodType, PaymentMethodConfig, PaymentData, PaymentFormProps } from './types';
+export type { PaymentMethodType, PaymentMethodConfig, PaymentData, PaymentFormProps } from './types';
