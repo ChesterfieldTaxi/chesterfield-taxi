@@ -1,5 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBookingFormV3 } from '../../hooks/useBookingFormV3';
+import { generateBookingReference } from '../../utils/bookingUtils';
 import { TripDetailsV3 } from './TripDetailsV3';
 import { TimeSelectorV3 } from './TimeSelectorV3';
 import { PassengerCounterV3 } from './PassengerCounterV3';
@@ -34,6 +36,7 @@ const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNo
  * Compact, professional minimal design
  */
 export const BookingFlowV3: React.FC = () => {
+    const navigate = useNavigate();
     const {
         state,
         effectiveVehicleType,
@@ -78,11 +81,22 @@ export const BookingFlowV3: React.FC = () => {
 
     const handleBookRide = async () => {
         setIsSubmitting(true);
+
         // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Generate booking reference
+        const bookingRef = generateBookingReference();
+
+        // Navigate to confirmation page with booking data
+        navigate('/confirmation', {
+            state: {
+                bookingRef,
+                bookingData: state
+            }
+        });
+
         setIsSubmitting(false);
-        alert('Booking Request Received! (This is a demo)');
-        console.log('Booking submitted:', state);
     };
 
     // TODO: Calculate prices for each vehicle type

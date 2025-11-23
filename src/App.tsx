@@ -13,6 +13,7 @@ import Contact from './pages/Contact';
 import Legal from './pages/Legal';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import { BookingConfirmation } from './pages/BookingConfirmation';
 import { HelpFAB } from './shared/components/HelpFAB';
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
           <Route path="legal" element={<Legal />} />
           <Route path="privacy-policy" element={<PrivacyPolicy />} />
           <Route path="terms-of-service" element={<TermsOfService />} />
+          <Route path="confirmation" element={<BookingConfirmation />} />
         </Route>
       </Routes>
       <HelpFAB />
