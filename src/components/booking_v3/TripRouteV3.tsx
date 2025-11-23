@@ -16,6 +16,8 @@ interface TripRouteV3Props {
     onReorderStops: (fromIndex: number, toIndex: number) => void;
     onFlightDetailsChange: (locationType: 'pickup' | 'dropoff', details: { airline: string; flightNumber: string; origin?: string }) => void;
     placeholderPrefix?: string;
+    distanceInYards?: number;
+    isCalculatingDistance?: boolean;
 }
 
 /**
@@ -34,7 +36,9 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
     onSwapLocations,
     onReorderStops,
     onFlightDetailsChange,
-    placeholderPrefix = ''
+    placeholderPrefix = '',
+    distanceInYards,
+    isCalculatingDistance
 }) => {
     const prefix = placeholderPrefix ? `${placeholderPrefix} ` : '';
 
