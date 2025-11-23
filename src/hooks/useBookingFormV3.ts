@@ -78,10 +78,10 @@ export interface BookingFormV3State {
     consentGiven: boolean;
 }
 
-export function useBookingFormV3() {
+export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
     const { rules, loading: rulesLoading } = usePricingRules(true);
 
-    const [state, setState] = useState<BookingFormV3State>({
+    const defaultState: BookingFormV3State = {
         pickup: null,
         dropoff: null,
         stops: [],
@@ -111,7 +111,12 @@ export function useBookingFormV3() {
         email: '',
         driverNotes: '',
         consentGiven: false
-    });
+    };
+
+    const [state, setState] = useState<BookingFormV3State>(() => ({
+        ...defaultState,
+        ...initialState // Merge in any persisted state
+    }));
 
     // Auto-populate return trip locations when enabled (reverse of main trip)
     useEffect(() => {
