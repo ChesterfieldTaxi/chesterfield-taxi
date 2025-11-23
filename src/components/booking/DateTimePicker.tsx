@@ -81,6 +81,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
         const month = currentDate.getMonth();
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time for accurate comparison
 
         const days = [];
         for (let i = 0; i < firstDay; i++) {
@@ -89,18 +91,28 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
 
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(year, month, day);
+            date.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+
             const isSelected = selectedDate &&
                 date.getDate() === selectedDate.getDate() &&
                 date.getMonth() === selectedDate.getMonth() &&
                 date.getFullYear() === selectedDate.getFullYear();
 
             const isToday = new Date().toDateString() === date.toDateString();
+            const isPast = date < today; // Disable past dates
 
             days.push(
                 <div
                     key={day}
-                    className={`dtp-datepicker-cell ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-                    onClick={() => handleDateClick(date)}
+                    className={`dtp-datepicker-cell ${isSelected ? 'selected' : ''
+                        } ${isToday ? 'today' : ''
+                        } ${isPast ? 'disabled' : ''
+                        }`}
+                    onClick={() => !isPast && handleDateClick(date)}
+                    style={{
+                        cursor: isPast ? 'not-allowed' : 'pointer',
+                        opacity: isPast ? 0.3 : 1
+                    }}
                 >
                     {day}
                 </div>
@@ -112,7 +124,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
     const formatDisplayDate = (date: Date | null) => {
         if (!date) return '';
 
-        // Format as: Friday, Nov 21, 2025 at 9:35 AM
+        // Format date: Friday, Nov 21, 2025
         const options: Intl.DateTimeFormatOptions = {
             weekday: 'long',
             month: 'short',
@@ -123,6 +135,14 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
 
         if (!showTimePicker) return dateStr;
 
+        // Only show time if user has explicitly selected hour, minute, and AM/PM
+        const hasCompleteTime = hour !== null && minute !== null && ampm !== null;
+        if (!hasCompleteTime) {
+            // Show only date until time is selected
+            return dateStr;
+        }
+
+        // Show full date + time: Friday, Nov 21, 2025 at 9:35 AM
         const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         return `${dateStr} at ${timeStr}`;
     };
