@@ -313,11 +313,22 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                 )}
             </div>
 
-            {/* Flight Info - Only for Pickup Airport */}
+            {/* Flight Info - Pickup from Airport */}
             {pickup?.isAirport && (
                 <FlightInfoV3
                     details={pickup.flightDetails}
                     onChange={(details) => onFlightDetailsChange('pickup', details)}
+                />
+            )}
+
+            {/* Flight Info - Dropoff to Airport (Airline only for terminal info) */}
+            {dropoff?.isAirport && (
+                <FlightInfoV3
+                    details={dropoff.flightDetails}
+                    onChange={(details) => onFlightDetailsChange('dropoff', details)}
+                    simplified={true}
+                    label="Departure Information"
+                    helperText="Which airline? This helps us take you to the correct terminal."
                 />
             )}
         </>
