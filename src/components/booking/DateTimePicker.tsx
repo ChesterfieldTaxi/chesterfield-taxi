@@ -22,6 +22,17 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
     const [minute, setMinute] = useState<number | null>(null);
     const [ampm, setAmpm] = useState<'AM' | 'PM' | null>(null);
 
+    // 🔥 NEW: Determine which field should be highlighted next
+    const getNextFieldHint = (): 'hour' | 'minute' | 'ampm' | null => {
+        if (!selectedDate) return null; // Date must be selected first
+        if (hour === null) return 'hour';
+        if (minute === null) return 'minute';
+        if (ampm === null) return 'ampm';
+        return null; // All fields complete
+    };
+
+    const nextHint = getNextFieldHint();
+
     useEffect(() => {
         if (value) {
             setSelectedDate(value);
@@ -178,7 +189,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                     <div className="dtp-time-footer">
                         <div className="dtp-time-select-group">
                             <select
-                                className="dtp-time-select"
+                                className={`dtp-time-select ${nextHint === 'hour' ? 'next-field-hint' : ''}`}
                                 value={hour ?? ''}
                                 onChange={(e) => {
                                     setHour(Number(e.target.value));
@@ -194,7 +205,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                             </select>
                             <span>:</span>
                             <select
-                                className="dtp-time-select"
+                                className={`dtp-time-select ${nextHint === 'minute' ? 'next-field-hint' : ''}`}
                                 value={minute ?? ''}
                                 onChange={(e) => {
                                     setMinute(Number(e.target.value));
@@ -209,7 +220,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                                 ))}
                             </select>
                             <button
-                                className="dtp-ampm-toggle"
+                                className={`dtp-ampm-toggle ${nextHint === 'ampm' ? 'next-field-hint' : ''}`}
                                 onClick={() => {
                                     const newAmpm = ampm === 'AM' ? 'PM' : ampm === 'PM' ? 'AM' : 'AM';
                                     setAmpm(newAmpm);

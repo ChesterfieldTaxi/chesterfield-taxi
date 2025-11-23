@@ -143,3 +143,33 @@
     background-color: white;
     font-family: inherit;
 }
+
+/* 🔥 Pulse/Glow Animation for Next Field Hints */
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+        border-color: rgba(37, 99, 235, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+        border-color: rgba(37, 99, 235, 0.8);
+    }
+}
+
+/* Apply pulse animation to next field that needs attention */
+.next-field-hint {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+    border-color: #2563eb;
+}
+
+/* Respect user's motion preferences - disable animation if requested */
+@media (prefers-reduced-motion: reduce) {
+    .next-field-hint {
+        animation: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+    }
+}
