@@ -15,7 +15,7 @@ export function useGooglePlaces() {
     const [isLoaded, setIsLoaded] = useState(false);
     const [loadError, setLoadError] = useState<Error | null>(null);
 
-    // 🔥 FIX: Use centralized Google Maps loader (no duplicate scripts)
+    // Load Google Maps API using centralized loader
     useEffect(() => {
         loadGoogleMaps()
             .then(() => {
@@ -28,7 +28,7 @@ export function useGooglePlaces() {
             });
     }, []);
 
-    // 🔥 FIX: Use new AutocompleteService API (no deprecated getPlacePredictions)
+    // Use the standard AutocompleteService (not deprecated when used correctly)
     const searchPlaces = useCallback(
         debounce(async (input: string) => {
             if (!isLoaded) {
@@ -43,22 +43,29 @@ export function useGooglePlaces() {
 
             setLoading(true);
             try {
-                // Use the new Places API (Autocomplete) - no deprecated methods
-                const { AutocompleteService } = await window.google.maps.importLibrary("places");
-                const service = new AutocompleteService();
+                // Use standard API - the callback pattern is still supported
+                const service = new window.google.maps.places.AutocompleteService();
 
-                const { predictions: results } = await service.getPlacePredictions({
-                    input,
-                    componentRestrictions: { country: 'us' },
-                    types: ['geocode', 'establishment']
-                });
-
-                console.log(`📍 Found ${results?.length || 0} place predictions`);
-                setPredictions(results || []);
+                service.getPlacePredictions(
+                    {
+                        input,
+                        componentRestrictions: { country: 'us' },
+                        types: ['geocode', 'establishment']
+                    },
+                    (predictions: any, status: any) => {
+                        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+                            console.log(`📍 Found ${predictions?.length || 0} place predictions`);
+                            setPredictions(predictions || []);
+                        } else {
+                            console.log(`⚠️ Places status: ${status}`);
+                            setPredictions([]);
+                        }
+                        setLoading(false);
+                    }
+                );
             } catch (error) {
                 console.error('❌ Places API error:', error);
                 setPredictions([]);
-            } finally {
                 setLoading(false);
             }
         }, 300),

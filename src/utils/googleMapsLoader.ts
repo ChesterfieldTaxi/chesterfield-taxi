@@ -1,6 +1,6 @@
 /**
- * Singleton loader for Google Maps API using the new functional API
- * 🔥 Updated to eliminate deprecation warnings
+ * Singleton loader for Google Maps API
+ * Ensures the API is loaded only ONCE to avoid "multiple includes" error
  */
 
 let loadPromise: Promise<typeof google> | null = null;
@@ -11,7 +11,10 @@ let loadPromise: Promise<typeof google> | null = null;
  */
 export async function loadGoogleMaps(): Promise<typeof google> {
     // Return existing promise if already loading/loaded
-    if (loadPromise) return loadPromise;
+    if (loadPromise) {
+        console.log('🔄 Google Maps already loading or loaded, returning existing promise');
+        return loadPromise;
+    }
 
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -21,7 +24,6 @@ export async function loadGoogleMaps(): Promise<typeof google> {
         );
     }
 
-    // 🔥 FIX: Use the new loading=async parameter for modern API
     loadPromise = (async () => {
         // Check if already loaded
         if (typeof google !== 'undefined' && google.maps) {
@@ -29,9 +31,25 @@ export async function loadGoogleMaps(): Promise<typeof google> {
             return google;
         }
 
-        // Dynamically import the Google Maps script with new API format
+        // Check if script already exists in DOM
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+        if (existingScript) {
+            console.log('🔄 Google Maps script already in DOM, waiting for load...');
+            // Wait for it to load
+            await new Promise<void>((resolve) => {
+                if (typeof google !== 'undefined' && google.maps) {
+                    resolve();
+                } else {
+                    existingScript.addEventListener('load', () => resolve());
+                }
+            });
+            return google;
+        }
+
+        // Load the script for the first time
+        console.log('📥 Loading Google Maps API...');
         const script = document.createElement('script');
-        // Use loading=async for new library loading system
+        // 🔥 FIX: Add loading=async for optimal performance
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
         script.async = true;
         script.defer = true;
