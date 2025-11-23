@@ -96,6 +96,16 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                 marginBottom: '0.25rem'
                             }}>
                                 <span style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>{vehicle.name}</span>
+                                {/* Price - inline on right, always blue */}
+                                {price !== undefined && (
+                                    <span style={{
+                                        fontSize: '16px',
+                                        fontWeight: 700,
+                                        color: '#2563eb'
+                                    }}>
+                                        ${price}
+                                    </span>
+                                )}
                             </div>
 
                             <div style={{
@@ -103,23 +113,10 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                 alignItems: 'center',
                                 gap: '0.25rem',
                                 fontSize: '13px',
-                                color: '#6b7280',
-                                marginBottom: '0.5rem'
+                                color: '#6b7280'
                             }}>
                                 <span>👥 {vehicle.passengers}</span>
                             </div>
-
-                            {/* Price */}
-                            {price !== undefined && (
-                                <div style={{
-                                    fontSize: '18px',
-                                    fontWeight: 700,
-                                    color: isSelected ? '#2563eb' : '#111827',
-                                    marginTop: 'auto'
-                                }}>
-                                    ${price}
-                                </div>
-                            )}
                         </div>
                     </button>
                 );
