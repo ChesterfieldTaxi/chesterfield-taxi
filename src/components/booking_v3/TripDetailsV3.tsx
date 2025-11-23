@@ -14,6 +14,8 @@ interface TripDetailsV3Props {
     onSwapLocations: () => void;
     onReorderStops: (fromIndex: number, toIndex: number) => void;
     onFlightDetailsChange: (locationType: 'pickup' | 'dropoff', details: { airline: string; flightNumber: string; origin?: string }) => void;
+    distanceInYards?: number;
+    isCalculatingDistance?: boolean;
 }
 
 /**
@@ -31,7 +33,9 @@ export const TripDetailsV3: React.FC<TripDetailsV3Props> = ({
     onRemoveStop,
     onSwapLocations,
     onReorderStops,
-    onFlightDetailsChange
+    onFlightDetailsChange,
+    distanceInYards,
+    isCalculatingDistance
 }) => {
     return (
         <TripRouteV3
@@ -46,6 +50,8 @@ export const TripDetailsV3: React.FC<TripDetailsV3Props> = ({
             onSwapLocations={onSwapLocations}
             onReorderStops={onReorderStops}
             onFlightDetailsChange={onFlightDetailsChange}
+            distanceInYards={distanceInYards}
+            isCalculatingDistance={isCalculatingDistance}
         />
     );
 };

@@ -157,6 +157,8 @@ export const BookingFlowV3: React.FC = () => {
                         onSwapLocations={swapLocations}
                         onReorderStops={reorderLocations}
                         onFlightDetailsChange={setFlightDetails}
+                        distanceInYards={state.distanceInYards}
+                        isCalculatingDistance={isCalculatingPrice}
                     />
                 </SectionWrapper>
 
