@@ -184,23 +184,39 @@ export const BookingFlowV3: React.FC = () => {
                         {state.vehicleType !== 'Any' && <span style={{ color: '#059669' }}>✅</span>}
                     </div>
                 }>
-                    <VehicleSelectorV3
-                        selectedVehicle={state.vehicleType}
-                        onSelect={setVehicleType}
-                        disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
-                        prices={vehiclePrices}
-                    />
-                    {effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan' && (
+                    {/* Hide vehicle selector if car seats selected */}
+                    {(state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
+                        <>
+                            <VehicleSelectorV3
+                                selectedVehicle={state.vehicleType}
+                                onSelect={setVehicleType}
+                                disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
+                                prices={vehiclePrices}
+                            />
+                            {effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan' && (
+                                <div style={{
+                                    marginTop: '0.75rem',
+                                    padding: '0.625rem 0.75rem',
+                                    backgroundColor: '#fef3c7',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    color: '#92400e',
+                                    border: '1px solid #fde68a'
+                                }}>
+                                    <strong>Note:</strong> Minivan required for car seats
+                                </div>
+                            )}
+                        </>
+                    ) : (
                         <div style={{
-                            marginTop: '0.75rem',
-                            padding: '0.625rem 0.75rem',
+                            padding: '0.75rem',
                             backgroundColor: '#fef3c7',
                             borderRadius: '4px',
-                            fontSize: '13px',
+                            fontSize: '14px',
                             color: '#92400e',
                             border: '1px solid #fde68a'
                         }}>
-                            <strong>Note:</strong> Minivan required for car seats
+                            <strong>Note:</strong> Minivan automatically selected for car seat safety. Vehicle preference is locked.
                         </div>
                     )}
                 </SectionWrapper>
