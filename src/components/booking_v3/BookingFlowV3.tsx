@@ -81,7 +81,33 @@ export const BookingFlowV3: React.FC = () => {
         setIsSubmitting
     } = useBookingFormV3();
 
+    // Validation state
+    const [showValidation, setShowValidation] = React.useState(false);
+
+    const validateForm = (): boolean => {
+        // Required: pickup, dropoff, time, name, phone, consent
+        const isValid = !!(
+            state.pickup?.isValidated &&
+            state.dropoff?.isValidated &&
+            (state.isNow || state.pickupDateTime) &&
+            state.name.trim() &&
+            state.phone.trim() &&
+            state.consentGiven
+        );
+        return isValid;
+    };
+
     const handleBookRide = async () => {
+        // Show validation errors
+        setShowValidation(true);
+
+        // Check if form is valid
+        if (!validateForm()) {
+            // Scroll to first error
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
         setIsSubmitting(true);
 
         // Simulate API call
@@ -132,6 +158,7 @@ export const BookingFlowV3: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Pickup Time
                         {(state.isNow || state.pickupDateTime) && <span style={{ color: '#059669' }}>✅</span>}
+                        {showValidation && !(state.isNow || state.pickupDateTime) && <span style={{ color: '#dc2626' }}>⚠️ Required</span>}
                     </div>
                 }>
                     <TimeSelectorV3
@@ -140,6 +167,11 @@ export const BookingFlowV3: React.FC = () => {
                         onIsNowChange={setIsNow}
                         onDateTimeChange={setPickupDateTime}
                     />
+                    {showValidation && !(state.isNow || state.pickupDateTime) && (
+                        <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>
+                            Please select a pickup time
+                        </div>
+                    )}
                 </SectionWrapper>
 
                 {/* Step 2: Locations */}
@@ -147,6 +179,7 @@ export const BookingFlowV3: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Trip Details
                         {state.pickup?.isValidated && state.dropoff?.isValidated && state.stops.every(stop => stop.isValidated) && <span style={{ color: '#059669' }}>✅</span>}
+                        {showValidation && (!state.pickup?.isValidated || !state.dropoff?.isValidated) && <span style={{ color: '#dc2626' }}>⚠️ Required</span>}
                     </div>
                 }>
                     <TripDetailsV3
@@ -164,6 +197,12 @@ export const BookingFlowV3: React.FC = () => {
                         distanceInYards={state.distanceInYards}
                         isCalculatingDistance={isCalculatingPrice}
                     />
+                    {showValidation && (!state.pickup?.isValidated || !state.dropoff?.isValidated) && (
+                        <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>
+                            {!state.pickup?.isValidated && <div>• Pickup location is required</div>}
+                            {!state.dropoff?.isValidated && <div>• Dropoff location is required</div>}
+                        </div>
+                    )}
                 </SectionWrapper>
 
                 {/* Step 3: Passengers & Luggage */}
@@ -291,7 +330,13 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 7: Contact Information */}
-                <SectionWrapper title="Contact Information">
+                <SectionWrapper title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Contact Information
+                        {state.name && state.phone && state.consentGiven && <span style={{ color: '#059669' }}>✅</span>}
+                        {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && <span style={{ color: '#dc2626' }}>⚠️ Required</span>}
+                    </div>
+                }>
                     <ContactInfoV3
                         name={state.name}
                         phone={state.phone}
@@ -304,6 +349,13 @@ export const BookingFlowV3: React.FC = () => {
                         onDriverNotesChange={setDriverNotes}
                         onConsentChange={setConsentGiven}
                     />
+                    {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && (
+                        <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>
+                            {!state.name.trim() && <div>• Name is required</div>}
+                            {!state.phone.trim() && <div>• Phone number is required</div>}
+                            {!state.consentGiven && <div>• You must agree to the terms and conditions</div>}
+                        </div>
+                    )}
                 </SectionWrapper>
 
                 {/* Step 8: Payment Method */}
