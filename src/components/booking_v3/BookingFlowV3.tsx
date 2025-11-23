@@ -99,12 +99,14 @@ export const BookingFlowV3: React.FC = () => {
         setIsSubmitting(false);
     };
 
-    // TODO: Calculate prices for each vehicle type
+    // Calculate prices for each vehicle type (for display in vehicle selector)
+    // The fare already includes the modifier for the effectiveVehicleType
+    // For display purposes, show the total for the currently selected vehicle type
     const vehiclePrices = fareBreakdown ? {
-        Sedan: fareBreakdown.total,
-        SUV: fareBreakdown.total + 10,
-        Minivan: fareBreakdown.total + 10,
-        Any: fareBreakdown.total
+        Sedan: fareBreakdown.total - fareBreakdown.vehicleUpgrade,  // Base price (no upgrade)
+        SUV: fareBreakdown.total - fareBreakdown.vehicleUpgrade + 10,  // Base + $10
+        Minivan: fareBreakdown.total - fareBreakdown.vehicleUpgrade + 10,  // Base + $10
+        Any: fareBreakdown.total - fareBreakdown.vehicleUpgrade  // Base price (no upgrade)
     } : undefined;
 
     return (

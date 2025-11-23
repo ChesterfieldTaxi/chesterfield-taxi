@@ -286,7 +286,8 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                         alignItems: 'center',
                         gap: '0.75rem',
                         fontSize: '13px',
-                        color: '#6b7280'
+                        color: '#6b7280',
+                        marginRight: '40px'
                     }}>
                         {isCalculatingDistance ? (
                             <span style={{ fontStyle: 'italic' }}>Calculating...</span>
