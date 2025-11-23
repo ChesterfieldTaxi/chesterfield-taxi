@@ -164,6 +164,12 @@ export const HelpFAB: React.FC = () => {
           70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
           100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
         }
+
+        @media print {
+          button, div[style*="position: fixed"] {
+            display: none !important;
+          }
+        }
       `}</style>
         </>
     );

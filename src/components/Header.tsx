@@ -150,6 +150,23 @@ const Header: React.FC = () => {
           .hamburger.open::before { transform: rotate(45deg); top: 0; }
           .hamburger.open::after { transform: rotate(-45deg); top: 0; }
         }
+
+        @media print {
+          .nav-menu, .mobile-menu-btn {
+            display: none !important;
+          }
+          .header-container {
+            justify-content: center;
+          }
+          .logo-container {
+            align-items: center;
+            margin-bottom: 1rem;
+          }
+          .header {
+            position: static;
+            box-shadow: none;
+          }
+        }
       `}</style>
     </header>
   );

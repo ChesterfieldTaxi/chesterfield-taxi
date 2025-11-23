@@ -109,6 +109,12 @@ const Footer: React.FC = () => {
           font-size: 0.9rem;
           opacity: 0.6;
         }
+
+        @media print {
+          .footer {
+            display: none !important;
+          }
+        }
       `}</style>
     </footer>
   );
