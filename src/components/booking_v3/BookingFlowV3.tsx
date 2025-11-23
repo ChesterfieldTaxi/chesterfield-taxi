@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBookingFormV3 } from '../../hooks/useBookingFormV3';
 import { useCompanyConfig } from '../../hooks/useCompanyConfig';
+import { usePricingRules } from '../../hooks/usePricingRules';
+import { calculateFare } from '../../utils/pricingEngine';
+import { BookingDetails } from '../../types/pricing';
 import { generateBookingReference } from '../../utils/bookingUtils';
 import { TripDetailsV3 } from './TripDetailsV3';
 import { TimeSelectorV3 } from './TimeSelectorV3';
@@ -39,6 +42,7 @@ const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNo
 export const BookingFlowV3: React.FC = () => {
     const navigate = useNavigate();
     const { config: companyConfig } = useCompanyConfig();
+    const { rules } = usePricingRules(true);
     const {
         state,
         effectiveVehicleType,
@@ -128,14 +132,31 @@ export const BookingFlowV3: React.FC = () => {
     };
 
     // Calculate prices for each vehicle type (for display in vehicle selector)
-    // The fare already includes the modifier for the effectiveVehicleType
-    // For display purposes, show the total for the currently selected vehicle type
-    const vehiclePrices = fareBreakdown ? {
-        Sedan: fareBreakdown.total - fareBreakdown.vehicleUpgrade,  // Base price (no upgrade)
-        SUV: fareBreakdown.total - fareBreakdown.vehicleUpgrade + 10,  // Base + $10
-        Minivan: fareBreakdown.total - fareBreakdown.vehicleUpgrade + 10,  // Base + $10
-        Any: fareBreakdown.total - fareBreakdown.vehicleUpgrade  // Base price (no upgrade)
-    } : undefined;
+    // Each vehicle gets its own price calculation based on the current booking details
+    const vehiclePrices = useMemo(() => {
+        if (!rules || state.distanceInYards === 0) return undefined;
+
+        const baseBooking: BookingDetails = {
+            tripType: state.pickup?.isAirport || state.dropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
+            distanceInYards: state.distanceInYards,
+            passengerCount: state.passengerCount,
+            luggageCount: state.luggageCount,
+            carSeats: state.carSeats,
+            specialRequests: state.specialRequests,
+            isAirport: state.pickup?.isAirport || state.dropoff?.isAirport || false,
+            pickupIsAirport: state.pickup?.isAirport || false,
+            dropoffIsAirport: state.dropoff?.isAirport || false,
+            pickupDateTime: state.pickupDateTime || new Date(),
+            vehicleType: 'Sedan' // placeholder, will be overridden
+        };
+
+        return {
+            Sedan: calculateFare({ ...baseBooking, vehicleType: 'Sedan' }, rules).total,
+            SUV: calculateFare({ ...baseBooking, vehicleType: 'SUV' }, rules).total,
+            Minivan: calculateFare({ ...baseBooking, vehicleType: 'Minivan' }, rules).total,
+            Any: calculateFare({ ...baseBooking, vehicleType: 'Any' }, rules).total
+        };
+    }, [rules, state.distanceInYards, state.passengerCount, state.luggageCount, state.carSeats, state.specialRequests, state.pickup?.isAirport, state.dropoff?.isAirport, state.pickupDateTime]);
 
     return (
         <div style={{

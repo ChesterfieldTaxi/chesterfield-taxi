@@ -30,10 +30,10 @@ export const mockPricingRules: PricingRules = {
             surcharges: [
                 {
                     id: "airport_fee",
-                    name: "Airport Surcharge",
+                    name: "Airport Pickup Surcharge",
                     type: "fixed",
                     amount: 5,
-                    conditions: { isAirport: true }
+                    conditions: { pickupIsAirport: true }
                 }
             ],
             waitTimeRate: {

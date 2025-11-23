@@ -223,6 +223,8 @@ export function useBookingFormV3() {
             carSeats: state.carSeats,
             specialRequests: state.specialRequests,
             isAirport: state.pickup?.isAirport || state.dropoff?.isAirport || false,
+            pickupIsAirport: state.pickup?.isAirport || false,
+            dropoffIsAirport: state.dropoff?.isAirport || false,
             pickupDateTime: state.pickupDateTime || new Date() // Fallback for pricing calculation only
         };
 

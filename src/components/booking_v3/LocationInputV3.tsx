@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AutocompleteDropdown } from './AutocompleteDropdown';
 import { searchAdminLocations, type AdminLocation } from '../../config/adminLocations';
 import { useGooglePlaces } from '../../hooks/useGooglePlaces';
@@ -30,6 +30,8 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
 }) => {
     const [inputValue, setInputValue] = useState(value);
     const [isOpen, setIsOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
     const { predictions, loading, searchPlaces, getPlaceDetails } = useGooglePlaces();
 
     // Sync inputValue with value prop
@@ -128,6 +130,8 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
         }
     };
 
+    const borderColor = isFocused ? '#3b82f6' : '#d1d5db';
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -152,34 +156,38 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
 
                 {/* Input with Icon */}
                 <div
+                    onClick={() => !disabled && inputRef.current?.focus()}
                     style={{
                         flex: 1,
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
-                        border: '1px solid #d1d5db',
+                        border: `1px solid ${borderColor}`,
                         borderRadius: '4px',
                         backgroundColor: disabled ? '#f3f4f6' : 'white',
                         padding: '0.625rem 0.75rem',
                         transition: 'border-color 0.2s',
                         cursor: disabled ? 'not-allowed' : 'text'
                     }}
-                    onFocus={(e) => {
-                        if (!disabled) e.currentTarget.style.borderColor = '#3b82f6';
-                    }}
-                    onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                    }}
                 >
                     <div style={{ marginRight: '0.5rem', display: 'flex', alignItems: 'center' }}>
                         {getIcon()}
                     </div>
                     <input
+                        ref={inputRef}
                         type="text"
                         value={inputValue}
                         onChange={handleInputChange}
-                        onFocus={() => !disabled && setIsOpen(true)}
-                        onBlur={() => setTimeout(() => setIsOpen(false), 200)} // Delay to allow click
+                        onFocus={() => {
+                            if (!disabled) {
+                                setIsFocused(true);
+                                setIsOpen(true);
+                            }
+                        }}
+                        onBlur={() => {
+                            setIsFocused(false);
+                            setTimeout(() => setIsOpen(false), 200); // Delay to allow click
+                        }}
                         placeholder={placeholder}
                         disabled={disabled}
                         style={{

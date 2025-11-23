@@ -127,7 +127,9 @@ export interface BookingDetails {
     };
     specialRequests: string[];
     waitTimeMinutes?: number;
-    isAirport: boolean;
+    isAirport: boolean; // DEPRECATED: Use pickupIsAirport/dropoffIsAirport instead
+    pickupIsAirport?: boolean;
+    dropoffIsAirport?: boolean;
     pickupDateTime: Date;
     hoursUntilPickup?: number;
     pickupZone?: string;

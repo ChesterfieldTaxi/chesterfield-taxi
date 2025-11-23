@@ -144,6 +144,12 @@ export function calculateFare(
     tripConfig.surcharges.forEach(surcharge => {
         let applies = true;
         if (surcharge.conditions) {
+            // Check for pickupIsAirport condition (airport surcharge only for pickups FROM airport)
+            if (surcharge.conditions.pickupIsAirport !== undefined &&
+                surcharge.conditions.pickupIsAirport !== booking.pickupIsAirport) {
+                applies = false;
+            }
+            // Fallback to generic isAirport for backward compatibility
             if (surcharge.conditions.isAirport !== undefined &&
                 surcharge.conditions.isAirport !== booking.isAirport) {
                 applies = false;
@@ -238,6 +244,8 @@ function extractBookingContext(booking: BookingDetails): Record<string, any> {
         year: dt.getFullYear(),
         hoursUntilPickup: booking.hoursUntilPickup,
         isAirport: booking.isAirport,
+        pickupIsAirport: booking.pickupIsAirport,
+        dropoffIsAirport: booking.dropoffIsAirport,
         pickupZone: booking.pickupZone,
         dropoffZone: booking.dropoffZone,
         accountType: booking.accountType,
