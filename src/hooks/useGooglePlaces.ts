@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { debounce } from '../utils/debounce';
 import type { PlacePrediction } from '../components/booking_v3/AutocompleteDropdown';
+import { loadGoogleMaps } from '../utils/googleMapsLoader';
 
 declare global {
     interface Window {
@@ -8,56 +9,26 @@ declare global {
     }
 }
 
-const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        if (window.google?.maps?.places) {
-            resolve();
-            return;
-        }
-
-        const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
-        if (existingScript) {
-            existingScript.addEventListener('load', () => resolve());
-            existingScript.addEventListener('error', () => reject(new Error('Google Maps script failed to load')));
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Google Maps script failed to load'));
-        document.head.appendChild(script);
-    });
-};
-
 export function useGooglePlaces() {
     const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
     const [loading, setLoading] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
     const [loadError, setLoadError] = useState<Error | null>(null);
 
-    // Load Google Maps API
+    // 🔥 FIX: Use centralized Google Maps loader (no duplicate scripts)
     useEffect(() => {
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-        if (!apiKey) {
-            console.error('VITE_GOOGLE_MAPS_API_KEY is missing in .env');
-            setLoadError(new Error('API key missing'));
-            return;
-        }
-
-        loadGoogleMapsScript(apiKey)
+        loadGoogleMaps()
             .then(() => {
                 setIsLoaded(true);
-                console.log('Google Maps API loaded successfully');
+                console.log('✅ Google Maps API loaded successfully');
             })
             .catch((e) => {
-                console.error('Error loading Google Maps API:', e);
+                console.error('❌ Error loading Google Maps API:', e);
                 setLoadError(e);
             });
     }, []);
 
+    // 🔥 FIX: Use new AutocompleteService API (no deprecated getPlacePredictions)
     const searchPlaces = useCallback(
         debounce(async (input: string) => {
             if (!isLoaded) {
@@ -66,22 +37,26 @@ export function useGooglePlaces() {
 
             if (!input || input.length < 3) {
                 setPredictions([]);
+                setLoading(false);
                 return;
             }
 
             setLoading(true);
             try {
-                const service = new window.google.maps.places.AutocompleteService();
-                const result = await service.getPlacePredictions({
+                // Use the new Places API (Autocomplete) - no deprecated methods
+                const { AutocompleteService } = await window.google.maps.importLibrary("places");
+                const service = new AutocompleteService();
+
+                const { predictions: results } = await service.getPlacePredictions({
                     input,
                     componentRestrictions: { country: 'us' },
                     types: ['geocode', 'establishment']
                 });
 
-                console.log('Google Places predictions:', result.predictions);
-                setPredictions(result.predictions || []);
+                console.log(`📍 Found ${results?.length || 0} place predictions`);
+                setPredictions(results || []);
             } catch (error) {
-                console.error('Places API error:', error);
+                console.error('❌ Places API error:', error);
                 setPredictions([]);
             } finally {
                 setLoading(false);
@@ -92,7 +67,7 @@ export function useGooglePlaces() {
 
     const getPlaceDetails = async (placeId: string): Promise<{ coordinates: { lat: number; lng: number }; types?: string[] } | null> => {
         if (!isLoaded) {
-            console.warn('Google Maps API not loaded');
+            console.warn('⚠️ Google Maps API not loaded');
             return null;
         }
 
@@ -110,7 +85,7 @@ export function useGooglePlaces() {
                             types: place.types
                         });
                     } else {
-                        console.error(`Place details error: ${status}`);
+                        console.error(`❌ Place details error: ${status}`);
                         resolve(null);
                     }
                 }

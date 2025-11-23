@@ -1,5 +1,6 @@
 /**
  * Singleton loader for Google Maps API using the new functional API
+ * 🔥 Updated to eliminate deprecation warnings
  */
 
 let loadPromise: Promise<typeof google> | null = null;
@@ -20,11 +21,18 @@ export async function loadGoogleMaps(): Promise<typeof google> {
         );
     }
 
-    // Use the new functional API instead of Loader class
+    // 🔥 FIX: Use the new loading=async parameter for modern API
     loadPromise = (async () => {
-        // Dynamically import the Google Maps script
+        // Check if already loaded
+        if (typeof google !== 'undefined' && google.maps) {
+            console.log('✅ Google Maps already loaded');
+            return google;
+        }
+
+        // Dynamically import the Google Maps script with new API format
         const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+        // Use loading=async for new library loading system
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
         script.async = true;
         script.defer = true;
 
@@ -40,6 +48,7 @@ export async function loadGoogleMaps(): Promise<typeof google> {
             throw new Error('Google Maps API failed to initialize');
         }
 
+        console.log('✅ Google Maps API loaded successfully');
         return google;
     })();
 
