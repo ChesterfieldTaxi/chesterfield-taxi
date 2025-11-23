@@ -5,6 +5,7 @@ interface VehicleSelectorV3Props {
     selectedVehicle: 'Sedan' | 'SUV' | 'Minivan' | 'Any';
     onSelect: (vehicle: 'Sedan' | 'SUV' | 'Minivan' | 'Any') => void;
     disabled?: boolean;
+    passengerCount?: number;
     prices?: {
         Sedan: number;
         SUV: number;
@@ -20,6 +21,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     selectedVehicle,
     onSelect,
     disabled = false,
+    passengerCount = 1,
     prices
 }) => {
     const { rules } = usePricingRules();
@@ -30,6 +32,8 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
         id: v.id,
         name: v.name,
         passengers: `1-${v.maxPassengers}`,
+        maxPassengers: v.maxPassengers,
+        canAccommodate: v.maxPassengers >= passengerCount,
         additionalFee: v.additionalFee,
         icon: <img src={`/vehicles/${v.id.toLowerCase()}.png`} alt={v.name} style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
     }));
@@ -39,13 +43,15 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
             {vehicles.map(vehicle => {
                 const isSelected = selectedVehicle === vehicle.id;
                 const price = prices?.[vehicle.id];
+                const isDisabledByCapacity = !vehicle.canAccommodate;
+                const isDisabled = disabled || isDisabledByCapacity;
 
                 return (
                     <button
                         key={vehicle.id}
                         type="button"
                         onClick={() => onSelect(isSelected ? 'Any' : vehicle.id)}
-                        disabled={disabled}
+                        disabled={isDisabled}
                         className="vehicle-card"
                         style={{
                             position: 'relative',
@@ -56,20 +62,20 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                             border: isSelected ? '2px solid #2563eb' : '2px solid transparent',
                             borderRadius: '12px',
                             backgroundColor: isSelected ? '#eff6ff' : 'white',
-                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
                             textAlign: 'left',
                             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             boxShadow: isSelected ? '0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06)' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                            opacity: disabled ? 0.6 : 1,
+                            opacity: isDisabled ? 0.5 : 1,
                             minHeight: '140px'
                         }}
                         onMouseEnter={(e) => {
-                            if (!disabled && !isSelected) {
+                            if (!isDisabled && !isSelected) {
                                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
                             }
                         }}
                         onMouseLeave={(e) => {
-                            if (!disabled && !isSelected) {
+                            if (!isDisabled && !isSelected) {
                                 e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
                             }
                         }}
