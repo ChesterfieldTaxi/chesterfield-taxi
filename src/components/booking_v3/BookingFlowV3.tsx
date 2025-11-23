@@ -343,6 +343,7 @@ export const BookingFlowV3: React.FC = () => {
                         email={state.email}
                         driverNotes={state.driverNotes}
                         consentGiven={state.consentGiven}
+                        showValidation={showValidation}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}

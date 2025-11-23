@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePricingRules, getVehicleConfig } from '../../hooks/usePricingRules';
 
 interface VehicleSelectorV3Props {
@@ -27,7 +27,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     const { rules } = usePricingRules();
     const vehicleConfig = getVehicleConfig(rules);
 
-    // Filter out 'Any' and only show selectable vehicles
+    // Build vehicle list with capacity info
     const vehicles = (vehicleConfig || []).filter(v => v.id !== 'Any').map(v => ({
         id: v.id,
         name: v.name,
@@ -37,6 +37,17 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
         additionalFee: v.additionalFee,
         icon: <img src={`/vehicles/${v.id.toLowerCase()}.png`} alt={v.name} style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
     }));
+
+    // Auto-select Minivan if current selection cannot accommodate passenger count
+    useEffect(() => {
+        const selected = vehicles.find(v => v.id === selectedVehicle);
+        if (selected && !selected.canAccommodate) {
+            const minivan = vehicles.find(v => v.id === 'Minivan');
+            if (minivan) {
+                onSelect('Minivan');
+            }
+        }
+    }, [passengerCount, selectedVehicle, vehicles, onSelect]);
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
@@ -51,7 +62,6 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                         key={vehicle.id}
                         type="button"
                         onClick={() => {
-                            // Don't allow selection if disabled by capacity
                             if (!isDisabledByCapacity) {
                                 onSelect(isSelected ? 'Any' : vehicle.id);
                             }
@@ -74,12 +84,12 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                             opacity: isDisabled ? 0.5 : 1,
                             minHeight: '140px'
                         }}
-                        onMouseEnter={(e) => {
+                        onMouseEnter={e => {
                             if (!isDisabled && !isSelected) {
                                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
                             }
                         }}
-                        onMouseLeave={(e) => {
+                        onMouseLeave={e => {
                             if (!isDisabled && !isSelected) {
                                 e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
                             }
@@ -107,8 +117,8 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                 marginBottom: '0.25rem'
                             }}>
                                 <span style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>{vehicle.name}</span>
-                                {/* Price - inline on right, always blue */}
-                                {price !== undefined && (
+                                {/* Price - inline on right, hide if disabled */}
+                                {price !== undefined && !isDisabledByCapacity && (
                                     <span style={{
                                         fontSize: '16px',
                                         fontWeight: 700,
