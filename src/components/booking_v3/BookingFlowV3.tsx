@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBookingFormV3 } from '../../hooks/useBookingFormV3';
+import { usePersistedBookingForm } from '../../hooks/usePersistedBookingForm';
 import { useCompanyConfig } from '../../hooks/useCompanyConfig';
 import { usePricingRules } from '../../hooks/usePricingRules';
 import { calculateFare } from '../../utils/pricingEngine';
@@ -16,6 +16,7 @@ import { ContactInfoV3 } from './ContactInfoV3';
 import { InstructionsV3 } from './InstructionsV3';
 import { PaymentMethodV3 } from './PaymentMethodV3';
 import { StickyPriceFooter } from './StickyPriceFooter';
+import { SaveIndicator } from './SaveIndicator';
 
 /**
  * Section Wrapper with light gray background
@@ -39,11 +40,16 @@ const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNo
 /**
  * Main V3 Booking Flow - Single Page with Progressive Disclosure
  * Compact, professional minimal design
+ * 🔥 NOW WITH AUTO-SAVE: Form progress persists to localStorage automatically
  */
 export const BookingFlowV3: React.FC = () => {
     const navigate = useNavigate();
     const { config: companyConfig } = useCompanyConfig();
     const { rules } = usePricingRules(true);
+
+    // 🔥 NEW: Auto-save state indicator
+    const [showSaveIndicator, setShowSaveIndicator] = useState(false);
+
     const {
         state,
         effectiveVehicleType,
@@ -83,8 +89,17 @@ export const BookingFlowV3: React.FC = () => {
         syncReturnTripFromMain,
         isCalculatingPrice,
         isSubmitting,
-        setIsSubmitting
-    } = useBookingFormV3();
+        setIsSubmitting,
+        clearSaved // 🔥 NEW: Function to clear saved booking data
+    } = usePersistedBookingForm();
+
+    // 🔥 NEW: Trigger save indicator when state changes
+    useEffect(() => {
+        // Only show indicator if user has started filling out form
+        if (state.pickup || state.dropoff || state.name || state.phone) {
+            setShowSaveIndicator(true);
+        }
+    }, [state]);
 
     // Validation state
     const [showValidation, setShowValidation] = React.useState(false);
@@ -120,6 +135,9 @@ export const BookingFlowV3: React.FC = () => {
 
         // Generate booking reference
         const bookingRef = generateBookingReference();
+
+        // 🔥 NEW: Clear saved booking data from localStorage
+        clearSaved();
 
         // Navigate to confirmation page with booking data
         navigate('/confirmation', {
@@ -403,6 +421,9 @@ export const BookingFlowV3: React.FC = () => {
                 isSubmitting={isSubmitting}
                 onBookClick={handleBookRide}
             />
+
+            {/* 🔥 NEW: Auto-save indicator */}
+            <SaveIndicator show={showSaveIndicator} />
         </div >
     );
 };
