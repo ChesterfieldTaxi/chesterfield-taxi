@@ -20,9 +20,10 @@ interface AutocompleteDropdownProps {
 }
 
 /**
- * Autocomplete dropdown showing hybrid results (admin locations first,then Google Places)
+ * Autocomplete dropdown showing hybrid results (admin locations first, then Google Places)
+ * 🔥 Optimized with React.memo to prevent unnecessary re-renders
  */
-export const AutocompleteDropdown: React.FC<AutocompleteDropdownProps> = ({
+export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
     adminResults,
     googleResults,
     onSelectAdmin,
@@ -194,6 +195,6 @@ export const AutocompleteDropdown: React.FC<AutocompleteDropdownProps> = ({
             )}
         </div>
     );
-};
+});
 
 export type { PlacePrediction };
