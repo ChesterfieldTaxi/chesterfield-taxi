@@ -188,13 +188,44 @@ export const BookingFlowV3: React.FC = () => {
                         {state.vehicleType !== 'Any' && <span style={{ color: '#059669' }}>✅</span>}
                     </div>
                 }>
-                    {/* Hide vehicle selector if car seats selected */}
-                    {(state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
+                    {/* Check for 7+ passengers - show contact message */}
+                    {state.passengerCount >= 7 ? (
+                        <div style={{
+                            padding: '1rem',
+                            backgroundColor: '#fef3c7',
+                            borderRadius: '8px',
+                            border: '1px solid #fde68a',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#92400e', marginBottom: '0.5rem' }}>
+                                Large Group Booking
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#713f12', marginBottom: '0.75rem' }}>
+                                For groups of 7 or more passengers, please contact us directly for specialized service.
+                            </div>
+                            <a
+                                href="tel:+13147770797"
+                                style={{
+                                    display: 'inline-block',
+                                    backgroundColor: '#2563eb',
+                                    color: 'white',
+                                    padding: '0.625rem 1.25rem',
+                                    borderRadius: '6px',
+                                    textDecoration: 'none',
+                                    fontWeight: 600,
+                                    fontSize: '15px'
+                                }}
+                            >
+                                📞 Call (314) 777-0797
+                            </a>
+                        </div>
+                    ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
                         <>
                             <VehicleSelectorV3
                                 selectedVehicle={state.vehicleType}
                                 onSelect={setVehicleType}
                                 disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
+                                passengerCount={state.passengerCount}
                                 prices={vehiclePrices}
                             />
                             {effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan' && (
