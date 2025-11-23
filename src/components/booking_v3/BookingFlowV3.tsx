@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBookingFormV3 } from '../../hooks/useBookingFormV3';
+import { useCompanyConfig } from '../../hooks/useCompanyConfig';
 import { generateBookingReference } from '../../utils/bookingUtils';
 import { TripDetailsV3 } from './TripDetailsV3';
 import { TimeSelectorV3 } from './TimeSelectorV3';
@@ -37,6 +38,7 @@ const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNo
  */
 export const BookingFlowV3: React.FC = () => {
     const navigate = useNavigate();
+    const { config: companyConfig } = useCompanyConfig();
     const {
         state,
         effectiveVehicleType,
@@ -204,7 +206,7 @@ export const BookingFlowV3: React.FC = () => {
                                 For groups of 7 or more passengers, please contact us directly for specialized service.
                             </div>
                             <a
-                                href="tel:+13147770797"
+                                href={`tel:${companyConfig?.contactInfo.phone.dialable || '+13147380100'}`}
                                 style={{
                                     display: 'inline-block',
                                     backgroundColor: '#2563eb',
@@ -216,7 +218,7 @@ export const BookingFlowV3: React.FC = () => {
                                     fontSize: '15px'
                                 }}
                             >
-                                📞 Call (314) 777-0797
+                                📞 Call {companyConfig?.contactInfo.phone.display || '(314) 738-0100'}
                             </a>
                         </div>
                     ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
