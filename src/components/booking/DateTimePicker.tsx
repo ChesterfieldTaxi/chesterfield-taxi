@@ -37,8 +37,22 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
         if (value) {
             setSelectedDate(value);
             setCurrentDate(value);
-            // DO NOT auto-populate time - force user to select explicitly
-            // Time state remains null until user selects
+
+            // 🔥 FIX: Extract time from restored Date (e.g., from localStorage)
+            // If value already has time set, restore hour/minute/ampm
+            const hours = value.getHours();
+            const minutes = value.getMinutes();
+
+            // Only restore time if it's not midnight (0:00) - which indicates "unset"
+            if (hours !== 0 || minutes !== 0) {
+                // Convert 24h to 12h format
+                let hour12 = hours % 12;
+                if (hour12 === 0) hour12 = 12; // Midnight/Noon = 12
+
+                setHour(hour12);
+                setMinute(minutes);
+                setAmpm(hours >= 12 ? 'PM' : 'AM');
+            }
         }
     }, [value]);
 
@@ -193,9 +207,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                                 value={hour ?? ''}
                                 onChange={(e) => {
                                     setHour(Number(e.target.value));
-                                    // Initialize minute and ampm with defaults if not set
-                                    if (minute === null) setMinute(0);
-                                    if (ampm === null) setAmpm('AM');
                                 }}
                             >
                                 <option value="" disabled>HH</option>
@@ -209,9 +220,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                                 value={minute ?? ''}
                                 onChange={(e) => {
                                     setMinute(Number(e.target.value));
-                                    // Initialize hour and ampm with defaults if not set
-                                    if (hour === null) setHour(12);
-                                    if (ampm === null) setAmpm('AM');
                                 }}
                             >
                                 <option value="" disabled>MM</option>
@@ -224,9 +232,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
                                 onClick={() => {
                                     const newAmpm = ampm === 'AM' ? 'PM' : ampm === 'PM' ? 'AM' : 'AM';
                                     setAmpm(newAmpm);
-                                    // Initialize hour and minute with defaults if not set
-                                    if (hour === null) setHour(12);
-                                    if (minute === null) setMinute(0);
                                 }}
                             >
                                 {ampm ?? 'AM'}
