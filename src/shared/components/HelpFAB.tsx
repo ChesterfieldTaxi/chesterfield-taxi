@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCompanyConfig } from '../../hooks/useCompanyConfig';
 
 interface HelpLinkProps {
     icon: string;
@@ -37,6 +38,7 @@ const HelpLink: React.FC<HelpLinkProps> = ({ icon, label, href, subtitle, openIn
 
 export const HelpFAB: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const { config } = useCompanyConfig();
 
     return (
         <>
@@ -81,13 +83,13 @@ export const HelpFAB: React.FC = () => {
                         <HelpLink
                             icon="📞"
                             label="Call Us"
-                            href="tel:+13147380100"
-                            subtitle="(314) 738-0100"
+                            href={`tel:${config?.contactInfo.phone.dialable || '+13147380100'}`}
+                            subtitle={config?.contactInfo.phone.display || '(314) 738-0100'}
                         />
                         <HelpLink
                             icon="📧"
                             label="Contact Support"
-                            href="mailto:support@chesterfieldtaxi.com"
+                            href={`mailto:${config?.contactInfo.email.support || 'support@chesterfieldtaxi.com'}`}
                         />
                         <HelpLink
                             icon="📄"
@@ -110,7 +112,7 @@ export const HelpFAB: React.FC = () => {
                         fontSize: '11px',
                         color: '#9ca3af'
                     }}>
-                        © 2025 Chesterfield Taxi
+                        © 2025 {config?.businessInfo.displayName || 'Chesterfield Taxi'}
                     </div>
                 </div>
             )}

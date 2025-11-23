@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useCompanyConfig } from '../hooks/useCompanyConfig';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
+  const { config } = useCompanyConfig();
 
   return (
     <footer className="footer">
       <div className="container">
         <div className="footer-grid">
           <div className="footer-col">
-            <h3 className="footer-logo">Chesterfield Taxi & Car Service</h3>
+            <h3 className="footer-logo">{config?.businessInfo.displayName || 'Chesterfield Taxi'} & Car Service</h3>
             <p>Premium transportation services for St. Louis County and beyond.</p>
             <div className="contact-info">
-              <p><strong>Phone:</strong> (314) 738-0100</p>
-              <p><strong>Email:</strong> info@chesterfieldtaxi.com</p>
+              <p><strong>Phone:</strong> {config?.contactInfo.phone.display || '(314) 738-0100'}</p>
+              <p><strong>Email:</strong> {config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}</p>
             </div>
           </div>
 

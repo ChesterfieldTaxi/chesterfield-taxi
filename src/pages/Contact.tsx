@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { useCompanyConfig } from '../hooks/useCompanyConfig';
 
 const Contact: React.FC = () => {
+  const { config } = useCompanyConfig();
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,19 +41,31 @@ const Contact: React.FC = () => {
               <h2>Get in Touch</h2>
               <div className="info-item">
                 <h3>Dispatch & Reservations</h3>
-                <p><a href="tel:3147380100">(314) 738-0100</a></p>
+                <p>
+                  <a href={`tel:${config?.contactInfo.phone.dialable || '+13147380100'}`}>
+                    {config?.contactInfo.phone.display || '(314) 738-0100'}
+                  </a>
+                </p>
               </div>
               <div className="info-item">
                 <h3>Email</h3>
-                <p>Customer Service: <a href="mailto:info@chesterfieldtaxi.com">info@chesterfieldtaxi.com</a></p>
-                <p>Bookings: <a href="mailto:bookings@chesterfieldtaxi.com">bookings@chesterfieldtaxi.com</a></p>
+                <p>
+                  Customer Service: <a href={`mailto:${config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}`}>
+                    {config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}
+                  </a>
+                </p>
+                <p>
+                  Bookings: <a href={`mailto:${config?.contactInfo.email.booking || 'bookings@chesterfieldtaxi.com'}`}>
+                    {config?.contactInfo.email.booking || 'bookings@chesterfieldtaxi.com'}
+                  </a>
+                </p>
               </div>
               <div className="info-item">
                 <h3>Headquarters</h3>
                 <address>
-                  Chesterfield Taxi & Car Service<br />
-                  1814 Woodson Road<br />
-                  Overland, MO 63114
+                  {config?.businessInfo.displayName || 'Chesterfield Taxi'} & Car Service<br />
+                  {config?.contactInfo.address.street || '1814 Woodson Road'}<br />
+                  {config?.contactInfo.address.city || 'Overland'}, {config?.contactInfo.address.state || 'MO'} {config?.contactInfo.address.zip || '63114'}
                 </address>
               </div>
             </div>
