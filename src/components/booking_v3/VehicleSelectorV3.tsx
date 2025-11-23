@@ -50,7 +50,12 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                     <button
                         key={vehicle.id}
                         type="button"
-                        onClick={() => onSelect(isSelected ? 'Any' : vehicle.id)}
+                        onClick={() => {
+                            // Don't allow selection if disabled by capacity
+                            if (!isDisabledByCapacity) {
+                                onSelect(isSelected ? 'Any' : vehicle.id);
+                            }
+                        }}
                         disabled={isDisabled}
                         className="vehicle-card"
                         style={{
