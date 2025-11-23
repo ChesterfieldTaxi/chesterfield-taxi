@@ -147,7 +147,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                         fontWeight: 500
                     }}
                 >
-                    <span>{showCarSeats ? 'Hide Car Seats' : 'Add Car Seats'}</span>
+                    <span>{showCarSeats ? 'Hide Car Seats' : '+ Add Car Seats'}</span>
                     {totalCarSeats > 0 && <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '999px', fontSize: '12px' }}>{totalCarSeats} selected</span>}
                 </button>
 

@@ -4,13 +4,11 @@ interface ContactInfoV3Props {
     name: string;
     phone: string;
     email: string;
-    driverNotes: string;
     consentGiven: boolean;
     showValidation: boolean;
     onNameChange: (name: string) => void;
     onPhoneChange: (phone: string) => void;
     onEmailChange: (email: string) => void;
-    onDriverNotesChange: (notes: string) => void;
     onConsentChange: (consent: boolean) => void;
 }
 
@@ -79,13 +77,11 @@ export const ContactInfoV3: React.FC<ContactInfoV3Props> = ({
     name,
     phone,
     email,
-    driverNotes,
     consentGiven,
     showValidation,
     onNameChange,
     onPhoneChange,
     onEmailChange,
-    onDriverNotesChange,
     onConsentChange
 }) => {
     return (
@@ -156,29 +152,7 @@ export const ContactInfoV3: React.FC<ContactInfoV3Props> = ({
                 </div>
             </div>
 
-            {/* Driver Notes */}
-            <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px' }}>Notes for Driver (optional)</label>
-                <textarea
-                    value={driverNotes}
-                    onChange={e => onDriverNotesChange(e.target.value)}
-                    placeholder="Any special instructions?"
-                    rows={3}
-                    style={{
-                        width: '100%',
-                        padding: '0.625rem 0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '16px',
-                        fontFamily: 'inherit',
-                        resize: 'vertical',
-                        outline: 'none',
-                        transition: 'border-color 0.2s'
-                    }}
-                    onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
-                    onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
-                />
-            </div>
+
 
             {/* Consent Checkbox - TCPA Compliance */}
             <div style={{ marginTop: '0.5rem' }}>

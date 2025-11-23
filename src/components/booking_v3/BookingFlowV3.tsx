@@ -13,6 +13,7 @@ import { VehicleSelectorV3 } from './VehicleSelectorV3';
 import { SpecialRequestsV3 } from './SpecialRequestsV3';
 import { ReturnTripV3 } from './ReturnTripV3';
 import { ContactInfoV3 } from './ContactInfoV3';
+import { InstructionsV3 } from './InstructionsV3';
 import { PaymentMethodV3 } from './PaymentMethodV3';
 import { StickyPriceFooter } from './StickyPriceFooter';
 
@@ -323,8 +324,6 @@ export const BookingFlowV3: React.FC = () => {
                     <SpecialRequestsV3
                         selectedRequests={state.specialRequests}
                         onToggleRequest={toggleSpecialRequest}
-                        gateCode={state.gateCode}
-                        onGateCodeChange={setGateCode}
                     />
                 </SectionWrapper>
 
@@ -362,13 +361,11 @@ export const BookingFlowV3: React.FC = () => {
                         name={state.name}
                         phone={state.phone}
                         email={state.email}
-                        driverNotes={state.driverNotes}
                         consentGiven={state.consentGiven}
                         showValidation={showValidation}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}
-                        onDriverNotesChange={setDriverNotes}
                         onConsentChange={setConsentGiven}
                     />
                     {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && (
@@ -380,7 +377,17 @@ export const BookingFlowV3: React.FC = () => {
                     )}
                 </SectionWrapper>
 
-                {/* Step 8: Payment Method */}
+                {/* Step 8: Ride Instructions */}
+                <SectionWrapper title="Ride Instructions">
+                    <InstructionsV3
+                        driverNotes={state.driverNotes}
+                        onDriverNotesChange={setDriverNotes}
+                        gateCode={state.gateCode}
+                        onGateCodeChange={setGateCode}
+                    />
+                </SectionWrapper>
+
+                {/* Step 9: Payment Method */}
                 <SectionWrapper title="Payment Method">
                     <PaymentMethodV3
                         value={state.payment}
@@ -396,6 +403,6 @@ export const BookingFlowV3: React.FC = () => {
                 isSubmitting={isSubmitting}
                 onBookClick={handleBookRide}
             />
-        </div>
+        </div >
     );
 };

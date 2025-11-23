@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { airlines, airports } from '../../config/flightData';
 
 interface FlightInfoV3Props {
-    details?: { airline: string; flightNumber: string; origin?: string };
-    onChange: (details: { airline: string; flightNumber: string; origin?: string }) => void;
+    details?: { airline: string; flightNumber: string; origin?: string; hasCheckedLuggage?: boolean };
+    onChange: (details: { airline: string; flightNumber: string; origin?: string; hasCheckedLuggage?: boolean }) => void;
     simplified?: boolean; // If true, only show airline selector
     label?: string; // Custom label text
     helperText?: string; // Helper text below label
@@ -51,7 +51,17 @@ export const FlightInfoV3: React.FC<FlightInfoV3Props> = ({
         onChange({
             airline: e.target.value,
             flightNumber: details?.flightNumber || '',
-            origin: details?.origin || ''
+            origin: details?.origin || '',
+            hasCheckedLuggage: details?.hasCheckedLuggage
+        });
+    };
+
+    const handleCheckedLuggageChange = (checked: boolean) => {
+        onChange({
+            airline: details?.airline || '',
+            flightNumber: details?.flightNumber || '',
+            origin: details?.origin || '',
+            hasCheckedLuggage: checked
         });
     };
 
@@ -199,6 +209,37 @@ export const FlightInfoV3: React.FC<FlightInfoV3Props> = ({
                             )}
                         </div>
                     </>
+                )}
+
+                {/* Checked Luggage Toggle - Only for pickup (not simplified) */}
+                {!simplified && (
+                    <div style={{ gridColumn: 'span 2', marginTop: '0.25rem' }}>
+                        <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            cursor: 'pointer',
+                            userSelect: 'none'
+                        }}>
+                            <input
+                                type="checkbox"
+                                checked={details?.hasCheckedLuggage || false}
+                                onChange={(e) => handleCheckedLuggageChange(e.target.checked)}
+                                style={{
+                                    width: '16px',
+                                    height: '16px',
+                                    accentColor: '#2563eb',
+                                    cursor: 'pointer'
+                                }}
+                            />
+                            <span style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>
+                                Passenger has checked luggage
+                            </span>
+                        </label>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '0.25rem', marginLeft: '1.5rem' }}>
+                            Helps us estimate pickup time (usually +20-30 mins for baggage claim)
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

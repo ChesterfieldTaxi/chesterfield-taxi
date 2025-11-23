@@ -26,6 +26,7 @@ export interface Location {
         airline: string;
         flightNumber: string;
         origin?: string;
+        hasCheckedLuggage?: boolean; // For pickup airports - affects timing
     };
 }
 
