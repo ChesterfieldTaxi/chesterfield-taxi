@@ -1,4 +1,5 @@
 import React from 'react';
+import { typography } from '../../styles/typography-helpers';
 
 interface StickyPriceFooterProps {
     total: number;
@@ -38,8 +39,8 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                 gap: '0.5rem'
             }}>
                 <div>
-                    <div style={{ fontSize: '11px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 500 }}>Estimated Total</div>
-                    <div style={{ fontSize: '22px', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>
+                    <div style={{ ...typography.caption, color: '#666' }}>Estimated Total</div>
+                    <div style={{ ...typography.priceLarge, marginTop: '2px' }}>
                         {isLoading ? (
                             <div style={{
                                 display: 'inline-block',
@@ -66,8 +67,7 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
-                            fontSize: '15px',
-                            fontWeight: 600,
+                            ...typography.button,
                             cursor: (isLoading || isSubmitting || total === 0) ? 'not-allowed' : 'pointer',
                             whiteSpace: 'nowrap',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
