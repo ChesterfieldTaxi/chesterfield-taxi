@@ -1,22 +1,18 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { usePricingRules, getVehicleConfig } from '../../hooks/usePricingRules';
 
 interface VehicleSelectorV3Props {
-    selectedVehicle: 'Sedan' | 'SUV' | 'Minivan' | 'Any';
-    onSelect: (vehicle: 'Sedan' | 'SUV' | 'Minivan' | 'Any') => void;
+    selectedVehicle: 'Sedan' | 'SUV' | 'Minivan';
+    onSelect: (vehicle: 'Sedan' | 'SUV' | 'Minivan') => void;
     disabled?: boolean;
     passengerCount?: number;
     prices?: {
         Sedan: number;
         SUV: number;
         Minivan: number;
-        Any: number;
     };
 }
 
-/**
- * Vehicle selector with modern card design and icons
- */
 export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     selectedVehicle,
     onSelect,
@@ -25,120 +21,121 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     prices
 }) => {
     const { rules } = usePricingRules();
-    const vehicleConfig = getVehicleConfig(rules);
 
-    // Build vehicle list with capacity info
-    const vehicles = (vehicleConfig || []).filter(v => v.id !== 'Any').map(v => ({
-        id: v.id,
-        name: v.name,
-        passengers: `1-${v.maxPassengers}`,
-        maxPassengers: v.maxPassengers,
-        canAccommodate: v.maxPassengers >= passengerCount,
-        additionalFee: v.additionalFee,
-        icon: <img src={`/vehicles/${v.id.toLowerCase()}.png`} alt={v.name} style={{ width: '100%', height: 'auto', objectFit: 'contain' }} />
-    }));
-
-    // Auto-select Minivan if current selection cannot accommodate passenger count
-    useEffect(() => {
-        const selected = vehicles.find(v => v.id === selectedVehicle);
-        if (selected && !selected.canAccommodate) {
-            const minivan = vehicles.find(v => v.id === 'Minivan');
-            if (minivan) {
-                onSelect('Minivan');
-            }
-        }
-    }, [passengerCount, selectedVehicle, vehicles, onSelect]);
+    const vehicles: Array<'Sedan' | 'SUV' | 'Minivan'> = ['Sedan', 'SUV', 'Minivan'];
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
-            {vehicles.map(vehicle => {
-                const isSelected = selectedVehicle === vehicle.id;
-                const price = prices?.[vehicle.id];
-                const isDisabledByCapacity = !vehicle.canAccommodate;
-                const isDisabled = disabled || isDisabledByCapacity;
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', width: '100%' }}>
+            {vehicles.map(vehicleType => {
+                const config = rules?.vehicleModifiers[vehicleType];
+                const isSelected = selectedVehicle === vehicleType;
+                const capacity = config?.maxPassengers || 4;
+                const isDisabledByCapacity = passengerCount > capacity;
+                const isCardDisabled = disabled || isDisabledByCapacity;
+                const price = prices?.[vehicleType];
 
                 return (
                     <button
-                        key={vehicle.id}
-                        type="button"
-                        onClick={() => {
-                            if (!isDisabledByCapacity) {
-                                onSelect(isSelected ? 'Any' : vehicle.id);
-                            }
-                        }}
-                        disabled={isDisabled}
-                        className="vehicle-card"
+                        key={vehicleType}
+                        onClick={() => !isCardDisabled && onSelect(vehicleType)}
+                        disabled={isCardDisabled}
                         style={{
-                            position: 'relative',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'flex-start',
-                            padding: '1rem',
-                            border: isSelected ? '2px solid #2563eb' : '2px solid transparent',
+                            padding: '16px',
+                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                            border: `2px solid ${isSelected ? '#2563eb' : '#e5e7eb'}`,
                             borderRadius: '12px',
-                            backgroundColor: isSelected ? '#eff6ff' : 'white',
-                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            cursor: isCardDisabled ? 'not-allowed' : 'pointer',
+                            opacity: isCardDisabled ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
                             textAlign: 'left',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            boxShadow: isSelected ? '0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06)' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                            opacity: isDisabled ? 0.5 : 1,
-                            minHeight: '140px'
-                        }}
-                        onMouseEnter={e => {
-                            if (!isDisabled && !isSelected) {
-                                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (!isDisabled && !isSelected) {
-                                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
-                            }
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}
                     >
-                        {/* Icon */}
-                        <div style={{
-                            marginBottom: '0.75rem',
-                            width: '100%',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            height: '120px', // Fixed height for image area
-                            overflow: 'hidden'
-                        }}>
-                            {vehicle.icon}
-                        </div>
+                        {/* Header Section */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{
+                                    fontSize: '16px',
+                                    fontWeight: 600,
+                                    color: '#111827',
+                                    marginBottom: '4px'
+                                }}>
+                                    {vehicleType}
+                                </span>
+                                <span style={{
+                                    fontSize: '13px',
+                                    color: '#6b7280',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Max {capacity}
+                                </span>
+                            </div>
 
-                        {/* Content */}
-                        <div style={{ width: '100%' }}>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '0.25rem'
-                            }}>
-                                <span style={{ fontWeight: 600, fontSize: '15px', color: '#111827' }}>{vehicle.name}</span>
-                                {/* Price - inline on right, hide if disabled */}
-                                {price !== undefined && !isDisabledByCapacity && (
+                            {/* Price Display */}
+                            {price !== undefined && !isDisabledByCapacity && (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                     <span style={{
-                                        fontSize: '16px',
+                                        fontSize: '18px',
                                         fontWeight: 700,
-                                        color: '#2563eb'
+                                        color: '#2563eb', // Blue color for price
+                                        lineHeight: 1.2
                                     }}>
                                         ${price}
                                     </span>
-                                )}
-                            </div>
-
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                fontSize: '13px',
-                                color: '#6b7280'
-                            }}>
-                                <span>👥 {vehicle.passengers}</span>
-                            </div>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Vehicle Image */}
+                        <div style={{
+                            width: '100%',
+                            height: '100px',
+                            backgroundColor: '#f3f4f6',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: 'auto',
+                            overflow: 'hidden'
+                        }}>
+                            <img
+                                src={`/vehicles/${vehicleType.toLowerCase()}.png`}
+                                alt={vehicleType}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain'
+                                }}
+                                onError={(e) => {
+                                    // Fallback if image fails
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement!.innerHTML = '<span style="fontSize: 24px; opacity: 0.5">🚗</span>';
+                                }}
+                            />
+                        </div>
+
+                        {isDisabledByCapacity && (
+                            <div style={{
+                                marginTop: '8px',
+                                fontSize: '12px',
+                                color: '#ef4444',
+                                fontWeight: 500
+                            }}>
+                                Capacity exceeded
+                            </div>
+                        )}
                     </button>
                 );
             })}

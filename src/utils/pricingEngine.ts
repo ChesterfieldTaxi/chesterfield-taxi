@@ -208,23 +208,28 @@ export function calculateFare(
         runningTotal += modAmount;
     });
 
-    breakdown.subtotal = runningTotal;
+    // 10. Calculate subtotal before minimum fare check
+    let baseSubtotal = breakdown.baseFare + breakdown.distanceFare;
 
-    // 11. Apply minimum fare
-    if (breakdown.subtotal < tripConfig.minimumFare) {
+    // 11. Apply minimum fare to base calculation only (base + distance)
+    let adjustedBase = baseSubtotal;
+    if (baseSubtotal < tripConfig.minimumFare) {
         breakdown.minimumApplied = true;
-        breakdown.total = tripConfig.minimumFare;
+        adjustedBase = tripConfig.minimumFare;
         breakdown.lineItems.push({
-            label: `Minimum Fare Applied`,
-            amount: tripConfig.minimumFare - breakdown.subtotal,
+            label: `Minimum Fare Adjustment`,
+            amount: tripConfig.minimumFare - baseSubtotal,
             type: 'modifier'
         });
-    } else {
-        breakdown.total = breakdown.subtotal;
     }
 
-    // 12. Round UP to nearest dollar
-    breakdown.total = Math.ceil(breakdown.total);
+    // 12. Calculate final total: adjusted base + all additional fees
+    runningTotal = adjustedBase + breakdown.vehicleUpgrade + breakdown.passengerFees +
+        breakdown.carSeatFees + breakdown.luggageFees + breakdown.specialRequestFees +
+        breakdown.surcharges + breakdown.waitTimeFees;
+
+    breakdown.subtotal = runningTotal;
+    breakdown.total = Math.ceil(runningTotal);
 
     return breakdown;
 }

@@ -19,19 +19,22 @@ import { StickyPriceFooter } from './StickyPriceFooter';
 import { SaveIndicator } from './SaveIndicator';
 
 /**
- * Section Wrapper with light gray background
+ * Section Wrapper with light gray background + focus-within highlighting
  */
 const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
     <section style={{ marginBottom: '1rem' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
             {title}
         </h2>
-        <div style={{
-            backgroundColor: '#f9fafb',
-            padding: '0.75rem',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
-        }}>
+        <div
+            className="focus-section"
+            style={{
+                backgroundColor: '#f9fafb',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb'
+            }}
+        >
             {children}
         </div>
     </section>
@@ -100,6 +103,22 @@ export const BookingFlowV3: React.FC = () => {
             setShowSaveIndicator(true);
         }
     }, [state]);
+
+    // 🔥 Auto-focus first empty required field on mount
+    useEffect(() => {
+        // Only auto-focus if form is empty (not restored from localStorage)
+        if (!state.pickup && !state.name) {
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                // Try to focus first input (pickup location)
+                const firstInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+                if (firstInput) {
+                    firstInput.focus();
+                }
+            }, 100);
+        }
+    }, []); // Only run on mount
+
 
     // Validation state
     const [showValidation, setShowValidation] = React.useState(false);
@@ -172,8 +191,7 @@ export const BookingFlowV3: React.FC = () => {
         return {
             Sedan: calculateFare({ ...baseBooking, vehicleType: 'Sedan' }, rules).total,
             SUV: calculateFare({ ...baseBooking, vehicleType: 'SUV' }, rules).total,
-            Minivan: calculateFare({ ...baseBooking, vehicleType: 'Minivan' }, rules).total,
-            Any: calculateFare({ ...baseBooking, vehicleType: 'Any' }, rules).total
+            Minivan: calculateFare({ ...baseBooking, vehicleType: 'Minivan' }, rules).total
         };
     }, [rules, state.distanceInYards, state.passengerCount, state.luggageCount, state.carSeats, state.specialRequests, state.pickup?.isAirport, state.dropoff?.isAirport, state.pickupDateTime]);
 
@@ -181,7 +199,7 @@ export const BookingFlowV3: React.FC = () => {
         <div style={{
             minHeight: '100vh',
             backgroundColor: '#f9fafb',
-            paddingBottom: '100px'
+            paddingBottom: '180px' // Extra space above footer and FAB elements
         }}>
             <div style={{
                 maxWidth: '600px',
@@ -423,7 +441,7 @@ export const BookingFlowV3: React.FC = () => {
             />
 
             {/* 🔥 NEW: Auto-save indicator */}
-            <SaveIndicator show={showSaveIndicator} />
+            <SaveIndicator isVisible={showSaveIndicator} />
         </div >
     );
 };

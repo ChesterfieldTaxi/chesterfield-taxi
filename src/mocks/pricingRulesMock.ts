@@ -93,15 +93,6 @@ export const mockPricingRules: PricingRules = {
                 type: "fixed",
                 amount: 10
             }
-        },
-        Any: {
-            name: "Any Available",
-            enabled: true,
-            maxPassengers: 4,
-            modifier: {
-                type: "fixed",
-                amount: 0
-            }
         }
     },
 
