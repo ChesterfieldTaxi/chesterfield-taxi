@@ -166,8 +166,9 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         borderRadius: '4px',
                         backgroundColor: disabled ? '#f3f4f6' : 'white',
                         padding: '0.625rem 0.75rem',
-                        transition: 'border-color 0.2s',
-                        cursor: disabled ? 'not-allowed' : 'text'
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                        cursor: disabled ? 'not-allowed' : 'text',
+                        boxShadow: isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.15)' : 'none'
                     }}
                 >
                     <div style={{ marginRight: '0.5rem', display: 'flex', alignItems: 'center' }}>

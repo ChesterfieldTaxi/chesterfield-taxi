@@ -1,0 +1,36 @@
+/**
+ * Focus & Hover Interactions
+ * Professional button animations only (input glow removed due to component structure conflicts)
+ */
+
+/* Button Hover & Active States */
+button:not(:disabled) {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+button:not(:disabled):hover {
+    transform: scale(1.02);
+}
+
+button:not(:disabled):active {
+    transform: scale(0.98);
+}
+
+/* Disabled State */
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Link Hover */
+a:hover {
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
+}
+
+/* Smooth transitions for inputs (no glow to avoid conflicts) */
+input,
+textarea,
+select {
+    transition: border-color 0.2s ease;
+}
