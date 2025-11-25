@@ -66,6 +66,7 @@ export const BookingFlowV3: React.FC = () => {
         toggleSpecialRequest,
         setGateCode,
         setIsReturnTrip,
+        setIsReturnWait,
         setReturnDateTime,
         setReturnPickup,
         setReturnDropoff,
@@ -182,11 +183,14 @@ export const BookingFlowV3: React.FC = () => {
     // Calculate prices for each vehicle type (for display in vehicle selector)
     // Each vehicle gets its own price calculation based on the current booking details
     const vehiclePrices = useMemo(() => {
-        if (!rules || state.distanceInYards === 0) return undefined;
+        if (!rules || (state.distanceInYards === 0 && state.reverseDistanceInYards === 0)) return undefined;
+
+        // Use max distance to prevent under-quoting
+        const maxDistance = Math.max(state.distanceInYards || 0, state.reverseDistanceInYards || 0);
 
         const baseBooking: BookingDetails = {
             tripType: state.pickup?.isAirport || state.dropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
-            distanceInYards: state.distanceInYards,
+            distanceInYards: maxDistance,
             passengerCount: state.passengerCount,
             luggageCount: state.luggageCount,
             carSeats: state.carSeats,
@@ -198,12 +202,35 @@ export const BookingFlowV3: React.FC = () => {
             vehicleType: 'Sedan' // placeholder, will be overridden
         };
 
-        return {
-            Sedan: calculateFare({ ...baseBooking, vehicleType: 'Sedan' }, rules).total,
-            SUV: calculateFare({ ...baseBooking, vehicleType: 'SUV' }, rules).total,
-            Minivan: calculateFare({ ...baseBooking, vehicleType: 'Minivan' }, rules).total
-        };
-    }, [rules, state.distanceInYards, state.passengerCount, state.luggageCount, state.carSeats, state.specialRequests, state.pickup?.isAirport, state.dropoff?.isAirport, state.pickupDateTime]);
+        const prices: { Sedan: number; SUV: number; Minivan: number } = {} as any;
+
+        (['Sedan', 'SUV', 'Minivan'] as const).forEach(vehicleType => {
+            const onewayFare = calculateFare({ ...baseBooking, vehicleType }, rules);
+
+            if (state.isReturnTrip) {
+                // Use actual return trip distance if available, otherwise use reverse distance
+                const returnDistance = state.returnDistanceInYards > 0
+                    ? state.returnDistanceInYards
+                    : Math.max(state.distanceInYards, state.reverseDistanceInYards);
+
+                // Calculate return leg with actual return trip data
+                const returnFare = calculateFare({
+                    ...baseBooking,
+                    vehicleType,
+                    distanceInYards: returnDistance, // Use actual return distance
+                    tripType: state.returnPickup?.isAirport || state.returnDropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
+                    pickupIsAirport: state.returnPickup?.isAirport || false,
+                    dropoffIsAirport: state.returnDropoff?.isAirport || false,
+                    isAirport: state.returnPickup?.isAirport || state.returnDropoff?.isAirport || false
+                }, rules);
+                prices[vehicleType] = onewayFare.total + returnFare.total;
+            } else {
+                prices[vehicleType] = onewayFare.total;
+            }
+        });
+
+        return prices;
+    }, [rules, state.distanceInYards, state.reverseDistanceInYards, state.returnDistanceInYards, state.isReturnTrip, state.pickup?.isAirport, state.dropoff?.isAirport, state.returnPickup?.isAirport, state.returnDropoff?.isAirport, state.passengerCount, state.luggageCount, state.carSeats, state.specialRequests, state.pickupDateTime]);
 
     return (
         <div style={{
@@ -331,7 +358,7 @@ export const BookingFlowV3: React.FC = () => {
                     ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
                         <>
                             <VehicleSelectorV3
-                                selectedVehicle={effectiveVehicleType}
+                                selectedVehicle={effectiveVehicleType === 'Any' ? 'Sedan' : effectiveVehicleType}
                                 onSelect={setVehicleType}
                                 disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
                                 passengerCount={state.passengerCount}
@@ -377,10 +404,12 @@ export const BookingFlowV3: React.FC = () => {
                 <SectionWrapper title="Return Trip">
                     <ReturnTripV3
                         isReturnTrip={state.isReturnTrip}
+                        isReturnWait={state.isReturnWait}
                         returnDateTime={state.returnDateTime}
                         returnPickup={state.returnPickup}
                         returnDropoff={state.returnDropoff}
                         onIsReturnTripChange={setIsReturnTrip}
+                        onIsReturnWaitChange={setIsReturnWait}
                         onReturnDateTimeChange={setReturnDateTime}
                         onReturnPickupChange={setReturnPickup}
                         onReturnDropoffChange={setReturnDropoff}
@@ -392,6 +421,8 @@ export const BookingFlowV3: React.FC = () => {
                         reorderReturnStops={reorderReturnStops}
                         syncReturnTripFromMain={syncReturnTripFromMain}
                         isRouteComplete={!!(state.pickup?.address && state.dropoff?.address)}
+                        returnDistanceInYards={state.returnDistanceInYards}
+                        isCalculatingReturnDistance={isCalculatingPrice}
                     />
                 </SectionWrapper>
 

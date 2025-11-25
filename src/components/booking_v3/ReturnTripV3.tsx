@@ -5,6 +5,7 @@ import type { Location } from '../../hooks/useBookingFormV3';
 
 interface ReturnTripV3Props {
     isReturnTrip: boolean;
+    isReturnWait: boolean; // NEW: true = "Wait", false = "Schedule"
     returnDateTime: Date | null;
     returnPickup: Location | null;
     returnDropoff: Location | null;
@@ -13,7 +14,12 @@ interface ReturnTripV3Props {
     // Validation
     isRouteComplete: boolean;  // true when original pickup & dropoff are filled
 
+    // Distance (for display)
+    returnDistanceInYards?: number;
+    isCalculatingReturnDistance?: boolean;
+
     onIsReturnTripChange: (isReturn: boolean) => void;
+    onIsReturnWaitChange: (isWait: boolean) => void; // NEW
     onReturnDateTimeChange: (date: Date) => void;
     onReturnPickupChange: (location: Location | null) => void;
     onReturnDropoffChange: (location: Location | null) => void;
@@ -27,12 +33,16 @@ interface ReturnTripV3Props {
 
 export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
     isReturnTrip,
+    isReturnWait,
     returnDateTime,
     returnPickup,
     returnDropoff,
     returnStops = [],
     isRouteComplete,
+    returnDistanceInYards,
+    isCalculatingReturnDistance,
     onIsReturnTripChange,
+    onIsReturnWaitChange,
     onReturnDateTimeChange,
     onReturnPickupChange,
     onReturnDropoffChange,
@@ -121,58 +131,66 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                     flexDirection: 'column'
                     // gap removed to reduce whitespace
                 }}>
-                    {/* Date & Time - Moved to top */}
-                    <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '14px', color: '#1e40af' }}>
-                            Return Date & Time
-                        </label>
-                        <DateTimePicker
-                            value={returnDateTime}
-                            onChange={onReturnDateTimeChange}
-                            showTimePicker={true}
-                            placeholder="Select return date and time"
-                        />
-                    </div>
+                    {/* Wait/Schedule Segmented Control - Matching main trip design */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                        <div style={{
+                            display: 'inline-flex',
+                            gap: '0.25rem',
+                            padding: '0.25rem',
+                            backgroundColor: '#e5e7eb',
+                            borderRadius: '6px',
+                            flexShrink: 0
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => onIsReturnWaitChange(true)}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    backgroundColor: isReturnWait ? 'white' : 'transparent',
+                                    color: isReturnWait ? '#111827' : '#6b7280',
+                                    fontWeight: 600,
+                                    fontSize: '16px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: isReturnWait ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                }}
+                            >
+                                Wait
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onIsReturnWaitChange(false)}
+                                style={{
+                                    padding: '0.5rem 1.25rem',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    backgroundColor: !isReturnWait ? '#2563eb' : 'transparent',
+                                    color: !isReturnWait ? 'white' : '#6b7280',
+                                    fontWeight: 600,
+                                    fontSize: '16px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: !isReturnWait ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                }}
+                            >
+                                Schedule
+                            </button>
+                        </div>
 
-                    {/* Sync Button */}
-                    {isRouteComplete && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                console.log('[ReturnTripV3] Syncing return trip from main trip');
-                                syncReturnTripFromMain();
-                            }}
-                            style={{
-                                padding: '0.5rem 0.75rem',
-                                backgroundColor: '#f3f4f6',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '14px',
-                                fontWeight: 500,
-                                color: '#374151',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#e5e7eb';
-                                e.currentTarget.style.borderColor = '#9ca3af';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f3f4f6';
-                                e.currentTarget.style.borderColor = '#d1d5db';
-                            }}
-                            title="Copy locations from main trip in reverse order"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                            </svg>
-                            Copy from Main Trip
-                        </button>
-                    )}
+                        {/* DateTime Picker - Inline when Schedule is selected */}
+                        {!isReturnWait && (
+                            <div style={{ flex: '1 1 250px', minWidth: '250px' }}>
+                                <DateTimePicker
+                                    value={returnDateTime}
+                                    onChange={onReturnDateTimeChange}
+                                    showTimePicker={true}
+                                    placeholder="Select return date and time"
+                                />
+                            </div>
+                        )}
+                    </div>
 
                     {/* Return Trip Route */}
                     <TripRouteV3
@@ -192,6 +210,8 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                         onReorderStops={reorderReturnStops}
                         onFlightDetailsChange={onReturnFlightDetailsChange}
                         placeholderPrefix="Return"
+                        distanceInYards={returnDistanceInYards}
+                        isCalculatingDistance={isCalculatingReturnDistance}
                     />
                 </div>
             </div>

@@ -38,6 +38,7 @@ export interface BookingFormV3State {
 
     // Distance (from Google Maps API)
     distanceInYards: number;
+    reverseDistanceInYards: number; // B→A distance for max price logic
     isCalculatingPrice: boolean;
     isSubmitting: boolean;
 
@@ -61,11 +62,13 @@ export interface BookingFormV3State {
 
     // Return trip
     isReturnTrip: boolean;
+    isReturnWait: boolean; // true = "Wait", false = "Schedule"
     returnDateTime: Date | null;
     returnRouteType: 'reverse' | 'custom';
     returnPickup: Location | null;
     returnDropoff: Location | null;
     returnStops: Location[];
+    returnDistanceInYards: number; // Independent distance for return trip
 
     // Payment (uses discriminated union)
     payment: PaymentData;
@@ -86,6 +89,7 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         dropoff: null,
         stops: [],
         distanceInYards: 0,
+        reverseDistanceInYards: 0,
         isCalculatingPrice: false,
         isSubmitting: false,
         vehicleType: 'Any',
@@ -97,11 +101,13 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         specialRequests: [],
         gateCode: '',
         isReturnTrip: false,
+        isReturnWait: true, // Default to "Wait"
         returnDateTime: null,
         returnRouteType: 'reverse',
         returnPickup: null,
         returnDropoff: null,
         returnStops: [],
+        returnDistanceInYards: 0,
         payment: {
             method: 'cash',
             timestamp: new Date()
@@ -206,6 +212,75 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         state.stops.map(s => s.placeId).join(',')
     ]);
 
+    // Calculate reverse distance (B→A) for max price logic
+    useEffect(() => {
+        const calculateReverseDistance = async () => {
+            // Need both pickup and dropoff with coordinates to calculate
+            if (!state.pickup?.coordinates || !state.dropoff?.coordinates) {
+                setState(prev => ({ ...prev, reverseDistanceInYards: 0 }));
+                return;
+            }
+
+            try {
+                // Swap pickup and dropoff for reverse calculation
+                const pickupPoint = { coordinates: state.dropoff.coordinates };
+                const dropoffPoint = { coordinates: state.pickup.coordinates };
+                const stopPoints = [...state.stops]
+                    .reverse()
+                    .filter(s => s.coordinates)
+                    .map(s => ({ coordinates: s.coordinates! }));
+
+                const distance = await calculateRouteDistance(pickupPoint, dropoffPoint, stopPoints);
+                setState(prev => ({ ...prev, reverseDistanceInYards: distance }));
+            } catch (error) {
+                console.error('Error calculating reverse distance:', error);
+                setState(prev => ({ ...prev, reverseDistanceInYards: 0 }));
+            }
+        };
+
+        // Debounce API calls
+        const timer = setTimeout(calculateReverseDistance, 1000);
+        return () => clearTimeout(timer);
+    }, [
+        state.pickup?.placeId,
+        state.dropoff?.placeId,
+        state.stops.map(s => s.placeId).join(',')
+    ]);
+
+    // Calculate return trip distance (independent calculation based on return trip locations)
+    useEffect(() => {
+        const calculateReturnDistance = async () => {
+            // Only calculate if return trip is enabled and has valid locations
+            if (!state.isReturnTrip || !state.returnPickup?.coordinates || !state.returnDropoff?.coordinates) {
+                setState(prev => ({ ...prev, returnDistanceInYards: 0 }));
+                return;
+            }
+
+            try {
+                const pickupPoint = { coordinates: state.returnPickup.coordinates };
+                const dropoffPoint = { coordinates: state.returnDropoff.coordinates };
+                const stopPoints = state.returnStops
+                    .filter(s => s.coordinates)
+                    .map(s => ({ coordinates: s.coordinates! }));
+
+                const distance = await calculateRouteDistance(pickupPoint, dropoffPoint, stopPoints);
+                setState(prev => ({ ...prev, returnDistanceInYards: distance }));
+            } catch (error) {
+                console.error('Error calculating return trip distance:', error);
+                setState(prev => ({ ...prev, returnDistanceInYards: 0 }));
+            }
+        };
+
+        // Debounce API calls
+        const timer = setTimeout(calculateReturnDistance, 1000);
+        return () => clearTimeout(timer);
+    }, [
+        state.isReturnTrip,
+        state.returnPickup?.placeId,
+        state.returnDropoff?.placeId,
+        state.returnStops.map(s => s.placeId).join(',')
+    ]);
+
 
     // Auto-select Minivan if car seats are selected
     const effectiveVehicleType = useMemo(() => {
@@ -218,24 +293,54 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
 
     // Calculate fare in real-time
     const fareBreakdown = useMemo(() => {
-        if (!rules || state.distanceInYards === 0) return null;
+        if (!rules || (state.distanceInYards === 0 && state.reverseDistanceInYards === 0)) return null;
 
-        const booking: BookingDetails = {
+        // Use the higher of the two distances for one-way quote (prevents under-quoting)
+        const maxDistance = Math.max(state.distanceInYards, state.reverseDistanceInYards);
+
+        const baseBooking: BookingDetails = {
             tripType: state.pickup?.isAirport || state.dropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
-            distanceInYards: state.distanceInYards,
+            distanceInYards: maxDistance, // Use max distance
             vehicleType: effectiveVehicleType,
             passengerCount: state.passengerCount,
             luggageCount: state.luggageCount,
             carSeats: state.carSeats,
             specialRequests: state.specialRequests,
             isAirport: state.pickup?.isAirport || state.dropoff?.isAirport || false,
-            pickupIsAirport: state.pickup?.isAirport || false,
-            dropoffIsAirport: state.dropoff?.isAirport || false,
             pickupDateTime: state.pickupDateTime || new Date() // Fallback for pricing calculation only
         };
 
-        return calculateFare(booking, rules);
-    }, [rules, state, effectiveVehicleType]);
+        // Calculate outbound fare
+        const outboundFare = calculateFare({
+            ...baseBooking,
+            pickupIsAirport: state.pickup?.isAirport || false,
+            dropoffIsAirport: state.dropoff?.isAirport || false
+        }, rules);
+
+        // If return trip, calculate return fare using actual return trip data
+        if (state.isReturnTrip) {
+            // Use actual return trip distance if available, otherwise use reverse distance
+            const returnDistance = state.returnDistanceInYards > 0
+                ? state.returnDistanceInYards
+                : Math.max(state.distanceInYards, state.reverseDistanceInYards);
+
+            const returnFare = calculateFare({
+                ...baseBooking,
+                distanceInYards: returnDistance, // Use actual return distance
+                tripType: state.returnPickup?.isAirport || state.returnDropoff?.isAirport ? 'airport_transfer' : 'point_to_point',
+                pickupIsAirport: state.returnPickup?.isAirport || false,
+                dropoffIsAirport: state.returnDropoff?.isAirport || false,
+                isAirport: state.returnPickup?.isAirport || state.returnDropoff?.isAirport || false
+            }, rules);
+
+            return {
+                ...outboundFare,
+                total: outboundFare.total + returnFare.total // SUM both legs
+            };
+        }
+
+        return outboundFare;
+    }, [rules, state.distanceInYards, state.reverseDistanceInYards, state.returnDistanceInYards, state.isReturnTrip, state.pickup?.isAirport, state.dropoff?.isAirport, state.returnPickup?.isAirport, state.returnDropoff?.isAirport, state.passengerCount, state.luggageCount, state.carSeats, state.specialRequests, state.pickupDateTime, effectiveVehicleType]);
 
     // Setters
     // Mock airport detection
@@ -353,6 +458,7 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
     const setIsNow = (isNow: boolean) => setState(prev => ({ ...prev, isNow }));
     const setPickupDateTime = (date: Date) => setState(prev => ({ ...prev, pickupDateTime: date }));
     const setIsReturnTrip = (isReturn: boolean) => setState(prev => ({ ...prev, isReturnTrip: isReturn }));
+    const setIsReturnWait = (isWait: boolean) => setState(prev => ({ ...prev, isReturnWait: isWait }));
     const setReturnDateTime = (date: Date | null) => setState(prev => ({ ...prev, returnDateTime: date }));
     const setReturnRouteType = (type: 'reverse' | 'custom') => setState(prev => ({ ...prev, returnRouteType: type }));
     const setReturnPickup = (location: Location | null) => setState(prev => ({
@@ -544,6 +650,7 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         setIsNow,
         setPickupDateTime,
         setIsReturnTrip,
+        setIsReturnWait,
         setReturnDateTime,
         setReturnRouteType,
         setReturnPickup,
