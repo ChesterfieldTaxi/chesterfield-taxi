@@ -1,4 +1,5 @@
-import React from 'react';
+import { RippleButton } from '../common/RippleButton';
+import '../../styles/interactions.css';
 import { typography } from '../../styles/typography-helpers';
 
 interface StickyPriceFooterProps {
@@ -57,7 +58,7 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                 </div>
 
                 {onBookClick && (
-                    <button
+                    <RippleButton
                         type="button"
                         onClick={onBookClick}
                         disabled={isLoading || isSubmitting || total === 0}
@@ -74,26 +75,20 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                             opacity: (isLoading || isSubmitting) ? 0.7 : 1,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem'
+                            gap: '0.5rem',
+                            position: 'relative', // Required for ripple
+                            overflow: 'hidden'    // Required for ripple
                         }}
                     >
-                        {isSubmitting && (
-                            <svg style={{ animation: 'spin 1s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
-                                <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75"></path>
-                            </svg>
-                        )}
+                        {isSubmitting && <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: 'white' }} />}
                         {isSubmitting ? 'Submitting...' : 'Book Ride'}
-                    </button>
+                    </RippleButton>
                 )}
             </div>
             <style>{`
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }
                     50% { opacity: .5; }
-                }
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
                 }
             `}</style>
         </div>

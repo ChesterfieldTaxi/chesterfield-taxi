@@ -415,7 +415,7 @@ export const BookingFlowV3: React.FC = () => {
                         onConsentChange={setConsentGiven}
                     />
                     {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && (
-                        <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>
+                        <div className="error-message-slide" style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>
                             {!state.name.trim() && <div>• Name is required</div>}
                             {!state.phone.trim() && <div>• Phone number is required</div>}
                             {!state.consentGiven && <div>• You must agree to the terms and conditions</div>}

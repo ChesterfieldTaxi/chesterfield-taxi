@@ -41,6 +41,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
     isCalculatingDistance
 }) => {
     const prefix = placeholderPrefix ? `${placeholderPrefix} ` : '';
+    const [draggingIndex, setDraggingIndex] = React.useState<number | null>(null);
 
     return (
         <>
@@ -79,7 +80,16 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     justifyContent: 'center',
                                     cursor: 'pointer',
                                     color: '#6b7280',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
                                 }}
                                 title="Swap locations"
                             >
@@ -138,6 +148,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                             const isFirst = index === 0;
                             const isLast = index === array.length - 1;
                             const visualType = isFirst ? 'pickup' : isLast ? 'dropoff' : 'stop';
+                            const isDragging = draggingIndex === index;
 
                             return (
                                 <React.Fragment key={location.id || `loc-${index}`}>
@@ -145,15 +156,28 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     <div
                                         draggable
                                         onDragStart={(e) => {
+                                            setDraggingIndex(index);
                                             e.dataTransfer.setData('text/plain', index.toString());
                                             e.dataTransfer.effectAllowed = 'move';
+                                            // Set drag image ghost
+                                            const ghost = e.currentTarget.parentElement?.cloneNode(true) as HTMLElement;
+                                            if (ghost) {
+                                                ghost.style.opacity = '0.5';
+                                                ghost.style.position = 'absolute';
+                                                ghost.style.top = '-1000px';
+                                                document.body.appendChild(ghost);
+                                                e.dataTransfer.setDragImage(ghost, 0, 0);
+                                                setTimeout(() => document.body.removeChild(ghost), 0);
+                                            }
                                         }}
+                                        onDragEnd={() => setDraggingIndex(null)}
                                         onDragOver={(e) => {
                                             e.preventDefault();
                                             e.dataTransfer.dropEffect = 'move';
                                         }}
                                         onDrop={(e) => {
                                             e.preventDefault();
+                                            setDraggingIndex(null);
                                             const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
                                             if (fromIndex !== index) {
                                                 onReorderStops(fromIndex, index);
@@ -164,8 +188,11 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                             display: 'flex',
                                             justifyContent: 'center',
                                             alignItems: 'center',
-                                            color: '#9ca3af',
-                                            height: '100%'
+                                            color: isDragging ? '#2563eb' : '#9ca3af',
+                                            height: '100%',
+                                            opacity: isDragging ? 0.5 : 1,
+                                            transform: isDragging ? 'scale(1.1)' : 'scale(1)',
+                                            transition: 'all 0.2s ease'
                                         }}
                                     >
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -179,7 +206,11 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     </div>
 
                                     {/* Col 2: Input */}
-                                    <div>
+                                    <div style={{
+                                        transition: 'all 0.2s ease',
+                                        opacity: isDragging ? 0.4 : 1,
+                                        transform: isDragging ? 'translateX(5px)' : 'none'
+                                    }}>
                                         <LocationInputV3
                                             value={location.name || location.address || ''}
                                             onChange={(locationUpdate) => {

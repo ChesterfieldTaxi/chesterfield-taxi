@@ -101,7 +101,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                         {/* Vehicle Image */}
                         <div style={{
                             width: '100%',
-                            height: '100px',
+                            height: '140px', // Increased height for better visibility
                             backgroundColor: 'transparent',
                             borderRadius: '8px',
                             display: 'flex',
@@ -112,12 +112,13 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                         }}>
                             <img
                                 src={`/vehicles/${vehicleType.toLowerCase()}.png`}
+                                srcSet={`/vehicles/${vehicleType.toLowerCase()}.png 1x, /vehicles/${vehicleType.toLowerCase()}@2x.png 2x`}
                                 alt={vehicleType}
                                 style={{
                                     width: '100%',
                                     height: '100%',
-                                    objectFit: 'cover',
-                                    objectPosition: 'center'
+                                    objectFit: 'contain',
+                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' // Subtle shadow for depth
                                 }}
                                 onError={(e) => {
                                     // Fallback if image fails

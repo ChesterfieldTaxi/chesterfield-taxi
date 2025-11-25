@@ -226,7 +226,7 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         }
                     `}</style>
 
-                    {/* Clear Button */}
+                    {/* Clear Button - Circle X */}
                     {inputValue && (
                         <button
                             type="button"
@@ -251,18 +251,17 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                                 border: 'none',
                                 background: 'none',
                                 cursor: 'pointer',
-                                color: '#ef4444',
+                                color: '#9ca3af', // Softer gray
                                 display: 'flex',
                                 alignItems: 'center',
                                 transition: 'color 0.15s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = '#ef4444'}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#6b7280'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
                             title="Clear location"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" />
                             </svg>
                         </button>
                     )}
@@ -275,27 +274,35 @@ export const LocationInputV3: React.FC<LocationInputV3Props> = ({
                         onSelectGoogle={handleSelectGoogle}
                         isOpen={isOpen}
                         loading={loading}
+                        inputValue={inputValue}
                     />
                 </div>
 
-                {/* Remove Button */}
+                {/* Remove Button - Trash Icon */}
                 {onRemove && (
                     <button
                         type="button"
                         onClick={onRemove}
                         style={{
-                            padding: '0.25rem',
+                            padding: '0.5rem',
                             border: 'none',
                             background: 'none',
                             cursor: 'pointer',
-                            color: '#9ca3af',
+                            color: '#ef4444', // Red for destructive action
                             display: 'flex',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            opacity: 0.8,
+                            transition: 'opacity 0.2s'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+                        title="Remove stop"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
                         </svg>
                     </button>
                 )}

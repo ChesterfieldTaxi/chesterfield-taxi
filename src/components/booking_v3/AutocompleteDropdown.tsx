@@ -17,7 +17,28 @@ interface AutocompleteDropdownProps {
     onSelectGoogle: (prediction: PlacePrediction) => void;
     isOpen: boolean;
     loading: boolean;
+    inputValue?: string; // Add inputValue for highlighting
 }
+
+/**
+ * Helper to highlight matching text
+ */
+const highlightMatch = (text: string, query?: string) => {
+    if (!query || query.length < 2) return text;
+
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === query.toLowerCase() ? (
+                    <span key={i} className="match-highlight">{part}</span>
+                ) : (
+                    part
+                )
+            )}
+        </>
+    );
+};
 
 /**
  * Autocomplete dropdown showing hybrid results (admin locations first, then Google Places)
@@ -29,7 +50,8 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
     onSelectAdmin,
     onSelectGoogle,
     isOpen,
-    loading
+    loading,
+    inputValue
 }) => {
     if (!isOpen) return null;
 
@@ -64,11 +86,12 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                     }}>
                         Recommended
                     </div>
-                    {adminResults.map(location => (
+                    {adminResults.map((location, index) => (
                         <button
                             key={location.id}
                             type="button"
                             onClick={() => onSelectAdmin(location)}
+                            className="autocomplete-item"
                             style={{
                                 width: '100%',
                                 display: 'flex',
@@ -79,7 +102,8 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                                 backgroundColor: 'transparent',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                transition: 'background-color 0.15s'
+                                transition: 'background-color 0.15s',
+                                animationDelay: `${index * 30}ms`
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -94,7 +118,7 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                                     color: '#111827',
                                     marginBottom: '2px'
                                 }}>
-                                    {location.name}
+                                    {highlightMatch(location.name, inputValue)}
                                 </div>
                                 <div style={{
                                     fontSize: '13px',
@@ -123,11 +147,12 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
             {/* Google Places Section */}
             {googleResults.length > 0 && (
                 <div>
-                    {googleResults.map(prediction => (
+                    {googleResults.map((prediction, index) => (
                         <button
                             key={prediction.place_id}
                             type="button"
                             onClick={() => onSelectGoogle(prediction)}
+                            className="autocomplete-item"
                             style={{
                                 width: '100%',
                                 display: 'flex',
@@ -138,7 +163,8 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                                 backgroundColor: 'transparent',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                transition: 'background-color 0.15s'
+                                transition: 'background-color 0.15s',
+                                animationDelay: `${(adminResults.length + index) * 30}ms`
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -153,7 +179,7 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                                     color: '#111827',
                                     marginBottom: '2px'
                                 }}>
-                                    {prediction.structured_formatting.main_text}
+                                    {highlightMatch(prediction.structured_formatting.main_text, inputValue)}
                                 </div>
                                 <div style={{
                                     fontSize: '13px',
@@ -170,15 +196,18 @@ export const AutocompleteDropdown = React.memo<AutocompleteDropdownProps>(({
                 </div>
             )}
 
-            {/* Loading State */}
+            {/* Skeleton Loading State */}
             {loading && !hasResults && (
-                <div style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontSize: '13px',
-                    color: '#6b7280'
-                }}>
-                    Searching...
+                <div style={{ padding: '12px' }}>
+                    {[1, 2, 3].map(i => (
+                        <div key={i} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                            <div className="skeleton" style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                            <div style={{ flex: 1 }}>
+                                <div className="skeleton" style={{ width: '60%', height: '16px', marginBottom: '6px' }} />
+                                <div className="skeleton" style={{ width: '90%', height: '12px' }} />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 
