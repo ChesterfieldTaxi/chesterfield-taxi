@@ -8,7 +8,7 @@ const About: React.FC = () => {
       <header className="page-header">
         <div className="container">
           <h1>About Chesterfield Taxi</h1>
-          <p className="page-subtitle">Local St. Louis ownership. World-class service standards.</p>
+          <p className="page-subtitle">Locally owned and operated since 1995. Over 30 years of trusted service.</p>
         </div>
       </header>
 
@@ -16,8 +16,8 @@ const About: React.FC = () => {
       <section className="section">
         <div className="container">
           <div className="about-content">
-            <h2>Driven by Excellence</h2>
-            <p>Chesterfield Taxi & Car Service was founded with a simple mission: to provide a level of service that rideshare apps simply cannot match. Owned and operated by Zemene Muche, we have grown from a single car into a premier fleet serving St. Louis County. We are not a tech company trying to disrupt transportation; we are a transportation company dedicated to serving our community.</p>
+            <h2>Over 30 Years of Trusted Service</h2>
+            <p>Founded in 1995, Chesterfield Taxi & Car Service has been serving St. Louis County for over 30 years. Owned and operated by Zemene Muche, we've grown from a single taxi into a trusted fleet specializing in airport transfers and local transportation. We're not a tech company or ride-share service - we're a professional taxi company with experienced drivers who know St. Louis roads like the back of their hand.</p>
           </div>
         </div>
       </section>
@@ -28,6 +28,26 @@ const About: React.FC = () => {
           <div className="about-content">
             <h2>The "Passenger Care" Approach</h2>
             <p>We believe you are a guest, not just a fare. Our drivers are trained in defensive driving, local geography, and customer etiquette. We assist with doors, handle your luggage, and respect your privacy during the ride.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Drivers */}
+      <section className="section">
+        <div className="container">
+          <div className="about-content">
+            <h2>Experienced, Professional Drivers</h2>
+            <p>Our driver team averages over 10 years of experience. Many have been with us since the beginning. They're not gig workers - they're career professionals who take pride in providing safe, reliable transportation. All drivers are fully licensed, background-checked, drug-screened, and trained in defensive driving and customer service.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Airport Transfer Specialists */}
+      <section className="section bg-alt">
+        <div className="container">
+          <div className="about-content">
+            <h2>Lambert Airport (STL) Transfer Specialists</h2>
+            <p>Airport transfers are our specialty. We monitor flight arrivals in real-time, offer flat-rate pricing (no surprises), and provide curb-to-curb service at both Terminal 1 and Terminal 2. Whether you're flying out or coming home, we'll be there on time, every time.</p>
           </div>
         </div>
       </section>
@@ -63,7 +83,7 @@ const About: React.FC = () => {
         }
 
         .page-header h1 {
-          color: var(--color-text-light);
+          color: white;
           font-family: var(--font-family-sans);
           font-size: 2.5rem;
         }

@@ -35,81 +35,123 @@ const Contact: React.FC = () => {
 
       <div className="container section">
         <div className="contact-grid">
-          {/* Contact Info & Map */}
+          {/* Left Column: Info & Hours */}
           <div className="contact-info-col">
-            <div className="info-card">
+            {/* Contact Info Card */}
+            <div className="info-card glass-panel">
               <h2>Get in Touch</h2>
+
               <div className="info-item">
-                <h3>Dispatch & Reservations</h3>
-                <p>
-                  <a href={`tel:${config?.contactInfo.phone.dialable || '+13147380100'}`}>
-                    {config?.contactInfo.phone.display || '(314) 738-0100'}
-                  </a>
-                </p>
+                <div className="icon-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                </div>
+                <div className="info-content">
+                  <h3>Dispatch & Reservations</h3>
+                  <p>
+                    <a href={`tel:${config?.contactInfo.phone.dialable || '+13147380100'}`}>
+                      {config?.contactInfo.phone.display || '(314) 738-0100'}
+                    </a>
+                  </p>
+                </div>
               </div>
+
               <div className="info-item">
-                <h3>Email</h3>
-                <p>
-                  Customer Service: <a href={`mailto:${config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}`}>
-                    {config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}
-                  </a>
-                </p>
-                <p>
-                  Bookings: <a href={`mailto:${config?.contactInfo.email.booking || 'bookings@chesterfieldtaxi.com'}`}>
-                    {config?.contactInfo.email.booking || 'bookings@chesterfieldtaxi.com'}
-                  </a>
-                </p>
+                <div className="icon-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                </div>
+                <div className="info-content">
+                  <h3>Email</h3>
+                  <p>
+                    <a href={`mailto:${config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}`}>
+                      {config?.contactInfo.email.general || 'info@chesterfieldtaxi.com'}
+                    </a>
+                  </p>
+                </div>
               </div>
+
               <div className="info-item">
-                <h3>Headquarters</h3>
-                <address>
-                  {config?.businessInfo.displayName || 'Chesterfield Taxi'} & Car Service<br />
-                  {config?.contactInfo.address.street || '1814 Woodson Road'}<br />
-                  {config?.contactInfo.address.city || 'Overland'}, {config?.contactInfo.address.state || 'MO'} {config?.contactInfo.address.zip || '63114'}
-                </address>
+                <div className="icon-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                </div>
+                <div className="info-content">
+                  <h3>Headquarters</h3>
+                  <address>
+                    {config?.contactInfo.address.street || '1814 Woodson Road'}<br />
+                    {config?.contactInfo.address.city || 'Overland'}, {config?.contactInfo.address.state || 'MO'} {config?.contactInfo.address.zip || '63114'}
+                  </address>
+                </div>
               </div>
             </div>
 
-            <div className="map-container">
-              {/* Placeholder for Google Map */}
-              <div className="map-placeholder">
-                Google Map Embed centered on St. Louis County service area
+            {/* Business Hours Card */}
+            <div className="hours-card glass-panel dark">
+              <h2>Business Hours</h2>
+              <div className="hours-list">
+                <div className="hours-item">
+                  <span className="day">Dispatch Office</span>
+                  <span className="time">24/7</span>
+                </div>
+                <div className="hours-item">
+                  <span className="day">Phone Support</span>
+                  <span className="time">24 Hours Daily</span>
+                </div>
+                <div className="hours-item">
+                  <span className="day">Office Visits</span>
+                  <span className="time">Mon-Fri: 9am - 5pm</span>
+                </div>
               </div>
+              <p className="hours-note">For immediate dispatch, call anytime. For administrative inquiries, visit during office hours.</p>
             </div>
           </div>
 
-          {/* Contact Form */}
+          {/* Right Column: Contact Form */}
           <div className="contact-form-col">
-            <div className="form-container">
+            <div className="form-container glass-panel">
               <h2>Send us a Message</h2>
               <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label htmlFor="name">Name</label>
-                  <input type="text" id="name" name="name" required value={formData.name} onChange={handleChange} />
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="name">Name</label>
+                    <input type="text" id="name" name="name" required value={formData.name} onChange={handleChange} placeholder="Your Name" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="email">Email</label>
+                    <input type="email" id="email" name="email" required value={formData.email} onChange={handleChange} placeholder="your@email.com" />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="email">Email</label>
-                  <input type="email" id="email" name="email" required value={formData.email} onChange={handleChange} />
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(555) 555-5555" />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="subject">Subject</label>
+                    <select id="subject" name="subject" value={formData.subject} onChange={handleChange}>
+                      <option value="General Inquiry">General Inquiry</option>
+                      <option value="Lost & Found">Lost & Found</option>
+                      <option value="Corporate Account">Corporate Account</option>
+                      <option value="Feedback">Feedback</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label htmlFor="phone">Phone</label>
-                  <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="subject">Subject</label>
-                  <select id="subject" name="subject" value={formData.subject} onChange={handleChange}>
-                    <option value="General Inquiry">General Inquiry</option>
-                    <option value="Lost & Found">Lost & Found</option>
-                    <option value="Corporate Account Request">Corporate Account Request</option>
-                    <option value="Feedback">Feedback</option>
-                  </select>
-                </div>
+
                 <div className="form-group">
                   <label htmlFor="message">Message</label>
-                  <textarea id="message" name="message" rows={5} required value={formData.message} onChange={handleChange}></textarea>
+                  <textarea id="message" name="message" rows={5} required value={formData.message} onChange={handleChange} placeholder="How can we help you?"></textarea>
                 </div>
+
                 <button type="submit" className="btn btn-primary full-width-btn">Send Message</button>
               </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Map Section - Full Width Below */}
+        <div className="map-section">
+          <div className="map-container">
+            <div className="map-placeholder">
+              Google Map Embed centered on St. Louis County service area
             </div>
           </div>
         </div>
@@ -144,18 +186,22 @@ const Contact: React.FC = () => {
         .page-header {
           background-color: #1a1a1a;
           color: white;
-          padding: var(--spacing-xl) 0;
+          padding: 4rem 0;
           text-align: center;
+          background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('/vehicles/sedan.png');
+          background-size: cover;
+          background-position: center;
         }
 
         .page-header h1 {
-          color: var(--color-text-light);
+          color: white;
           font-family: var(--font-family-sans);
-          font-size: 2.5rem;
+          font-size: 3rem;
+          margin-bottom: 1rem;
         }
 
         .page-subtitle {
-          font-size: 1.2rem;
+          font-size: 1.25rem;
           opacity: 0.9;
           max-width: 600px;
           margin: 0 auto;
@@ -163,45 +209,210 @@ const Contact: React.FC = () => {
 
         .contact-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: var(--spacing-xl);
+          grid-template-columns: 1fr 1.5fr;
+          gap: 3rem;
+          margin-bottom: 3rem;
+          align-items: stretch; /* Ensure columns stretch to same height */
         }
 
+        .contact-info-col {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem; /* Replace margin-bottom on cards with gap here if needed, or keep margins */
+        }
+        
         .info-card {
-          margin-bottom: var(--spacing-lg);
+          /* margin-bottom handled by gap or keep it */
         }
 
-        .info-card h2 {
+        .hours-card {
+          flex: 1; /* Stretch to fill remaining space if form is taller */
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .hours-list {
+          flex: 1; /* Push content to fill space */
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          margin: 1.5rem 0;
+          justify-content: center;
+        }
+
+        .contact-form-col {
+          height: 100%;
+        }
+
+        .form-container {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .form-container form {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .form-group:last-of-type {
+          margin-bottom: auto; /* Push button to bottom if needed */
+        }
+
+        .glass-panel {
+          background: white;
+          border-radius: var(--radius-md);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+          padding: 2rem;
+          border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .glass-panel.dark {
+          background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+          color: white;
+        }
+
+        .info-card h2, .form-container h2 {
           color: var(--color-primary-dark);
-          margin-bottom: var(--spacing-md);
+          margin-bottom: 1.5rem;
+          font-size: 1.5rem;
+          border-bottom: 2px solid var(--color-primary);
+          padding-bottom: 0.5rem;
+          display: inline-block;
+        }
+        
+        .glass-panel.dark h2 {
+          color: white;
+          border-bottom-color: var(--color-primary);
         }
 
         .info-item {
-          margin-bottom: var(--spacing-md);
+          display: flex;
+          align-items: flex-start;
+          margin-bottom: 1.5rem;
+          gap: 1rem;
         }
 
-        .info-item h3 {
-          font-size: 1rem;
-          margin-bottom: var(--spacing-xs);
-          color: #666;
-        }
-
-        .info-item p, .info-item address {
-          font-size: 1.1rem;
-          font-style: normal;
-          line-height: 1.6;
-        }
-
-        .info-item a {
+        .icon-wrapper {
+          background-color: rgba(212, 175, 55, 0.1);
           color: var(--color-primary-dark);
+          padding: 0.75rem;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .info-content h3 {
+          font-size: 0.9rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #666;
+          margin-bottom: 0.25rem;
+        }
+
+        .info-content p, .info-content address {
+          font-size: 1.1rem;
           font-weight: 500;
+          color: #333;
+          font-style: normal;
+          line-height: 1.4;
+        }
+
+        .info-content a {
+          color: var(--color-primary-dark);
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+
+        .info-content a:hover {
+          color: var(--color-primary);
+        }
+
+        /* .hours-list defined above */
+
+        .hours-item {
+          display: flex;
+          justify-content: space-between;
+          padding-bottom: 0.75rem;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .hours-item:last-child {
+          border-bottom: none;
+        }
+
+        .hours-item .day {
+          color: white; /* Fixed contrast: was var(--color-primary) */
+          font-weight: 600;
+        }
+
+        .hours-item .time {
+          color: rgba(255,255,255,0.9);
+        }
+
+        .hours-note {
+          font-size: 0.9rem;
+          opacity: 0.7;
+          font-style: italic;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+        }
+
+        .form-group {
+          margin-bottom: 1.5rem;
+        }
+
+        label {
+          display: block;
+          margin-bottom: 0.5rem;
+          font-weight: 500;
+          color: #444;
+          font-size: 0.95rem;
+        }
+
+        input, select, textarea {
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border: 1px solid #ddd;
+          border-radius: var(--radius-sm);
+          font-family: inherit;
+          font-size: 1rem;
+          transition: all 0.2s;
+          background-color: #f9f9f9;
+        }
+
+        input:focus, select:focus, textarea:focus {
+          outline: none;
+          border-color: var(--color-primary);
+          background-color: white;
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+        }
+
+        .full-width-btn {
+          width: 100%;
+          padding: 1rem;
+          font-size: 1.1rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .map-section {
+          margin-top: 3rem;
         }
 
         .map-container {
-          height: 300px;
+          height: 400px;
           background-color: #eee;
           border-radius: var(--radius-md);
           overflow: hidden;
+          box-shadow: var(--shadow-sm);
         }
 
         .map-placeholder {
@@ -212,84 +423,52 @@ const Contact: React.FC = () => {
           justify-content: center;
           color: #666;
           background-color: #e0e0e0;
-          text-align: center;
-          padding: var(--spacing-md);
-        }
-
-        .form-container {
-          background-color: white;
-          padding: var(--spacing-lg);
-          border-radius: var(--radius-md);
-          box-shadow: var(--shadow-md);
-          border: 1px solid var(--color-border);
-        }
-
-        .form-container h2 {
-          margin-bottom: var(--spacing-md);
-        }
-
-        .form-group {
-          margin-bottom: var(--spacing-md);
-          display: flex;
-          flex-direction: column;
-          gap: var(--spacing-xs);
-        }
-
-        label {
           font-weight: 500;
-          font-size: 0.9rem;
-        }
-
-        input, select, textarea {
-          padding: var(--spacing-sm);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-sm);
-          font-family: inherit;
-          font-size: 1rem;
-          width: 100%;
-        }
-
-        input:focus, select:focus, textarea:focus {
-          outline: none;
-          border-color: var(--color-primary);
-          box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
-        }
-
-        .full-width-btn {
-          width: 100%;
-        }
-
-        .bg-alt {
-          background-color: var(--color-background-alt);
         }
 
         .section-title {
           text-align: center;
-          margin-bottom: var(--spacing-xl);
+          margin-bottom: 3rem;
+          font-size: 2rem;
+          color: var(--color-primary-dark);
         }
 
         .faq-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          gap: var(--spacing-lg);
+          gap: 2rem;
         }
 
         .faq-item {
-          background-color: white;
-          padding: var(--spacing-lg);
+          background: white;
+          padding: 2rem;
           border-radius: var(--radius-md);
-          box-shadow: var(--shadow-sm);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+          border-left: 4px solid var(--color-primary);
         }
 
         .faq-item h3 {
           color: var(--color-primary-dark);
           font-size: 1.1rem;
-          margin-bottom: var(--spacing-sm);
+          margin-bottom: 0.75rem;
+          font-weight: 600;
         }
 
-        @media (max-width: 768px) {
+        .faq-item p {
+          color: #555;
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        @media (max-width: 900px) {
           .contact-grid {
             grid-template-columns: 1fr;
+            gap: 2rem;
+          }
+          
+          .form-row {
+            grid-template-columns: 1fr;
+            gap: 0;
           }
         }
       `}</style>

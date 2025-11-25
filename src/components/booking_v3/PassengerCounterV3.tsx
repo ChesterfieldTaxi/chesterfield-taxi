@@ -62,8 +62,9 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
         onIncrement: () => void;
         onDecrement: () => void;
         min?: number;
+        max?: number;
         style?: React.CSSProperties;
-    }> = ({ label, icon, value, onIncrement, onDecrement, min = 0, style }) => (
+    }> = ({ label, icon, value, onIncrement, onDecrement, min = 0, max, style }) => (
         <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -78,7 +79,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <CounterButton onClick={onDecrement} disabled={value <= min}>−</CounterButton>
                 <div style={{ minWidth: '24px', textAlign: 'center', fontWeight: 600, fontSize: '16px' }}>{value}</div>
-                <CounterButton onClick={onIncrement}>+</CounterButton>
+                <CounterButton onClick={onIncrement} disabled={max !== undefined && value >= max}>+</CounterButton>
             </div>
         </div>
     );
@@ -108,6 +109,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                     onIncrement={() => onPassengerChange(passengerCount + 1)}
                     onDecrement={() => onPassengerChange(passengerCount - 1)}
                     min={1}
+                    max={7}
                     style={{ flex: '1 1 200px' }}
                 />
 
@@ -125,6 +127,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                     onIncrement={() => onLuggageChange(luggageCount + 1)}
                     onDecrement={() => onLuggageChange(luggageCount - 1)}
                     min={0}
+                    max={7}
                     style={{ flex: '1 1 200px' }}
                 />
             </div>

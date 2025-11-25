@@ -2,15 +2,22 @@ import React, { useState } from 'react';
 
 const Careers: React.FC = () => {
   const [formData, setFormData] = useState({
+    roleType: 'driver',
     name: '',
     email: '',
     phone: '',
     address: '',
+    // Driver specific
     licenseNumber: '',
     experience: '',
     hasClassE: 'no',
     resume: null as File | null,
-    licenseCopy: null as File | null
+    licenseCopy: null as File | null,
+    // Dispatcher specific
+    customerServiceExperience: '',
+    dispatchExperience: 'no',
+    computerSkills: 'intermediate',
+    availability: ''
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -36,7 +43,7 @@ const Careers: React.FC = () => {
       {/* Page Header */}
       <header className="page-header">
         <div className="container">
-          <h1>Drive with Chesterfield Taxi</h1>
+          <h1>Join the Chesterfield Taxi Team</h1>
           <p className="page-subtitle">Build a career with a company that values your work.</p>
         </div>
       </header>
@@ -49,8 +56,8 @@ const Careers: React.FC = () => {
             <p>Unlike gig-economy apps, we offer stability and support.</p>
             <div className="benefits-grid">
               <div className="benefit-card">
-                <h3>Competitive Earnings</h3>
-                <p>Keep more of what you earn with fair splits and tips.</p>
+                <h3>Competitive Pay</h3>
+                <p>{formData.roleType === 'driver' ? 'Keep more of what you earn with fair splits and tips.' : 'Hourly wage with performance bonuses.'}</p>
               </div>
               <div className="benefit-card">
                 <h3>Real Support</h3>
@@ -74,13 +81,24 @@ const Careers: React.FC = () => {
         <div className="container">
           <div className="careers-content">
             <h2>Requirements</h2>
-            <ul className="requirements-list">
-              <li>Valid Class E Chauffeur’s License (or CDL).</li>
-              <li>Clean driving record (MVR check required).</li>
-              <li>Must pass a criminal background check and drug screening.</li>
-              <li>Minimum age of 25 (for insurance purposes).</li>
-              <li>Strong knowledge of St. Louis County roads.</li>
-            </ul>
+            {formData.roleType === 'driver' ? (
+              <ul className="requirements-list">
+                <li>Valid Class E Chauffeur’s License (or CDL).</li>
+                <li>Clean driving record (MVR check required).</li>
+                <li>Must pass a criminal background check and drug screening.</li>
+                <li>Minimum age of 25 (for insurance purposes).</li>
+                <li>Strong knowledge of St. Louis County roads.</li>
+              </ul>
+            ) : (
+              <ul className="requirements-list">
+                <li>Excellent communication and multitasking skills.</li>
+                <li>Customer service experience (minimum 2 years preferred).</li>
+                <li>Ability to work under pressure during peak hours.</li>
+                <li>Basic computer proficiency (dispatch software training provided).</li>
+                <li>Must pass background check.</li>
+                <li>Flexible schedule (evening/weekend shifts available).</li>
+              </ul>
+            )}
           </div>
         </div>
       </section>
@@ -91,6 +109,38 @@ const Careers: React.FC = () => {
           <div className="form-container">
             <h2>Apply Now</h2>
             <form onSubmit={handleSubmit} className="application-form">
+              <fieldset>
+                <legend>Position Applying For</legend>
+                <div className="role-selection">
+                  <label className="role-option">
+                    <input
+                      type="radio"
+                      name="roleType"
+                      value="driver"
+                      checked={formData.roleType === 'driver'}
+                      onChange={handleChange}
+                    />
+                    <div className="role-card">
+                      <h3>Driver</h3>
+                      <p>Professional taxi driver positions. Full-time and part-time available.</p>
+                    </div>
+                  </label>
+                  <label className="role-option">
+                    <input
+                      type="radio"
+                      name="roleType"
+                      value="dispatcher"
+                      checked={formData.roleType === 'dispatcher'}
+                      onChange={handleChange}
+                    />
+                    <div className="role-card">
+                      <h3>Dispatcher</h3>
+                      <p>Coordinate rides and support drivers from our dispatch center.</p>
+                    </div>
+                  </label>
+                </div>
+              </fieldset>
+
               <fieldset>
                 <legend>Personal Details</legend>
                 <div className="form-grid">
@@ -116,21 +166,51 @@ const Careers: React.FC = () => {
               <fieldset>
                 <legend>Qualifications</legend>
                 <div className="form-grid">
-                  <div className="form-group">
-                    <label htmlFor="licenseNumber">License Number</label>
-                    <input type="text" id="licenseNumber" name="licenseNumber" required value={formData.licenseNumber} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="experience">Years of Professional Driving Experience</label>
-                    <input type="number" id="experience" name="experience" min="0" required value={formData.experience} onChange={handleChange} />
-                  </div>
-                  <div className="form-group full-width">
-                    <label htmlFor="hasClassE">Do you currently hold a Class E License?</label>
-                    <select id="hasClassE" name="hasClassE" value={formData.hasClassE} onChange={handleChange}>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
+                  {formData.roleType === 'driver' ? (
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="licenseNumber">License Number</label>
+                        <input type="text" id="licenseNumber" name="licenseNumber" required value={formData.licenseNumber} onChange={handleChange} />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="experience">Years of Professional Driving Experience</label>
+                        <input type="number" id="experience" name="experience" min="0" required value={formData.experience} onChange={handleChange} />
+                      </div>
+                      <div className="form-group full-width">
+                        <label htmlFor="hasClassE">Do you currently hold a Class E License?</label>
+                        <select id="hasClassE" name="hasClassE" value={formData.hasClassE} onChange={handleChange}>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="customerServiceExperience">Years of Customer Service Experience</label>
+                        <input type="number" id="customerServiceExperience" name="customerServiceExperience" min="0" required value={formData.customerServiceExperience} onChange={handleChange} />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="computerSkills">Computer Proficiency</label>
+                        <select id="computerSkills" name="computerSkills" value={formData.computerSkills} onChange={handleChange}>
+                          <option value="beginner">Beginner</option>
+                          <option value="intermediate">Intermediate</option>
+                          <option value="advanced">Advanced</option>
+                        </select>
+                      </div>
+                      <div className="form-group full-width">
+                        <label htmlFor="dispatchExperience">Do you have previous dispatch experience?</label>
+                        <select id="dispatchExperience" name="dispatchExperience" value={formData.dispatchExperience} onChange={handleChange}>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                      <div className="form-group full-width">
+                        <label htmlFor="availability">Availability (Days/Hours)</label>
+                        <input type="text" id="availability" name="availability" placeholder="e.g., Weekends, Evenings, Mon-Fri" required value={formData.availability} onChange={handleChange} />
+                      </div>
+                    </>
+                  )}
                 </div>
               </fieldset>
 
@@ -141,10 +221,12 @@ const Careers: React.FC = () => {
                     <label htmlFor="resume">Upload Resume (PDF/Image)</label>
                     <input type="file" id="resume" name="resume" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="licenseCopy">Copy of License (PDF/Image)</label>
-                    <input type="file" id="licenseCopy" name="licenseCopy" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
-                  </div>
+                  {formData.roleType === 'driver' && (
+                    <div className="form-group">
+                      <label htmlFor="licenseCopy">Copy of License (PDF/Image)</label>
+                      <input type="file" id="licenseCopy" name="licenseCopy" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} />
+                    </div>
+                  )}
                 </div>
               </fieldset>
 
@@ -165,7 +247,7 @@ const Careers: React.FC = () => {
         }
 
         .page-header h1 {
-          color: var(--color-text-light);
+          color: white;
           font-family: var(--font-family-sans);
           font-size: 2.5rem;
         }
@@ -246,7 +328,7 @@ const Careers: React.FC = () => {
           max-width: 800px;
           margin: 0 auto;
           background-color: white;
-          padding: var(--spacing-lg);
+          padding: var(--spacing-xl);
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-md);
         }
@@ -259,24 +341,24 @@ const Careers: React.FC = () => {
 
         fieldset {
           border: none;
-          margin-bottom: var(--spacing-lg);
+          margin-bottom: var(--spacing-xl);
           padding: 0;
         }
 
         legend {
-          font-size: 1.2rem;
+          font-size: 1.25rem;
           font-weight: 600;
           color: var(--color-primary-dark);
-          margin-bottom: var(--spacing-md);
-          border-bottom: 1px solid var(--color-border);
+          margin-bottom: var(--spacing-lg);
+          border-bottom: 2px solid var(--color-border);
           width: 100%;
           padding-bottom: var(--spacing-xs);
         }
 
         .form-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: var(--spacing-md);
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: var(--spacing-lg);
         }
 
         .form-group {
@@ -290,27 +372,101 @@ const Careers: React.FC = () => {
         }
 
         label {
-          font-weight: 500;
+          font-weight: 600;
           font-size: 0.9rem;
+          color: #444;
         }
 
         input, select {
-          padding: var(--spacing-sm);
+          padding: 0.75rem;
           border: 1px solid var(--color-border);
           border-radius: var(--radius-sm);
           font-family: inherit;
           font-size: 1rem;
+          background-color: #f9f9f9;
+          transition: all 0.2s;
         }
 
         input:focus, select:focus {
           outline: none;
           border-color: var(--color-primary);
-          box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+          background-color: white;
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+        }
+        
+        input[type="file"] {
+          padding: 0.5rem;
+          background-color: white;
         }
 
         .form-footer {
           text-align: center;
-          margin-top: var(--spacing-lg);
+          margin-top: var(--spacing-xl);
+        }
+        
+        .form-footer button {
+          padding: 1rem 3rem;
+          font-size: 1.1rem;
+        }
+
+        .role-selection {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: var(--spacing-lg);
+        }
+
+        .role-option {
+          cursor: pointer;
+        }
+
+        .role-option input {
+          display: none;
+        }
+
+        .role-card {
+          border: 2px solid var(--color-border);
+          border-radius: var(--radius-md);
+          padding: var(--spacing-lg);
+          text-align: center;
+          height: 100%;
+          transition: all 0.2s ease;
+          background-color: white;
+        }
+        
+        .role-option:hover .role-card {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-sm);
+          border-color: #ccc;
+        }
+
+        .role-option input:checked + .role-card {
+          border-color: var(--color-primary);
+          background-color: rgba(212, 175, 55, 0.05);
+          box-shadow: 0 4px 12px rgba(212, 175, 55, 0.15);
+          transform: translateY(-2px);
+        }
+
+        .role-card h3 {
+          color: var(--color-primary-dark);
+          margin-bottom: var(--spacing-sm);
+          font-size: 1.2rem;
+        }
+
+        .role-card p {
+          font-size: 0.95rem;
+          margin-bottom: 0;
+          color: #666;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 600px) {
+          .role-selection {
+            grid-template-columns: 1fr;
+          }
+          
+          .form-container {
+            padding: var(--spacing-lg);
+          }
         }
       `}</style>
     </div>

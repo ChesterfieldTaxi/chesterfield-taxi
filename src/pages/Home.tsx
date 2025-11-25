@@ -2,108 +2,108 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Home: React.FC = () => {
-    return (
-        <div className="home-page">
-            {/* Hero Section */}
-            <section className="hero">
-                <div className="container hero-content">
-                    <h1>Premium Taxi & Black Car Service in St. Louis County</h1>
-                    <p className="hero-subtitle">Reliable airport transfers, corporate travel, and local transportation. Serving Chesterfield, Clayton, Ladue, and the entire Greater St. Louis area.</p>
-                    <div className="hero-buttons">
-                        <Link to="/reservations" className="btn btn-primary">Book a Ride Online</Link>
-                        <a href="tel:3147380100" className="btn btn-secondary">Call (314) 738-0100</a>
-                    </div>
-                </div>
-            </section>
+  return (
+    <div className="home-page">
+      {/* Hero Section */}
+      <section className="hero">
+        <div className="container hero-content">
+          <h1>Professional Taxi & Airport Transfer Service in St. Louis County</h1>
+          <p className="hero-subtitle">Reliable airport transfers and local transportation. Serving St. Louis County with experienced drivers for over 30 years.</p>
+          <div className="hero-buttons">
+            <Link to="/reservations" className="btn btn-primary">Book a Ride Online</Link>
+            <a href="tel:3147380100" className="btn btn-secondary">Call (314) 738-0100</a>
+          </div>
+        </div>
+      </section>
 
-            {/* Quick Booking Bar */}
-            <section className="booking-bar">
-                <div className="container">
-                    <h2>Where can we take you today?</h2>
-                    <div className="booking-placeholder">
-                        {/* Placeholder for form inputs */}
-                        <input type="text" placeholder="Pickup Address" disabled />
-                        <input type="text" placeholder="Dropoff Address" disabled />
-                        <input type="tel" placeholder="Phone Number" disabled />
-                        <Link to="/reservations" className="btn btn-primary">Book Now</Link>
-                    </div>
-                </div>
-            </section>
+      {/* Quick Booking Bar */}
+      <section className="booking-bar">
+        <div className="container">
+          <h2>Where can we take you today?</h2>
+          <div className="booking-placeholder">
+            {/* Placeholder for form inputs */}
+            <input type="text" placeholder="Pickup Address" disabled />
+            <input type="text" placeholder="Dropoff Address" disabled />
+            <input type="tel" placeholder="Phone Number" disabled />
+            <Link to="/reservations" className="btn btn-primary">Book Now</Link>
+          </div>
+        </div>
+      </section>
 
-            {/* Why Choose Us */}
-            <section className="section why-choose-us">
-                <div className="container">
-                    <h2 className="section-title">Experience the Difference of Professional Transportation</h2>
-                    <div className="features-grid">
-                        <div className="feature-card">
-                            <h3>Punctuality Guaranteed</h3>
-                            <p>We understand that every minute counts. Our dispatch team tracks flights and traffic patterns in real-time to ensure on-time pickups for every reservation.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h3>Professional Chauffeurs</h3>
-                            <p>Forget the uncertainty of rideshare apps. Our drivers are fully licensed, background-checked, and drug-screened professionals with deep knowledge of St. Louis roads.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h3>Transparent Pricing</h3>
-                            <p>We offer competitive metered rates and transparent flat-rate airport specials. No surge pricing during rain or rush hour.</p>
-                        </div>
-                        <div className="feature-card">
-                            <h3>Safety & Cleanliness</h3>
-                            <p>Every vehicle in our fleet undergoes rigorous daily sanitization and mechanical inspections. Your safety is our non-negotiable priority.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+      {/* Why Choose Us */}
+      <section className="section why-choose-us">
+        <div className="container">
+          <h2 className="section-title">Experience the Difference of Professional Transportation</h2>
+          <div className="features-grid">
+            <div className="feature-card">
+              <h3>Punctuality Guaranteed</h3>
+              <p>We understand that every minute counts. Our dispatch team tracks flights and traffic patterns in real-time to ensure on-time pickups for every reservation.</p>
+            </div>
+            <div className="feature-card">
+              <h3>Experienced Drivers</h3>
+              <p>Our experienced drivers average 10+ years with the company. Fully licensed, background-checked, and experts in St. Louis area roads and traffic patterns.</p>
+            </div>
+            <div className="feature-card">
+              <h3>Transparent Pricing</h3>
+              <p>Clear, upfront flat-rate pricing for airport transfers. Metered rates for local trips. No surge pricing during rain or rush hour - ever.</p>
+            </div>
+            <div className="feature-card">
+              <h3>Safety & Cleanliness</h3>
+              <p>Every vehicle in our fleet undergoes rigorous daily sanitization and mechanical inspections. Your safety is our non-negotiable priority.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Core Services */}
-            <section className="section bg-alt">
-                <div className="container">
-                    <h2 className="section-title">Our Core Services</h2>
-                    <div className="services-grid">
-                        <div className="service-card">
-                            <h3>Lambert Airport Transfers (STL)</h3>
-                            <p>Stress-free curb-to-curb service for Terminal 1 and Terminal 2.</p>
-                        </div>
-                        <div className="service-card">
-                            <h3>Corporate Car Service</h3>
-                            <p>Executive transportation for St. Louis businesses, creating the right impression for your clients.</p>
-                        </div>
-                        <div className="service-card">
-                            <h3>Local Taxi Service</h3>
-                            <p>Dependable rides for medical appointments, shopping, or nights out in West County.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+      {/* Core Services */}
+      <section className="section bg-alt">
+        <div className="container">
+          <h2 className="section-title">Our Core Services</h2>
+          <div className="services-grid">
+            <div className="service-card">
+              <h3>Lambert Airport Transfers (STL)</h3>
+              <p>Stress-free curb-to-curb service for Terminal 1 and Terminal 2.</p>
+            </div>
+            <div className="service-card">
+              <h3>Corporate Car Service</h3>
+              <p>Reliable transportation for St. Louis businesses, professional service for your clients and employees.</p>
+            </div>
+            <div className="service-card">
+              <h3>Local Taxi Service</h3>
+              <p>Dependable rides for medical appointments, shopping, or nights out in West County.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Service Area Highlight */}
-            <section className="section service-area">
-                <div className="container">
-                    <div className="service-area-content">
-                        <h2>Proudly Serving St. Louis County</h2>
-                        <p>While we are based in Overland/Chesterfield, our fleet covers the entire region, including Clayton, Ladue, Town and Country, Creve Coeur, Maryland Heights, Wildwood, and St. Charles.</p>
-                    </div>
-                </div>
-            </section>
+      {/* Service Area Highlight */}
+      <section className="section service-area">
+        <div className="container">
+          <div className="service-area-content">
+            <h2>Proudly Serving St. Louis County</h2>
+            <p>Established in 1995, Chesterfield Taxi has been your trusted transportation partner for over 30 years. Based in Overland, our fleet covers the entire region, including Clayton, Ladue, Town and Country, Creve Coeur, Maryland Heights, Wildwood, and St. Charles.</p>
+          </div>
+        </div>
+      </section>
 
-            {/* Testimonials */}
-            <section className="section testimonials">
-                <div className="container">
-                    <div className="testimonial-card">
-                        <blockquote>"I've used Chesterfield Taxi for my weekly airport commutes for two years. Zemene and his team are always punctual, and the cars are immaculate. Highly recommended over Uber for reliability."</blockquote>
-                        <cite>– Sarah J., Clayton, MO</cite>
-                    </div>
-                    <div className="cta-container">
-                        <h3>Ready to upgrade your ride?</h3>
-                        <div className="hero-buttons">
-                            <Link to="/reservations" className="btn btn-primary">Book Online</Link>
-                            <a href="tel:3147380100" className="btn btn-secondary">Call (314) 738-0100</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
+      {/* Testimonials */}
+      <section className="section testimonials">
+        <div className="container">
+          <div className="testimonial-card">
+            <blockquote>"I've used Chesterfield Taxi for my weekly airport commutes for two years. Zemene and his team are always punctual, and the cars are immaculate. Highly recommended over Uber for reliability."</blockquote>
+            <cite>– Sarah J., Clayton, MO</cite>
+          </div>
+          <div className="cta-container">
+            <h3>Ready to upgrade your ride?</h3>
+            <div className="hero-buttons">
+              <Link to="/reservations" className="btn btn-primary">Book Online</Link>
+              <a href="tel:3147380100" className="btn btn-secondary">Call (314) 738-0100</a>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <style>{`
+      <style>{`
         .hero {
           background-color: #1a1a1a;
           color: white;
@@ -120,7 +120,7 @@ const Home: React.FC = () => {
         .hero h1 {
           font-size: 2.5rem;
           margin-bottom: var(--spacing-md);
-          color: var(--color-primary);
+          color: white;
         }
 
         .hero-subtitle {
@@ -149,7 +149,7 @@ const Home: React.FC = () => {
 
         .booking-bar h2 {
           text-align: center;
-          color: var(--color-secondary);
+          color: white;
           margin-bottom: var(--spacing-md);
           font-size: 1.5rem;
         }
@@ -234,8 +234,8 @@ const Home: React.FC = () => {
           margin-top: var(--spacing-xl);
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default Home;

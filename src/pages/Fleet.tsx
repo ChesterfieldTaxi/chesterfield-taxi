@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useFleetConfig } from '../hooks/useFleetConfig';
 
 const Fleet: React.FC = () => {
+  const { fleetConfig } = useFleetConfig();
+
   return (
     <div className="fleet-page">
       {/* Page Header */}
@@ -12,99 +15,43 @@ const Fleet: React.FC = () => {
         </div>
       </header>
 
-      {/* Vehicle 1: Sedan */}
-      <section className="section">
-        <div className="container">
-          <div className="vehicle-card">
-            <div className="vehicle-content">
-              <h2>Executive Sedan Series</h2>
-              <p className="vehicle-type">Lincoln Town Car / Luxury Sedan</p>
-              <p><strong>Best For:</strong> Corporate travel, airport transfers, couples.</p>
+      {/* Vehicle Fleet */}
+      {Object.values(fleetConfig?.vehicles || {})
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((vehicle, index) => (
+          <section key={vehicle.id} className={`section ${index % 2 !== 0 ? 'bg-alt' : ''}`}>
+            <div className="container">
+              <div className={`vehicle-card ${index % 2 !== 0 ? 'reverse' : ''}`}>
+                <div className="vehicle-content">
+                  <h2>{vehicle.name}</h2>
+                  <p className="vehicle-type">{vehicle.description.split('. ')[0]}</p>
+                  <p><strong>Best For:</strong> {vehicle.description.split('Best For: ')[1]}</p>
 
-              <div className="vehicle-features">
-                <h3>Features:</h3>
-                <ul>
-                  <li>Plush leather seating</li>
-                  <li>Extra legroom</li>
-                  <li>Quiet, smooth ride</li>
-                  <li>Climate control</li>
-                </ul>
-              </div>
+                  <div className="vehicle-features">
+                    <h3>Features:</h3>
+                    <ul>
+                      {vehicle.features.map((feature, i) => (
+                        <li key={i}>{feature}</li>
+                      ))}
+                    </ul>
+                  </div>
 
-              <div className="vehicle-capacity">
-                <span className="capacity-item">👤 3 Passengers</span>
-                <span className="capacity-item">🧳 3 Suitcases</span>
-              </div>
-            </div>
-            <div className="vehicle-image">
-              {/* Placeholder image */}
-              <div className="img-placeholder">Luxury Sedan Image</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Vehicle 2: Minivan */}
-      <section className="section bg-alt">
-        <div className="container">
-          <div className="vehicle-card reverse">
-            <div className="vehicle-content">
-              <h2>Spacious Minivans</h2>
-              <p className="vehicle-type">Toyota Sienna / Dodge Grand Caravan</p>
-              <p><strong>Best For:</strong> Families, airport runs with extra luggage, small groups.</p>
-
-              <div className="vehicle-features">
-                <h3>Features:</h3>
-                <ul>
-                  <li>Easy entry and exit sliding doors</li>
-                  <li>Ample rear cargo space</li>
-                  <li>Child car seat compatible (seats available upon request)</li>
-                </ul>
-              </div>
-
-              <div className="vehicle-capacity">
-                <span className="capacity-item">👤 6 Passengers</span>
-                <span className="capacity-item">🧳 4-5 Suitcases</span>
+                  <div className="vehicle-capacity">
+                    <span className="capacity-item">👤 {vehicle.physicalCapacity} Passengers</span>
+                    <span className="capacity-item">🧳 {vehicle.luggageCapacity} Suitcases</span>
+                  </div>
+                </div>
+                <div className="vehicle-image">
+                  <img
+                    src={vehicle.images.default}
+                    srcSet={`${vehicle.images.default} 1x, ${vehicle.images.highRes} 2x`}
+                    alt={vehicle.name}
+                  />
+                </div>
               </div>
             </div>
-            <div className="vehicle-image">
-              {/* Placeholder image */}
-              <div className="img-placeholder">Minivan Image</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Vehicle 3: SUV */}
-      <section className="section">
-        <div className="container">
-          <div className="vehicle-card">
-            <div className="vehicle-content">
-              <h2>Premium SUVs</h2>
-              <p className="vehicle-type">Suburban / Yukon</p>
-              <p><strong>Best For:</strong> VIP transport, severe weather safety, executive groups.</p>
-
-              <div className="vehicle-features">
-                <h3>Features:</h3>
-                <ul>
-                  <li>High clearance and 4WD safety</li>
-                  <li>Premium sound and interior finishes</li>
-                  <li>Maximum luggage capacity</li>
-                </ul>
-              </div>
-
-              <div className="vehicle-capacity">
-                <span className="capacity-item">👤 6 Passengers</span>
-                <span className="capacity-item">🧳 6 Suitcases</span>
-              </div>
-            </div>
-            <div className="vehicle-image">
-              {/* Placeholder image */}
-              <div className="img-placeholder">Luxury SUV Image</div>
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        ))}
 
       {/* Maintenance Promise */}
       <section className="section maintenance-section">
@@ -131,7 +78,7 @@ const Fleet: React.FC = () => {
         }
 
         .page-header h1 {
-          color: var(--color-text-light);
+          color: white;
           font-family: var(--font-family-sans);
           font-size: 2.5rem;
         }
@@ -160,18 +107,15 @@ const Fleet: React.FC = () => {
 
         .vehicle-image {
           flex: 1;
-          height: 300px;
-          background-color: #ddd;
-          border-radius: var(--radius-md);
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow: hidden;
         }
 
-        .img-placeholder {
-          color: #666;
-          font-weight: bold;
+        .vehicle-image img {
+          max-width: 100%;
+          height: auto;
+          display: block;
         }
 
         .vehicle-type {
@@ -183,16 +127,37 @@ const Fleet: React.FC = () => {
 
         .vehicle-features {
           margin: var(--spacing-md) 0;
+          margin-bottom: var(--spacing-lg);
         }
 
         .vehicle-features h3 {
           font-size: 1rem;
           margin-bottom: var(--spacing-xs);
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .vehicle-features ul {
-          list-style: disc;
-          padding-left: var(--spacing-lg);
+          list-style: none;
+          padding: 0;
+        }
+        
+        .vehicle-features li {
+          position: relative;
+          padding-left: 1.5rem;
+          margin-bottom: 0.5rem;
+          line-height: 1.4;
+        }
+        
+        .vehicle-features li::before {
+          content: '•';
+          color: var(--color-primary);
+          position: absolute;
+          left: 0;
+          font-weight: bold;
+          font-size: 1.2rem;
+          line-height: 1;
         }
 
         .vehicle-capacity {
@@ -200,6 +165,10 @@ const Fleet: React.FC = () => {
           gap: var(--spacing-lg);
           margin-top: var(--spacing-lg);
           font-weight: 600;
+          background-color: #f5f5f5;
+          padding: var(--spacing-md);
+          border-radius: var(--radius-sm);
+          display: inline-flex;
         }
 
         .bg-alt {
@@ -219,6 +188,7 @@ const Fleet: React.FC = () => {
 
         .maintenance-content h2 {
           color: var(--color-primary);
+          margin-bottom: var(--spacing-md);
         }
 
         .maintenance-list {
