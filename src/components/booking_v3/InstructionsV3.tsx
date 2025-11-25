@@ -72,67 +72,6 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-            {/* Gate Code Toggle */}
-            <div>
-                {!showGateCode && !gateCode ? (
-                    <button
-                        type="button"
-                        onClick={() => setShowGateCode(true)}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            fontSize: '14px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            padding: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                        }}
-                    >
-                        <span>+</span> Add Gate Code
-                    </button>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                            <label style={{ fontWeight: 500, fontSize: '14px', color: '#374151' }}>
-                                Gate Code
-                            </label>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowGateCode(false);
-                                    onGateCodeChange('');
-                                }}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#6b7280',
-                                    fontSize: '12px',
-                                    cursor: 'pointer',
-                                    padding: 0
-                                }}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                        <InputWithIcon
-                            icon={
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                            }
-                            type="text"
-                            value={gateCode}
-                            onChange={onGateCodeChange}
-                            placeholder="Enter gate code"
-                        />
-                    </div>
-                )}
-            </div>
-
             {/* Driver Notes */}
             <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px', color: '#374151' }}>
@@ -158,6 +97,74 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
                     onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
                     onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                 />
+            </div>
+
+            {/* Gate Code Toggle */}
+            <div>
+                {!showGateCode && !gateCode ? (
+                    <button
+                        type="button"
+                        onClick={() => setShowGateCode(true)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#2563eb',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                        }}
+                    >
+                        <span>+</span> Add Gate Code
+                    </button>
+                ) : (
+                    <div style={{
+                        maxHeight: (showGateCode || gateCode) ? '150px' : '0',
+                        opacity: (showGateCode || gateCode) ? 1 : 0,
+                        overflow: 'hidden',
+                        transition: 'max-height 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 250ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <label style={{ fontWeight: 500, fontSize: '14px', color: '#374151' }}>
+                                    Gate Code
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowGateCode(false);
+                                        onGateCodeChange('');
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#6b7280',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        padding: 0
+                                    }}
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                            <InputWithIcon
+                                icon={
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                }
+                                type="text"
+                                value={gateCode}
+                                onChange={onGateCodeChange}
+                                placeholder="Enter gate code"
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

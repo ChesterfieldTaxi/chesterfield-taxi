@@ -63,7 +63,7 @@ export const HelpFAB: React.FC = () => {
             {isOpen && (
                 <div style={{
                     position: 'fixed',
-                    bottom: '90px',
+                    bottom: '170px', // Above FAB button
                     right: '20px',
                     width: '300px',
                     backgroundColor: 'white',
@@ -122,7 +122,7 @@ export const HelpFAB: React.FC = () => {
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     position: 'fixed',
-                    bottom: '20px',
+                    bottom: '100px', // Above sticky footer
                     right: '20px',
                     width: '56px',
                     height: '56px',
@@ -136,7 +136,7 @@ export const HelpFAB: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '24px',
-                    zIndex: 1000,
+                    zIndex: 1001, // Above footer but below modal
                     transition: 'transform 0.2s, background-color 0.2s',
                     animation: 'pulse 3s infinite'
                 }}

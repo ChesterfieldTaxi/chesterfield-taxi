@@ -152,7 +152,12 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                 </button>
 
                 {/* Car Seats Section (Collapsible) */}
-                {showCarSeats && (
+                <div style={{
+                    maxHeight: showCarSeats ? '400px' : '0',
+                    opacity: showCarSeats ? 1 : 0,
+                    overflow: 'hidden',
+                    transition: 'max-height 350ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+                }}>
                     <div style={{
                         marginTop: '0.75rem',
                         padding: '1rem',
@@ -198,7 +203,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                             </div>
                         )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );

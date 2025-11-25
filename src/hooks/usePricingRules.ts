@@ -48,3 +48,28 @@ export function getVehicleConfig(rules: PricingRules | null) {
             additionalFee: config.modifier.amount
         }));
 }
+
+/**
+ * Get minimum/base prices for each vehicle type (for "From $X" display)
+ * Uses airport minimum as baseline (most common use case)
+ */
+export function getMinimumPrices(rules: PricingRules | null): Record<string, number> | null {
+    if (!rules) return null;
+
+    const airportTrip = rules.tripTypes['airport_transfer'];
+    if (!airportTrip) return null;
+
+    // Base minimum is the airport minimum fare
+    const baseMinimum = airportTrip.minimumFare;
+
+    // Calculate minimum for each vehicle considering vehicle upgrades
+    const minimums: Record<string, number> = {};
+
+    Object.entries(rules.vehicleModifiers)
+        .filter(([_, config]) => config.enabled)
+        .forEach(([vehicleType, config]) => {
+            minimums[vehicleType] = baseMinimum + config.modifier.amount;
+        });
+
+    return minimums;
+}

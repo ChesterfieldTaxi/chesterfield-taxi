@@ -167,8 +167,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, showTi
             return dateStr;
         }
 
+        // 🔥 FIX: Create a temp date with selected time for live display
+        const displayDate = new Date(date);
+        let h = hour!;
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        displayDate.setHours(h, minute!);
+
         // Show full date + time: Friday, Nov 21, 2025 at 9:35 AM
-        const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const timeStr = displayDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         return `${dateStr} at ${timeStr}`;
     };
 

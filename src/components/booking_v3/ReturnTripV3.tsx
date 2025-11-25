@@ -106,7 +106,12 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
             </div>
 
             {/* Return Trip Details */}
-            {isReturnTrip && (
+            <div style={{
+                maxHeight: isReturnTrip ? '2000px' : '0',
+                opacity: isReturnTrip ? 1 : 0,
+                overflow: 'hidden',
+                transition: 'max-height 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}>
                 <div style={{
                     padding: '1rem',
                     backgroundColor: '#eff6ff',
@@ -189,7 +194,7 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                         placeholderPrefix="Return"
                     />
                 </div>
-            )}
+            </div>
         </div>
     );
 };

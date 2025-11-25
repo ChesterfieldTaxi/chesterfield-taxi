@@ -306,15 +306,15 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
     const reorderLocations = (startIndex: number, endIndex: number) => {
         setState(prev => {
             // Create a combined array of all locations
-            // We ensure pickup and dropoff exist or create placeholders if they don't (though they should in this flow)
             const pickup = prev.pickup || { id: 'pickup', address: '', type: 'pickup', isAirport: false, isValidated: false };
             const dropoff = prev.dropoff || { id: 'dropoff', address: '', type: 'dropoff', isAirport: false, isValidated: false };
 
             const allLocations = [pickup, ...prev.stops, dropoff];
 
-            // Perform the reorder
-            const [movedItem] = allLocations.splice(startIndex, 1);
-            allLocations.splice(endIndex, 0, movedItem);
+            // Swap the two locations instead of reordering
+            const temp = allLocations[startIndex];
+            allLocations[startIndex] = allLocations[endIndex];
+            allLocations[endIndex] = temp;
 
             // Reassign types based on new positions
             const newPickup = { ...allLocations[0], type: 'pickup' as const };

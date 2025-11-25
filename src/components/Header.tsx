@@ -13,8 +13,10 @@ const Header: React.FC = () => {
     <header className="header">
       <div className="container header-container">
         <Link to="/" className="logo-container">
-          <div className="logo-title">CHESTERFIELD TAXI AND CAR SERVICE</div>
-          <div className="logo-subtitle">Chesterfield Car Service, LLC</div>
+          <div className="logo-text">
+            <span className="logo-brand">CHESTERFIELD</span>
+            <span className="logo-type">TAXI</span>
+          </div>
         </Link>
 
         <button className="mobile-menu-btn" onClick={toggleMenu} aria-label="Toggle menu">
@@ -51,24 +53,30 @@ const Header: React.FC = () => {
 
         .logo-container {
           display: flex;
-          flex-direction: column;
+          align-items: center;
           text-decoration: none;
+          gap: 0.5rem;
         }
 
-        .logo-title {
-          font-family: var(--font-family-sans); /* Inter */
-          font-size: 1.2rem;
+        .logo-text {
+          display: flex;
+          align-items: baseline;
+          gap: 0.5rem;
+          font-family: var(--font-family-sans);
           font-weight: 700;
+          line-height: 1;
+        }
+
+        .logo-brand {
+          font-size: 1.25rem;
           color: var(--color-primary);
-          text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
-        .logo-subtitle {
-          font-family: var(--font-family-sans);
-          font-size: 0.8rem;
+        .logo-type {
+          font-size: 1.25rem;
           color: var(--color-text);
-          font-weight: 400;
+          letter-spacing: 0.5px;
         }
 
         .nav-menu {

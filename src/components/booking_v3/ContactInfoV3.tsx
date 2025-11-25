@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { typography } from '../../styles/typography-helpers';
 
 interface ContactInfoV3Props {
     name: string;
@@ -60,7 +61,7 @@ const InputWithIcon: React.FC<{
                     flex: 1,
                     border: 'none',
                     outline: 'none',
-                    fontSize: '16px',
+                    ...typography.input,
                     padding: 0,
                     backgroundColor: 'transparent',
                     boxShadow: 'none'

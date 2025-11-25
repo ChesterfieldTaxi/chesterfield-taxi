@@ -314,23 +314,33 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
             </div>
 
             {/* Flight Info - Pickup from Airport */}
-            {pickup?.isAirport && (
+            <div style={{
+                maxHeight: pickup?.isAirport ? '500px' : '0',
+                opacity: pickup?.isAirport ? 1 : 0,
+                overflow: 'hidden',
+                transition: 'max-height 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+            }}>
                 <FlightInfoV3
-                    details={pickup.flightDetails}
+                    details={pickup?.flightDetails}
                     onChange={(details) => onFlightDetailsChange('pickup', details)}
                 />
-            )}
+            </div>
 
-            {/* Flight Info - Dropoff to Airport (Airline only for terminal info) */}
-            {dropoff?.isAirport && (
+            {/* Flight Info - Dropoff to Airport (only if pickup is NOT airport - priority to arrival) */}
+            <div style={{
+                maxHeight: (dropoff?.isAirport && !pickup?.isAirport) ? '300px' : '0',
+                opacity: (dropoff?.isAirport && !pickup?.isAirport) ? 1 : 0,
+                overflow: 'hidden',
+                transition: 'max-height 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+            }}>
                 <FlightInfoV3
-                    details={dropoff.flightDetails}
+                    details={dropoff?.flightDetails}
                     onChange={(details) => onFlightDetailsChange('dropoff', details)}
                     simplified={true}
                     label="Departure Information"
                     helperText="Which airline? This helps us take you to the correct terminal."
                 />
-            )}
+            </div>
         </>
     );
 };

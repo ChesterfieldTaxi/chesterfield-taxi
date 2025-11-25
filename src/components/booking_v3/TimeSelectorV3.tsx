@@ -16,7 +16,7 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
 }) => {
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {/* iOS-style Segmented Button */}
+            {/* Segmented Button - Simple design matching mockup */}
             <div style={{
                 display: 'inline-flex',
                 gap: '0.25rem',
@@ -63,7 +63,7 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
                 </button>
             </div>
 
-            {/* ASAP Feedback */}
+            {/* Inline ASAP Feedback - Appears to the right of buttons */}
             {isNow && (
                 <div style={{ fontSize: '13px', color: '#059669', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -73,9 +73,9 @@ export const TimeSelectorV3: React.FC<TimeSelectorV3Props> = ({
                 </div>
             )}
 
-            {/* DateTime Picker - inline when Schedule is selected */}
+            {/* DateTime Picker - Inline when Schedule is selected */}
             {!isNow && (
-                <div style={{ flex: 1, minWidth: '250px' }}>
+                <div style={{ flex: '1 1 250px', minWidth: '250px' }}>
                     <DateTimePicker
                         value={pickupDateTime}
                         onChange={onDateTimeChange}

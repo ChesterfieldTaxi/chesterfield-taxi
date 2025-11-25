@@ -102,7 +102,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                         <div style={{
                             width: '100%',
                             height: '100px',
-                            backgroundColor: '#f3f4f6',
+                            backgroundColor: 'transparent',
                             borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
@@ -116,7 +116,8 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                 style={{
                                     width: '100%',
                                     height: '100%',
-                                    objectFit: 'contain'
+                                    objectFit: 'cover',
+                                    objectPosition: 'center'
                                 }}
                                 onError={(e) => {
                                     // Fallback if image fails

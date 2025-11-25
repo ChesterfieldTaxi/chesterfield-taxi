@@ -119,6 +119,16 @@ export const BookingFlowV3: React.FC = () => {
         }
     }, []); // Only run on mount
 
+    // 🔥 Auto-select Minivan when passengers > 4 and Sedan/SUV are disabled
+    useEffect(() => {
+        if (state.passengerCount > 4) {
+            // Check if current vehicle is Sedan or SUV (which are disabled for >4 passengers)
+            if (state.vehicleType === 'Sedan' || state.vehicleType === 'SUV' || state.vehicleType === 'Any') {
+                // Auto-select Minivan (with correct capitalization)
+                setVehicleType('Minivan');
+            }
+        }
+    }, [state.passengerCount, state.vehicleType, setVehicleType]);
 
     // Validation state
     const [showValidation, setShowValidation] = React.useState(false);
@@ -321,7 +331,7 @@ export const BookingFlowV3: React.FC = () => {
                     ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
                         <>
                             <VehicleSelectorV3
-                                selectedVehicle={state.vehicleType}
+                                selectedVehicle={effectiveVehicleType}
                                 onSelect={setVehicleType}
                                 disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
                                 passengerCount={state.passengerCount}

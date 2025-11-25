@@ -1,6 +1,6 @@
 /**
  * Focus & Hover Interactions
- * Professional button animations only (input glow removed due to component structure conflicts)
+ * Professional button animations, focus styles, and section-level highlighting
  */
 
 /* Button Hover & Active States */
@@ -28,9 +28,34 @@ a:hover {
     transition: opacity 0.15s ease;
 }
 
-/* Smooth transitions for inputs (no glow to avoid conflicts) */
+/* Smooth transitions for inputs */
 input,
 textarea,
 select {
     transition: border-color 0.2s ease;
+}
+
+/* Button Focus Styles - WCAG AAA Compliance */
+button:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Secondary/Link-style buttons get background + outline */
+button[type="button"]:focus-visible,
+button.secondary:focus-visible {
+    background-color: #eff6ff;
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Section-level Focus Highlighting - Modern UX Best Practice */
+.focus-section {
+    transition: all 0.2s ease;
+}
+
+.focus-section:focus-within {
+    background-color: #eff6ff !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
 }
