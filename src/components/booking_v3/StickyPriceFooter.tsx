@@ -1,3 +1,4 @@
+import React from 'react';
 import { RippleButton } from '../common/RippleButton';
 import '../../styles/interactions.css';
 import { typography } from '../../styles/typography-helpers';
@@ -6,6 +7,7 @@ interface StickyPriceFooterProps {
     total: number;
     isLoading?: boolean;
     isSubmitting?: boolean;
+    disabled?: boolean;
     onBreakdownClick?: () => void;
     onBookClick?: () => void;
 }
@@ -14,6 +16,7 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
     total,
     isLoading = false,
     isSubmitting = false,
+    disabled = false,
     onBreakdownClick,
     onBookClick
 }) => {
@@ -61,7 +64,7 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                     <RippleButton
                         type="button"
                         onClick={onBookClick}
-                        disabled={isLoading || isSubmitting || total === 0}
+                        disabled={isLoading || isSubmitting || total === 0 || disabled}
                         style={{
                             padding: '0.75rem 2rem',
                             backgroundColor: '#10b981',
@@ -69,10 +72,11 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
                             border: 'none',
                             borderRadius: '4px',
                             ...typography.button,
-                            cursor: (isLoading || isSubmitting || total === 0) ? 'not-allowed' : 'pointer',
+                            cursor: (isLoading || isSubmitting || total === 0 || disabled) ? 'not-allowed' : 'pointer',
                             whiteSpace: 'nowrap',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                            opacity: (isLoading || isSubmitting) ? 0.7 : 1,
+                            opacity: (isLoading || isSubmitting || disabled) ? 0.5 : 1,
+                            pointerEvents: disabled ? 'none' : 'auto',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',

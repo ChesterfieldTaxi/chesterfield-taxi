@@ -468,6 +468,7 @@ export const BookingFlowV3: React.FC = () => {
                 total={fareBreakdown?.total || 0}
                 isLoading={isCalculatingPrice}
                 isSubmitting={isSubmitting}
+                disabled={isLargeGroup}
                 onBookClick={handleBookRide}
             />
 
