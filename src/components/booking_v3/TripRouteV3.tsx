@@ -161,20 +161,17 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                             setDraggingIndex(index);
                                             e.dataTransfer.setData('text/plain', index.toString());
                                             e.dataTransfer.effectAllowed = 'move';
-                                            // Create custom ghost image from input container only
-                                            const parentElement = e.currentTarget.parentElement;
-                                            if (parentElement) {
-                                                const inputContainer = parentElement.querySelector('[data-input-container]');
-                                                if (inputContainer) {
-                                                    const ghost = inputContainer.cloneNode(true) as HTMLElement;
-                                                    ghost.style.width = inputContainer.getBoundingClientRect().width + 'px';
-                                                    ghost.style.position = 'absolute';
-                                                    ghost.style.top = '-1000px';
-                                                    ghost.style.opacity = '0.8';
-                                                    document.body.appendChild(ghost);
-                                                    e.dataTransfer.setDragImage(ghost, 0, 0);
-                                                    setTimeout(() => document.body.removeChild(ghost), 0);
-                                                }
+                                            // Create custom ghost image from the adjacent input container
+                                            const inputContainer = e.currentTarget.nextElementSibling;
+                                            if (inputContainer && inputContainer.hasAttribute('data-input-container')) {
+                                                const ghost = inputContainer.cloneNode(true) as HTMLElement;
+                                                ghost.style.width = inputContainer.getBoundingClientRect().width + 'px';
+                                                ghost.style.position = 'absolute';
+                                                ghost.style.top = '-1000px';
+                                                ghost.style.opacity = '0.8';
+                                                document.body.appendChild(ghost);
+                                                e.dataTransfer.setDragImage(ghost, 0, 0);
+                                                setTimeout(() => document.body.removeChild(ghost), 0);
                                             }
                                         }}
                                         onDragEnd={() => {
