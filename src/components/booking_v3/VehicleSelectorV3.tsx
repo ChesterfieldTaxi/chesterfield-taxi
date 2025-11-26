@@ -51,7 +51,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                 return (
                     <button
                         key={vehicleType}
-                        onClick={() => !isCardDisabled && onSelect(vehicleType)}
+                        onClick={() => !isCardDisabled && onSelect(isSelected ? ('Any' as any) : vehicleType)}
                         disabled={isCardDisabled}
                         style={{
                             display: 'flex',
@@ -64,9 +64,24 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                             cursor: isCardDisabled ? 'not-allowed' : 'pointer',
                             opacity: isCardDisabled ? 0.6 : 1,
                             transition: 'all 0.2s ease',
+                            boxShadow: isSelected ? '0 4px 6px rgba(37, 99, 235, 0.1)' : '0 1px 2px rgba(0,0,0,0.05)',
                             textAlign: 'left',
                             position: 'relative',
                             overflow: 'hidden'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!isCardDisabled) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
+                                const img = e.currentTarget.querySelector('img');
+                                if (img) img.style.transform = 'scale(1.05)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = isSelected ? '0 4px 6px rgba(37, 99, 235, 0.1)' : '0 1px 2px rgba(0,0,0,0.05)';
+                            const img = e.currentTarget.querySelector('img');
+                            if (img) img.style.transform = 'scale(1)';
                         }}
                     >
                         {/* Header Section */}
@@ -132,7 +147,8 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                     width: '100%',
                                     height: '100%',
                                     objectFit: 'contain',
-                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))'
+                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
+                                    transition: 'transform 0.2s ease'
                                 }}
                                 onError={(e) => {
                                     e.currentTarget.style.display = 'none';
