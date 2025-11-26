@@ -1,0 +1,158 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "CHESTERFIELD TAXI" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]:
+            - generic [ref=e8]: CHESTERFIELD
+            - generic [ref=e9]: TAXI
+        - navigation [ref=e10]:
+          - link "Home" [ref=e11] [cursor=pointer]:
+            - /url: /
+          - link "Services" [ref=e12] [cursor=pointer]:
+            - /url: /services
+          - link "Fleet" [ref=e13] [cursor=pointer]:
+            - /url: /fleet
+          - link "About" [ref=e14] [cursor=pointer]:
+            - /url: /about
+          - link "Careers" [ref=e15] [cursor=pointer]:
+            - /url: /careers
+          - link "Contact" [ref=e16] [cursor=pointer]:
+            - /url: /contact
+          - link "Book Now" [ref=e17] [cursor=pointer]:
+            - /url: /reservations
+    - main [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e21]:
+          - heading "Join the Chesterfield Taxi Team" [level=1] [ref=e22]
+          - paragraph [ref=e23]: Build a career with a company that values your work.
+        - generic [ref=e26]:
+          - heading "Why Professional Drivers Choose Us" [level=2] [ref=e27]
+          - paragraph [ref=e28]: Unlike gig-economy apps, we offer stability and support.
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - heading "Competitive Pay" [level=3] [ref=e31]
+              - paragraph [ref=e32]: Keep more of what you earn with fair splits and tips.
+            - generic [ref=e33]:
+              - heading "Real Support" [level=3] [ref=e34]
+              - paragraph [ref=e35]: Talk to a real dispatcher, not a chatbot. We have your back on the road.
+            - generic [ref=e36]:
+              - heading "Flexible Scheduling" [level=3] [ref=e37]
+              - paragraph [ref=e38]: Full-time and part-time shifts available to fit your life.
+            - generic [ref=e39]:
+              - heading "Great Customers" [level=3] [ref=e40]
+              - paragraph [ref=e41]: Serve corporate clients and regulars who appreciate professional service.
+        - generic [ref=e44]:
+          - heading "Requirements" [level=2] [ref=e45]
+          - list [ref=e46]:
+            - listitem [ref=e47]: ✓ Valid Class E Chauffeur’s License (or CDL).
+            - listitem [ref=e48]: ✓ Clean driving record (MVR check required).
+            - listitem [ref=e49]: ✓ Must pass a criminal background check and drug screening.
+            - listitem [ref=e50]: ✓ Minimum age of 25 (for insurance purposes).
+            - listitem [ref=e51]: ✓ Strong knowledge of St. Louis County roads.
+        - generic [ref=e54]:
+          - heading "Apply Now" [level=2] [ref=e55]
+          - generic [ref=e56]:
+            - group "Position Applying For" [ref=e57]:
+              - generic [ref=e58]: Position Applying For
+              - generic [ref=e59]:
+                - generic [ref=e61] [cursor=pointer]:
+                  - heading "Driver" [level=3] [ref=e62]
+                  - paragraph [ref=e63]: Professional taxi driver positions. Full-time and part-time available.
+                - generic [ref=e65] [cursor=pointer]:
+                  - heading "Dispatcher" [level=3] [ref=e66]
+                  - paragraph [ref=e67]: Coordinate rides and support drivers from our dispatch center.
+            - group "Personal Details" [ref=e68]:
+              - generic [ref=e69]: Personal Details
+              - generic [ref=e70]:
+                - generic [ref=e71]:
+                  - generic [ref=e72]: Full Name
+                  - textbox "Full Name" [ref=e73]
+                - generic [ref=e74]:
+                  - generic [ref=e75]: Email Address
+                  - textbox "Email Address" [ref=e76]
+                - generic [ref=e77]:
+                  - generic [ref=e78]: Phone Number
+                  - textbox "Phone Number" [ref=e79]
+                - generic [ref=e80]:
+                  - generic [ref=e81]: Address
+                  - textbox "Address" [ref=e82]
+            - group "Qualifications" [ref=e83]:
+              - generic [ref=e84]: Qualifications
+              - generic [ref=e85]:
+                - generic [ref=e86]:
+                  - generic [ref=e87]: License Number
+                  - textbox "License Number" [ref=e88]
+                - generic [ref=e89]:
+                  - generic [ref=e90]: Years of Professional Driving Experience
+                  - spinbutton "Years of Professional Driving Experience" [ref=e91]
+                - generic [ref=e92]:
+                  - generic [ref=e93]: Do you currently hold a Class E License?
+                  - combobox "Do you currently hold a Class E License?" [ref=e94]:
+                    - option "Yes"
+                    - option "No" [selected]
+            - group "Documents" [ref=e95]:
+              - generic [ref=e96]: Documents
+              - generic [ref=e97]:
+                - generic [ref=e98]:
+                  - generic [ref=e99]: Upload Resume (PDF/Image)
+                  - button "Upload Resume (PDF/Image)" [ref=e100]
+                - generic [ref=e101]:
+                  - generic [ref=e102]: Copy of License (PDF/Image)
+                  - button "Copy of License (PDF/Image)" [ref=e103]
+            - button "Submit Application" [ref=e105] [cursor=pointer]
+    - contentinfo [ref=e106]:
+      - generic [ref=e107]:
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - heading "Chesterfield Taxi & Car Service" [level=3] [ref=e110]
+            - paragraph [ref=e111]: Premium transportation services for St. Louis County and beyond.
+            - generic [ref=e112]:
+              - paragraph [ref=e113]:
+                - strong [ref=e114]: "Phone:"
+                - text: (314) 738-0100
+              - paragraph [ref=e115]:
+                - strong [ref=e116]: "Email:"
+                - text: info@chesterfieldtaxi.com
+          - generic [ref=e117]:
+            - heading "Quick Links" [level=4] [ref=e118]
+            - list [ref=e119]:
+              - listitem [ref=e120]:
+                - link "Home" [ref=e121] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e122]:
+                - link "Services" [ref=e123] [cursor=pointer]:
+                  - /url: /services
+              - listitem [ref=e124]:
+                - link "Book a Ride" [ref=e125] [cursor=pointer]:
+                  - /url: /reservations
+              - listitem [ref=e126]:
+                - link "Our Fleet" [ref=e127] [cursor=pointer]:
+                  - /url: /fleet
+              - listitem [ref=e128]:
+                - link "Careers" [ref=e129] [cursor=pointer]:
+                  - /url: /careers
+          - generic [ref=e130]:
+            - heading "Service Areas" [level=4] [ref=e131]
+            - list [ref=e132]:
+              - listitem [ref=e133]: Chesterfield
+              - listitem [ref=e134]: Clayton & Ladue
+              - listitem [ref=e135]: Town and Country
+              - listitem [ref=e136]: Creve Coeur
+              - listitem [ref=e137]: St. Charles
+          - generic [ref=e138]:
+            - heading "Legal" [level=4] [ref=e139]
+            - list [ref=e140]:
+              - listitem [ref=e141]:
+                - link "Privacy Policy" [ref=e142] [cursor=pointer]:
+                  - /url: /privacy-policy
+              - listitem [ref=e143]:
+                - link "Terms of Service" [ref=e144] [cursor=pointer]:
+                  - /url: /terms-of-service
+        - paragraph [ref=e146]: © 2025 Chesterfield Taxi & Car Service. All rights reserved.
+  - button "?" [ref=e147] [cursor=pointer]
+```

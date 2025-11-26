@@ -8,9 +8,10 @@ import { useBookingFormV3, BookingFormV3State } from './useBookingFormV3';
  * - Auto-saves form state to localStorage with 500ms debounce
  * - Provides clearSaved() to remove persisted data after successful booking
  * 
+ * @param overrideState - State that takes precedence over localStorage (e.g., URL params)
  * @returns Same interface as useBookingFormV3, plus clearSaved() function
  */
-export function usePersistedBookingForm() {
+export function usePersistedBookingForm(overrideState?: Partial<BookingFormV3State>) {
     const STORAGE_KEY = 'booking_draft_v3';
 
     // 1. FIRST: Try to restore saved state from localStorage
@@ -42,8 +43,21 @@ export function usePersistedBookingForm() {
         return undefined;
     }, []); // Only run once on mount
 
-    // 2. THEN: Initialize booking form with restored state (if any)
-    const bookingForm = useBookingFormV3(savedState);
+    // 2. THEN: Merge savedState with overrideState (override takes precedence)
+    const initialState = useMemo(() => {
+        const merged = {
+            ...savedState,
+            ...overrideState  // URL params override localStorage
+        };
+        if (overrideState && Object.keys(overrideState).length > 0) {
+            console.log('[usePersistedBooking] Merging override state:', overrideState);
+            console.log('[usePersistedBooking] Merged initial state:', merged);
+        }
+        return merged;
+    }, [savedState, overrideState]);
+
+    // 3. Initialize booking form with merged state
+    const bookingForm = useBookingFormV3(initialState);
 
     // 3. Auto-save state to localStorage whenever it changes (debounced)
     useEffect(() => {

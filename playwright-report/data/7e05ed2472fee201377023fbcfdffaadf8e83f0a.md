@@ -1,0 +1,281 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "CHESTERFIELD TAXI" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]:
+            - generic [ref=e8]: CHESTERFIELD
+            - generic [ref=e9]: TAXI
+        - navigation [ref=e10]:
+          - link "Home" [ref=e11] [cursor=pointer]:
+            - /url: /
+          - link "Services" [ref=e12] [cursor=pointer]:
+            - /url: /services
+          - link "Fleet" [ref=e13] [cursor=pointer]:
+            - /url: /fleet
+          - link "About" [ref=e14] [cursor=pointer]:
+            - /url: /about
+          - link "Careers" [ref=e15] [cursor=pointer]:
+            - /url: /careers
+          - link "Contact" [ref=e16] [cursor=pointer]:
+            - /url: /contact
+          - link "Book Now" [ref=e17] [cursor=pointer]:
+            - /url: /reservations
+    - main [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - heading "Book Your Ride" [level=1] [ref=e21]
+          - paragraph [ref=e22]: Get an instant quote for your trip
+          - generic [ref=e23]:
+            - heading "Pickup Time" [level=2] [ref=e24]:
+              - generic [ref=e25]: Pickup Time
+            - generic [ref=e27]:
+              - generic [ref=e28]:
+                - button "Now" [ref=e29] [cursor=pointer]
+                - button "Schedule" [ref=e30] [cursor=pointer]
+              - textbox "Select date and time" [ref=e33] [cursor=pointer]
+          - generic [ref=e34]:
+            - heading "Trip Details" [level=2] [ref=e35]:
+              - generic [ref=e36]: Trip Details
+            - generic [ref=e37]:
+              - generic [ref=e38]:
+                - button "Swap locations" [ref=e40] [cursor=pointer]:
+                  - img [ref=e41]
+                - generic [ref=e46]:
+                  - img [ref=e48]
+                  - textbox "Pickup location" [ref=e51]
+                - generic [ref=e55]:
+                  - img [ref=e57]
+                  - textbox "Dropoff location" [ref=e60]
+              - button "Add Stop" [ref=e62] [cursor=pointer]:
+                - img [ref=e63]
+                - text: Add Stop
+              - generic [ref=e64]:
+                - heading "✈️ Flight Information" [level=4] [ref=e65]:
+                  - generic [ref=e66]: ✈️
+                  - text: Flight Information
+                - generic [ref=e67]:
+                  - combobox [ref=e69] [cursor=pointer]:
+                    - option "Select Airline" [selected]
+                    - option "Air Canada"
+                    - option "Alaska Airlines"
+                    - option "American Airlines"
+                    - option "Cape Air"
+                    - option "Delta Air Lines"
+                    - option "Frontier Airlines"
+                    - option "Lufthansa"
+                    - option "Southern Airways Express"
+                    - option "Southwest Airlines"
+                    - option "Spirit Airlines"
+                    - option "Sun Country Airlines"
+                    - option "United Airlines"
+                  - 'textbox "Flight #" [ref=e71]'
+                  - textbox "Origin (City/Code)" [ref=e73]
+                  - generic [ref=e74]:
+                    - generic [ref=e75] [cursor=pointer]:
+                      - checkbox "Passenger has checked luggage" [ref=e76]
+                      - generic [ref=e77]: Passenger has checked luggage
+                    - generic [ref=e78]: Helps us estimate pickup time (usually +20-30 mins for baggage claim)
+              - generic [ref=e79]:
+                - heading "✈️ Departure Information" [level=4] [ref=e80]:
+                  - generic [ref=e81]: ✈️
+                  - text: Departure Information
+                - paragraph [ref=e82]: Which airline? This helps us take you to the correct terminal.
+                - combobox [ref=e85] [cursor=pointer]:
+                  - option "Select Airline" [selected]
+                  - option "Air Canada"
+                  - option "Alaska Airlines"
+                  - option "American Airlines"
+                  - option "Cape Air"
+                  - option "Delta Air Lines"
+                  - option "Frontier Airlines"
+                  - option "Lufthansa"
+                  - option "Southern Airways Express"
+                  - option "Southwest Airlines"
+                  - option "Spirit Airlines"
+                  - option "Sun Country Airlines"
+                  - option "United Airlines"
+          - generic [ref=e86]:
+            - heading "Passengers & Luggage ✅" [level=2] [ref=e87]:
+              - generic [ref=e88]:
+                - text: Passengers & Luggage
+                - generic [ref=e89]: ✅
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - generic [ref=e94]:
+                    - img [ref=e96]
+                    - generic [ref=e101]: Passengers
+                  - generic [ref=e102]:
+                    - button "−" [ref=e103] [cursor=pointer]
+                    - generic [ref=e104]: "7"
+                    - button "+" [disabled] [ref=e105]
+                - generic [ref=e106]:
+                  - generic [ref=e107]:
+                    - img [ref=e109]
+                    - generic [ref=e114]: Luggage
+                  - generic [ref=e115]:
+                    - button "−" [ref=e116] [cursor=pointer]
+                    - generic [ref=e117]: "1"
+                    - button "+" [ref=e118] [cursor=pointer]
+              - generic [ref=e119]:
+                - button "+ Add Car Seats" [ref=e120] [cursor=pointer]:
+                  - generic [ref=e121]: + Add Car Seats
+                - generic [ref=e122]:
+                  - generic [ref=e123]:
+                    - generic [ref=e125]: Infant (0-1yr)
+                    - generic [ref=e126]:
+                      - button "−" [disabled] [ref=e127]
+                      - generic [ref=e128]: "0"
+                      - button "+" [ref=e129] [cursor=pointer]
+                  - generic [ref=e130]:
+                    - generic [ref=e132]: Toddler (1-4yr)
+                    - generic [ref=e133]:
+                      - button "−" [disabled] [ref=e134]
+                      - generic [ref=e135]: "0"
+                      - button "+" [ref=e136] [cursor=pointer]
+                  - generic [ref=e137]:
+                    - generic [ref=e139]: Booster (4-8yr)
+                    - generic [ref=e140]:
+                      - button "−" [disabled] [ref=e141]
+                      - generic [ref=e142]: "0"
+                      - button "+" [ref=e143] [cursor=pointer]
+          - generic [ref=e144]:
+            - heading "Vehicle Preference (Optional) ✅" [level=2] [ref=e145]:
+              - generic [ref=e146]:
+                - text: Vehicle Preference (Optional)
+                - generic [ref=e147]: ✅
+            - generic [ref=e149]:
+              - generic [ref=e150]: Large Group Booking
+              - generic [ref=e151]: For groups of 7 or more passengers, please contact us directly for specialized service.
+              - link "📞 Call (314) 738-0100" [ref=e152] [cursor=pointer]:
+                - /url: tel:+13147380100
+          - generic [ref=e153]:
+            - heading "Special Requests" [level=2] [ref=e154]
+            - generic [ref=e157]:
+              - button "Pet-friendly" [ref=e158] [cursor=pointer]
+              - button "Wheelchair accessible" [ref=e159] [cursor=pointer]
+              - button "Quiet ride" [ref=e160] [cursor=pointer]
+              - button "Music OK" [ref=e161] [cursor=pointer]
+          - generic [ref=e162]:
+            - heading "Return Trip" [level=2] [ref=e163]
+            - generic [ref=e165]:
+              - generic [ref=e166]:
+                - generic [ref=e167]:
+                  - generic [ref=e168]: Book Return Trip
+                  - generic [ref=e169]: Complete your route first
+                - generic [ref=e170]:
+                  - checkbox [disabled]
+              - generic [ref=e173]:
+                - generic [ref=e175]:
+                  - button "Wait" [ref=e176] [cursor=pointer]
+                  - button "Schedule" [ref=e177] [cursor=pointer]
+                - generic [ref=e178]:
+                  - button "Swap locations" [ref=e180] [cursor=pointer]:
+                    - img [ref=e181]
+                  - generic [ref=e186]:
+                    - img [ref=e188]
+                    - textbox "Return Pickup location" [ref=e191]
+                  - generic [ref=e195]:
+                    - img [ref=e197]
+                    - textbox "Return Dropoff location" [ref=e200]
+                - button "Add Stop" [ref=e202] [cursor=pointer]:
+                  - img [ref=e203]
+                  - text: Add Stop
+                - generic [ref=e204]:
+                  - heading "✈️ Flight Information" [level=4] [ref=e205]:
+                    - generic [ref=e206]: ✈️
+                    - text: Flight Information
+                  - generic [ref=e207]:
+                    - combobox [ref=e209] [cursor=pointer]:
+                      - option "Select Airline" [selected]
+                      - option "Air Canada"
+                      - option "Alaska Airlines"
+                      - option "American Airlines"
+                      - option "Cape Air"
+                      - option "Delta Air Lines"
+                      - option "Frontier Airlines"
+                      - option "Lufthansa"
+                      - option "Southern Airways Express"
+                      - option "Southwest Airlines"
+                      - option "Spirit Airlines"
+                      - option "Sun Country Airlines"
+                      - option "United Airlines"
+                    - 'textbox "Flight #" [ref=e211]'
+                    - textbox "Origin (City/Code)" [ref=e213]
+                    - generic [ref=e214]:
+                      - generic [ref=e215] [cursor=pointer]:
+                        - checkbox "Passenger has checked luggage" [ref=e216]
+                        - generic [ref=e217]: Passenger has checked luggage
+                      - generic [ref=e218]: Helps us estimate pickup time (usually +20-30 mins for baggage claim)
+                - generic [ref=e219]:
+                  - heading "✈️ Departure Information" [level=4] [ref=e220]:
+                    - generic [ref=e221]: ✈️
+                    - text: Departure Information
+                  - paragraph [ref=e222]: Which airline? This helps us take you to the correct terminal.
+                  - combobox [ref=e225] [cursor=pointer]:
+                    - option "Select Airline" [selected]
+                    - option "Air Canada"
+                    - option "Alaska Airlines"
+                    - option "American Airlines"
+                    - option "Cape Air"
+                    - option "Delta Air Lines"
+                    - option "Frontier Airlines"
+                    - option "Lufthansa"
+                    - option "Southern Airways Express"
+                    - option "Southwest Airlines"
+                    - option "Spirit Airlines"
+                    - option "Sun Country Airlines"
+                    - option "United Airlines"
+          - generic [ref=e226]:
+            - heading "Contact Information" [level=2] [ref=e227]:
+              - generic [ref=e228]: Contact Information
+            - generic [ref=e230]:
+              - generic [ref=e232]:
+                - img [ref=e234]
+                - textbox "Full Name" [ref=e237]
+              - generic [ref=e238]:
+                - generic [ref=e240]:
+                  - img [ref=e242]
+                  - textbox "Phone Number" [ref=e244]
+                - generic [ref=e246]:
+                  - img [ref=e248]
+                  - textbox "Email" [ref=e251]
+              - generic [ref=e253] [cursor=pointer]:
+                - checkbox "I agree to receive booking confirmations, updates, and service notifications via phone, email, or SMS. Standard message rates may apply. Privacy Policy" [ref=e254]
+                - generic [ref=e255]:
+                  - text: I agree to receive booking confirmations, updates, and service notifications via phone, email, or SMS. Standard message rates may apply.
+                  - link "Privacy Policy" [ref=e256]:
+                    - /url: /privacy-policy
+          - generic [ref=e257]:
+            - heading "Ride Instructions" [level=2] [ref=e258]
+            - generic [ref=e260]:
+              - generic [ref=e261]:
+                - generic [ref=e262]: Notes for Driver (optional)
+                - textbox "Any special instructions? (e.g. 'Call upon arrival', 'Look for red house')" [ref=e263]
+              - button "+ Add Gate Code" [ref=e265] [cursor=pointer]:
+                - generic [ref=e266]: +
+                - text: Add Gate Code
+          - generic [ref=e267]:
+            - heading "Payment Method" [level=2] [ref=e268]
+            - generic [ref=e270]:
+              - generic [ref=e271]: Payment Method
+              - generic [ref=e272]:
+                - button "Cash/Card" [ref=e273] [cursor=pointer]
+                - button "Corporate Account" [ref=e274] [cursor=pointer]
+              - generic [ref=e277]:
+                - generic [ref=e278]: 💵
+                - generic [ref=e279]:
+                  - paragraph [ref=e280]: Pay driver at pickup
+                  - paragraph [ref=e281]: Cash or card terminal accepted
+        - generic [ref=e283]:
+          - generic [ref=e284]:
+            - generic [ref=e285]: Estimated Total
+            - generic [ref=e286]: $0
+          - button "Book Ride" [disabled] [ref=e287]
+  - button "?" [ref=e288] [cursor=pointer]
+```

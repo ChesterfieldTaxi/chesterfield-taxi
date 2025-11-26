@@ -1,12 +1,12 @@
 import React from 'react';
-import BookingForm from '../components/BookingForm';
+import { BookingFlowV3 } from '../components/booking_v3/BookingFlowV3';
 
 const Reservations: React.FC = () => {
     return (
         <div className="page-reservations">
             <div className="container">
                 <div className="section">
-                    <BookingForm />
+                    <BookingFlowV3 />
                 </div>
             </div>
             <style>{`

@@ -1,8 +1,8 @@
-import React from 'react';
-import { usePricingRules, getVehicleConfig } from '../../hooks/usePricingRules';
+import React, { useEffect } from 'react';
+import { usePricingRules } from '../../hooks/usePricingRules';
 
 interface VehicleSelectorV3Props {
-    selectedVehicle: 'Sedan' | 'SUV' | 'Minivan';
+    selectedVehicle: 'Sedan' | 'SUV' | 'Minivan' | undefined;
     onSelect: (vehicle: 'Sedan' | 'SUV' | 'Minivan') => void;
     disabled?: boolean;
     passengerCount?: number;
@@ -21,6 +21,20 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
     prices
 }) => {
     const { rules } = usePricingRules();
+
+    // Listen for vehicle pre-selection event from Fleet page
+    useEffect(() => {
+        const handlePreselect = (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const { vehicleType } = customEvent.detail;
+            if (vehicleType && !disabled) {
+                onSelect(vehicleType);
+            }
+        };
+
+        window.addEventListener('preselect-vehicle', handlePreselect);
+        return () => window.removeEventListener('preselect-vehicle', handlePreselect);
+    }, [onSelect, disabled]);
 
     const vehicles: Array<'Sedan' | 'SUV' | 'Minivan'> = ['Sedan', 'SUV', 'Minivan'];
 
@@ -89,7 +103,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                     <span style={{
                                         fontSize: '18px',
                                         fontWeight: 700,
-                                        color: '#2563eb', // Blue color for price
+                                        color: '#2563eb',
                                         lineHeight: 1.2
                                     }}>
                                         ${price}
@@ -101,7 +115,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                         {/* Vehicle Image */}
                         <div style={{
                             width: '100%',
-                            height: '140px', // Increased height for better visibility
+                            height: '140px',
                             backgroundColor: 'transparent',
                             borderRadius: '8px',
                             display: 'flex',
@@ -118,10 +132,9 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                                     width: '100%',
                                     height: '100%',
                                     objectFit: 'contain',
-                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' // Subtle shadow for depth
+                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))'
                                 }}
                                 onError={(e) => {
-                                    // Fallback if image fails
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.parentElement!.innerHTML = '<span style="fontSize: 24px; opacity: 0.5">🚗</span>';
                                 }}

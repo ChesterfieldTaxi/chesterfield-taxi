@@ -101,7 +101,7 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         specialRequests: [],
         gateCode: '',
         isReturnTrip: false,
-        isReturnWait: true, // Default to "Wait"
+        isReturnWait: false, // Default to "Schedule"
         returnDateTime: null,
         returnRouteType: 'reverse',
         returnPickup: null,

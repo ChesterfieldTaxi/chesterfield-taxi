@@ -1,0 +1,144 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "CHESTERFIELD TAXI" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]:
+            - generic [ref=e8]: CHESTERFIELD
+            - generic [ref=e9]: TAXI
+        - navigation [ref=e10]:
+          - link "Home" [ref=e11] [cursor=pointer]:
+            - /url: /
+          - link "Services" [ref=e12] [cursor=pointer]:
+            - /url: /services
+          - link "Fleet" [ref=e13] [cursor=pointer]:
+            - /url: /fleet
+          - link "About" [ref=e14] [cursor=pointer]:
+            - /url: /about
+          - link "Careers" [ref=e15] [cursor=pointer]:
+            - /url: /careers
+          - link "Contact" [ref=e16] [cursor=pointer]:
+            - /url: /contact
+          - link "Book Now" [ref=e17] [cursor=pointer]:
+            - /url: /reservations
+    - main [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e21]:
+          - heading "Our Vehicle Fleet" [level=1] [ref=e22]
+          - paragraph [ref=e23]: Modern comfort. Meticulous maintenance. Uncompromised safety.
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - heading "Comfort Sedan" [level=2] [ref=e28]
+            - paragraph [ref=e29]: Ford Taurus or similar
+            - paragraph [ref=e30]:
+              - strong [ref=e31]: "Best For:"
+              - text: Corporate travel, airport transfers, couples.
+            - generic [ref=e32]:
+              - heading "Features:" [level=3] [ref=e33]
+              - list [ref=e34]:
+                - listitem [ref=e35]: • Plush leather seating
+                - listitem [ref=e36]: • Extra legroom
+                - listitem [ref=e37]: • Quiet, smooth ride
+                - listitem [ref=e38]: • Climate control
+            - generic [ref=e39]:
+              - generic [ref=e40]: 👤 4 Passengers
+              - generic [ref=e41]: 🧳 4 Suitcases
+          - img "Comfort Sedan" [ref=e43]
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Spacious Minivan" [level=2] [ref=e48]
+            - paragraph [ref=e49]: Toyota Sienna or similar
+            - paragraph [ref=e50]:
+              - strong [ref=e51]: "Best For:"
+              - text: Families, airport runs with extra luggage, small groups.
+            - generic [ref=e52]:
+              - heading "Features:" [level=3] [ref=e53]
+              - list [ref=e54]:
+                - listitem [ref=e55]: • Easy entry and exit sliding doors
+                - listitem [ref=e56]: • Ample rear cargo space
+                - listitem [ref=e57]: • Child car seat compatible
+            - generic [ref=e58]:
+              - generic [ref=e59]: 👤 6 Passengers
+              - generic [ref=e60]: 🧳 5 Suitcases
+          - img "Spacious Minivan" [ref=e62]
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - heading "Full-Size SUV" [level=2] [ref=e67]
+            - paragraph [ref=e68]: Ford Explorer or similar
+            - paragraph [ref=e69]:
+              - strong [ref=e70]: "Best For:"
+              - text: VIP transport, severe weather safety, executive groups.
+            - generic [ref=e71]:
+              - heading "Features:" [level=3] [ref=e72]
+              - list [ref=e73]:
+                - listitem [ref=e74]: • High clearance and 4WD safety
+                - listitem [ref=e75]: • Premium sound and interior finishes
+                - listitem [ref=e76]: • Maximum luggage capacity
+            - generic [ref=e77]:
+              - generic [ref=e78]: 👤 4 Passengers
+              - generic [ref=e79]: 🧳 4 Suitcases
+          - img "Full-Size SUV" [ref=e81]
+        - generic [ref=e84]:
+          - heading "The Chesterfield Standard" [level=2] [ref=e85]
+          - paragraph [ref=e86]: "We take pride in our vehicles. Every car in our fleet is:"
+          - list [ref=e87]:
+            - listitem [ref=e88]: ✓ Inspected daily for mechanical safety.
+            - listitem [ref=e89]: ✓ Detailed regularly for a spotless interior.
+            - listitem [ref=e90]: ✓ Smoke-free.
+          - link "Book Your Ride" [ref=e91] [cursor=pointer]:
+            - /url: /reservations
+    - contentinfo [ref=e92]:
+      - generic [ref=e93]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - heading "Chesterfield Taxi & Car Service" [level=3] [ref=e96]
+            - paragraph [ref=e97]: Premium transportation services for St. Louis County and beyond.
+            - generic [ref=e98]:
+              - paragraph [ref=e99]:
+                - strong [ref=e100]: "Phone:"
+                - text: (314) 738-0100
+              - paragraph [ref=e101]:
+                - strong [ref=e102]: "Email:"
+                - text: info@chesterfieldtaxi.com
+          - generic [ref=e103]:
+            - heading "Quick Links" [level=4] [ref=e104]
+            - list [ref=e105]:
+              - listitem [ref=e106]:
+                - link "Home" [ref=e107] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e108]:
+                - link "Services" [ref=e109] [cursor=pointer]:
+                  - /url: /services
+              - listitem [ref=e110]:
+                - link "Book a Ride" [ref=e111] [cursor=pointer]:
+                  - /url: /reservations
+              - listitem [ref=e112]:
+                - link "Our Fleet" [ref=e113] [cursor=pointer]:
+                  - /url: /fleet
+              - listitem [ref=e114]:
+                - link "Careers" [ref=e115] [cursor=pointer]:
+                  - /url: /careers
+          - generic [ref=e116]:
+            - heading "Service Areas" [level=4] [ref=e117]
+            - list [ref=e118]:
+              - listitem [ref=e119]: Chesterfield
+              - listitem [ref=e120]: Clayton & Ladue
+              - listitem [ref=e121]: Town and Country
+              - listitem [ref=e122]: Creve Coeur
+              - listitem [ref=e123]: St. Charles
+          - generic [ref=e124]:
+            - heading "Legal" [level=4] [ref=e125]
+            - list [ref=e126]:
+              - listitem [ref=e127]:
+                - link "Privacy Policy" [ref=e128] [cursor=pointer]:
+                  - /url: /privacy-policy
+              - listitem [ref=e129]:
+                - link "Terms of Service" [ref=e130] [cursor=pointer]:
+                  - /url: /terms-of-service
+        - paragraph [ref=e132]: © 2025 Chesterfield Taxi & Car Service. All rights reserved.
+  - button "?" [ref=e133] [cursor=pointer]
+```

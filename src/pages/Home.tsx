@@ -16,20 +16,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Quick Booking Bar */}
-      <section className="booking-bar">
-        <div className="container">
-          <h2>Where can we take you today?</h2>
-          <div className="booking-placeholder">
-            {/* Placeholder for form inputs */}
-            <input type="text" placeholder="Pickup Address" disabled />
-            <input type="text" placeholder="Dropoff Address" disabled />
-            <input type="tel" placeholder="Phone Number" disabled />
-            <Link to="/reservations" className="btn btn-primary">Book Now</Link>
-          </div>
-        </div>
-      </section>
-
       {/* Why Choose Us */}
       <section className="section why-choose-us">
         <div className="container">

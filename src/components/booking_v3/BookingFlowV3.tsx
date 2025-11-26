@@ -358,7 +358,7 @@ export const BookingFlowV3: React.FC = () => {
                     ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
                         <>
                             <VehicleSelectorV3
-                                selectedVehicle={effectiveVehicleType === 'Any' ? 'Sedan' : effectiveVehicleType}
+                                selectedVehicle={effectiveVehicleType === 'Any' ? undefined : effectiveVehicleType}
                                 onSelect={setVehicleType}
                                 disabled={effectiveVehicleType === 'Minivan' && state.vehicleType !== 'Minivan'}
                                 passengerCount={state.passengerCount}

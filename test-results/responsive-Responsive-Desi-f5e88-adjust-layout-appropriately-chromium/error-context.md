@@ -1,0 +1,123 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "CHESTERFIELD TAXI" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]:
+            - generic [ref=e8]: CHESTERFIELD
+            - generic [ref=e9]: TAXI
+        - button "Toggle menu" [ref=e10] [cursor=pointer]
+    - main [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e15]:
+          - heading "Professional Taxi & Airport Transfer Service in St. Louis County" [level=1] [ref=e16]
+          - paragraph [ref=e17]: Reliable airport transfers and local transportation. Serving St. Louis County with experienced drivers for over 30 years.
+          - generic [ref=e18]:
+            - link "Book a Ride Online" [ref=e19] [cursor=pointer]:
+              - /url: /reservations
+            - link "Call (314) 738-0100" [ref=e20] [cursor=pointer]:
+              - /url: tel:3147380100
+        - generic [ref=e22]:
+          - heading "Where can we take you today?" [level=2] [ref=e23]
+          - generic [ref=e24]:
+            - textbox "Pickup Address" [disabled] [ref=e25]
+            - textbox "Dropoff Address" [disabled] [ref=e26]
+            - textbox "Phone Number" [disabled] [ref=e27]
+            - link "Book Now" [ref=e28] [cursor=pointer]:
+              - /url: /reservations
+        - generic [ref=e30]:
+          - heading "Experience the Difference of Professional Transportation" [level=2] [ref=e31]
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - heading "Punctuality Guaranteed" [level=3] [ref=e34]
+              - paragraph [ref=e35]: We understand that every minute counts. Our dispatch team tracks flights and traffic patterns in real-time to ensure on-time pickups for every reservation.
+            - generic [ref=e36]:
+              - heading "Experienced Drivers" [level=3] [ref=e37]
+              - paragraph [ref=e38]: Our experienced drivers average 10+ years with the company. Fully licensed, background-checked, and experts in St. Louis area roads and traffic patterns.
+            - generic [ref=e39]:
+              - heading "Transparent Pricing" [level=3] [ref=e40]
+              - paragraph [ref=e41]: Clear, upfront flat-rate pricing for airport transfers. Metered rates for local trips. No surge pricing during rain or rush hour - ever.
+            - generic [ref=e42]:
+              - heading "Safety & Cleanliness" [level=3] [ref=e43]
+              - paragraph [ref=e44]: Every vehicle in our fleet undergoes rigorous daily sanitization and mechanical inspections. Your safety is our non-negotiable priority.
+        - generic [ref=e46]:
+          - heading "Our Core Services" [level=2] [ref=e47]
+          - generic [ref=e48]:
+            - generic [ref=e49]:
+              - heading "Lambert Airport Transfers (STL)" [level=3] [ref=e50]
+              - paragraph [ref=e51]: Stress-free curb-to-curb service for Terminal 1 and Terminal 2.
+            - generic [ref=e52]:
+              - heading "Corporate Car Service" [level=3] [ref=e53]
+              - paragraph [ref=e54]: Reliable transportation for St. Louis businesses, professional service for your clients and employees.
+            - generic [ref=e55]:
+              - heading "Local Taxi Service" [level=3] [ref=e56]
+              - paragraph [ref=e57]: Dependable rides for medical appointments, shopping, or nights out in West County.
+        - generic [ref=e60]:
+          - heading "Proudly Serving St. Louis County" [level=2] [ref=e61]
+          - paragraph [ref=e62]: Established in 1995, Chesterfield Taxi has been your trusted transportation partner for over 30 years. Based in Overland, our fleet covers the entire region, including Clayton, Ladue, Town and Country, Creve Coeur, Maryland Heights, Wildwood, and St. Charles.
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - blockquote [ref=e66]: "\"I've used Chesterfield Taxi for my weekly airport commutes for two years. Zemene and his team are always punctual, and the cars are immaculate. Highly recommended over Uber for reliability.\""
+            - text: – Sarah J., Clayton, MO
+          - generic [ref=e67]:
+            - heading "Ready to upgrade your ride?" [level=3] [ref=e68]
+            - generic [ref=e69]:
+              - link "Book Online" [ref=e70] [cursor=pointer]:
+                - /url: /reservations
+              - link "Call (314) 738-0100" [ref=e71] [cursor=pointer]:
+                - /url: tel:3147380100
+    - contentinfo [ref=e72]:
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - heading "Chesterfield Taxi & Car Service" [level=3] [ref=e76]
+            - paragraph [ref=e77]: Premium transportation services for St. Louis County and beyond.
+            - generic [ref=e78]:
+              - paragraph [ref=e79]:
+                - strong [ref=e80]: "Phone:"
+                - text: (314) 738-0100
+              - paragraph [ref=e81]:
+                - strong [ref=e82]: "Email:"
+                - text: info@chesterfieldtaxi.com
+          - generic [ref=e83]:
+            - heading "Quick Links" [level=4] [ref=e84]
+            - list [ref=e85]:
+              - listitem [ref=e86]:
+                - link "Home" [ref=e87] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e88]:
+                - link "Services" [ref=e89] [cursor=pointer]:
+                  - /url: /services
+              - listitem [ref=e90]:
+                - link "Book a Ride" [ref=e91] [cursor=pointer]:
+                  - /url: /reservations
+              - listitem [ref=e92]:
+                - link "Our Fleet" [ref=e93] [cursor=pointer]:
+                  - /url: /fleet
+              - listitem [ref=e94]:
+                - link "Careers" [ref=e95] [cursor=pointer]:
+                  - /url: /careers
+          - generic [ref=e96]:
+            - heading "Service Areas" [level=4] [ref=e97]
+            - list [ref=e98]:
+              - listitem [ref=e99]: Chesterfield
+              - listitem [ref=e100]: Clayton & Ladue
+              - listitem [ref=e101]: Town and Country
+              - listitem [ref=e102]: Creve Coeur
+              - listitem [ref=e103]: St. Charles
+          - generic [ref=e104]:
+            - heading "Legal" [level=4] [ref=e105]
+            - list [ref=e106]:
+              - listitem [ref=e107]:
+                - link "Privacy Policy" [ref=e108] [cursor=pointer]:
+                  - /url: /privacy-policy
+              - listitem [ref=e109]:
+                - link "Terms of Service" [ref=e110] [cursor=pointer]:
+                  - /url: /terms-of-service
+        - paragraph [ref=e112]: © 2025 Chesterfield Taxi & Car Service. All rights reserved.
+  - button "?" [ref=e113] [cursor=pointer]
+```
