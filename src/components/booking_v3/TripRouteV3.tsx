@@ -42,6 +42,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
 }) => {
     const prefix = placeholderPrefix ? `${placeholderPrefix} ` : '';
     const [draggingIndex, setDraggingIndex] = React.useState<number | null>(null);
+    const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
 
     return (
         <>
@@ -149,6 +150,7 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                             const isLast = index === array.length - 1;
                             const visualType = isFirst ? 'pickup' : isLast ? 'dropoff' : 'stop';
                             const isDragging = draggingIndex === index;
+                            const isHovered = hoverIndex === index && draggingIndex !== null && draggingIndex !== index;
 
                             return (
                                 <React.Fragment key={location.id || `loc-${index}`}>
@@ -159,32 +161,47 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                             setDraggingIndex(index);
                                             e.dataTransfer.setData('text/plain', index.toString());
                                             e.dataTransfer.effectAllowed = 'move';
-                                            // Set drag image ghost
-                                            const ghost = e.currentTarget.parentElement?.cloneNode(true) as HTMLElement;
-                                            if (ghost) {
-                                                ghost.style.opacity = '0.5';
-                                                ghost.style.position = 'absolute';
-                                                ghost.style.top = '-1000px';
-                                                document.body.appendChild(ghost);
-                                                e.dataTransfer.setDragImage(ghost, 0, 0);
-                                                setTimeout(() => document.body.removeChild(ghost), 0);
+                                            // Create custom ghost image from input container only
+                                            const parentElement = e.currentTarget.parentElement;
+                                            if (parentElement) {
+                                                const inputContainer = parentElement.querySelector('[data-input-container]');
+                                                if (inputContainer) {
+                                                    const ghost = inputContainer.cloneNode(true) as HTMLElement;
+                                                    ghost.style.width = inputContainer.getBoundingClientRect().width + 'px';
+                                                    ghost.style.position = 'absolute';
+                                                    ghost.style.top = '-1000px';
+                                                    ghost.style.opacity = '0.8';
+                                                    document.body.appendChild(ghost);
+                                                    e.dataTransfer.setDragImage(ghost, 0, 0);
+                                                    setTimeout(() => document.body.removeChild(ghost), 0);
+                                                }
                                             }
                                         }}
-                                        onDragEnd={() => setDraggingIndex(null)}
+                                        onDragEnd={() => {
+                                            setDraggingIndex(null);
+                                            setHoverIndex(null);
+                                        }}
                                         onDragOver={(e) => {
                                             e.preventDefault();
                                             e.dataTransfer.dropEffect = 'move';
+                                            if (draggingIndex !== null && draggingIndex !== index) {
+                                                setHoverIndex(index);
+                                            }
+                                        }}
+                                        onDragLeave={() => {
+                                            setHoverIndex(null);
                                         }}
                                         onDrop={(e) => {
                                             e.preventDefault();
                                             setDraggingIndex(null);
+                                            setHoverIndex(null);
                                             const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
                                             if (fromIndex !== index) {
                                                 onReorderStops(fromIndex, index);
                                             }
                                         }}
                                         style={{
-                                            cursor: 'grab',
+                                            cursor: isDragging ? 'grabbing' : 'grab',
                                             display: 'flex',
                                             justifyContent: 'center',
                                             alignItems: 'center',
@@ -206,11 +223,14 @@ export const TripRouteV3: React.FC<TripRouteV3Props> = ({
                                     </div>
 
                                     {/* Col 2: Input */}
-                                    <div style={{
-                                        transition: 'all 0.2s ease',
-                                        opacity: isDragging ? 0.4 : 1,
-                                        transform: isDragging ? 'translateX(5px)' : 'none'
-                                    }}>
+                                    <div
+                                        data-input-container
+                                        style={{
+                                            transition: 'all 0.2s ease',
+                                            opacity: isDragging ? 0.4 : 1,
+                                            transform: isDragging ? 'translateX(5px)' : (isHovered ? 'translateY(4px)' : 'none')
+                                        }}
+                                    >
                                         <LocationInputV3
                                             value={location.name || location.address || ''}
                                             onChange={(locationUpdate) => {
