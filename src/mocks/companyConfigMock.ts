@@ -49,5 +49,35 @@ export const mockCompanyConfig: CompanyConfig = {
         primaryCity: 'Chesterfield',
         primaryState: 'Missouri',
         serviceRadius: 50
+    },
+
+    bookingLimits: {
+        passengers: {
+            min: 1,
+            max: 7,
+            largeGroupThreshold: 7
+        },
+        luggage: {
+            min: 0,
+            max: 7
+        },
+        carSeats: {
+            min: 0,
+            max: 4,
+            maxTotal: 4
+        },
+        stops: {
+            min: 0,
+            max: 4
+        },
+        advanceBooking: {
+            minHoursInAdvance: 0,
+            maxDaysInAdvance: 90
+        },
+        operatingHours: {
+            enforceBusinessHours: false,
+            allowOutsideHoursScheduling: true,
+            blockSameDayAfterHour: null
+        }
     }
 };

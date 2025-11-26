@@ -17,12 +17,23 @@ import { InstructionsV3 } from './InstructionsV3';
 import { PaymentMethodV3 } from './PaymentMethodV3';
 import { StickyPriceFooter } from './StickyPriceFooter';
 import { SaveIndicator } from './SaveIndicator';
+import { LargeGroupAlert } from './LargeGroupAlert';
 
 /**
  * Section Wrapper with light gray background + focus-within highlighting
  */
-const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
-    <section style={{ marginBottom: '1rem' }}>
+const SectionWrapper: React.FC<{ title: React.ReactNode; children: React.ReactNode; disabled?: boolean }> = ({ title, children, disabled }) => (
+    <section style={{
+        marginBottom: '1rem',
+        ...(disabled ? {
+            opacity: 0.5,
+            pointerEvents: 'none',
+            filter: 'grayscale(100%)',
+            transition: 'all 0.3s ease'
+        } : {
+            transition: 'all 0.3s ease'
+        })
+    }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '0.75rem' }}>
             {title}
         </h2>
@@ -98,12 +109,18 @@ export const BookingFlowV3: React.FC = () => {
     } = usePersistedBookingForm();
 
     // 🔥 NEW: Trigger save indicator when state changes
+    // 🔥 NEW: Trigger save indicator when state changes
     useEffect(() => {
         // Only show indicator if user has started filling out form
         if (state.pickup || state.dropoff || state.name || state.phone) {
             setShowSaveIndicator(true);
         }
     }, [state]);
+
+    const largeGroupThreshold = companyConfig?.bookingLimits.passengers.largeGroupThreshold || 7;
+    const isLargeGroup = state.passengerCount >= largeGroupThreshold;
+
+
 
     // 🔥 Auto-focus first empty required field on mount
     useEffect(() => {
@@ -248,8 +265,10 @@ export const BookingFlowV3: React.FC = () => {
                     Get an instant quote for your trip
                 </p>
 
+                {isLargeGroup && <LargeGroupAlert />}
+
                 {/* Step 1: Time */}
-                <SectionWrapper title={
+                <SectionWrapper disabled={isLargeGroup} title={
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Pickup Time
                         {(state.isNow || state.pickupDateTime) && <span style={{ color: '#059669' }}>✅</span>}
@@ -270,7 +289,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 2: Locations */}
-                <SectionWrapper title={
+                <SectionWrapper disabled={isLargeGroup} title={
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Trip Details
                         {state.pickup?.isValidated && state.dropoff?.isValidated && state.stops.every(stop => stop.isValidated) && <span style={{ color: '#059669' }}>✅</span>}
@@ -324,37 +343,8 @@ export const BookingFlowV3: React.FC = () => {
                         {state.vehicleType !== 'Any' && <span style={{ color: '#059669' }}>✅</span>}
                     </div>
                 }>
-                    {/* Check for 7+ passengers - show contact message */}
-                    {state.passengerCount >= 7 ? (
-                        <div style={{
-                            padding: '1rem',
-                            backgroundColor: '#fef3c7',
-                            borderRadius: '8px',
-                            border: '1px solid #fde68a',
-                            textAlign: 'center'
-                        }}>
-                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#92400e', marginBottom: '0.5rem' }}>
-                                Large Group Booking
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#713f12', marginBottom: '0.75rem' }}>
-                                For groups of 7 or more passengers, please contact us directly for specialized service.
-                            </div>
-                            <a
-                                href={`tel:${companyConfig?.contactInfo.phone.dialable || '+13147380100'}`}
-                                style={{
-                                    display: 'inline-block',
-                                    backgroundColor: '#2563eb',
-                                    color: 'white',
-                                    padding: '0.625rem 1.25rem',
-                                    borderRadius: '6px',
-                                    textDecoration: 'none',
-                                    fontWeight: 600,
-                                    fontSize: '15px'
-                                }}
-                            >
-                                📞 Call {companyConfig?.contactInfo.phone.display || '(314) 738-0100'}
-                            </a>
-                        </div>
+                    {isLargeGroup ? (
+                        <LargeGroupAlert />
                     ) : (state.carSeats.infant + state.carSeats.toddler + state.carSeats.booster) === 0 ? (
                         <>
                             <VehicleSelectorV3
@@ -393,7 +383,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 5: Special Requests */}
-                <SectionWrapper title="Special Requests">
+                <SectionWrapper disabled={isLargeGroup} title="Special Requests">
                     <SpecialRequestsV3
                         selectedRequests={state.specialRequests}
                         onToggleRequest={toggleSpecialRequest}
@@ -401,7 +391,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 6: Return Trip */}
-                <SectionWrapper title="Return Trip">
+                <SectionWrapper disabled={isLargeGroup} title="Return Trip">
                     <ReturnTripV3
                         isReturnTrip={state.isReturnTrip}
                         isReturnWait={state.isReturnWait}
@@ -427,7 +417,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 7: Contact Information */}
-                <SectionWrapper title={
+                <SectionWrapper disabled={isLargeGroup} title={
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Contact Information
                         {state.name && state.phone && state.consentGiven && <span style={{ color: '#059669' }}>✅</span>}
@@ -455,7 +445,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 8: Ride Instructions */}
-                <SectionWrapper title="Ride Instructions">
+                <SectionWrapper disabled={isLargeGroup} title="Ride Instructions">
                     <InstructionsV3
                         driverNotes={state.driverNotes}
                         onDriverNotesChange={setDriverNotes}
@@ -465,7 +455,7 @@ export const BookingFlowV3: React.FC = () => {
                 </SectionWrapper>
 
                 {/* Step 9: Payment Method */}
-                <SectionWrapper title="Payment Method">
+                <SectionWrapper disabled={isLargeGroup} title="Payment Method">
                     <PaymentMethodV3
                         value={state.payment}
                         onChange={setPayment}

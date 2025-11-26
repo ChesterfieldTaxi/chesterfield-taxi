@@ -7,6 +7,7 @@ export interface CompanyConfig {
     contactInfo: ContactInfo;
     operatingHours: OperatingHours;
     serviceArea: ServiceArea;
+    bookingLimits: BookingLimits;
 }
 
 export interface BusinessInfo {
@@ -54,3 +55,35 @@ export interface ServiceArea {
     primaryState: string;
     serviceRadius: number;    // miles
 }
+
+export interface BookingLimits {
+    passengers: {
+        min: number;
+        max: number;
+        largeGroupThreshold: number;
+    };
+    luggage: {
+        min: number;
+        max: number;
+    };
+    carSeats: {
+        min: number;
+        max: number;
+        maxTotal: number;
+    };
+    stops: {
+        min: number;
+        max: number;
+    };
+    advanceBooking: {
+        minHoursInAdvance: number;
+        maxDaysInAdvance: number;
+    };
+    operatingHours: {
+        enforceBusinessHours: boolean;
+        allowOutsideHoursScheduling: boolean;
+        blockSameDayAfterHour: number | null;
+    };
+}
+
+

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCompanyConfig } from '../../hooks/useCompanyConfig';
 
 interface PassengerCounterProps {
     passengerCount: number;
@@ -84,6 +85,15 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
         </div>
     );
 
+    const { config } = useCompanyConfig();
+
+    // Use config limits with fallbacks
+    const limits = config?.bookingLimits || {
+        passengers: { min: 1, max: 7, largeGroupThreshold: 7 },
+        luggage: { min: 0, max: 7 },
+        carSeats: { min: 0, max: 4, maxTotal: 4 }
+    };
+
     const totalCarSeats = carSeats.infant + carSeats.toddler + carSeats.booster;
 
     return (
@@ -108,8 +118,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                     value={passengerCount}
                     onIncrement={() => onPassengerChange(passengerCount + 1)}
                     onDecrement={() => onPassengerChange(passengerCount - 1)}
-                    min={1}
-                    max={7}
+                    min={limits.passengers.min}
+                    max={limits.passengers.max}
                     style={{ flex: '1 1 200px' }}
                 />
 
@@ -126,8 +136,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                     value={luggageCount}
                     onIncrement={() => onLuggageChange(luggageCount + 1)}
                     onDecrement={() => onLuggageChange(luggageCount - 1)}
-                    min={0}
-                    max={7}
+                    min={limits.luggage.min}
+                    max={limits.luggage.max}
                     style={{ flex: '1 1 200px' }}
                 />
             </div>
@@ -176,6 +186,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                             value={carSeats.infant}
                             onIncrement={() => onCarSeatChange('infant', carSeats.infant + 1)}
                             onDecrement={() => onCarSeatChange('infant', carSeats.infant - 1)}
+                            min={limits.carSeats.min}
+                            max={totalCarSeats >= limits.carSeats.maxTotal ? carSeats.infant : limits.carSeats.max}
                         />
 
                         <Counter
@@ -183,6 +195,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                             value={carSeats.toddler}
                             onIncrement={() => onCarSeatChange('toddler', carSeats.toddler + 1)}
                             onDecrement={() => onCarSeatChange('toddler', carSeats.toddler - 1)}
+                            min={limits.carSeats.min}
+                            max={totalCarSeats >= limits.carSeats.maxTotal ? carSeats.toddler : limits.carSeats.max}
                         />
 
                         <Counter
@@ -190,6 +204,8 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                             value={carSeats.booster}
                             onIncrement={() => onCarSeatChange('booster', carSeats.booster + 1)}
                             onDecrement={() => onCarSeatChange('booster', carSeats.booster - 1)}
+                            min={limits.carSeats.min}
+                            max={totalCarSeats >= limits.carSeats.maxTotal ? carSeats.booster : limits.carSeats.max}
                         />
 
                         {totalCarSeats > 0 && (
