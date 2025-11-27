@@ -146,7 +146,7 @@ export const VehicleSelectorV3: React.FC<VehicleSelectorV3Props> = ({
                             <div style={{
                                 width: '100%',
                                 height: '140px',
-                                backgroundColor: 'transparent',
+                                background: 'linear-gradient(to bottom, #f9fafb 0%, #e5e7eb 100%)',
                                 borderRadius: '8px',
                                 display: 'flex',
                                 alignItems: 'center',
