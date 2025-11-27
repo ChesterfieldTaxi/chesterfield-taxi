@@ -5,7 +5,6 @@ import { mockFleetConfig } from '../mocks/fleetConfigMock';
 export function useFleetConfig(useMock = true) {
     const [fleetConfig, setFleetConfig] = useState<FleetConfig | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
         if (useMock) {
@@ -21,5 +20,5 @@ export function useFleetConfig(useMock = true) {
         }
     }, [useMock]);
 
-    return { fleetConfig, loading, error };
+    return { fleetConfig, loading };
 }

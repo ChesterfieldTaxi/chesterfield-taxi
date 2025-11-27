@@ -8,7 +8,6 @@ interface StickyPriceFooterProps {
     isLoading?: boolean;
     isSubmitting?: boolean;
     disabled?: boolean;
-    onBreakdownClick?: () => void;
     onBookClick?: () => void;
 }
 
@@ -17,7 +16,6 @@ export const StickyPriceFooter: React.FC<StickyPriceFooterProps> = ({
     isLoading = false,
     isSubmitting = false,
     disabled = false,
-    onBreakdownClick,
     onBookClick
 }) => {
     return (
