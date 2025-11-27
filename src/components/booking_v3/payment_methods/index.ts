@@ -14,10 +14,18 @@ import { PaymentMethodType, PaymentMethodConfig } from './types';
 export const PAYMENT_METHODS: PaymentMethodConfig[] = [
     {
         id: 'cash',
-        label: 'Cash/Card',
+        label: 'Cash',
         component: CashPaymentForm,
         requiresAuth: false,
-        description: 'Pay driver at pickup with cash or card terminal',
+        description: 'Pay driver with cash at pickup',
+        enabled: true
+    },
+    {
+        id: 'card',
+        label: 'Card',
+        component: CashPaymentForm, // Reusing same form as it's just a message
+        requiresAuth: false,
+        description: 'Pay driver with card at pickup',
         enabled: true
     },
     {

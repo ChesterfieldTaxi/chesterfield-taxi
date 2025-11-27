@@ -6,6 +6,7 @@
 // Core payment method types
 export type PaymentMethodType =
     | 'cash'
+    | 'card'
     | 'corporate_account'
     | 'stripe'           // Future
     | 'paypal'           // Future
@@ -20,6 +21,11 @@ export interface BasePaymentData {
 // Cash payment (no additional fields)
 export interface CashPaymentData extends BasePaymentData {
     method: 'cash';
+}
+
+// Card payment (no additional fields)
+export interface CardPaymentData extends BasePaymentData {
+    method: 'card';
 }
 
 // Corporate account payment
@@ -57,6 +63,7 @@ export interface EmployeePortalPaymentData extends BasePaymentData {
 // Discriminated union of all payment data types
 export type PaymentData =
     | CashPaymentData
+    | CardPaymentData
     | CorporateAccountPaymentData
     | StripePaymentData
     | PayPalPaymentData

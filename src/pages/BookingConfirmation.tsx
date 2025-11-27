@@ -67,6 +67,26 @@ export const BookingConfirmation: React.FC = () => {
         });
     };
 
+    // Helper to format special requests (camelCase to Title Case)
+    const formatSpecialRequest = (request: string) => {
+        // Handle known IDs specifically if needed, or generic formatter
+        const map: Record<string, string> = {
+            'quietRide': 'Quiet Ride',
+            'petFriendly': 'Pet Friendly',
+            'extraLuggage': 'Extra Luggage',
+            'meetAndGreet': 'Meet & Greet',
+            'childSeat': 'Child Seat'
+        };
+
+        if (map[request]) return map[request];
+
+        // Fallback: insert space before capital letters and capitalize first
+        return request
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, (str) => str.toUpperCase())
+            .trim();
+    };
+
     // Icons
     const MapPinIcon = () => (
         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
@@ -274,7 +294,7 @@ export const BookingConfirmation: React.FC = () => {
                             <h3 className="section-subtitle">Special Requests</h3>
                             <div className="special-requests-list">
                                 {bookingData.specialRequests.map((request, idx) => (
-                                    <span key={idx} className="badge">{request}</span>
+                                    <span key={idx} className="badge">{formatSpecialRequest(request)}</span>
                                 ))}
                             </div>
                         </div>
@@ -307,10 +327,10 @@ export const BookingConfirmation: React.FC = () => {
                         <div className="details-grid">
                             <div className="detail-row">
                                 <span className="detail-label">Method:</span>
-                                <span className="detail-value">
-                                    {bookingData.payment.method === 'cash' && '💵 Cash'}
-                                    {bookingData.payment.method === 'card' && '💳 Credit/Debit Card'}
-                                    {bookingData.payment.method === 'account' && '📋 Charge to Account'}
+                                <span className="detail-value payment-method">
+                                    {bookingData.payment.method === 'cash' && 'Cash'}
+                                    {bookingData.payment.method === 'card' && 'Card'}
+                                    {bookingData.payment.method === 'corporate_account' && 'Corporate Account'}
                                 </span>
                             </div>
                             {bookingData.estimatedTotal && (
@@ -351,7 +371,7 @@ export const BookingConfirmation: React.FC = () => {
                 <div className="footer-note">
                     <p>Questions? Call us at <a href="tel:+13147380100">(314) 738-0100</a></p>
                 </div>
-            </div>
+            </div >
 
             <style>{`
                 .confirmation-page {
@@ -572,6 +592,17 @@ export const BookingConfirmation: React.FC = () => {
                     font-weight: 700;
                 }
                 
+                .payment-method {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }
+                
+                .payment-method svg {
+                    flex-shrink: 0;
+                    color: #6b7280;
+                }
+                
                 .next-steps-card {
                     background-color: #eff6ff;
                     border-color: #bfdbfe;
@@ -704,6 +735,6 @@ export const BookingConfirmation: React.FC = () => {
                     }
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
