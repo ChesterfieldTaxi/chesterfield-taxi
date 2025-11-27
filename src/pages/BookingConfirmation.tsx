@@ -3,9 +3,13 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import type { BookingFormV3State } from '../hooks/useBookingFormV3';
 import { generateCalendarFile, downloadFile, formatBookingForPrint } from '../utils/bookingUtils';
 
+interface ExtendedBookingData extends BookingFormV3State {
+    estimatedTotal?: number;
+}
+
 interface BookingConfirmationData {
     bookingRef: string;
-    bookingData: BookingFormV3State;
+    bookingData: ExtendedBookingData;
 }
 
 export const BookingConfirmation: React.FC = () => {
@@ -210,25 +214,111 @@ export const BookingConfirmation: React.FC = () => {
                     </div>
                 )}
 
-                {/* Passenger & Vehicle */}
-                <div className="passenger-vehicle-section">
-                    <h2>Passenger & Vehicle</h2>
-                    <div className="details-grid">
-                        <div className="detail-row">
-                            <span className="detail-label">Name:</span>
-                            <span className="detail-value">{bookingData.name}</span>
+                {/* Booking Details Card */}
+                <div className="card details-card">
+                    <h2 className="card-title">Booking Details</h2>
+
+                    {/* Contact Info */}
+                    <div className="detail-section">
+                        <h3 className="section-subtitle">Contact Information</h3>
+                        <div className="details-grid">
+                            <div className="detail-row">
+                                <span className="detail-label">Name:</span>
+                                <span className="detail-value">{bookingData.name}</span>
+                            </div>
+                            <div className="detail-row">
+                                <span className="detail-label">Phone:</span>
+                                <span className="detail-value">{bookingData.phone}</span>
+                            </div>
+                            {bookingData.email && (
+                                <div className="detail-row">
+                                    <span className="detail-label">Email:</span>
+                                    <span className="detail-value">{bookingData.email}</span>
+                                </div>
+                            )}
                         </div>
-                        <div className="detail-row">
-                            <span className="detail-label">Phone:</span>
-                            <span className="detail-value">{bookingData.phone}</span>
+                    </div>
+
+                    {/* Passengers & Luggage */}
+                    <div className="detail-section">
+                        <h3 className="section-subtitle">Passengers & Luggage</h3>
+                        <div className="details-grid">
+                            <div className="detail-row">
+                                <span className="detail-label">Passengers:</span>
+                                <span className="detail-value">{bookingData.passengerCount}</span>
+                            </div>
+                            <div className="detail-row">
+                                <span className="detail-label">Luggage:</span>
+                                <span className="detail-value">{bookingData.luggageCount} bag(s)</span>
+                            </div>
+                            {(bookingData.carSeats.infant + bookingData.carSeats.toddler + bookingData.carSeats.booster) > 0 && (
+                                <div className="detail-row">
+                                    <span className="detail-label">Car Seats:</span>
+                                    <span className="detail-value">
+                                        {bookingData.carSeats.infant > 0 && `${bookingData.carSeats.infant} Infant `}
+                                        {bookingData.carSeats.toddler > 0 && `${bookingData.carSeats.toddler} Toddler `}
+                                        {bookingData.carSeats.booster > 0 && `${bookingData.carSeats.booster} Booster`}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="detail-row">
+                                <span className="detail-label">Vehicle:</span>
+                                <span className="detail-value">{bookingData.vehicleType}</span>
+                            </div>
                         </div>
-                        <div className="detail-row">
-                            <span className="detail-label">Passengers:</span>
-                            <span className="detail-value">{bookingData.passengerCount}</span>
+                    </div>
+
+                    {/* Special Requests */}
+                    {bookingData.specialRequests.length > 0 && (
+                        <div className="detail-section">
+                            <h3 className="section-subtitle">Special Requests</h3>
+                            <div className="special-requests-list">
+                                {bookingData.specialRequests.map((request, idx) => (
+                                    <span key={idx} className="badge">{request}</span>
+                                ))}
+                            </div>
                         </div>
-                        <div className="detail-row">
-                            <span className="detail-label">Vehicle:</span>
-                            <span className="detail-value">{bookingData.vehicleType} Requested</span>
+                    )}
+
+                    {/* Driver Notes */}
+                    {(bookingData.driverNotes || bookingData.gateCode) && (
+                        <div className="detail-section">
+                            <h3 className="section-subtitle">Additional Information</h3>
+                            <div className="details-grid">
+                                {bookingData.gateCode && (
+                                    <div className="detail-row">
+                                        <span className="detail-label">Gate Code:</span>
+                                        <span className="detail-value">{bookingData.gateCode}</span>
+                                    </div>
+                                )}
+                                {bookingData.driverNotes && (
+                                    <div className="detail-row">
+                                        <span className="detail-label">Notes:</span>
+                                        <span className="detail-value">{bookingData.driverNotes}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Payment Info */}
+                    <div className="detail-section">
+                        <h3 className="section-subtitle">Payment</h3>
+                        <div className="details-grid">
+                            <div className="detail-row">
+                                <span className="detail-label">Method:</span>
+                                <span className="detail-value">
+                                    {bookingData.payment.method === 'cash' && '💵 Cash'}
+                                    {bookingData.payment.method === 'card' && '💳 Credit/Debit Card'}
+                                    {bookingData.payment.method === 'account' && '📋 Charge to Account'}
+                                </span>
+                            </div>
+                            {bookingData.estimatedTotal && (
+                                <div className="detail-row price-row">
+                                    <span className="detail-label">Estimated Total:</span>
+                                    <span className="detail-value price-value">${bookingData.estimatedTotal.toFixed(0)}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -386,6 +476,36 @@ export const BookingConfirmation: React.FC = () => {
                     margin-top: 4px;
                 }
                 
+                .details-card {
+                    padding: 1.5rem;
+                }
+                
+                .card-title {
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: #1f2937;
+                    margin: 0 0 1.5rem 0;
+                    border-bottom: 2px solid #e5e7eb;
+                    padding-bottom: 0.75rem;
+                }
+                
+                .detail-section {
+                    margin-bottom: 1.5rem;
+                }
+                
+                .detail-section:last-child {
+                    margin-bottom: 0;
+                }
+                
+                .section-subtitle {
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #4b5563;
+                    margin: 0 0 0.75rem 0;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
                 .passenger-vehicle-section {
                     margin-bottom: 2rem;
                     padding: 0 0.5rem;
@@ -420,6 +540,36 @@ export const BookingConfirmation: React.FC = () => {
                 
                 .detail-value {
                     color: #1f2937;
+                }
+                
+                .special-requests-list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                }
+                
+                .badge {
+                    display: inline-block;
+                    padding: 0.375rem 0.75rem;
+                    background-color: #eff6ff;
+                    color: #1e40af;
+                    border: 1px solid #bfdbfe;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                
+                .price-row {
+                    border-top: 2px solid #e5e7eb;
+                    padding-top: 0.75rem;
+                    margin-top: 0.5rem;
+                    font-weight: 600;
+                }
+                
+                .price-value {
+                    font-size: 18px;
+                    color: #10b981;
+                    font-weight: 700;
                 }
                 
                 .next-steps-card {

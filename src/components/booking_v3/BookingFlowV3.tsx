@@ -190,7 +190,10 @@ export const BookingFlowV3: React.FC = () => {
         navigate('/confirmation', {
             state: {
                 bookingRef,
-                bookingData: state
+                bookingData: {
+                    ...state,
+                    estimatedTotal: fareBreakdown?.total
+                }
             }
         });
 
