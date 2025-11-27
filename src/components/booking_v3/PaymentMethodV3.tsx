@@ -32,8 +32,8 @@ export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
             newData = {
                 method: 'corporate_account',
                 timestamp: new Date(),
-                accountNumber: '',
-                authorizationCode: ''
+                organizationName: '',
+                accountNumber: ''
             };
         } else {
             newData = {

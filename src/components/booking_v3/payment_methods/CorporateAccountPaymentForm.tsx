@@ -12,11 +12,11 @@ export const CorporateAccountPaymentForm: React.FC<PaymentFormProps> = ({
 }) => {
     const data = value as CorporateAccountPaymentData;
 
-    // Validate: account number and auth code are required
+    // Validate: organization name and account number are required
     React.useEffect(() => {
-        const isValid = !!(data.accountNumber?.trim() && data.authorizationCode?.trim());
+        const isValid = !!(data.organizationName?.trim() && data.accountNumber?.trim());
         onValidate?.(isValid);
-    }, [data.accountNumber, data.authorizationCode, onValidate]);
+    }, [data.organizationName, data.accountNumber, onValidate]);
 
     const inputStyle: React.CSSProperties = {
         width: '100%',
@@ -29,28 +29,50 @@ export const CorporateAccountPaymentForm: React.FC<PaymentFormProps> = ({
         fontFamily: 'inherit'
     };
 
+    const labelStyle: React.CSSProperties = {
+        display: 'block',
+        marginBottom: '0.375rem',
+        fontSize: '14px',
+        fontWeight: 500,
+        color: '#374151'
+    };
+
     return (
         <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.75rem',
+            gap: '1rem',
             animation: 'fadeIn 0.3s ease-out'
         }}>
-            {/* Account Number & Authorization Code - Side by Side */}
+            {/* Organization Name (Full Width) */}
+            <div>
+                <label style={labelStyle}>
+                    Organization Name <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                    type="text"
+                    value={data.organizationName || ''}
+                    onChange={(e) => onChange({
+                        ...data,
+                        organizationName: e.target.value
+                    })}
+                    placeholder="Company Name"
+                    style={inputStyle}
+                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    required
+                />
+            </div>
+
+            {/* Account # & Cost Center - 2 Column Grid */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '0.75rem'
+                gap: '1rem'
             }}>
                 {/* Account Number */}
                 <div>
-                    <label style={{
-                        display: 'block',
-                        marginBottom: '0.375rem',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: '#374151'
-                    }}>
+                    <label style={labelStyle}>
                         Account # <span style={{ color: '#ef4444' }}>*</span>
                     </label>
                     <input
@@ -61,7 +83,7 @@ export const CorporateAccountPaymentForm: React.FC<PaymentFormProps> = ({
                             accountNumber: e.target.value
                         })}
                         placeholder="001"
-                        maxLength={6}
+                        maxLength={10}
                         style={inputStyle}
                         onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                         onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
@@ -69,43 +91,29 @@ export const CorporateAccountPaymentForm: React.FC<PaymentFormProps> = ({
                     />
                 </div>
 
-                {/* Authorization Code */}
+                {/* Cost Center */}
                 <div>
-                    <label style={{
-                        display: 'block',
-                        marginBottom: '0.375rem',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: '#374151'
-                    }}>
-                        Authorization Code <span style={{ color: '#ef4444' }}>*</span>
+                    <label style={labelStyle}>
+                        Cost Center <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
                     </label>
                     <input
-                        type="password"
-                        value={data.authorizationCode || ''}
+                        type="text"
+                        value={data.costCenter || ''}
                         onChange={(e) => onChange({
                             ...data,
-                            authorizationCode: e.target.value
+                            costCenter: e.target.value
                         })}
-                        placeholder="Provided by company"
-                        maxLength={20}
+                        placeholder="Internal Billing Code"
                         style={inputStyle}
                         onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                         onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                        required
                     />
                 </div>
             </div>
 
-            {/* Booked By (for dispute records) */}
+            {/* Booked By (Optional - Full Width below) */}
             <div>
-                <label style={{
-                    display: 'block',
-                    marginBottom: '0.375rem',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#374151'
-                }}>
+                <label style={labelStyle}>
                     Booked By <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
@@ -116,39 +124,6 @@ export const CorporateAccountPaymentForm: React.FC<PaymentFormProps> = ({
                         employeeName: e.target.value
                     })}
                     placeholder="Name of person booking (for records)"
-                    style={inputStyle}
-                    onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
-                />
-                <p style={{
-                    margin: '0.25rem 0 0 0',
-                    fontSize: '12px',
-                    color: '#6b7280'
-                }}>
-                    Employee or department making this booking
-                </p>
-            </div>
-
-            {/* Cost Center (Optional) */}
-            <div>
-                <label style={{
-                    display: 'block',
-                    marginBottom: '0.375rem',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#374151'
-                }}>
-                    Cost Center <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input
-                    type="text"
-                    value={data.costCenter || ''}
-                    onChange={(e) => onChange({
-                        ...data,
-                        costCenter: e.target.value
-                    })}
-                    placeholder="For internal billing"
-                    maxLength={20}
                     style={inputStyle}
                     onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                     onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}

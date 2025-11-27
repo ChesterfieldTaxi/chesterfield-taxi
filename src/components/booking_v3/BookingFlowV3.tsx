@@ -422,7 +422,7 @@ export const BookingFlowV3: React.FC = () => {
                 {/* Step 7: Contact Information */}
                 <SectionWrapper disabled={isLargeGroup} title={
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        Contact Information
+                        Passenger Information
                         {state.name && state.phone && state.consentGiven && <span style={{ color: '#059669' }}>✅</span>}
                         {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && <span style={{ color: '#dc2626' }}>⚠️ Required</span>}
                     </div>

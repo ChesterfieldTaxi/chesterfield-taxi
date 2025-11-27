@@ -31,8 +31,9 @@ export interface CardPaymentData extends BasePaymentData {
 // Corporate account payment
 export interface CorporateAccountPaymentData extends BasePaymentData {
     method: 'corporate_account';
+    organizationName: string;
     accountNumber: string;
-    authorizationCode: string;
+    authorizationCode?: string;
     employeeName?: string;
     costCenter?: string;
 }
