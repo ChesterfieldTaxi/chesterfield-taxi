@@ -579,6 +579,7 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
             dropoff: null,
             stops: [],
             distanceInYards: 0,
+            reverseDistanceInYards: 0,
             isCalculatingPrice: false,
             isSubmitting: false,
             vehicleType: 'Any',
@@ -590,11 +591,13 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
             specialRequests: [],
             gateCode: '',
             isReturnTrip: false,
+            isReturnWait: true,
             returnDateTime: null,
             returnRouteType: 'reverse',
             returnPickup: null,
             returnDropoff: null,
             returnStops: [],
+            returnDistanceInYards: 0,
             payment: {
                 method: 'cash',
                 timestamp: new Date()

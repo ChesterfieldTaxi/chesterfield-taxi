@@ -35,7 +35,6 @@ const Fleet: React.FC = () => {
                   <div className="vehicle-details">
                     <div className="vehicle-header">
                       <h2>{vehicle.name}</h2>
-                      <p className="vehicle-subtitle">{vehicle.specificModel}</p>
                     </div>
 
                     <p className="vehicle-description">{vehicle.description.split('Best For: ')[0]}</p>
