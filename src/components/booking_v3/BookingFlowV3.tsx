@@ -87,6 +87,10 @@ export const BookingFlowV3: React.FC = () => {
         setEmail,
         setDriverNotes,
         setConsentGiven,
+        setIsGuestBooking,
+        setGuestName,
+        setGuestPhone,
+        setGuestEmail,
         setPayment,
         addStop,
         removeStop,
@@ -432,11 +436,19 @@ export const BookingFlowV3: React.FC = () => {
                         phone={state.phone}
                         email={state.email}
                         consentGiven={state.consentGiven}
+                        isGuestBooking={state.isGuestBooking}
+                        guestName={state.guestName}
+                        guestPhone={state.guestPhone}
+                        guestEmail={state.guestEmail}
                         showValidation={showValidation}
                         onNameChange={setName}
                         onPhoneChange={setPhone}
                         onEmailChange={setEmail}
                         onConsentChange={setConsentGiven}
+                        onIsGuestBookingChange={setIsGuestBooking}
+                        onGuestNameChange={setGuestName}
+                        onGuestPhoneChange={setGuestPhone}
+                        onGuestEmailChange={setGuestEmail}
                     />
                     {showValidation && (!state.name.trim() || !state.phone.trim() || !state.consentGiven) && (
                         <div className="error-message-slide" style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '13px' }}>

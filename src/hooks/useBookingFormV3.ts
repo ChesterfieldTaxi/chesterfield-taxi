@@ -79,6 +79,12 @@ export interface BookingFormV3State {
     email: string;
     driverNotes: string;
     consentGiven: boolean;
+
+    // Guest Booking (Booking for someone else)
+    isGuestBooking: boolean;
+    guestName: string;
+    guestPhone: string;
+    guestEmail: string;
 }
 
 export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
@@ -116,7 +122,11 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         phone: '',
         email: '',
         driverNotes: '',
-        consentGiven: false
+        consentGiven: false,
+        isGuestBooking: false,
+        guestName: '',
+        guestPhone: '',
+        guestEmail: ''
     };
 
     const [state, setState] = useState<BookingFormV3State>(() => ({
@@ -606,7 +616,11 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
             phone: '',
             email: '',
             driverNotes: '',
-            consentGiven: false
+            consentGiven: false,
+            isGuestBooking: false,
+            guestName: '',
+            guestPhone: '',
+            guestEmail: ''
         });
     };
 
@@ -678,6 +692,10 @@ export function useBookingFormV3(initialState?: Partial<BookingFormV3State>) {
         setEmail,
         setDriverNotes,
         setConsentGiven,
+        setIsGuestBooking: (isGuest: boolean) => setState(prev => ({ ...prev, isGuestBooking: isGuest })),
+        setGuestName: (name: string) => setState(prev => ({ ...prev, guestName: name })),
+        setGuestPhone: (phone: string) => setState(prev => ({ ...prev, guestPhone: phone })),
+        setGuestEmail: (email: string) => setState(prev => ({ ...prev, guestEmail: email })),
         setIsSubmitting: (isSubmitting: boolean) => setState(prev => ({ ...prev, isSubmitting })),
 
         // Utility
