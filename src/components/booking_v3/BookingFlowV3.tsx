@@ -473,7 +473,6 @@ export const BookingFlowV3: React.FC = () => {
                         removeReturnStop={removeReturnStop}
                         updateReturnStop={updateReturnStop}
                         reorderReturnStops={reorderReturnStops}
-                        syncReturnTripFromMain={syncReturnTripFromMain}
                         isRouteComplete={!!(state.pickup?.address && state.dropoff?.address)}
                         returnDistanceInYards={state.returnDistanceInYards}
                         isCalculatingReturnDistance={isCalculatingPrice}
