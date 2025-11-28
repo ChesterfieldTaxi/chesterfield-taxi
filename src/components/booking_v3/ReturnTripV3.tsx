@@ -29,7 +29,6 @@ interface ReturnTripV3Props {
     removeReturnStop: (id: string) => void;
     updateReturnStop: (id: string, updates: Partial<Location>) => void;
     reorderReturnStops: (fromIndex: number, toIndex: number) => void;
-    syncReturnTripFromMain: () => void;
 }
 
 export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
