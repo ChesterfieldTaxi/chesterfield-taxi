@@ -8,8 +8,8 @@ export const mockCompanyConfig: CompanyConfig = {
     lastUpdated: new Date().toISOString(),
 
     businessInfo: {
-        legalName: 'Chesterfield Taxi Service LLC',
-        displayName: 'Chesterfield Taxi',
+        legalName: 'Chesterfield Taxi and Car Service',
+        displayName: 'Chesterfield Taxi and Car Service',
         tagline: 'Your Reliable Ride, Anytime',
         founded: '2020'
     },
@@ -21,17 +21,17 @@ export const mockCompanyConfig: CompanyConfig = {
             sms: true
         },
         email: {
-            general: 'info@chesterfieldtaxi.com',
-            support: 'support@chesterfieldtaxi.com',
-            booking: 'bookings@chesterfieldtaxi.com'
+            general: 'info@chesterfieldcar.com',
+            support: 'support@chesterfieldcar.com',
+            booking: 'bookings@chesterfieldcar.com'
         },
         address: {
-            street: '123 Main Street',
-            city: 'Chesterfield',
+            street: '1814 Woodson Rd',
+            city: 'Overland',
             state: 'MO',
-            zip: '63017',
+            zip: '63114',
             country: 'USA',
-            mapUrl: 'https://maps.google.com/?q=Chesterfield+MO'
+            mapUrl: 'https://maps.google.com/?q=1814+Woodson+Rd+Overland+MO+63114'
         },
         social: {
             facebook: 'https://facebook.com/chesterfieldtaxi',
@@ -79,5 +79,37 @@ export const mockCompanyConfig: CompanyConfig = {
             allowOutsideHoursScheduling: true,
             blockSameDayAfterHour: null
         }
+    },
+
+    pricing: {
+        baseRate: 3.50,
+        perMileRate: 2.50,
+        minFare: 15.00,
+        hourlyRate: 55.00,
+        waitRatePerMinute: 0.50,
+        airportFees: {
+            pickup: 5.00,
+            dropoff: 0.00,
+            curbside: 0.00
+        },
+        vehicleMultipliers: {
+            sedan: 1.0,
+            suv: 1.5,
+            minivan: 1.5,
+            passenger_van: 2.0
+        }
+    },
+
+    features: {
+        enableGuestBooking: true,
+        enableCareersPage: true,
+        enableBlog: false,
+        maintenanceMode: false
+    },
+
+    payment: {
+        acceptedMethods: ['cash', 'credit_card', 'account'],
+        depositRequired: false,
+        depositPercentage: 0
     }
 };

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { CompanyConfig } from '../types/companyConfig';
 import { mockCompanyConfig } from '../mocks/companyConfigMock';
+import { subscribeToCompanyConfig } from '../services/configService';
 
 /**
  * Hook to fetch company configuration
- * Currently uses mock data - will be replaced with Firestore later
+ * Subscribes to Firestore updates by default
  */
-export function useCompanyConfig(useMock = true) {
+export function useCompanyConfig(useMock = false) {
     const [config, setConfig] = useState<CompanyConfig | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -21,11 +22,19 @@ export function useCompanyConfig(useMock = true) {
 
             return () => clearTimeout(timer);
         } else {
-            // TODO: Implement Firestore listener
-            // const unsubscribe = onSnapshot(doc(db, 'company_config', 'current'), ...);
-            // return () => unsubscribe();
-            setError(new Error('Firestore not implemented yet'));
-            setLoading(false);
+            // Subscribe to Firestore updates
+            const unsubscribe = subscribeToCompanyConfig(
+                (newConfig) => {
+                    setConfig(newConfig);
+                    setLoading(false);
+                },
+                (err) => {
+                    setError(err);
+                    setLoading(false);
+                }
+            );
+
+            return () => unsubscribe();
         }
     }, [useMock]);
 

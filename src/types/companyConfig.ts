@@ -8,8 +8,42 @@ export interface CompanyConfig {
     operatingHours: OperatingHours;
     serviceArea: ServiceArea;
     bookingLimits: BookingLimits;
+    pricing: PricingConfig;
+    features: FeatureFlags;
+    payment: PaymentConfig;
 }
 
+export interface PricingConfig {
+    baseRate: number;
+    perMileRate: number;
+    minFare: number;
+    hourlyRate: number;
+    waitRatePerMinute: number;
+    airportFees: {
+        pickup: number;
+        dropoff: number;
+        curbside: number;
+    };
+    vehicleMultipliers: {
+        sedan: number;
+        suv: number;
+        minivan: number;
+        passenger_van: number;
+    };
+}
+
+export interface FeatureFlags {
+    enableGuestBooking: boolean;
+    enableCareersPage: boolean;
+    enableBlog: boolean;
+    maintenanceMode: boolean;
+}
+
+export interface PaymentConfig {
+    acceptedMethods: ('cash' | 'credit_card' | 'account' | 'prepaid')[];
+    depositRequired: boolean;
+    depositPercentage: number;
+}
 export interface BusinessInfo {
     legalName: string;
     displayName: string;

@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Company Configuration
+    // Allow public read so the app can load
+    // Allow public write temporarily for seeding (should be restricted to admin later)
+    match /company_config/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Contact inquiries - allow public creation
+    match /contact_inquiries/{inquiryId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+    
+    // Career applications - allow public creation
+    match /career_applications/{applicationId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+    
+    // Bookings - allow public creation
+    match /bookings/{bookingId} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}
