@@ -107,7 +107,6 @@ export const BookingFlowV3: React.FC = () => {
         removeReturnStop,
         updateReturnStop,
         reorderReturnStops,
-        syncReturnTripFromMain,
         isCalculatingPrice,
         isSubmitting,
         setIsSubmitting,
