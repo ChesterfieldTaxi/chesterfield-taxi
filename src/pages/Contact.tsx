@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useCompanyConfig } from '../hooks/useCompanyConfig';
 import { submitContactInquiry } from '../services/contactService';
 import { useToast } from '../shared/hooks/useToast';
+import { ENV } from '../config/env';
 
 const Contact: React.FC = () => {
   const { config } = useCompanyConfig();
@@ -213,9 +214,18 @@ const Contact: React.FC = () => {
         {/* Map Section - Full Width Below */}
         <div className="map-section">
           <div className="map-container">
-            <div className="map-placeholder">
-              Google Map Embed centered on St. Louis County service area
-            </div>
+            <iframe
+              title="Office Location"
+              width="100%"
+              height="450"
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps/embed/v1/place?key=${ENV.MAPS_API_KEY}&q=${encodeURIComponent(
+                `${config?.contactInfo.address.street || '1814 Woodson Rd'}, ${config?.contactInfo.address.city || 'Overland'}, ${config?.contactInfo.address.state || 'MO'} ${config?.contactInfo.address.zip || '63114'}`
+              )}`}
+            ></iframe>
           </div>
         </div>
       </div>
