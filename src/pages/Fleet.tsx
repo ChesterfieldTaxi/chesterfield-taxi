@@ -192,7 +192,7 @@ const Fleet: React.FC = () => {
 
         .vehicle-image-container {
           position: relative;
-          background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+          background: linear-gradient(to bottom, #f9fafb 0%, #e5e7eb 100%);
           padding: 2rem;
           display: flex;
           align-items: center;

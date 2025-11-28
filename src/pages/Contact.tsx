@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { useCompanyConfig } from '../hooks/useCompanyConfig';
+import { submitContactInquiry } from '../services/contactService';
+import { useToast } from '../shared/hooks/useToast';
 
 const Contact: React.FC = () => {
   const { config } = useCompanyConfig();
+  const { success: showSuccess, error: showError } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [inquiryId, setInquiryId] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -17,10 +23,34 @@ const Contact: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Contact form submitted:', formData);
-    alert('Thank you for contacting us! We will get back to you shortly.');
+
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const id = await submitContactInquiry(formData);
+
+      setInquiryId(id);
+      setIsSubmitted(true);
+      showSuccess(`Message sent successfully! Reference ID: ${id}`);
+
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        subject: 'General Inquiry',
+        message: ''
+      });
+    } catch (error) {
+      console.error('Submission error:', error);
+      showError(error instanceof Error ? error.message : 'Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -104,46 +134,79 @@ const Contact: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Contact Form */}
+          {/* Right Column: Contact Form OR Confirmation */}
           <div className="contact-form-col">
-            <div className="form-container glass-panel">
-              <h2>Send us a Message</h2>
-              <form onSubmit={handleSubmit}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="name">Name</label>
-                    <input type="text" id="name" name="name" required value={formData.name} onChange={handleChange} placeholder="Your Name" />
+            {isSubmitted ? (
+              <div className="form-container glass-panel">
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '64px', color: 'var(--color-primary)', marginBottom: '1rem' }}>✓</div>
+                  <h2 style={{ marginBottom: '1rem' }}>Message Sent Successfully!</h2>
+                  <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+                    Thank you for contacting Chesterfield Taxi. We've received your message and will respond as soon as possible.
+                  </p>
+                  <div style={{ backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                    <span style={{ color: '#666', fontSize: '0.9rem' }}>Reference ID: </span>
+                    <strong style={{ color: 'var(--color-primary-dark)', fontSize: '1.1rem' }}>{inquiryId}</strong>
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="email">Email</label>
-                    <input type="email" id="email" name="email" required value={formData.email} onChange={handleChange} placeholder="your@email.com" />
+                  <div style={{ textAlign: 'left', backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary-dark)' }}>What Happens Next?</h3>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      <li style={{ padding: '0.5rem 0', borderBottom: '1px solid #e0e0e0' }}>✓ Our team will review your inquiry</li>
+                      <li style={{ padding: '0.5rem 0', borderBottom: '1px solid #e0e0e0' }}>✓ You'll receive a response within 24 hours</li>
+                      <li style={{ padding: '0.5rem 0' }}>✓ Keep your reference ID for follow-up</li>
+                    </ul>
                   </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setIsSubmitted(false)}
+                    style={{ width: '100%' }}
+                  >
+                    Send Another Message
+                  </button>
                 </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="phone">Phone</label>
-                    <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(555) 555-5555" />
+              </div>
+            ) : (
+              <div className="form-container glass-panel">
+                <h2>Send us a Message</h2>
+                <form onSubmit={handleSubmit}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="name">Name</label>
+                      <input type="text" id="name" name="name" required value={formData.name} onChange={handleChange} placeholder="Your Name" />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="email">Email</label>
+                      <input type="email" id="email" name="email" required value={formData.email} onChange={handleChange} placeholder="your@email.com" />
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label htmlFor="subject">Subject</label>
-                    <select id="subject" name="subject" value={formData.subject} onChange={handleChange}>
-                      <option value="General Inquiry">General Inquiry</option>
-                      <option value="Lost & Found">Lost & Found</option>
-                      <option value="Corporate Account">Corporate Account</option>
-                      <option value="Feedback">Feedback</option>
-                    </select>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="phone">Phone</label>
+                      <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="(555) 555-5555" />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="subject">Subject</label>
+                      <select id="subject" name="subject" value={formData.subject} onChange={handleChange}>
+                        <option value="General Inquiry">General Inquiry</option>
+                        <option value="Lost & Found">Lost & Found</option>
+                        <option value="Corporate Account">Corporate Account</option>
+                        <option value="Feedback">Feedback</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label htmlFor="message">Message</label>
-                  <textarea id="message" name="message" rows={5} required value={formData.message} onChange={handleChange} placeholder="How can we help you?"></textarea>
-                </div>
+                  <div className="form-group">
+                    <label htmlFor="message">Message</label>
+                    <textarea id="message" name="message" rows={5} required value={formData.message} onChange={handleChange} placeholder="How can we help you?"></textarea>
+                  </div>
 
-                <button type="submit" className="btn btn-primary full-width-btn">Send Message</button>
-              </form>
-            </div>
+                  <button type="submit" className="btn btn-primary full-width-btn" disabled={isSubmitting}>
+                    {isSubmitting ? 'Sending...' : 'Send Message'}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
 

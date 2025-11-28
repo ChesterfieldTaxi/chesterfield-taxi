@@ -1,0 +1,14 @@
+src/components/booking_v3/BookingFlowV3.tsx(8,1): error TS6133: 'generateBookingReference' is declared but its value is never read.
+src/components/booking_v3/BookingFlowV3.tsx(206,43): error TS2339: Property 'flightInfo' does not exist on type 'Location'.
+src/components/booking_v3/BookingFlowV3.tsx(206,72): error TS2339: Property 'flightInfo' does not exist on type 'Location'.
+src/components/booking_v3/BookingFlowV3.tsx(216,53): error TS2339: Property 'flightInfo' does not exist on type 'Location'.
+src/components/booking_v3/BookingFlowV3.tsx(216,88): error TS2339: Property 'flightInfo' does not exist on type 'Location'.
+src/components/booking_v3/BookingFlowV3.tsx(235,47): error TS2339: Property 'basePrice' does not exist on type 'FareBreakdown'.
+src/components/booking_v3/BookingFlowV3.tsx(236,44): error TS2339: Property 'extras' does not exist on type 'FareBreakdown'.
+src/components/booking_v3/helpContent.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/booking_v3/PassengerCounterV3.tsx(164,86): error TS2783: 'color' is specified more than once, so this usage will be overwritten.
+src/components/booking_v3/ReturnTripV3.tsx(55,5): error TS6133: 'syncReturnTripFromMain' is declared but its value is never read.
+src/components/booking_v3/SpecialRequestsV3.tsx(1,17): error TS6133: 'useRef' is declared but its value is never read.
+src/components/booking_v3/SpecialRequestsV3.tsx(1,25): error TS6133: 'useState' is declared but its value is never read.
+src/services/bookingService.ts(2,10): error TS7034: Variable 'db' implicitly has type 'any' in some locations where its type cannot be determined.
+src/services/bookingService.ts(140,48): error TS7005: Variable 'db' implicitly has an 'any' type.

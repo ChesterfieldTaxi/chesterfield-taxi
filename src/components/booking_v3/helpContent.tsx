@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 /**
  * Help content for each section of the booking form

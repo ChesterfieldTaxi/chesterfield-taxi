@@ -1,4 +1,5 @@
 import React from 'react';
+import { typography } from '../../styles/typography-helpers';
 import DateTimePicker from '../booking/DateTimePicker';
 import { TripRouteV3 } from './TripRouteV3';
 import type { Location } from '../../hooks/useBookingFormV3';
@@ -50,8 +51,7 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
     addReturnStop,
     removeReturnStop,
     updateReturnStop,
-    reorderReturnStops,
-    syncReturnTripFromMain
+    reorderReturnStops
 }) => {
 
 
@@ -68,10 +68,10 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                 border: '1px solid #e5e7eb'
             }}>
                 <div>
-                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                    <div style={{ ...typography.sectionTitle, fontSize: '16px', marginBottom: '0.25rem' }}>
                         Book Return Trip
                     </div>
-                    <div style={{ fontSize: '12px', color: isRouteComplete ? '#6b7280' : '#ef4444' }}>
+                    <div style={{ ...typography.helper, color: isRouteComplete ? '#6b7280' : '#ef4444' }}>
                         {isRouteComplete ? 'Save time by booking both ways' : 'Complete your route first'}
                     </div>
                 </div>
@@ -150,8 +150,8 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                                     borderRadius: '4px',
                                     backgroundColor: isReturnWait ? 'white' : 'transparent',
                                     color: isReturnWait ? '#111827' : '#6b7280',
+                                    ...typography.buttonLarge,
                                     fontWeight: 600,
-                                    fontSize: '16px',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     boxShadow: isReturnWait ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
@@ -168,8 +168,8 @@ export const ReturnTripV3: React.FC<ReturnTripV3Props> = ({
                                     borderRadius: '4px',
                                     backgroundColor: !isReturnWait ? '#2563eb' : 'transparent',
                                     color: !isReturnWait ? 'white' : '#6b7280',
+                                    ...typography.buttonLarge,
                                     fontWeight: 600,
-                                    fontSize: '16px',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     boxShadow: !isReturnWait ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'

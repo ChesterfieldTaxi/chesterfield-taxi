@@ -1,4 +1,5 @@
 import React from 'react';
+import { typography } from '../../styles/typography-helpers';
 import {
     PAYMENT_METHODS,
     getPaymentMethod,
@@ -54,8 +55,7 @@ export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
             <label style={{
                 display: 'block',
                 marginBottom: '0.5rem',
-                fontWeight: 500,
-                fontSize: '16px',
+                ...typography.labelLarge,
                 color: '#111827'
             }}>
                 Payment Method
@@ -81,8 +81,8 @@ export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
                             borderRadius: '6px',
                             backgroundColor: currentMethod === method.id ? '#eff6ff' : 'white',
                             color: currentMethod === method.id ? '#2563eb' : '#6b7280',
+                            ...typography.button,
                             fontWeight: 500,
-                            fontSize: '15px',
                             cursor: 'pointer',
                             transition: 'all 0.2s',
                             outline: 'none'
@@ -124,7 +124,7 @@ export const PaymentMethodV3: React.FC<PaymentMethodV3Props> = ({
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
                     borderRadius: '4px',
-                    fontSize: '14px',
+                    ...typography.bodySmall,
                     color: '#991b1b'
                 }}>
                     Please complete all required fields

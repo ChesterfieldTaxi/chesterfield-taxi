@@ -1,0 +1,26 @@
+src/components/booking_v3/PassengerCounterV3.tsx(164,86): error TS2783: 'color' is specified more than once, so this usage will be overwritten.
+src/components/booking_v3/ReturnTripV3.tsx(41,5): error TS6133: 'syncReturnTripFromMain' is declared but its value is never read.
+src/components/booking_v3/ReturnTripV3.tsx(61,64): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(62,26): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(70,30): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(75,42): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(75,61): error TS2304: Cannot find name 'onIsReturnTripChange'.
+src/components/booking_v3/ReturnTripV3.tsx(76,36): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(81,33): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(86,70): error TS2304: Cannot find name 'isRouteComplete'.
+src/components/booking_v3/ReturnTripV3.tsx(133,48): error TS2304: Cannot find name 'onIsReturnWaitChange'.
+src/components/booking_v3/ReturnTripV3.tsx(151,48): error TS2304: Cannot find name 'onIsReturnWaitChange'.
+src/components/booking_v3/ReturnTripV3.tsx(174,47): error TS2304: Cannot find name 'onReturnDateTimeChange'.
+src/components/booking_v3/ReturnTripV3.tsx(185,34): error TS2304: Cannot find name 'returnDropoff'.
+src/components/booking_v3/ReturnTripV3.tsx(186,32): error TS2304: Cannot find name 'returnStops'.
+src/components/booking_v3/ReturnTripV3.tsx(187,41): error TS2304: Cannot find name 'onReturnPickupChange'.
+src/components/booking_v3/ReturnTripV3.tsx(188,42): error TS2304: Cannot find name 'onReturnDropoffChange'.
+src/components/booking_v3/ReturnTripV3.tsx(189,39): error TS2304: Cannot find name 'updateReturnStop'.
+src/components/booking_v3/ReturnTripV3.tsx(190,36): error TS2304: Cannot find name 'addReturnStop'.
+src/components/booking_v3/ReturnTripV3.tsx(191,39): error TS2304: Cannot find name 'removeReturnStop'.
+src/components/booking_v3/ReturnTripV3.tsx(194,29): error TS2304: Cannot find name 'onReturnPickupChange'.
+src/components/booking_v3/ReturnTripV3.tsx(194,50): error TS2304: Cannot find name 'returnDropoff'.
+src/components/booking_v3/ReturnTripV3.tsx(195,29): error TS2304: Cannot find name 'onReturnDropoffChange'.
+src/components/booking_v3/ReturnTripV3.tsx(198,48): error TS2304: Cannot find name 'onReturnFlightDetailsChange'.
+src/components/booking_v3/ReturnTripV3.tsx(200,42): error TS2304: Cannot find name 'returnDistanceInYards'.
+src/components/booking_v3/ReturnTripV3.tsx(201,48): error TS2304: Cannot find name 'isCalculatingReturnDistance'.

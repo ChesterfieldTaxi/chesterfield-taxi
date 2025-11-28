@@ -5,7 +5,8 @@ import { useCompanyConfig } from '../../hooks/useCompanyConfig';
 import { usePricingRules } from '../../hooks/usePricingRules';
 import { calculateFare } from '../../utils/pricingEngine';
 import { BookingDetails } from '../../types/pricing';
-import { generateBookingReference } from '../../utils/bookingUtils';
+import { submitBooking, BookingSubmission } from '../../services/bookingService';
+import { useToast } from '../../shared/hooks/useToast';
 import { TripDetailsV3 } from './TripDetailsV3';
 import { TimeSelectorV3 } from './TimeSelectorV3';
 import { PassengerCounterV3 } from './PassengerCounterV3';
@@ -60,6 +61,7 @@ export const BookingFlowV3: React.FC = () => {
     const navigate = useNavigate();
     const { config: companyConfig } = useCompanyConfig();
     const { rules } = usePricingRules(true);
+    const { error: showError } = useToast();
 
     // 🔥 NEW: Auto-save state indicator
     const [showSaveIndicator, setShowSaveIndicator] = useState(false);
@@ -181,27 +183,82 @@ export const BookingFlowV3: React.FC = () => {
 
         setIsSubmitting(true);
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+            // Construct booking submission object
+            const bookingData: BookingSubmission = {
+                serviceType: 'standard', // Default for now
+                vehicleType: effectiveVehicleType,
+                passengers: state.passengerCount,
+                luggage: state.luggageCount,
+                carSeats: state.carSeats,
 
-        // Generate booking reference
-        const bookingRef = generateBookingReference();
+                pickup: state.pickup!,
+                dropoff: state.dropoff!,
+                stops: state.stops,
+                distanceInYards: state.distanceInYards,
+                durationInSeconds: 0, // We might want to add this to state if needed
 
-        // 🔥 NEW: Clear saved booking data from localStorage
-        clearSaved();
+                date: state.isNow ? new Date().toISOString().split('T')[0] : (state.pickupDateTime?.toISOString().split('T')[0] || ''),
+                time: state.isNow ? new Date().toTimeString().split(' ')[0] : (state.pickupDateTime?.toTimeString().split(' ')[0] || ''),
+                isASAP: state.isNow,
 
-        // Navigate to confirmation page with booking data
-        navigate('/confirmation', {
-            state: {
-                bookingRef,
-                bookingData: {
-                    ...state,
-                    estimatedTotal: fareBreakdown?.total
+                flightInfo: state.pickup?.flightDetails || state.dropoff?.flightDetails,
+
+                isReturnTrip: state.isReturnTrip,
+                returnDetails: state.isReturnTrip ? {
+                    date: state.returnDateTime?.toISOString().split('T')[0] || '',
+                    time: state.returnDateTime?.toTimeString().split(' ')[0] || '',
+                    isWait: state.isReturnWait,
+                    pickup: state.returnPickup!,
+                    dropoff: state.returnDropoff!,
+                    stops: returnStops,
+                    flightInfo: state.returnPickup?.flightDetails || state.returnDropoff?.flightDetails
+                } : undefined,
+
+                contact: {
+                    name: state.name,
+                    phone: state.phone,
+                    email: state.email,
+                    isGuestBooking: state.isGuestBooking,
+                    guestName: state.guestName,
+                    guestPhone: state.guestPhone,
+                    guestEmail: state.guestEmail
+                },
+                payment: state.payment,
+
+                instructions: {
+                    driverNotes: state.driverNotes,
+                    gateCode: state.gateCode
+                },
+                pricing: {
+                    basePrice: (fareBreakdown?.baseFare || 0) + (fareBreakdown?.distanceFare || 0),
+                    extras: (fareBreakdown?.total || 0) - ((fareBreakdown?.baseFare || 0) + (fareBreakdown?.distanceFare || 0)),
+                    total: fareBreakdown?.total || 0
                 }
-            }
-        });
+            };
 
-        setIsSubmitting(false);
+            // Submit to Firestore
+            const bookingRef = await submitBooking(bookingData);
+
+            // 🔥 NEW: Clear saved booking data from localStorage
+            clearSaved();
+
+            // Navigate to confirmation page with booking data
+            navigate('/confirmation', {
+                state: {
+                    bookingRef,
+                    bookingData: {
+                        ...state,
+                        estimatedTotal: fareBreakdown?.total
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Booking submission failed:', error);
+            showError('Failed to submit booking. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Calculate prices for each vehicle type (for display in vehicle selector)

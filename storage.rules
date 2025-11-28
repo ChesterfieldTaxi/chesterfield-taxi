@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Applications folder (career applications with resumes/licenses)
+    match /applications/{applicationId}/{allPaths=**} {
+      // Allow public uploads (for job applications)
+      // File size limit enforced on client (5MB)
+      allow write: if request.resource.size < 5 * 1024 * 1024;
+      
+      // Only authenticated admins can read/delete
+      allow read, delete: if request.auth != null;
+    }
+    
+    // Default: deny all access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCompanyConfig } from '../../hooks/useCompanyConfig';
+import { typography } from '../../styles/typography-helpers';
 
 interface PassengerCounterProps {
     passengerCount: number;
@@ -46,8 +47,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 600,
-                fontSize: '16px',
+                ...typography.buttonLarge,
                 color: disabled ? '#9ca3af' : '#111827',
                 transition: 'all 0.2s'
             }}
@@ -74,12 +74,12 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: 'auto' }}>
                 {icon && <span style={{ color: '#6b7280', display: 'flex' }}>{icon}</span>}
-                <span style={{ fontWeight: 500, fontSize: '16px', color: '#374151' }}>{label}</span>
+                <span style={{ ...typography.labelLarge }}>{label}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <CounterButton onClick={onDecrement} disabled={value <= min}>−</CounterButton>
-                <div style={{ minWidth: '24px', textAlign: 'center', fontWeight: 600, fontSize: '16px' }}>{value}</div>
+                <div style={{ minWidth: '24px', textAlign: 'center', ...typography.body, fontWeight: 600 }}>{value}</div>
                 <CounterButton onClick={onIncrement} disabled={max !== undefined && value >= max}>+</CounterButton>
             </div>
         </div>
@@ -156,12 +156,12 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                         padding: 0,
                         cursor: 'pointer',
                         color: '#2563eb',
-                        fontSize: '14px',
+                        ...typography.button,
                         fontWeight: 500
                     }}
                 >
                     <span>{showCarSeats ? 'Hide Car Seats' : '+ Add Car Seats'}</span>
-                    {totalCarSeats > 0 && <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 6px', borderRadius: '999px', fontSize: '12px' }}>{totalCarSeats} selected</span>}
+                    {totalCarSeats > 0 && <span style={{ backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '999px', ...typography.helper, fontSize: '12px', color: '#1d4ed8' }}>{totalCarSeats} selected</span>}
                 </button>
 
                 {/* Car Seats Section (Collapsible) */}
@@ -211,7 +211,7 @@ export const PassengerCounterV3: React.FC<PassengerCounterProps> = ({
                         {totalCarSeats > 0 && (
                             <div style={{
                                 marginTop: '0.5rem',
-                                fontSize: '13px',
+                                ...typography.helper,
                                 color: '#92400e',
                                 backgroundColor: '#fef3c7',
                                 padding: '0.5rem',

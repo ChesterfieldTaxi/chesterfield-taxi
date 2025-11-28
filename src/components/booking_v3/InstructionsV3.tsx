@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { typography } from '../../styles/typography-helpers';
 
 interface InstructionsV3Props {
     driverNotes: string;
@@ -51,7 +52,7 @@ const InputWithIcon: React.FC<{
                     flex: 1,
                     border: 'none',
                     outline: 'none',
-                    fontSize: '16px',
+                    ...typography.input,
                     padding: 0,
                     backgroundColor: 'transparent',
                     boxShadow: 'none'
@@ -74,7 +75,7 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
 
             {/* Driver Notes */}
             <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '16px', color: '#374151' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', ...typography.labelLarge }}>
                     Notes for Driver <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '14px' }}>(optional)</span>
                 </label>
                 <textarea
@@ -87,7 +88,7 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
                         padding: '0.625rem 0.75rem',
                         border: '1px solid #d1d5db',
                         borderRadius: '4px',
-                        fontSize: '16px',
+                        ...typography.input,
                         fontFamily: 'inherit',
                         resize: 'vertical',
                         outline: 'none',
@@ -109,7 +110,7 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
                             background: 'none',
                             border: 'none',
                             color: '#2563eb',
-                            fontSize: '14px',
+                            ...typography.button,
                             fontWeight: 500,
                             cursor: 'pointer',
                             padding: 0,
@@ -129,7 +130,7 @@ export const InstructionsV3: React.FC<InstructionsV3Props> = ({
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                <label style={{ fontWeight: 500, fontSize: '14px', color: '#374151' }}>
+                                <label style={{ ...typography.label }}>
                                     Gate Code
                                 </label>
                                 <button
