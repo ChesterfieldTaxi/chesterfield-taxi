@@ -1,16 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 
 const Services: React.FC = () => {
   return (
     <div className="services-page">
-      {/* Page Header */}
-      <header className="page-header">
-        <div className="container">
-          <h1>Transportation Services</h1>
-          <p className="page-subtitle">Professional taxi service with flat-rate airport transfers and reliable local transportation.</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Transportation Services"
+        subtitle="Professional taxi service with flat-rate airport transfers and reliable local transportation."
+        backgroundImage="/vehicles/suv.png"
+      />
 
       {/* Service 1: Airport */}
       <section className="section" id="airport">
@@ -96,25 +95,6 @@ const Services: React.FC = () => {
       </section>
 
       <style>{`
-        .page-header {
-          background-color: #1a1a1a;
-          color: white;
-          padding: var(--spacing-xl) 0;
-          text-align: center;
-        }
-
-        .page-header h1 {
-          color: white;
-          font-size: 2.5rem;
-        }
-
-        .page-subtitle {
-          font-size: 1.2rem;
-          opacity: 0.9;
-          max-width: 600px;
-          margin: 0 auto;
-        }
-
         .service-detail {
           max-width: 800px;
           margin: 0 auto;

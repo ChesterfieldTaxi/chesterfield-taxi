@@ -1,16 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 
 const About: React.FC = () => {
   return (
     <div className="about-page">
-      {/* Page Header */}
-      <header className="page-header">
-        <div className="container">
-          <h1>About Chesterfield Taxi</h1>
-          <p className="page-subtitle">Locally owned and operated since 1995. Over 30 years of trusted service.</p>
-        </div>
-      </header>
+      <PageHeader
+        title="About Chesterfield Taxi"
+        subtitle="Locally owned and operated since 1995. Over 30 years of trusted service."
+        backgroundImage="/vehicles/sedan.png"
+      />
 
       {/* Our Story */}
       <section className="section">
@@ -75,25 +74,6 @@ const About: React.FC = () => {
       </section>
 
       <style>{`
-        .page-header {
-          background-color: #1a1a1a;
-          color: white;
-          padding: var(--spacing-xl) 0;
-          text-align: center;
-        }
-
-        .page-header h1 {
-          color: white;
-          font-family: var(--font-family-sans);
-          font-size: 2.5rem;
-        }
-
-        .page-subtitle {
-          font-size: 1.2rem;
-          opacity: 0.9;
-          max-width: 600px;
-          margin: 0 auto;
-        }
 
         .about-content {
           max-width: 800px;

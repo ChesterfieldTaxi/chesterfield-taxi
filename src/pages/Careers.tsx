@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { submitCareerApplication, CareerApplicationData } from '../services/careersService';
 import { useToast } from '../shared/hooks/useToast';
 import { FILE_SIZE_LIMITS } from '../services/storageService';
+import { PageHeader } from '../components/PageHeader';
 
 const Careers: React.FC = () => {
   const { success: showSuccess, error: showError } = useToast();
@@ -99,13 +100,11 @@ const Careers: React.FC = () => {
 
   return (
     <div className="careers-page">
-      {/* Page Header */}
-      <header className="page-header">
-        <div className="container">
-          <h1>Join the Chesterfield Taxi Team</h1>
-          <p className="page-subtitle">Build a career with a company that values your work.</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Join the Chesterfield Taxi Team"
+        subtitle="Build a career with a company that values your work."
+        backgroundImage="/vehicles/minivan.png"
+      />
 
       {/* The Chesterfield Advantage */}
       <section className="section">
@@ -339,25 +338,6 @@ const Careers: React.FC = () => {
       </section>
 
       <style>{`
-        .page-header {
-          background-color: #1a1a1a;
-          color: white;
-          padding: var(--spacing-xl) 0;
-          text-align: center;
-        }
-
-        .page-header h1 {
-          color: white;
-          font-family: var(--font-family-sans);
-          font-size: 2.5rem;
-        }
-
-        .page-subtitle {
-          font-size: 1.2rem;
-          opacity: 0.9;
-          max-width: 600px;
-          margin: 0 auto;
-        }
 
         .careers-content {
           max-width: 900px;

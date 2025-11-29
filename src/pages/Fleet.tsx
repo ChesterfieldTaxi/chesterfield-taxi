@@ -1,19 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useFleetConfig } from '../hooks/useFleetConfig';
+import { PageHeader } from '../components/PageHeader';
 
 const Fleet: React.FC = () => {
   const { fleetConfig } = useFleetConfig();
 
   return (
     <div className="fleet-page">
-      {/* Hero Header */}
-      <header className="fleet-hero">
-        <div className="container">
-          <h1>Our Premium Fleet</h1>
-          <p className="hero-subtitle">Choose the perfect vehicle for your journey</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Our Premium Fleet"
+        subtitle="Choose the perfect vehicle for your journey"
+      />
 
       {/* Vehicle Grid */}
       <section className="section">
@@ -146,26 +144,6 @@ const Fleet: React.FC = () => {
       <style>{`
         .fleet-page {
           min-height: 100vh;
-        }
-
-        .fleet-hero {
-          background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-          color: white;
-          padding: 6rem 0 4rem;
-          text-align: center;
-        }
-
-        .fleet-hero h1 {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-          font-weight: 700;
-        }
-
-        .hero-subtitle {
-          font-size: 1.25rem;
-          opacity: 0.9;
-          max-width: 600px;
-          margin: 0 auto;
         }
 
         .vehicles-grid {
