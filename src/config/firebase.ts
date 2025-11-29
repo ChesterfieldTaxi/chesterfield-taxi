@@ -30,6 +30,7 @@ try {
     // Initialize Firebase
     app = initializeApp(firebaseConfig);
     // Initialize Firestore
+    // Initialize Firestore
     db = getFirestore(app);
     // Initialize Storage
     storage = getStorage(app);
