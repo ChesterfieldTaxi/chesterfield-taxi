@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { bookingFormConfig } from '../../config/formConfig';
 import type { FormStepSchema, VehicleTier, PaymentMethod, Trip, CreateTripInput } from '../../core/types';
 import { isFieldVisible, isFieldRequired } from '../../core/types/field-schema';
 import { getBookingService, type QuoteResponse } from '../../core/services';
+import {
+  detectAirportInAddresses,
+  VEHICLE_LUGGAGE_CAPACITY,
+  MAJOR_AIRLINES,
+} from '../../core/config/airports';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card';
 import { Alert } from '../ui/Alert';
@@ -10,6 +15,8 @@ import { CheckIcon, ChevronRightIcon, ChevronLeftIcon, SpinnerIcon } from '../ui
 import { FieldRenderer } from './FieldRenderer';
 import { QuoteSummary } from './QuoteSummary';
 import { BookingConfirmation } from './BookingConfirmation';
+import { AirportDetectedBanner } from './AirportDetectedBanner';
+import { LuggageCapacityWarning } from './LuggageCapacityWarning';
 
 export interface BookingFormProps {
   className?: string;
@@ -22,7 +29,9 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
 
   // Form values map
   const [formValues, setFormValues] = useState<Record<string, unknown>>(() => {
-    const initial: Record<string, unknown> = {};
+    const initial: Record<string, unknown> = {
+      isAirportTrip: false,
+    };
     for (const step of bookingFormConfig.steps) {
       for (const field of step.fields) {
         if (field.defaultValue !== undefined) {
@@ -50,6 +59,32 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
 
   const steps = bookingFormConfig.steps;
   const currentStep = steps[currentStepIndex];
+
+  // Pure airport detection based on entered addresses
+  const airportDetection = useMemo(() => {
+    const pickup = String(formValues.pickupAddress || '');
+    const dropoff = String(formValues.dropoffAddress || '');
+    return detectAirportInAddresses(pickup, dropoff);
+  }, [formValues.pickupAddress, formValues.dropoffAddress]);
+
+  // Synchronize dynamic isAirportTrip flag into formValues for FieldSchema visibility/requirement evaluation
+  useEffect(() => {
+    setFormValues((prev) => {
+      if (prev.isAirportTrip === airportDetection.isAirportTrip) {
+        return prev;
+      }
+      return {
+        ...prev,
+        isAirportTrip: airportDetection.isAirportTrip,
+      };
+    });
+  }, [airportDetection.isAirportTrip]);
+
+  // Vehicle luggage capacity calculation
+  const currentVehicleTier = (formValues.vehicleTier as VehicleTier) || 'standard';
+  const maxAllowedLuggage = VEHICLE_LUGGAGE_CAPACITY[currentVehicleTier] ?? 2;
+  const currentLuggageCount = Number(formValues.luggageCount) || 0;
+  const isLuggageOverCapacity = currentLuggageCount > maxAllowedLuggage;
 
   // Helper to update a field value
   const handleFieldChange = (name: string, value: unknown) => {
@@ -270,6 +305,23 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
         scheduledPickupTime = new Date(`${formValues.scheduledDate}T${timePart}`).toISOString();
       }
 
+      const matchedAirline = MAJOR_AIRLINES.find((a) => a.code === formValues.airlineCode);
+      const airlineName = matchedAirline ? matchedAirline.name : formValues.airlineCode ? String(formValues.airlineCode) : undefined;
+
+      // Construct structured flight remarks if airport details were provided
+      let flightRemarks: string | undefined;
+      if (airportDetection.isAirportTrip && formValues.flightNumber) {
+        const parts: string[] = [];
+        if (airlineName) parts.push(`Airline: ${airlineName} (${formValues.airlineCode})`);
+        parts.push(`Flight #: ${formValues.flightNumber}`);
+        if (formValues.departureAirport) parts.push(`Origin: ${formValues.departureAirport}`);
+        parts.push(`Checked Luggage: ${formValues.hasCheckedLuggage ? 'Yes' : 'No'}`);
+        flightRemarks = `[Airport Dispatch: ${parts.join(', ')}]`;
+      }
+
+      const userSpecialRequests = formValues.specialRequests ? String(formValues.specialRequests).trim() : '';
+      const mergedSpecialRequests = [flightRemarks, userSpecialRequests].filter(Boolean).join('\n') || undefined;
+
       const inputPayload: CreateTripInput = {
         pickupLocation: {
           address: String(formValues.pickupAddress),
@@ -288,7 +340,7 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
           phone: String(formValues.phone),
           passengerCount: Number(formValues.passengerCount) || 1,
           luggageCount: Number(formValues.luggageCount) || 0,
-          specialRequests: formValues.specialRequests ? String(formValues.specialRequests) : undefined,
+          specialRequests: mergedSpecialRequests,
         },
         vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
         pricing: finalQuote.pricing,
@@ -299,7 +351,17 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
         },
         metadata: {
           corporateAccountId: formValues.corporateAccountId ? String(formValues.corporateAccountId) : undefined,
+          airlineCode: formValues.airlineCode ? String(formValues.airlineCode) : undefined,
+          airlineName,
           flightNumber: formValues.flightNumber ? String(formValues.flightNumber) : undefined,
+          departureAirport: formValues.departureAirport ? String(formValues.departureAirport) : undefined,
+          hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
+          isAirportTrip: airportDetection.isAirportTrip,
+          isPickupAirport: airportDetection.isPickupAirport,
+          isDropoffAirport: airportDetection.isDropoffAirport,
+          detectedAirportIata: airportDetection.airport?.iataCode,
+          detectedAirportName: airportDetection.airport?.name,
+          flightRemarks,
           promoCode: formValues.promoCode ? String(formValues.promoCode) : undefined,
         },
       };
@@ -423,6 +485,35 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
                   <Alert variant="warning" title="Quote Notice">
                     {quoteError}
                   </Alert>
+                )}
+
+                {/* Airport transfer auto-detected banner on Step 1 */}
+                {currentStepIndex === 0 && airportDetection.isAirportTrip && airportDetection.airport && (
+                  <AirportDetectedBanner
+                    airport={airportDetection.airport}
+                    isPickupAirport={airportDetection.isPickupAirport}
+                    isDropoffAirport={airportDetection.isDropoffAirport}
+                  />
+                )}
+
+                {/* Airport operations indicator on Step 4 */}
+                {currentStepIndex === 3 && airportDetection.isAirportTrip && airportDetection.airport && (
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                    <span>
+                      Airport dispatch active for <strong>{airportDetection.airport.shortName}</strong>. Please specify flight details below so your driver can monitor arrivals.
+                    </span>
+                  </div>
+                )}
+
+                {/* Luggage capacity warning alert on Step 4 */}
+                {currentStepIndex === 3 && isLuggageOverCapacity && (
+                  <LuggageCapacityWarning
+                    vehicleTier={currentVehicleTier}
+                    luggageCount={currentLuggageCount}
+                    maxLuggage={maxAllowedLuggage}
+                    onUpgradeToXL={() => handleFieldChange('vehicleTier', 'xl')}
+                  />
                 )}
 
                 {/* Config-driven fields rendered dynamically */}

@@ -231,6 +231,52 @@ export function PlaneIcon({ className = 'w-5 h-5', size, ...props }: IconProps) 
   );
 }
 
+export function PlaneLandingIcon({ className = 'w-5 h-5', size, ...props }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M2 22h20" />
+      <path d="M3.77 10.77 2 9l2-4.5 4.14 1.38L16 3l1.5 1.5-6.55 7.42L15 15l1.77-1.77" />
+      <path d="m19 21-4.5-4.5" />
+    </svg>
+  );
+}
+
+export function PlaneTakeoffIcon({ className = 'w-5 h-5', size, ...props }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M2 22h20" />
+      <path d="M6.36 17.4 4 17l-2-4 4.14-.69L13.5 6 15 7.5l-3.32 9.24L16 19l1.77-1.77" />
+      <path d="m19 13 3-3" />
+    </svg>
+  );
+}
+
 export function ShieldCheckIcon({ className = 'w-5 h-5', size, ...props }: IconProps) {
   return (
     <svg

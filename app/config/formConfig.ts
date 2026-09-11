@@ -7,6 +7,7 @@
  */
 
 import type { FormSchema } from '../core/types';
+import { AIRLINE_SELECT_OPTIONS } from '../core/config/airports';
 
 export const bookingFormConfig: FormSchema = {
   id: 'chesterfield-taxi-booking-form',
@@ -331,31 +332,21 @@ export const bookingFormConfig: FormSchema = {
           },
         },
         {
-          id: 'isAirportPickup',
-          name: 'isAirportPickup',
-          type: 'switch',
-          defaultValue: false,
+          id: 'airlineCode',
+          name: 'airlineCode',
+          type: 'select',
           presentation: {
-            label: 'Is this an Airport Pickup?',
-            helperText: 'Provide your flight number so we can track flight delays automatically.',
-            colSpan: 12,
+            label: 'Airline Carrier',
+            placeholder: 'Select your airline...',
+            helperText: 'Choose the commercial airline operating your flight',
+            colSpan: 6,
             order: 7,
           },
-        },
-        {
-          id: 'flightNumber',
-          name: 'flightNumber',
-          type: 'text',
-          presentation: {
-            label: 'Airline & Flight Number',
-            placeholder: 'e.g., AA 1234 or DL 567',
-            colSpan: 12,
-            order: 8,
-          },
-          dependencies: ['isAirportPickup'],
+          options: AIRLINE_SELECT_OPTIONS,
+          dependencies: ['isAirportTrip'],
           visibility: {
             when: {
-              field: 'isAirportPickup',
+              field: 'isAirportTrip',
               operator: 'equals',
               value: true,
             },
@@ -363,12 +354,101 @@ export const bookingFormConfig: FormSchema = {
           },
           requirement: {
             when: {
-              field: 'isAirportPickup',
+              field: 'isAirportTrip',
               operator: 'equals',
               value: true,
             },
             action: 'require',
-            message: 'Please provide your flight number for airport dispatch coordination.',
+            message: 'Please select your airline carrier.',
+          },
+        },
+        {
+          id: 'flightNumber',
+          name: 'flightNumber',
+          type: 'text',
+          presentation: {
+            label: 'Flight Number',
+            placeholder: 'e.g. 1234',
+            helperText: 'Flight number (1-4 digits only, e.g. 1234 — do not enter confirmation code)',
+            colSpan: 6,
+            order: 8,
+          },
+          validation: {
+            pattern: '^\\d{1,4}$',
+            patternMessage: 'Please enter 1 to 4 digits only (not your booking/confirmation code).',
+            maxLength: 4,
+          },
+          dependencies: ['isAirportTrip'],
+          visibility: {
+            when: {
+              field: 'isAirportTrip',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'show',
+          },
+          requirement: {
+            when: {
+              field: 'isAirportTrip',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'require',
+            message: 'Please provide a valid flight number (1-4 digits).',
+          },
+        },
+        {
+          id: 'departureAirport',
+          name: 'departureAirport',
+          type: 'text',
+          presentation: {
+            label: 'Departure Airport / Origin City',
+            placeholder: "e.g. Chicago O'Hare (ORD) or Dallas (DFW)",
+            helperText: 'Where is your flight originating from?',
+            colSpan: 6,
+            order: 9,
+          },
+          validation: {
+            maxLength: 80,
+          },
+          dependencies: ['isAirportTrip'],
+          visibility: {
+            when: {
+              field: 'isAirportTrip',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'show',
+          },
+          requirement: {
+            when: {
+              field: 'isAirportTrip',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'require',
+            message: 'Please enter the departure airport or originating city.',
+          },
+        },
+        {
+          id: 'hasCheckedLuggage',
+          name: 'hasCheckedLuggage',
+          type: 'switch',
+          defaultValue: false,
+          presentation: {
+            label: 'Do you have checked luggage?',
+            helperText: 'Alerts driver to anticipate baggage carousel clearance time at baggage claim.',
+            colSpan: 6,
+            order: 10,
+          },
+          dependencies: ['isAirportTrip'],
+          visibility: {
+            when: {
+              field: 'isAirportTrip',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'show',
           },
         },
         {
@@ -379,7 +459,7 @@ export const bookingFormConfig: FormSchema = {
           presentation: {
             label: 'Do you have special requests or instructions?',
             colSpan: 12,
-            order: 9,
+            order: 11,
           },
         },
         {
@@ -390,7 +470,7 @@ export const bookingFormConfig: FormSchema = {
             label: 'Special Requests / Notes for Driver',
             placeholder: 'Child seat requested, pet traveling in crate, assistance with heavy bags, etc.',
             colSpan: 12,
-            order: 10,
+            order: 12,
           },
           dependencies: ['hasSpecialRequests'],
           visibility: {

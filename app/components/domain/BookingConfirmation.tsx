@@ -12,6 +12,7 @@ import {
   CreditCardIcon,
   CashIcon,
   ShieldCheckIcon,
+  PlaneLandingIcon,
 } from '../ui/Icons';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -164,6 +165,64 @@ export function BookingConfirmation({ trip, onBookAnother, className = '' }: Boo
             </div>
           </div>
         </div>
+
+        {/* Airport Flight Operations Block (if applicable) */}
+        {Boolean(trip.metadata?.isAirportTrip || trip.metadata?.flightNumber) ? (
+          <div className="pt-4 border-t border-slate-100">
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <PlaneLandingIcon className="w-4 h-4 text-amber-600" />
+                  Flight & Airport Dispatch
+                </span>
+                {trip.metadata?.detectedAirportIata ? (
+                  <Badge variant="warning" size="sm">
+                    {String(trip.metadata.detectedAirportIata)}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                <div>
+                  <span className="text-slate-500 block font-medium">Airline</span>
+                  <span className="font-bold text-slate-800">
+                    {String(trip.metadata?.airlineName || trip.metadata?.airlineCode || 'N/A')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Flight Number</span>
+                  <span className="font-bold text-slate-800">
+                    {String(trip.metadata?.flightNumber || 'N/A')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Origin</span>
+                  <span className="font-bold text-slate-800 truncate block">
+                    {String(trip.metadata?.departureAirport || 'N/A')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Checked Bags</span>
+                  <span className="font-bold text-slate-800">
+                    {trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Special Requests / Driver Notes */}
+        {trip.passenger.specialRequests && (
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Driver Dispatch Notes
+            </h4>
+            <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line">
+              {trip.passenger.specialRequests}
+            </p>
+          </div>
+        )}
 
         {/* Resend Email Notice */}
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex items-start gap-3 text-xs text-slate-600">
