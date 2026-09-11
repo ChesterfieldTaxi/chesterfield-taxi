@@ -54,6 +54,72 @@ export const bookingFormConfig: FormSchema = {
           },
         },
         {
+          id: 'hasIntermediateStop',
+          name: 'hasIntermediateStop',
+          type: 'switch',
+          defaultValue: false,
+          presentation: {
+            label: 'Add an Intermediate Stop Along the Way',
+            helperText: 'Need to pick up a passenger or make a quick errand before your final destination?',
+            colSpan: 12,
+            order: 3,
+          },
+        },
+        {
+          id: 'intermediateStopAddress',
+          name: 'intermediateStopAddress',
+          type: 'location-autocomplete',
+          presentation: {
+            label: 'Intermediate Stop Address',
+            placeholder: 'Enter intermediate stop address or landmark',
+            helperText: 'Select from suggested addresses or type custom stop',
+            colSpan: 12,
+            order: 4,
+            icon: 'map-pin',
+          },
+          dependencies: ['hasIntermediateStop'],
+          visibility: {
+            when: {
+              field: 'hasIntermediateStop',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'show',
+          },
+          requirement: {
+            when: {
+              field: 'hasIntermediateStop',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'require',
+            message: 'Please enter your intermediate stop address.',
+          },
+        },
+        {
+          id: 'intermediateStopNotes',
+          name: 'intermediateStopNotes',
+          type: 'text',
+          presentation: {
+            label: 'Stop Details (Optional)',
+            placeholder: 'Specific entrance, passenger pickup name, or errand note',
+            colSpan: 12,
+            order: 5,
+          },
+          dependencies: ['hasIntermediateStop'],
+          visibility: {
+            when: {
+              field: 'hasIntermediateStop',
+              operator: 'equals',
+              value: true,
+            },
+            action: 'show',
+          },
+          validation: {
+            maxLength: 120,
+          },
+        },
+        {
           id: 'dropoffAddress',
           name: 'dropoffAddress',
           type: 'location-autocomplete',
@@ -62,7 +128,7 @@ export const bookingFormConfig: FormSchema = {
             placeholder: 'Enter destination address or landmark',
             helperText: 'Where would you like to be dropped off?',
             colSpan: 12,
-            order: 3,
+            order: 6,
             icon: 'flag',
           },
           validation: {
@@ -77,7 +143,7 @@ export const bookingFormConfig: FormSchema = {
             label: 'Dropoff Details (Optional)',
             placeholder: 'Entrance, specific door, or dropoff note',
             colSpan: 12,
-            order: 4,
+            order: 7,
           },
           validation: {
             maxLength: 120,

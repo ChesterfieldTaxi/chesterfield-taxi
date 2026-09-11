@@ -39,7 +39,7 @@ import type {
   BookingStatusResponse,
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
-import { getServerRouteService } from '../maps';
+import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
 import { getAdminConfigService } from '../config/admin-config.service';
 
 
@@ -113,11 +113,56 @@ export class FirebaseBookingService implements IBookingService {
   }
 
   public async calculateQuote(request: QuoteRequest): Promise<QuoteResponse> {
-    const routeService = getServerRouteService();
-    const route = await routeService.calculateRoute({
-      origin: request.pickupLocation.coordinates ?? request.pickupLocation.address,
-      destination: request.dropoffLocation.coordinates ?? request.dropoffLocation.address,
-    });
+    const origin = request.pickupLocation.coordinates ?? request.pickupLocation.address;
+    const destination = request.dropoffLocation.coordinates ?? request.dropoffLocation.address;
+    const waypoints = (request.intermediateStops ?? [])
+      .map((s) => s.coordinates ?? s.address)
+      .filter((w) => {
+        if (typeof w === 'string') return w.trim().length > 0;
+        return Boolean(w);
+      });
+
+    let distanceMiles: number | null = null;
+    let durationMinutes: number | null = null;
+    let isLiveGoogleResult = false;
+
+    // 1. Attempt live Google Maps client-side Directions calculation
+    if (typeof window !== 'undefined') {
+      try {
+        const liveResult = await calculateLiveRoute({
+          origin,
+          destination,
+          waypoints,
+        });
+        if (liveResult) {
+          distanceMiles = liveResult.distanceMiles;
+          durationMinutes = liveResult.durationMinutes;
+          isLiveGoogleResult = true;
+          console.log('[FirebaseBookingService] Using live Google Maps route for quote:', {
+            distanceMiles,
+            durationMinutes,
+            origin,
+            destination,
+          });
+        }
+      } catch (e) {
+        console.warn('[FirebaseBookingService] Client-side live route failed:', e);
+      }
+    }
+
+    // 2. Fall back to ServerRouteService (with HTTPS Google Directions API query or St. Louis Haversine fallback)
+    if (distanceMiles === null || durationMinutes === null) {
+      console.log('[FirebaseBookingService] Falling back to ServerRouteService');
+      const routeService = getServerRouteService();
+      const route = await routeService.calculateRoute({
+        origin: request.pickupLocation.coordinates ?? request.pickupLocation.address,
+        destination: request.dropoffLocation.coordinates ?? request.dropoffLocation.address,
+        waypoints: request.intermediateStops?.map((s) => s.coordinates ?? s.address),
+      });
+      distanceMiles = route.distanceMiles;
+      durationMinutes = route.durationMinutes;
+      isLiveGoogleResult = Boolean(route.isLiveGoogleResult);
+    }
 
     const now = new Date();
     const pickupDateTime = request.scheduledPickupTime
@@ -130,8 +175,8 @@ export class FirebaseBookingService implements IBookingService {
 
     const { pricing } = calculateTripPricing(
       {
-        distanceMiles: route.distanceMiles,
-        durationMinutes: route.durationMinutes,
+        distanceMiles,
+        durationMinutes,
         vehicleTier: request.vehicleTier,
         pickupDateTime,
         promoCode: request.promoCode,
@@ -140,14 +185,14 @@ export class FirebaseBookingService implements IBookingService {
       dynamicPricingConfig
     );
 
-
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     return {
       pricing,
-      estimatedDistanceMiles: route.distanceMiles,
-      estimatedDurationMinutes: route.durationMinutes,
+      estimatedDistanceMiles: distanceMiles,
+      estimatedDurationMinutes: durationMinutes,
       currency: pricing.currency,
+      isLiveGoogleResult,
       expiresAt,
     };
   }

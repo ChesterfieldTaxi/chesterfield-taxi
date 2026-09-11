@@ -1,5 +1,23 @@
+/// <reference types="google.maps" />
+
 import React, { useState, useRef, useEffect, useId } from 'react';
+import type { GeoPoint } from '../../core/types';
+import {
+  loadGoogleMaps,
+  isGoogleMapsReady,
+  getGoogleMapsStatus,
+  subscribeToGoogleMapsStatus,
+  ST_LOUIS_METRO_BOUNDS,
+  type GoogleMapsStatus,
+} from '../../core/services/maps/google-maps-loader';
 import { MapPinIcon, FlagIcon, CheckIcon } from '../ui/Icons';
+
+export interface PlaceSelectedDetails {
+  address: string;
+  formattedAddress?: string;
+  placeId?: string;
+  coordinates?: GeoPoint;
+}
 
 export interface LocationAutocompleteProps {
   name?: string;
@@ -9,6 +27,7 @@ export interface LocationAutocompleteProps {
   error?: string;
   value?: string;
   onChange?: (value: string) => void;
+  onPlaceSelected?: (details: PlaceSelectedDetails) => void;
   required?: boolean;
   disabled?: boolean;
   icon?: 'map-pin' | 'flag';
@@ -25,6 +44,8 @@ const POPULAR_LOCATIONS = [
   'Chesterfield Amphitheater, Chesterfield, MO',
   'Faust Park / Butterfly House, Chesterfield, MO',
   'Downtown St. Louis / Gateway Arch, St. Louis, MO',
+  'Town and Country Crossing, Town and Country, MO',
+  'Centene Community Ice Center, Maryland Heights, MO',
 ];
 
 export function LocationAutocomplete({
@@ -35,6 +56,7 @@ export function LocationAutocomplete({
   error,
   value = '',
   onChange,
+  onPlaceSelected,
   required,
   disabled = false,
   icon = 'map-pin',
@@ -43,17 +65,110 @@ export function LocationAutocomplete({
 }: LocationAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>(getGoogleMapsStatus());
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
   const generatedId = useId();
   const inputId = `${generatedId}-input`;
   const listId = `${generatedId}-list`;
   const errorId = `${generatedId}-error`;
   const helperId = `${generatedId}-helper`;
 
+  // Sync external value with local input value
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
+  // Subscribe to Google Maps API status
+  useEffect(() => {
+    // Attempt client load if browser environment
+    loadGoogleMaps().catch((e) => {
+      console.warn('[LocationAutocomplete] Google Maps load failed:', e);
+    });
+
+    const unsubscribe = subscribeToGoogleMapsStatus((status) => {
+      setMapsStatus(status);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Initialize Google Places Autocomplete when API is ready
+  useEffect(() => {
+    if (disabled || mapsStatus !== 'ready' || !inputRef.current) {
+      return;
+    }
+
+    try {
+      if (typeof window.google?.maps?.places?.Autocomplete !== 'function') {
+        return;
+      }
+
+      // Configure St. Louis Metro & West County bounding box
+      const stlBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(ST_LOUIS_METRO_BOUNDS.south, ST_LOUIS_METRO_BOUNDS.west),
+        new google.maps.LatLng(ST_LOUIS_METRO_BOUNDS.north, ST_LOUIS_METRO_BOUNDS.east)
+      );
+
+      const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+        bounds: stlBounds,
+        componentRestrictions: { country: 'us' },
+        fields: ['formatted_address', 'geometry', 'name', 'place_id'],
+        strictBounds: false, // Biased toward St. Louis/West County, allows regional expansion
+      });
+
+      const listener = autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        const selectedAddress = place.formatted_address || place.name || '';
+
+        if (selectedAddress) {
+          setInputValue(selectedAddress);
+          onChange?.(selectedAddress);
+          setIsOpen(false);
+
+          let coordinates: GeoPoint | undefined;
+          if (place.geometry?.location) {
+            const loc = place.geometry.location;
+            const lat = typeof loc.lat === 'function' ? loc.lat() : Number((loc as unknown as { lat: number }).lat);
+            const lng = typeof loc.lng === 'function' ? loc.lng() : Number((loc as unknown as { lng: number }).lng);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              coordinates = { lat, lng };
+            }
+          }
+
+          console.log('[LocationAutocomplete] Place selected:', {
+            inputName: name,
+            address: selectedAddress,
+            placeId: place.place_id,
+            coordinates,
+          });
+
+          onPlaceSelected?.({
+            address: selectedAddress,
+            formattedAddress: place.formatted_address,
+            placeId: place.place_id,
+            coordinates,
+          });
+        }
+      });
+
+      autocompleteRef.current = autocomplete;
+
+      return () => {
+        if (listener) {
+          google.maps.event.removeListener(listener);
+        }
+      };
+    } catch (err) {
+      console.warn('[LocationAutocomplete] Error initializing Google Places Autocomplete:', err);
+    }
+  }, [mapsStatus, disabled, onChange, onPlaceSelected]);
+
+  // Handle clicking outside for the fallback dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -68,12 +183,19 @@ export function LocationAutocomplete({
     const val = e.target.value;
     setInputValue(val);
     onChange?.(val);
-    setIsOpen(true);
+    // Only open local fallback dropdown if Google Maps is NOT active
+    if (mapsStatus !== 'ready') {
+      setIsOpen(true);
+    }
   };
 
   const handleSelectLocation = (loc: string) => {
     setInputValue(loc);
     onChange?.(loc);
+    onPlaceSelected?.({
+      address: loc,
+      formattedAddress: loc,
+    });
     setIsOpen(false);
   };
 
@@ -81,17 +203,33 @@ export function LocationAutocomplete({
     loc.toLowerCase().includes(inputValue.toLowerCase())
   );
 
+  const isGoogleLive = mapsStatus === 'ready';
+
   return (
     <div ref={containerRef} className={`relative w-full flex flex-col gap-1.5 ${className}`}>
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
-        >
-          {label}
-          {required && <span className="text-amber-600 ml-1" title="Required">*</span>}
-        </label>
-      )}
+      <div className="flex items-center justify-between">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+          >
+            {label}
+            {required && <span className="text-amber-600 ml-1" title="Required">*</span>}
+          </label>
+        )}
+
+        {/* Live Google Maps Status Indicator */}
+        {isGoogleLive ? (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Google Maps Live
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            St. Louis Region (Local Mode)
+          </span>
+        )}
+      </div>
 
       <div className="relative flex items-center w-full">
         <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400">
@@ -103,19 +241,25 @@ export function LocationAutocomplete({
         </div>
 
         <input
+          ref={inputRef}
           id={inputId}
           name={name}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            // Only trigger local list when Google Maps Autocomplete is NOT attached
+            if (!isGoogleLive) {
+              setIsOpen(true);
+            }
+          }}
           placeholder={placeholder}
           required={required}
           disabled={disabled}
           autoFocus={autoFocus}
           autoComplete="off"
           aria-expanded={isOpen}
-          aria-autocomplete="list"
+          aria-autocomplete={isGoogleLive ? 'both' : 'list'}
           aria-controls={listId}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
@@ -127,15 +271,18 @@ export function LocationAutocomplete({
         />
       </div>
 
-      {/* Autocomplete Suggestions Dropdown */}
-      {isOpen && !disabled && (
+      {/* Local Fallback Suggestions Dropdown (active when Google Maps is not connected) */}
+      {!isGoogleLive && isOpen && !disabled && (
         <div
           id={listId}
           role="listbox"
           className="absolute z-50 left-0 right-0 top-full mt-1.5 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all"
         >
-          <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Suggested Chesterfield Locations
+          <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <span>Suggested St. Louis & Chesterfield Locations</span>
+            <span className="text-[10px] font-normal normal-case text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+              Offline / Local Fallback
+            </span>
           </div>
 
           {filteredLocations.length > 0 ? (

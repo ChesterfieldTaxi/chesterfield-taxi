@@ -186,6 +186,14 @@ export function renderPassengerConfirmationEmail(
         ${payload.pickupNotes ? `<div style="font-size: 12px; color: #64748b; margin-top: 3px; font-style: italic;">Note: ${payload.pickupNotes}</div>` : ''}
       </div>
 
+      ${payload.intermediateStops && payload.intermediateStops.length > 0 ? payload.intermediateStops.map(s => `
+      <div style="border-left: 2px dashed #cbd5e1; height: 16px; margin-left: 4px;"></div>
+      <div class="route-point">
+        <div class="item-label" style="color: #475569;">◆ Intermediate Stop</div>
+        <div class="item-value" style="font-size: 14px; font-weight: 600;">${s.address}</div>
+        ${s.notes ? `<div style="font-size: 12px; color: #64748b; margin-top: 3px; font-style: italic;">Note: ${s.notes}</div>` : ''}
+      </div>`).join('') : ''}
+
       <div style="border-left: 2px dashed #cbd5e1; height: 16px; margin-left: 4px;"></div>
 
       <div class="route-point">
@@ -370,6 +378,14 @@ export function renderDispatcherAlertEmail(
         <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${payload.pickupAddress}</div>
         ${payload.pickupNotes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Pickup Note: <strong>${payload.pickupNotes}</strong></div>` : ''}
       </div>
+
+      ${payload.intermediateStops && payload.intermediateStops.length > 0 ? payload.intermediateStops.map(s => `
+      <div style="border-left: 2px dashed #cbd5e1; height: 14px; margin-left: 4px; margin-top: 6px; margin-bottom: 6px;"></div>
+      <div class="route-point">
+        <div class="item-label" style="color: #475569;">Intermediate Stop</div>
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${s.address}</div>
+        ${s.notes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Stop Note: <strong>${s.notes}</strong></div>` : ''}
+      </div>`).join('') : ''}
 
       <div style="border-left: 2px dashed #cbd5e1; height: 14px; margin-left: 4px; margin-top: 6px; margin-bottom: 6px;"></div>
 

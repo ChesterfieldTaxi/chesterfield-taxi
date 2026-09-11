@@ -26,6 +26,7 @@ export interface BookingConfirmationEmailPayload {
   };
   pickupAddress: string;
   pickupNotes?: string;
+  intermediateStops?: Array<{ address: string; notes?: string }>;
   dropoffAddress: string;
   dropoffNotes?: string;
   pickupTime: string;
@@ -49,6 +50,7 @@ export interface AdminDispatchAlertEmailPayload {
   luggageCount?: number;
   pickupAddress: string;
   pickupNotes?: string;
+  intermediateStops?: Array<{ address: string; notes?: string }>;
   dropoffAddress: string;
   dropoffNotes?: string;
   pickupTime: string;

@@ -84,5 +84,30 @@
 - [x] 13.6 Integrate email dispatch trigger in `BookingForm.tsx` upon trip creation, update `BookingConfirmation.tsx` with live email delivery status indicator, and wire status update notification in admin console (`AdminBookingsTab.tsx`).
 - [x] 13.7 Verify with `npm run typecheck` and `npm run build`, ensuring zero TypeScript errors and clean SSR/client production bundles.
 
+## Phase 14: Google Maps API & Distance Matrix Integration
+- [x] 14.1 Update specifications (`spec.md` Section 10) and task tracking (`tasks.md`).
+- [x] 14.2 Implement Google Maps API loader (`app/core/services/maps/google-maps-loader.ts`) with `VITE_GOOGLE_MAPS_API_KEY`, status tracking, and St. Louis metro bounding.
+- [x] 14.3 Integrate Google Places Autocomplete in `LocationAutocomplete.tsx` with St. Louis regional biasing and clean fallback mode.
+- [x] 14.4 Add Intermediate Stop support to Step 1 schema (`formConfig.ts`), data models (`trip.ts`, `booking-service.ts`), and booking form wizard.
+- [x] 14.5 Implement live Directions & Distance Matrix calculation (`live-routing.service.ts` and `server-route.service.ts`), feeding real miles & minutes into the pricing engine.
+- [x] 14.6 Verify with `npm run typecheck` and `npm run build`, and confirm clean SSR/client production bundling.
+
+## Phase 15: Master Booking Engine Architecture & Single-Page UI Overhaul
+- [x] 15.1 Update specifications (`spec.md` Section 11) and task tracking (`tasks.md`).
+- [x] 15.2 Create centralized form configuration engine `app/config/roleFormConfig.ts` with role-based schemas (`customer`, `dispatcher`, `admin`), section ordering, capability flags, and Firestore fallback logic.
+- [x] 15.3 Add supporting SVG icons (`SearchIcon`, `RepeatIcon`, `DollarSignIcon`, `SlidersIcon`, `InfoIcon`) to `app/components/ui/Icons.tsx`.
+- [x] 15.4 Implement Passenger Lookup Service & React Hook (`app/core/services/booking/passenger-lookup.service.ts` & `app/core/hooks/usePassengerLookup.ts`) for phone/email auto-population.
+- [x] 15.5 Build core master `<BookingEngine />` component (`app/components/domain/BookingEngine.tsx`) supporting customer, dispatcher, and admin modes.
+- [x] 15.6 Implement Recurring Trip Generator UI (daily/weekly/custom batches with shared `recurringGroupId`) and Manual Price & Payment Overrides inside `<BookingEngine />`.
+- [x] 15.7 Refactor Single-Page Customer Booking Portal (`app/routes/book.tsx`) with vertical card sections, Sticky Bottom Summary Footer with live fare updates, and interactive Contextual Help & Fare Breakdown Panel (`onFocus`).
+- [x] 15.8 Wire Dispatcher Booking mode into Admin Console (`AdminBookingsTab.tsx`), verify `npm run typecheck` and `npm run build` with zero errors, and complete task checklist.
+
+## Phase 16: Form Layout Versioning (v1 vs v2) & Admin Layout Switcher
+- [x] 16.1 Update specifications (`spec.md` Section 12) and task tracking (`tasks.md`).
+- [x] 16.2 Add `publicFormVersion: 'v1' | 'v2'` to system configuration models in `app/config/companyConfig.ts` (defaulting to 'v2'), `app/core/types/config.ts`, and `admin-config.service.ts`.
+- [x] 16.3 Build `BookingEngineV2.tsx` recreating the user's mockup layout (pickup time, trip details, flight tracking, steppers, vehicle cards, special requests, return trip, passenger/booker info, instructions, payment cards, floating `?` FAB, sticky footer with emerald Book Ride CTA).
+- [x] 16.4 Update `app/routes/book.tsx` with dynamic layout resolution (rendering V2 by default or V1 based on Firestore config, with `?layout=v1` / `?layout=v2` query preview support).
+- [x] 16.5 Implement Admin Layout Switcher in `AdminGeneralTab.tsx` and register dedicated `/admin/settings` route in `app/routes.ts` (`app/routes/admin.settings.tsx`).
+- [x] 16.6 Run `npm run typecheck` and `npm run build` to confirm zero errors, and generate walkthrough documentation.
 
 

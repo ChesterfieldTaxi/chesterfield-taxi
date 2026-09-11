@@ -46,6 +46,7 @@ export interface AppSettings {
   branding: BrandingConfig;
   pricing: DynamicPricingConfig;
   vehicles: VehicleTierConfig[];
+  publicFormVersion?: 'v1' | 'v2';
   updatedAt?: string;
   updatedBy?: string;
 }

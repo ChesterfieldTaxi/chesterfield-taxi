@@ -39,10 +39,19 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
       <div className="bg-amber-500/10 px-4 py-2.5 border-b border-amber-200/60 flex items-center justify-between text-xs">
         <span className="font-semibold text-amber-950 flex items-center gap-1.5">
           <ShieldCheckIcon className="w-4 h-4 text-amber-600" />
-          Guaranteed Live Fare Quote
+          Guaranteed Fare Quote
         </span>
-        <span className="text-amber-800 text-[11px] font-medium">
-          Pure Functional Engine
+        <span className="text-[11px] font-medium">
+          {quote.isLiveGoogleResult ? (
+            <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              Google Maps Live
+            </span>
+          ) : (
+            <span className="text-amber-800 bg-amber-100/60 px-2 py-0.5 rounded-full text-[10px]">
+              Regional Road Matrix
+            </span>
+          )}
         </span>
       </div>
 
@@ -54,7 +63,7 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
               <MapPinIcon className="w-3 h-3 text-slate-400" /> Est. Distance
             </span>
             <span className="text-base font-bold text-slate-800 mt-0.5">
-              {estimatedDistanceMiles.toFixed(1)} miles
+              {estimatedDistanceMiles.toFixed(2)} miles
             </span>
           </div>
           <div className="flex flex-col items-center justify-center border-l border-slate-200">
@@ -74,7 +83,7 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
             <span className="font-medium text-slate-900">${pricing.baseFare.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
-            <span>Distance & Time ({estimatedDistanceMiles.toFixed(1)} mi)</span>
+            <span>Distance & Time ({estimatedDistanceMiles.toFixed(2)} mi)</span>
             <span className="font-medium text-slate-900">
               ${((pricing.distanceMiles * pricing.distanceRate) + (pricing.durationMinutes * pricing.timeRate)).toFixed(2)}
             </span>

@@ -15,6 +15,7 @@ import {
   UserIcon,
   SpinnerIcon,
 } from '../../ui/Icons';
+import { BookingEngine } from '../BookingEngine';
 
 export function AdminBookingsTab() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -25,6 +26,7 @@ export function AdminBookingsTab() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [isNewBookingModalOpen, setIsNewBookingModalOpen] = useState(false);
 
   // Subscribe to real-time trips
   useEffect(() => {
@@ -233,21 +235,33 @@ export function AdminBookingsTab() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
-          {['all', 'pending', 'offered', 'assigned', 'completed', 'cancelled'].map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setStatusFilter(tab)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
-                statusFilter === tab
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {['all', 'pending', 'offered', 'assigned', 'completed', 'cancelled'].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setStatusFilter(tab)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+                  statusFilter === tab
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => setIsNewBookingModalOpen(true)}
+            className="font-bold whitespace-nowrap shadow-xs ml-auto sm:ml-2"
+          >
+            + New Dispatch Booking
+          </Button>
         </div>
       </div>
 
@@ -550,6 +564,42 @@ export function AdminBookingsTab() {
                 Close
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Dispatch Booking Modal */}
+      {isNewBookingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-4 sm:p-6 max-h-[92vh] overflow-y-auto shadow-2xl relative border border-slate-200">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                  <CarIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-950">New Dispatch Reservation</h2>
+                  <p className="text-xs text-slate-500">
+                    Live dispatch operator console with passenger lookup, recurring schedules, and price overrides.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewBookingModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <BookingEngine
+              mode="dispatcher"
+              onBookingSuccess={() => {
+                setIsNewBookingModalOpen(false);
+                setActionSuccessMessage('New reservation successfully recorded in dispatch queue!');
+              }}
+            />
           </div>
         </div>
       )}

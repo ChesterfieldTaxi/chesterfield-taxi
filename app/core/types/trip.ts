@@ -133,6 +133,7 @@ export interface Trip {
   /** Location details */
   pickupLocation: TripLocation;
   dropoffLocation: TripLocation;
+  intermediateStops?: TripLocation[];
   flightNotes?: string;
   driverNotes?: string;
 

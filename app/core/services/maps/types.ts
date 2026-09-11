@@ -13,6 +13,7 @@ export type RouteEndpoint = string | GeoPoint;
 export interface RouteRequest {
   origin: RouteEndpoint;
   destination: RouteEndpoint;
+  waypoints?: RouteEndpoint[];
   departureTime?: Date | string;
   trafficModel?: 'best_guess' | 'pessimistic' | 'optimistic';
   avoidTolls?: boolean;
@@ -32,6 +33,7 @@ export interface RouteResponse {
   /** Encoded polyline string returned for safe client-side vector map rendering */
   overviewPolyline?: string;
   warnings?: string[];
+  isLiveGoogleResult?: boolean;
   calculatedAt: string; // ISO 8601
 }
 

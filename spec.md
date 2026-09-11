@@ -96,4 +96,69 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Confirmation Screen Visual Feedback:** `BookingConfirmation.tsx` renders dynamic visual feedback confirming dispatch to the passenger's email address (with message ID or simulated development badge).
   - **Admin Status Transition:** Optional automated notification dispatched to the passenger when an admin updates a trip status in `AdminBookingsTab.tsx`.
 
+## 10. Phase 14: Google Maps & Route Matrix Integration
+- **Client-Side Google Maps API Loader (`GoogleMapsLoader`):**
+  - Robust client-side loader leveraging `@googlemaps/js-api-loader` to load Google Maps JavaScript API with libraries `places`, `routes`, and `geometry`.
+  - Securely accesses public API key via `import.meta.env.VITE_GOOGLE_MAPS_API_KEY`.
+  - Graceful fallback: If no key is configured or rate limits/network errors occur, the application provides an informative, non-intrusive offline state and preserves full booking functionality using curated St. Louis/Chesterfield regional landmarks.
+- **Regional Geographic Bounding & Centering:**
+  - Regional centroid centered on Chesterfield, MO (`lat: 38.6631, lng: -90.5771`).
+  - Autocomplete location biasing constrained strictly to the St. Louis metropolitan area and West County regional bounds (latitudes `38.35°N` to `38.90°N`, longitudes `90.85°W` to `90.10°W`), enveloping Spirit of St. Louis Airport (SUS), St. Louis Lambert International Airport (STL), St. Louis Downtown Airport (CPS), and West County municipalities (Chesterfield, Wildwood, Ballwin, Town & Country, Creve Coeur).
+  - Country restriction constrained to `us`.
+- **Places Autocomplete on All Location Inputs:**
+  - Integrated on Pickup Address, Dropoff Destination, and Intermediate Stop inputs in the booking form.
+  - Extracts full formatted addresses, place IDs, and lat/lng coordinates upon selection, updating form state and triggering instant quote recalculation.
+- **Multi-Stop Itineraries (Intermediate Stops):**
+  - Config-driven intermediate stop field in Step 1 supporting add/remove stop interactions.
+  - Waypoints seamlessly passed to routing engines to calculate cumulative trip mileage and driving durations.
+  - Intermediate stop data propagated to `TripLocation` data models, Firestore persistence, and confirmation notifications.
+- **Real Directions & Distance Matrix Calculation:**
+  - Live driving distance (in statute miles) and driving duration (in minutes) computed via Google Maps `DirectionsService` and `DistanceMatrixService` for authentic road-network turn-by-turn routing.
+  - Real metrics feed directly into the pure functional pricing engine pipeline (`calculateTripPricing`), replacing mock and straight-line approximations.
+  - Server-side fallback (`server-route.service.ts`) updated to Chesterfield, MO coordinates with optional server-side Google Maps Directions API fetch.
+
+## 11. Phase 15: Master Booking Engine Architecture & Single-Page UI
+- **Centralized Form Configuration Engine (`app/config/roleFormConfig.ts`):**
+  - Declarative role-based form schemas catering to `customer`, `dispatcher`, and `admin` personas.
+  - Section ordering customization: Customer flow prioritizes Pickup Timing & Trip Details first, while Dispatcher/Admin flow leads with instant Passenger Lookup.
+  - Role capabilities and permission flags: `canRecurringTrips`, `canPriceOverride`, `canDirectDriverAssign`, `canBypassPayment`, and `hasPassengerLookup`.
+  - Resilient runtime hydration with dynamic fallback merging default presets with Firestore `config/appSettings`.
+- **Core Master Booking Engine Component (`<BookingEngine />`):**
+  - Unified booking interface consolidating customer and operator capabilities into a robust, high-performance module.
+  - Accepts `mode="customer" | "dispatcher" | "admin"`, optional role config overrides, and submission handlers.
+  - **Passenger Lookup Hook & Service:** As-you-type phone/email lookup querying past customer records, auto-populating contact details, corporate billing codes, and historical routing preferences.
+  - **Recurring Trip Generator UI:** Flexible frequency controls (Daily, Weekly, Custom intervals) generating batch trip itineraries linked by a shared `recurringGroupId`.
+  - **Manual Price & Payment Overrides:** Allows operators to adjust fares, append itemized billing notes (discounts, surcharge explanations), and toggle offline/in-cab payment bypass modes.
+- **Single-Page Customer Booking Portal Refactor:**
+  - Elimination of rigid step-by-step wizard friction in favor of a responsive, vertically scrollable single-page portal.
+  - Seamless vertical cards:
+    1. Pickup Time Selection (ASAP vs Scheduled)
+    2. Trip Details & Route (Pickup, Intermediate Stops, Dropoff, Airport Hub Detection & Flight Ops)
+    3. Passengers & Luggage (Passenger count, Luggage count, Luggage limit alerts)
+    4. Vehicle Selection Cards (Interactive fleet selector with specifications and rate previews)
+    5. Passenger Information & Ride Instructions (Contact details, corporate accounts, driver notes)
+    6. Payment Options & Disclosures (Payment methods, billing terms)
+  - **Sticky Bottom Summary Footer:** Persistent floating summary bar displaying active route, selected vehicle class, real-time fare calculation (`ESTIMATED TOTAL`), and primary "Book Ride" CTA with auto-scroll to missing validations.
+  - **Contextual Help & Fare Breakdown Panel:** Right-hand interactive panel featuring input focus listeners (`onFocus`) that dynamically display field-specific guides (flight tracking explanation, corporate billing instructions, airport meetup points) alongside a transparent, itemized fare breakdown.
+
+## 12. Phase 16: Form Layout Versioning (v1 vs v2) & Admin Layout Switcher
+- **Form Layout Versioning Architecture:**
+  - System-wide configuration flag `publicFormVersion: 'v1' | 'v2'` introduced in `app/config/companyConfig.ts` (defaulting to `'v2'`) and stored dynamically in Firestore at `config/appSettings`.
+  - Public booking portal (`app/routes/book.tsx`) dynamically renders either Layout V1 (Phase 15 Master Booking Engine) or Layout V2 based on the active setting, with query parameter preview support (`?layout=v1` / `?layout=v2`).
+- **Streamlined Single-Page Layout V2 (`BookingEngineV2.tsx`):**
+  - High-fidelity recreation of the user's single-page mockup interface:
+    1. **Pickup Time:** Segmented control toggling ASAP ("Now") and advance reservation ("Schedule") with an embedded datetime picker.
+    2. **Trip Details:** Integrated pickup/dropoff card with address swapping, intermediate stops (`+ Add Stop`), and dedicated airline/flight tracking subcard with luggage estimation check.
+    3. **Passengers & Luggage:** Prominent stepper counters (`[-] 1 [+]`), luggage capacity feedback, and optional child car seat add-ons.
+    4. **Vehicle Preference Cards:** 3-column visual card grid for Sedan, SUV, and Minivan with passenger capacities and clean automotive imagery.
+    5. **Special Requests & Return Trip:** Pill chip toggles (Pet-friendly, Wheelchair accessible, Quiet ride, Music OK) and return trip reservation toggle.
+    6. **Passenger & Booker Details:** Separate guest vs employee booking toggles with distinct passenger vs booker contact sections and SMS consent.
+    7. **Ride Instructions:** Driver notes textarea and quick gate code reveal.
+    8. **Payment Method Cards:** Segmented Cash, Card, and Corporate Account billing with organization name, account number, and cost center fields.
+    9. **Floating Help FAB & Contextual Help Panel:** Circular floating `?` button and real-time focus guides.
+    10. **Sticky Bottom Summary Footer:** Large bold blue estimated total (`$0` or live calculated fare) with emerald green "Book Ride" CTA.
+- **Admin Layout Switcher:**
+  - Interactive visual selector in the Admin Console (`AdminGeneralTab.tsx` and `/admin/settings`) displaying side-by-side previews of Layout V1 and Layout V2.
+  - One-click toggling that updates Firestore in real-time, instantly updating the public booking experience.
+
 

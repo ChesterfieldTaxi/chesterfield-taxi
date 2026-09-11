@@ -1,21 +1,22 @@
-import React from 'react';
-import { BookingForm } from '../components/domain/BookingForm';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
+import { BookingEngine } from '../components/domain/BookingEngine';
+import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import {
   ShieldCheckIcon,
   ClockIcon,
-  PhoneIcon,
   CarIcon,
-  CheckIcon,
 } from '../components/ui/Icons';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { getAdminConfigService } from '../core/services/config/admin-config.service';
 
 export function meta() {
   return [
-    { title: `Book a Ride – ${COMPANY_CONFIG.name} Online Booking` },
+    { title: `Book a Ride – ${COMPANY_CONFIG.name} Online Reservation Portal` },
     {
       name: 'description',
       content:
-        'Reserve your taxi or executive car in Chesterfield, MO. Live upfront fare calculation, instant ASAP dispatch or scheduled airport transfers.',
+        'Reserve your taxi or executive car in Chesterfield, MO. Single-page booking with live upfront fare calculation, instant ASAP dispatch, or scheduled airport transfers.',
     },
   ];
 }
@@ -23,28 +24,63 @@ export function meta() {
 const GUARANTEES = [
   {
     icon: <ShieldCheckIcon className="w-4 h-4 text-amber-500" />,
-    text: 'Upfront fixed fare guarantee — what you see is what you pay',
+    text: 'Upfront fixed fare guarantee — no surprise surge rates',
   },
   {
     icon: <ClockIcon className="w-4 h-4 text-amber-500" />,
-    text: '24/7 live dispatch monitoring with real-time driver tracking',
+    text: '24/7 live dispatch desk with real-time flight radar tracking',
   },
   {
     icon: <CarIcon className="w-4 h-4 text-amber-500" />,
-    text: 'Standard, Executive SUV, and Wheelchair Accessible (WAV) fleet',
+    text: 'Premium Sedans, Executive SUVs, and WAV Wheelchair Accessible fleet',
   },
 ];
 
 export default function BookRoute() {
+  const [searchParams] = useSearchParams();
+  const queryLayout = searchParams.get('layout'); // 'v1' or 'v2'
+
+  const [activeVersion, setActiveVersion] = useState<'v1' | 'v2'>(() => {
+    if (queryLayout === 'v1' || queryLayout === 'v2') return queryLayout;
+    return COMPANY_CONFIG.publicFormVersion || 'v2';
+  });
+
+  // Hydrate dynamic settings from Firestore
+  useEffect(() => {
+    if (queryLayout === 'v1' || queryLayout === 'v2') {
+      setActiveVersion(queryLayout);
+      return;
+    }
+
+    const configService = getAdminConfigService();
+    configService.getSettings().then((settings) => {
+      if (settings.publicFormVersion) {
+        setActiveVersion(settings.publicFormVersion);
+      }
+    });
+
+    if (configService.subscribeToSettings) {
+      const unsub = configService.subscribeToSettings((updated) => {
+        if (!queryLayout && updated.publicFormVersion) {
+          setActiveVersion(updated.publicFormVersion);
+        }
+      });
+      return unsub;
+    }
+  }, [queryLayout]);
+
   return (
-    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 flex-1">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 flex-1 pb-28">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Distraction-Free Header */}
+        {/* Header Bar */}
         <div className="text-center mb-8 space-y-2">
           <div className="inline-flex items-center gap-2 bg-amber-100/80 text-amber-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             {COMPANY_CONFIG.name} Reservation System
+            <span className="ml-1 text-[10px] bg-amber-200 text-amber-950 px-1.5 py-0.2 rounded font-mono">
+              Layout {activeVersion.toUpperCase()}
+            </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950 tracking-tight">
@@ -52,8 +88,7 @@ export default function BookRoute() {
           </h1>
 
           <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto">
-            Complete the 5 quick steps below to receive a guaranteed live fare quote and reserve
-            your vehicle.
+            Single-page booking portal with instant Google Maps live fare calculation and upfront pricing guarantee.
           </p>
 
           {/* Quick reassurance pills */}
@@ -67,13 +102,17 @@ export default function BookRoute() {
           </div>
         </div>
 
-        {/* Interactive Booking Wizard Form */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-4 sm:p-8">
-          <BookingForm />
+        {/* Dynamic Booking Engine Layout (V1 vs V2) */}
+        <div className="mt-6">
+          {activeVersion === 'v2' ? (
+            <BookingEngineV2 />
+          ) : (
+            <BookingEngine mode="customer" />
+          )}
         </div>
 
         {/* Live Support Footnote */}
-        <div className="mt-8 text-center text-xs text-slate-500 space-y-1">
+        <div className="mt-12 text-center text-xs text-slate-500 space-y-1">
           <p>
             Need immediate roadside assistance or specialized group dispatch?
           </p>

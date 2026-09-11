@@ -10,13 +10,15 @@ import {
   Switch,
   Counter,
 } from '../ui';
-import { LocationAutocomplete } from './LocationAutocomplete';
+import { LocationAutocomplete, type PlaceSelectedDetails } from './LocationAutocomplete';
 import { VehicleTierSelector } from './VehicleTierSelector';
 
 export interface FieldRendererProps {
   field: FieldSchema;
   value: unknown;
   onChange: (value: unknown) => void;
+  onPlaceSelected?: (details: PlaceSelectedDetails) => void;
+  onFocus?: (fieldName: string) => void;
   error?: string;
   formValues: Record<string, unknown>;
   disabled?: boolean;
@@ -26,6 +28,8 @@ export function FieldRenderer({
   field,
   value,
   onChange,
+  onPlaceSelected,
+  onFocus,
   error,
   formValues,
   disabled = false,
@@ -62,6 +66,7 @@ export function FieldRenderer({
             error={error}
             value={typeof value === 'string' ? value : ''}
             onChange={onChange}
+            onPlaceSelected={onPlaceSelected}
             required={required}
             disabled={disabled || presentation.disabled}
             autoFocus={presentation.autoFocus}
@@ -215,7 +220,10 @@ export function FieldRenderer({
   };
 
   return (
-    <div className={`${colSpanClass} ${presentation.className || ''}`}>
+    <div
+      className={`${colSpanClass} ${presentation.className || ''}`}
+      onFocusCapture={() => onFocus?.(field.name)}
+    >
       {renderControl()}
     </div>
   );

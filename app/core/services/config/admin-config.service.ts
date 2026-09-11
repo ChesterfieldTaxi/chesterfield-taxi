@@ -86,6 +86,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       iconType: 'wheelchair',
     },
   ],
+  publicFormVersion: COMPANY_CONFIG.publicFormVersion || 'v2',
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -152,6 +153,7 @@ export class AdminConfigService implements IAdminConfigService {
       vehicles: incoming.vehicles && incoming.vehicles.length > 0
         ? incoming.vehicles
         : DEFAULT_APP_SETTINGS.vehicles,
+      publicFormVersion: incoming.publicFormVersion || DEFAULT_APP_SETTINGS.publicFormVersion || 'v2',
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };

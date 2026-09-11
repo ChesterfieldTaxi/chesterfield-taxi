@@ -17,6 +17,9 @@ export interface AdminGeneralTabProps {
 export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGeneralTabProps) {
   const [company, setCompany] = useState<CompanyConfig>({ ...settings.company });
   const [branding, setBranding] = useState<BrandingConfig>({ ...settings.branding });
+  const [publicFormVersion, setPublicFormVersion] = useState<'v1' | 'v2'>(
+    settings.publicFormVersion || 'v2'
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -27,7 +30,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
       setIsSaving(true);
       setSaveSuccess(false);
       setSaveError(null);
-      await onSave({ company, branding });
+      await onSave({ company, branding, publicFormVersion });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: unknown) {
@@ -41,7 +44,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
     <form onSubmit={handleSubmit} className="space-y-6">
       {saveSuccess && (
         <Alert variant="success" title="Settings Saved">
-          Company and branding configuration updated and synced with Firestore.
+          Company, branding, and booking layout configuration updated and synced with Firestore.
         </Alert>
       )}
 
@@ -52,8 +55,114 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Company Contact Information */}
+        {/* Left Column: Layout Versioning & Company Info */}
         <div className="lg:col-span-7 space-y-6">
+          {/* Public Booking Form Layout Selector Card */}
+          <Card variant="elevated" className="border-slate-200 shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-slate-900 flex items-center gap-2">
+                    <SparklesIcon className="w-5 h-5 text-amber-500" />
+                    Public Booking Form Layout
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">
+                    Select which booking portal layout is active for public customers visiting <code>/book</code>.
+                  </CardDescription>
+                </div>
+                <Badge variant={publicFormVersion === 'v2' ? 'success' : 'default'} size="sm">
+                  Layout {publicFormVersion.toUpperCase()} Active
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Option: Layout V2 */}
+                <div
+                  onClick={() => setPublicFormVersion('v2')}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    publicFormVersion === 'v2'
+                      ? 'border-blue-600 bg-blue-50/30 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                      Layout V2
+                    </span>
+                    {publicFormVersion === 'v2' && (
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    Streamlined Single-Page
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Modern card stack with segmented pickup time, airport flight subcard, visual vehicle cards, and sticky emerald CTA.
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-emerald-600">
+                      ★ Recommended
+                    </span>
+                    <a
+                      href="/book?layout=v2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] text-blue-600 hover:underline font-semibold"
+                    >
+                      Preview V2 ↗
+                    </a>
+                  </div>
+                </div>
+
+                {/* Option: Layout V1 */}
+                <div
+                  onClick={() => setPublicFormVersion('v1')}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                    publicFormVersion === 'v1'
+                      ? 'border-amber-500 bg-amber-50/30 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                      Layout V1
+                    </span>
+                    {publicFormVersion === 'v1' && (
+                      <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-slate-900 text-sm">
+                    Master Booking Engine
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Multi-section master engine featuring role configuration schemas, comprehensive routing details, and live contextual panel.
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      Phase 15 Engine
+                    </span>
+                    <a
+                      href="/book?layout=v1"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] text-amber-600 hover:underline font-semibold"
+                    >
+                      Preview V1 ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Company Contact Information */}
           <Card variant="elevated" className="border-slate-200 shadow-xs">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50">
               <CardTitle className="text-lg text-slate-900">Company Information</CardTitle>

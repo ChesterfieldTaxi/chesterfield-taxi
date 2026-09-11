@@ -100,6 +100,20 @@ export function BookingConfirmation({
               )}
             </div>
 
+            {/* Intermediate Stops */}
+            {trip.intermediateStops && trip.intermediateStops.length > 0 && trip.intermediateStops.map((stop, idx) => (
+              <div key={idx} className="relative">
+                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center text-white">
+                  <span className="text-[9px] font-bold">{idx + 1}</span>
+                </div>
+                <p className="text-xs font-semibold text-slate-500">Intermediate Stop {trip.intermediateStops && trip.intermediateStops.length > 1 ? idx + 1 : ''}</p>
+                <p className="text-sm font-bold text-slate-900">{stop.address}</p>
+                {stop.notes && (
+                  <p className="text-xs text-slate-500 mt-0.5">Note: {stop.notes}</p>
+                )}
+              </div>
+            ))}
+
             {/* Dropoff */}
             <div className="relative">
               <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-white">

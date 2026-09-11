@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Outlet } from 'react-router';
+import { useNavigate, useSearchParams, Outlet, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
@@ -199,6 +199,14 @@ export default function AdminLayout() {
               </span>
               <span className="text-[10px] text-slate-400">Operator</span>
             </div>
+
+            {/* Link to form layout settings */}
+            <Link
+              to="/admin/settings"
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+            >
+              Form Layout ⚙
+            </Link>
 
             {/* Link to public portal */}
             <a

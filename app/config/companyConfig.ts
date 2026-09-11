@@ -33,12 +33,14 @@ export interface CompanyBrandConfig {
   operatingHours: string;
   address: CompanyBrandAddress;
   serviceAreas: string[];
+  publicFormVersion: 'v1' | 'v2';
 }
 
 export const COMPANY_CONFIG: CompanyBrandConfig = {
   name: 'Chesterfield Taxi',
   tagline: 'Professional Car Service',
   legalName: 'Chesterfield Taxi & Transportation LLC',
+  publicFormVersion: 'v2',
   phone: {
     primary: '(314) 738-0100',
     primaryRaw: '+13147380100',

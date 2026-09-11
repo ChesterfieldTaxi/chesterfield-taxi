@@ -21,6 +21,7 @@ import type {
 export interface QuoteRequest {
   pickupLocation: TripLocation;
   dropoffLocation: TripLocation;
+  intermediateStops?: TripLocation[];
   vehicleTier: VehicleTier;
   bookingType: 'asap' | 'scheduled';
   scheduledPickupTime?: string; // ISO 8601 string
@@ -37,6 +38,7 @@ export interface QuoteResponse {
   estimatedDistanceMiles: number;
   estimatedDurationMinutes: number;
   currency: string;
+  isLiveGoogleResult?: boolean;
   expiresAt: string; // ISO 8601 string expiration for the quote
 }
 
