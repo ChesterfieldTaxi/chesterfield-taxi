@@ -88,4 +88,32 @@ export interface IBookingService {
     onUpdate: (trip: Trip) => void,
     onError?: (error: Error) => void
   ): () => void;
+
+  /**
+   * Admin / Operator query to fetch all recent trips.
+   */
+  getAllTrips?(): Promise<Trip[]>;
+
+  /**
+   * Admin / Operator real-time stream of all bookings in the dispatch queue.
+   */
+  subscribeToAllTrips?(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void;
+
+  /**
+   * Transitions a trip through the state machine (e.g., admin dispatch assignment or completion).
+   */
+  updateTripStatus?(
+    tripId: string,
+    status: TripStatus,
+    options?: {
+      reason?: string;
+      actorRole?: 'passenger' | 'driver' | 'admin' | 'system';
+      assignedDriverId?: string;
+      offeredToIds?: string[];
+    }
+  ): Promise<Trip>;
 }
+

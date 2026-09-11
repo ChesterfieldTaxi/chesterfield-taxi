@@ -5,6 +5,7 @@
 import type { IBookingService } from '../booking-service';
 import { FirebaseBookingService, type FirebaseClientConfig } from './firebase-booking.service';
 import { MockBookingService } from './mock-booking.service';
+import { isFirebaseConfigured } from '../firebase';
 
 export * from './firebase-booking.service';
 export * from './mock-booking.service';
@@ -30,9 +31,9 @@ export function getBookingService(options?: {
 
   const hasFirebase = Boolean(
     options?.firebaseConfig?.apiKey ||
-    process.env.VITE_FIREBASE_API_KEY ||
-    process.env.FIREBASE_API_KEY
+    isFirebaseConfigured()
   );
+
 
   if (hasFirebase) {
     try {

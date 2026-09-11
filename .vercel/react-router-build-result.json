@@ -10,7 +10,9 @@
       }
     },
     "routeIdToServerBundleId": {
-      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -24,6 +26,24 @@
         "parentId": "root",
         "file": "app/routes/home.tsx",
         "index": true,
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/admin.login": {
+        "id": "routes/admin.login",
+        "parentId": "root",
+        "file": "app/routes/admin.login.tsx",
+        "path": "admin/login",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/admin": {
+        "id": "routes/admin",
+        "parentId": "root",
+        "file": "app/routes/admin.tsx",
+        "path": "admin",
         "config": {
           "runtime": "nodejs"
         }
@@ -54,6 +74,18 @@
         "parentId": "root",
         "file": "routes/home.tsx",
         "index": true
+      },
+      "routes/admin.login": {
+        "id": "routes/admin.login",
+        "parentId": "root",
+        "file": "routes/admin.login.tsx",
+        "path": "admin/login"
+      },
+      "routes/admin": {
+        "id": "routes/admin",
+        "parentId": "root",
+        "file": "routes/admin.tsx",
+        "path": "admin"
       }
     },
     "routeDiscovery": {
@@ -74,6 +106,14 @@
           {
             "file": "routes/home.tsx",
             "index": true
+          },
+          {
+            "file": "routes/admin.login.tsx",
+            "path": "admin/login"
+          },
+          {
+            "file": "routes/admin.tsx",
+            "path": "admin"
           }
         ]
       }

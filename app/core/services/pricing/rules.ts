@@ -245,7 +245,16 @@ export function createSurgeStep(
 
     // Find the highest applicable surge rule
     let matchedRule: SurgeRule | undefined;
-    let highestMultiplier = 1.0;
+    let highestMultiplier = context.config.manualSurgeMultiplier ?? 1.0;
+
+    if (highestMultiplier > 1.0) {
+      matchedRule = {
+        name: 'Active Surge Pricing',
+        description: `Admin manual surge rate applied (${highestMultiplier.toFixed(2)}x)`,
+        multiplier: highestMultiplier,
+        matches: () => true,
+      };
+    }
 
     for (const rule of rules) {
       if (rule.matches(pickupDate) && rule.multiplier > highestMultiplier) {
@@ -253,6 +262,7 @@ export function createSurgeStep(
         matchedRule = rule;
       }
     }
+
 
     if (highestMultiplier <= 1.0 || !matchedRule) {
       return {

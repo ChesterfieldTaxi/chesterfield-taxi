@@ -17,12 +17,15 @@ export interface PricingConfig {
   /** Absolute minimum fare floor */
   minimumFare: number;
   /** Multipliers mapped to each vehicle category */
-  vehicleMultipliers: Record<VehicleTier, number>;
+  vehicleMultipliers: Record<string, number>;
   /** Fixed surcharge applied to airport pickups */
   airportSurcharge: number;
   /** Standard currency code (e.g. USD) */
   currency: string;
+  /** Optional manual surge multiplier configured by admin */
+  manualSurgeMultiplier?: number;
 }
+
 
 export interface SurgeRule {
   name: string;

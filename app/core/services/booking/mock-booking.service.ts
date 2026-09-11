@@ -21,12 +21,15 @@ import type {
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
 import { getServerRouteService } from '../maps';
+import { getAdminConfigService } from '../config/admin-config.service';
 
 const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
 
 export class MockBookingService implements IBookingService {
   private trips: Map<string, Trip> = new Map();
   private listeners: Map<string, Set<(trip: Trip) => void>> = new Map();
+  private allTripsListeners: Set<(trips: Trip[]) => void> = new Set();
+
 
   constructor() {
     this.loadFromStorage();
@@ -70,6 +73,18 @@ export class MockBookingService implements IBookingService {
         }
       }
     }
+
+    // Notify all-trips admin subscribers
+    const allTrips = Array.from(this.trips.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    for (const listener of this.allTripsListeners) {
+      try {
+        listener(allTrips);
+      } catch (err) {
+        console.error('[MockBookingService] All-trips listener error:', err);
+      }
+    }
   }
 
   public async calculateQuote(request: QuoteRequest): Promise<QuoteResponse> {
@@ -84,14 +99,21 @@ export class MockBookingService implements IBookingService {
       ? new Date(request.scheduledPickupTime)
       : now;
 
-    const { pricing } = calculateTripPricing({
-      distanceMiles: route.distanceMiles,
-      durationMinutes: route.durationMinutes,
-      vehicleTier: request.vehicleTier,
-      pickupDateTime,
-      promoCode: request.promoCode,
-      isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
-    });
+    const adminConfig = getAdminConfigService();
+    const settings = await adminConfig.getSettings();
+    const dynamicPricingConfig = adminConfig.toPricingConfig(settings);
+
+    const { pricing } = calculateTripPricing(
+      {
+        distanceMiles: route.distanceMiles,
+        durationMinutes: route.durationMinutes,
+        vehicleTier: request.vehicleTier,
+        pickupDateTime,
+        promoCode: request.promoCode,
+        isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
+      },
+      dynamicPricingConfig
+    );
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min validity
 
@@ -103,6 +125,7 @@ export class MockBookingService implements IBookingService {
       expiresAt,
     };
   }
+
 
   public async createBooking(payload: CreateTripInput): Promise<Trip> {
     const now = new Date().toISOString();
@@ -248,4 +271,82 @@ export class MockBookingService implements IBookingService {
     this.notifyListeners(updated);
     return updated;
   }
+
+  public async getAllTrips(): Promise<Trip[]> {
+    return Array.from(this.trips.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  public subscribeToAllTrips(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    this.allTripsListeners.add(onUpdate);
+
+    // Immediately push current sorted trips
+    const current = Array.from(this.trips.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    Promise.resolve().then(() => onUpdate(current)).catch(onError);
+
+    return () => {
+      this.allTripsListeners.delete(onUpdate);
+    };
+  }
+
+  public async updateTripStatus(
+    tripId: string,
+    status: TripStatus,
+    options?: {
+      reason?: string;
+      actorRole?: 'passenger' | 'driver' | 'admin' | 'system';
+      assignedDriverId?: string;
+      offeredToIds?: string[];
+    }
+  ): Promise<Trip> {
+    const trip = this.trips.get(tripId);
+    if (!trip) {
+      throw new Error(`Booking with ID "${tripId}" not found.`);
+    }
+
+    const now = new Date().toISOString();
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: status,
+      timestamp: now,
+      actorRole: options?.actorRole ?? 'admin',
+      reason: options?.reason ?? `Status updated to ${status}`,
+    };
+
+    const updated: Trip = {
+      ...trip,
+      status,
+      updatedAt: now,
+      statusHistory: [...trip.statusHistory, historyEntry],
+    };
+
+    if (options?.assignedDriverId !== undefined) {
+      updated.assignedDriverId = options.assignedDriverId;
+    }
+
+    if (options?.offeredToIds !== undefined) {
+      updated.offeredToIds = options.offeredToIds;
+    }
+
+    if (status === 'completed') {
+      updated.completedAt = now;
+    } else if (status === 'cancelled') {
+      updated.cancelledAt = now;
+      updated.cancellationReason = options?.reason;
+      updated.cancelledBy = options?.actorRole ?? 'admin';
+    }
+
+    this.trips.set(tripId, updated);
+    this.persistToStorage();
+    this.notifyListeners(updated);
+
+    return updated;
+  }
 }
+

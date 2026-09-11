@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import type { VehicleTier } from '../../core/types';
 import {
   CarIcon,
@@ -9,6 +9,7 @@ import {
   CheckIcon,
 } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
+import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 
 export interface VehicleTierOption {
   value: VehicleTier;
@@ -26,12 +27,13 @@ export interface VehicleTierSelectorProps {
   error?: string;
   value?: VehicleTier;
   onChange?: (tier: VehicleTier) => void;
+  options?: VehicleTierOption[];
   required?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
-const VEHICLE_TIERS: VehicleTierOption[] = [
+const DEFAULT_FALLBACK_TIERS: VehicleTierOption[] = [
   {
     value: 'standard',
     label: 'Standard Sedan',
@@ -73,6 +75,7 @@ export function VehicleTierSelector({
   error,
   value = 'standard',
   onChange,
+  options,
   required,
   disabled = false,
   className = '',
@@ -81,6 +84,49 @@ export function VehicleTierSelector({
   const groupId = `${generatedId}-vehicle-group`;
   const errorId = `${generatedId}-error`;
   const helperId = `${generatedId}-helper`;
+
+  const [tiers, setTiers] = useState<VehicleTierOption[]>(() => {
+    if (options && options.length > 0) return options;
+    const cached = getAdminConfigService().getCachedSettings().vehicles;
+    if (cached && cached.length > 0) {
+      return cached.map((v) => ({
+        value: v.id as VehicleTier,
+        label: v.name,
+        description: v.description || `${v.name} tier`,
+        badge: v.badge,
+        maxPassengers: v.maxPassengers,
+        maxLuggage: v.maxLuggage,
+        iconType: (v.iconType as any) || (v.id as any) || 'standard',
+      }));
+    }
+    return DEFAULT_FALLBACK_TIERS;
+  });
+
+  useEffect(() => {
+    if (options && options.length > 0) {
+      setTiers(options);
+      return;
+    }
+
+    const unsub = getAdminConfigService().subscribeToSettings((settings) => {
+      if (settings.vehicles && settings.vehicles.length > 0) {
+        setTiers(
+          settings.vehicles.map((v) => ({
+            value: v.id as VehicleTier,
+            label: v.name,
+            description: v.description || `${v.name} tier`,
+            badge: v.badge,
+            maxPassengers: v.maxPassengers,
+            maxLuggage: v.maxLuggage,
+            iconType: (v.iconType as any) || (v.id as any) || 'standard',
+          }))
+        );
+      }
+    });
+
+    return unsub;
+  }, [options]);
+
 
   const getTierIcon = (type: VehicleTierOption['iconType']) => {
     switch (type) {
@@ -105,8 +151,9 @@ export function VehicleTierSelector({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="radiogroup">
-        {VEHICLE_TIERS.map((tier) => {
+        {tiers.map((tier) => {
           const isSelected = value === tier.value;
+
           const optId = `${groupId}-${tier.value}`;
 
           return (

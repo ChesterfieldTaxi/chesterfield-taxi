@@ -21,3 +21,19 @@ The booking portal will guide the user through a sequential, config-driven flow:
 ## 4. Resend Email Dispatch
 - Transactional emails will be sent reliably via Resend.
 - **Triggers:** Booking confirmation (User), New booking alert (Admin/Console), and status updates (e.g., Driver Assigned).
+
+## 5. Phase 9: Admin Configuration Panel & Dynamic Firestore Sync
+- **Centralized App Settings in Firestore:** Global configuration stored at document `config/appSettings` containing:
+  - `company`: name, phone, email, address.
+  - `branding`: primaryColor, secondaryColor, logoUrl.
+  - `pricing`: baseFare, perMileRate, airportFee, surgeMultiplier.
+  - `vehicles`: array of editable vehicle tiers (`id`, `name`, `baseMultiplier`, `maxPassengers`, `maxLuggage`).
+- **Client-Side Auth Route Guards:** Protection of `/admin` routes via Firebase Auth state listening (`onAuthStateChanged`). Unauthenticated visitors are redirected to `/admin/login`.
+- **Dynamic Pricing & Fleet Hydration:** The pricing engine and booking service dynamically query and apply runtime settings from `config/appSettings`, with resilient fallback to default JSON configs when offline or unconfigured.
+- **Interactive Multi-Tab Admin Portal:**
+  - Tab 1: General & Branding (company contact info, color pickers, brand identity).
+  - Tab 2: Pricing & Rules (base fare, mileage rate, airport surcharge, real-time surge multiplier override).
+  - Tab 3: Fleet Management (add, edit, toggle, and delete vehicle tiers with custom capacity and fare multipliers).
+  - Tab 4: Live Bookings (live stream of submitted trips from Firestore with status workflow controls).
+- **Authentication Gateway (`/admin/login`):** Secure credential login using Firebase Authentication with error handling and demo session support.
+

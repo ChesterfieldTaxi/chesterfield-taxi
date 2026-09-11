@@ -33,3 +33,17 @@
 
 ## Phase 8: Deployment
 - [x] Deploy the Phase 1 web application to Vercel and verify environment variables.
+
+## Phase 9: Admin Configuration Panel & Dynamic Firestore Sync
+- [x] 9.1 Define AppSettings Firestore schema & IAdminConfigService interfaces in `app/core/types/config.ts`.
+- [x] 9.2 Implement `AdminConfigService` in `app/core/services/config/admin-config.service.ts` with Firestore `config/appSettings` sync and fallback.
+- [x] 9.3 Refactor `getBookingService()` and `calculateQuote()` to dynamically hydrate pricing and vehicle multipliers from Firestore.
+- [x] 9.4 Set up Firebase Auth route guards and tab navigation in `/admin` layout (`app/routes/admin.tsx`).
+- [x] 9.5 Build Tab 1: General & Branding settings (Company contact info, hex color pickers, logo).
+- [x] 9.6 Build Tab 2: Pricing & Rules controls (Base fare, per-mile rates, surge multiplier override).
+- [x] 9.7 Build Tab 3: Fleet Management (Add, update, or remove vehicle specs and multipliers).
+- [x] 9.8 Build Tab 4: Live Bookings monitor (Real-time Firestore trips stream and status transition actions).
+- [x] 9.9 Implement `/admin/login` route (`app/routes/admin.login.tsx`) with Firebase Auth password authentication.
+- [x] 9.10 Register admin routes in `app/routes.ts` and verify build with zero typecheck errors.
+
+

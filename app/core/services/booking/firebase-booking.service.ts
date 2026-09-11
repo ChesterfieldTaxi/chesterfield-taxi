@@ -16,6 +16,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  query,
+  orderBy,
   updateDoc,
   collection,
   onSnapshot,
@@ -24,6 +27,7 @@ import {
 
 import type {
   Trip,
+  TripStatus,
   CreateTripInput,
   TripStatusHistoryEntry,
 } from '../../types';
@@ -36,6 +40,8 @@ import type {
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
 import { getServerRouteService } from '../maps';
+import { getAdminConfigService } from '../config/admin-config.service';
+
 
 export interface FirebaseClientConfig {
   apiKey?: string;
@@ -82,14 +88,22 @@ export class FirebaseBookingService implements IBookingService {
       ? new Date(request.scheduledPickupTime)
       : now;
 
-    const { pricing } = calculateTripPricing({
-      distanceMiles: route.distanceMiles,
-      durationMinutes: route.durationMinutes,
-      vehicleTier: request.vehicleTier,
-      pickupDateTime,
-      promoCode: request.promoCode,
-      isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
-    });
+    const adminConfig = getAdminConfigService();
+    const settings = await adminConfig.getSettings();
+    const dynamicPricingConfig = adminConfig.toPricingConfig(settings);
+
+    const { pricing } = calculateTripPricing(
+      {
+        distanceMiles: route.distanceMiles,
+        durationMinutes: route.durationMinutes,
+        vehicleTier: request.vehicleTier,
+        pickupDateTime,
+        promoCode: request.promoCode,
+        isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
+      },
+      dynamicPricingConfig
+    );
+
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
@@ -220,4 +234,97 @@ export class FirebaseBookingService implements IBookingService {
 
     return unsubscribe;
   }
+
+  public async getAllTrips(): Promise<Trip[]> {
+    const q = query(collection(this.db, this.collectionName), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const trips: Trip[] = [];
+    snapshot.forEach((d) => {
+      trips.push(d.data() as Trip);
+    });
+    return trips;
+  }
+
+  public subscribeToAllTrips(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const q = query(collection(this.db, this.collectionName), orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const trips: Trip[] = [];
+        snapshot.forEach((d) => {
+          trips.push(d.data() as Trip);
+        });
+        onUpdate(trips);
+      },
+      (err) => {
+        console.error('[FirebaseBookingService] Snapshot error on all trips:', err);
+        if (onError) onError(err);
+      }
+    );
+
+    return unsubscribe;
+  }
+
+  public async updateTripStatus(
+    tripId: string,
+    status: TripStatus,
+    options?: {
+      reason?: string;
+      actorRole?: 'passenger' | 'driver' | 'admin' | 'system';
+      assignedDriverId?: string;
+      offeredToIds?: string[];
+    }
+  ): Promise<Trip> {
+    const tripDocRef = doc(this.db, this.collectionName, tripId);
+    const snapshot = await getDoc(tripDocRef);
+
+    if (!snapshot.exists()) {
+      throw new Error(`Booking with ID "${tripId}" not found in Firestore.`);
+    }
+
+    const trip = snapshot.data() as Trip;
+    const now = new Date().toISOString();
+
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: status,
+      timestamp: now,
+      actorRole: options?.actorRole ?? 'admin',
+      reason: options?.reason ?? `Status manually updated to ${status}`,
+    };
+
+    const updates: Partial<Trip> = {
+      status,
+      updatedAt: now,
+      statusHistory: [...trip.statusHistory, historyEntry],
+    };
+
+    if (options?.assignedDriverId !== undefined) {
+      updates.assignedDriverId = options.assignedDriverId;
+    }
+
+    if (options?.offeredToIds !== undefined) {
+      updates.offeredToIds = options.offeredToIds;
+    }
+
+    if (status === 'completed') {
+      updates.completedAt = now;
+    } else if (status === 'cancelled') {
+      updates.cancelledAt = now;
+      updates.cancellationReason = options?.reason;
+      updates.cancelledBy = options?.actorRole ?? 'admin';
+    }
+
+    await updateDoc(tripDocRef, updates);
+
+    return {
+      ...trip,
+      ...updates,
+    };
+  }
 }
+
