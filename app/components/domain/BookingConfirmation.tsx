@@ -19,13 +19,26 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 
+export interface EmailDeliveryFeedback {
+  status: 'idle' | 'sending' | 'sent' | 'simulated' | 'failed';
+  recipient?: string;
+  messageId?: string;
+  error?: string;
+}
+
 export interface BookingConfirmationProps {
   trip: Trip;
   onBookAnother: () => void;
+  emailDelivery?: EmailDeliveryFeedback;
   className?: string;
 }
 
-export function BookingConfirmation({ trip, onBookAnother, className = '' }: BookingConfirmationProps) {
+export function BookingConfirmation({
+  trip,
+  onBookAnother,
+  emailDelivery,
+  className = '',
+}: BookingConfirmationProps) {
   const isScheduled = trip.bookingType === 'scheduled';
   const paymentMethodLabel = {
     card: 'Credit / Debit Card',
@@ -225,17 +238,76 @@ export function BookingConfirmation({ trip, onBookAnother, className = '' }: Boo
           </div>
         )}
 
-        {/* Resend Email Notice */}
+        {/* Resend Email Delivery Notice */}
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex items-start gap-3 text-xs text-slate-600">
-          <MailIcon className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <p>
-              A confirmation receipt has been dispatched via <strong className="text-slate-800">Resend</strong> to{' '}
-              <strong className="text-slate-800">{trip.passenger.email}</strong>.
-            </p>
-            <p className="text-slate-500 mt-1">
-              You will receive SMS and phone updates as your driver is dispatched.
-            </p>
+          <div className="mt-0.5 shrink-0">
+            {emailDelivery?.status === 'sending' ? (
+              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            ) : emailDelivery?.status === 'sent' ? (
+              <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
+                ✓
+              </div>
+            ) : (
+              <MailIcon className="w-4 h-4 text-slate-400" />
+            )}
+          </div>
+          <div className="leading-relaxed flex-1">
+            {emailDelivery?.status === 'sending' ? (
+              <p className="text-slate-700 font-medium">
+                Dispatching confirmation receipt via <strong className="text-slate-900">Resend</strong> to{' '}
+                <strong className="text-slate-900">{trip.passenger.email}</strong>...
+              </p>
+            ) : emailDelivery?.status === 'sent' ? (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-emerald-800">
+                    Confirmation receipt dispatched via Resend!
+                  </p>
+                  {emailDelivery.messageId && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-mono px-2 py-0.5 rounded-md font-semibold">
+                      ID: {emailDelivery.messageId}
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-600 mt-1">
+                  A full trip itinerary and itemized invoice was sent to{' '}
+                  <strong className="text-slate-800">{emailDelivery.recipient || trip.passenger.email}</strong>.
+                </p>
+              </>
+            ) : emailDelivery?.status === 'simulated' ? (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-slate-800">
+                    Confirmation receipt generated (Development / Offline Mode)
+                  </p>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-md">
+                    Simulated
+                  </span>
+                </div>
+                <p className="text-slate-600 mt-1">
+                  Receipt logged for <strong className="text-slate-800">{trip.passenger.email}</strong>. In production with <code className="text-[11px] bg-slate-200 px-1 py-0.5 rounded">RESEND_API_KEY</code>, this delivers live via Resend.
+                </p>
+              </>
+            ) : emailDelivery?.status === 'failed' ? (
+              <>
+                <p className="text-amber-800 font-medium">
+                  Receipt queued for delayed dispatch to <strong className="text-slate-800">{trip.passenger.email}</strong>.
+                </p>
+                <p className="text-slate-500 mt-1">
+                  Your booking is safe in our central dispatch system. You will receive SMS updates as your driver is dispatched.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  A confirmation receipt has been dispatched via <strong className="text-slate-800">Resend</strong> to{' '}
+                  <strong className="text-slate-800">{trip.passenger.email}</strong>.
+                </p>
+                <p className="text-slate-500 mt-1">
+                  You will receive SMS and phone updates as your driver is dispatched.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </CardContent>

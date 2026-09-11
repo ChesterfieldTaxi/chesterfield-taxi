@@ -13,4 +13,7 @@ export default [
   // Operator & Admin Console (Isolated Layout)
   route("admin/login", "routes/admin.login.tsx"),
   route("admin", "routes/admin.tsx"),
+
+  // Transactional Email Gateway Route (Server Action)
+  route("api/send-email", "routes/api.send-email.ts"),
 ] satisfies RouteConfig;

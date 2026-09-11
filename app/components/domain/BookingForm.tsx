@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { bookingFormConfig } from '../../config/formConfig';
 import type { FormStepSchema, VehicleTier, PaymentMethod, Trip, CreateTripInput } from '../../core/types';
 import { isFieldVisible, isFieldRequired } from '../../core/types/field-schema';
-import { getBookingService, type QuoteResponse } from '../../core/services';
+import { getBookingService, getEmailDispatchService, type QuoteResponse } from '../../core/services';
 import {
   detectAirportInAddresses,
   VEHICLE_LUGGAGE_CAPACITY,
@@ -14,7 +14,7 @@ import { Alert } from '../ui/Alert';
 import { CheckIcon, ChevronRightIcon, ChevronLeftIcon, SpinnerIcon } from '../ui/Icons';
 import { FieldRenderer } from './FieldRenderer';
 import { QuoteSummary } from './QuoteSummary';
-import { BookingConfirmation } from './BookingConfirmation';
+import { BookingConfirmation, type EmailDeliveryFeedback } from './BookingConfirmation';
 import { AirportDetectedBanner } from './AirportDetectedBanner';
 import { LuggageCapacityWarning } from './LuggageCapacityWarning';
 
@@ -56,6 +56,8 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmedTrip, setConfirmedTrip] = useState<Trip | null>(null);
+  const [emailDelivery, setEmailDelivery] = useState<EmailDeliveryFeedback>({ status: 'idle' });
+
 
   const steps = bookingFormConfig.steps;
   const currentStep = steps[currentStepIndex];
@@ -378,6 +380,101 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
       const newTrip = await bookingService.createBooking(inputPayload);
       setConfirmedTrip(newTrip);
       onBookingSuccess?.(newTrip);
+
+      // Trigger transactional Resend email dispatch (both passenger receipt and operations alert)
+      setEmailDelivery({ status: 'sending', recipient: newTrip.passenger.email });
+
+      try {
+        const emailService = getEmailDispatchService();
+
+        // 1. Passenger Confirmation Receipt
+        const passengerReceiptPromise = emailService.sendBookingConfirmation({
+          tripId: newTrip.id,
+          passenger: {
+            firstName: newTrip.passenger.firstName,
+            lastName: newTrip.passenger.lastName,
+            email: newTrip.passenger.email,
+            phone: newTrip.passenger.phone,
+          },
+          pickupAddress: newTrip.pickupLocation.address,
+          pickupNotes: newTrip.pickupLocation.notes,
+          dropoffAddress: newTrip.dropoffLocation.address,
+          dropoffNotes: newTrip.dropoffLocation.notes,
+          pickupTime: newTrip.bookingType === 'scheduled' && newTrip.scheduledPickupTime
+            ? new Date(newTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate Ride (ASAP)',
+          bookingType: newTrip.bookingType,
+          vehicleTier: newTrip.vehicleTier,
+          passengerCount: newTrip.passenger.passengerCount,
+          luggageCount: newTrip.passenger.luggageCount,
+          totalFare: newTrip.pricing.totalFare,
+          currency: newTrip.pricing.currency,
+          paymentMethod: newTrip.payment.method,
+          specialRequests: newTrip.passenger.specialRequests,
+          flightDetails: {
+            airlineName,
+            airlineCode: formValues.airlineCode ? String(formValues.airlineCode) : undefined,
+            flightNumber: formValues.flightNumber ? String(formValues.flightNumber) : undefined,
+            departureAirport: formattedDepartureAirport,
+            hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
+            isAirportTrip: airportDetection.isAirportTrip,
+          },
+        });
+
+        // 2. Immediate Dispatcher Alert
+        const dispatcherAlertPromise = emailService.sendAdminDispatchAlert({
+          tripId: newTrip.id,
+          passengerName: `${newTrip.passenger.firstName} ${newTrip.passenger.lastName}`,
+          passengerPhone: newTrip.passenger.phone,
+          passengerEmail: newTrip.passenger.email,
+          passengerCount: newTrip.passenger.passengerCount,
+          luggageCount: newTrip.passenger.luggageCount,
+          pickupAddress: newTrip.pickupLocation.address,
+          pickupNotes: newTrip.pickupLocation.notes,
+          dropoffAddress: newTrip.dropoffLocation.address,
+          dropoffNotes: newTrip.dropoffLocation.notes,
+          pickupTime: newTrip.bookingType === 'scheduled' && newTrip.scheduledPickupTime
+            ? new Date(newTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate (ASAP)',
+          vehicleTier: newTrip.vehicleTier,
+          totalFare: newTrip.pricing.totalFare,
+          currency: newTrip.pricing.currency,
+          bookingType: newTrip.bookingType,
+          paymentMethod: newTrip.payment.method,
+          specialRequests: newTrip.passenger.specialRequests,
+          urgency: newTrip.bookingType === 'asap' ? 'high' : 'normal',
+          flightDetails: {
+            airlineName,
+            airlineCode: formValues.airlineCode ? String(formValues.airlineCode) : undefined,
+            flightNumber: formValues.flightNumber ? String(formValues.flightNumber) : undefined,
+            departureAirport: formattedDepartureAirport,
+            hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
+          },
+        });
+
+        const [receiptResult] = await Promise.all([passengerReceiptPromise, dispatcherAlertPromise]);
+
+        if (receiptResult.success) {
+          setEmailDelivery({
+            status: receiptResult.simulated ? 'simulated' : 'sent',
+            recipient: receiptResult.recipient,
+            messageId: receiptResult.messageId,
+          });
+        } else {
+          setEmailDelivery({
+            status: 'failed',
+            recipient: newTrip.passenger.email,
+            error: receiptResult.error,
+          });
+        }
+      } catch (emailErr) {
+        console.warn('[BookingForm] Transactional email dispatch exception:', emailErr);
+        setEmailDelivery({
+          status: 'failed',
+          recipient: newTrip.passenger.email,
+          error: emailErr instanceof Error ? emailErr.message : 'Email dispatch encountered a network error',
+        });
+      }
     } catch (err: unknown) {
       console.error('[BookingForm] Submission error:', err);
       setSubmitError(
@@ -395,6 +492,7 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
     setQuote(null);
     setErrors({});
     setSubmitError(null);
+    setEmailDelivery({ status: 'idle' });
   };
 
   // If trip is successfully booked, render confirmation screen
@@ -403,6 +501,7 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
       <BookingConfirmation
         trip={confirmedTrip}
         onBookAnother={handleBookAnother}
+        emailDelivery={emailDelivery}
         className={className}
       />
     );

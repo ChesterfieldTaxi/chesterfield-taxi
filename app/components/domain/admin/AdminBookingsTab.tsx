@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Trip, TripStatus } from '../../../core/types/trip';
 import { getBookingService } from '../../../core/services/booking';
+import { getEmailDispatchService } from '../../../core/services/email';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -84,6 +85,41 @@ export function AdminBookingsTab() {
         setTimeout(() => setActionSuccessMessage(null), 3000);
         if (selectedTrip?.id === tripId) {
           setSelectedTrip(updated);
+        }
+
+        // Trigger passenger status update notification email if email is present
+        const currentTrip = updated || trips.find((t) => t.id === tripId);
+        if (currentTrip && currentTrip.passenger?.email) {
+          try {
+            const emailService = getEmailDispatchService();
+            const formattedPickupTime = currentTrip.bookingType === 'scheduled' && currentTrip.scheduledPickupTime
+              ? new Date(currentTrip.scheduledPickupTime).toLocaleString()
+              : 'Immediate Ride (ASAP)';
+
+            emailService.sendStatusUpdateNotification({
+              tripId: currentTrip.id,
+              passenger: {
+                firstName: currentTrip.passenger.firstName,
+                lastName: currentTrip.passenger.lastName,
+                email: currentTrip.passenger.email,
+                phone: currentTrip.passenger.phone,
+              },
+              newStatus,
+              previousStatus: currentTrip.status,
+              pickupAddress: currentTrip.pickupLocation.address,
+              dropoffAddress: currentTrip.dropoffLocation.address,
+              pickupTime: formattedPickupTime,
+              vehicleTier: currentTrip.vehicleTier,
+              driverInfo: options?.assignedDriverId ? {
+                name: `Assigned Driver (ID: ${options.assignedDriverId})`,
+              } : undefined,
+              statusReason: options?.reason,
+            }).catch((err) => {
+              console.warn('[AdminBookingsTab] Non-blocking status notification warning:', err);
+            });
+          } catch (emailErr) {
+            console.warn('[AdminBookingsTab] Failed to trigger status email notification:', emailErr);
+          }
         }
       }
     } catch (err: unknown) {

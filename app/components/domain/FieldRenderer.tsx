@@ -55,6 +55,7 @@ export function FieldRenderer({
       case 'location-autocomplete':
         return (
           <LocationAutocomplete
+            name={field.name}
             label={presentation.label}
             placeholder={presentation.placeholder}
             helperText={presentation.helperText}
@@ -107,6 +108,7 @@ export function FieldRenderer({
       case 'select':
         return (
           <Select
+            name={field.name}
             label={presentation.label}
             placeholder={presentation.placeholder}
             helperText={presentation.helperText}
@@ -169,6 +171,7 @@ export function FieldRenderer({
       case 'textarea':
         return (
           <Textarea
+            name={field.name}
             label={presentation.label}
             placeholder={presentation.placeholder}
             helperText={presentation.helperText}
@@ -191,6 +194,7 @@ export function FieldRenderer({
       default:
         return (
           <Input
+            name={field.name}
             type={field.type}
             label={presentation.label}
             placeholder={presentation.placeholder}

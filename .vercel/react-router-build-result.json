@@ -17,7 +17,8 @@
       "routes/about": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/contact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -81,6 +82,13 @@
         "parentId": "root",
         "file": "app/routes/admin.tsx",
         "path": "admin",
+        "config": {}
+      },
+      "routes/api.send-email": {
+        "id": "routes/api.send-email",
+        "parentId": "root",
+        "file": "app/routes/api.send-email.ts",
+        "path": "api/send-email",
         "config": {}
       }
     }
@@ -150,6 +158,12 @@
         "parentId": "root",
         "file": "routes/admin.tsx",
         "path": "admin"
+      },
+      "routes/api.send-email": {
+        "id": "routes/api.send-email",
+        "parentId": "root",
+        "file": "routes/api.send-email.ts",
+        "path": "api/send-email"
       }
     },
     "routeDiscovery": {
@@ -199,6 +213,10 @@
           {
             "file": "routes/admin.tsx",
             "path": "admin"
+          },
+          {
+            "file": "routes/api.send-email.ts",
+            "path": "api/send-email"
           }
         ]
       }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useId } from 'react';
 import { MapPinIcon, FlagIcon, CheckIcon } from '../ui/Icons';
 
 export interface LocationAutocompleteProps {
+  name?: string;
   label?: string;
   placeholder?: string;
   helperText?: string;
@@ -27,6 +28,7 @@ const POPULAR_LOCATIONS = [
 ];
 
 export function LocationAutocomplete({
+  name,
   label,
   placeholder = 'Enter address, venue, or airport...',
   helperText,
@@ -102,6 +104,7 @@ export function LocationAutocomplete({
 
         <input
           id={inputId}
+          name={name}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
