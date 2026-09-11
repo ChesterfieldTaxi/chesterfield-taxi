@@ -52,6 +52,42 @@ export interface FirebaseClientConfig {
   appId?: string;
 }
 
+/**
+ * Recursively sanitizes data payloads before writing to Firestore.
+ * Converts any `undefined` values to `null` or empty strings `""` to prevent
+ * Firestore runtime exceptions ("Unsupported field value: undefined").
+ *
+ * @param obj The payload object to sanitize
+ * @param undefinedFallback Fallback value for `undefined` entries (default: null)
+ */
+export function sanitizePayload<T>(obj: T, undefinedFallback: null | '' = null): T {
+  if (obj === undefined) {
+    return undefinedFallback as unknown as T;
+  }
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (obj instanceof Date) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizePayload(item, undefinedFallback)) as unknown as T;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      sanitized[key] = undefinedFallback;
+    } else if (value !== null && typeof value === 'object') {
+      sanitized[key] = sanitizePayload(value, undefinedFallback);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized as T;
+}
+
 export class FirebaseBookingService implements IBookingService {
   private db: Firestore;
   private collectionName = 'trips';
@@ -144,8 +180,9 @@ export class FirebaseBookingService implements IBookingService {
       updatedAt: now,
     };
 
-    await setDoc(tripDocRef, newTrip);
-    return newTrip;
+    const sanitizedTrip = sanitizePayload(newTrip);
+    await setDoc(tripDocRef, sanitizedTrip);
+    return sanitizedTrip;
   }
 
   public async getBookingStatus(bookingId: string): Promise<BookingStatusResponse | null> {
@@ -319,7 +356,8 @@ export class FirebaseBookingService implements IBookingService {
       updates.cancelledBy = options?.actorRole ?? 'admin';
     }
 
-    await updateDoc(tripDocRef, updates);
+    const sanitizedUpdates = sanitizePayload(updates);
+    await updateDoc(tripDocRef, sanitizedUpdates);
 
     return {
       ...trip,

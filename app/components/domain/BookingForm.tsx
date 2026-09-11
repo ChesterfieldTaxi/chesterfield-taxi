@@ -133,11 +133,15 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
       const calculatedQuote = await bookingService.calculateQuote({
         pickupLocation: {
           address: pickupAddress,
-          notes: formValues.pickupNotes ? String(formValues.pickupNotes) : undefined,
+          notes: (formValues.pickupNotes as string) ?? '',
+          flightNotes: (formValues.flightNotes as string) ?? '',
+          driverNotes: (formValues.driverNotes as string) ?? '',
         },
         dropoffLocation: {
           address: dropoffAddress,
-          notes: formValues.dropoffNotes ? String(formValues.dropoffNotes) : undefined,
+          notes: (formValues.dropoffNotes as string) ?? '',
+          flightNotes: (formValues.flightNotes as string) ?? '',
+          driverNotes: (formValues.driverNotes as string) ?? '',
         },
         vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
         bookingType: formValues.bookingType === 'scheduled' ? 'scheduled' : 'asap',
@@ -289,19 +293,23 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
 
         finalQuote = await bookingService.calculateQuote({
           pickupLocation: {
-            address: String(formValues.pickupAddress),
-            notes: formValues.pickupNotes ? String(formValues.pickupNotes) : undefined,
+            address: String(formValues.pickupAddress ?? ''),
+            notes: (formValues.pickupNotes as string) ?? '',
+            flightNotes: (formValues.flightNotes as string) ?? '',
+            driverNotes: (formValues.driverNotes as string) ?? '',
           },
           dropoffLocation: {
-            address: String(formValues.dropoffAddress),
-            notes: formValues.dropoffNotes ? String(formValues.dropoffNotes) : undefined,
+            address: String(formValues.dropoffAddress ?? ''),
+            notes: (formValues.dropoffNotes as string) ?? '',
+            flightNotes: (formValues.flightNotes as string) ?? '',
+            driverNotes: (formValues.driverNotes as string) ?? '',
           },
           vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
           bookingType: formValues.bookingType === 'scheduled' ? 'scheduled' : 'asap',
           scheduledPickupTime,
           passengerCount: Number(formValues.passengerCount) || 1,
           luggageCount: Number(formValues.luggageCount) || 0,
-          promoCode: formValues.promoCode ? String(formValues.promoCode) : undefined,
+          promoCode: (formValues.promoCode as string) ?? '',
         });
         setQuote(finalQuote);
       }
@@ -333,25 +341,37 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
       const userSpecialRequests = formValues.specialRequests ? String(formValues.specialRequests).trim() : '';
       const mergedSpecialRequests = [flightRemarks, userSpecialRequests].filter(Boolean).join('\n') || undefined;
 
+      const flightRemarksVal = flightRemarks ?? '';
+      const flightNotes = ((formValues.flightNotes as string) ?? flightRemarksVal) ?? '';
+      const driverNotes = ((formValues.driverNotes as string) ?? userSpecialRequests) ?? '';
+      const pickupNotes = (formValues.pickupNotes as string) ?? '';
+      const dropoffNotes = (formValues.dropoffNotes as string) ?? '';
+
       const inputPayload: CreateTripInput = {
         pickupLocation: {
-          address: String(formValues.pickupAddress),
-          notes: formValues.pickupNotes ? String(formValues.pickupNotes) : undefined,
+          address: String(formValues.pickupAddress ?? ''),
+          notes: pickupNotes ?? '',
+          flightNotes: flightNotes ?? '',
+          driverNotes: driverNotes ?? '',
         },
         dropoffLocation: {
-          address: String(formValues.dropoffAddress),
-          notes: formValues.dropoffNotes ? String(formValues.dropoffNotes) : undefined,
+          address: String(formValues.dropoffAddress ?? ''),
+          notes: dropoffNotes ?? '',
+          flightNotes: flightNotes ?? '',
+          driverNotes: driverNotes ?? '',
         },
+        flightNotes: flightNotes ?? '',
+        driverNotes: driverNotes ?? '',
         bookingType: formValues.bookingType === 'scheduled' ? 'scheduled' : 'asap',
         scheduledPickupTime,
         passenger: {
-          firstName: String(formValues.firstName),
-          lastName: String(formValues.lastName),
-          email: String(formValues.email),
-          phone: String(formValues.phone),
+          firstName: String(formValues.firstName ?? ''),
+          lastName: String(formValues.lastName ?? ''),
+          email: String(formValues.email ?? ''),
+          phone: String(formValues.phone ?? ''),
           passengerCount: Number(formValues.passengerCount) || 1,
           luggageCount: Number(formValues.luggageCount) || 0,
-          specialRequests: mergedSpecialRequests,
+          specialRequests: (mergedSpecialRequests ?? driverNotes) ?? '',
         },
         vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
         pricing: finalQuote.pricing,
@@ -361,19 +381,21 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
           amount: finalQuote.pricing.totalFare,
         },
         metadata: {
-          corporateAccountId: formValues.corporateAccountId ? String(formValues.corporateAccountId) : undefined,
-          airlineCode: formValues.airlineCode ? String(formValues.airlineCode) : undefined,
-          airlineName,
-          flightNumber: formValues.flightNumber ? String(formValues.flightNumber) : undefined,
-          departureAirport: formattedDepartureAirport,
+          corporateAccountId: (formValues.corporateAccountId as string) ?? '',
+          airlineCode: (formValues.airlineCode as string) ?? '',
+          airlineName: airlineName ?? '',
+          flightNumber: (formValues.flightNumber as string) ?? '',
+          departureAirport: formattedDepartureAirport ?? '',
           hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
-          isAirportTrip: airportDetection.isAirportTrip,
-          isPickupAirport: airportDetection.isPickupAirport,
-          isDropoffAirport: airportDetection.isDropoffAirport,
-          detectedAirportIata: airportDetection.airport?.iataCode,
-          detectedAirportName: airportDetection.airport?.name,
-          flightRemarks,
-          promoCode: formValues.promoCode ? String(formValues.promoCode) : undefined,
+          isAirportTrip: Boolean(airportDetection.isAirportTrip),
+          isPickupAirport: Boolean(airportDetection.isPickupAirport),
+          isDropoffAirport: Boolean(airportDetection.isDropoffAirport),
+          detectedAirportIata: airportDetection.airport?.iataCode ?? '',
+          detectedAirportName: airportDetection.airport?.name ?? '',
+          flightRemarks: flightRemarksVal ?? '',
+          flightNotes: flightNotes ?? '',
+          driverNotes: driverNotes ?? '',
+          promoCode: (formValues.promoCode as string) ?? '',
         },
       };
 
@@ -397,9 +419,9 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
             phone: newTrip.passenger.phone,
           },
           pickupAddress: newTrip.pickupLocation.address,
-          pickupNotes: newTrip.pickupLocation.notes,
+          pickupNotes: newTrip.pickupLocation.notes ?? '',
           dropoffAddress: newTrip.dropoffLocation.address,
-          dropoffNotes: newTrip.dropoffLocation.notes,
+          dropoffNotes: newTrip.dropoffLocation.notes ?? '',
           pickupTime: newTrip.bookingType === 'scheduled' && newTrip.scheduledPickupTime
             ? new Date(newTrip.scheduledPickupTime).toLocaleString()
             : 'Immediate Ride (ASAP)',
@@ -430,9 +452,9 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
           passengerCount: newTrip.passenger.passengerCount,
           luggageCount: newTrip.passenger.luggageCount,
           pickupAddress: newTrip.pickupLocation.address,
-          pickupNotes: newTrip.pickupLocation.notes,
+          pickupNotes: newTrip.pickupLocation.notes ?? '',
           dropoffAddress: newTrip.dropoffLocation.address,
-          dropoffNotes: newTrip.dropoffLocation.notes,
+          dropoffNotes: newTrip.dropoffLocation.notes ?? '',
           pickupTime: newTrip.bookingType === 'scheduled' && newTrip.scheduledPickupTime
             ? new Date(newTrip.scheduledPickupTime).toLocaleString()
             : 'Immediate (ASAP)',

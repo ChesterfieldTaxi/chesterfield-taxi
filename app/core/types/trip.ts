@@ -59,6 +59,8 @@ export interface TripLocation {
   coordinates?: GeoPoint;
   unitOrApt?: string;
   notes?: string;
+  flightNotes?: string;
+  driverNotes?: string;
 }
 
 export interface TripPassenger {
@@ -131,6 +133,8 @@ export interface Trip {
   /** Location details */
   pickupLocation: TripLocation;
   dropoffLocation: TripLocation;
+  flightNotes?: string;
+  driverNotes?: string;
 
   /** Schedule & timing */
   bookingType: 'asap' | 'scheduled';
