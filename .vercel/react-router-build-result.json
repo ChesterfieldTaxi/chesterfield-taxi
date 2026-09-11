@@ -10,7 +10,12 @@
       }
     },
     "routeIdToServerBundleId": {
-      "routes/home": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "root": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/_index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/book": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/services": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/about": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/contact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
@@ -19,34 +24,64 @@
         "id": "root",
         "file": "app/root.tsx",
         "path": "",
-        "config": {}
-      },
-      "routes/home": {
-        "id": "routes/home",
-        "parentId": "root",
-        "file": "app/routes/home.tsx",
-        "index": true,
         "config": {
           "runtime": "nodejs"
         }
+      },
+      "routes/layout": {
+        "id": "routes/layout",
+        "parentId": "root",
+        "file": "app/routes/layout.tsx",
+        "config": {}
+      },
+      "routes/_index": {
+        "id": "routes/_index",
+        "parentId": "routes/layout",
+        "file": "app/routes/_index.tsx",
+        "index": true,
+        "config": {}
+      },
+      "routes/book": {
+        "id": "routes/book",
+        "parentId": "routes/layout",
+        "file": "app/routes/book.tsx",
+        "path": "book",
+        "config": {}
+      },
+      "routes/services": {
+        "id": "routes/services",
+        "parentId": "routes/layout",
+        "file": "app/routes/services.tsx",
+        "path": "services",
+        "config": {}
+      },
+      "routes/about": {
+        "id": "routes/about",
+        "parentId": "routes/layout",
+        "file": "app/routes/about.tsx",
+        "path": "about",
+        "config": {}
+      },
+      "routes/contact": {
+        "id": "routes/contact",
+        "parentId": "routes/layout",
+        "file": "app/routes/contact.tsx",
+        "path": "contact",
+        "config": {}
       },
       "routes/admin.login": {
         "id": "routes/admin.login",
         "parentId": "root",
         "file": "app/routes/admin.login.tsx",
         "path": "admin/login",
-        "config": {
-          "runtime": "nodejs"
-        }
+        "config": {}
       },
       "routes/admin": {
         "id": "routes/admin",
         "parentId": "root",
         "file": "app/routes/admin.tsx",
         "path": "admin",
-        "config": {
-          "runtime": "nodejs"
-        }
+        "config": {}
       }
     }
   },
@@ -69,11 +104,40 @@
         "file": "root.tsx",
         "path": ""
       },
-      "routes/home": {
-        "id": "routes/home",
+      "routes/layout": {
+        "id": "routes/layout",
         "parentId": "root",
-        "file": "routes/home.tsx",
+        "file": "routes/layout.tsx"
+      },
+      "routes/_index": {
+        "id": "routes/_index",
+        "parentId": "routes/layout",
+        "file": "routes/_index.tsx",
         "index": true
+      },
+      "routes/book": {
+        "id": "routes/book",
+        "parentId": "routes/layout",
+        "file": "routes/book.tsx",
+        "path": "book"
+      },
+      "routes/services": {
+        "id": "routes/services",
+        "parentId": "routes/layout",
+        "file": "routes/services.tsx",
+        "path": "services"
+      },
+      "routes/about": {
+        "id": "routes/about",
+        "parentId": "routes/layout",
+        "file": "routes/about.tsx",
+        "path": "about"
+      },
+      "routes/contact": {
+        "id": "routes/contact",
+        "parentId": "routes/layout",
+        "file": "routes/contact.tsx",
+        "path": "contact"
       },
       "routes/admin.login": {
         "id": "routes/admin.login",
@@ -104,8 +168,29 @@
         "file": "root.tsx",
         "children": [
           {
-            "file": "routes/home.tsx",
-            "index": true
+            "file": "routes/layout.tsx",
+            "children": [
+              {
+                "file": "routes/_index.tsx",
+                "index": true
+              },
+              {
+                "file": "routes/book.tsx",
+                "path": "book"
+              },
+              {
+                "file": "routes/services.tsx",
+                "path": "services"
+              },
+              {
+                "file": "routes/about.tsx",
+                "path": "about"
+              },
+              {
+                "file": "routes/contact.tsx",
+                "path": "contact"
+              }
+            ]
           },
           {
             "file": "routes/admin.login.tsx",
