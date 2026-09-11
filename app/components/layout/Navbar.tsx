@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router';
 import { CarIcon, PhoneIcon, MenuIcon, XIcon, ShieldCheckIcon } from '../ui/Icons';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
+import { COMPANY_CONFIG } from '../../config/companyConfig';
 
 interface NavItem {
   label: string;
@@ -24,9 +25,9 @@ export function Navbar() {
       return getAdminConfigService().getCachedSettings().company;
     } catch {
       return {
-        name: 'Chesterfield Taxi',
-        phone: '(636) 555-TAXI',
-        email: 'dispatch@chesterfieldtaxi.com',
+        name: COMPANY_CONFIG.name,
+        phone: COMPANY_CONFIG.phone.dispatch,
+        email: COMPANY_CONFIG.email.dispatch,
       };
     }
   });
@@ -65,10 +66,10 @@ export function Navbar() {
             </div>
             <div>
               <span className="text-lg font-extrabold tracking-tight text-slate-950 block leading-none">
-                {companySettings.name || 'Chesterfield Taxi'}
+                {companySettings.name || COMPANY_CONFIG.name}
               </span>
               <span className="text-[11px] font-bold tracking-wider text-amber-600 uppercase leading-none mt-1 block">
-                Professional Car Service
+                {COMPANY_CONFIG.tagline}
               </span>
             </div>
           </Link>
@@ -113,11 +114,11 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3.5">
             {/* Quick Phone Link */}
             <a
-              href={`tel:${companySettings.phone.replace(/[^0-9+]/g, '') || '+16365558294'}`}
+              href={`tel:${companySettings.phone ? companySettings.phone.replace(/[^0-9+]/g, '') : COMPANY_CONFIG.phone.primaryRaw}`}
               className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-950 text-sm font-semibold px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
               <PhoneIcon className="w-4 h-4 text-amber-500" />
-              <span>{companySettings.phone || '(636) 555-TAXI'}</span>
+              <span>{companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
 
             {/* Prominent Book Now CTA */}
@@ -203,11 +204,11 @@ export function Navbar() {
             </Link>
 
             <a
-              href={`tel:${companySettings.phone.replace(/[^0-9+]/g, '') || '+16365558294'}`}
+              href={`tel:${companySettings.phone ? companySettings.phone.replace(/[^0-9+]/g, '') : COMPANY_CONFIG.phone.primaryRaw}`}
               className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
             >
               <PhoneIcon className="w-4 h-4 text-amber-600" />
-              <span>Call Dispatch: {companySettings.phone || '(636) 555-TAXI'}</span>
+              <span>Call Dispatch: {companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
           </div>
         </div>

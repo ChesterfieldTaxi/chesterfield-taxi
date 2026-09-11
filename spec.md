@@ -60,3 +60,21 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - `hasCheckedLuggage`: Boolean toggle indicating whether passengers checked bags, alerting dispatchers and drivers to expected baggage claim wait times.
 - **Luggage Capacity Warning System:** Live comparison of total baggage count against the luggage limit of the chosen vehicle tier (Sedan: 2, Premium: 3, XL: 5, WAV: 2), displaying proactive warnings when capacity is exceeded.
 - **Flight Remarks & Dispatch Metadata:** Seamless integration of airline, flight number, departure airport, and checked luggage status into trip metadata and dispatch notes.
+
+## 8. Phase 12: Brand & Content Centralization
+- **Single-Source-of-Truth Brand Configuration:** Centralized module (`app/config/companyConfig.ts`) exposing `COMPANY_CONFIG` containing brand identity and contact information:
+  - `name`: "Chesterfield Taxi"
+  - `tagline`: "Professional Car Service"
+  - `legalName`: "Chesterfield Taxi & Transportation LLC"
+  - `phone`:
+    - `primary`: "(314) 738-0100" (formatted human-readable display)
+    - `primaryRaw`: "+13147380100" (RFC 3966 `tel:` link format)
+    - `dispatch`: "(314) 738-0100" (standardized across headers, footers, and cards)
+  - `email`:
+    - `dispatch`: "dispatch@chesterfieldtaxi.com"
+    - `support`: "support@chesterfieldtaxi.com"
+  - `operatingHours`: "24 Hours a Day, 365 Days a Year"
+  - `serviceAreas`: Standardized coverage list encompassing West St. Louis County, regional airports (STL, SUS), and downtown corridors.
+- **Elimination of Hardcoded Strings:** Complete refactor of presentation and route components (`Navbar.tsx`, `Footer.tsx`, `BookingConfirmation.tsx`, `contact.tsx`, `about.tsx`, `_index.tsx`, `services.tsx`, `book.tsx`) to consume `COMPANY_CONFIG`.
+- **Airport Origin Code Normalization:** Automatic uppercase conversion (`.toUpperCase()`) of origin airport codes (e.g., `ord` -> `ORD`) during input entry, metadata serialization in `BookingForm.tsx`, and receipt presentation in `BookingConfirmation.tsx`.
+

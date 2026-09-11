@@ -7,10 +7,11 @@ import {
   CarIcon,
   CheckIcon,
 } from '../components/ui/Icons';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export function meta() {
   return [
-    { title: 'Book a Ride – Chesterfield Taxi Online Booking' },
+    { title: `Book a Ride – ${COMPANY_CONFIG.name} Online Booking` },
     {
       name: 'description',
       content:
@@ -43,7 +44,7 @@ export default function BookRoute() {
         <div className="text-center mb-8 space-y-2">
           <div className="inline-flex items-center gap-2 bg-amber-100/80 text-amber-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            Chesterfield Taxi Reservation System
+            {COMPANY_CONFIG.name} Reservation System
           </div>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950 tracking-tight">
@@ -77,9 +78,9 @@ export default function BookRoute() {
             Need immediate roadside assistance or specialized group dispatch?
           </p>
           <p className="font-semibold text-slate-700">
-            Call our 24/7 Chesterfield Dispatch Desk at{' '}
-            <a href="tel:+16365550000" className="text-amber-600 hover:text-amber-700 underline font-bold">
-              (636) 555-TAXI
+            Call our 24/7 {COMPANY_CONFIG.name} Dispatch Desk at{' '}
+            <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="text-amber-600 hover:text-amber-700 underline font-bold">
+              {COMPANY_CONFIG.phone.dispatch}
             </a>
           </p>
         </div>

@@ -14,14 +14,15 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export function meta() {
   return [
-    { title: 'Contact & Support – Chesterfield Taxi' },
+    { title: `Contact & Support – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
       content:
-        'Contact Chesterfield Taxi dispatch 24/7. Call (636) 555-TAXI, submit corporate inquiries, or get assistance with airport reservations in Chesterfield, MO.',
+        `Contact ${COMPANY_CONFIG.name} dispatch 24/7. Call ${COMPANY_CONFIG.phone.dispatch}, submit corporate inquiries, or get assistance with airport reservations in Chesterfield, MO.`,
     },
   ];
 }
@@ -101,11 +102,11 @@ export default function ContactRoute() {
               </p>
             </div>
             <a
-              href="tel:+16365550000"
+              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
               className="inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-900 text-amber-400 font-extrabold text-sm py-3 px-4 rounded-xl transition-colors shadow-xs"
             >
               <PhoneIcon className="w-4 h-4" />
-              <span>(636) 555-TAXI</span>
+              <span>{COMPANY_CONFIG.phone.dispatch}</span>
             </a>
           </div>
 
@@ -124,11 +125,11 @@ export default function ContactRoute() {
               </p>
             </div>
             <a
-              href="mailto:dispatch@chesterfieldtaxi.com"
+              href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
               className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-3 px-4 rounded-xl transition-colors truncate"
             >
               <MailIcon className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="truncate">dispatch@chesterfieldtaxi.com</span>
+              <span className="truncate">{COMPANY_CONFIG.email.dispatch}</span>
             </a>
           </div>
 
@@ -143,11 +144,11 @@ export default function ContactRoute() {
                 <p className="text-xs text-slate-500 mt-0.5">West County Operations Hub</p>
               </div>
               <div className="text-xs text-slate-600 space-y-1">
-                <p className="font-semibold text-slate-800">17200 Chesterfield Airport Rd</p>
-                <p>Chesterfield, MO 63005</p>
+                <p className="font-semibold text-slate-800">{COMPANY_CONFIG.address.street}</p>
+                <p>{COMPANY_CONFIG.address.city}, {COMPANY_CONFIG.address.state} {COMPANY_CONFIG.address.zip}</p>
                 <div className="flex items-center gap-1.5 pt-2 text-amber-700 font-bold">
                   <ClockIcon className="w-3.5 h-3.5" />
-                  <span>24 Hours a Day &bull; 7 Days a Week</span>
+                  <span>{COMPANY_CONFIG.operatingHours}</span>
                 </div>
               </div>
             </div>
@@ -184,7 +185,7 @@ export default function ContactRoute() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">Message Received!</h3>
                   <p className="text-sm text-slate-600 max-w-md mx-auto">
-                    Thank you for reaching out. A Chesterfield Taxi dispatch representative has received
+                    Thank you for reaching out. A {COMPANY_CONFIG.name} dispatch representative has received
                     your inquiry and will respond within 1 business hour.
                   </p>
                   <Button
@@ -342,8 +343,8 @@ export default function ContactRoute() {
                       online booking portal
                     </Link>{' '}
                     or call{' '}
-                    <a href="tel:+16365550000" className="underline font-bold">
-                      (636) 555-TAXI
+                    <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="underline font-bold">
+                      {COMPANY_CONFIG.phone.dispatch}
                     </a>
                     .
                   </p>

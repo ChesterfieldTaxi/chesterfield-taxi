@@ -11,14 +11,15 @@ import {
   ChevronRightIcon,
 } from '../components/ui/Icons';
 import { Card } from '../components/ui/Card';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export function meta() {
   return [
-    { title: 'About Us – Chesterfield Taxi' },
+    { title: `About Us – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
       content:
-        'Learn about Chesterfield Taxi, our commitment to passenger safety, professional driver vetting, and wheelchair accessible fleet across West St. Louis County.',
+        `Learn about ${COMPANY_CONFIG.name}, our commitment to passenger safety, professional driver vetting, and wheelchair accessible fleet across West St. Louis County.`,
     },
   ];
 }
@@ -65,7 +66,7 @@ export default function AboutRoute() {
         {/* Page Header & Mission */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <div className="inline-flex items-center gap-2 bg-amber-100/90 text-amber-950 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-amber-300">
-            About Chesterfield Taxi
+            About {COMPANY_CONFIG.name}
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
             West County&apos;s Trusted Private Car Service
@@ -87,7 +88,7 @@ export default function AboutRoute() {
                 Locally Owned, Community Focused
               </h2>
               <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
-                Chesterfield Taxi was established to bridge the gap between impersonal rideshare apps
+                {COMPANY_CONFIG.name} was established to bridge the gap between impersonal rideshare apps
                 and outdated taxi companies. Based right in Chesterfield, Missouri, we serve corporate
                 campuses, residential subdivisions, and airport commuters throughout West St. Louis
                 County.

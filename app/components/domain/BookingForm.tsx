@@ -88,9 +88,14 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
 
   // Helper to update a field value
   const handleFieldChange = (name: string, value: unknown) => {
+    let processedValue = value;
+    if (name === 'departureAirport' && typeof value === 'string') {
+      processedValue = value.toUpperCase();
+    }
+
     setFormValues((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: processedValue,
     }));
 
     // Clear field-specific error when modified
@@ -308,13 +313,17 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
       const matchedAirline = MAJOR_AIRLINES.find((a) => a.code === formValues.airlineCode);
       const airlineName = matchedAirline ? matchedAirline.name : formValues.airlineCode ? String(formValues.airlineCode) : undefined;
 
+      const formattedDepartureAirport = formValues.departureAirport
+        ? String(formValues.departureAirport).trim().toUpperCase()
+        : undefined;
+
       // Construct structured flight remarks if airport details were provided
       let flightRemarks: string | undefined;
       if (airportDetection.isAirportTrip && formValues.flightNumber) {
         const parts: string[] = [];
         if (airlineName) parts.push(`Airline: ${airlineName} (${formValues.airlineCode})`);
         parts.push(`Flight #: ${formValues.flightNumber}`);
-        if (formValues.departureAirport) parts.push(`Origin: ${formValues.departureAirport}`);
+        if (formattedDepartureAirport) parts.push(`Origin: ${formattedDepartureAirport}`);
         parts.push(`Checked Luggage: ${formValues.hasCheckedLuggage ? 'Yes' : 'No'}`);
         flightRemarks = `[Airport Dispatch: ${parts.join(', ')}]`;
       }
@@ -354,7 +363,7 @@ export function BookingForm({ className = '', onBookingSuccess }: BookingFormPro
           airlineCode: formValues.airlineCode ? String(formValues.airlineCode) : undefined,
           airlineName,
           flightNumber: formValues.flightNumber ? String(formValues.flightNumber) : undefined,
-          departureAirport: formValues.departureAirport ? String(formValues.departureAirport) : undefined,
+          departureAirport: formattedDepartureAirport,
           hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
           isAirportTrip: airportDetection.isAirportTrip,
           isPickupAirport: airportDetection.isPickupAirport,

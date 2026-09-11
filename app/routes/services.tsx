@@ -12,14 +12,15 @@ import {
   ShieldCheckIcon,
 } from '../components/ui/Icons';
 import { Card } from '../components/ui/Card';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export function meta() {
   return [
-    { title: 'Services & Rates – Chesterfield Taxi' },
+    { title: `Services & Rates – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
       content:
-        'Comprehensive transportation services including Lambert STL airport transfers, corporate accounts, hourly charters, and WAV handicap accessible taxi service in Chesterfield, MO.',
+        `Comprehensive transportation services including Lambert STL airport transfers, corporate accounts, hourly charters, and WAV handicap accessible taxi service in ${COMPANY_CONFIG.name}, MO.`,
     },
   ];
 }
@@ -136,7 +137,7 @@ export default function ServicesRoute() {
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 bg-amber-100/90 text-amber-950 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-amber-300">
-            Chesterfield Taxi Services
+            {COMPANY_CONFIG.name} Services
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
             Premium Transportation Services

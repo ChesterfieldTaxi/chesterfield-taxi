@@ -17,6 +17,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { COMPANY_CONFIG } from '../../config/companyConfig';
 
 export interface BookingConfirmationProps {
   trip: Trip;
@@ -198,7 +199,7 @@ export function BookingConfirmation({ trip, onBookAnother, className = '' }: Boo
                 <div>
                   <span className="text-slate-500 block font-medium">Origin</span>
                   <span className="font-bold text-slate-800 truncate block">
-                    {String(trip.metadata?.departureAirport || 'N/A')}
+                    {trip.metadata?.departureAirport ? String(trip.metadata.departureAirport).toUpperCase() : 'N/A'}
                   </span>
                 </div>
                 <div>
@@ -241,7 +242,7 @@ export function BookingConfirmation({ trip, onBookAnother, className = '' }: Boo
 
       <CardFooter className="bg-slate-50/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <span className="text-xs text-slate-500 text-center sm:text-left">
-          Questions about your ride? Call 24/7 Dispatch at (636) 555-TAXI.
+          Questions about your ride? Call 24/7 Dispatch at {COMPANY_CONFIG.phone.dispatch}.
         </span>
         <Button onClick={onBookAnother} variant="primary" size="md">
           Book Another Ride

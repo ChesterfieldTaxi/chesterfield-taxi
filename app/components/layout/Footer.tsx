@@ -8,6 +8,7 @@ import {
   ClockIcon,
   ShieldCheckIcon,
 } from '../ui/Icons';
+import { COMPANY_CONFIG } from '../../config/companyConfig';
 
 const QUICK_LINKS = [
   { label: 'Home', path: '/' },
@@ -16,17 +17,6 @@ const QUICK_LINKS = [
   { label: 'About Us', path: '/about' },
   { label: 'Contact & Support', path: '/contact' },
   { label: 'Admin Console', path: '/admin' },
-];
-
-const SERVICE_AREAS = [
-  'Chesterfield, MO',
-  'Wildwood & Clarkson Valley',
-  'Ballwin & Ellisville',
-  'Town & Country',
-  'Creve Coeur & Maryland Heights',
-  'Lambert-St. Louis Airport (STL)',
-  'Spirit of St. Louis Airport (SUS)',
-  'Downtown St. Louis Metro',
 ];
 
 export function Footer() {
@@ -45,17 +35,17 @@ export function Footer() {
               </div>
               <div>
                 <span className="text-lg font-extrabold tracking-tight text-white block leading-none">
-                  Chesterfield Taxi
+                  {COMPANY_CONFIG.name}
                 </span>
                 <span className="text-[10px] font-bold tracking-widest text-amber-400 uppercase leading-none mt-1 block">
-                  Professional Car Service
+                  {COMPANY_CONFIG.tagline}
                 </span>
               </div>
             </Link>
             
             <p className="text-sm text-slate-400 leading-relaxed">
               West St. Louis County&apos;s premier licensed taxi and private transportation service.
-              Delivering dependable, upfront-priced rides 24 hours a day, 365 days a year.
+              Delivering dependable, upfront-priced rides {COMPANY_CONFIG.operatingHours.toLowerCase()}.
             </p>
 
             <div className="flex items-center gap-2 text-xs text-amber-400/90 font-medium">
@@ -90,7 +80,7 @@ export function Footer() {
               Service Areas
             </h3>
             <ul className="space-y-2 text-xs text-slate-400">
-              {SERVICE_AREAS.map((area) => (
+              {COMPANY_CONFIG.serviceAreas.map((area) => (
                 <li key={area} className="flex items-center gap-2">
                   <MapPinIcon className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
                   <span>{area}</span>
@@ -107,7 +97,7 @@ export function Footer() {
 
             <div className="space-y-3">
               <a
-                href="tel:+16365550000"
+                href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
                 className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
@@ -116,13 +106,13 @@ export function Footer() {
                 <div>
                   <span className="text-[11px] text-slate-400 block">Instant Phone Dispatch</span>
                   <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-                    (636) 555-TAXI
+                    {COMPANY_CONFIG.phone.dispatch}
                   </span>
                 </div>
               </a>
 
               <a
-                href="mailto:dispatch@chesterfieldtaxi.com"
+                href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
                 className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
@@ -131,7 +121,7 @@ export function Footer() {
                 <div>
                   <span className="text-[11px] text-slate-400 block">Support &amp; Accounts</span>
                   <span className="text-xs font-medium text-white truncate group-hover:text-amber-400 transition-colors">
-                    dispatch@chesterfieldtaxi.com
+                    {COMPANY_CONFIG.email.dispatch}
                   </span>
                 </div>
               </a>
@@ -139,7 +129,7 @@ export function Footer() {
 
             <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
               <ClockIcon className="w-4 h-4 text-slate-600 shrink-0" />
-              <span>Available 24 Hours &bull; 7 Days a Week</span>
+              <span>Available {COMPANY_CONFIG.operatingHours}</span>
             </div>
           </div>
 
@@ -148,7 +138,7 @@ export function Footer() {
         {/* Bottom Sub-footer */}
         <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>
-            &copy; {currentYear} Chesterfield Taxi LLC. All rights reserved. Registered in Missouri.
+            &copy; {currentYear} {COMPANY_CONFIG.legalName}. All rights reserved. Registered in Missouri.
           </p>
           <div className="flex items-center gap-6">
             <Link to="/book" className="hover:text-amber-400 transition-colors">

@@ -6,6 +6,7 @@ import { Input } from '../../ui/Input';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
 import { CheckIcon, SparklesIcon, CarIcon } from '../../ui/Icons';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export interface AdminGeneralTabProps {
   settings: AppSettings;
@@ -65,7 +66,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                 label="Company Name"
                 value={company.name}
                 onChange={(e) => setCompany((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Chesterfield Taxi"
+                placeholder={COMPANY_CONFIG.name}
                 required
               />
 
@@ -75,7 +76,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                   type="tel"
                   value={company.phone}
                   onChange={(e) => setCompany((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="(636) 555-TAXI"
+                  placeholder={COMPANY_CONFIG.phone.dispatch}
                   required
                 />
                 <Input
@@ -83,7 +84,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                   type="email"
                   value={company.email}
                   onChange={(e) => setCompany((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="dispatch@chesterfieldtaxi.com"
+                  placeholder={COMPANY_CONFIG.email.dispatch}
                   required
                 />
               </div>
@@ -92,7 +93,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                 label="Headquarters Address"
                 value={company.address}
                 onChange={(e) => setCompany((prev) => ({ ...prev, address: e.target.value }))}
-                placeholder="17200 Chesterfield Airport Rd, Chesterfield, MO 63005"
+                placeholder={COMPANY_CONFIG.address.formatted}
                 required
               />
             </CardContent>
@@ -211,7 +212,7 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                   className="text-xs font-semibold px-2.5 py-1 rounded-lg text-white"
                   style={{ backgroundColor: branding.secondaryColor }}
                 >
-                  {company.phone || '(636) 555-TAXI'}
+                  {company.phone || COMPANY_CONFIG.phone.dispatch}
                 </span>
               </div>
 

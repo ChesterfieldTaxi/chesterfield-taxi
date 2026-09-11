@@ -22,13 +22,14 @@ import type {
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   company: {
-    name: 'Chesterfield Taxi',
-    phone: '(636) 555-TAXI',
-    email: 'dispatch@chesterfieldtaxi.com',
-    address: '17200 Chesterfield Airport Rd, Chesterfield, MO 63005',
+    name: COMPANY_CONFIG.name,
+    phone: COMPANY_CONFIG.phone.dispatch,
+    email: COMPANY_CONFIG.email.dispatch,
+    address: COMPANY_CONFIG.address.formatted,
   },
   branding: {
     primaryColor: '#f59e0b', // Amber-500

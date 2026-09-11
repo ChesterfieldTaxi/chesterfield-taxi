@@ -12,6 +12,7 @@ import type {
   AdminDispatchAlertEmailPayload,
   EmailDispatchResult,
 } from './types';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export interface EmailServiceConfig {
   apiKey?: string;
@@ -19,8 +20,8 @@ export interface EmailServiceConfig {
   adminAlertRecipient?: string;
 }
 
-const DEFAULT_FROM_ADDRESS = 'Chesterfield Taxi <dispatch@chesterfieldtaxi.com>';
-const DEFAULT_ADMIN_EMAIL = 'admin@chesterfieldtaxi.com';
+const DEFAULT_FROM_ADDRESS = `${COMPANY_CONFIG.name} <${COMPANY_CONFIG.email.dispatch}>`;
+const DEFAULT_ADMIN_EMAIL = COMPANY_CONFIG.email.support || 'admin@chesterfieldtaxi.com';
 
 /**
  * Generates branded HTML body for passenger booking confirmations.
@@ -31,52 +32,47 @@ function buildBookingConfirmationHtml(payload: BookingConfirmationEmailPayload):
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>Booking Confirmation - Chesterfield Taxi</title>
+        <title>Booking Confirmation - ${COMPANY_CONFIG.name}</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }
           .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
           .header { background: #0f172a; color: #ffffff; padding: 24px; text-align: center; }
           .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
-          .header p { margin: 6px 0 0; color: #94a3b8; font-size: 14px; }
           .content { padding: 24px; }
-          .summary-card { background: #f1f5f9; border-radius: 6px; padding: 16px; margin-bottom: 20px; }
+          .details-card { background: #f1f5f9; border-radius: 6px; padding: 16px; margin: 16px 0; }
           .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-          .label { font-weight: 600; color: #64748b; }
-          .value { font-weight: 600; color: #0f172a; }
-          .divider { border-top: 1px solid #e2e8f0; margin: 16px 0; }
-          .fare-total { font-size: 20px; color: #0f172a; font-weight: 700; }
-          .footer { text-align: center; color: #94a3b8; font-size: 12px; padding: 16px; border-top: 1px solid #f1f5f9; }
+          .label { color: #64748b; font-weight: 500; }
+          .value { font-weight: 600; text-align: right; }
+          .fare-total { font-size: 18px; font-weight: 700; color: #d97706; }
+          .divider { height: 1px; background: #cbd5e1; margin: 12px 0; }
+          .footer { padding: 16px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Chesterfield Taxi</h1>
-            <p>Your ride request has been received</p>
+            <h1>${COMPANY_CONFIG.name}</h1>
+            <p style="margin: 4px 0 0; color: #f59e0b; font-size: 14px; font-weight: 600;">Ride Confirmation</p>
           </div>
           <div class="content">
-            <p>Hello <strong>${payload.passenger.firstName}</strong>,</p>
-            <p>Thank you for choosing Chesterfield Taxi. Your booking is confirmed and our dispatch team is assigning a qualified driver.</p>
+            <p>Dear ${payload.passenger.firstName} ${payload.passenger.lastName},</p>
+            <p>Your ride booking <strong>#${payload.tripId}</strong> has been received and confirmed by our 24/7 dispatch operations.</p>
             
-            <div class="summary-card">
+            <div class="details-card">
               <div class="row">
-                <span class="label">Booking ID</span>
-                <span class="value">${payload.tripId}</span>
+                <span class="label">Pickup Location</span>
+                <span class="value">${payload.pickupAddress}</span>
+              </div>
+              <div class="row">
+                <span class="label">Dropoff Location</span>
+                <span class="value">${payload.dropoffAddress}</span>
               </div>
               <div class="row">
                 <span class="label">Pickup Time</span>
                 <span class="value">${payload.pickupTime} (${payload.bookingType.toUpperCase()})</span>
               </div>
               <div class="row">
-                <span class="label">Pickup Location</span>
-                <span class="value">${payload.pickupAddress}</span>
-              </div>
-              <div class="row">
-                <span class="label">Destination</span>
-                <span class="value">${payload.dropoffAddress}</span>
-              </div>
-              <div class="row">
-                <span class="label">Vehicle Tier</span>
+                <span class="label">Vehicle Class</span>
                 <span class="value">${payload.vehicleTier.toUpperCase()}</span>
               </div>
               <div class="divider"></div>
@@ -91,11 +87,11 @@ function buildBookingConfirmationHtml(payload: BookingConfirmationEmailPayload):
             </div>
             
             <p style="font-size: 13px; color: #64748b;">
-              Need to modify or cancel your booking? Please reply directly to this email or call our dispatch desk.
+              Need to modify or cancel your booking? Please reply directly to this email or call our dispatch desk at ${COMPANY_CONFIG.phone.dispatch}.
             </p>
           </div>
           <div class="footer">
-            &copy; ${new Date().getFullYear()} Chesterfield Taxi Portal. All rights reserved.
+            &copy; ${new Date().getFullYear()} ${COMPANY_CONFIG.legalName}. All rights reserved.
           </div>
         </div>
       </body>

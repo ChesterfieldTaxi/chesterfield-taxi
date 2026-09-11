@@ -15,10 +15,11 @@ import {
 } from '../components/ui/Icons';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export function meta() {
   return [
-    { title: 'Chesterfield Taxi – Professional Taxi & Executive Car Service' },
+    { title: `${COMPANY_CONFIG.name} – ${COMPANY_CONFIG.tagline}` },
     {
       name: 'description',
       content:
@@ -216,11 +217,11 @@ export default function IndexRoute() {
 
                   <div className="text-center">
                     <a
-                      href="tel:+16365550000"
+                      href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
                       className="text-xs text-slate-500 hover:text-slate-900 inline-flex items-center gap-1 font-semibold"
                     >
                       <PhoneIcon className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Prefer to call? Speak with dispatch: (636) 555-TAXI</span>
+                      <span>Prefer to call? Speak with dispatch: {COMPANY_CONFIG.phone.dispatch}</span>
                     </a>
                   </div>
                 </div>
@@ -337,11 +338,11 @@ export default function IndexRoute() {
             </Link>
 
             <a
-              href="tel:+16365550000"
+              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-base font-bold px-6 py-3.5 rounded-xl border border-slate-800 transition-colors"
             >
               <PhoneIcon className="w-4 h-4 text-amber-400" />
-              <span>(636) 555-TAXI</span>
+              <span>{COMPANY_CONFIG.phone.dispatch}</span>
             </a>
           </div>
         </div>
