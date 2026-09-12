@@ -582,6 +582,48 @@ export function BookingEngine({
     return true;
   };
 
+  const resetForm = () => {
+    setFormValues({
+      bookingType: 'asap',
+      scheduledDate: '',
+      scheduledTime: '',
+      pickupAddress: '',
+      pickupNotes: '',
+      intermediateStops: [],
+      hasIntermediateStop: false,
+      intermediateStopAddress: '',
+      dropoffAddress: '',
+      dropoffNotes: '',
+      passengerCount: 1,
+      luggageCount: 0,
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      corporateAccountId: '',
+      specialInstructions: '',
+      paymentMethod: 'credit_card',
+      airlineCode: '',
+      flightNumber: '',
+      departureAirport: '',
+      hasCheckedLuggage: false,
+      isRecurring: false,
+      recurringFrequency: 'daily',
+      recurringEndDate: '',
+      isPriceOverridden: false,
+      manualFare: '',
+      overrideReason: '',
+      bypassPayment: false,
+      waiveMultiStopFees: false,
+      waiveAirportFee: false,
+      bypassSurge: false,
+      customTolls: '',
+      manualDiscount: '',
+    });
+    setErrors({});
+    passengerLookup.clearAll();
+  };
+
   // Submission handler
   const handleSubmitBooking = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1025,9 +1067,9 @@ export function BookingEngine({
       )}
 
       {/* Main Single-Page Two-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className={`grid grid-cols-1 ${mode === 'customer' ? 'lg:grid-cols-12 gap-8' : 'gap-4'} items-start`}>
         {/* Left Column: Seamless Vertical Form Sections */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className={mode === 'customer' ? 'lg:col-span-8 space-y-6' : 'lg:col-span-12 space-y-4'}>
           {submitError && (
             <Alert variant="error" title="Reservation Submission Error">
               {submitError}
@@ -1047,9 +1089,9 @@ export function BookingEngine({
                   </div>
                   <Badge variant="warning" size="sm">Operations</Badge>
                 </div>
-                <CardDescription className="text-xs text-slate-600">
+                {mode === 'customer' && (<CardDescription className="text-xs text-slate-600">
                   Search by phone, email, or name to auto-populate passenger info and preferences.
-                </CardDescription>
+                </CardDescription>)}
               </CardHeader>
               <CardContent className="p-4 sm:p-5 space-y-3">
                 <div className="relative">
@@ -1478,9 +1520,9 @@ export function BookingEngine({
                   </div>
                   <Badge variant="info" size="sm">Batch Dispatch</Badge>
                 </div>
-                <CardDescription className="text-xs text-slate-600">
+                {mode === 'customer' && (<CardDescription className="text-xs text-slate-600">
                   Generate repeating daily or weekly bookings sharing a single Recurring Group ID.
-                </CardDescription>
+                </CardDescription>)}
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4">
                 <div onFocusCapture={() => setActiveField('isRecurring')}>
@@ -1901,9 +1943,10 @@ export function BookingEngine({
         </div>
 
         {/* Right Column: Contextual Help & Real-Time Fare Breakdown Panel */}
-        <div className="lg:col-span-4 sticky top-6 space-y-5">
-          {/* Contextual Guidance Card */}
-          <Card variant="default" className="border-amber-200/90 shadow-xs bg-amber-50/30 overflow-hidden transition-all">
+        {mode === 'customer' && (
+          <div className="lg:col-span-4 sticky top-6 space-y-5">
+            {/* Contextual Guidance Card */}
+            <Card variant="default" className="border-amber-200/90 shadow-xs bg-amber-50/30 overflow-hidden transition-all">
             <div className="bg-amber-100/70 px-4 py-2.5 border-b border-amber-200 flex items-center gap-2 text-xs font-bold text-amber-950 uppercase tracking-wide">
               {activeGuide.icon}
               <span>{activeGuide.title}</span>
@@ -2047,6 +2090,7 @@ export function BookingEngine({
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
 
       {/* Sticky Bottom Summary Footer */}
@@ -2089,13 +2133,25 @@ export function BookingEngine({
               )}
             </div>
 
+            {mode !== 'customer' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={resetForm}
+                className="text-slate-500 font-bold ml-2"
+              >
+                Clear Form
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="primary"
-              size="lg"
+              size={mode === 'customer' ? 'lg' : 'md'}
               isLoading={isSubmitting}
               onClick={() => handleSubmitBooking()}
-              className="px-6 sm:px-8 shadow-md text-sm sm:text-base font-bold whitespace-nowrap"
+              className={`${mode === 'customer' ? 'px-6 sm:px-8 shadow-md text-sm sm:text-base' : 'px-4 shadow-sm text-sm'} font-bold whitespace-nowrap`}
             >
               {mode === 'customer' ? 'Book Ride Now' : 'Dispatch Booking'}
             </Button>
@@ -2106,3 +2162,4 @@ export function BookingEngine({
   );
 }
 export default BookingEngine;
+

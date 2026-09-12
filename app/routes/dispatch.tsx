@@ -42,7 +42,7 @@ export default function DispatchLayout() {
 
   // Draft Tabs state
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
-  const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', title: 'New Booking', isNew: true }]);
+  const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', title: '#1', isNew: true }]);
   const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
   const [nextDraftIdx, setNextDraftIdx] = useState(2);
 
@@ -90,7 +90,7 @@ export default function DispatchLayout() {
       alert(`Maximum of ${maxDrafts} drafts allowed.`);
       return;
     }
-    const newDraft = { id: `new-${nextDraftIdx}`, title: `New Booking ${nextDraftIdx}`, isNew: true };
+    const newDraft = { id: `new-${nextDraftIdx}`, title: `#${nextDraftIdx}`, isNew: true };
     setDrafts([...drafts, newDraft]);
     setActiveDraftId(newDraft.id);
     setNextDraftIdx(n => n + 1);
@@ -236,15 +236,9 @@ export default function DispatchLayout() {
         {/* Right Side (Map + Queue) */}
         <div className="flex-1 flex flex-col relative bg-slate-200/50">
           
-          {/* Center Stage Map (Mock) */}
-          <div className="flex-1 relative flex items-center justify-center bg-blue-50/50 border-b border-slate-300 overflow-hidden">
-             {/* Map Placeholder */}
-             <div className="absolute inset-0" style={{ backgroundSize: '40px 40px', backgroundImage: 'linear-gradient(to right, #cbd5e1 1px, transparent 1px), linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)' }} />
-             <div className="relative z-10 flex flex-col items-center p-6 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-blue-100/50">
-                <MapPinIcon className="w-12 h-12 text-blue-500 mb-2 animate-bounce" />
-                <h3 className="text-lg font-bold text-slate-800">Live Google Map Sync</h3>
-                <p className="text-xs text-slate-500">Route polylines synced to active tab.</p>
-             </div>
+          {/* Center Stage Map */}
+          <div className="flex-1 relative flex items-stretch justify-stretch bg-blue-50/50 border-b border-slate-300 overflow-hidden">
+             <DispatchMap activeTrip={trips.find(t => activeDraftId === `edit-${t.id}`) || null} />
           </div>
 
           {/* Resize Handle Y */}
@@ -279,7 +273,7 @@ export default function DispatchLayout() {
             {/* Table */}
             <div className="flex-1 overflow-auto">
                <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-white sticky top-0 shadow-sm text-[10px] uppercase font-bold text-slate-400">
+                  <thead className="bg-white sticky top-0 shadow-sm text-[10px] uppercase font-bold text-slate-400 z-10">
                     <tr>
                       <th className="px-4 py-2">ID</th>
                       <th className="px-4 py-2">Status</th>
@@ -319,4 +313,62 @@ export default function DispatchLayout() {
       </div>
     </div>
   );
+}
+
+function DispatchMap({ activeTrip }: { activeTrip: Trip | null }) {
+  const mapRef = React.useRef<HTMLDivElement>(null);
+  const mapInstance = React.useRef<google.maps.Map | null>(null);
+  const directionsRenderer = React.useRef<google.maps.DirectionsRenderer | null>(null);
+
+  useEffect(() => {
+    import('@googlemaps/js-api-loader').then(({ Loader }) => {
+      const loader = new Loader({
+        apiKey: typeof window !== 'undefined' && window.ENV?.VITE_GOOGLE_MAPS_API_KEY ? window.ENV.VITE_GOOGLE_MAPS_API_KEY : '',
+        version: "weekly",
+      });
+
+      (loader as any).importLibrary('maps').then(() => {
+        if (!mapRef.current) return;
+        
+        if (!mapInstance.current) {
+          mapInstance.current = new google.maps.Map(mapRef.current, {
+            center: { lat: 38.6270, lng: -90.1994 }, // Default to St. Louis
+            zoom: 10,
+            disableDefaultUI: true,
+            zoomControl: true,
+          });
+          directionsRenderer.current = new google.maps.DirectionsRenderer({
+            map: mapInstance.current,
+            suppressMarkers: false,
+          });
+        }
+
+        if (activeTrip && activeTrip.pickupLocation?.coordinates && activeTrip.dropoffLocation?.coordinates) {
+          const originLatLng = { lat: activeTrip.pickupLocation.coordinates.lat, lng: activeTrip.pickupLocation.coordinates.lng };
+          const destLatLng = { lat: activeTrip.dropoffLocation.coordinates.lat, lng: activeTrip.dropoffLocation.coordinates.lng };
+          
+          const directionsService = new google.maps.DirectionsService();
+          directionsService.route({
+            origin: originLatLng,
+            destination: destLatLng,
+            travelMode: google.maps.TravelMode.DRIVING,
+          }, (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK && directionsRenderer.current) {
+              directionsRenderer.current.setDirections(result);
+            } else {
+               // Fallback just center map on pickup
+               mapInstance.current?.setCenter(originLatLng);
+               mapInstance.current?.setZoom(12);
+            }
+          });
+        } else if (directionsRenderer.current) {
+           directionsRenderer.current.setDirections({ routes: [] } as any); // Clear directions
+        }
+      }).catch((err: unknown) => {
+         console.warn("Failed to load google maps for dispatcher map:", err);
+      });
+    });
+  }, [activeTrip]);
+
+  return <div ref={mapRef} className="w-full h-full" />;
 }
