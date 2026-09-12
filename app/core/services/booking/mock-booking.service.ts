@@ -394,5 +394,25 @@ export class MockBookingService implements IBookingService {
 
     return updated;
   }
+
+  public async updateTrip(tripId: string, updates: Partial<Trip>): Promise<Trip> {
+    const trip = this.trips.get(tripId);
+    if (!trip) {
+      throw new Error(`Trip ${tripId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    const updated: Trip = {
+      ...trip,
+      ...updates,
+      updatedAt: now,
+    };
+
+    this.trips.set(tripId, updated);
+    this.persistToStorage();
+    this.notifyListeners(updated);
+
+    return updated;
+  }
 }
 

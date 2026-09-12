@@ -124,5 +124,10 @@ export interface IBookingService {
       offeredToIds?: string[];
     }
   ): Promise<Trip>;
+
+  /**
+   * Updates an existing trip's details in Firestore (e.g., dispatcher editing route, passenger, pricing, notes).
+   */
+  updateTrip?(tripId: string, updates: Partial<Trip>): Promise<Trip>;
 }
 

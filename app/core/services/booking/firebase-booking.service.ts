@@ -399,5 +399,29 @@ export class FirebaseBookingService implements IBookingService {
       ...updates,
     };
   }
+
+  public async updateTrip(tripId: string, updates: Partial<Trip>): Promise<Trip> {
+    const tripDocRef = doc(this.db, this.collectionName, tripId);
+    const snapshot = await getDoc(tripDocRef);
+
+    if (!snapshot.exists()) {
+      throw new Error(`Booking with ID "${tripId}" not found in Firestore.`);
+    }
+
+    const trip = snapshot.data() as Trip;
+    const now = new Date().toISOString();
+
+    const cleanUpdates = sanitizePayload({
+      ...updates,
+      updatedAt: now,
+    });
+
+    await updateDoc(tripDocRef, cleanUpdates);
+
+    return {
+      ...trip,
+      ...cleanUpdates,
+    };
+  }
 }
 

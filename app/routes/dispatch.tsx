@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -7,11 +7,10 @@ import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
 import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import { BookingEngine } from '../components/domain/BookingEngine';
-import { CarIcon, SpinnerIcon, MapPinIcon } from '../components/ui/Icons';
-import { Button } from '../components/ui/Button';
+import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
+import { loadGoogleMaps, isGoogleMapsReady, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
+import { SpinnerIcon } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
-import { Input } from '../components/ui/Input';
 
 export function meta() {
   return [
@@ -22,38 +21,40 @@ export function meta() {
 
 interface DraftTab {
   id: string;
-  title: string;
   isNew: boolean;
-  initialValues?: Partial<Record<string, unknown>>;
+  trip?: Trip;
+  formValues?: DispatchFormValues;
 }
 
 export default function DispatchLayout() {
   const navigate = useNavigate();
 
-  // Auth & Config state
+  // Auth & Config
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [settings, setSettings] = useState<AppSettings>(() => getAdminConfigService().getCachedSettings());
-  const [isLiveFirebase, setIsLiveFirebase] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   // Trips state
   const [trips, setTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
 
   // Draft Tabs state
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
-  const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', title: '#1', isNew: true }]);
+  const [drafts, setDrafts] = useState<DraftTab[]>([
+    { id: 'new-1', isNew: true },
+  ]);
   const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
   const [nextDraftIdx, setNextDraftIdx] = useState(2);
 
-  // Resizable state
-  const [sidebarWidth, setSidebarWidth] = useState(450); // 320px - 600px
+  // Resizable layout dimensions
+  const [sidebarWidth, setSidebarWidth] = useState(420); // 340px - 600px
   const [queueHeight, setQueueHeight] = useState(250); // 180px - 50%
 
   // Auth Guard
   useEffect(() => {
-    setIsLiveFirebase(isFirebaseConfigured());
     const unsubscribe = getAdminAuthService().onAuthStateChanged((currentUser) => {
       if (!currentUser) {
         navigate('/admin/login?message=unauthenticated', { replace: true });
@@ -73,11 +74,16 @@ export default function DispatchLayout() {
     return unsub;
   }, []);
 
-  // Trips subscription
+  // Trips real-time subscription
   useEffect(() => {
     const service = getBookingService();
     if (service.subscribeToAllTrips) {
-      return service.subscribeToAllTrips(setTrips, (err) => console.error(err));
+      return service.subscribeToAllTrips(
+        (updatedTrips) => setTrips(updatedTrips),
+        (err) => console.error('[Dispatch] Trips subscription error:', err)
+      );
+    } else if (service.getAllTrips) {
+      service.getAllTrips().then(setTrips).catch(console.error);
     }
   }, []);
 
@@ -86,261 +92,528 @@ export default function DispatchLayout() {
     navigate('/admin/login', { replace: true });
   };
 
+  // Create new draft
   const createDraft = () => {
     if (drafts.length >= maxDrafts) {
       alert(`Maximum of ${maxDrafts} drafts allowed.`);
       return;
     }
-    const newDraft = { id: `new-${nextDraftIdx}`, title: `#${nextDraftIdx}`, isNew: true };
+    const newDraft: DraftTab = {
+      id: `new-${nextDraftIdx}`,
+      isNew: true,
+    };
     setDrafts([...drafts, newDraft]);
     setActiveDraftId(newDraft.id);
-    setNextDraftIdx(n => n + 1);
+    setNextDraftIdx((n) => n + 1);
   };
 
+  // Close draft
   const closeDraft = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (drafts.length === 1) return; // Keep at least one
-    const newDrafts = drafts.filter(d => d.id !== id);
-    setDrafts(newDrafts);
+    if (drafts.length === 1) {
+      // If closing the only tab, reset it to new-1
+      setDrafts([{ id: `new-${nextDraftIdx}`, isNew: true }]);
+      setActiveDraftId(`new-${nextDraftIdx}`);
+      setNextDraftIdx((n) => n + 1);
+      return;
+    }
+
+    const filtered = drafts.filter((d) => d.id !== id);
+    setDrafts(filtered);
     if (activeDraftId === id) {
-      setActiveDraftId(newDrafts[newDrafts.length - 1].id);
+      setActiveDraftId(filtered[filtered.length - 1].id);
     }
   };
 
-  const filteredTrips = trips.filter(trip => {
+  // Double click queue row to open/switch to edit tab
+  const handleOpenEditTrip = (trip: Trip) => {
+    const editTabId = `edit-${trip.id}`;
+    const existing = drafts.find((d) => d.id === editTabId);
+
+    if (existing) {
+      setActiveDraftId(editTabId);
+    } else {
+      if (drafts.length >= maxDrafts) {
+        alert(`Maximum of ${maxDrafts} tabs open. Please close a tab first.`);
+        return;
+      }
+      const newEditTab: DraftTab = {
+        id: editTabId,
+        isNew: false,
+        trip,
+      };
+      setDrafts([...drafts, newEditTab]);
+      setActiveDraftId(editTabId);
+    }
+    setSelectedQueueTripId(trip.id);
+  };
+
+  // Handle live form values changes for a draft (for tab titles & map sync)
+  const handleDraftValuesChange = (draftId: string, values: DispatchFormValues) => {
+    setDrafts((prev) =>
+      prev.map((d) => (d.id === draftId ? { ...d, formValues: values } : d))
+    );
+  };
+
+  // Handle successful booking create or edit
+  const handleBookingSuccess = (draftId: string, trip: Trip, isEdit: boolean) => {
+    if (isEdit) {
+      // Successfully updated existing trip
+      alert(`Trip #${trip.id.slice(-6)} updated successfully!`);
+    } else {
+      // Successfully booked new trip
+      alert(`Trip #${trip.id.slice(-6)} booked successfully!`);
+      // Close the draft tab and open a fresh new tab
+      const remaining = drafts.filter((d) => d.id !== draftId);
+      if (remaining.length === 0) {
+        const freshTab: DraftTab = { id: `new-${nextDraftIdx}`, isNew: true };
+        setDrafts([freshTab]);
+        setActiveDraftId(freshTab.id);
+        setNextDraftIdx((n) => n + 1);
+      } else {
+        setDrafts(remaining);
+        setActiveDraftId(remaining[remaining.length - 1].id);
+      }
+    }
+  };
+
+  // Clear draft
+  const handleClearDraft = (draftId: string) => {
+    setDrafts((prev) =>
+      prev.map((d) => (d.id === draftId ? { ...d, formValues: undefined } : d))
+    );
+  };
+
+  // Compute smart dynamic title for tabs
+  const getTabTitle = (draft: DraftTab): string => {
+    const isCompact = drafts.length > 3;
+    if (draft.isNew) {
+      if (draft.formValues?.passengerName?.trim()) {
+        const name = draft.formValues.passengerName.trim();
+        return isCompact ? name.split(' ')[0] : name;
+      }
+      const num = draft.id.replace('new-', '');
+      return isCompact ? `#${num}` : `New Booking ${num}`;
+    } else {
+      const shortId = draft.trip?.id.slice(-4) || draft.id.replace('edit-', '').slice(-4);
+      return isCompact ? `#${shortId}` : `Edit #${shortId}`;
+    }
+  };
+
+  // Filtered trips in queue
+  const filteredTrips = trips.filter((trip) => {
     if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       return (
+        trip.id.toLowerCase().includes(term) ||
         trip.passenger.firstName.toLowerCase().includes(term) ||
         trip.passenger.lastName.toLowerCase().includes(term) ||
-        trip.passenger.phone.includes(term)
+        trip.passenger.phone.includes(term) ||
+        trip.pickupLocation.address.toLowerCase().includes(term) ||
+        trip.dropoffLocation.address.toLowerCase().includes(term)
       );
     }
     return true;
   });
 
+  const unconfirmedCount = trips.filter(
+    (t) => t.status === 'pending' || !t.assignedDriverId
+  ).length;
+
   const getStatusBadge = (status: TripStatus) => {
     switch (status) {
-      case 'pending': return <Badge variant="warning">Pending</Badge>;
-      case 'offered': return <Badge variant="info">Offered</Badge>;
-      case 'assigned': return <Badge variant="primary">Assigned</Badge>;
-      case 'completed': return <Badge variant="success">Completed</Badge>;
-      default: return <Badge variant="neutral">{status}</Badge>;
+      case 'pending':
+        return <Badge variant="warning">Pending</Badge>;
+      case 'offered':
+        return <Badge variant="info">Offered</Badge>;
+      case 'assigned':
+        return <Badge variant="primary">Assigned</Badge>;
+      case 'completed':
+        return <Badge variant="success">Completed</Badge>;
+      case 'cancelled':
+        return <Badge variant="danger">Cancelled</Badge>;
+      default:
+        return <Badge variant="neutral">{status}</Badge>;
     }
   };
 
+  // Active Draft object for map route display
+  const activeDraft = drafts.find((d) => d.id === activeDraftId);
+
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
         <SpinnerIcon className="w-8 h-8 animate-spin text-amber-500" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden text-slate-900">
-      {/* ─── Top Header ─── */}
-      <header className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shrink-0 shadow-md z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-slate-900">
-            <CarIcon className="w-4 h-4" />
-          </div>
-          <div>
-            <h1 className="text-sm font-extrabold leading-none">{settings.company.name}</h1>
-            <span className="text-[10px] text-amber-400 uppercase tracking-wider font-bold">Dispatch Console</span>
-          </div>
+    <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden text-slate-900 select-none">
+      {/* ─────────────────────────────────────────────────────────────
+          1. TOP NAVIGATION BAR (Mockup Matching)
+      ───────────────────────────────────────────────────────────── */}
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30 shadow-sm">
+        {/* Left: Navigation Buttons / Pills */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <span className="text-sm">⊞</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded hover:bg-slate-100 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors"
+          >
+            <span>🚗</span>
+            <span>Drivers</span>
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded hover:bg-slate-100 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors"
+          >
+            <span>💬</span>
+            <span>Messages</span>
+          </button>
+
+          <a
+            href="tel:+13147380100"
+            className="px-3 py-1.5 rounded hover:bg-slate-100 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors"
+          >
+            <span>📞</span>
+            <span>Phone</span>
+          </a>
         </div>
-        <div className="flex items-center gap-3">
-          {user?.role === 'admin' && (
-            <Link to="/admin" className="text-xs text-emerald-400 hover:text-emerald-300 font-bold px-3 py-1.5 bg-slate-800 rounded-lg">
-              &larr; Return to Admin Settings
-            </Link>
+
+        {/* Center: Brand Badge */}
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs tracking-tighter">
+            CT
+          </div>
+          <span className="font-extrabold text-sm tracking-tight text-slate-900">
+            {settings.company.name}
+          </span>
+        </div>
+
+        {/* Right: Admin User Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-colors"
+          >
+            <div className="w-6 h-6 rounded-full bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-[11px]">
+              {user?.email ? user.email[0].toUpperCase() : 'A'}
+            </div>
+            <span>{user?.email || 'Admin User'}</span>
+            <span className="text-[10px] text-slate-400">▾</span>
+          </button>
+
+          {isProfileMenuOpen && (
+            <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50 text-xs font-medium">
+              <div className="px-3 py-2 border-b border-slate-100 text-slate-500">
+                Signed in as <strong className="text-slate-800 block truncate">{user?.email}</strong>
+              </div>
+              {user?.role === 'admin' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-blue-600"
+                >
+                  <span>⚙️</span>
+                  <span>Admin Settings</span>
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50"
+              >
+                <span>↪</span>
+                <span>Log out</span>
+              </button>
+            </div>
           )}
-          <span className="text-xs text-slate-400 font-semibold">{user?.email}</span>
-          <Button type="button" variant="outline" size="sm" onClick={handleSignOut} className="text-slate-300 border-slate-700">
-            Sign Out
-          </Button>
         </div>
       </header>
 
-      {/* ─── Split Screen Workspace ─── */}
+      {/* ─────────────────────────────────────────────────────────────
+          2. MAIN SPLIT-SCREEN WORKSPACE
+      ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar (Drafts) */}
-        <div 
-          className="flex flex-col bg-white border-r border-slate-200 relative shrink-0"
-          style={{ width: sidebarWidth, minWidth: 320, maxWidth: 600 }}
+        {/* ─── Left Sidebar (Tabs & Dedicated Dispatch Booking Engine) ─── */}
+        <div
+          className="flex flex-col bg-white border-r border-slate-200 relative shrink-0 shadow-sm"
+          style={{ width: sidebarWidth, minWidth: 340, maxWidth: 600 }}
         >
           {/* Resize Handle X */}
-          <div 
-            className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-amber-400/50 active:bg-amber-500 z-10"
+          <div
+            className="absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 active:bg-blue-500 z-20"
             onMouseDown={(e) => {
               const startX = e.clientX;
               const startW = sidebarWidth;
-              const onMove = (ev: MouseEvent) => setSidebarWidth(Math.min(600, Math.max(320, startW + ev.clientX - startX)));
-              const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+              const onMove = (ev: MouseEvent) =>
+                setSidebarWidth(Math.min(600, Math.max(340, startW + ev.clientX - startX)));
+              const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+              };
               window.addEventListener('mousemove', onMove);
               window.addEventListener('mouseup', onUp);
             }}
           />
 
           {/* Draft Tabs Bar */}
-          <div className="h-10 bg-slate-200 border-b border-slate-300 flex items-end px-1 gap-0.5 overflow-hidden shrink-0 relative pr-20 pt-1">
-            {drafts.map(draft => (
-              <div 
-                key={draft.id}
-                onClick={() => setActiveDraftId(draft.id)}
-                className={`group flex items-center justify-between gap-1 px-2 py-1.5 rounded-t-lg border border-b-0 text-[11px] font-bold cursor-pointer flex-1 min-w-[60px] max-w-[150px] transition-colors ${activeDraftId === draft.id ? 'bg-white border-slate-300 text-slate-900 z-10' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-                style={activeDraftId === draft.id ? { boxShadow: '0 -2px 5px rgba(0,0,0,0.02)' } : {}}
-              >
-                <span className="truncate">{draft.title}</span>
-                {drafts.length > 1 && (
-                  <button type="button" onClick={(e) => closeDraft(draft.id, e)} className="text-slate-400 hover:text-red-500 p-0.5 rounded-full hover:bg-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 leading-none">✕</button>
-                )}
-              </div>
-            ))}
-            
-            {/* Overflow Dropdown / Create Controls */}
+          <div className="h-10 bg-slate-200/90 border-b border-slate-300 flex items-end px-1 gap-1 overflow-hidden shrink-0 relative pr-20 pt-1">
+            {drafts.map((draft) => {
+              const isActive = activeDraftId === draft.id;
+              const title = getTabTitle(draft);
+              return (
+                <div
+                  key={draft.id}
+                  onClick={() => setActiveDraftId(draft.id)}
+                  className={`group flex items-center justify-between gap-1 px-2.5 py-1.5 rounded-t-lg border text-xs font-semibold cursor-pointer flex-1 min-w-[50px] max-w-[150px] transition-colors ${
+                    isActive
+                      ? 'bg-white border-slate-300 border-b-white text-slate-900 shadow-sm z-10'
+                      : 'bg-slate-100/90 border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  <span className="truncate">{title}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => closeDraft(draft.id, e)}
+                    className="text-slate-400 hover:text-red-500 p-0.5 rounded hover:bg-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 leading-none"
+                    title="Close Tab"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Overflow Dropdown & Add Button */}
             <div className="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-slate-200 via-slate-200 to-transparent w-24 flex items-center justify-end px-2 gap-1 z-20">
-               <select
-                 className="opacity-0 absolute inset-0 cursor-pointer w-full h-full z-10"
-                 value={activeDraftId}
-                 onChange={(e) => setActiveDraftId(e.target.value)}
-                 title="All Tabs"
-               >
-                 {drafts.map(d => (
-                   <option key={d.id} value={d.id}>{d.title}</option>
-                 ))}
-               </select>
-               <div className="pointer-events-none px-2 py-1 rounded hover:bg-slate-300 text-slate-500 flex items-center justify-center font-bold">
-                 ...
-               </div>
-               <button type="button" onClick={createDraft} className="px-2 py-1 rounded bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold shadow-sm relative z-20">
-                 +
-               </button>
+              <select
+                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full z-10"
+                value={activeDraftId}
+                onChange={(e) => setActiveDraftId(e.target.value)}
+                title="All Open Tabs"
+              >
+                {drafts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {getTabTitle(d)}
+                  </option>
+                ))}
+              </select>
+
+              <div className="pointer-events-none px-2 py-1 rounded hover:bg-slate-300 text-slate-600 flex items-center justify-center font-bold text-xs">
+                ...
+              </div>
+
+              <button
+                type="button"
+                onClick={createDraft}
+                className="px-2.5 py-1 rounded bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-extrabold shadow-sm relative z-20 transition-all"
+                title="Open New Booking Draft"
+              >
+                +
+              </button>
             </div>
           </div>
 
-          {/* Active Draft Content */}
-          <div className="flex-1 overflow-y-auto bg-slate-50 relative dispatcher-compact-container">
-            <style dangerouslySetInnerHTML={{__html: `
-              .dispatcher-compact-container .p-4, .dispatcher-compact-container .sm\\:p-6 { padding: 0.75rem !important; }
-              .dispatcher-compact-container .space-y-6 > * + * { margin-top: 0.75rem !important; }
-              .dispatcher-compact-container .gap-4, .dispatcher-compact-container .gap-6, .dispatcher-compact-container .sm\\:gap-4 { gap: 0.5rem !important; }
-              .dispatcher-compact-container .mb-6 { margin-bottom: 0.5rem !important; }
-              .dispatcher-compact-container .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-              .dispatcher-compact-container .mt-6 { margin-top: 0.5rem !important; }
-              .dispatcher-compact-container .rounded-2xl { border-radius: 0.5rem !important; }
-              .dispatcher-compact-container .p-5 { padding: 0.75rem !important; }
-              .dispatcher-compact-container .fixed, .dispatcher-compact-container .sticky { border-top: 1px solid #e2e8f0; box-shadow: none !important; }
-            `}} />
-            {drafts.map(draft => (
-              <div key={draft.id} className={activeDraftId === draft.id ? 'block h-full p-2' : 'hidden'}>
-                <BookingEngine mode="dispatcher" initialValues={draft.initialValues} onBookingSuccess={() => {
-                  setDrafts(drafts.filter(d => d.id !== draft.id));
-                  if (drafts.length === 1) createDraft();
-                  else setActiveDraftId(drafts.find(d => d.id !== draft.id)!.id);
-                }} />
+          {/* Dedicated Dispatch Booking Engine Component */}
+          <div className="flex-1 overflow-hidden bg-slate-50 relative">
+            {drafts.map((draft) => (
+              <div
+                key={draft.id}
+                className={`h-full ${activeDraftId === draft.id ? 'block' : 'hidden'}`}
+              >
+                <DispatchBookingEngine
+                  draftId={draft.id}
+                  initialTrip={draft.trip}
+                  onValuesChange={(vals) => handleDraftValuesChange(draft.id, vals)}
+                  onBookingSuccess={(savedTrip, isEdit) =>
+                    handleBookingSuccess(draft.id, savedTrip, isEdit)
+                  }
+                  onClearDraft={() => handleClearDraft(draft.id)}
+                />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right Side (Map + Queue) */}
-        <div className="flex-1 flex flex-col relative bg-slate-200/50">
-          
-          {/* Center Stage Map */}
-          <div className="flex-1 relative flex items-stretch justify-stretch bg-blue-50/50 border-b border-slate-300 overflow-hidden">
-             <DispatchMap activeTrip={trips.find(t => activeDraftId === `edit-${t.id}`) || null} />
+        {/* ─── Right Area: Map Stage + Docked Trip Queue ─── */}
+        <div className="flex-1 flex flex-col relative bg-slate-100 overflow-hidden">
+          {/* Center Stage Live Google Map */}
+          <div className="flex-1 relative flex items-stretch justify-stretch bg-slate-100 border-b border-slate-300 overflow-hidden">
+            <LiveDispatchMap
+              activeFormValues={activeDraft?.formValues}
+              activeTrip={activeDraft?.trip || null}
+            />
           </div>
 
           {/* Resize Handle Y */}
-          <div 
-            className="h-1.5 w-full cursor-row-resize hover:bg-amber-400/50 active:bg-amber-500 absolute z-20"
+          <div
+            className="h-1.5 w-full cursor-row-resize hover:bg-blue-400/50 active:bg-blue-500 absolute z-20"
             style={{ bottom: queueHeight - 3 }}
             onMouseDown={(e) => {
               const startY = e.clientY;
               const startH = queueHeight;
               const maxH = window.innerHeight * 0.7;
-              const onMove = (ev: MouseEvent) => setQueueHeight(Math.min(maxH, Math.max(180, startH - (ev.clientY - startY))));
-              const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+              const onMove = (ev: MouseEvent) =>
+                setQueueHeight(Math.min(maxH, Math.max(180, startH - (ev.clientY - startY))));
+              const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+              };
               window.addEventListener('mousemove', onMove);
               window.addEventListener('mouseup', onUp);
             }}
           />
 
-          {/* Bottom Docked Queue */}
-          <div className="bg-white flex flex-col shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)] shrink-0" style={{ height: queueHeight }}>
+          {/* ─────────────────────────────────────────────────────────
+              3. BOTTOM DOCKED TRIP QUEUE
+          ───────────────────────────────────────────────────────── */}
+          <div
+            className="bg-white flex flex-col shadow-lg shrink-0 border-t border-slate-200"
+            style={{ height: queueHeight }}
+          >
             {/* Toolbar */}
-            <div className="h-12 bg-slate-50 border-b border-slate-200 flex items-center px-4 justify-between shrink-0">
-               <div className="flex gap-2">
-                 {['all', 'pending', 'offered', 'assigned', 'completed'].map(f => (
-                   <button type="button" key={f} onClick={() => setStatusFilter(f)} className={`px-3 py-1 text-xs font-bold rounded-full capitalize ${statusFilter === f ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>
-                     {f}
-                   </button>
-                 ))}
-               </div>
-               <Input placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-48 h-8 text-xs" />
+            <div className="h-11 bg-slate-50 border-b border-slate-200 flex items-center px-3 justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-300 rounded text-slate-700 hover:bg-slate-100 shadow-sm"
+                >
+                  Select date range
+                </button>
+
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-xs">
+                  <span>Unconfirmed</span>
+                  <span className="w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px]">
+                    {unconfirmedCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                  <span>Status:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 focus:outline-none"
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="offered">Offered</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setSearchTerm('');
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium ml-1"
+                >
+                  + Add Filter
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="🔍 Search trips..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-56 px-2.5 py-1 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400"
+                />
+              </div>
             </div>
 
             {/* Table */}
             <div className="flex-1 overflow-auto">
-               <table className="w-full text-left text-xs text-slate-600">
-                  <thead className="bg-white sticky top-0 shadow-sm text-[10px] uppercase font-bold text-slate-400 z-10">
-                    <tr>
-                      <th className="px-4 py-2">ID</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2">Passenger</th>
-                      <th className="px-4 py-2">Route</th>
-                      <th className="px-4 py-2">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredTrips.map(trip => (
-                      <tr key={trip.id} className="hover:bg-amber-50 cursor-pointer" onDoubleClick={() => {
-                          const newDraft: DraftTab = { 
-                            id: `edit-${trip.id}`, 
-                            title: `Edit #${trip.id.slice(-4)}`, 
-                            isNew: false,
-                            initialValues: {
-                              pickupAddress: trip.pickupLocation.address,
-                              pickupNotes: trip.pickupLocation.notes || '',
-                              dropoffAddress: trip.dropoffLocation.address,
-                              dropoffNotes: trip.dropoffLocation.notes || '',
-                              firstName: trip.passenger.firstName,
-                              lastName: trip.passenger.lastName,
-                              phone: trip.passenger.phone,
-                              email: trip.passenger.email || '',
-                              passengerCount: trip.passenger.passengerCount || 1,
-                              luggageCount: trip.passenger.luggageCount || 0,
-                              bookingType: trip.timing.type,
-                              scheduledDate: trip.timing.scheduledDate || '',
-                              scheduledTime: trip.timing.scheduledTime || '',
-                              isPriceOverridden: true, // Mark custom to pre-populate custom fare
-                              manualFare: trip.pricing.totalFare.toString()
-                            }
-                          };
-                          if (!drafts.find(d => d.id === newDraft.id)) {
-                             if (drafts.length >= maxDrafts) {
-                               alert(`Maximum of ${maxDrafts} drafts allowed.`);
-                               return;
-                             }
-                             setDrafts([...drafts, newDraft]);
-                          }
-                          setActiveDraftId(newDraft.id);
-                      }}>
-                        <td className="px-4 py-3 font-mono font-bold">#{trip.id.slice(-6)}</td>
-                        <td className="px-4 py-3">{getStatusBadge(trip.status)}</td>
-                        <td className="px-4 py-3 font-semibold text-slate-900">{trip.passenger.firstName} {trip.passenger.lastName}</td>
-                        <td className="px-4 py-3 truncate max-w-[200px]">{trip.pickupLocation.address} &rarr; {trip.dropoffLocation.address}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">${trip.pricing.totalFare.toFixed(2)}</td>
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500 z-10">
+                  <tr>
+                    <th className="px-3 py-2">ID</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Passenger</th>
+                    <th className="px-3 py-2">Phone</th>
+                    <th className="px-3 py-2">Route</th>
+                    <th className="px-3 py-2">Vehicle</th>
+                    <th className="px-3 py-2">Driver</th>
+                    <th className="px-3 py-2">Fare</th>
+                    <th className="px-3 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredTrips.map((trip) => {
+                    const isSelected = selectedQueueTripId === trip.id;
+                    return (
+                      <tr
+                        key={trip.id}
+                        onDoubleClick={() => handleOpenEditTrip(trip)}
+                        onClick={() => setSelectedQueueTripId(trip.id)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50/80 font-medium'
+                            : 'hover:bg-slate-50'
+                        }`}
+                        title="Double-click to open and edit in left panel"
+                      >
+                        <td className="px-3 py-2 font-mono font-bold text-blue-600">
+                          #{trip.id.slice(-6)}
+                        </td>
+                        <td className="px-3 py-2">{getStatusBadge(trip.status)}</td>
+                        <td className="px-3 py-2 font-semibold">
+                          {trip.passenger.firstName} {trip.passenger.lastName}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">{trip.passenger.phone}</td>
+                        <td className="px-3 py-2 truncate max-w-[220px]" title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}>
+                          <span className="text-emerald-600 font-bold">●</span> {trip.pickupLocation.address}
+                          <span className="mx-1 text-slate-400">→</span>
+                          <span className="text-rose-600 font-bold">●</span> {trip.dropoffLocation.address}
+                        </td>
+                        <td className="px-3 py-2 capitalize font-medium">{trip.vehicleTier}</td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {trip.assignedDriverId || 'Unassigned'}
+                        </td>
+                        <td className="px-3 py-2 font-bold text-slate-900">
+                          ${trip.pricing.totalFare.toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditTrip(trip);
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-600 hover:text-white border border-slate-300 text-[11px] font-bold text-slate-700 transition-colors"
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </tr>
-                    ))}
-                    {filteredTrips.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-slate-400">No trips found in queue.</td></tr>
-                    )}
-                  </tbody>
-               </table>
+                    );
+                  })}
+                  {filteredTrips.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-400">
+                        No trips found matching the criteria.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -349,61 +622,99 @@ export default function DispatchLayout() {
   );
 }
 
-function DispatchMap({ activeTrip }: { activeTrip: Trip | null }) {
-  const mapRef = React.useRef<HTMLDivElement>(null);
-  const mapInstance = React.useRef<google.maps.Map | null>(null);
-  const directionsRenderer = React.useRef<google.maps.DirectionsRenderer | null>(null);
+// ─────────────────────────────────────────────────────────────
+// Live Google Map Stage
+// ─────────────────────────────────────────────────────────────
+interface LiveDispatchMapProps {
+  activeFormValues?: DispatchFormValues;
+  activeTrip?: Trip | null;
+}
 
+function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+
+  // Initialize Map
   useEffect(() => {
-    import('@googlemaps/js-api-loader').then((api) => {
-      if (api.setOptions) {
-        api.setOptions({
-          key: typeof window !== 'undefined' && window.ENV?.VITE_GOOGLE_MAPS_API_KEY ? window.ENV.VITE_GOOGLE_MAPS_API_KEY : '',
-          v: "weekly",
-        });
-        
-        api.importLibrary('maps').then(() => {
-          if (!mapRef.current) return;
-          
-          if (!mapInstance.current) {
-            mapInstance.current = new google.maps.Map(mapRef.current, {
-              center: { lat: 38.6270, lng: -90.1994 }, // Default to St. Louis
-              zoom: 10,
-              disableDefaultUI: true,
-              zoomControl: true,
-            });
-            directionsRenderer.current = new google.maps.DirectionsRenderer({
-              map: mapInstance.current,
-              suppressMarkers: false,
-            });
-          }
+    loadGoogleMaps()
+      .then((gMaps) => {
+        if (!gMaps || !mapContainerRef.current) return;
 
-          if (activeTrip && activeTrip.pickupLocation?.coordinates && activeTrip.dropoffLocation?.coordinates) {
-            const originLatLng = { lat: activeTrip.pickupLocation.coordinates.lat, lng: activeTrip.pickupLocation.coordinates.lng };
-            const destLatLng = { lat: activeTrip.dropoffLocation.coordinates.lat, lng: activeTrip.dropoffLocation.coordinates.lng };
-            
-            const directionsService = new google.maps.DirectionsService();
-            directionsService.route({
-              origin: originLatLng,
-              destination: destLatLng,
-              travelMode: google.maps.TravelMode.DRIVING,
-            }, (result, status) => {
-              if (status === google.maps.DirectionsStatus.OK && directionsRenderer.current) {
-                directionsRenderer.current.setDirections(result);
-              } else {
-                 mapInstance.current?.setCenter(originLatLng);
-                 mapInstance.current?.setZoom(12);
-              }
-            });
-          } else if (directionsRenderer.current) {
-             directionsRenderer.current.setDirections({ routes: [] } as any);
+        if (!mapInstanceRef.current) {
+          mapInstanceRef.current = new gMaps.maps.Map(mapContainerRef.current, {
+            center: { lat: CHESTERFIELD_CENTER.lat, lng: CHESTERFIELD_CENTER.lng },
+            zoom: 11,
+            disableDefaultUI: true,
+            zoomControl: true,
+            streetViewControl: false,
+          });
+
+          directionsRendererRef.current = new gMaps.maps.DirectionsRenderer({
+            map: mapInstanceRef.current,
+            suppressMarkers: false,
+            polylineOptions: {
+              strokeColor: '#2563eb',
+              strokeWeight: 5,
+              strokeOpacity: 0.8,
+            },
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('[LiveDispatchMap] Initialization failed:', err);
+      });
+  }, []);
+
+  // Update Route Polyline based on active draft or active trip
+  useEffect(() => {
+    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
+    if (typeof window.google?.maps?.DirectionsService !== 'function') return;
+
+    let origin: any = null;
+    let destination: any = null;
+    let waypoints: any[] = [];
+
+    if (activeFormValues?.pickupAddress && activeFormValues?.dropoffAddress) {
+      origin = activeFormValues.pickupCoordinates || activeFormValues.pickupAddress;
+      destination = activeFormValues.dropoffCoordinates || activeFormValues.dropoffAddress;
+      waypoints = (activeFormValues.intermediateStops || [])
+        .map((s) => s.coordinates || s.address)
+        .filter(Boolean)
+        .map((loc) => ({ location: loc, stopover: true }));
+    } else if (activeTrip?.pickupLocation?.address && activeTrip?.dropoffLocation?.address) {
+      origin = activeTrip.pickupLocation.coordinates || activeTrip.pickupLocation.address;
+      destination = activeTrip.dropoffLocation.coordinates || activeTrip.dropoffLocation.address;
+      waypoints = (activeTrip.intermediateStops || [])
+        .map((s) => s.coordinates || s.address)
+        .filter(Boolean)
+        .map((loc) => ({ location: loc, stopover: true }));
+    }
+
+    if (origin && destination) {
+      const directionsService = new window.google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin,
+          destination,
+          waypoints,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === window.google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
+            directionsRendererRef.current.setDirections(result);
           }
-        }).catch((err: unknown) => {
-           console.warn("Failed to load google maps for dispatcher map:", err);
-        });
+        }
+      );
+    } else {
+      // Clear route
+      try {
+        directionsRendererRef.current.setDirections({ routes: [] } as any);
+      } catch {
+        // ignore
       }
-    });
-  }, [activeTrip]);
+    }
+  }, [activeFormValues, activeTrip]);
 
-  return <div ref={mapRef} className="w-full h-full" />;
+  return <div ref={mapContainerRef} className="w-full h-full" />;
 }
