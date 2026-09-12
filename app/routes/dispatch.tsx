@@ -24,6 +24,7 @@ interface DraftTab {
   id: string;
   title: string;
   isNew: boolean;
+  initialValues?: Partial<Record<string, unknown>>;
 }
 
 export default function DispatchLayout() {
@@ -184,22 +185,23 @@ export default function DispatchLayout() {
           />
 
           {/* Draft Tabs Bar */}
-          <div className="h-12 bg-slate-100 border-b border-slate-200 flex items-center px-2 gap-1 overflow-hidden shrink-0 relative pr-20">
+          <div className="h-10 bg-slate-200 border-b border-slate-300 flex items-end px-1 gap-0.5 overflow-hidden shrink-0 relative pr-20 pt-1">
             {drafts.map(draft => (
               <div 
                 key={draft.id}
                 onClick={() => setActiveDraftId(draft.id)}
-                className={`group flex items-center gap-2 px-3 py-1.5 rounded-t-lg border-b-2 text-xs font-bold cursor-pointer whitespace-nowrap shrink-0 max-w-xs ${activeDraftId === draft.id ? 'bg-white border-amber-500 text-slate-900' : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-200'}`}
+                className={`group flex items-center justify-between gap-1 px-2 py-1.5 rounded-t-lg border border-b-0 text-[11px] font-bold cursor-pointer flex-1 min-w-[60px] max-w-[150px] transition-colors ${activeDraftId === draft.id ? 'bg-white border-slate-300 text-slate-900 z-10' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                style={activeDraftId === draft.id ? { boxShadow: '0 -2px 5px rgba(0,0,0,0.02)' } : {}}
               >
                 <span className="truncate">{draft.title}</span>
                 {drafts.length > 1 && (
-                  <button type="button" onClick={(e) => closeDraft(draft.id, e)} className="text-slate-400 hover:text-red-500 px-1 rounded hover:bg-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">✕</button>
+                  <button type="button" onClick={(e) => closeDraft(draft.id, e)} className="text-slate-400 hover:text-red-500 p-0.5 rounded-full hover:bg-slate-200 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 leading-none">✕</button>
                 )}
               </div>
             ))}
             
             {/* Overflow Dropdown / Create Controls */}
-            <div className="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-slate-100 via-slate-100 to-transparent w-24 flex items-center justify-end px-2 gap-1">
+            <div className="absolute right-0 top-0 bottom-0 bg-gradient-to-l from-slate-200 via-slate-200 to-transparent w-24 flex items-center justify-end px-2 gap-1 z-20">
                <select
                  className="opacity-0 absolute inset-0 cursor-pointer w-full h-full z-10"
                  value={activeDraftId}
@@ -210,20 +212,31 @@ export default function DispatchLayout() {
                    <option key={d.id} value={d.id}>{d.title}</option>
                  ))}
                </select>
-               <div className="pointer-events-none px-2 py-1 rounded hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold">
+               <div className="pointer-events-none px-2 py-1 rounded hover:bg-slate-300 text-slate-500 flex items-center justify-center font-bold">
                  ...
                </div>
-               <button type="button" onClick={createDraft} className="px-2 py-1 rounded bg-slate-200 text-slate-600 hover:bg-slate-300 text-xs font-bold shadow-sm relative z-20">
+               <button type="button" onClick={createDraft} className="px-2 py-1 rounded bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold shadow-sm relative z-20">
                  +
                </button>
             </div>
           </div>
 
           {/* Active Draft Content */}
-          <div className="flex-1 overflow-y-auto bg-slate-50 relative">
+          <div className="flex-1 overflow-y-auto bg-slate-50 relative dispatcher-compact-container">
+            <style dangerouslySetInnerHTML={{__html: `
+              .dispatcher-compact-container .p-4, .dispatcher-compact-container .sm\\:p-6 { padding: 0.75rem !important; }
+              .dispatcher-compact-container .space-y-6 > * + * { margin-top: 0.75rem !important; }
+              .dispatcher-compact-container .gap-4, .dispatcher-compact-container .gap-6, .dispatcher-compact-container .sm\\:gap-4 { gap: 0.5rem !important; }
+              .dispatcher-compact-container .mb-6 { margin-bottom: 0.5rem !important; }
+              .dispatcher-compact-container .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+              .dispatcher-compact-container .mt-6 { margin-top: 0.5rem !important; }
+              .dispatcher-compact-container .rounded-2xl { border-radius: 0.5rem !important; }
+              .dispatcher-compact-container .p-5 { padding: 0.75rem !important; }
+              .dispatcher-compact-container .fixed, .dispatcher-compact-container .sticky { border-top: 1px solid #e2e8f0; box-shadow: none !important; }
+            `}} />
             {drafts.map(draft => (
-              <div key={draft.id} className={activeDraftId === draft.id ? 'block h-full p-4' : 'hidden'}>
-                <BookingEngine mode="dispatcher" onBookingSuccess={() => {
+              <div key={draft.id} className={activeDraftId === draft.id ? 'block h-full p-2' : 'hidden'}>
+                <BookingEngine mode="dispatcher" initialValues={draft.initialValues} onBookingSuccess={() => {
                   setDrafts(drafts.filter(d => d.id !== draft.id));
                   if (drafts.length === 1) createDraft();
                   else setActiveDraftId(drafts.find(d => d.id !== draft.id)!.id);
@@ -285,7 +298,28 @@ export default function DispatchLayout() {
                   <tbody className="divide-y divide-slate-100">
                     {filteredTrips.map(trip => (
                       <tr key={trip.id} className="hover:bg-amber-50 cursor-pointer" onDoubleClick={() => {
-                          const newDraft = { id: `edit-${trip.id}`, title: `Edit #${trip.id.slice(-4)}`, isNew: false };
+                          const newDraft: DraftTab = { 
+                            id: `edit-${trip.id}`, 
+                            title: `Edit #${trip.id.slice(-4)}`, 
+                            isNew: false,
+                            initialValues: {
+                              pickupAddress: trip.pickupLocation.address,
+                              pickupNotes: trip.pickupLocation.notes || '',
+                              dropoffAddress: trip.dropoffLocation.address,
+                              dropoffNotes: trip.dropoffLocation.notes || '',
+                              firstName: trip.passenger.firstName,
+                              lastName: trip.passenger.lastName,
+                              phone: trip.passenger.phone,
+                              email: trip.passenger.email || '',
+                              passengerCount: trip.passenger.passengerCount || 1,
+                              luggageCount: trip.passenger.luggageCount || 0,
+                              bookingType: trip.timing.type,
+                              scheduledDate: trip.timing.scheduledDate || '',
+                              scheduledTime: trip.timing.scheduledTime || '',
+                              isPriceOverridden: true, // Mark custom to pre-populate custom fare
+                              manualFare: trip.pricing.totalFare.toString()
+                            }
+                          };
                           if (!drafts.find(d => d.id === newDraft.id)) {
                              if (drafts.length >= maxDrafts) {
                                alert(`Maximum of ${maxDrafts} drafts allowed.`);
