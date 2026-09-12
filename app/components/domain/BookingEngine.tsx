@@ -572,16 +572,22 @@ export function BookingEngine({
         const inputPayload: CreateTripInput = {
           pickupLocation: {
             address: String(formValues.pickupAddress ?? ''),
-            placeId: formValues.pickupAddress_placeId as string | undefined,
+            placeId: (formValues.pickupAddress_placeId as string) ?? '',
             coordinates: formValues.pickupAddress_coordinates as { lat: number; lng: number } | undefined,
             notes: (formValues.pickupNotes as string) ?? '',
+            flightNotes: (formValues.flightNotes as string) ?? '',
+            driverNotes: (formValues.driverNotes as string) ?? '',
           },
           dropoffLocation: {
             address: String(formValues.dropoffAddress ?? ''),
-            placeId: formValues.dropoffAddress_placeId as string | undefined,
+            placeId: (formValues.dropoffAddress_placeId as string) ?? '',
             coordinates: formValues.dropoffAddress_coordinates as { lat: number; lng: number } | undefined,
             notes: (formValues.dropoffNotes as string) ?? '',
+            flightNotes: (formValues.flightNotes as string) ?? '',
+            driverNotes: (formValues.driverNotes as string) ?? '',
           },
+          flightNotes: (formValues.flightNotes as string) ?? '',
+          driverNotes: (formValues.driverNotes as string) ?? '',
           intermediateStops: intermediateStops.length > 0 ? intermediateStops : undefined,
           bookingType: formValues.bookingType === 'scheduled' ? 'scheduled' : 'asap',
           scheduledPickupTime: formValues.bookingType === 'scheduled' ? scheduledTime : undefined,
@@ -611,6 +617,8 @@ export function BookingEngine({
             hasCheckedLuggage: Boolean(formValues.hasCheckedLuggage),
             isAirportTrip: Boolean(airportDetection.isAirportTrip),
             flightRemarks: flightRemarks ?? '',
+            flightNotes: (formValues.flightNotes as string) ?? '',
+            driverNotes: (formValues.driverNotes as string) ?? '',
             promoCode: (formValues.promoCode as string) ?? '',
             // Recurring info
             recurringGroupId: recurringGroupId ?? '',

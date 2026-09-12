@@ -52,41 +52,17 @@ export interface FirebaseClientConfig {
   appId?: string;
 }
 
-/**
- * Recursively sanitizes data payloads before writing to Firestore.
- * Converts any `undefined` values to `null` or empty strings `""` to prevent
- * Firestore runtime exceptions ("Unsupported field value: undefined").
- *
- * @param obj The payload object to sanitize
- * @param undefinedFallback Fallback value for `undefined` entries (default: null)
- */
-export function sanitizePayload<T>(obj: T, undefinedFallback: null | '' = null): T {
-  if (obj === undefined) {
-    return undefinedFallback as unknown as T;
-  }
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (obj instanceof Date) {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizePayload(item, undefinedFallback)) as unknown as T;
-  }
+import {
+  sanitizePayload,
+  sanitizeFirestoreDocument,
+  sanitizeFirestoreUpdate,
+} from '../firestore-sanitizer';
 
-  const sanitized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) {
-      sanitized[key] = undefinedFallback;
-    } else if (value !== null && typeof value === 'object') {
-      sanitized[key] = sanitizePayload(value, undefinedFallback);
-    } else {
-      sanitized[key] = value;
-    }
-  }
-
-  return sanitized as T;
-}
+export {
+  sanitizePayload,
+  sanitizeFirestoreDocument,
+  sanitizeFirestoreUpdate,
+};
 
 export class FirebaseBookingService implements IBookingService {
   private db: Firestore;
@@ -397,7 +373,7 @@ export class FirebaseBookingService implements IBookingService {
       updates.completedAt = now;
     } else if (status === 'cancelled') {
       updates.cancelledAt = now;
-      updates.cancellationReason = options?.reason;
+      updates.cancellationReason = options?.reason ?? '';
       updates.cancelledBy = options?.actorRole ?? 'admin';
     }
 

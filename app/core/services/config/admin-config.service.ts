@@ -22,6 +22,7 @@ import type {
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
+import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -211,7 +212,8 @@ export class AdminConfigService implements IAdminConfigService {
     if (this.db && this.isConfigured) {
       try {
         const docRef = doc(this.db, 'config', 'appSettings');
-        await setDoc(docRef, merged, { merge: true });
+        const sanitizedSettings = sanitizePayload(merged);
+        await setDoc(docRef, sanitizedSettings, { merge: true });
       } catch (err) {
         console.error('[AdminConfigService] Failed to persist updates to Firestore:', err);
         throw err;
