@@ -43,11 +43,40 @@ export interface VehicleTierConfig {
   iconType?: 'standard' | 'premium' | 'xl' | 'wheelchair';
 }
 
+export interface MaintenanceRecord {
+  id: string;
+  date: string;
+  description: string;
+  cost?: number;
+  odometer?: number;
+  performedBy?: string;
+}
+
+export interface FleetCarConfig {
+  id: string; // e.g. 'car-101'
+  unitNumber: string; // e.g. 'Cab #101'
+  vehicleTypeId: string; // references VehicleTierConfig.id (e.g. 'standard', 'xl')
+  make: string; // e.g. 'Toyota'
+  model: string; // e.g. 'Camry'
+  year: number; // e.g. 2023
+  color: string; // e.g. 'Silver'
+  licensePlate: string; // e.g. 'MO-7TX91'
+  vin: string; // e.g. '1G1YY22U7H510...'
+  assignedDriverId?: string; // e.g. 'driver-101'
+  assignedDriverName?: string;
+  insurancePolicy?: string;
+  insuranceExpiry?: string;
+  mileage: number; // e.g. 45210
+  status: 'active' | 'maintenance' | 'out_of_service' | 'inspecting';
+  maintenanceHistory?: MaintenanceRecord[];
+}
+
 export interface AppSettings {
   company: CompanyConfig;
   branding: BrandingConfig;
   pricing: DynamicPricingConfig;
-  vehicles: VehicleTierConfig[];
+  vehicles: VehicleTierConfig[]; // Vehicle Types (tiers/classes)
+  fleet?: FleetCarConfig[]; // Physical Fleet Cars
   publicFormVersion?: 'v1' | 'v2';
   updatedAt?: string;
   updatedBy?: string;

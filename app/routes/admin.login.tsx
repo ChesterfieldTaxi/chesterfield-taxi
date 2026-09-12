@@ -21,6 +21,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoNotice, setInfoNotice] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const [isConfigured, setIsConfigured] = useState(false);
 
@@ -30,6 +31,18 @@ export default function AdminLogin() {
       setError('You do not have administrative privileges to access this area.');
     } else if (message === 'unauthenticated') {
       setError('Please log in to access this area.');
+    } else if (message === 'logged_out') {
+      setInfoNotice('You have been logged out successfully.');
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.clear();
+          localStorage.removeItem('chesterfield_taxi_admin_session');
+        } catch {}
+      }
+      try {
+        getAdminAuthService().signOut().catch(() => {});
+      } catch {}
+      return; // Do not auto-redirect if explicitly logged out
     }
 
     setIsConfigured(isFirebaseConfigured());
@@ -125,6 +138,12 @@ export default function AdminLogin() {
 
           <form onSubmit={handleSubmit}>
             <CardContent className="p-6 space-y-4">
+              {infoNotice && (
+                <Alert variant="success" title="Session Closed">
+                  {infoNotice}
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="error" title="Sign In Error">
                   {error}

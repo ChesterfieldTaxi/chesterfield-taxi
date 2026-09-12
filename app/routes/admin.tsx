@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Outlet, Link } from 'react-router';
+import { useNavigate, useSearchParams, useLocation, Outlet, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
@@ -7,10 +7,14 @@ import type { AppSettings } from '../core/types/config';
 import {
   AdminGeneralTab,
   AdminPricingTab,
+  AdminVehiclesTab,
   AdminFleetTab,
   AdminStaffTab,
   AdminBookingsTab,
+  AdminDashboardTab,
+  AdminLayoutTab,
 } from '../components/domain/admin';
+import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
   CarIcon,
   ShieldCheckIcon,
@@ -27,7 +31,7 @@ export function meta() {
   ];
 }
 
-type TabKey = 'general' | 'pricing' | 'fleet' | 'staff' | 'bookings';
+type TabKey = 'dashboard' | 'layout' | 'general' | 'pricing' | 'vehicles' | 'fleet' | 'bookings' | 'staff';
 
 interface TabItem {
   key: TabKey;
@@ -38,40 +42,55 @@ interface TabItem {
 
 const TABS: TabItem[] = [
   {
+    key: 'dashboard',
+    label: '📊 Executive Dashboard',
+    description: 'Real-time booking volume, revenue metrics, and dispatch operations launcher',
+  },
+  {
+    key: 'layout',
+    label: '🎨 Form Layout',
+    description: 'Switch between Modern Interactive (V2) and Classic Streamlined (V1) public booking layout',
+  },
+  {
     key: 'general',
-    label: 'General & Branding',
-    description: 'Company information, contact details, and brand colors',
+    label: '🏢 General & Business',
+    description: 'Company identity, contact info, operating hours, and booking rules',
   },
   {
     key: 'pricing',
-    label: 'Pricing & Rules',
-    description: 'Base rates, per-mile pricing, and real-time surge multiplier controls',
+    label: '💵 Rates & Pricing',
+    description: 'Base fares, per-mile/minute rates, surge settings, and airport fees',
+  },
+  {
+    key: 'vehicles',
+    label: '🚗 Vehicles (Types)',
+    description: 'Vehicle classes, passenger/luggage capacities, base fare multipliers, and active tiers',
   },
   {
     key: 'fleet',
-    label: 'Fleet Management',
-    description: 'Vehicle categories, capacities, and tier multipliers',
-  },
-  {
-    key: 'staff',
-    label: 'Staff',
-    description: 'Manage admin and dispatcher roles',
+    label: '🚕 Fleet (Cars)',
+    description: 'Physical fleet inventory, makes, models, license plates, VINs, mileage, and maintenance logs',
   },
   {
     key: 'bookings',
-    label: 'Live Bookings',
-    badge: 'Real-time',
-    description: 'Incoming customer bookings and dispatch workflow management',
+    label: '📋 Reservations',
+    description: 'Live trip queue, driver assignment, dispatch creation, and status management',
+  },
+  {
+    key: 'staff',
+    label: '👥 Operators & Staff',
+    description: 'Manage dispatcher and admin roles and access permissions',
   },
 ];
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const [, setSearchParams] = useSearchParams();
 
   // Authentication state
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [user, setUser] = useState<AdminUser | null>(() => getAdminAuthService().getCurrentUser());
+  const [isAuthChecking, setIsAuthChecking] = useState(() => !getAdminAuthService().getCurrentUser());
 
   // Dynamic configuration state
   const [settings, setSettings] = useState<AppSettings>(() =>
@@ -81,8 +100,9 @@ export default function AdminLayout() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isLiveFirebase, setIsLiveFirebase] = useState(false);
 
-  // Active tab derived from query param or default 'general'
-  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'general';
+  // Active tab derived reactively from location.search
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'dashboard';
 
   const handleTabChange = (key: TabKey) => {
     setSearchParams({ tab: key });
@@ -139,15 +159,16 @@ export default function AdminLayout() {
   };
 
   const handleSignOut = () => {
-    try {
-      getAdminAuthService().signOut().catch(() => {});
-    } catch {}
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.clear();
+        localStorage.removeItem('chesterfield_taxi_admin_session');
       } catch {}
     }
-    navigate('/admin/login', { replace: true });
+    try {
+      getAdminAuthService().signOut().catch(() => {});
+    } catch {}
+    window.location.href = '/admin/login?message=logged_out';
   };
 
   // Render auth loading screen while validating credentials
@@ -193,22 +214,8 @@ export default function AdminLayout() {
           </div>
 
           {/* User actions and public site link */}
+          {/* User actions and public site link */}
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* View Switcher: Dashboard (Active) vs Dispatch */}
-            <div className="flex items-center p-1 rounded-xl bg-slate-800 border border-slate-700">
-              <span className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm">
-                <span>📊</span>
-                <span>Dashboard</span>
-              </span>
-              <Link
-                to="/dispatch"
-                className="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
-              >
-                <span>🚕</span>
-                <span>Dispatch</span>
-              </Link>
-            </div>
-
             {/* Sync Mode Pill */}
             <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
               <span
@@ -221,20 +228,15 @@ export default function AdminLayout() {
               </span>
             </div>
 
-            {/* Operator Identifier */}
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-semibold text-slate-200 truncate max-w-[180px]">
-                {user?.email || 'Dispatcher'}
-              </span>
-              <span className="text-[10px] text-slate-400">Operator</span>
-            </div>
-
-            {/* Link to form layout settings */}
+            {/* Link to dispatch console */}
             <Link
-              to="/admin/settings"
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              to="/dispatch"
+              reloadDocument
+              className="text-xs text-white font-bold px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-400/30 transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Open Tactical Dispatch Console"
             >
-              Form Layout ⚙
+              <span>🚕</span>
+              <span>Dispatch Console</span>
             </Link>
 
             {/* Link to public portal */}
@@ -247,16 +249,12 @@ export default function AdminLayout() {
               View Public Site &rarr;
             </a>
 
-            {/* Sign Out Button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white"
-            >
-              Sign Out
-            </Button>
+            {/* Unified User Dropdown across all admin pages */}
+            <UserDropdown
+              email={user?.email}
+              onSignOut={handleSignOut}
+              variant="dark"
+            />
           </div>
         </div>
       </header>
@@ -265,7 +263,7 @@ export default function AdminLayout() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Dynamic Tab Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
@@ -313,6 +311,13 @@ export default function AdminLayout() {
 
         {/* Dynamic Tab Body */}
         <div>
+          {activeTab === 'dashboard' && (
+            <AdminDashboardTab
+              settings={settings}
+              onNavigateTab={handleTabChange}
+            />
+          )}
+
           {activeTab === 'general' && (
             <AdminGeneralTab
               settings={settings}
@@ -323,6 +328,14 @@ export default function AdminLayout() {
 
           {activeTab === 'pricing' && (
             <AdminPricingTab
+              settings={settings}
+              onSave={handleSaveSettings}
+              isLoading={isSavingConfig}
+            />
+          )}
+
+          {activeTab === 'vehicles' && (
+            <AdminVehiclesTab
               settings={settings}
               onSave={handleSaveSettings}
               isLoading={isSavingConfig}
@@ -340,6 +353,14 @@ export default function AdminLayout() {
           {activeTab === 'staff' && <AdminStaffTab />}
 
           {activeTab === 'bookings' && <AdminBookingsTab />}
+
+          {activeTab === 'layout' && (
+            <AdminLayoutTab
+              settings={settings}
+              onSave={handleSaveSettings}
+              isLoading={isSavingConfig}
+            />
+          )}
         </div>
 
         {/* Outlet for any nested routes */}

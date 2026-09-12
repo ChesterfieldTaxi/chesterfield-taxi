@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AppSettings, VehicleTierConfig } from '../../../core/types/config';
+import type { AppSettings, FleetCarConfig, MaintenanceRecord } from '../../../core/types/config';
 import { Button } from '../../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Input } from '../../ui/Input';
@@ -9,7 +9,6 @@ import {
   CarIcon,
   SparklesIcon,
   UserIcon,
-  LuggageIcon,
   CheckIcon,
   PlusIcon,
   TrashIcon,
@@ -23,80 +22,137 @@ export interface AdminFleetTabProps {
 }
 
 export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFleetTabProps) {
-  const [vehicles, setVehicles] = useState<VehicleTierConfig[]>([...settings.vehicles]);
+  const [fleet, setFleet] = useState<FleetCarConfig[]>(() => {
+    if (settings.fleet && settings.fleet.length > 0) {
+      return [...settings.fleet];
+    }
+    return DEFAULT_APP_SETTINGS.fleet ? [...DEFAULT_APP_SETTINGS.fleet] : [];
+  });
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // New vehicle form state
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newTier, setNewTier] = useState<VehicleTierConfig>({
-    id: '',
-    name: '',
-    baseMultiplier: 1.25,
-    maxPassengers: 4,
-    maxLuggage: 3,
-    description: '',
-    badge: '',
-    iconType: 'standard',
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchCar, setSearchCar] = useState('');
+
+  // Add Car modal/form state
+  const [showAddCarModal, setShowAddCarModal] = useState(false);
+  const [newCar, setNewCar] = useState<Omit<FleetCarConfig, 'id'>>({
+    unitNumber: '',
+    vehicleTypeId: settings.vehicles[0]?.id || 'standard',
+    make: '',
+    model: '',
+    year: new Date().getFullYear(),
+    color: 'White',
+    licensePlate: '',
+    vin: '',
+    assignedDriverName: '',
+    insurancePolicy: '',
+    insuranceExpiry: '',
+    mileage: 0,
+    status: 'active',
+    maintenanceHistory: [],
   });
 
-  const handleUpdateVehicle = (index: number, updates: Partial<VehicleTierConfig>) => {
-    setVehicles((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], ...updates };
-      return next;
-    });
+  // Maintenance Log Modal state
+  const [selectedCarForMaintenance, setSelectedCarForMaintenance] = useState<FleetCarConfig | null>(null);
+  const [newMaintenanceRecord, setNewMaintenanceRecord] = useState<Omit<MaintenanceRecord, 'id'>>({
+    date: new Date().toISOString().slice(0, 10),
+    description: '',
+    cost: 0,
+    odometer: 0,
+    performedBy: '',
+  });
+
+  // Helpers
+  const getVehicleTypeName = (typeId: string) => {
+    const v = settings.vehicles.find((tier) => tier.id === typeId);
+    return v ? v.name : typeId;
   };
 
-  const handleDeleteVehicle = (index: number) => {
-    if (vehicles.length <= 1) {
-      alert('You must have at least one active vehicle tier in the fleet.');
-      return;
-    }
-    setVehicles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleAddNewTier = (e: React.FormEvent) => {
+  const handleAddNewCar = (e: React.FormEvent) => {
     e.preventDefault();
-    const idSlug = newTier.id.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    if (!idSlug || !newTier.name.trim()) {
-      alert('Tier ID and Name are required.');
+    if (!newCar.unitNumber.trim() || !newCar.make.trim() || !newCar.model.trim()) {
+      alert('Unit Number, Make, and Model are required.');
       return;
     }
 
-    if (vehicles.some((v) => v.id === idSlug)) {
-      alert(`A vehicle tier with ID "${idSlug}" already exists.`);
-      return;
-    }
-
-    const tierToAdd: VehicleTierConfig = {
-      ...newTier,
-      id: idSlug,
-      name: newTier.name.trim(),
-      baseMultiplier: Number(newTier.baseMultiplier) || 1.0,
-      maxPassengers: Number(newTier.maxPassengers) || 4,
-      maxLuggage: Number(newTier.maxLuggage) || 2,
+    const carToAdd: FleetCarConfig = {
+      ...newCar,
+      id: `fleet-${Date.now().toString(36)}`,
+      unitNumber: newCar.unitNumber.trim(),
+      make: newCar.make.trim(),
+      model: newCar.model.trim(),
+      year: Number(newCar.year) || new Date().getFullYear(),
+      mileage: Number(newCar.mileage) || 0,
+      maintenanceHistory: [],
     };
 
-    setVehicles((prev) => [...prev, tierToAdd]);
-    setShowAddForm(false);
-    setNewTier({
-      id: '',
-      name: '',
-      baseMultiplier: 1.25,
-      maxPassengers: 4,
-      maxLuggage: 3,
-      description: '',
-      badge: '',
-      iconType: 'standard',
+    setFleet((prev) => [carToAdd, ...prev]);
+    setShowAddCarModal(false);
+    setNewCar({
+      unitNumber: '',
+      vehicleTypeId: settings.vehicles[0]?.id || 'standard',
+      make: '',
+      model: '',
+      year: new Date().getFullYear(),
+      color: 'White',
+      licensePlate: '',
+      vin: '',
+      assignedDriverName: '',
+      insurancePolicy: '',
+      insuranceExpiry: '',
+      mileage: 0,
+      status: 'active',
+      maintenanceHistory: [],
     });
   };
 
-  const handleResetDefaults = () => {
-    if (confirm('Reset fleet tiers to default configuration?')) {
-      setVehicles([...DEFAULT_APP_SETTINGS.vehicles]);
+  const handleDeleteCar = (carId: string) => {
+    if (confirm('Are you sure you want to remove this car from the fleet?')) {
+      setFleet((prev) => prev.filter((c) => c.id !== carId));
     }
+  };
+
+  const handleUpdateCar = (carId: string, updates: Partial<FleetCarConfig>) => {
+    setFleet((prev) =>
+      prev.map((c) => (c.id === carId ? { ...c, ...updates } : c))
+    );
+  };
+
+  const handleAddMaintenanceRecord = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCarForMaintenance || !newMaintenanceRecord.description.trim()) return;
+
+    const record: MaintenanceRecord = {
+      ...newMaintenanceRecord,
+      id: `m-${Date.now().toString(36)}`,
+      cost: Number(newMaintenanceRecord.cost) || 0,
+      odometer: Number(newMaintenanceRecord.odometer) || selectedCarForMaintenance.mileage,
+    };
+
+    const updatedHistory = [record, ...(selectedCarForMaintenance.maintenanceHistory || [])];
+    const newMileage = Math.max(selectedCarForMaintenance.mileage, record.odometer || 0);
+
+    handleUpdateCar(selectedCarForMaintenance.id, {
+      maintenanceHistory: updatedHistory,
+      mileage: newMileage,
+    });
+
+    setSelectedCarForMaintenance((prev) =>
+      prev ? { ...prev, maintenanceHistory: updatedHistory, mileage: newMileage } : null
+    );
+
+    setNewMaintenanceRecord({
+      date: new Date().toISOString().slice(0, 10),
+      description: '',
+      cost: 0,
+      odometer: newMileage,
+      performedBy: '',
+    });
   };
 
   const handleSaveFleet = async () => {
@@ -104,21 +160,45 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       setIsSaving(true);
       setSaveSuccess(false);
       setSaveError(null);
-      await onSave({ vehicles });
+      await onSave({ fleet });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save fleet configuration.');
+      setSaveError(err instanceof Error ? err.message : 'Failed to save fleet inventory.');
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Filtered cars
+  const filteredFleet = fleet.filter((c) => {
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+    if (typeFilter !== 'all' && c.vehicleTypeId !== typeFilter) return false;
+    if (searchCar.trim()) {
+      const q = searchCar.toLowerCase();
+      const matchUnit = c.unitNumber.toLowerCase().includes(q);
+      const matchMake = c.make.toLowerCase().includes(q);
+      const matchModel = c.model.toLowerCase().includes(q);
+      const matchPlate = c.licensePlate.toLowerCase().includes(q);
+      const matchDriver = c.assignedDriverName?.toLowerCase().includes(q);
+      const matchVin = c.vin.toLowerCase().includes(q);
+      if (!matchUnit && !matchMake && !matchModel && !matchPlate && !matchDriver && !matchVin) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const activeCount = fleet.filter((c) => c.status === 'active').length;
+  const maintenanceCount = fleet.filter((c) => c.status === 'maintenance').length;
+  const avgMileage =
+    fleet.length > 0 ? Math.round(fleet.reduce((sum, c) => sum + (c.mileage || 0), 0) / fleet.length) : 0;
+
   return (
     <div className="space-y-6">
       {saveSuccess && (
-        <Alert variant="success" title="Fleet Configuration Saved">
-          Vehicle tiers and rate multipliers are updated and synced across the dispatch pipeline.
+        <Alert variant="success" title="Fleet Inventory Saved">
+          Physical cars, assignments, mileage, and maintenance logs successfully synced.
         </Alert>
       )}
 
@@ -128,129 +208,237 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
         </Alert>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div>
-          <h3 className="text-base font-extrabold text-slate-900">Fleet Management</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage available passenger vehicle tiers, passenger/luggage capacities, and fare multipliers.
-          </p>
+      {/* Header and Quick Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Total Fleet</span>
+          <div className="text-2xl font-black text-slate-900 mt-1">{fleet.length} <span className="text-xs font-semibold text-slate-500">vehicles</span></div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Active in Service</span>
+          <div className="text-2xl font-black text-emerald-600 mt-1">{activeCount} <span className="text-xs font-semibold text-slate-500">ready</span></div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">In Maintenance</span>
+          <div className="text-2xl font-black text-amber-600 mt-1">{maintenanceCount} <span className="text-xs font-semibold text-slate-500">shop</span></div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Avg Fleet Odometer</span>
+          <div className="text-2xl font-black text-blue-600 mt-1">{avgMileage.toLocaleString()} <span className="text-xs font-semibold text-slate-500">mi</span></div>
+        </div>
+      </div>
+
+      {/* Control bar: Filters & Add Car */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <div className="relative">
+            <Input
+              placeholder="Search unit #, make, plate, VIN..."
+              value={searchCar}
+              onChange={(e) => setSearchCar(e.target.value)}
+              className="w-56 h-9 text-xs pl-3"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-9 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="maintenance">In Maintenance</option>
+            <option value="out_of_service">Out of Service</option>
+            <option value="inspecting">Inspecting</option>
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-9 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
+          >
+            <option value="all">All Vehicle Types</option>
+            {settings.vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleResetDefaults}
-            disabled={isSaving}
-          >
-            Reset Defaults
-          </Button>
-
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <Button
             type="button"
             variant="primary"
             size="sm"
-            onClick={() => setShowAddForm(!showAddForm)}
-            leftIcon={<PlusIcon className="w-4 h-4" />}
+            onClick={() => setShowAddCarModal(true)}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold"
           >
-            {showAddForm ? 'Cancel Add' : 'Add Vehicle Tier'}
-          </Button>
-
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={handleSaveFleet}
-            isLoading={isSaving || isLoading}
-            leftIcon={<CheckIcon className="w-4 h-4" />}
-            className="bg-amber-600 hover:bg-amber-700"
-          >
-            Save All Changes
+            <PlusIcon className="w-4 h-4" />
+            Add Fleet Car
           </Button>
         </div>
       </div>
 
-      {/* Add New Tier Drawer / Form */}
-      {showAddForm && (
-        <Card variant="elevated" className="border-amber-300 bg-amber-50/20 shadow-xs">
-          <CardHeader className="border-b border-amber-200/60 pb-3">
-            <CardTitle className="text-base text-slate-900">Create New Vehicle Tier</CardTitle>
+      {/* Add Car Modal */}
+      {showAddCarModal && (
+        <Card className="border-blue-200 bg-blue-50/20 shadow-sm animate-in fade-in duration-200">
+          <CardHeader>
+            <CardTitle className="text-sm font-bold text-blue-900">Add New Fleet Car</CardTitle>
             <CardDescription className="text-xs text-slate-600">
-              Define a custom vehicle category with unique pricing multiplier and capacity rules.
+              Register a physical vehicle asset, assign its vehicle type class, and enter registration details.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
-            <form onSubmit={handleAddNewTier} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Input
-                  label="Tier ID (Unique Identifier)"
-                  placeholder="e.g., luxury_van"
-                  value={newTier.id}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, id: e.target.value }))}
-                  helperText="Lower-case alphanumeric (e.g. suv_exec)"
-                  required
-                />
-                <Input
-                  label="Display Name"
-                  placeholder="e.g., Luxury Executive Van"
-                  value={newTier.name}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, name: e.target.value }))}
-                  required
-                />
-                <Input
-                  label="Fare Multiplier"
-                  type="number"
-                  step="0.05"
-                  min="0.5"
-                  max="5.0"
-                  value={newTier.baseMultiplier}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, baseMultiplier: parseFloat(e.target.value) || 1.0 }))}
-                  helperText="Multiplier applied to mileage and time components"
-                  required
-                />
+          <CardContent>
+            <form onSubmit={handleAddNewCar} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Unit / Car Number <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Cab #110"
+                    value={newCar.unitNumber}
+                    onChange={(e) => setNewCar({ ...newCar, unitNumber: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Vehicle Type Class <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                    value={newCar.vehicleTypeId}
+                    onChange={(e) => setNewCar({ ...newCar, vehicleTypeId: e.target.value })}
+                  >
+                    {settings.vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} (Tier {v.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Make <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Toyota"
+                    value={newCar.make}
+                    onChange={(e) => setNewCar({ ...newCar, make: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Model <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Camry Hybrid"
+                    value={newCar.model}
+                    onChange={(e) => setNewCar({ ...newCar, model: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Input
-                  label="Max Passengers"
-                  type="number"
-                  min="1"
-                  max="16"
-                  value={newTier.maxPassengers}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, maxPassengers: parseInt(e.target.value, 10) || 1 }))}
-                  required
-                />
-                <Input
-                  label="Max Luggage Bags"
-                  type="number"
-                  min="0"
-                  max="16"
-                  value={newTier.maxLuggage}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, maxLuggage: parseInt(e.target.value, 10) || 0 }))}
-                  required
-                />
-                <Input
-                  label="Badge Label (Optional)"
-                  placeholder="e.g., Popular or VIP"
-                  value={newTier.badge || ''}
-                  onChange={(e) => setNewTier((prev) => ({ ...prev, badge: e.target.value }))}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Year</label>
+                  <Input
+                    type="number"
+                    value={newCar.year}
+                    onChange={(e) => setNewCar({ ...newCar, year: parseInt(e.target.value) || 2024 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Color</label>
+                  <Input
+                    placeholder="e.g. Silver, Black"
+                    value={newCar.color}
+                    onChange={(e) => setNewCar({ ...newCar, color: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">License Plate</label>
+                  <Input
+                    placeholder="e.g. MO-7TX91"
+                    value={newCar.licensePlate}
+                    onChange={(e) => setNewCar({ ...newCar, licensePlate: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">VIN (Vehicle ID Number)</label>
+                  <Input
+                    placeholder="17-character VIN"
+                    value={newCar.vin}
+                    onChange={(e) => setNewCar({ ...newCar, vin: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <Input
-                label="Customer Description"
-                placeholder="Spacious luxury vehicle with premium comfort for groups..."
-                value={newTier.description || ''}
-                onChange={(e) => setNewTier((prev) => ({ ...prev, description: e.target.value }))}
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Driver</label>
+                  <Input
+                    placeholder="e.g. Mike T."
+                    value={newCar.assignedDriverName || ''}
+                    onChange={(e) => setNewCar({ ...newCar, assignedDriverName: e.target.value })}
+                  />
+                </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Current Mileage</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 45000"
+                    value={newCar.mileage}
+                    onChange={(e) => setNewCar({ ...newCar, mileage: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Insurance Policy</label>
+                  <Input
+                    placeholder="e.g. ST-902348-COMM"
+                    value={newCar.insurancePolicy || ''}
+                    onChange={(e) => setNewCar({ ...newCar, insurancePolicy: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                    value={newCar.status}
+                    onChange={(e) => setNewCar({ ...newCar, status: e.target.value as any })}
+                  >
+                    <option value="active">Active</option>
+                    <option value="maintenance">In Maintenance</option>
+                    <option value="out_of_service">Out of Service</option>
+                    <option value="inspecting">Inspecting</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddCarModal(false)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary" size="sm" leftIcon={<PlusIcon className="w-4 h-4" />}>
-                  Add Tier to Fleet
+                <Button type="submit" variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700 font-bold">
+                  Save Car to Fleet
                 </Button>
               </div>
             </form>
@@ -258,129 +446,293 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
         </Card>
       )}
 
-      {/* Fleet Tiers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {vehicles.map((vehicle, idx) => (
-          <Card key={vehicle.id} variant="elevated" className="border-slate-200 shadow-xs relative">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
-                  <CarIcon className="w-5 h-5 text-amber-700" />
-                </div>
-                <div>
-                  <CardTitle className="text-base text-slate-900 leading-none">
-                    {vehicle.name}
-                  </CardTitle>
-                  <span className="text-[11px] font-mono text-slate-400">ID: {vehicle.id}</span>
-                </div>
-              </div>
+      {/* Fleet Cars List */}
+      <div className="space-y-4">
+        {filteredFleet.length === 0 ? (
+          <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-500">
+            <span className="text-3xl block mb-2">🚕</span>
+            <p className="font-bold text-slate-800">No fleet cars match your criteria.</p>
+            <p className="text-xs text-slate-400 mt-1">Try clearing filters or adding a new car to the fleet.</p>
+          </div>
+        ) : (
+          filteredFleet.map((car) => {
+            const historyCount = car.maintenanceHistory?.length || 0;
+            return (
+              <div
+                key={car.id}
+                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-sm transition-all p-5 space-y-4"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm shadow-xs">
+                      🚕
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-base font-extrabold text-slate-900">{car.unitNumber}</h4>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          {getVehicleTypeName(car.vehicleTypeId)}
+                        </span>
+                        {car.status === 'active' && <Badge variant="success">Active</Badge>}
+                        {car.status === 'maintenance' && <Badge variant="warning">In Maintenance</Badge>}
+                        {car.status === 'out_of_service' && <Badge variant="neutral">Out of Service</Badge>}
+                        {car.status === 'inspecting' && <Badge variant="info">Inspecting</Badge>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {car.year} {car.make} {car.model} • <span className="font-mono text-slate-700">{car.color}</span>
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                {vehicle.badge && <Badge variant="primary">{vehicle.badge}</Badge>}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteVehicle(idx)}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                  title="Remove vehicle tier"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </CardHeader>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={car.status}
+                      onChange={(e) => handleUpdateCar(car.id, { status: e.target.value as any })}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700"
+                    >
+                      <option value="active">Active</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="out_of_service">Out of Service</option>
+                      <option value="inspecting">Inspecting</option>
+                    </select>
 
-            <CardContent className="p-5 space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold uppercase text-slate-500">
-                    Multiplier
-                  </label>
-                  <div className="flex items-center gap-1 mt-1">
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0.5"
-                      max="5.0"
-                      value={vehicle.baseMultiplier}
-                      onChange={(e) =>
-                        handleUpdateVehicle(idx, {
-                          baseMultiplier: parseFloat(e.target.value) || 1.0,
-                        })
-                      }
-                      className="w-full text-sm font-bold text-slate-900 border border-slate-200 rounded-lg px-2.5 py-1.5"
-                    />
-                    <span className="text-xs font-bold text-slate-400">x</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCarForMaintenance(car);
+                        setNewMaintenanceRecord({
+                          date: new Date().toISOString().slice(0, 10),
+                          description: '',
+                          cost: 0,
+                          odometer: car.mileage,
+                          performedBy: '',
+                        });
+                      }}
+                      className="text-xs h-8 flex items-center gap-1.5"
+                    >
+                      <span>🔧 Service Log</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
+                        {historyCount}
+                      </span>
+                    </Button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCar(car.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      title="Delete car from fleet"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase text-slate-500">
-                    Max Passengers
-                  </label>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <input
-                      type="number"
-                      min="1"
-                      max="16"
-                      value={vehicle.maxPassengers}
-                      onChange={(e) =>
-                        handleUpdateVehicle(idx, {
-                          maxPassengers: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                      className="w-full text-sm font-bold text-slate-900 border border-slate-200 rounded-lg px-2.5 py-1.5"
+                {/* Grid of Car Specs and Tracking */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">License Plate</span>
+                    <span className="font-mono font-bold text-slate-900 mt-0.5 block truncate">
+                      {car.licensePlate || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Odometer</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Input
+                        type="number"
+                        value={car.mileage}
+                        onChange={(e) => handleUpdateCar(car.id, { mileage: parseInt(e.target.value) || 0 })}
+                        className="h-6 text-xs font-mono font-bold w-20 px-1"
+                      />
+                      <span className="text-[10px] text-slate-500 font-bold">mi</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Assigned Driver</span>
+                    <Input
+                      placeholder="Unassigned"
+                      value={car.assignedDriverName || ''}
+                      onChange={(e) => handleUpdateCar(car.id, { assignedDriverName: e.target.value })}
+                      className="h-6 text-xs font-semibold mt-0.5 px-1"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase text-slate-500">
-                    Max Luggage
-                  </label>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="16"
-                      value={vehicle.maxLuggage}
-                      onChange={(e) =>
-                        handleUpdateVehicle(idx, {
-                          maxLuggage: parseInt(e.target.value, 10) || 0,
-                        })
-                      }
-                      className="w-full text-sm font-bold text-slate-900 border border-slate-200 rounded-lg px-2.5 py-1.5"
-                    />
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">VIN</span>
+                    <span className="font-mono text-[11px] text-slate-700 mt-0.5 block truncate" title={car.vin}>
+                      {car.vin || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Insurance</span>
+                    <span className="text-[11px] font-semibold text-slate-700 mt-0.5 block truncate" title={car.insurancePolicy}>
+                      {car.insurancePolicy || 'Commercial Policy'}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              <div>
-                <label className="text-[11px] font-semibold uppercase text-slate-500">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={vehicle.description || ''}
-                  onChange={(e) => handleUpdateVehicle(idx, { description: e.target.value })}
-                  placeholder="Tier description for passenger selection..."
-                  className="w-full text-xs text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5 mt-1"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+            );
+          })
+        )}
       </div>
 
-      <div className="flex justify-end pt-4">
+      {/* Maintenance History Modal */}
+      {selectedCarForMaintenance && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-blue-100 text-blue-700 text-lg">🔧</span>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Maintenance History: {selectedCarForMaintenance.unitNumber}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {selectedCarForMaintenance.year} {selectedCarForMaintenance.make} {selectedCarForMaintenance.model} (Plate: {selectedCarForMaintenance.licensePlate})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCarForMaintenance(null)}
+                className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content: Form to add record + list of records */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Add record form */}
+              <form onSubmit={handleAddMaintenanceRecord} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
+                  + Log Service or Maintenance Event
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Date</label>
+                    <Input
+                      type="date"
+                      value={newMaintenanceRecord.date}
+                      onChange={(e) => setNewMaintenanceRecord({ ...newMaintenanceRecord, date: e.target.value })}
+                      required
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Odometer (mi)</label>
+                    <Input
+                      type="number"
+                      value={newMaintenanceRecord.odometer}
+                      onChange={(e) => setNewMaintenanceRecord({ ...newMaintenanceRecord, odometer: parseInt(e.target.value) || 0 })}
+                      required
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Cost ($)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newMaintenanceRecord.cost}
+                      onChange={(e) => setNewMaintenanceRecord({ ...newMaintenanceRecord, cost: parseFloat(e.target.value) || 0 })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Service Performed / Description</label>
+                    <Input
+                      placeholder="e.g. Oil change, brake pads, tire replacement..."
+                      value={newMaintenanceRecord.description}
+                      onChange={(e) => setNewMaintenanceRecord({ ...newMaintenanceRecord, description: e.target.value })}
+                      required
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Shop / Technician</label>
+                    <Input
+                      placeholder="e.g. Chesterfield Auto Service"
+                      value={newMaintenanceRecord.performedBy || ''}
+                      onChange={(e) => setNewMaintenanceRecord({ ...newMaintenanceRecord, performedBy: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700 text-xs font-bold">
+                    Add Record
+                  </Button>
+                </div>
+              </form>
+
+              {/* Maintenance List */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Past Service Logs</span>
+                {(!selectedCarForMaintenance.maintenanceHistory || selectedCarForMaintenance.maintenanceHistory.length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-3 text-center">No service records logged yet for this vehicle.</p>
+                ) : (
+                  selectedCarForMaintenance.maintenanceHistory.map((rec) => (
+                    <div key={rec.id} className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-bold text-slate-900">{rec.description}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          <span>📅 {rec.date}</span>
+                          {rec.odometer && <span className="ml-2">🛣️ {rec.odometer.toLocaleString()} mi</span>}
+                          {rec.performedBy && <span className="ml-2">🏢 {rec.performedBy}</span>}
+                        </div>
+                      </div>
+                      {rec.cost !== undefined && (
+                        <div className="font-mono font-bold text-slate-900 text-sm">
+                          ${rec.cost.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedCarForMaintenance(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Save Actions Bar */}
+      <div className="sticky bottom-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-lg flex items-center justify-between z-20">
+        <div className="flex items-center gap-2">
+          <SparklesIcon className="w-4 h-4 text-amber-500" />
+          <span className="text-xs text-slate-600">
+            {fleet.length} fleet cars registered. Updates sync to dispatch operations and fleet database.
+          </span>
+        </div>
+
         <Button
           type="button"
           variant="primary"
           size="md"
           onClick={handleSaveFleet}
-          isLoading={isSaving || isLoading}
-          leftIcon={<CheckIcon className="w-4 h-4" />}
-          className="bg-amber-600 hover:bg-amber-700 shadow-sm"
+          disabled={isSaving || isLoading}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md font-bold px-6"
         >
-          Save Fleet Changes
+          {isSaving ? <CheckIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+          {isSaving ? 'Saving...' : 'Save Fleet Inventory'}
         </Button>
       </div>
     </div>

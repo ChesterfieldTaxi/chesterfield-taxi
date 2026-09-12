@@ -121,6 +121,7 @@ export interface DispatchBookingEngineProps {
   onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
+  onCloneBooking?: (values: DispatchFormValues) => void;
 }
 
 const DEFAULT_COMPANIES = ['Chesterfield Taxi', 'St. Louis Taxi', 'West County Express'];
@@ -149,6 +150,7 @@ export function DispatchBookingEngine({
   onBookingSuccess,
   onValuesChange,
   onClearDraft,
+  onCloneBooking,
 }: DispatchBookingEngineProps) {
   const isEditMode = Boolean(initialTrip?.id);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
@@ -424,10 +426,29 @@ export function DispatchBookingEngine({
           if (parsed.internalNotes) setInternalNotes(parsed.internalNotes);
           if (parsed.returnTrip !== undefined) setReturnTrip(parsed.returnTrip);
           if (parsed.returnPickupAddress) setReturnPickupAddress(parsed.returnPickupAddress);
+          if (parsed.returnPickupCoordinates) setReturnPickupCoordinates(parsed.returnPickupCoordinates);
           if (parsed.returnDropoffAddress) setReturnDropoffAddress(parsed.returnDropoffAddress);
+          if (parsed.returnDropoffCoordinates) setReturnDropoffCoordinates(parsed.returnDropoffCoordinates);
+          if (parsed.returnIntermediateStops) setReturnIntermediateStops(parsed.returnIntermediateStops);
+          if (parsed.returnDate) setReturnDate(parsed.returnDate);
+          if (parsed.returnTime) setReturnTime(parsed.returnTime);
+          if (parsed.returnPassengers !== undefined) setReturnPassengers(parsed.returnPassengers);
+          if (parsed.returnBags !== undefined) setReturnBags(parsed.returnBags);
+          if (parsed.returnCarSeats !== undefined) setReturnCarSeats(parsed.returnCarSeats);
+          if (parsed.returnRearFacing !== undefined) setReturnRearFacing(parsed.returnRearFacing);
+          if (parsed.returnFrontFacing !== undefined) setReturnFrontFacing(parsed.returnFrontFacing);
+          if (parsed.returnBooster !== undefined) setReturnBooster(parsed.returnBooster);
+          if (parsed.returnVehicles) setReturnVehicles(parsed.returnVehicles);
           if (parsed.repeat !== undefined) setRepeat(parsed.repeat);
+          if (parsed.repeatFrequency) setRepeatFrequency(parsed.repeatFrequency);
+          if (parsed.repeatDays) setRepeatDays(parsed.repeatDays);
+          if (parsed.repeatOccurrences) setRepeatOccurrences(parsed.repeatOccurrences);
           if (parsed.repeatUntilDate) setRepeatUntilDate(parsed.repeatUntilDate);
           if (parsed.repeatWeeksPattern) setRepeatWeeksPattern(parsed.repeatWeeksPattern);
+          if (parsed.estimatedFare) setEstimatedFare(parsed.estimatedFare);
+          if (parsed.returnEstimatedFare) setReturnEstimatedFare(parsed.returnEstimatedFare);
+          if (parsed.manualFare) setManualFare(parsed.manualFare);
+          if (parsed.isFareOverridden !== undefined) setIsFareOverridden(parsed.isFareOverridden);
         }
       } catch {}
     }
@@ -1018,6 +1039,102 @@ export function DispatchBookingEngine({
     onClearDraft?.();
   };
 
+  // Clone current booking data into a new draft tab
+  const handleCloneBooking = () => {
+    const clonedValues: DispatchFormValues = {
+      timingType,
+      scheduledDate,
+      scheduledTime,
+      pickupAddress,
+      pickupCoordinates,
+      dropoffAddress,
+      dropoffCoordinates,
+      intermediateStops,
+      passengerName,
+      phone,
+      email,
+      additionalPassengers,
+      contactPerson: {
+        isBookerDifferent,
+        contactName,
+        contactPhone,
+        contactEmail,
+        contactRole,
+      },
+      passengers,
+      bags,
+      carSeats,
+      carSeatsBreakdown: {
+        rearFacing: rearFacingCount,
+        frontFacing: frontFacingCount,
+        booster: boosterCount,
+      },
+      selectedVehicles,
+      vehicle: selectedVehicles[0] || 'any',
+      paymentMethod,
+      cardDetails: {
+        cardPaymentType,
+        cardholderName,
+        cardNumber,
+        cardExp,
+        cardCvc,
+        saveCardOnFile,
+      },
+      corporateDetails: {
+        corporateAccount,
+        billingPo,
+        authorizedBy,
+        invoicingTerms,
+      },
+      tariff,
+      discount,
+      company,
+      driverId: 'unassigned',
+      notesForAll,
+      internalNotes,
+      returnDetails: {
+        returnTrip,
+        returnPickupAddress,
+        returnPickupCoordinates,
+        returnDropoffAddress,
+        returnDropoffCoordinates,
+        returnIntermediateStops,
+        returnDate,
+        returnTime,
+        returnPassengers,
+        returnBags,
+        returnCarSeats,
+        returnCarSeatsBreakdown: {
+          rearFacing: returnRearFacing,
+          frontFacing: returnFrontFacing,
+          booster: returnBooster,
+        },
+        returnVehicles,
+        autoCreateReturnTrip,
+        returnEstimatedFare,
+        returnEstimatedDurationMinutes,
+        returnEstimatedDistanceMiles,
+      },
+      repeatDetails: {
+        repeat,
+        repeatFrequency,
+        repeatDays,
+        repeatOccurrences,
+        repeatUntilDate,
+        repeatWeeksPattern,
+      },
+      estimatedFare,
+      returnEstimatedFare,
+      totalCalculatedFare: returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare,
+      manualFare,
+      isFareOverridden,
+      estimatedDurationMinutes,
+      estimatedDistanceMiles,
+    };
+
+    onCloneBooking?.(clonedValues);
+  };
+
   // Submit Booking (Create or Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1383,8 +1500,16 @@ export function DispatchBookingEngine({
         )}
 
         {/* ─── Timing Selector (Reverted clean pill switch design) ─── */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700 text-xs">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-xs">Pickup Time</span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              {timingType === 'later' ? 'Scheduled reservation' : 'On-demand dispatch'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700 text-xs">
             <input
               type="checkbox"
               checked={timingType === 'later'}
@@ -1427,6 +1552,7 @@ export function DispatchBookingEngine({
               ASAP (Live / Immediate)
             </div>
           )}
+          </div>
         </div>
 
         {/* ─── Routing Section (Outbound) ─── */}
@@ -2623,7 +2749,17 @@ export function DispatchBookingEngine({
         </div>
 
         <div className="flex items-center gap-2">
-          {!isEditMode && (
+          {isEditMode ? (
+            <button
+              type="button"
+              onClick={handleCloneBooking}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
+              title="Create a new draft tab pre-populated with these trip details"
+            >
+              <span>📋</span>
+              <span>Clone Booking</span>
+            </button>
+          ) : (
             <button
               type="button"
               onClick={handleClear}
