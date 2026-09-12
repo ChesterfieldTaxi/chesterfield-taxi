@@ -346,16 +346,15 @@ export function AdminOperatorsTab() {
 
   return (
     <div className="space-y-6">
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>👥</span>
-            <span>Operators &amp; RBAC Roster</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage operational roles, driver licenses, dispatch authorization, and user account status across Chesterfield Taxi.
-          </p>
+      {/* ─── Operators Top Action Bar ─── */}
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Operational Staff &amp; Drivers ({operators.length})
+          </span>
+          <span className="hidden sm:inline-block text-xs text-slate-400">
+            RBAC Access Controls &amp; Fleet Assignments
+          </span>
         </div>
 
         <Button
@@ -363,10 +362,10 @@ export function AdminOperatorsTab() {
           variant="primary"
           size="sm"
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold"
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold text-xs"
         >
           <PlusIcon className="w-4 h-4" />
-          Provision Operator
+          <span>Provision Operator</span>
         </Button>
       </div>
 

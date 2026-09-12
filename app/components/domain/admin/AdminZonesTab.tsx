@@ -180,35 +180,32 @@ export function AdminZonesTab() {
 
   return (
     <div className="space-y-6">
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>📍</span>
-            <span>Geofence Map Manager</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Define polygon and radius zones across Chesterfield and Greater St. Louis with dedicated flat surcharges and multipliers.
-          </p>
+      {/* ─── Zones Top Action Bar ─── */}
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Operational Geofences ({zones.length})
+          </span>
+          <span className="hidden sm:inline-block text-xs text-slate-400">
+            Chesterfield &amp; St. Louis Regional Zones
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={handleStartCreate}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold"
-          >
-            <PlusIcon className="w-4 h-4" />
-            Create Named Zone
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={handleStartCreate}
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold text-xs"
+        >
+          <PlusIcon className="w-4 h-4" />
+          <span>Create Named Zone</span>
+        </Button>
       </div>
 
       {saveSuccess && (
         <Alert variant="success" title="Zone Updated">
-          Geofence successfully saved and synchronized with Firestore `/zones`.
+          Geofence successfully saved and synchronized.
         </Alert>
       )}
 
@@ -224,12 +221,9 @@ export function AdminZonesTab() {
         <div className="lg:col-span-5 space-y-4">
           <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-600">
-                  Active Zones ({zones.length})
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">Firestore /zones</span>
-              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Zones Directory
+              </span>
             </div>
 
             <Input

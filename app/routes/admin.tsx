@@ -226,36 +226,25 @@ export default function AdminLayout() {
             <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
               <CarIcon className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold tracking-tight leading-none text-white">
-                  {settings.company.name || 'Chesterfield Taxi'}
-                </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                  Admin Console
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400">
-                Phase 18: Admin Navigation &amp; Operations Restructure
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base font-extrabold tracking-tight leading-none text-white">
+                {settings.company.name || 'Chesterfield Taxi'}
+              </h1>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700 uppercase tracking-wider">
+                Admin
               </span>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isLiveFirebase ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+                title={isLiveFirebase ? 'Firestore Connected' : 'Local Storage Mode'}
+              />
             </div>
           </div>
 
           {/* User actions, Prominent Dispatch Button, and public site link */}
           <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Sync Mode Pill */}
-            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isLiveFirebase ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                }`}
-              />
-              <span className="text-slate-300 font-medium">
-                {isLiveFirebase ? 'Firestore Connected' : 'Local Storage Mode'}
-              </span>
-            </div>
-
-            {/* Prominent Header CTA: Direct Route to /dispatch 3-pane console */}
+            {/* Prominent Header CTA: The Single Primary Entry Point to /dispatch */}
             <Link
               to="/dispatch"
               reloadDocument
@@ -287,7 +276,7 @@ export default function AdminLayout() {
       </header>
 
       {/* ─── Main Admin Workspace ─── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Dynamic 7-Tab Navigation Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -308,29 +297,6 @@ export default function AdminLayout() {
                 </button>
               );
             })}
-          </div>
-        </div>
-
-        {/* Tab Context Banner */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-1">
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-              {currentTabObj.label}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">{currentTabObj.description}</p>
-          </div>
-
-          <div className="text-[11px] text-slate-400">
-            Active Store:{' '}
-            <span className="font-mono text-slate-600">
-              {normalizedTab === 'zones'
-                ? 'Firestore /zones'
-                : normalizedTab === 'operators'
-                ? 'Firestore /users'
-                : normalizedTab === 'vehicles' && subSection === 'fleet'
-                ? 'Firestore /fleet'
-                : 'config/appSettings'}
-            </span>
           </div>
         </div>
 

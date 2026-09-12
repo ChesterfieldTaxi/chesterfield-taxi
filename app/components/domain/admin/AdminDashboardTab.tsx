@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
 import type { Trip } from '../../../core/types/trip';
 import { getBookingService } from '../../../core/services/booking';
 import type { AppSettings } from '../../../core/types/config';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
-import { Button } from '../../ui/Button';
-import {
-  CarIcon,
-  ClockIcon,
-  CheckIcon,
-  ShieldCheckIcon,
-  SpinnerIcon,
-} from '../../ui/Icons';
+import { SpinnerIcon } from '../../ui/Icons';
 
 export type AdminTabKey =
   | 'dashboard'
@@ -29,7 +21,6 @@ interface AdminDashboardTabProps {
 }
 
 export function AdminDashboardTab({ settings, onNavigateTab }: AdminDashboardTabProps) {
-  const navigate = useNavigate();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -111,52 +102,12 @@ export function AdminDashboardTab({ settings, onNavigateTab }: AdminDashboardTab
 
   return (
     <div className="space-y-6">
-      {/* ─── Hero Quick Launcher ─── */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-bold uppercase tracking-wider">
-              Executive Dispatch Overview
-            </span>
-            <span className="text-xs text-slate-400">&bull; Live Fleet &amp; Booking Telemetry</span>
-          </div>
-          <h2 className="text-2xl font-black tracking-tight text-white">
-            Chesterfield Taxi Command Center
-          </h2>
-          <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-            Monitor real-time reservations, vehicle asset health, active geofences, and revenue metrics.
-            Launch the tactical dispatch console to assign trips and manage driver queues.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Link
-            to="/dispatch"
-            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 border border-amber-400/40 group"
-          >
-            <span>🚕</span>
-            <span>Launch Dispatch Console</span>
-            <span className="transition-transform group-hover:translate-x-1">&rarr;</span>
-          </Link>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={() => onNavigateTab('operators')}
-            className="w-full sm:w-auto text-slate-300 border-slate-700 hover:bg-slate-800 hover:text-white"
-          >
-            View Operators Roster
-          </Button>
-        </div>
-      </div>
-
       {/* ─── Unassigned Booking Alerts Banner ─── */}
       {pendingCount > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/5 border-2 border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-sm">
+        <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/5 border-2 border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-sm shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-xs shrink-0">
                 ⚠️
               </div>
               <div>
@@ -170,18 +121,14 @@ export function AdminDashboardTab({ settings, onNavigateTab }: AdminDashboardTab
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
                   Latest pending request: <strong>{pendingTrips[0]?.passenger?.firstName || 'Customer'}</strong> from{' '}
-                  <span className="font-mono text-[11px] text-slate-800">{pendingTrips[0]?.pickupLocation?.address?.slice(0, 35) || 'Chesterfield, MO'}...</span>
+                  <span className="font-mono text-[11px] text-slate-800">{pendingTrips[0]?.pickupLocation?.address?.slice(0, 45) || 'Chesterfield, MO'}...</span>
                 </p>
               </div>
             </div>
 
-            <Link
-              to="/dispatch"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0"
-            >
-              <span>Assign in Dispatch Console</span>
-              <span>&rarr;</span>
-            </Link>
+            <span className="text-xs font-semibold text-amber-900 bg-amber-100/90 px-3 py-1.5 rounded-lg border border-amber-300 shrink-0">
+              Awaiting Driver Allocation
+            </span>
           </div>
         </div>
       )}
@@ -399,240 +346,94 @@ export function AdminDashboardTab({ settings, onNavigateTab }: AdminDashboardTab
         </Card>
       </div>
 
-      {/* ─── Two-Column Lower Section: Recent Activity & Admin Quick Links ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Recent Bookings & Dispatch Activity */}
-        <div className="lg:col-span-2">
-          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs h-full flex flex-col">
-            <CardHeader className="border-b border-slate-100 p-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-slate-900">
-                  Recent Dispatch Activity
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Latest customer bookings received and active trip status
-                </CardDescription>
-              </div>
-              <Link
-                to="/dispatch"
-                className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-              >
-                Open Dispatch Console &rarr;
-              </Link>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-x-auto">
-              {isLoading ? (
-                <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
-                  <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
-                  <span className="text-xs">Loading live trip queue...</span>
-                </div>
-              ) : recentTrips.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  No bookings registered yet. Open the Dispatch Console to create your first reservation.
-                </div>
-              ) : (
-                <table className="w-full text-left text-xs divide-y divide-slate-100">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="px-4 py-2.5">Passenger</th>
-                      <th className="px-4 py-2.5">Route</th>
-                      <th className="px-4 py-2.5">Fare</th>
-                      <th className="px-4 py-2.5">Status</th>
-                      <th className="px-4 py-2.5 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {recentTrips.map((trip) => {
-                      const fare = Number(trip.pricing?.totalFare || trip.payment?.amount || 0);
-                      const passengerName = trip.passenger
-                        ? `${trip.passenger.firstName || ''} ${trip.passenger.lastName || ''}`.trim() || 'Anonymous Rider'
-                        : 'Anonymous Rider';
-                      const passengerPhone = trip.passenger?.phone || trip.id;
-                      const pickup = trip.pickupLocation?.address || 'Pickup address not specified';
-                      const dropoff = trip.dropoffLocation?.address || 'Dropoff address not specified';
-
-                      return (
-                        <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            <div>{passengerName}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {passengerPhone}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 max-w-[200px]">
-                            <div className="truncate font-medium text-slate-800">
-                              📍 {pickup}
-                            </div>
-                            <div className="truncate text-slate-400 text-[11px]">
-                              🏁 {dropoff}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-bold text-slate-900">
-                            ${fare > 0 ? fare.toFixed(2) : '--'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                trip.status === 'completed'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : trip.status === 'assigned' || trip.status === 'offered'
-                                  ? 'bg-blue-100 text-blue-800 animate-pulse'
-                                  : trip.status === 'pending'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {trip.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Link
-                              to="/dispatch"
-                              className="text-[11px] font-semibold text-blue-600 hover:underline"
-                            >
-                              Dispatch &rarr;
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right 1 Col: Quick Navigation to Admin Modules */}
-        <div>
-          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4 space-y-4">
-            <CardHeader className="p-0">
-              <CardTitle className="text-sm font-bold text-slate-900">
-                Management Modules
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                Access restructured Phase 18 configuration consoles
-              </CardDescription>
-            </CardHeader>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => onNavigateTab('rates')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">💵</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      Rates &amp; Pricing Rules
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Surge: {settings.pricing.surgeMultiplier}x &bull; Base: ${settings.pricing.baseFare}
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('vehicles')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">🚗</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      Vehicles &amp; Physical Fleet
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Types, VIN, insurance &amp; maintenance
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('zones')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">📍</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      Geofence Zones
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Chesterfield, SUS, STL Airport zones
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('operators')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">👥</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      Operators &amp; RBAC Roster
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Drivers, dispatchers, and admin roles
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('general')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">🏢</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      General &amp; Localization
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Hours, timezone &amp; branding
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('advanced')}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50 transition-all text-left text-xs group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base">⚙️</span>
-                  <div>
-                    <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                      Advanced Settings &amp; Security
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      API monitors, Firestore &amp; audit logs
-                    </div>
-                  </div>
-                </div>
-                <span className="text-slate-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
-              </button>
+      {/* ─── Recent Bookings Activity ─── */}
+      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs flex flex-col">
+        <CardHeader className="border-b border-slate-100 p-4">
+          <CardTitle className="text-sm font-bold text-slate-900">
+            Recent Booking &amp; Trip Queue
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Real-time reservations and operational trip status across Chesterfield and St. Louis.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 overflow-x-auto">
+          {isLoading ? (
+            <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+              <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
+              <span className="text-xs">Loading live trip queue...</span>
             </div>
-          </Card>
-        </div>
-      </div>
+          ) : recentTrips.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">
+              No bookings registered yet.
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs divide-y divide-slate-100">
+              <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="px-4 py-2.5">Trip ID</th>
+                  <th className="px-4 py-2.5">Passenger</th>
+                  <th className="px-4 py-2.5">Route</th>
+                  <th className="px-4 py-2.5">Fare</th>
+                  <th className="px-4 py-2.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recentTrips.map((trip) => {
+                  const fare = Number(trip.pricing?.totalFare || trip.payment?.amount || 0);
+                  const passengerName = trip.passenger
+                    ? `${trip.passenger.firstName || ''} ${trip.passenger.lastName || ''}`.trim() || 'Anonymous Rider'
+                    : 'Anonymous Rider';
+                  const passengerPhone = trip.passenger?.phone || '';
+                  const pickup = trip.pickupLocation?.address || 'Pickup address not specified';
+                  const dropoff = trip.dropoffLocation?.address || 'Dropoff address not specified';
+
+                  return (
+                    <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        #{trip.id.slice(0, 8)}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900">
+                        <div>{passengerName}</div>
+                        {passengerPhone && (
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {passengerPhone}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 max-w-sm">
+                        <div className="truncate font-medium text-slate-800">
+                          📍 {pickup}
+                        </div>
+                        <div className="truncate text-slate-400 text-[11px]">
+                          🏁 {dropoff}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        ${fare > 0 ? fare.toFixed(2) : '--'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            trip.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : trip.status === 'assigned' || trip.status === 'offered'
+                              ? 'bg-blue-100 text-blue-800 animate-pulse'
+                              : trip.status === 'pending'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {trip.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

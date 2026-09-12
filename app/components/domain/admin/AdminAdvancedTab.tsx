@@ -129,20 +129,19 @@ export function AdminAdvancedTab({ settings, onSave, isLoading = false }: AdminA
 
   return (
     <div className="space-y-6">
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>⚙️</span>
-            <span>Advanced Settings, Security &amp; Audit</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            System health diagnostics, API credentials, Firestore rule enforcement, and administrative access logging.
-          </p>
+      {/* ─── Advanced Top Header ─── */}
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            System Diagnostics &amp; Security Controls
+          </span>
+          <span className="hidden sm:inline-block text-xs text-slate-400">
+            API Monitors, Maintenance Flags &amp; Audit Trail
+          </span>
         </div>
 
-        <Badge variant="warning" size="sm" className="font-mono">
-          Privileged Admin Area
+        <Badge variant="warning" size="sm" className="font-mono text-[11px]">
+          Privileged Access
         </Badge>
       </div>
 

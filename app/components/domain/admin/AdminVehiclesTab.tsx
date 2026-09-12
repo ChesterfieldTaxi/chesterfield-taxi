@@ -124,18 +124,8 @@ export function AdminVehiclesTab({
 
   return (
     <div className="space-y-6">
-      {/* ─── Vehicles Sub-Navigation Header ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>🚗</span>
-            <span>Vehicles &amp; Fleet Architecture</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configure vehicle tier classifications and track physical motorized assets in the Chesterfield fleet.
-          </p>
-        </div>
-
+      {/* ─── Vehicles Sub-Navigation ─── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
         {/* Sub-navigation Pills */}
         <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
           <button
@@ -147,8 +137,8 @@ export function AdminVehiclesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🏷️ Section 1: Vehicle Types</span>
-            <span className="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.2 rounded-full">
+            <span>🏷️ Vehicle Classes</span>
+            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
               {vehicles.length}
             </span>
           </button>
@@ -161,11 +151,15 @@ export function AdminVehiclesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🚐 Section 2: Physical Fleet</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-700 font-extrabold px-1.5 py-0.2 rounded-full">
+            <span>🚐 Physical Fleet</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">
               {settings.fleet?.length || 4} Cars
             </span>
           </button>
+        </div>
+
+        <div className="text-xs text-slate-500 font-medium">
+          Fleet Asset Management
         </div>
       </div>
 

@@ -164,17 +164,7 @@ export function AdminRatesTab({ settings, onSave, isLoading = false }: AdminRate
   return (
     <div className="space-y-6">
       {/* Rates Top Sub-Navigation Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>💵</span>
-            <span>Rates &amp; Dynamic Pricing Architecture</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage live baseline formulas, Named Pricing Rules, and distance step increment tables.
-          </p>
-        </div>
-
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
         {/* Sub-navigation Pills */}
         <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
           <button
@@ -198,8 +188,8 @@ export function AdminRatesTab({ settings, onSave, isLoading = false }: AdminRate
             }`}
           >
             <span>📜 Named Rules</span>
-            <span className="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.2 rounded-full">
-              Phase 19 Ready
+            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
+              Preview
             </span>
           </button>
           <button
@@ -212,10 +202,14 @@ export function AdminRatesTab({ settings, onSave, isLoading = false }: AdminRate
             }`}
           >
             <span>📈 Step Increments</span>
-            <span className="text-[10px] bg-purple-100 text-purple-700 font-extrabold px-1.5 py-0.2 rounded-full">
-              Phase 19 Ready
+            <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.2 rounded-full">
+              Preview
             </span>
           </button>
+        </div>
+
+        <div className="text-xs text-slate-500 font-medium">
+          Pricing &amp; Fare Engine
         </div>
       </div>
 
