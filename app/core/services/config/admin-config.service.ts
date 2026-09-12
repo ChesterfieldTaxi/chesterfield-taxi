@@ -33,8 +33,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     address: COMPANY_CONFIG.address.formatted,
   },
   branding: {
-    primaryColor: '#f59e0b', // Amber-500
-    secondaryColor: '#0f172a', // Slate-900
+    primaryColor: COMPANY_CONFIG.primaryColor || '#f59e0b', // Amber-500
+    secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a', // Slate-900
     logoUrl: '',
   },
   pricing: {
@@ -44,6 +44,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     surgeMultiplier: 1.00,
     perMinuteRate: 0.35,
     minimumFare: 10.00,
+    multiStopFee: 5.00,
+    defaultTolls: 0,
   },
   vehicles: [
     {
@@ -281,6 +283,8 @@ export class AdminConfigService implements IAdminConfigService {
       perMinuteRate: settings.pricing.perMinuteRate ?? DEFAULT_PRICING_CONFIG.perMinuteRate,
       minimumFare: settings.pricing.minimumFare ?? DEFAULT_PRICING_CONFIG.minimumFare,
       vehicleMultipliers,
+      multiStopFee: settings.pricing.multiStopFee ?? DEFAULT_PRICING_CONFIG.multiStopFee,
+      defaultTolls: settings.pricing.defaultTolls ?? 0,
       airportSurcharge: settings.pricing.airportFee,
       currency: 'USD',
       manualSurgeMultiplier: settings.pricing.surgeMultiplier,

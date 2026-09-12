@@ -28,6 +28,13 @@ export interface QuoteRequest {
   passengerCount?: number;
   luggageCount?: number;
   promoCode?: string;
+  tolls?: number;
+  customTollsOrFees?: number;
+  bypassSurge?: boolean;
+  waiveMultiStopFees?: boolean;
+  waiveAirportFee?: boolean;
+  manualDiscount?: number;
+  manualFareOverride?: number;
 }
 
 /**

@@ -37,6 +37,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
     xl: 1.75,
     wheelchair: 1.0, // Equitable accessibility
   },
+  multiStopFee: 5.00,
   airportSurcharge: 4.00,
   currency: 'USD',
 };
@@ -152,7 +153,10 @@ function appendAudit(
 // STEP 1: Base Fare Calculation
 // ----------------------------------------------------------------------------
 export const applyBaseFare: PricingPipelineStep = (context) => {
-  const baseFare = roundCurrency(context.config.baseFare);
+  const tier = context.input.vehicleTier;
+  const configuredBaseFare =
+    context.config.vehicleBaseFares?.[tier] ?? context.config.baseFare;
+  const baseFare = roundCurrency(configuredBaseFare);
   const newSubtotal = baseFare;
 
   return {
@@ -164,7 +168,7 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
       context.auditTrail,
       1,
       'Base Fare',
-      `Applied platform base fare of $${baseFare.toFixed(2)}`,
+      `Applied platform base fare of $${baseFare.toFixed(2)}${context.config.vehicleBaseFares?.[tier] ? ` (${tier.toUpperCase()} tier)` : ''}`,
       baseFare,
       newSubtotal
     ),
@@ -175,10 +179,30 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
 // STEP 2: Distance & Time Rate Application
 // ----------------------------------------------------------------------------
 export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
-  const { distanceMiles, durationMinutes } = context.input;
-  const { perMileRate, perMinuteRate } = context.config;
+  const { distanceMiles, durationMinutes, vehicleTier } = context.input;
+  const { perMileRate, perMinuteRate, vehicleMileRates, mileageTiers } = context.config;
 
-  const distanceFare = roundCurrency(Math.max(0, distanceMiles) * perMileRate);
+  const effectivePerMileRate = vehicleMileRates?.[vehicleTier] ?? perMileRate;
+
+  let distanceFare = 0;
+  if (mileageTiers && mileageTiers.length > 0) {
+    let remainingMiles = Math.max(0, distanceMiles);
+    let prevMax = 0;
+    for (const tier of mileageTiers) {
+      const tierMax = tier.maxMiles ?? Infinity;
+      const bracketMiles = Math.min(remainingMiles, tierMax - prevMax);
+      if (bracketMiles > 0) {
+        distanceFare += bracketMiles * tier.rate;
+        remainingMiles -= bracketMiles;
+        prevMax = tierMax;
+      }
+      if (remainingMiles <= 0) break;
+    }
+    distanceFare = roundCurrency(distanceFare);
+  } else {
+    distanceFare = roundCurrency(Math.max(0, distanceMiles) * effectivePerMileRate);
+  }
+
   const timeFare = roundCurrency(Math.max(0, durationMinutes) * perMinuteRate);
 
   const delta = distanceFare + timeFare;
@@ -194,7 +218,7 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
       context.auditTrail,
       2,
       'Distance & Time Rates',
-      `${distanceMiles.toFixed(2)} mi @ $${perMileRate.toFixed(2)}/mi ($${distanceFare.toFixed(2)}) + ${durationMinutes.toFixed(0)} min @ $${perMinuteRate.toFixed(2)}/min ($${timeFare.toFixed(2)})`,
+      `${distanceMiles.toFixed(2)} mi @ $${effectivePerMileRate.toFixed(2)}/mi ($${distanceFare.toFixed(2)}) + ${durationMinutes.toFixed(0)} min @ $${perMinuteRate.toFixed(2)}/min ($${timeFare.toFixed(2)})`,
       delta,
       newSubtotal
     ),
@@ -238,6 +262,23 @@ export function createSurgeStep(
   rules: readonly SurgeRule[] = DEFAULT_SURGE_RULES
 ): PricingPipelineStep {
   return (context) => {
+    // Check if dispatcher explicitly bypassed surge
+    if (context.input.bypassSurge) {
+      return {
+        ...context,
+        surgeMultiplier: 1.0,
+        surgeDescription: 'Surge waived by dispatcher override',
+        auditTrail: appendAudit(
+          context.auditTrail,
+          4,
+          'Surge / Time-of-Day',
+          'Surge rate waived by dispatcher override (1.0x enforced)',
+          0,
+          context.subtotal
+        ),
+      };
+    }
+
     const pickupDate =
       typeof context.input.pickupDateTime === 'string'
         ? new Date(context.input.pickupDateTime)
@@ -262,7 +303,6 @@ export function createSurgeStep(
         matchedRule = rule;
       }
     }
-
 
     if (highestMultiplier <= 1.0 || !matchedRule) {
       return {
@@ -314,29 +354,76 @@ export function createSurchargesAndDiscountsStep(
     const newDiscounts: DiscountEntry[] = [];
     let currentSubtotal = context.subtotal;
 
-    // 1. Airport surcharge
-    if (context.input.isAirportPickup && context.config.airportSurcharge > 0) {
-      const airportFee = roundCurrency(context.config.airportSurcharge);
-      newSurcharges.push({
-        name: 'Airport Terminal Access Fee',
-        amount: airportFee,
-        description: 'Mandatory airport commercial terminal fee',
-      });
-      currentSubtotal = roundCurrency(currentSubtotal + airportFee);
+    // 1. Multi-stop waypoint surcharge
+    const stopsCount = Math.max(0, context.input.intermediateStopsCount ?? 0);
+    if (stopsCount > 0) {
+      const perStopFee = context.config.multiStopFee ?? 5.00;
+      if (context.input.waiveMultiStopFees) {
+        newSurcharges.push({
+          name: `Multi-Stop Surcharge (${stopsCount} stop${stopsCount > 1 ? 's' : ''} - Waived)`,
+          amount: 0,
+          description: `Dispatcher waived $${(stopsCount * perStopFee).toFixed(2)} fee for ${stopsCount} intermediate stop(s)`,
+        });
+      } else {
+        const totalStopFee = roundCurrency(stopsCount * perStopFee);
+        newSurcharges.push({
+          name: `Multi-Stop Surcharge (${stopsCount} stop${stopsCount > 1 ? 's' : ''})`,
+          amount: totalStopFee,
+          description: `$${perStopFee.toFixed(2)} per intermediate waypoint`,
+        });
+        currentSubtotal = roundCurrency(currentSubtotal + totalStopFee);
+      }
     }
 
-    // 2. Custom tolls / fees
-    if (context.input.customTollsOrFees && context.input.customTollsOrFees > 0) {
-      const tollFee = roundCurrency(context.input.customTollsOrFees);
+    // 2. Airport surcharge
+    if (context.input.isAirportPickup && context.config.airportSurcharge > 0) {
+      const airportFee = roundCurrency(context.config.airportSurcharge);
+      if (context.input.waiveAirportFee) {
+        newSurcharges.push({
+          name: 'Airport Terminal Access Fee (Waived)',
+          amount: 0,
+          description: 'Dispatcher waived airport commercial terminal fee',
+        });
+      } else {
+        newSurcharges.push({
+          name: 'Airport Terminal Access Fee',
+          amount: airportFee,
+          description: 'Mandatory airport commercial terminal fee',
+        });
+        currentSubtotal = roundCurrency(currentSubtotal + airportFee);
+      }
+    }
+
+    // 3. Tolls & highway surcharge
+    const tollAmount =
+      context.input.tolls ??
+      context.input.customTollsOrFees ??
+      context.config.defaultTolls ??
+      0;
+    if (tollAmount > 0) {
+      const tollFee = roundCurrency(tollAmount);
       newSurcharges.push({
         name: 'Tolls & Highway Surcharge',
         amount: tollFee,
+        description: 'Bridge, express lane, and highway toll fees',
       });
       currentSubtotal = roundCurrency(currentSubtotal + tollFee);
     }
 
-    // 3. Promotional discounts
+    // 4. Dispatcher Courtesy Discount
     let totalDiscountAmount = 0;
+    if (context.input.manualDiscount && context.input.manualDiscount > 0) {
+      const discountVal = Math.min(roundCurrency(context.input.manualDiscount), currentSubtotal);
+      totalDiscountAmount = roundCurrency(totalDiscountAmount + discountVal);
+      newDiscounts.push({
+        name: 'Dispatcher Courtesy Discount',
+        code: 'DISPATCHER_CREDIT',
+        amount: discountVal,
+      });
+      currentSubtotal = roundCurrency(currentSubtotal - discountVal);
+    }
+
+    // 5. Promotional discounts
     if (context.input.promoCode) {
       const codeKey = context.input.promoCode.trim().toUpperCase();
       const discountRule = availableDiscounts[codeKey];
@@ -355,7 +442,7 @@ export function createSurchargesAndDiscountsStep(
 
           // Discount cannot exceed current subtotal
           discountVal = Math.min(discountVal, currentSubtotal);
-          totalDiscountAmount = discountVal;
+          totalDiscountAmount = roundCurrency(totalDiscountAmount + discountVal);
 
           newDiscounts.push({
             name: discountRule.description,
@@ -367,7 +454,30 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 4. Enforce minimum fare floor
+    // 6. Manual Fare Override check (Dispatcher Override)
+    if (
+      typeof context.input.manualFareOverride === 'number' &&
+      context.input.manualFareOverride >= 0
+    ) {
+      const overrideFare = roundCurrency(context.input.manualFareOverride);
+      return {
+        ...context,
+        surcharges: [...context.surcharges, ...newSurcharges],
+        discounts: [...context.discounts, ...newDiscounts],
+        subtotal: overrideFare,
+        totalFare: overrideFare,
+        auditTrail: appendAudit(
+          context.auditTrail,
+          5,
+          'Dispatcher Fare Override',
+          `Manual total fare override applied ($${overrideFare.toFixed(2)})`,
+          overrideFare - context.subtotal,
+          overrideFare
+        ),
+      };
+    }
+
+    // 7. Enforce minimum fare floor
     const minFare = context.config.minimumFare;
     let minFareAdjustment = 0;
     if (currentSubtotal < minFare) {

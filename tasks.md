@@ -113,3 +113,18 @@
 - [x] 16.8 Wire up site-wide dynamic branding variables so saved colors from Admin Settings update CSS variables across the booking portal.
 - [x] 16.9 Run `npm run typecheck` to confirm zero TypeScript compilation errors.
 - [x] 16.10 Run `npm run build` to confirm clean SSR and client production bundles.
+
+## Phase 17: Multi-Stop Routing, Dynamic Branding CSS Injection, & Advanced Pricing Rules
+- [x] 17.1 Update `spec.md` with Section 13 and `tasks.md` with Phase 17 sub-tasks.
+- [x] 17.2 Implement dynamic waypoint multi-stop UI (add up to 5 stops, address autocomplete, notes, move up, move down, and remove) in Customer Booking V2 (`BookingEngineV2.tsx`).
+- [x] 17.3 Implement dynamic waypoint multi-stop UI (add up to 5 stops, address autocomplete, notes, move up, move down, and remove) in Single-Page V1 / Dispatcher Engine (`BookingEngine.tsx`).
+- [x] 17.4 Integrate intermediate stops in Google Maps routing service and calculate accurate cumulative distance and duration across all intermediate waypoints.
+- [x] 17.5 Define brand colors (`primaryColor`, `secondaryColor`) in `companyConfig.ts` and declare `--color-primary`, `--color-secondary`, `--brand-primary`, `--brand-secondary` root CSS variables in `app.css`.
+- [x] 17.6 Inject dynamic CSS variables into `root.tsx` (SSR initial `<html style="...">`), `layout.tsx` (client-side dynamic updates), and `AdminGeneralTab.tsx` (live branding preview).
+- [x] 17.7 Update UI components (`Button.tsx`, badges, highlights) to consume dynamic CSS variables with fallbacks.
+- [x] 17.8 Implement advanced pricing pipeline rules (`rules.ts`, `pipeline.ts`): vehicle base tiers, mileage brackets, intermediate stop surcharges ($5/stop default), and highway tolls.
+- [x] 17.9 Update Admin Pricing configuration (`AdminPricingTab.tsx`, `admin-config.service.ts`, `types/config.ts`) with `multiStopFee` and `defaultTolls` controls.
+- [x] 17.10 Implement Dispatcher Price Overrides in `BookingEngine.tsx` with fee waivers (`waiveMultiStopFees`, `waiveAirportFee`), surge bypass (`bypassSurge`), custom tolls, and courtesy discounts.
+- [x] 17.11 Add itemized fare breakdown lines for multi-stop surcharges, tolls, peak demand surge, airport fee, and courtesy discounts across both booking engines.
+- [x] 17.12 Run `npm run typecheck` to confirm complete TypeScript compilation with zero errors.
+- [x] 17.13 Run `npm run build` to confirm production SSR and client bundles compile cleanly.

@@ -22,10 +22,17 @@ export interface BookingEngineV2Props {
 
 type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
 
+export interface WaypointItem {
+  id: string;
+  address: string;
+  placeId?: string;
+  coordinates?: { lat: number; lng: number };
+}
+
 interface FormState {
-  // Pickup timing
+  // Booking Type & Schedule
   bookingType: 'asap' | 'scheduled';
-  scheduledDateTime: string;
+  scheduledDateTime: string; // ISO / datetime-local format
 
   // Locations
   pickupAddress: string;
@@ -34,6 +41,7 @@ interface FormState {
   dropoffAddress: string;
   dropoffPlaceId?: string;
   dropoffCoordinates?: { lat: number; lng: number };
+  intermediateStops: WaypointItem[];
   hasIntermediateStop: boolean;
   intermediateStopAddress: string;
   intermediateStopPlaceId?: string;
@@ -90,6 +98,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
     scheduledDateTime: '',
     pickupAddress: '',
     dropoffAddress: '',
+    intermediateStops: [],
     hasIntermediateStop: false,
     intermediateStopAddress: '',
     airline: '',
@@ -126,6 +135,67 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
     corporateBookedBy: '',
   });
 
+  // Waypoint Management Handlers
+  const handleAddStop = () => {
+    if (form.intermediateStops.length >= 5) return;
+    setForm((prev) => {
+      const newStops = [
+        ...prev.intermediateStops,
+        {
+          id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          address: '',
+        },
+      ];
+      return {
+        ...prev,
+        intermediateStops: newStops,
+        hasIntermediateStop: true,
+      };
+    });
+  };
+
+  const handleUpdateStop = (id: string, updates: Partial<WaypointItem>) => {
+    setForm((prev) => {
+      const nextStops = prev.intermediateStops.map((stop) =>
+        stop.id === id ? { ...stop, ...updates } : stop
+      );
+      return {
+        ...prev,
+        intermediateStops: nextStops,
+        hasIntermediateStop: nextStops.length > 0,
+        intermediateStopAddress: nextStops[0]?.address ?? '',
+      };
+    });
+  };
+
+  const handleRemoveStop = (id: string) => {
+    setForm((prev) => {
+      const nextStops = prev.intermediateStops.filter((stop) => stop.id !== id);
+      return {
+        ...prev,
+        intermediateStops: nextStops,
+        hasIntermediateStop: nextStops.length > 0,
+        intermediateStopAddress: nextStops[0]?.address ?? '',
+      };
+    });
+  };
+
+  const handleMoveStop = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= form.intermediateStops.length) return;
+    setForm((prev) => {
+      const nextStops = [...prev.intermediateStops];
+      const temp = nextStops[index];
+      nextStops[index] = nextStops[targetIndex];
+      nextStops[targetIndex] = temp;
+      return {
+        ...prev,
+        intermediateStops: nextStops,
+        intermediateStopAddress: nextStops[0]?.address ?? '',
+      };
+    });
+  };
+
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -161,6 +231,14 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
     try {
       const bookingService = getBookingService();
+      const validStops = form.intermediateStops
+        .filter((s) => s.address && s.address.trim().length > 0)
+        .map((s) => ({
+          address: s.address,
+          placeId: s.placeId,
+          coordinates: s.coordinates,
+        }));
+
       const quoteRes = await bookingService.calculateQuote({
         pickupLocation: {
           address: form.pickupAddress,
@@ -172,11 +250,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
           placeId: form.dropoffPlaceId,
           coordinates: form.dropoffCoordinates,
         },
-        intermediateStops: form.hasIntermediateStop && form.intermediateStopAddress ? [{
-          address: form.intermediateStopAddress,
-          placeId: form.intermediateStopPlaceId,
-          coordinates: form.intermediateStopCoordinates,
-        }] : undefined,
+        intermediateStops: validStops.length > 0 ? validStops : undefined,
         vehicleTier: form.vehicleTier,
         bookingType: form.bookingType === 'scheduled' ? 'scheduled' : 'asap',
         scheduledPickupTime: form.bookingType === 'scheduled' && form.scheduledDateTime ? new Date(form.scheduledDateTime).toISOString() : undefined,
@@ -194,11 +268,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
   }, [
     form.pickupAddress,
     form.dropoffAddress,
-    form.hasIntermediateStop,
-    form.intermediateStopAddress,
+    form.intermediateStops,
     form.pickupCoordinates,
     form.dropoffCoordinates,
-    form.intermediateStopCoordinates,
     form.vehicleTier,
     form.bookingType,
     form.scheduledDateTime,
@@ -247,7 +319,13 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
     if (!form.dropoffAddress.trim()) {
       newErrors.dropoffAddress = 'Dropoff destination is required.';
     }
-    if (form.hasIntermediateStop && !form.intermediateStopAddress.trim()) {
+    if (form.intermediateStops.length > 0) {
+      form.intermediateStops.forEach((stop, idx) => {
+        if (!stop.address.trim()) {
+          newErrors[`intermediateStop_${stop.id}`] = `Intermediate Stop #${idx + 1} address is required.`;
+        }
+      });
+    } else if (form.hasIntermediateStop && !form.intermediateStopAddress.trim()) {
       newErrors.intermediateStopAddress = 'Intermediate stop address is required.';
     }
     if (form.bookingType === 'scheduled' && !form.scheduledDateTime) {
@@ -321,14 +399,23 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
         coordinates: form.dropoffCoordinates || { lat: 38.627, lng: -90.1994 },
       };
 
-      const intermediateStopLocation: TripLocation | undefined =
-        form.hasIntermediateStop && form.intermediateStopAddress
-          ? {
-              address: form.intermediateStopAddress,
+      const intermediateStopsLocations: TripLocation[] = form.intermediateStops.length > 0
+        ? form.intermediateStops
+            .filter((s) => s.address && s.address.trim().length > 0)
+            .map((s) => ({
+              address: s.address.trim(),
+              placeId: s.placeId,
+              coordinates: s.coordinates || { lat: 38.64, lng: -90.35 },
+            }))
+        : form.hasIntermediateStop && form.intermediateStopAddress
+        ? [
+            {
+              address: form.intermediateStopAddress.trim(),
               placeId: form.intermediateStopPlaceId,
               coordinates: form.intermediateStopCoordinates || { lat: 38.64, lng: -90.35 },
-            }
-          : undefined;
+            },
+          ]
+        : [];
 
       // Special requests notes
       const activeSpecialRequests = Object.entries(form.specialRequests)
@@ -369,7 +456,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
       const inputPayload: CreateTripInput = {
         pickupLocation,
         dropoffLocation,
-        intermediateStops: intermediateStopLocation ? [intermediateStopLocation] : undefined,
+        intermediateStops: intermediateStopsLocations.length > 0 ? intermediateStopsLocations : undefined,
         bookingType: form.bookingType === 'scheduled' ? 'scheduled' : 'asap',
         scheduledPickupTime:
           form.bookingType === 'scheduled' && form.scheduledDateTime
@@ -638,41 +725,77 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                   </div>
                 </div>
 
-                {/* Optional Intermediate Stop */}
-                {form.hasIntermediateStop && (
-                  <div className="relative pr-10 pl-5 border-l-2 border-dashed border-amber-300 ml-1.5" onFocusCapture={() => setActiveField('intermediateStopAddress')}>
+                {/* Dynamic Multi-Stop Waypoints */}
+                {form.intermediateStops.map((stop, index) => (
+                  <div
+                    key={stop.id}
+                    className="relative pl-5 border-l-2 border-dashed border-amber-400 ml-1.5 my-1"
+                    onFocusCapture={() => setActiveField('intermediateStopAddress')}
+                  >
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                      <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-xs">
+                        {index + 1}
+                      </span>
                       <div className="flex-1 relative">
                         <LocationAutocomplete
-                          name="intermediateStopAddress"
-                          placeholder="Intermediate stop address"
-                          value={form.intermediateStopAddress}
-                          onChange={(val) => setForm((prev) => ({ ...prev, intermediateStopAddress: val }))}
-                          onPlaceSelected={(details) => {
-                            setForm((prev) => ({
-                              ...prev,
-                              intermediateStopAddress: details.formattedAddress || '',
-                              intermediateStopPlaceId: details.placeId,
-                              intermediateStopCoordinates: details.coordinates,
-                            }));
+                          name={`intermediateStop_${stop.id}`}
+                          placeholder={`Stop #${index + 1} address or landmark`}
+                          value={stop.address}
+                          onChange={(val) => {
+                            handleUpdateStop(stop.id, { address: val });
+                            if (errors[`intermediateStop_${stop.id}`]) {
+                              setErrors((prev) => {
+                                const next = { ...prev };
+                                delete next[`intermediateStop_${stop.id}`];
+                                return next;
+                              });
+                            }
                           }}
-                          error={errors.intermediateStopAddress}
+                          onPlaceSelected={(details) => {
+                            handleUpdateStop(stop.id, {
+                              address: details.formattedAddress || '',
+                              placeId: details.placeId,
+                              coordinates: details.coordinates,
+                            });
+                          }}
+                          error={errors[`intermediateStop_${stop.id}`]}
                           required
                           icon="map-pin"
                         />
+                      </div>
+
+                      {/* Waypoint Actions: Up, Down, Delete */}
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
-                          onClick={() => setForm((prev) => ({ ...prev, hasIntermediateStop: false, intermediateStopAddress: '' }))}
-                          className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold"
-                          title="Remove intermediate stop"
+                          onClick={() => handleMoveStop(index, 'up')}
+                          disabled={index === 0}
+                          title="Move stop earlier in route"
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white text-slate-700 flex items-center justify-center text-xs font-bold transition-colors shadow-2xs"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveStop(index, 'down')}
+                          disabled={index === form.intermediateStops.length - 1}
+                          title="Move stop later in route"
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white text-slate-700 flex items-center justify-center text-xs font-bold transition-colors shadow-2xs"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStop(stop.id)}
+                          title="Remove waypoint"
+                          className="w-7 h-7 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-bold transition-colors shadow-2xs"
                         >
                           ✕
                         </button>
                       </div>
                     </div>
                   </div>
-                )}
+                ))}
 
                 {/* Dropoff Location */}
                 <div className="relative pr-10" onFocusCapture={() => setActiveField('dropoffAddress')}>
@@ -714,14 +837,15 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                 </div>
               </div>
 
-              {/* Add Stop Button */}
-              {!form.hasIntermediateStop && (
+              {/* Dynamic Add Stop Button */}
+              {form.intermediateStops.length < 5 && (
                 <button
                   type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, hasIntermediateStop: true }))}
-                  className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1 hover:underline pt-1"
+                  onClick={handleAddStop}
+                  className="text-amber-600 hover:text-amber-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 hover:underline pt-1 transition-colors"
                 >
-                  <span>+</span> Add Stop
+                  <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">+</span>
+                  <span>Add Stop {form.intermediateStops.length > 0 ? `(${form.intermediateStops.length}/5)` : ''}</span>
                 </button>
               )}
 
@@ -1459,12 +1583,35 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                     ${(quote.pricing.durationMinutes * quote.pricing.timeRate).toFixed(2)}
                   </span>
                 </div>
-                {airportDetection.isAirportTrip && (
+                {Boolean(quote.pricing.multiStopSurcharge) && (
+                  <div className="flex justify-between text-amber-700 font-medium">
+                    <span>Intermediate Stops ({quote.pricing.intermediateStopsCount || form.intermediateStops.length})</span>
+                    <span>+${quote.pricing.multiStopSurcharge?.toFixed(2)}</span>
+                  </div>
+                )}
+                {Boolean(quote.pricing.tollsFee) && (
+                  <div className="flex justify-between text-slate-700 font-medium">
+                    <span>Tolls &amp; Highway Surcharge</span>
+                    <span>+${quote.pricing.tollsFee?.toFixed(2)}</span>
+                  </div>
+                )}
+                {quote.pricing.surgeMultiplier > 1.0 && (
+                  <div className="flex justify-between text-amber-600 font-medium">
+                    <span>Peak Surge Multiplier</span>
+                    <span>{quote.pricing.surgeMultiplier.toFixed(2)}x</span>
+                  </div>
+                )}
+                {Boolean(quote.pricing.airportSurcharge) ? (
+                  <div className="flex justify-between text-blue-800 font-medium">
+                    <span>Airport Terminal Access</span>
+                    <span>+${quote.pricing.airportSurcharge?.toFixed(2)}</span>
+                  </div>
+                ) : airportDetection.isAirportTrip ? (
                   <div className="flex justify-between text-blue-800 font-medium">
                     <span>Airport Terminal Access</span>
                     <span>Included</span>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 

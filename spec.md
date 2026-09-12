@@ -163,3 +163,32 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Site-Wide Dynamic Branding:**
   - The saved branding colors from the Admin Settings (e.g., `settings.branding.primaryColor`) dynamically project CSS variables (`--brand-primary`) into the root `layout.tsx`.
   - Enables instant site-wide branding updates across the booking portal without requiring redeployment.
+
+### 13. Phase 17: Multi-Stop Routing, Dynamic Branding CSS Injection, & Advanced Pricing Rules
+- **Multi-Stop Routing & Waypoint Management:**
+  - Dynamic intermediate stop waypoint management in both Customer Booking V2 (`BookingEngineV2.tsx`) and Single-Page V1 / Dispatcher Engine (`BookingEngine.tsx`).
+  - Supports adding up to 5 intermediate stops with individual location autocomplete, optional stop notes, and immediate validation.
+  - Interactive waypoint re-ordering (Move Up `↑`, Move Down `↓`) and removal (`✕`), keeping sequential stop ordering intact.
+  - Backward compatibility: transparently populates legacy `hasIntermediateStop` and `intermediateStopAddress` properties while emitting full `intermediateStops: TripLocation[]` arrays for storage and email notifications.
+  - Google Maps routing engine calculates true road mileage and travel duration across all intermediate waypoints seamlessly.
+- **Global Dynamic Branding & CSS Variable Injection:**
+  - Injects `primaryColor` and `secondaryColor` hex values from `companyConfig.ts` and Firestore `appSettings` directly into root CSS custom properties (`--color-primary`, `--color-secondary`, `--brand-primary`, `--brand-secondary`).
+  - SSR zero-flash protection: initial colors injected directly onto `<html style="...">` attributes during server-side render in `root.tsx`.
+  - Client synchronization: dynamic observation in `layout.tsx` updates `document.documentElement.style` on settings change.
+  - UI components (such as `Button.tsx` primary and secondary variants, active indicators, and badges) consume CSS variables with built-in fallbacks.
+  - Live brand preview card in `AdminGeneralTab.tsx` updates instantaneously to preview brand appearance before saving.
+- **Advanced Pricing Pipeline & Dispatcher Overrides:**
+  - Pure functional pipeline architecture (`rules.ts`, `pipeline.ts`) supporting:
+    - Base fare tiers by vehicle type (`sedan`, `suv`, `van`, `luxury`).
+    - Distance rate tiers (0–15 miles baseline, 15+ miles long-haul discount bracket).
+    - Multi-stop surcharges (configurable `$5.00` per intermediate stop default).
+    - Highway tolls & bridge fees (configurable default or manual custom entry).
+    - Peak demand / surge multipliers (configurable surge rules and multipliers).
+  - Dispatcher and manager override controls:
+    - Waive multi-stop waypoint surcharges (`waiveMultiStopFees`).
+    - Waive airport commercial pickup gate fees (`waiveAirportFee`).
+    - Bypass peak demand surge multiplier (`bypassSurge`), enforcing 1.0x baseline rates.
+    - Custom bridge/highway tolls entry (`customTolls`).
+    - Courtesy discount credit (`manualDiscount`).
+    - Agreed total flat fare override (`manualFare` + `overrideReason`).
+  - Itemized transparent fare breakdown showing all baseline, surcharge, toll, surge, discount, and override line items.

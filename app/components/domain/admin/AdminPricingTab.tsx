@@ -51,6 +51,8 @@ export function AdminPricingTab({ settings, onSave, isLoading = false }: AdminPr
         surgeMultiplier: Math.max(1.0, Number(pricing.surgeMultiplier) || 1.0),
         perMinuteRate: Math.max(0, Number(pricing.perMinuteRate) || 0),
         minimumFare: Math.max(0, Number(pricing.minimumFare) || 0),
+        multiStopFee: Math.max(0, Number(pricing.multiStopFee) || 5.00),
+        defaultTolls: Math.max(0, Number(pricing.defaultTolls) || 0),
       };
 
       await onSave({ pricing: normalizedPricing });
@@ -141,15 +143,37 @@ export function AdminPricingTab({ settings, onSave, isLoading = false }: AdminPr
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Airport Terminal Surcharge ($)"
+                  type="number"
+                  step="0.50"
+                  min="0"
+                  value={pricing.airportFee}
+                  onChange={(e) => setPricing((prev) => ({ ...prev, airportFee: parseFloat(e.target.value) || 0 }))}
+                  helperText="Surcharge for airport pickups."
+                  required
+                />
+
+                <Input
+                  label="Multi-Stop Waypoint Fee ($/stop)"
+                  type="number"
+                  step="0.50"
+                  min="0"
+                  value={pricing.multiStopFee ?? 5.00}
+                  onChange={(e) => setPricing((prev) => ({ ...prev, multiStopFee: parseFloat(e.target.value) || 0 }))}
+                  helperText="Fee per intermediate stop."
+                />
+              </div>
+
               <Input
-                label="Airport Terminal Access Surcharge ($)"
+                label="Default Toll Surcharge ($)"
                 type="number"
                 step="0.50"
                 min="0"
-                value={pricing.airportFee}
-                onChange={(e) => setPricing((prev) => ({ ...prev, airportFee: parseFloat(e.target.value) || 0 }))}
-                helperText="Fixed surcharge added when pickup is at Lambert STL or Spirit of St. Louis Airport."
-                required
+                value={pricing.defaultTolls ?? 0}
+                onChange={(e) => setPricing((prev) => ({ ...prev, defaultTolls: parseFloat(e.target.value) || 0 }))}
+                helperText="Default toll/bridge surcharge applied to standard routes if not customized."
               />
             </CardContent>
           </Card>

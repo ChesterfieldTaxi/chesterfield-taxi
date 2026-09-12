@@ -84,6 +84,10 @@ export function toTripPricing(context: PricingContext): TripPricing {
     context.discounts.reduce((sum, d) => sum + d.amount, 0)
   );
 
+  const multiStopItem = context.surcharges.find((s) => s.name.toLowerCase().includes('stop'));
+  const tollsItem = context.surcharges.find((s) => s.name.toLowerCase().includes('toll'));
+  const airportItem = context.surcharges.find((s) => s.name.toLowerCase().includes('airport'));
+
   return {
     baseFare: context.baseFare,
     distanceMiles: context.input.distanceMiles,
@@ -96,6 +100,10 @@ export function toTripPricing(context: PricingContext): TripPricing {
     subtotal: context.subtotal,
     totalFare: context.totalFare,
     currency: context.currency,
+    intermediateStopsCount: context.input.intermediateStopsCount || 0,
+    multiStopSurcharge: multiStopItem ? multiStopItem.amount : 0,
+    tollsFee: tollsItem ? tollsItem.amount : 0,
+    airportSurcharge: airportItem ? airportItem.amount : 0,
   };
 }
 

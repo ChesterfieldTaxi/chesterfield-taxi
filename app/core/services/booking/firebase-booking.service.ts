@@ -149,6 +149,12 @@ export class FirebaseBookingService implements IBookingService {
     const settings = await adminConfig.getSettings();
     const dynamicPricingConfig = adminConfig.toPricingConfig(settings);
 
+    const validIntermediateStops = (request.intermediateStops ?? []).filter((s) => {
+      if (s.coordinates) return true;
+      if (s.address && s.address.trim().length > 0) return true;
+      return false;
+    });
+
     const { pricing } = calculateTripPricing(
       {
         distanceMiles,
@@ -157,6 +163,14 @@ export class FirebaseBookingService implements IBookingService {
         pickupDateTime,
         promoCode: request.promoCode,
         isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
+        intermediateStopsCount: validIntermediateStops.length,
+        tolls: request.tolls,
+        customTollsOrFees: request.customTollsOrFees,
+        bypassSurge: request.bypassSurge,
+        waiveMultiStopFees: request.waiveMultiStopFees,
+        waiveAirportFee: request.waiveAirportFee,
+        manualDiscount: request.manualDiscount,
+        manualFareOverride: request.manualFareOverride,
       },
       dynamicPricingConfig
     );

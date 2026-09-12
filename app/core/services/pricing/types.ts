@@ -18,6 +18,16 @@ export interface PricingConfig {
   minimumFare: number;
   /** Multipliers mapped to each vehicle category */
   vehicleMultipliers: Record<string, number>;
+  /** Optional vehicle-specific base fares override */
+  vehicleBaseFares?: Record<string, number>;
+  /** Optional vehicle-specific per-mile rates override */
+  vehicleMileRates?: Record<string, number>;
+  /** Optional distance tier rates */
+  mileageTiers?: Array<{ maxMiles?: number; rate: number }>;
+  /** Surcharge per intermediate waypoint stop */
+  multiStopFee: number;
+  /** Optional default toll amount */
+  defaultTolls?: number;
   /** Fixed surcharge applied to airport pickups */
   airportSurcharge: number;
   /** Standard currency code (e.g. USD) */
@@ -58,6 +68,20 @@ export interface PricingInput {
   promoCode?: string;
   /** Optional custom toll or fee additions */
   customTollsOrFees?: number;
+  /** Toll fees amount */
+  tolls?: number;
+  /** Number of intermediate waypoint stops */
+  intermediateStopsCount?: number;
+  /** Dispatcher override: waive all intermediate stop fees */
+  waiveMultiStopFees?: boolean;
+  /** Dispatcher override: waive airport access fee */
+  waiveAirportFee?: boolean;
+  /** Dispatcher override: bypass surge multiplier (force 1.0x) */
+  bypassSurge?: boolean;
+  /** Dispatcher override: manual courtesy dollar discount */
+  manualDiscount?: number;
+  /** Dispatcher override: complete manual fare override */
+  manualFareOverride?: number;
 }
 
 export interface SurchargeEntry {

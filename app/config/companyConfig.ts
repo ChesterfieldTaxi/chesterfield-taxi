@@ -24,6 +24,11 @@ export interface CompanyBrandAddress {
   formatted: string;
 }
 
+export interface CompanyBrandColors {
+  primary: string;
+  secondary: string;
+}
+
 export interface CompanyBrandConfig {
   name: string;
   tagline: string;
@@ -34,6 +39,9 @@ export interface CompanyBrandConfig {
   address: CompanyBrandAddress;
   serviceAreas: string[];
   publicFormVersion: 'v1' | 'v2';
+  primaryColor: string;
+  secondaryColor: string;
+  colors?: CompanyBrandColors;
 }
 
 export const COMPANY_CONFIG: CompanyBrandConfig = {
@@ -41,6 +49,12 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   tagline: 'Professional Car Service',
   legalName: 'Chesterfield Taxi & Transportation LLC',
   publicFormVersion: 'v2',
+  primaryColor: '#f59e0b',
+  secondaryColor: '#0f172a',
+  colors: {
+    primary: '#f59e0b',
+    secondary: '#0f172a',
+  },
   phone: {
     primary: '(314) 738-0100',
     primaryRaw: '+13147380100',

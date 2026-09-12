@@ -28,6 +28,8 @@ export interface DynamicPricingConfig {
   surgeMultiplier: number;
   perMinuteRate?: number;
   minimumFare?: number;
+  multiStopFee?: number;
+  defaultTolls?: number;
 }
 
 export interface VehicleTierConfig {

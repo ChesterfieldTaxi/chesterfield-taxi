@@ -85,6 +85,12 @@ export interface TripPricing {
   subtotal: number;
   totalFare: number;
   currency: string;
+  // Itemized fee breakdowns
+  intermediateStopsCount?: number;
+  multiStopSurcharge?: number;
+  tollsFee?: number;
+  airportSurcharge?: number;
+  manualAdjustment?: number;
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'corporate';

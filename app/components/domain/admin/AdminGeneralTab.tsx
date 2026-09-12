@@ -278,7 +278,18 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
 
         {/* Live Branding Preview */}
         <div className="lg:col-span-5 space-y-6">
-          <Card variant="elevated" className="border-slate-200 shadow-xs sticky top-24">
+          <Card
+            variant="elevated"
+            className="border-slate-200 shadow-xs sticky top-24"
+            style={
+              {
+                '--color-primary': branding.primaryColor,
+                '--color-secondary': branding.secondaryColor,
+                '--brand-primary': branding.primaryColor,
+                '--brand-secondary': branding.secondaryColor,
+              } as React.CSSProperties
+            }
+          >
             <CardHeader className="border-b border-slate-100 bg-slate-50/50">
               <CardTitle className="text-base text-slate-900 flex items-center gap-2">
                 <SparklesIcon className="w-4 h-4 text-amber-500" />

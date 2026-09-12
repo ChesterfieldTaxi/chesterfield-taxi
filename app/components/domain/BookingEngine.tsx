@@ -105,6 +105,7 @@ export function BookingEngine({
     // Locations
     pickupAddress: '',
     pickupNotes: '',
+    intermediateStops: [] as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>,
     hasIntermediateStop: false,
     intermediateStopAddress: '',
     intermediateStopNotes: '',
@@ -142,6 +143,11 @@ export function BookingEngine({
     lineItemNotes: '',
     bypassPayment: false,
     bypassReason: 'cash_in_cab',
+    bypassSurge: false,
+    waiveMultiStopFees: false,
+    waiveAirportFee: false,
+    customTolls: '',
+    manualDiscount: '',
     // Customer Payment
     paymentMethod: 'card' as PaymentMethod,
     termsAccepted: false,
@@ -255,6 +261,70 @@ export function BookingEngine({
     }));
   };
 
+  // Waypoint Management Handlers
+  const handleAddIntermediateStop = () => {
+    setFormValues((prev) => {
+      const current = (prev.intermediateStops as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [];
+      if (current.length >= 5) return prev;
+      const next = [
+        ...current,
+        {
+          id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          address: '',
+          notes: '',
+        },
+      ];
+      return {
+        ...prev,
+        intermediateStops: next,
+        hasIntermediateStop: true,
+        intermediateStopAddress: next[0]?.address ?? '',
+      };
+    });
+  };
+
+  const handleUpdateIntermediateStop = (id: string, updates: Record<string, unknown>) => {
+    setFormValues((prev) => {
+      const current = (prev.intermediateStops as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [];
+      const next = current.map((stop) => (stop.id === id ? { ...stop, ...updates } : stop));
+      return {
+        ...prev,
+        intermediateStops: next,
+        hasIntermediateStop: next.length > 0,
+        intermediateStopAddress: next[0]?.address ?? '',
+      };
+    });
+  };
+
+  const handleRemoveIntermediateStop = (id: string) => {
+    setFormValues((prev) => {
+      const current = (prev.intermediateStops as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [];
+      const next = current.filter((stop) => stop.id !== id);
+      return {
+        ...prev,
+        intermediateStops: next,
+        hasIntermediateStop: next.length > 0,
+        intermediateStopAddress: next[0]?.address ?? '',
+      };
+    });
+  };
+
+  const handleMoveIntermediateStop = (index: number, direction: 'up' | 'down') => {
+    setFormValues((prev) => {
+      const current = [...((prev.intermediateStops as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [])];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= current.length) return prev;
+      const temp = current[index];
+      current[index] = current[targetIndex];
+      current[targetIndex] = temp;
+      return {
+        ...prev,
+        intermediateStops: current,
+        intermediateStopAddress: current[0]?.address ?? '',
+      };
+    });
+  };
+
   // Real-time Quote Calculation
   const refreshQuote = useCallback(async () => {
     const pickup = String(formValues.pickupAddress || '').trim();
@@ -276,8 +346,20 @@ export function BookingEngine({
         scheduledPickupTime = new Date(`${formValues.scheduledDate}T${timePart}`).toISOString();
       }
 
+      const rawStops = (formValues.intermediateStops as Array<{ id?: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [];
       const intermediateStops: TripLocation[] = [];
-      if (formValues.hasIntermediateStop && formValues.intermediateStopAddress) {
+      if (rawStops.length > 0) {
+        rawStops.forEach((stop) => {
+          if (stop.address && stop.address.trim()) {
+            intermediateStops.push({
+              address: stop.address.trim(),
+              placeId: stop.placeId,
+              coordinates: stop.coordinates,
+              notes: stop.notes || '',
+            });
+          }
+        });
+      } else if (formValues.hasIntermediateStop && formValues.intermediateStopAddress) {
         intermediateStops.push({
           address: String(formValues.intermediateStopAddress).trim(),
           placeId: formValues.intermediateStopAddress_placeId as string | undefined,
@@ -285,6 +367,10 @@ export function BookingEngine({
           notes: (formValues.intermediateStopNotes as string) ?? '',
         });
       }
+
+      const customTollsVal = formValues.customTolls ? Number(formValues.customTolls) : undefined;
+      const manualDiscountVal = formValues.manualDiscount ? Number(formValues.manualDiscount) : undefined;
+      const manualFareVal = formValues.isPriceOverridden && formValues.manualFare ? Number(formValues.manualFare) : undefined;
 
       const calculatedQuote = await bookingService.calculateQuote({
         pickupLocation: {
@@ -306,6 +392,14 @@ export function BookingEngine({
         passengerCount: Number(formValues.passengerCount) || 1,
         luggageCount: Number(formValues.luggageCount) || 0,
         promoCode: formValues.promoCode ? String(formValues.promoCode) : undefined,
+        // Dispatcher Overrides
+        tolls: customTollsVal,
+        customTollsOrFees: customTollsVal,
+        bypassSurge: Boolean(formValues.bypassSurge),
+        waiveMultiStopFees: Boolean(formValues.waiveMultiStopFees),
+        waiveAirportFee: Boolean(formValues.waiveAirportFee),
+        manualDiscount: manualDiscountVal,
+        manualFareOverride: manualFareVal,
       });
 
       setQuote(calculatedQuote);
@@ -324,6 +418,7 @@ export function BookingEngine({
     formValues.dropoffAddress_coordinates,
     formValues.pickupNotes,
     formValues.dropoffNotes,
+    formValues.intermediateStops,
     formValues.hasIntermediateStop,
     formValues.intermediateStopAddress,
     formValues.intermediateStopAddress_placeId,
@@ -336,6 +431,13 @@ export function BookingEngine({
     formValues.passengerCount,
     formValues.luggageCount,
     formValues.promoCode,
+    formValues.customTolls,
+    formValues.bypassSurge,
+    formValues.waiveMultiStopFees,
+    formValues.waiveAirportFee,
+    formValues.manualDiscount,
+    formValues.isPriceOverridden,
+    formValues.manualFare,
   ]);
 
   // Recalculate quote when relevant fields change
@@ -348,11 +450,19 @@ export function BookingEngine({
     formValues.pickupAddress_coordinates,
     formValues.dropoffAddress,
     formValues.dropoffAddress_coordinates,
+    formValues.intermediateStops,
     formValues.hasIntermediateStop,
     formValues.intermediateStopAddress,
     formValues.intermediateStopAddress_coordinates,
     formValues.vehicleTier,
     formValues.promoCode,
+    formValues.customTolls,
+    formValues.bypassSurge,
+    formValues.waiveMultiStopFees,
+    formValues.waiveAirportFee,
+    formValues.manualDiscount,
+    formValues.isPriceOverridden,
+    formValues.manualFare,
     refreshQuote,
   ]);
 
@@ -394,7 +504,14 @@ export function BookingEngine({
     if (!formValues.dropoffAddress || !String(formValues.dropoffAddress).trim()) {
       newErrors.dropoffAddress = 'Dropoff destination is required.';
     }
-    if (formValues.hasIntermediateStop && (!formValues.intermediateStopAddress || !String(formValues.intermediateStopAddress).trim())) {
+    const stopsList = (formValues.intermediateStops as Array<{ id?: string; address: string }>) || [];
+    if (stopsList.length > 0) {
+      stopsList.forEach((s, idx) => {
+        if (!s.address || !s.address.trim()) {
+          newErrors[`intermediateStop_${s.id || idx}`] = `Stop #${idx + 1} address is required.`;
+        }
+      });
+    } else if (formValues.hasIntermediateStop && (!formValues.intermediateStopAddress || !String(formValues.intermediateStopAddress).trim())) {
       newErrors.intermediateStopAddress = 'Please enter intermediate stop address.';
     }
 
@@ -450,13 +567,14 @@ export function BookingEngine({
 
     setErrors(newErrors);
 
-    // Auto-scroll to first invalid element if errors exist
+    // Scroll to the first errored section
     if (Object.keys(newErrors).length > 0) {
-      const firstErrorField = Object.keys(newErrors)[0];
-      const targetElement = document.querySelector(`[name="${firstErrorField}"]`) || document.getElementById(firstErrorField);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        (targetElement as HTMLElement).focus?.();
+      const errorKeys = Object.keys(newErrors);
+      const sectionPriority = ['pickupAddress', 'dropoffAddress', 'intermediateStopAddress', 'scheduledDate', 'firstName', 'phone', 'email', 'termsAccepted'];
+      const firstSection = sectionPriority.find((k) => errorKeys.includes(k)) || errorKeys[0];
+      const targetRef = sectionRefs.current[firstSection];
+      if (targetRef) {
+        targetRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return false;
     }
@@ -464,49 +582,27 @@ export function BookingEngine({
     return true;
   };
 
-  // Submission Handler
+  // Submission handler
   const handleSubmitBooking = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setIsSubmitting(true);
       setSubmitError(null);
-
       const bookingService = getBookingService();
 
-      // Ensure quote is ready
+      // Recalculate or use existing quote
       let finalQuote = quote;
       if (!finalQuote) {
-        let scheduledPickupTime: string | undefined;
-        if (formValues.bookingType === 'scheduled' && formValues.scheduledDate) {
-          const timePart = formValues.scheduledTime ? String(formValues.scheduledTime) : '12:00';
-          scheduledPickupTime = new Date(`${formValues.scheduledDate}T${timePart}`).toISOString();
-        }
-
-        finalQuote = await bookingService.calculateQuote({
-          pickupLocation: {
-            address: String(formValues.pickupAddress ?? ''),
-            notes: (formValues.pickupNotes as string) ?? '',
-          },
-          dropoffLocation: {
-            address: String(formValues.dropoffAddress ?? ''),
-            notes: (formValues.dropoffNotes as string) ?? '',
-          },
-          vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
-          bookingType: formValues.bookingType === 'scheduled' ? 'scheduled' : 'asap',
-          scheduledPickupTime,
-          passengerCount: Number(formValues.passengerCount) || 1,
-          luggageCount: Number(formValues.luggageCount) || 0,
-          promoCode: (formValues.promoCode as string) ?? '',
-        });
-        setQuote(finalQuote);
+        await refreshQuote();
+        finalQuote = quote;
       }
 
-      // Calculate effective pricing structure
+      if (!finalQuote) {
+        throw new Error('Could not calculate a guaranteed upfront fare quote for these locations.');
+      }
+
       let effectivePricing: TripPricing = finalQuote.pricing;
       if (capabilities.canPriceOverride && formValues.isPriceOverridden && effectiveFare !== null) {
         effectivePricing = {
@@ -536,8 +632,20 @@ export function BookingEngine({
       const userSpecialRequests = formValues.specialRequests ? String(formValues.specialRequests).trim() : '';
       const mergedSpecialRequests = [flightRemarks, userSpecialRequests].filter(Boolean).join('\n') || undefined;
 
+      const rawStops = (formValues.intermediateStops as Array<{ id?: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || [];
       const intermediateStops: TripLocation[] = [];
-      if (formValues.hasIntermediateStop && formValues.intermediateStopAddress) {
+      if (rawStops.length > 0) {
+        rawStops.forEach((stop) => {
+          if (stop.address && stop.address.trim()) {
+            intermediateStops.push({
+              address: stop.address.trim(),
+              placeId: stop.placeId,
+              coordinates: stop.coordinates,
+              notes: stop.notes || '',
+            });
+          }
+        });
+      } else if (formValues.hasIntermediateStop && formValues.intermediateStopAddress) {
         intermediateStops.push({
           address: String(formValues.intermediateStopAddress).trim(),
           placeId: formValues.intermediateStopAddress_placeId as string | undefined,
@@ -1116,40 +1224,98 @@ export function BookingEngine({
                 />
               </div>
 
-              {/* Intermediate Stop Switch & Input */}
-              <div className="pt-1">
-                <div onFocusCapture={() => setActiveField('hasIntermediateStop')}>
-                  <Switch
-                    name="hasIntermediateStop"
-                    label="Add an Intermediate Stop Along the Way"
-                    helperText="Need to pick up a passenger or make a quick errand before final destination?"
-                    checked={Boolean(formValues.hasIntermediateStop)}
-                    onChange={(checked) => handleFieldChange('hasIntermediateStop', checked)}
-                  />
-                </div>
-
-                {Boolean(formValues.hasIntermediateStop) && (
-                  <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                    <div onFocusCapture={() => setActiveField('intermediateStopAddress')}>
-                      <LocationAutocomplete
-                        name="intermediateStopAddress"
-                        label="Intermediate Stop Address"
-                        placeholder="Enter stop address or venue"
-                        value={formValues.intermediateStopAddress as string}
-                        onChange={(val) => handleFieldChange('intermediateStopAddress', val)}
-                        onPlaceSelected={(details) => handlePlaceSelected('intermediateStopAddress', details)}
-                        error={errors.intermediateStopAddress}
-                        required
-                        icon="map-pin"
-                      />
+              {/* Dynamic Intermediate Stops / Waypoints */}
+              <div className="pt-1 space-y-3">
+                {((formValues.intermediateStops as Array<{ id: string; address: string; placeId?: string; coordinates?: { lat: number; lng: number }; notes?: string }>) || []).map((stop, index) => (
+                  <div
+                    key={stop.id}
+                    className="p-3.5 bg-slate-50 rounded-xl border border-amber-200/80 shadow-2xs space-y-2.5 transition-all"
+                    onFocusCapture={() => setActiveField('intermediateStopAddress')}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px] flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">Intermediate Stop #{index + 1}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveIntermediateStop(index, 'up')}
+                          disabled={index === 0}
+                          title="Move stop earlier in route"
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white text-slate-700 flex items-center justify-center text-xs font-bold transition-colors"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveIntermediateStop(index, 'down')}
+                          disabled={index === (((formValues.intermediateStops as unknown[])?.length || 1) - 1)}
+                          title="Move stop later in route"
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white text-slate-700 flex items-center justify-center text-xs font-bold transition-colors"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIntermediateStop(stop.id)}
+                          title="Remove waypoint"
+                          className="w-7 h-7 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-bold transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
+
+                    <LocationAutocomplete
+                      name={`intermediateStop_${stop.id}`}
+                      placeholder={`Stop #${index + 1} address or landmark`}
+                      value={stop.address}
+                      onChange={(val) => {
+                        handleUpdateIntermediateStop(stop.id, { address: val });
+                        if (errors[`intermediateStop_${stop.id}`]) {
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next[`intermediateStop_${stop.id}`];
+                            return next;
+                          });
+                        }
+                      }}
+                      onPlaceSelected={(details) => {
+                        handleUpdateIntermediateStop(stop.id, {
+                          address: details.formattedAddress || '',
+                          placeId: details.placeId,
+                          coordinates: details.coordinates,
+                        });
+                      }}
+                      error={errors[`intermediateStop_${stop.id}`]}
+                      required
+                      icon="map-pin"
+                    />
+
                     <Input
-                      name="intermediateStopNotes"
+                      name={`intermediateStopNotes_${stop.id}`}
                       placeholder="Stop note: passenger name or errand detail (optional)"
-                      value={formValues.intermediateStopNotes as string}
-                      onChange={(e) => handleFieldChange('intermediateStopNotes', e.target.value)}
+                      value={stop.notes || ''}
+                      onChange={(e) => handleUpdateIntermediateStop(stop.id, { notes: e.target.value })}
                     />
                   </div>
+                ))}
+
+                {/* Add Stop Button */}
+                {(((formValues.intermediateStops as unknown[])?.length || 0) < 5) && (
+                  <button
+                    type="button"
+                    onClick={handleAddIntermediateStop}
+                    className="text-amber-600 hover:text-amber-700 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 hover:underline py-1 transition-colors"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">+</span>
+                    <span>
+                      Add Intermediate Stop {(((formValues.intermediateStops as unknown[])?.length || 0) > 0) ? `(${((formValues.intermediateStops as unknown[])?.length || 0)}/5)` : ''}
+                    </span>
+                  </button>
                 )}
               </div>
 
@@ -1439,53 +1605,116 @@ export function BookingEngine({
                 </div>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4">
-                <div onFocusCapture={() => setActiveField('isPriceOverridden')}>
-                  <Switch
-                    name="isPriceOverridden"
-                    label="Manual Fare Override"
-                    helperText="Manually adjust total fare quote with custom rate and line-item notes"
-                    checked={Boolean(formValues.isPriceOverridden)}
-                    onChange={(checked) => handleFieldChange('isPriceOverridden', checked)}
-                  />
-                </div>
-
-                {Boolean(formValues.isPriceOverridden) && (
-                  <div className="space-y-3 pt-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div onFocusCapture={() => setActiveField('manualFare')}>
-                        <Input
-                          type="number"
-                          name="manualFare"
-                          label="Override Total Fare ($)"
-                          placeholder="e.g. 35.00"
-                          step="0.01"
-                          value={String(formValues.manualFare)}
-                          onChange={(e) => handleFieldChange('manualFare', e.target.value)}
-                          error={errors.manualFare}
-                          required
-                        />
-                      </div>
-
-                      <div onFocusCapture={() => setActiveField('overrideReason')}>
-                        <Input
-                          name="overrideReason"
-                          label="Override Justification"
-                          placeholder="e.g. VIP Negotiated Rate / Weather Discount"
-                          value={formValues.overrideReason as string}
-                          onChange={(e) => handleFieldChange('overrideReason', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <Input
-                      name="lineItemNotes"
-                      label="Line-Item Notes"
-                      placeholder="e.g. Includes $10 waiting fee, minus $5 courtesy credit"
-                      value={formValues.lineItemNotes as string}
-                      onChange={(e) => handleFieldChange('lineItemNotes', e.target.value)}
+                {/* Granular Fee Waivers & Dynamic Pricing Overrides */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                    Fee Waivers &amp; Dynamic Multipliers
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-white/90 rounded-xl border border-amber-200 shadow-2xs">
+                    <Switch
+                      name="waiveMultiStopFees"
+                      label="Waive Multi-Stop Surcharge"
+                      helperText="Intermediate stop fees bypassed"
+                      checked={Boolean(formValues.waiveMultiStopFees)}
+                      onChange={(checked) => handleFieldChange('waiveMultiStopFees', checked)}
+                    />
+                    <Switch
+                      name="waiveAirportFee"
+                      label="Waive Airport Gate Fee"
+                      helperText="Airport pickup charge waived"
+                      checked={Boolean(formValues.waiveAirportFee)}
+                      onChange={(checked) => handleFieldChange('waiveAirportFee', checked)}
+                    />
+                    <Switch
+                      name="bypassSurge"
+                      label="Bypass Surge Multiplier"
+                      helperText="Lock 1.0x baseline rates"
+                      checked={Boolean(formValues.bypassSurge)}
+                      onChange={(checked) => handleFieldChange('bypassSurge', checked)}
                     />
                   </div>
-                )}
+                </div>
+
+                {/* Custom Tolls and Courtesy Discounts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div onFocusCapture={() => setActiveField('customTolls')}>
+                    <Input
+                      type="number"
+                      name="customTolls"
+                      label="Custom Tolls & Highway Surcharge ($)"
+                      placeholder="0.00"
+                      step="0.50"
+                      min="0"
+                      value={String(formValues.customTolls ?? '')}
+                      onChange={(e) => handleFieldChange('customTolls', e.target.value)}
+                      helperText="Manual bridge or highway tolls applied to fare"
+                    />
+                  </div>
+                  <div onFocusCapture={() => setActiveField('manualDiscount')}>
+                    <Input
+                      type="number"
+                      name="manualDiscount"
+                      label="Courtesy Discount Credit ($)"
+                      placeholder="0.00"
+                      step="0.50"
+                      min="0"
+                      value={String(formValues.manualDiscount ?? '')}
+                      onChange={(e) => handleFieldChange('manualDiscount', e.target.value)}
+                      helperText="Deducted from fare subtotal"
+                    />
+                  </div>
+                </div>
+
+                {/* Total Fare Override */}
+                <div className="pt-2 border-t border-amber-200">
+                  <div onFocusCapture={() => setActiveField('isPriceOverridden')}>
+                    <Switch
+                      name="isPriceOverridden"
+                      label="Manual Total Fare Override"
+                      helperText="Manually adjust total fare quote with custom rate and line-item notes"
+                      checked={Boolean(formValues.isPriceOverridden)}
+                      onChange={(checked) => handleFieldChange('isPriceOverridden', checked)}
+                    />
+                  </div>
+
+                  {Boolean(formValues.isPriceOverridden) && (
+                    <div className="space-y-3 pt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div onFocusCapture={() => setActiveField('manualFare')}>
+                          <Input
+                            type="number"
+                            name="manualFare"
+                            label="Override Total Fare ($)"
+                            placeholder="e.g. 35.00"
+                            step="0.01"
+                            value={String(formValues.manualFare)}
+                            onChange={(e) => handleFieldChange('manualFare', e.target.value)}
+                            error={errors.manualFare}
+                            required
+                          />
+                        </div>
+
+                        <div onFocusCapture={() => setActiveField('overrideReason')}>
+                          <Input
+                            name="overrideReason"
+                            label="Override Justification"
+                            placeholder="e.g. VIP Negotiated Rate / Weather Discount"
+                            value={formValues.overrideReason as string}
+                            onChange={(e) => handleFieldChange('overrideReason', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <Input
+                        name="lineItemNotes"
+                        label="Line-Item Notes"
+                        placeholder="e.g. Includes $10 waiting fee, minus $5 courtesy credit"
+                        value={formValues.lineItemNotes as string}
+                        onChange={(e) => handleFieldChange('lineItemNotes', e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {capabilities.canBypassPayment && (
                   <div className="pt-2 border-t border-amber-100">
@@ -1745,10 +1974,38 @@ export function BookingEngine({
                       <span className="font-semibold text-slate-900">{quote.pricing.vehicleMultiplier}x</span>
                     </div>
                   )}
+                  {Boolean(quote.pricing.intermediateStopsCount && quote.pricing.intermediateStopsCount > 0) && (
+                    <div className="flex justify-between text-slate-700">
+                      <span>Intermediate Stops ({quote.pricing.intermediateStopsCount} stop{Number(quote.pricing.intermediateStopsCount || 0) > 1 ? 's' : ''})</span>
+                      <span className="font-semibold text-slate-900">
+                        {quote.pricing.multiStopSurcharge ? `+$${quote.pricing.multiStopSurcharge.toFixed(2)}` : 'Waived ($0.00)'}
+                      </span>
+                    </div>
+                  )}
+                  {Boolean(quote.pricing.tollsFee && quote.pricing.tollsFee > 0) && (
+                    <div className="flex justify-between text-slate-700">
+                      <span>Tolls & Highway Fees</span>
+                      <span className="font-semibold text-slate-900">+${Number(quote.pricing.tollsFee || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {Boolean(quote.pricing.surgeMultiplier && quote.pricing.surgeMultiplier > 1) && (
+                    <div className="flex justify-between text-amber-700 font-medium">
+                      <span>Peak Demand Surge</span>
+                      <span className="font-bold">{quote.pricing.surgeMultiplier.toFixed(2)}x</span>
+                    </div>
+                  )}
                   {airportDetection.isAirportTrip && (
                     <div className="flex justify-between text-amber-800">
                       <span>Airport Hub Access</span>
-                      <span className="font-semibold">Included</span>
+                      <span className="font-semibold">
+                        {quote.pricing.airportSurcharge ? `+$${quote.pricing.airportSurcharge.toFixed(2)}` : 'Included'}
+                      </span>
+                    </div>
+                  )}
+                  {Boolean(quote.pricing.discountAmount && quote.pricing.discountAmount > 0) && (
+                    <div className="flex justify-between text-emerald-700 font-medium">
+                      <span>Courtesy / Promo Discount</span>
+                      <span className="font-bold">-${quote.pricing.discountAmount.toFixed(2)}</span>
                     </div>
                   )}
                   {Boolean(formValues.isPriceOverridden) && (
