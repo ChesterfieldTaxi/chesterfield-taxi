@@ -134,6 +134,10 @@ export function getGoogleMapsStatus(): GoogleMapsStatus {
   if (typeof window === 'undefined') {
     return 'unconfigured';
   }
+  // If an error occurred (e.g. auth failure or referer restriction), honor 'error' status
+  if (currentStatus === 'error') {
+    return 'error';
+  }
   // If window.google is already available, mark as ready
   if (typeof window.google?.maps?.places?.Autocomplete === 'function') {
     return 'ready';
@@ -152,6 +156,9 @@ export function getGoogleMapsError(): string | null {
  * Checks whether the Google Maps API and its Places library are fully loaded.
  */
 export function isGoogleMapsReady(): boolean {
+  if (currentStatus === 'error') {
+    return false;
+  }
   return typeof window !== 'undefined' && typeof window.google?.maps?.places?.Autocomplete === 'function';
 }
 

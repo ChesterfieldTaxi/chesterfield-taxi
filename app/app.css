@@ -107,3 +107,17 @@
   margin-top: 0 !important;
 }
 
+/* Guard against Google Maps error injection (e.g. RefererNotAllowedMapError) */
+input.gm-err-autocomplete {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  cursor: text !important;
+}
+
+.gm-err-icon,
+.gm-err-container {
+  display: none !important;
+}
+
+

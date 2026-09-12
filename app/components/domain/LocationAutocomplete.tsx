@@ -187,6 +187,57 @@ export function LocationAutocomplete({
     };
   }, [mapsStatus, disabled]);
 
+  // Defend against Google Maps disabling or hijacking the input on auth error (e.g. RefererNotAllowedMapError)
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const restoreInput = () => {
+      if (disabled) return;
+      if (input.disabled || input.getAttribute('disabled') !== null) {
+        input.removeAttribute('disabled');
+        input.disabled = false;
+      }
+      if (input.classList.contains('gm-err-autocomplete')) {
+        input.classList.remove('gm-err-autocomplete');
+      }
+      if (input.value === 'Oops! Something went wrong.') {
+        input.value = inputValue;
+      }
+      if (input.placeholder === 'Oops! Something went wrong.') {
+        input.placeholder = placeholder || '';
+      }
+
+      // Remove any injected Google error icons or overlays
+      const parent = input.parentElement;
+      if (parent) {
+        const errorNodes = parent.querySelectorAll('.gm-err-icon, [class*="gm-err"]');
+        errorNodes.forEach((node) => node.remove());
+      }
+    };
+
+    if (mapsStatus === 'error') {
+      restoreInput();
+    }
+
+    // Observe DOM mutations to prevent Google from greying out and disabling the input
+    const observer = new MutationObserver(() => {
+      if (!disabled && (input.disabled || input.classList.contains('gm-err-autocomplete') || input.value === 'Oops! Something went wrong.')) {
+        restoreInput();
+      }
+    });
+
+    observer.observe(input, {
+      attributes: true,
+      attributeFilter: ['disabled', 'class', 'placeholder'],
+      subtree: false,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [mapsStatus, disabled, inputValue, placeholder]);
+
   // Handle clicking outside for the fallback dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
