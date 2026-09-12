@@ -102,12 +102,14 @@
 - [x] 15.7 Refactor Single-Page Customer Booking Portal (`app/routes/book.tsx`) with vertical card sections, Sticky Bottom Summary Footer with live fare updates, and interactive Contextual Help & Fare Breakdown Panel (`onFocus`).
 - [x] 15.8 Wire Dispatcher Booking mode into Admin Console (`AdminBookingsTab.tsx`), verify `npm run typecheck` and `npm run build` with zero errors, and complete task checklist.
 
-## Phase 16: Form Layout Versioning (v1 vs v2) & Admin Layout Switcher
-- [x] 16.1 Update specifications (`spec.md` Section 12) and task tracking (`tasks.md`).
-- [x] 16.2 Add `publicFormVersion: 'v1' | 'v2'` to system configuration models in `app/config/companyConfig.ts` (defaulting to 'v2'), `app/core/types/config.ts`, and `admin-config.service.ts`.
-- [x] 16.3 Build `BookingEngineV2.tsx` recreating the user's mockup layout (pickup time, trip details, flight tracking, steppers, vehicle cards, special requests, return trip, passenger/booker info, instructions, payment cards, floating `?` FAB, sticky footer with emerald Book Ride CTA).
-- [x] 16.4 Update `app/routes/book.tsx` with dynamic layout resolution (rendering V2 by default or V1 based on Firestore config, with `?layout=v1` / `?layout=v2` query preview support).
-- [x] 16.5 Implement Admin Layout Switcher in `AdminGeneralTab.tsx` and register dedicated `/admin/settings` route in `app/routes.ts` (`app/routes/admin.settings.tsx`).
-- [x] 16.6 Run `npm run typecheck` and `npm run build` to confirm zero errors, and generate walkthrough documentation.
-
-
+## Phase 16: Dispatcher & Admin Console (RBAC, Live Map, and Advanced Trip Management)
+- [x] 16.1 Update spec.md with Section 12 (Phase 16: Dispatcher & Admin Console Specification).
+- [x] 16.2 Update tasks.md to track Phase 16 sub-tasks and deliverables.
+- [x] 16.3 Verify Auth context handles 'customer', 'dispatcher', and 'admin' roles properly in `admin-auth.service.ts`.
+- [x] 16.4 Secure `/dispatch` (accessible to dispatchers & admins) and `/admin` (accessible exclusively to admins).
+- [x] 16.5 Ensure unauthorized or unauthenticated users are gracefully redirected to `/admin/login` with contextual feedback.
+- [x] 16.6 Enhance Live Trips Table with real-time Firestore listeners, status filters, vehicle/driver assignment modals, and manual status overrides.
+- [x] 16.7 Integrate `<BookingEngine mode="dispatcher" />` featuring CRM lookup, manual overrides, payment bypass, and Recurring Trip Generator UI.
+- [x] 16.8 Wire up site-wide dynamic branding variables so saved colors from Admin Settings update CSS variables across the booking portal.
+- [x] 16.9 Run `npm run typecheck` to confirm zero TypeScript compilation errors.
+- [x] 16.10 Run `npm run build` to confirm clean SSR and client production bundles.

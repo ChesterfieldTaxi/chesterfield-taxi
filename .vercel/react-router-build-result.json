@@ -19,6 +19,7 @@
       "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/dispatch": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
@@ -90,6 +91,13 @@
         "parentId": "root",
         "file": "app/routes/admin.settings.tsx",
         "path": "admin/settings",
+        "config": {}
+      },
+      "routes/dispatch": {
+        "id": "routes/dispatch",
+        "parentId": "root",
+        "file": "app/routes/dispatch.tsx",
+        "path": "dispatch",
         "config": {}
       },
       "routes/api.send-email": {
@@ -173,6 +181,12 @@
         "file": "routes/admin.settings.tsx",
         "path": "admin/settings"
       },
+      "routes/dispatch": {
+        "id": "routes/dispatch",
+        "parentId": "root",
+        "file": "routes/dispatch.tsx",
+        "path": "dispatch"
+      },
       "routes/api.send-email": {
         "id": "routes/api.send-email",
         "parentId": "root",
@@ -231,6 +245,10 @@
           {
             "file": "routes/admin.settings.tsx",
             "path": "admin/settings"
+          },
+          {
+            "file": "routes/dispatch.tsx",
+            "path": "dispatch"
           },
           {
             "file": "routes/api.send-email.ts",

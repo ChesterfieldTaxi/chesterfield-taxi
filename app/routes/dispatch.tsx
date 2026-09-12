@@ -21,8 +21,8 @@ import { Button } from '../components/ui/Button';
 
 export function meta() {
   return [
-    { title: 'Admin Console – Chesterfield Taxi' },
-    { name: 'description', content: 'Operator management and configuration console' },
+    { title: 'Dispatch Console – Chesterfield Taxi' },
+    { name: 'description', content: 'Operator dispatch and workflow console' },
   ];
 }
 
@@ -37,21 +37,6 @@ interface TabItem {
 
 const TABS: TabItem[] = [
   {
-    key: 'general',
-    label: 'General & Branding',
-    description: 'Company information, contact details, and brand colors',
-  },
-  {
-    key: 'pricing',
-    label: 'Pricing & Rules',
-    description: 'Base rates, per-mile pricing, and real-time surge multiplier controls',
-  },
-  {
-    key: 'fleet',
-    label: 'Fleet Management',
-    description: 'Vehicle categories, capacities, and tier multipliers',
-  },
-  {
     key: 'bookings',
     label: 'Live Bookings',
     badge: 'Real-time',
@@ -59,7 +44,7 @@ const TABS: TabItem[] = [
   },
 ];
 
-export default function AdminLayout() {
+export default function DispatchLayout() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -75,8 +60,8 @@ export default function AdminLayout() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isLiveFirebase, setIsLiveFirebase] = useState(false);
 
-  // Active tab derived from query param or default 'general'
-  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'general';
+  // Active tab derived from query param or default 'bookings'
+  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'bookings';
 
   const handleTabChange = (key: TabKey) => {
     setSearchParams({ tab: key });
@@ -91,7 +76,7 @@ export default function AdminLayout() {
     const unsubscribe = authService.onAuthStateChanged((currentUser) => {
       if (!currentUser) {
         navigate('/admin/login?message=unauthenticated', { replace: true });
-      } else if (currentUser.role !== 'admin') {
+      } else if (currentUser.role !== 'admin' && currentUser.role !== 'dispatcher') {
         navigate('/admin/login?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
@@ -171,11 +156,11 @@ export default function AdminLayout() {
                   {settings.company.name || 'Chesterfield Taxi'}
                 </h1>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                  Admin Console
+                  Dispatch Console
                 </span>
               </div>
               <span className="text-[11px] text-slate-400">
-                Phase 9: Config &amp; Dispatch Sync
+                Phase 16: Advanced Trip Management
               </span>
             </div>
           </div>
@@ -202,13 +187,15 @@ export default function AdminLayout() {
               <span className="text-[10px] text-slate-400">Operator</span>
             </div>
 
-            {/* Link to form layout settings */}
-            <Link
-              to="/admin/settings"
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
-            >
-              Form Layout ⚙
-            </Link>
+            {/* Link to form layout settings (Admin Only) */}
+            {user?.role === 'admin' && (
+              <Link
+                to="/admin/settings"
+                className="text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              >
+                Form Layout ⚙
+              </Link>
+            )}
 
             {/* Link to public portal */}
             <a
@@ -286,30 +273,6 @@ export default function AdminLayout() {
 
         {/* Dynamic Tab Body */}
         <div>
-          {activeTab === 'general' && (
-            <AdminGeneralTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
-            />
-          )}
-
-          {activeTab === 'pricing' && (
-            <AdminPricingTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
-            />
-          )}
-
-          {activeTab === 'fleet' && (
-            <AdminFleetTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
-            />
-          )}
-
           {activeTab === 'bookings' && <AdminBookingsTab />}
         </div>
 

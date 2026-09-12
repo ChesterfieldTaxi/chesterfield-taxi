@@ -141,24 +141,25 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Sticky Bottom Summary Footer:** Persistent floating summary bar displaying active route, selected vehicle class, real-time fare calculation (`ESTIMATED TOTAL`), and primary "Book Ride" CTA with auto-scroll to missing validations.
   - **Contextual Help & Fare Breakdown Panel:** Right-hand interactive panel featuring input focus listeners (`onFocus`) that dynamically display field-specific guides (flight tracking explanation, corporate billing instructions, airport meetup points) alongside a transparent, itemized fare breakdown.
 
-## 12. Phase 16: Form Layout Versioning (v1 vs v2) & Admin Layout Switcher
-- **Form Layout Versioning Architecture:**
-  - System-wide configuration flag `publicFormVersion: 'v1' | 'v2'` introduced in `app/config/companyConfig.ts` (defaulting to `'v2'`) and stored dynamically in Firestore at `config/appSettings`.
-  - Public booking portal (`app/routes/book.tsx`) dynamically renders either Layout V1 (Phase 15 Master Booking Engine) or Layout V2 based on the active setting, with query parameter preview support (`?layout=v1` / `?layout=v2`).
-- **Streamlined Single-Page Layout V2 (`BookingEngineV2.tsx`):**
-  - High-fidelity recreation of the user's single-page mockup interface:
-    1. **Pickup Time:** Segmented control toggling ASAP ("Now") and advance reservation ("Schedule") with an embedded datetime picker.
-    2. **Trip Details:** Integrated pickup/dropoff card with address swapping, intermediate stops (`+ Add Stop`), and dedicated airline/flight tracking subcard with luggage estimation check.
-    3. **Passengers & Luggage:** Prominent stepper counters (`[-] 1 [+]`), luggage capacity feedback, and optional child car seat add-ons.
-    4. **Vehicle Preference Cards:** 3-column visual card grid for Sedan, SUV, and Minivan with passenger capacities and clean automotive imagery.
-    5. **Special Requests & Return Trip:** Pill chip toggles (Pet-friendly, Wheelchair accessible, Quiet ride, Music OK) and return trip reservation toggle.
-    6. **Passenger & Booker Details:** Separate guest vs employee booking toggles with distinct passenger vs booker contact sections and SMS consent.
-    7. **Ride Instructions:** Driver notes textarea and quick gate code reveal.
-    8. **Payment Method Cards:** Segmented Cash, Card, and Corporate Account billing with organization name, account number, and cost center fields.
-    9. **Floating Help FAB & Contextual Help Panel:** Circular floating `?` button and real-time focus guides.
-    10. **Sticky Bottom Summary Footer:** Large bold blue estimated total (`$0` or live calculated fare) with emerald green "Book Ride" CTA.
-- **Admin Layout Switcher:**
-  - Interactive visual selector in the Admin Console (`AdminGeneralTab.tsx` and `/admin/settings`) displaying side-by-side previews of Layout V1 and Layout V2.
-  - One-click toggling that updates Firestore in real-time, instantly updating the public booking experience.
-
-
+### 12. Phase 16: Dispatcher & Admin Console Specification
+- **Role-Based Access Control (RBAC):**
+  - Implement three roles: `customer` (default), `dispatcher`, and `admin`.
+  - Deduced securely based on authentication details (`admin@` mapped to `admin`, `dispatch@` mapped to `dispatcher`).
+  - Strict Route Guarding:
+    - `/admin`: Exclusively for `admin` users. Redirects to `/admin/login?message=unauthorized` if accessed by dispatchers or customers.
+    - `/dispatch`: Accessible by both `dispatcher` and `admin` users.
+- **Dispatcher Console (`/dispatch`):**
+  - Streamlined layout presenting only the "Live Bookings" tab, optimized for fast-paced operational workflows.
+  - Real-time Firestore listeners updating the dispatch queue instantly upon customer submission.
+  - Status filters (`pending`, `offered`, `assigned`, `completed`) and full text search across passenger, phone, and locations.
+  - Vehicle and driver assignment modals, capable of triggering driver broadcasts or direct assignments.
+  - Manual status overrides with detailed audit logging and real-time passenger notification triggering via Resend.
+- **Advanced Trip Management & Override Capabilities:**
+  - `<BookingEngine mode="dispatcher" />` integration within the New Dispatch Booking modal.
+  - As-you-type passenger CRM lookup filling past contact profiles automatically.
+  - Manual fare/toll overrides, bypassing automated engine calculation for custom jobs.
+  - Payment collection bypass features allowing off-platform billing (e.g. corporate invoicing or cash).
+  - Recurring Trip Generator UI enabling generation of batch reservations on daily, weekly, or custom schedules.
+- **Site-Wide Dynamic Branding:**
+  - The saved branding colors from the Admin Settings (e.g., `settings.branding.primaryColor`) dynamically project CSS variables (`--brand-primary`) into the root `layout.tsx`.
+  - Enables instant site-wide branding updates across the booking portal without requiring redeployment.

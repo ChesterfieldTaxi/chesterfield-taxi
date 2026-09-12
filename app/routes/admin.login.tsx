@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import { Button } from '../components/ui/Button';
@@ -21,16 +21,33 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [isConfigured, setIsConfigured] = useState(false);
 
   useEffect(() => {
+    const message = searchParams.get('message');
+    if (message === 'unauthorized') {
+      setError('You do not have administrative privileges to access this area.');
+    } else if (message === 'unauthenticated') {
+      setError('Please log in to access this area.');
+    }
+
     setIsConfigured(isFirebaseConfigured());
     const authService = getAdminAuthService();
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      navigate('/admin', { replace: true });
-    }
-  }, [navigate]);
+    
+    // Subscribe to auth state so we reliably get async Firestore roles
+    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
+      if (currentUser) {
+        if (currentUser.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else if (currentUser.role === 'dispatcher') {
+          navigate('/dispatch', { replace: true });
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigate, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +55,12 @@ export default function AdminLogin() {
       setIsLoading(true);
       setError(null);
       const authService = getAdminAuthService();
-      await authService.signIn(email, password);
-      navigate('/admin', { replace: true });
+      const user = await authService.signIn(email, password);
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dispatch', { replace: true });
+      }
     } catch (err: unknown) {
       console.error('[AdminLogin] Authentication failure:', err);
       if (err instanceof Error) {
@@ -58,13 +79,18 @@ export default function AdminLogin() {
     }
   };
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = async (role: 'admin' | 'dispatcher' = 'admin') => {
     try {
       setIsLoading(true);
       setError(null);
       const authService = getAdminAuthService();
-      await authService.signIn('admin@chesterfieldtaxi.com', 'admin_demo_password');
-      navigate('/admin', { replace: true });
+      const email = role === 'admin' ? 'admin@chesterfieldtaxi.com' : 'dispatch@chesterfieldtaxi.com';
+      const user = await authService.signIn(email, 'admin_demo_password');
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dispatch', { replace: true });
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Demo login failed.');
     } finally {
@@ -155,17 +181,29 @@ export default function AdminLogin() {
                 Sign In to Console
               </Button>
 
-              {/* Quick Demo Access button for offline / unconfigured mode */}
-              <button
-                type="button"
-                onClick={handleDemoLogin}
-                disabled={isLoading}
-                className="w-full text-center text-xs text-amber-400 hover:text-amber-300 hover:underline pt-1 transition-colors"
-              >
-                {isConfigured
-                  ? 'Quick Access: Use Operator Demo Credentials'
-                  : 'Offline Dev Mode: Click here for Instant Demo Login'}
-              </button>
+              {/* Quick Demo Access buttons for offline / unconfigured mode */}
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('admin')}
+                  disabled={isLoading}
+                  className="w-full text-center text-xs text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                >
+                  {isConfigured
+                    ? 'Quick Access: Admin Demo Credentials'
+                    : 'Offline Dev Mode: Admin Demo Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('dispatcher')}
+                  disabled={isLoading}
+                  className="w-full text-center text-xs text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                >
+                  {isConfigured
+                    ? 'Quick Access: Dispatcher Demo Credentials'
+                    : 'Offline Dev Mode: Dispatcher Demo Login'}
+                </button>
+              </div>
             </CardFooter>
           </form>
         </Card>

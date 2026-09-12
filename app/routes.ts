@@ -14,6 +14,7 @@ export default [
   route("admin/login", "routes/admin.login.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/settings", "routes/admin.settings.tsx"),
+  route("dispatch", "routes/dispatch.tsx"),
 
   // Transactional Email Gateway Route (Server Action)
   route("api/send-email", "routes/api.send-email.ts"),

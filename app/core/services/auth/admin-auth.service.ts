@@ -2,7 +2,7 @@
  * Admin Authentication Service
  * 
  * Provides client-side authentication management using Firebase Auth,
- * with fallback support for offline/demo development modes.
+ * with Firestore-backed Role-Based Access Control (RBAC).
  */
 
 import {
@@ -11,13 +11,15 @@ import {
   onAuthStateChanged as firebaseOnAuthStateChanged,
   type User,
 } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '../firebase';
+import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
+import { getFirebaseAuth, getFirebaseApp, isFirebaseConfigured } from '../firebase';
 
 export interface AdminUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
   isDemo?: boolean;
+  role?: 'customer' | 'dispatcher' | 'admin';
 }
 
 const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
@@ -29,20 +31,55 @@ export class AdminAuthService {
     this.isConfigured = isFirebaseConfigured();
   }
 
+  private async fetchUserRole(user: User): Promise<'customer' | 'dispatcher' | 'admin'> {
+    if (!this.isConfigured) return 'customer';
+
+    try {
+      const db = getFirestore(getFirebaseApp());
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (data && data.role) {
+          return data.role as 'customer' | 'dispatcher' | 'admin';
+        }
+      }
+
+      // Auto-provision primary admin if it's the specific admin email
+      if (user.email === 'admin@chesterfieldtaxi.com') {
+        const adminRole = 'admin';
+        await setDoc(userRef, { role: adminRole, email: user.email }, { merge: true });
+        return adminRole;
+      }
+
+      // Default to customer
+      return 'customer';
+    } catch (err) {
+      console.warn('[AdminAuthService] Error fetching user role from Firestore:', err);
+      return 'customer';
+    }
+  }
+
+  // Note: getCurrentUser is synchronous. It will return the base user but might not have the fully
+  // hydrated role if it hasn't been cached. For accurate roles, prefer onAuthStateChanged or signIn.
   public getCurrentUser(): AdminUser | null {
     if (typeof window === 'undefined') {
       return null;
     }
 
-    // Check Firebase Auth if configured
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();
         if (auth.currentUser) {
+          // Sync check won't have Firestore role.
+          // Returning null forces consumers to rely on onAuthStateChanged which is async and safe.
+          // However, to satisfy the signature and not break existing sync checks, we return customer default.
           return {
             uid: auth.currentUser.uid,
             email: auth.currentUser.email,
             displayName: auth.currentUser.displayName,
+            role: 'customer',
           };
         }
       } catch (err) {
@@ -69,16 +106,17 @@ export class AdminAuthService {
       return () => {};
     }
 
-    // If Firebase Auth is configured, listen to real Auth events
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();
-        return firebaseOnAuthStateChanged(auth, (user: User | null) => {
+        return firebaseOnAuthStateChanged(auth, async (user: User | null) => {
           if (user) {
+            const role = await this.fetchUserRole(user);
             callback({
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
+              role,
             });
           } else {
             // Check if demo user is in storage
@@ -104,25 +142,28 @@ export class AdminAuthService {
       try {
         const auth = getFirebaseAuth();
         const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        const role = await this.fetchUserRole(cred.user);
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
+          role,
         };
       } catch (err: unknown) {
-        // If Firebase Auth fails with invalid credentials, check if demo fallback is permitted
         console.warn('[AdminAuthService] Firebase Auth sign-in error:', err);
         throw err;
       }
     }
 
     // Local / Offline demo mode authentication
-    if (trimmedEmail === 'admin@chesterfieldtaxi.com' || trimmedEmail.includes('admin')) {
+    if (trimmedEmail === 'admin@chesterfieldtaxi.com' || trimmedEmail.includes('admin') || trimmedEmail.includes('dispatch')) {
+      const role = trimmedEmail.includes('admin') ? 'admin' : 'dispatcher';
       const demoUser: AdminUser = {
         uid: 'demo_admin_uid_001',
         email: trimmedEmail,
-        displayName: 'Chesterfield Dispatcher',
+        displayName: 'Chesterfield ' + (role === 'admin' ? 'Admin' : 'Dispatcher'),
         isDemo: true,
+        role,
       };
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
@@ -131,7 +172,7 @@ export class AdminAuthService {
     }
 
     throw new Error(
-      'Authentication failed. In offline development mode, use admin@chesterfieldtaxi.com.'
+      'Authentication failed. In offline development mode, use admin@... or dispatch@...'
     );
   }
 
