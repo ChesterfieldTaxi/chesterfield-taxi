@@ -79,6 +79,15 @@ function endpointToString(point: RouteEndpointInput): string {
   return `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`;
 }
 
+// Track whether Directions API or Distance Matrix API has been denied to prevent repeated console spam
+let directionsApiDenied = false;
+let distanceMatrixApiDenied = false;
+
+export function resetRoutingApiDenial(): void {
+  directionsApiDenied = false;
+  distanceMatrixApiDenied = false;
+}
+
 /**
  * Calculates a live driving route using Google Maps DirectionsService.
  * 
@@ -86,6 +95,11 @@ function endpointToString(point: RouteEndpointInput): string {
  * @returns LiveRouteResult if successful, or null if Google Maps is unavailable/fails.
  */
 export async function calculateLiveRoute(request: LiveRouteRequest): Promise<LiveRouteResult | null> {
+  // If Directions API is not authorized on this API key, avoid spamming Google's endpoint
+  if (directionsApiDenied) {
+    return null;
+  }
+
   // Ensure Google Maps is loaded
   if (!isGoogleMapsReady()) {
     const loaded = await loadGoogleMaps();
@@ -204,8 +218,16 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       isLiveGoogleResult: true,
       legs,
     };
-  } catch (err) {
-    console.warn('[LiveRoutingService] Live directions query failed or rate-limited, falling back:', err);
+  } catch (err: unknown) {
+    const errorStr = String(err);
+    if (errorStr.includes('REQUEST_DENIED') || errorStr.includes('not authorized') || errorStr.includes('Directions Service')) {
+      directionsApiDenied = true;
+      console.warn(
+        '[LiveRoutingService] Directions API is not enabled for this key in Google Cloud Console. Enable "Directions API" under APIs & Services to activate client-side driving directions. Seamlessly using server-side road estimation.'
+      );
+    } else {
+      console.warn('[LiveRoutingService] Live directions query failed or rate-limited, falling back:', err);
+    }
     return null;
   }
 }
@@ -217,6 +239,10 @@ export async function calculateLiveDistanceMatrix(
   origins: RouteEndpointInput[],
   destinations: RouteEndpointInput[]
 ): Promise<Array<{ originIndex: number; destinationIndex: number; distanceMiles: number; durationMinutes: number }> | null> {
+  if (distanceMatrixApiDenied) {
+    return null;
+  }
+
   if (!isGoogleMapsReady()) {
     const loaded = await loadGoogleMaps();
     if (!loaded || !isGoogleMapsReady()) {
@@ -259,7 +285,11 @@ export async function calculateLiveDistanceMatrix(
     });
 
     return elements;
-  } catch (err) {
+  } catch (err: unknown) {
+    const errorStr = String(err);
+    if (errorStr.includes('REQUEST_DENIED') || errorStr.includes('not authorized')) {
+      distanceMatrixApiDenied = true;
+    }
     console.warn('[LiveRoutingService] Distance matrix query failed:', err);
     return null;
   }
