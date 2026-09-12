@@ -54,6 +54,19 @@ export interface CompanyBrandConfig {
   primaryColor: string;
   secondaryColor: string;
   colors?: CompanyBrandColors;
+  // Phase 19: Granular Branding Studio Tokens
+  headingFont?: string;
+  bodyFont?: string;
+  headingColor?: string;
+  bodyTextColor?: string;
+  mutedTextColor?: string;
+  btnPrimaryBg?: string;
+  btnPrimaryText?: string;
+  btnSecondaryBg?: string;
+  btnSecondaryText?: string;
+  btnBorderRadius?: string;
+  navbarBg?: string;
+  cardBg?: string;
   maxDispatchDrafts?: number;
   carSeatLimits: CarSeatLimitsConfig;
   vehicleCapacities: Record<'sedan' | 'suv' | 'van' | 'any', VehicleCapacityConfig>;
@@ -66,6 +79,18 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   publicFormVersion: 'v2',
   primaryColor: '#f59e0b',
   secondaryColor: '#0f172a',
+  headingFont: 'Inter',
+  bodyFont: 'Inter',
+  headingColor: '#0f172a',
+  bodyTextColor: '#334155',
+  mutedTextColor: '#64748b',
+  btnPrimaryBg: '#f59e0b',
+  btnPrimaryText: '#020617',
+  btnSecondaryBg: '#0f172a',
+  btnSecondaryText: '#ffffff',
+  btnBorderRadius: '8px',
+  navbarBg: '#0f172a',
+  cardBg: '#ffffff',
   colors: {
     primary: '#f59e0b',
     secondary: '#0f172a',

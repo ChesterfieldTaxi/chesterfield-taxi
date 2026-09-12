@@ -4,8 +4,9 @@ import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { getBookingService } from '../core/services/booking';
 import { isFirebaseConfigured } from '../core/services/firebase';
-import type { AppSettings } from '../core/types/config';
+import type { AppSettings, NamedPricingRule } from '../core/types/config';
 import type { Trip, TripStatus } from '../core/types/trip';
+import { getPricingRulesService } from '../core/services/pricing';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
 import { CustomDateTimePicker, type DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
@@ -205,6 +206,15 @@ export default function DispatchRoute() {
   const [callDuration, setCallDuration] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
 
+  // Driver Fare Console Modal State
+  const [driverModalTrip, setDriverModalTrip] = useState<Trip | null>(null);
+  const [driverPermittedRules, setDriverPermittedRules] = useState<NamedPricingRule[]>([]);
+  const [selectedDriverRuleId, setSelectedDriverRuleId] = useState<string>('');
+  const [driverManualFare, setDriverManualFare] = useState<string>('');
+  const [driverOverrideReason, setDriverOverrideReason] = useState<string>('');
+  const [isApplyingDriverFare, setIsApplyingDriverFare] = useState<boolean>(false);
+  const [driverFareTab, setDriverFareTab] = useState<'rule' | 'flat'>('rule');
+
   // Resizable layout dimensions - Default to balanced heights so Softphone never overflows
   const [sidebarWidth, setSidebarWidth] = useState(430); // 340px - 620px
   const [queueHeight, setQueueHeight] = useState(240); // 160px - 50%
@@ -296,6 +306,126 @@ export default function DispatchRoute() {
     const unsub = getAdminConfigService().subscribeToSettings((updated) => setSettings(updated), () => {});
     return unsub;
   }, []);
+
+  // Pricing Rules (Driver Permitted)
+  useEffect(() => {
+    const unsub = getPricingRulesService().subscribeToRules((rules) => {
+      setDriverPermittedRules(rules.filter((r) => r.isActive && r.allowDriverSelection));
+    });
+    return () => unsub();
+  }, []);
+
+  const handleOpenDriverModal = (trip: Trip) => {
+    setDriverModalTrip(trip);
+    setSelectedDriverRuleId('');
+    setDriverManualFare(trip.pricing?.totalFare ? trip.pricing.totalFare.toFixed(2) : '');
+    setDriverOverrideReason('');
+    setDriverFareTab('rule');
+  };
+
+  const handleApplyDriverPricingRule = async () => {
+    if (!driverModalTrip) return;
+    const rule = driverPermittedRules.find((r) => r.id === selectedDriverRuleId);
+    if (!rule) return;
+
+    setIsApplyingDriverFare(true);
+    try {
+      let newFare = driverModalTrip.pricing?.totalFare || 0;
+      if (rule.modifier.type === 'flat_override') {
+        newFare = rule.modifier.value;
+      } else if (rule.modifier.type === 'multiplier') {
+        newFare = Math.round(newFare * rule.modifier.value * 100) / 100;
+      } else if (rule.modifier.type === 'surcharge_flat') {
+        newFare = Math.round((newFare + rule.modifier.value) * 100) / 100;
+      } else if (rule.modifier.type === 'surcharge_percent') {
+        newFare = Math.round((newFare * (1 + rule.modifier.value / 100)) * 100) / 100;
+      }
+
+      const existingRules = driverModalTrip.pricing?.appliedRuleNames || [];
+      const updatedRules = Array.from(new Set([...existingRules, rule.name]));
+
+      const updates: Partial<Trip> = {
+        pricing: {
+          ...driverModalTrip.pricing,
+          totalFare: newFare,
+          appliedRuleNames: updatedRules,
+        },
+        payment: {
+          ...driverModalTrip.payment,
+          amount: newFare,
+        },
+        metadata: {
+          ...driverModalTrip.metadata,
+          driverAppliedRule: {
+            ruleId: rule.id,
+            ruleName: rule.name,
+            appliedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      const bookingService = getBookingService();
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(driverModalTrip.id, updates);
+      }
+
+      setTrips((prev) =>
+        prev.map((t) => (t.id === driverModalTrip.id ? ({ ...t, ...updates } as Trip) : t))
+      );
+      setDriverModalTrip(null);
+    } catch (err) {
+      console.error('Failed to apply driver pricing rule:', err);
+    } finally {
+      setIsApplyingDriverFare(false);
+    }
+  };
+
+  const handleApplyDriverFlatOverride = async () => {
+    if (!driverModalTrip || !driverManualFare) return;
+    const fareVal = parseFloat(driverManualFare);
+    if (isNaN(fareVal) || fareVal <= 0) return;
+
+    setIsApplyingDriverFare(true);
+    try {
+      const existingRules = driverModalTrip.pricing?.appliedRuleNames || [];
+      const updatedRules = Array.from(new Set([...existingRules, `Driver Override: $${fareVal.toFixed(2)}`]));
+
+      const updates: Partial<Trip> = {
+        pricing: {
+          ...driverModalTrip.pricing,
+          totalFare: fareVal,
+          appliedRuleNames: updatedRules,
+        },
+        payment: {
+          ...driverModalTrip.payment,
+          amount: fareVal,
+        },
+        metadata: {
+          ...driverModalTrip.metadata,
+          driverFareOverride: {
+            originalFare: driverModalTrip.pricing?.totalFare,
+            overrideFare: fareVal,
+            reason: driverOverrideReason || 'Driver manual flat override',
+            appliedAt: new Date().toISOString(),
+          },
+        },
+      };
+
+      const bookingService = getBookingService();
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(driverModalTrip.id, updates);
+      }
+
+      setTrips((prev) =>
+        prev.map((t) => (t.id === driverModalTrip.id ? ({ ...t, ...updates } as Trip) : t))
+      );
+      setDriverModalTrip(null);
+    } catch (err) {
+      console.error('Failed to apply driver flat override:', err);
+    } finally {
+      setIsApplyingDriverFare(false);
+    }
+  };
 
   // Trips real-time subscription
   useEffect(() => {
@@ -1664,6 +1794,17 @@ export default function DispatchRoute() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleOpenDriverModal(trip);
+                              }}
+                              className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-[11px] font-bold text-blue-700 transition-colors cursor-pointer"
+                              title="Driver fare adjustment & permitted pricing rules"
+                            >
+                              Fare ⚡
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedQueueTripId(trip.id);
                                 setSelectedMapTrip(trip);
                                 setShouldZoomMap(true);
@@ -2407,6 +2548,213 @@ export default function DispatchRoute() {
           </aside>
         )}
       </div>
+
+      {/* Driver Fare Adjustment & Permitted Rules Modal */}
+      {driverModalTrip && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-sm">⚡ Driver Fare Console</span>
+                  <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                    Trip #{driverModalTrip.id.slice(-6).toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Passenger: {driverModalTrip.passenger?.firstName} {driverModalTrip.passenger?.lastName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDriverModalTrip(null)}
+                className="text-slate-400 hover:text-white text-lg font-bold p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Trip Snapshot */}
+            <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 text-xs grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Pickup</div>
+                <div className="text-slate-800 font-medium truncate" title={driverModalTrip.pickupLocation.address}>
+                  {driverModalTrip.pickupLocation.address}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Dropoff</div>
+                <div className="text-slate-800 font-medium truncate" title={driverModalTrip.dropoffLocation.address}>
+                  {driverModalTrip.dropoffLocation.address}
+                </div>
+              </div>
+              <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200">
+                <span className="text-slate-600 font-medium">
+                  Current Trip Total Fare:
+                </span>
+                <span className="text-sm font-extrabold text-blue-700 font-mono">
+                  ${driverModalTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                </span>
+              </div>
+            </div>
+
+            {/* Tabs: Permitted Rule vs Manual Flat Override */}
+            <div className="flex border-b border-slate-200 bg-slate-100/70 p-1.5 gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setDriverFareTab('rule')}
+                className={`flex-1 py-1.5 text-center font-bold rounded-lg transition-all cursor-pointer ${
+                  driverFareTab === 'rule'
+                    ? 'bg-white text-blue-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Apply Permitted Rule
+              </button>
+              <button
+                type="button"
+                onClick={() => setDriverFareTab('flat')}
+                className={`flex-1 py-1.5 text-center font-bold rounded-lg transition-all cursor-pointer ${
+                  driverFareTab === 'flat'
+                    ? 'bg-white text-blue-600 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Flat Fare Override
+              </button>
+            </div>
+
+            {/* Tab Body */}
+            <div className="p-5 flex-1 overflow-y-auto space-y-4 text-xs">
+              {driverFareTab === 'rule' ? (
+                <div className="space-y-3">
+                  <p className="text-slate-600 text-xs">
+                    Select an authorized pricing rule permitted for in-cab or on-trip driver selection:
+                  </p>
+
+                  {driverPermittedRules.length === 0 ? (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-center text-xs">
+                      No pricing rules are currently flagged for driver selection in the Admin Rates Tab.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {driverPermittedRules.map((rule) => {
+                        const isSelected = selectedDriverRuleId === rule.id;
+                        return (
+                          <div
+                            key={rule.id}
+                            onClick={() => setSelectedDriverRuleId(rule.id)}
+                            className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-50/70 shadow-2xs'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900">{rule.name}</span>
+                              <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-blue-100 text-blue-800">
+                                {rule.modifier.type === 'flat_override'
+                                  ? `$${rule.modifier.value.toFixed(2)} Flat`
+                                  : rule.modifier.type === 'multiplier'
+                                  ? `${rule.modifier.value}x Multiplier`
+                                  : rule.modifier.type === 'surcharge_flat'
+                                  ? `+$${rule.modifier.value.toFixed(2)}`
+                                  : `+${rule.modifier.value}%`}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-1">{rule.description}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {selectedDriverRuleId && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs">
+                      <span className="font-bold">Calculated Preview: </span>
+                      {(() => {
+                        const r = driverPermittedRules.find((x) => x.id === selectedDriverRuleId);
+                        if (!r) return null;
+                        let calc = driverModalTrip.pricing?.totalFare || 0;
+                        if (r.modifier.type === 'flat_override') calc = r.modifier.value;
+                        else if (r.modifier.type === 'multiplier') calc = calc * r.modifier.value;
+                        else if (r.modifier.type === 'surcharge_flat') calc = calc + r.modifier.value;
+                        else if (r.modifier.type === 'surcharge_percent') calc = calc * (1 + r.modifier.value / 100);
+                        return (
+                          <span className="font-bold font-mono text-emerald-700">
+                            New Fare: ${calc.toFixed(2)}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-slate-600 text-xs">
+                    Manually override the total fare for this trip. This will be recorded with driver audit metadata:
+                  </p>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Flat Fare Amount ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={driverManualFare}
+                      onChange={(e) => setDriverManualFare(e.target.value)}
+                      placeholder="e.g. 45.00"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-900 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Reason / Notes (Optional)</label>
+                    <input
+                      type="text"
+                      value={driverOverrideReason}
+                      onChange={(e) => setDriverOverrideReason(e.target.value)}
+                      placeholder="e.g. Severe weather detour, agreed customer flat"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDriverModalTrip(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              {driverFareTab === 'rule' ? (
+                <button
+                  type="button"
+                  disabled={!selectedDriverRuleId || isApplyingDriverFare}
+                  onClick={handleApplyDriverPricingRule}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                >
+                  {isApplyingDriverFare ? 'Applying...' : 'Apply Rule to Trip'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!driverManualFare || isApplyingDriverFare}
+                  onClick={handleApplyDriverFlatOverride}
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                >
+                  {isApplyingDriverFare ? 'Applying...' : 'Apply Flat Fare'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

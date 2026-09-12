@@ -27,8 +27,71 @@ export interface BrandingConfig {
   primaryColor: string;
   secondaryColor: string;
   logoUrl?: string;
+  headingFont?: string; // e.g. 'Inter', 'Outfit', 'Cinzel', 'Playfair Display', 'Plus Jakarta Sans', 'System UI'
+  bodyFont?: string; // e.g. 'Inter', 'Roboto', 'Open Sans', 'Lato', 'System UI'
+  headingColor?: string;
+  bodyTextColor?: string;
+  mutedTextColor?: string;
+  btnPrimaryBg?: string;
+  btnPrimaryText?: string;
+  btnSecondaryBg?: string;
+  btnSecondaryText?: string;
+  btnBorderRadius?: string; // e.g. '0px', '4px', '8px', '12px', '16px', '9999px'
+  navbarBg?: string;
+  cardBg?: string;
 }
 
+export interface StepIncrementTier {
+  id: string;
+  name: string;
+  startMiles: number;
+  endMiles: number;
+  stepMiles: number; // e.g. 0.1
+  ratePerStep: number; // e.g. 0.35
+}
+
+export interface DelayRateConfig {
+  stepSeconds: number; // e.g. 90 sec
+  ratePerStep: number; // e.g. $0.60
+  gracePeriodMinutes: number; // e.g. 5 min
+}
+
+export interface ConditionSurchargeConfig {
+  carSeatFeePerUnit: number; // $ per child safety seat
+  passengerBaseAllowance: number; // e.g. 2 passengers included
+  extraPassengerFeePerHead: number; // $ per passenger over base allowance
+  vehicleTierSurcharges?: Record<string, { flat: number; percent: number }>;
+  zoneSurcharges?: Record<string, { flat: number; percent: number }>;
+}
+
+export interface PricingRuleTrigger {
+  zoneIds?: string[];
+  minDistanceMiles?: number;
+  maxDistanceMiles?: number;
+  daysOfWeek?: number[]; // 0 = Sun, 1 = Mon ... 6 = Sat
+  timeWindows?: Array<{ start: string; end: string }>; // "HH:MM" 24h
+  holidayDates?: string[]; // "YYYY-MM-DD"
+  accountTypes?: Array<'retail' | 'corporate' | 'vip'>;
+  vehicleTiers?: string[]; // e.g. 'standard', 'premium', 'xl', 'wheelchair'
+}
+
+export interface PricingRuleModifier {
+  type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent';
+  value: number;
+}
+
+export interface NamedPricingRule {
+  id: string;
+  name: string;
+  description?: string;
+  priority: number; // 1 to 100, higher number = evaluated first
+  isActive: boolean;
+  allowDriverSelection: boolean;
+  triggers: PricingRuleTrigger;
+  modifier: PricingRuleModifier;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface DynamicPricingConfig {
   baseFare: number;
@@ -39,6 +102,12 @@ export interface DynamicPricingConfig {
   minimumFare?: number;
   multiStopFee?: number;
   defaultTolls?: number;
+  // Phase 19: Condition-Based & Incremental Rates
+  flagDropIncludedMiles?: number; // e.g. 1.5 miles included in baseFare
+  useStepIncrements?: boolean;
+  stepIncrementTiers?: StepIncrementTier[];
+  delayRate?: DelayRateConfig;
+  conditionSurcharges?: ConditionSurchargeConfig;
 }
 
 export interface VehicleTierConfig {

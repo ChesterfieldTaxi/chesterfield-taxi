@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Trip, GeoPoint, CreateTripInput, VehicleTier, PaymentMethod } from '../../../core/types';
+import type { NamedPricingRule } from '../../../core/types/config';
 import { getBookingService } from '../../../core/services/booking';
 import { calculateLiveRoute } from '../../../core/services/maps/live-routing.service';
-import { calculateTripPricing } from '../../../core/services/pricing';
+import { calculateTripPricing, getPricingRulesService } from '../../../core/services/pricing';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DispatchLocationInput } from './DispatchLocationInput';
@@ -99,6 +100,8 @@ export interface DispatchFormValues {
   cardDetails: CardDetails;
   corporateDetails: CorporateAccountDetails;
   tariff: string;
+  pricingRuleId?: string;
+  pricingRuleName?: string;
   discount: string;
   company: string;
   driverId: string;
@@ -204,9 +207,19 @@ export function DispatchBookingEngine({
   const [invoicingTerms, setInvoicingTerms] = useState('Net 30 Direct Bill');
 
   const [tariff, setTariff] = useState('Standard');
+  const [selectedRuleId, setSelectedRuleId] = useState('');
+  const [availableNamedRules, setAvailableNamedRules] = useState<NamedPricingRule[]>([]);
   const [discount, setDiscount] = useState('None');
   const [company, setCompany] = useState(DEFAULT_COMPANIES[0]);
   const [driverId, setDriverId] = useState('unassigned');
+
+  // Subscribe to real-time named pricing rules from Firestore
+  useEffect(() => {
+    const unsub = getPricingRulesService().subscribeToRules((rules) => {
+      setAvailableNamedRules(rules.filter((r) => r.isActive));
+    });
+    return () => unsub();
+  }, []);
 
   // Notes
   const [notesForAll, setNotesForAll] = useState('');
@@ -379,6 +392,10 @@ export function DispatchBookingEngine({
         setDriverId(initialTrip.assignedDriverId);
       }
 
+      if (meta.pricingRuleId) {
+        setSelectedRuleId(meta.pricingRuleId);
+      }
+
       if (initialTrip.driverNotes) {
         setNotesForAll(initialTrip.driverNotes);
       }
@@ -419,6 +436,7 @@ export function DispatchBookingEngine({
           if (parsed.authorizedBy) setAuthorizedBy(parsed.authorizedBy);
           if (parsed.invoicingTerms) setInvoicingTerms(parsed.invoicingTerms);
           if (parsed.tariff) setTariff(parsed.tariff);
+          if (parsed.pricingRuleId !== undefined) setSelectedRuleId(parsed.pricingRuleId);
           if (parsed.discount) setDiscount(parsed.discount);
           if (parsed.company) setCompany(parsed.company);
           if (parsed.driverId) setDriverId(parsed.driverId);
@@ -508,6 +526,7 @@ export function DispatchBookingEngine({
       authorizedBy,
       invoicingTerms,
       tariff,
+      pricingRuleId: selectedRuleId,
       discount,
       company,
       driverId,
@@ -590,6 +609,8 @@ export function DispatchBookingEngine({
         invoicingTerms,
       },
       tariff,
+      pricingRuleId: selectedRuleId || undefined,
+      pricingRuleName: availableNamedRules.find((r) => r.id === selectedRuleId)?.name,
       discount,
       company,
       driverId,
@@ -756,8 +777,20 @@ export function DispatchBookingEngine({
                     ? new Date(`${scheduledDate}T${scheduledTime}:00`)
                     : new Date(),
                 intermediateStopsCount: intermediateStops.length,
+                carSeatsBreakdown: {
+                  rearFacing: rearFacingCount,
+                  frontFacing: frontFacingCount,
+                  booster: boosterCount,
+                  total: rearFacingCount + frontFacingCount + boosterCount,
+                },
+                passengers,
+                accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
+                selectedRuleId: selectedRuleId || undefined,
               },
-              config
+              {
+                ...config,
+                namedPricingRules: availableNamedRules,
+              }
             );
             totalCalculated += quote.pricing.totalFare;
           });
@@ -783,6 +816,13 @@ export function DispatchBookingEngine({
     scheduledDate,
     scheduledTime,
     isFareOverridden,
+    rearFacingCount,
+    frontFacingCount,
+    boosterCount,
+    passengers,
+    paymentMethod,
+    selectedRuleId,
+    availableNamedRules,
   ]);
 
   // Return Route and Return Fare calculation
@@ -831,8 +871,20 @@ export function DispatchBookingEngine({
                   ? new Date(`${returnDate}T${returnTime}:00`)
                   : new Date(),
               intermediateStopsCount: returnIntermediateStops.length,
+              carSeatsBreakdown: {
+                rearFacing: returnRearFacing,
+                frontFacing: returnFrontFacing,
+                booster: returnBooster,
+                total: returnRearFacing + returnFrontFacing + returnBooster,
+              },
+              passengers: returnPassengers,
+              accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
+              selectedRuleId: selectedRuleId || undefined,
             },
-            config
+            {
+              ...config,
+              namedPricingRules: availableNamedRules,
+            }
           );
           retTotal += quote.pricing.totalFare;
         });
@@ -860,6 +912,13 @@ export function DispatchBookingEngine({
     pickupCoordinates,
     dropoffAddress,
     dropoffCoordinates,
+    returnRearFacing,
+    returnFrontFacing,
+    returnBooster,
+    returnPassengers,
+    paymentMethod,
+    selectedRuleId,
+    availableNamedRules,
   ]);
 
   // Swap outbound route
@@ -1008,6 +1067,7 @@ export function DispatchBookingEngine({
     setBillingPo('');
     setAuthorizedBy('');
     setTariff('Standard');
+    setSelectedRuleId('');
     setDiscount('None');
     setDriverId('unassigned');
     setNotesForAll('');
@@ -1087,6 +1147,8 @@ export function DispatchBookingEngine({
         invoicingTerms,
       },
       tariff,
+      pricingRuleId: selectedRuleId || undefined,
+      pricingRuleName: availableNamedRules.find((r) => r.id === selectedRuleId)?.name,
       discount,
       company,
       driverId: 'unassigned',
@@ -1197,6 +1259,8 @@ export function DispatchBookingEngine({
       company,
       internalNotes,
       tariff,
+      pricingRuleId: selectedRuleId || undefined,
+      pricingRuleName: availableNamedRules.find((r) => r.id === selectedRuleId)?.name || undefined,
       discount,
       additionalPassengers,
       selectedVehicles,
@@ -2165,16 +2229,35 @@ export function DispatchBookingEngine({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Tariff</span>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="block text-[10px] text-slate-500 font-semibold">Pricing Rule / Tariff</span>
+                {selectedRuleId && (
+                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1 rounded">Rule Active</span>
+                )}
+              </div>
               <select
-                value={tariff}
-                onChange={(e) => setTariff(e.target.value)}
-                className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
+                value={selectedRuleId}
+                onChange={(e) => {
+                  setSelectedRuleId(e.target.value);
+                  const matched = availableNamedRules.find((r) => r.id === e.target.value);
+                  setTariff(matched ? matched.name : 'Standard');
+                }}
+                className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 font-medium"
               >
-                <option value="Standard">Standard</option>
-                <option value="Flat Rate">Flat Rate</option>
-                <option value="Hourly">Hourly</option>
-                <option value="Corporate">Corporate</option>
+                <option value="">Auto (Dynamic Rules Matrix)</option>
+                {availableNamedRules.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} (
+                    {r.modifier.type === 'flat_override'
+                      ? `$${r.modifier.value.toFixed(2)} Flat`
+                      : r.modifier.type === 'multiplier'
+                      ? `${r.modifier.value}x`
+                      : r.modifier.type === 'surcharge_flat'
+                      ? `+$${r.modifier.value.toFixed(2)}`
+                      : `+${r.modifier.value}%`}
+                    )
+                  </option>
+                ))}
               </select>
             </div>
             <div>

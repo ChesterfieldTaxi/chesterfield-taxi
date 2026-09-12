@@ -211,3 +211,40 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - `/zones`: Dedicated collection storing regional geofence definitions (`ZoneGeofence`).
   - `/users`: Role-based user documents with support for `'driver' | 'dispatcher' | 'admin'` roles and operational contact records.
 
+### 15. Phase 19: Condition-Based Pricing Matrix & Dynamic Branding Studio
+- **Condition-Based Pricing Matrix Engine:**
+  - **Named Pricing Rules Repository (`/pricingRules`)**:
+    - Centralized Firestore collection storing rule sets evaluated by priority (1-100) with active toggles and `allowDriverSelection` permissions.
+    - Regional seeded presets: Spirit of St. Louis Airport (SUS) Corporate Flat Corridor, Lambert Airport (STL) Terminal Gate Fee, Rush Hour Peak Commute Surcharge, Weekend Late Night Safety Stipend, Corporate Account Preferred Pricing, and Long-Distance Interstate Discount.
+  - **Dynamic Multi-Condition Triggers**:
+    - Spatial Geofence trigger: Matches pickup or dropoff within named polygon or radius zones.
+    - Distance Bounds: Evaluates min/max mileage brackets (e.g. 15-30 miles).
+    - Schedule & Calendar: Matches day of week, time windows (e.g. 07:00-09:30), and calendar holiday dates.
+    - Account Classification: Retail vs Corporate Account vs VIP.
+    - Vehicle Class: Target specific vehicle tiers (sedan, executive, xl minivan, wheelchair).
+    - Rule Modifiers: Flat fare overrides, multipliers, flat surcharges, and percentage surcharges.
+  - **Incremental Distance & Delay Rates**:
+    - Flag drop base fare covering initial distance (e.g. $5.00 covering first 1.5 miles before incremental rates trigger).
+    - Configurable step increments (e.g. price per 0.1 mile / per 90 seconds wait time).
+    - Decaying bracket tiers (e.g., 0-5 mi @ $0.35/0.1 mi, 5-15 mi @ $0.25/0.1 mi, 15-30 mi @ $0.20/0.1 mi, 30+ mi @ $0.15/0.1 mi).
+    - Configurable delay/wait time increments ($ per 90 sec after optional grace period).
+  - **Condition Surcharges & Extras**:
+    - Car Seat Equipment: Flat fee per seat multiplied by total car seat count (rear-facing, front-facing, booster).
+    - Extra Passenger Surcharge: Configurable base allowance (e.g. 2 passengers included) with a per-head fee for additional passengers.
+    - Vehicle Class Surcharges: Flat or percentage fees per vehicle tier.
+    - Operational Zone Surcharges: Dynamic flat or percentage adders linked to `/zones`.
+  - **Dispatcher & Driver Operational Controls**:
+    - Dispatcher Draft Tabs: Dynamic Named Rule Selector with auto-matching suggestions or manual rule selection, plus manual flat fare overrides.
+    - Driver App Console / Quick Action Interface: Mobile-responsive driver view for inspecting trip fares, selecting driver-permitted rules, and applying manual flat fare overrides directly.
+- **Granular Dynamic Branding Studio with Live Preview:**
+  - **Expanded Token Architecture**:
+    - Typography: Heading font family (`--font-heading`), body font family (`--font-body`), heading color (`--color-heading`), body text color (`--color-text-main`), and muted text color (`--color-text-muted`).
+    - Buttons: Primary button fill (`--btn-primary-bg`) and text color (`--btn-primary-text`), secondary button fill (`--btn-secondary-bg`) and text color (`--btn-secondary-text`), button border radius (`--btn-radius`).
+    - Surfaces: Navbar background (`--navbar-bg`), surface card background (`--card-bg`), and brand accent colors (`--color-primary`, `--color-secondary`).
+  - **Side-by-Side Admin Studio Layout**:
+    - Left Column: Studio control panel with real-time color pickers, Google fonts selectors, border radius controls, and one-click themed presets.
+    - Right Column: Interactive live preview canvas rendering navigation bar, headings, typography, button variants, and sample booking cards.
+    - Draft Isolation: Edits in the studio alter the live preview canvas instantaneously without modifying site-wide styles until the operator clicks "Publish Changes to Site-Wide".
+  - **Universal CSS Variable Injection**:
+    - Published tokens are injected into root HTML styles in `root.tsx`, `layout.tsx`, and `admin.tsx`, guaranteeing uniform styling across all public customer views and internal operator consoles.
+

@@ -36,6 +36,18 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     primaryColor: COMPANY_CONFIG.primaryColor || '#f59e0b', // Amber-500
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a', // Slate-900
     logoUrl: '',
+    headingFont: COMPANY_CONFIG.headingFont || 'Inter',
+    bodyFont: COMPANY_CONFIG.bodyFont || 'Inter',
+    headingColor: COMPANY_CONFIG.headingColor || '#0f172a',
+    bodyTextColor: COMPANY_CONFIG.bodyTextColor || '#334155',
+    mutedTextColor: COMPANY_CONFIG.mutedTextColor || '#64748b',
+    btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#f59e0b',
+    btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#020617',
+    btnSecondaryBg: COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
+    btnSecondaryText: COMPANY_CONFIG.btnSecondaryText || '#ffffff',
+    btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '8px',
+    navbarBg: COMPANY_CONFIG.navbarBg || '#0f172a',
+    cardBg: COMPANY_CONFIG.cardBg || '#ffffff',
   },
   pricing: {
     baseFare: 5.00,
@@ -46,6 +58,32 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     minimumFare: 10.00,
     multiStopFee: 5.00,
     defaultTolls: 0,
+    // Phase 19: Condition-Based & Incremental Rates
+    flagDropIncludedMiles: 1.5,
+    useStepIncrements: false,
+    stepIncrementTiers: [
+      { id: 'tier-1', name: 'Initial Distance (0-5 mi)', startMiles: 0, endMiles: 5, stepMiles: 0.1, ratePerStep: 0.35 },
+      { id: 'tier-2', name: 'Intermediate (5-15 mi)', startMiles: 5, endMiles: 15, stepMiles: 0.1, ratePerStep: 0.25 },
+      { id: 'tier-3', name: 'Long Range (15-30 mi)', startMiles: 15, endMiles: 30, stepMiles: 0.1, ratePerStep: 0.20 },
+      { id: 'tier-4', name: 'Extended Regional (30+ mi)', startMiles: 30, endMiles: 999, stepMiles: 0.1, ratePerStep: 0.15 },
+    ],
+    delayRate: {
+      stepSeconds: 90,
+      ratePerStep: 0.60,
+      gracePeriodMinutes: 5,
+    },
+    conditionSurcharges: {
+      carSeatFeePerUnit: 5.00,
+      passengerBaseAllowance: 2,
+      extraPassengerFeePerHead: 3.00,
+      vehicleTierSurcharges: {
+        standard: { flat: 0, percent: 0 },
+        premium: { flat: 15.00, percent: 0 },
+        xl: { flat: 20.00, percent: 0 },
+        wheelchair: { flat: 0, percent: 0 },
+      },
+      zoneSurcharges: {},
+    },
   },
   vehicles: [
     {

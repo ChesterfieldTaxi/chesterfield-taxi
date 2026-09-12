@@ -4,6 +4,7 @@ import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 import {
   AdminDashboardTab,
   AdminGeneralTab,
@@ -217,7 +218,29 @@ export default function AdminLayout() {
     PRIMARY_TABS.find((t) => t.key === normalizedTab) || PRIMARY_TABS[0];
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col">
+    <div
+      className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col"
+      style={
+        {
+          "--color-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--color-secondary": settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || "#0f172a",
+          "--brand-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--brand-secondary": settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || "#0f172a",
+          "--color-heading": settings.branding?.headingColor || COMPANY_CONFIG.headingColor || "#0f172a",
+          "--color-text-main": settings.branding?.bodyTextColor || COMPANY_CONFIG.bodyTextColor || "#334155",
+          "--color-text-muted": settings.branding?.mutedTextColor || COMPANY_CONFIG.mutedTextColor || "#64748b",
+          "--btn-primary-bg": settings.branding?.btnPrimaryBg || COMPANY_CONFIG.btnPrimaryBg || "#f59e0b",
+          "--btn-primary-text": settings.branding?.btnPrimaryText || COMPANY_CONFIG.btnPrimaryText || "#020617",
+          "--btn-secondary-bg": settings.branding?.btnSecondaryBg || COMPANY_CONFIG.btnSecondaryBg || "#0f172a",
+          "--btn-secondary-text": settings.branding?.btnSecondaryText || COMPANY_CONFIG.btnSecondaryText || "#ffffff",
+          "--btn-radius": settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || "8px",
+          "--navbar-bg": settings.branding?.navbarBg || COMPANY_CONFIG.navbarBg || "#0f172a",
+          "--card-bg": settings.branding?.cardBg || COMPANY_CONFIG.cardBg || "#ffffff",
+          "--font-heading": `'${settings.branding?.headingFont || COMPANY_CONFIG.headingFont || "Inter"}', sans-serif`,
+          "--font-body": `'${settings.branding?.bodyFont || COMPANY_CONFIG.bodyFont || "Inter"}', sans-serif`,
+        } as React.CSSProperties
+      }
+    >
       {/* ─── Top Navigation Bar ─── */}
       <header className="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">

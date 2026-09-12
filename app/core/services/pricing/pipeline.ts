@@ -26,6 +26,8 @@ import {
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
   applySurgeMultiplier,
+  applyConditionSurcharges,
+  applyNamedPricingRules,
   applySurchargesAndDiscounts,
   roundCurrency,
 } from './rules';
@@ -62,6 +64,8 @@ export const DEFAULT_PIPELINE_STEPS: readonly PricingPipelineStep[] = [
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
   applySurgeMultiplier,
+  applyConditionSurcharges,
+  applyNamedPricingRules,
   applySurchargesAndDiscounts,
 ] as const;
 
@@ -104,6 +108,10 @@ export function toTripPricing(context: PricingContext): TripPricing {
     multiStopSurcharge: multiStopItem ? multiStopItem.amount : 0,
     tollsFee: tollsItem ? tollsItem.amount : 0,
     airportSurcharge: airportItem ? airportItem.amount : 0,
+    carSeatFee: context.carSeatFee || 0,
+    passengerSurcharge: context.passengerSurcharge || 0,
+    delayFee: context.delayFee || 0,
+    appliedRuleNames: context.appliedRuleNames ? [...context.appliedRuleNames] : undefined,
   };
 }
 

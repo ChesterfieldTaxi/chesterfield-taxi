@@ -22,6 +22,7 @@ import type {
   DiscountEntry,
   CalculationAuditStep,
 } from './types';
+import { evaluateApplicablePricingRules, DEFAULT_NAMED_PRICING_RULES } from './pricing-rules.service';
 
 /**
  * Default production pricing configuration.
@@ -40,6 +41,33 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   multiStopFee: 5.00,
   airportSurcharge: 4.00,
   currency: 'USD',
+  // Phase 19 Condition-Based Pricing Matrix additions
+  flagDropIncludedMiles: 1.5,
+  useStepIncrements: false,
+  stepIncrementTiers: [
+    { id: 'tier-1', name: 'Initial Distance (0-5 mi)', startMiles: 0, endMiles: 5, stepMiles: 0.1, ratePerStep: 0.35 },
+    { id: 'tier-2', name: 'Intermediate (5-15 mi)', startMiles: 5, endMiles: 15, stepMiles: 0.1, ratePerStep: 0.25 },
+    { id: 'tier-3', name: 'Long Range (15-30 mi)', startMiles: 15, endMiles: 30, stepMiles: 0.1, ratePerStep: 0.20 },
+    { id: 'tier-4', name: 'Extended Regional (30+ mi)', startMiles: 30, endMiles: 999, stepMiles: 0.1, ratePerStep: 0.15 },
+  ],
+  delayRate: {
+    stepSeconds: 90,
+    ratePerStep: 0.60,
+    gracePeriodMinutes: 5,
+  },
+  conditionSurcharges: {
+    carSeatFeePerUnit: 5.00,
+    passengerBaseAllowance: 2,
+    extraPassengerFeePerHead: 3.00,
+    vehicleTierSurcharges: {
+      standard: { flat: 0, percent: 0 },
+      premium: { flat: 15.00, percent: 0 },
+      xl: { flat: 20.00, percent: 0 },
+      wheelchair: { flat: 0, percent: 0 },
+    },
+    zoneSurcharges: {},
+  },
+  namedPricingRules: DEFAULT_NAMED_PRICING_RULES,
 };
 
 /**
@@ -150,14 +178,19 @@ function appendAudit(
 }
 
 // ----------------------------------------------------------------------------
-// STEP 1: Base Fare Calculation
+// STEP 1: Base Fare Calculation (with Flag Drop Distance Allowance)
 // ----------------------------------------------------------------------------
 export const applyBaseFare: PricingPipelineStep = (context) => {
   const tier = context.input.vehicleTier;
   const configuredBaseFare =
     context.config.vehicleBaseFares?.[tier] ?? context.config.baseFare;
   const baseFare = roundCurrency(configuredBaseFare);
+  const flagDropMiles = Math.max(0, context.config.flagDropIncludedMiles ?? 0);
   const newSubtotal = baseFare;
+
+  const desc = flagDropMiles > 0
+    ? `Applied platform flag drop base fare of $${baseFare.toFixed(2)} (covers first ${flagDropMiles} mi)${context.config.vehicleBaseFares?.[tier] ? ` (${tier.toUpperCase()} tier)` : ''}`
+    : `Applied platform base fare of $${baseFare.toFixed(2)}${context.config.vehicleBaseFares?.[tier] ? ` (${tier.toUpperCase()} tier)` : ''}`;
 
   return {
     ...context,
@@ -168,7 +201,7 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
       context.auditTrail,
       1,
       'Base Fare',
-      `Applied platform base fare of $${baseFare.toFixed(2)}${context.config.vehicleBaseFares?.[tier] ? ` (${tier.toUpperCase()} tier)` : ''}`,
+      desc,
       baseFare,
       newSubtotal
     ),
@@ -176,17 +209,54 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
 };
 
 // ----------------------------------------------------------------------------
-// STEP 2: Distance & Time Rate Application
+// STEP 2: Distance & Time Rate Application (Decaying Step Increments & Delays)
 // ----------------------------------------------------------------------------
 export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
-  const { distanceMiles, durationMinutes, vehicleTier } = context.input;
-  const { perMileRate, perMinuteRate, vehicleMileRates, mileageTiers } = context.config;
+  const { distanceMiles, durationMinutes, vehicleTier, delayMinutes } = context.input;
+  const {
+    perMileRate,
+    perMinuteRate,
+    vehicleMileRates,
+    mileageTiers,
+    flagDropIncludedMiles,
+    useStepIncrements,
+    stepIncrementTiers,
+    delayRate,
+  } = context.config;
 
+  const flagDropMiles = Math.max(0, flagDropIncludedMiles ?? 0);
+  const billableDistance = Math.max(0, distanceMiles - flagDropMiles);
   const effectivePerMileRate = vehicleMileRates?.[vehicleTier] ?? perMileRate;
 
   let distanceFare = 0;
-  if (mileageTiers && mileageTiers.length > 0) {
-    let remainingMiles = Math.max(0, distanceMiles);
+  let distanceAuditDesc = '';
+
+  if (useStepIncrements && stepIncrementTiers && stepIncrementTiers.length > 0) {
+    // Decaying Bracket Tiers with step increments (e.g. 0.1 mi per step)
+    let remainingMiles = billableDistance;
+    const bracketSummaries: string[] = [];
+    const sortedTiers = [...stepIncrementTiers].sort((a, b) => a.startMiles - b.startMiles);
+
+    for (const tier of sortedTiers) {
+      if (remainingMiles <= 0) break;
+      const tierCapacity = Math.max(0, tier.endMiles - tier.startMiles);
+      const milesInTier = Math.min(remainingMiles, tierCapacity);
+
+      if (milesInTier > 0) {
+        const stepSize = Math.max(0.01, tier.stepMiles || 0.1);
+        const steps = Math.ceil(roundCurrency(milesInTier / stepSize));
+        const tierCost = roundCurrency(steps * tier.ratePerStep);
+        distanceFare += tierCost;
+        remainingMiles -= milesInTier;
+        bracketSummaries.push(
+          `${tier.name}: ${milesInTier.toFixed(1)} mi (${steps}x ${stepSize}mi @ $${tier.ratePerStep.toFixed(2)}) = $${tierCost.toFixed(2)}`
+        );
+      }
+    }
+    distanceFare = roundCurrency(distanceFare);
+    distanceAuditDesc = bracketSummaries.join('; ') || `${billableDistance.toFixed(1)} mi = $0.00`;
+  } else if (mileageTiers && mileageTiers.length > 0) {
+    let remainingMiles = billableDistance;
     let prevMax = 0;
     for (const tier of mileageTiers) {
       const tierMax = tier.maxMiles ?? Infinity;
@@ -199,26 +269,45 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
       if (remainingMiles <= 0) break;
     }
     distanceFare = roundCurrency(distanceFare);
+    distanceAuditDesc = `${billableDistance.toFixed(2)} billable mi (tiers) = $${distanceFare.toFixed(2)}`;
   } else {
-    distanceFare = roundCurrency(Math.max(0, distanceMiles) * effectivePerMileRate);
+    distanceFare = roundCurrency(billableDistance * effectivePerMileRate);
+    distanceAuditDesc = `${billableDistance.toFixed(2)} billable mi @ $${effectivePerMileRate.toFixed(2)}/mi = $${distanceFare.toFixed(2)}`;
   }
 
+  // Duration & Delay / wait-time calculation
   const timeFare = roundCurrency(Math.max(0, durationMinutes) * perMinuteRate);
+  let delayFare = 0;
+  let delayDesc = '';
 
-  const delta = distanceFare + timeFare;
+  const totalDelayMinutes = Math.max(0, delayMinutes ?? 0);
+  if (totalDelayMinutes > 0 && delayRate) {
+    const grace = delayRate.gracePeriodMinutes ?? 0;
+    const excessMinutes = Math.max(0, totalDelayMinutes - grace);
+    if (excessMinutes > 0) {
+      const stepSecs = Math.max(1, delayRate.stepSeconds || 90);
+      const delaySteps = Math.ceil((excessMinutes * 60) / stepSecs);
+      delayFare = roundCurrency(delaySteps * delayRate.ratePerStep);
+      delayDesc = ` + Delay ${excessMinutes.toFixed(1)} min (${delaySteps}x ${stepSecs}s @ $${delayRate.ratePerStep.toFixed(2)}) = $${delayFare.toFixed(2)}`;
+    }
+  }
+
+  const combinedTimeAndDelayFare = roundCurrency(timeFare + delayFare);
+  const delta = roundCurrency(distanceFare + combinedTimeAndDelayFare);
   const newSubtotal = roundCurrency(context.subtotal + delta);
 
   return {
     ...context,
     distanceFare,
-    timeFare,
+    timeFare: combinedTimeAndDelayFare,
+    delayFee: delayFare,
     subtotal: newSubtotal,
     totalFare: newSubtotal,
     auditTrail: appendAudit(
       context.auditTrail,
       2,
       'Distance & Time Rates',
-      `${distanceMiles.toFixed(2)} mi @ $${effectivePerMileRate.toFixed(2)}/mi ($${distanceFare.toFixed(2)}) + ${durationMinutes.toFixed(0)} min @ $${perMinuteRate.toFixed(2)}/min ($${timeFare.toFixed(2)})`,
+      `${distanceAuditDesc} + ${durationMinutes.toFixed(0)} min travel @ $${perMinuteRate.toFixed(2)}/min ($${timeFare.toFixed(2)})${delayDesc}`,
       delta,
       newSubtotal
     ),
@@ -344,7 +433,241 @@ export function createSurgeStep(
 export const applySurgeMultiplier: PricingPipelineStep = createSurgeStep(DEFAULT_SURGE_RULES);
 
 // ----------------------------------------------------------------------------
-// STEP 5: Surcharges & Discount Deductions
+// STEP 5: Condition-Based Surcharges (Car Seats, Extra Passengers, Zones)
+// ----------------------------------------------------------------------------
+export const applyConditionSurcharges: PricingPipelineStep = (context) => {
+  const newSurcharges: SurchargeEntry[] = [];
+  const cfg = context.config.conditionSurcharges;
+  let runningAdditions = 0;
+
+  // 1. Child safety car seat equipment fee
+  let carSeatFee = 0;
+  if (cfg?.carSeatFeePerUnit && cfg.carSeatFeePerUnit > 0) {
+    const breakdown = context.input.carSeatsBreakdown;
+    const totalCarSeats = breakdown
+      ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
+      : 0;
+
+    if (totalCarSeats > 0) {
+      carSeatFee = roundCurrency(totalCarSeats * cfg.carSeatFeePerUnit);
+      newSurcharges.push({
+        name: `Child Safety Seats (${totalCarSeats})`,
+        amount: carSeatFee,
+        description: `$${cfg.carSeatFeePerUnit.toFixed(2)} equipment fee x ${totalCarSeats} seat(s)`,
+      });
+      runningAdditions += carSeatFee;
+    }
+  }
+
+  // 2. Extra passenger allowance fee
+  let passengerSurcharge = 0;
+  const passengers = Math.max(0, context.input.passengers ?? 0);
+  if (
+    cfg?.passengerBaseAllowance !== undefined &&
+    cfg?.extraPassengerFeePerHead &&
+    cfg.extraPassengerFeePerHead > 0 &&
+    passengers > cfg.passengerBaseAllowance
+  ) {
+    const extraHeads = passengers - cfg.passengerBaseAllowance;
+    passengerSurcharge = roundCurrency(extraHeads * cfg.extraPassengerFeePerHead);
+    newSurcharges.push({
+      name: `Additional Passenger Fee (+${extraHeads})`,
+      amount: passengerSurcharge,
+      description: `$${cfg.extraPassengerFeePerHead.toFixed(2)}/head over ${cfg.passengerBaseAllowance} passenger base allowance`,
+    });
+    runningAdditions += passengerSurcharge;
+  }
+
+  // 3. Vehicle tier specific surcharges
+  const tier = context.input.vehicleTier;
+  if (cfg?.vehicleTierSurcharges?.[tier]) {
+    const tierSurcharge = cfg.vehicleTierSurcharges[tier];
+    if (tierSurcharge.flat > 0) {
+      newSurcharges.push({
+        name: `${tier.toUpperCase()} Vehicle Premium`,
+        amount: roundCurrency(tierSurcharge.flat),
+        description: `Fixed vehicle class surcharge for ${tier}`,
+      });
+      runningAdditions += tierSurcharge.flat;
+    }
+    if (tierSurcharge.percent > 0) {
+      const pctAmount = roundCurrency(context.subtotal * (tierSurcharge.percent / 100));
+      newSurcharges.push({
+        name: `${tier.toUpperCase()} Class Fee (${tierSurcharge.percent}%)`,
+        amount: pctAmount,
+        description: `${tierSurcharge.percent}% vehicle tier adder`,
+      });
+      runningAdditions += pctAmount;
+    }
+  }
+
+  // 4. Zone surcharges
+  if (cfg?.zoneSurcharges && context.input.zoneIds?.length) {
+    for (const zid of context.input.zoneIds) {
+      const zoneSurcharge = cfg.zoneSurcharges[zid];
+      if (zoneSurcharge) {
+        if (zoneSurcharge.flat > 0) {
+          newSurcharges.push({
+            name: `Zone Surcharge (${zid})`,
+            amount: roundCurrency(zoneSurcharge.flat),
+            description: `Regional geofence operational adder`,
+          });
+          runningAdditions += zoneSurcharge.flat;
+        }
+        if (zoneSurcharge.percent > 0) {
+          const pctAmount = roundCurrency(context.subtotal * (zoneSurcharge.percent / 100));
+          newSurcharges.push({
+            name: `Zone Surcharge (${zoneSurcharge.percent}%)`,
+            amount: pctAmount,
+            description: `${zoneSurcharge.percent}% regional zone adder`,
+          });
+          runningAdditions += pctAmount;
+        }
+      }
+    }
+  }
+
+  if (newSurcharges.length === 0) {
+    return context;
+  }
+
+  const roundedDelta = roundCurrency(runningAdditions);
+  const newSubtotal = roundCurrency(context.subtotal + roundedDelta);
+
+  return {
+    ...context,
+    carSeatFee,
+    passengerSurcharge,
+    surcharges: [...context.surcharges, ...newSurcharges],
+    subtotal: newSubtotal,
+    totalFare: newSubtotal,
+    auditTrail: appendAudit(
+      context.auditTrail,
+      5,
+      'Condition Surcharges & Extras',
+      `Applied ${newSurcharges.length} condition surcharge(s): ${newSurcharges.map((s) => `${s.name} (+$${s.amount.toFixed(2)})`).join(', ')}`,
+      roundedDelta,
+      newSubtotal
+    ),
+  };
+};
+
+// ----------------------------------------------------------------------------
+// STEP 6: Named Pricing Rules Matrix (Dynamic Evaluation & Driver Selection)
+// ----------------------------------------------------------------------------
+export const applyNamedPricingRules: PricingPipelineStep = (context) => {
+  const rules = context.config.namedPricingRules;
+  if (!rules || rules.length === 0) {
+    return context;
+  }
+
+  let pickupDateStr: string | undefined;
+  let pickupTimeStr: string | undefined;
+
+  const dt =
+    typeof context.input.pickupDateTime === 'string'
+      ? new Date(context.input.pickupDateTime)
+      : context.input.pickupDateTime;
+
+  if (dt && !isNaN(dt.getTime())) {
+    pickupDateStr = dt.toISOString().split('T')[0];
+    const hours = String(dt.getHours()).padStart(2, '0');
+    const mins = String(dt.getMinutes()).padStart(2, '0');
+    pickupTimeStr = `${hours}:${mins}`;
+  }
+
+  const evaluationResult = evaluateApplicablePricingRules(
+    {
+      distanceMiles: context.input.distanceMiles,
+      pickupDate: pickupDateStr,
+      pickupTime: pickupTimeStr,
+      zoneIds: context.input.zoneIds,
+      accountType: context.input.accountType,
+      vehicleTier: context.input.vehicleTier,
+      selectedRuleId: context.input.selectedRuleId,
+    },
+    rules
+  );
+
+  if (evaluationResult.matchedRules.length === 0) {
+    return context;
+  }
+
+  let currentSubtotal = context.subtotal;
+  const appliedNames = evaluationResult.matchedRules.map((r) => r.name);
+  const newSurcharges: SurchargeEntry[] = [];
+
+  // Flat override takes precedence
+  if (typeof evaluationResult.flatOverride === 'number') {
+    const overrideVal = roundCurrency(evaluationResult.flatOverride);
+    const delta = roundCurrency(overrideVal - currentSubtotal);
+    currentSubtotal = overrideVal;
+
+    return {
+      ...context,
+      appliedRuleNames: appliedNames,
+      subtotal: currentSubtotal,
+      totalFare: currentSubtotal,
+      auditTrail: appendAudit(
+        context.auditTrail,
+        6,
+        'Named Pricing Rule: Flat Fare Corridor',
+        `Enforced flat corridor rule: ${appliedNames[0]} ($${overrideVal.toFixed(2)})`,
+        delta,
+        currentSubtotal
+      ),
+    };
+  }
+
+  let multiplierDelta = 0;
+  if (evaluationResult.multiplier !== 1.0) {
+    const scaled = roundCurrency(currentSubtotal * evaluationResult.multiplier);
+    multiplierDelta = roundCurrency(scaled - currentSubtotal);
+    currentSubtotal = scaled;
+  }
+
+  let additiveSurcharges = 0;
+  if (evaluationResult.surchargeFlat > 0) {
+    newSurcharges.push({
+      name: 'Named Rule Surcharge',
+      amount: roundCurrency(evaluationResult.surchargeFlat),
+      description: evaluationResult.auditTrail.join('; '),
+    });
+    additiveSurcharges += evaluationResult.surchargeFlat;
+  }
+
+  if (evaluationResult.surchargePercent > 0) {
+    const pctFee = roundCurrency(currentSubtotal * (evaluationResult.surchargePercent / 100));
+    newSurcharges.push({
+      name: `Named Rule Adder (${evaluationResult.surchargePercent}%)`,
+      amount: pctFee,
+      description: evaluationResult.auditTrail.join('; '),
+    });
+    additiveSurcharges += pctFee;
+  }
+
+  const totalDelta = roundCurrency(multiplierDelta + additiveSurcharges);
+  currentSubtotal = roundCurrency(currentSubtotal + additiveSurcharges);
+
+  return {
+    ...context,
+    appliedRuleNames: appliedNames,
+    surcharges: [...context.surcharges, ...newSurcharges],
+    subtotal: currentSubtotal,
+    totalFare: currentSubtotal,
+    auditTrail: appendAudit(
+      context.auditTrail,
+      6,
+      'Named Pricing Rules Matrix',
+      `Applied named rule(s) [${appliedNames.join(', ')}]: ${evaluationResult.auditTrail.join(', ')}`,
+      totalDelta,
+      currentSubtotal
+    ),
+  };
+};
+
+// ----------------------------------------------------------------------------
+// STEP 7: Surcharges & Discount Deductions
 // ----------------------------------------------------------------------------
 export function createSurchargesAndDiscountsStep(
   availableDiscounts: Record<string, DiscountRule> = DEFAULT_DISCOUNTS

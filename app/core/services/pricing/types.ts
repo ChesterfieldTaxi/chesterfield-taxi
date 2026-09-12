@@ -34,6 +34,18 @@ export interface PricingConfig {
   currency: string;
   /** Optional manual surge multiplier configured by admin */
   manualSurgeMultiplier?: number;
+  /** Initial distance covered by base flag drop fee */
+  flagDropIncludedMiles?: number;
+  /** Whether step increment bracket pricing is active */
+  useStepIncrements?: boolean;
+  /** Decaying distance brackets with step increments */
+  stepIncrementTiers?: import('../../types/config').StepIncrementTier[];
+  /** Delay and wait-time rate config */
+  delayRate?: import('../../types/config').DelayRateConfig;
+  /** Condition-based surcharges for car seats, extra passengers, vehicle tiers, zones */
+  conditionSurcharges?: import('../../types/config').ConditionSurchargeConfig;
+  /** Named pricing rules to evaluate */
+  namedPricingRules?: import('../../types/config').NamedPricingRule[];
 }
 
 
@@ -82,6 +94,23 @@ export interface PricingInput {
   manualDiscount?: number;
   /** Dispatcher override: complete manual fare override */
   manualFareOverride?: number;
+  /** Child safety car seat counts */
+  carSeatsBreakdown?: {
+    rearFacing?: number;
+    frontFacing?: number;
+    booster?: number;
+    total?: number;
+  };
+  /** Total number of passengers */
+  passengers?: number;
+  /** Account category: retail, corporate, or vip */
+  accountType?: 'retail' | 'corporate' | 'vip';
+  /** Zone IDs matched by pickup/dropoff coordinates */
+  zoneIds?: string[];
+  /** Wait time or delay in minutes */
+  delayMinutes?: number;
+  /** Dispatcher or driver selected Named Pricing Rule ID */
+  selectedRuleId?: string;
 }
 
 export interface SurchargeEntry {
@@ -128,6 +157,12 @@ export interface PricingContext {
   readonly subtotal: number;
   readonly totalFare: number;
   readonly currency: string;
+
+  // Phase 19: Extended condition totals & audit
+  readonly carSeatFee?: number;
+  readonly passengerSurcharge?: number;
+  readonly delayFee?: number;
+  readonly appliedRuleNames?: ReadonlyArray<string>;
 
   // Step-by-step calculation trace for transparency and auditing
   readonly auditTrail: ReadonlyArray<CalculationAuditStep>;

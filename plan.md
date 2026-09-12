@@ -65,3 +65,53 @@ Trips stored in Firestore will strictly adhere to the following state transition
 - Sub-Navigation State Machine: Under `Vehicles`, users can toggle seamlessly between `Vehicle Types` (service classes & capacity limits) and `Physical Fleet` (asset registry & maintenance records).
 - Graceful URL backwards-compatibility automatically maps legacy parameters (`?tab=pricing`, `?tab=fleet`, `?tab=staff`, `?tab=bookings`) to the new consolidated views.
 
+## 7. Phase 19 Architecture & Firestore Schemas
+
+### 7.1 `/pricingRules` Firestore Collection Schema
+- Collection: `/pricingRules`
+- Document ID: string (e.g. `rule-spirit-airport-corridor`, `rule-rush-hour`)
+- Fields:
+  - `id`: string
+  - `name`: string
+  - `description`?: string
+  - `priority`: number (1 - 100, where higher numbers evaluate first)
+  - `isActive`: boolean
+  - `allowDriverSelection`: boolean (determines visibility in driver app quick action dropdowns)
+  - `triggers`:
+    - `zoneIds`?: string[] (matches pickup or dropoff within zone)
+    - `minDistanceMiles`?: number
+    - `maxDistanceMiles`?: number
+    - `daysOfWeek`?: number[] (0 = Sunday ... 6 = Saturday)
+    - `timeWindows`?: Array<{ start: string; end: string }> (e.g. `16:00` to `18:30`)
+    - `holidayDates`?: string[] (e.g. `YYYY-MM-DD`)
+    - `accountTypes`?: Array<'retail' | 'corporate' | 'vip'>
+    - `vehicleTiers`?: string[] (e.g. `standard`, `premium`, `xl`, `wheelchair`)
+  - `modifier`:
+    - `type`: `'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent'`
+    - `value`: number
+  - `createdAt`?: string
+  - `updatedAt`?: string
+
+### 7.2 Extended Pricing Pipeline & Pure Functional Architecture
+- **Flag Drop Initial Distance Allowance**:
+  - `flagDropIncludedMiles`: Initial distance covered by `baseFare` before incremental mileage rates begin.
+- **Decaying Distance Brackets & Step Increments**:
+  - `stepIncrementTiers`: Array of `{ name, startMiles, endMiles, stepMiles, ratePerStep }`.
+  - Calculates distance charges in granular step intervals (e.g. $0.35 per 0.1 mile) with bracket decay for long trips.
+- **Wait-Time Delay Rate Config**:
+  - `delayRate`: `{ stepSeconds, ratePerStep, gracePeriodMinutes }` (e.g. $0.60 per 90 seconds delay).
+- **Condition Surcharges Step**:
+  - `carSeatFeePerUnit`: Fee per child safety seat multiplied by total seat count.
+  - `passengerBaseAllowance` & `extraPassengerFeePerHead`: Incremental passenger surcharge.
+  - `zoneSurcharges`: Zone flat fees or multipliers evaluated against pickup/dropoff coordinates.
+  - `namedPricingRules`: Evaluated in priority order; supports manual override or driver selection.
+
+### 7.3 Dynamic Branding Studio Architecture
+- Expanded Firestore document under `config/appSettings.branding`:
+  - `headingFont`, `bodyFont`, `headingColor`, `bodyTextColor`, `mutedTextColor`
+  - `btnPrimaryBg`, `btnPrimaryText`, `btnSecondaryBg`, `btnSecondaryText`, `btnBorderRadius`
+  - `navbarBg`, `cardBg`, `primaryColor`, `secondaryColor`, `logoUrl`
+- Isolated Studio State: Edits update only local component draft state in the Live Preview Canvas. Clicking "Publish Changes to Site-Wide" writes to Firestore and updates root CSS custom properties.
+- Universal CSS Injection: Injects root variables in `root.tsx`, `layout.tsx`, and `admin.tsx`.
+
+

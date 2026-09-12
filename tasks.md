@@ -148,3 +148,19 @@
 - [x] 18.15 Run `npm run build` to confirm production client and SSR build stability.
 - [x] 18.16 Mark Phase 18 complete in tasks.md upon verification.
 
+## Phase 19: Condition-Based Pricing Matrix & Dynamic Branding Studio
+- [x] 19.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to reflect Phase 19 scope (Named Pricing Rules, Step Increments, Condition Surcharges, Dynamic Branding Studio).
+- [x] 19.2 Define Firestore data models & types for `/pricingRules` (`NamedPricingRule`), Step Increments (`StepIncrementTier`), Delay Rates, Condition Surcharges, and expanded `BrandingConfig`.
+- [x] 19.3 Update `companyConfig.ts` and `admin-config.service.ts` with expanded Branding tokens and default Pricing Rule parameters.
+- [x] 19.4 Implement `PricingRulesService` (`app/core/services/pricing/pricing-rules.service.ts`) with `/pricingRules` Firestore CRUD, default regional seeded rules, and pure multi-condition evaluation logic.
+- [x] 19.5 Extend Pure Functional Pricing Engine (`rules.ts` & `pipeline.ts`) to support Flag Drop initial distance, decaying bracket step increments, wait-time delay rates, condition surcharges (car seats & extra passengers), and named rules evaluation.
+- [x] 19.6 Update Admin Rates Tab (`AdminRatesTab.tsx`) with 4 dedicated sub-tabs: Base Rates & Simulator, Named Pricing Rules Firestore manager, Step Increments & Brackets editor, and Condition Surcharges & Equipment.
+- [x] 19.7 Update Dispatcher draft tabs (`DispatchBookingEngine.tsx`) with dynamic Named Rule Selector and flat fare overrides.
+- [x] 19.8 Implement Driver App Console / Quick Action Interface in `dispatch.tsx` supporting driver-permitted named rules and manual flat fare overrides.
+- [x] 19.9 Build Dynamic Branding Studio in Admin General Tab (`AdminGeneralTab.tsx`) with side-by-side controls, isolated live preview canvas, and decoupled "Publish Changes to Site-Wide".
+- [x] 19.10 Universal Root CSS Variable Injection across `root.tsx`, `layout.tsx`, `admin.tsx`, and `app.css`.
+- [x] 19.11 Run `npm run typecheck` to verify 0 TypeScript compiler errors.
+- [x] 19.12 Run `npm run build` to verify clean SSR and client production builds.
+- [x] 19.13 Mark Phase 19 complete in tasks.md upon verification.
+
+

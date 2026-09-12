@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Lato:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@500;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -5,6 +6,18 @@
   --color-secondary: #0f172a;
   --brand-primary: var(--color-primary);
   --brand-secondary: var(--color-secondary);
+  --color-heading: #0f172a;
+  --color-text-main: #334155;
+  --color-text-muted: #64748b;
+  --btn-primary-bg: #f59e0b;
+  --btn-primary-text: #020617;
+  --btn-secondary-bg: #0f172a;
+  --btn-secondary-text: #ffffff;
+  --btn-radius: 8px;
+  --navbar-bg: #0f172a;
+  --card-bg: #ffffff;
+  --font-heading: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
 }
 
 /* Dynamic Branding Utility Classes & Overrides */
@@ -44,6 +57,53 @@
 
 .btn-brand-primary:active {
   filter: brightness(0.9);
+}
+
+/* Dynamic Branding Semantic Utility Classes */
+.brand-heading {
+  font-family: var(--font-heading, inherit) !important;
+  color: var(--color-heading, inherit) !important;
+}
+
+.brand-body {
+  font-family: var(--font-body, inherit) !important;
+  color: var(--color-text-main, inherit) !important;
+}
+
+.brand-muted {
+  color: var(--color-text-muted, inherit) !important;
+}
+
+.brand-btn-primary {
+  background-color: var(--btn-primary-bg, #f59e0b) !important;
+  color: var(--btn-primary-text, #020617) !important;
+  border-radius: var(--btn-radius, 8px) !important;
+}
+
+.brand-btn-primary:hover {
+  filter: brightness(0.95);
+}
+
+.brand-btn-primary:active {
+  filter: brightness(0.9);
+}
+
+.brand-btn-secondary {
+  background-color: var(--btn-secondary-bg, #0f172a) !important;
+  color: var(--btn-secondary-text, #ffffff) !important;
+  border-radius: var(--btn-radius, 8px) !important;
+}
+
+.brand-btn-secondary:hover {
+  filter: brightness(1.1);
+}
+
+.brand-navbar {
+  background-color: var(--navbar-bg, #0f172a) !important;
+}
+
+.brand-card {
+  background-color: var(--card-bg, #ffffff) !important;
 }
 
 /* -------------------------------------------------------------------------- */

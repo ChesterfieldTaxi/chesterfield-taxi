@@ -91,6 +91,10 @@ export interface TripPricing {
   tollsFee?: number;
   airportSurcharge?: number;
   manualAdjustment?: number;
+  carSeatFee?: number;
+  passengerSurcharge?: number;
+  delayFee?: number;
+  appliedRuleNames?: string[];
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'corporate';
