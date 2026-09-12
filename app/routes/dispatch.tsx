@@ -157,6 +157,29 @@ export default function DispatchRoute() {
   // Resizable layout dimensions
   const [sidebarWidth, setSidebarWidth] = useState(430); // 340px - 620px
   const [queueHeight, setQueueHeight] = useState(240); // 160px - 50%
+  const [operationsWidth, setOperationsWidth] = useState(400); // 320px - 750px
+  const [panelHeights, setPanelHeights] = useState<Record<string, number>>({
+    drivers: 320,
+    messages: 300,
+    phone: 380,
+  });
+  const [isViewsDropdownOpen, setIsViewsDropdownOpen] = useState(false);
+  const viewsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close views dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (viewsDropdownRef.current && !viewsDropdownRef.current.contains(e.target as Node)) {
+        setIsViewsDropdownOpen(false);
+      }
+    };
+    if (isViewsDropdownOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isViewsDropdownOpen]);
 
   // Auth Guard
   useEffect(() => {
@@ -369,6 +392,59 @@ export default function DispatchRoute() {
     document.removeEventListener('mouseup', handleQueueMouseUp);
   }, [handleQueueMouseMove]);
 
+  // Operations panel horizontal resize
+  const isDraggingOperations = useRef(false);
+  const handleOperationsMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingOperations.current = true;
+    document.addEventListener('mousemove', handleOperationsMouseMove);
+    document.addEventListener('mouseup', handleOperationsMouseUp);
+  };
+
+  const handleOperationsMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingOperations.current) return;
+    const windowWidth = window.innerWidth;
+    const newWidth = Math.min(Math.max(windowWidth - e.clientX, 320), 750);
+    setOperationsWidth(newWidth);
+  }, []);
+
+  const handleOperationsMouseUp = useCallback(() => {
+    isDraggingOperations.current = false;
+    document.removeEventListener('mousemove', handleOperationsMouseMove);
+    document.removeEventListener('mouseup', handleOperationsMouseUp);
+  }, [handleOperationsMouseMove]);
+
+  // Operations panels vertical resize between cards
+  const isDraggingVerticalKey = useRef<string | null>(null);
+  const startDragY = useRef(0);
+  const startDragHeight = useRef(0);
+
+  const handleVerticalResizeStart = (e: React.MouseEvent, panelKey: string) => {
+    e.preventDefault();
+    isDraggingVerticalKey.current = panelKey;
+    startDragY.current = e.clientY;
+    startDragHeight.current = panelHeights[panelKey] || 300;
+    document.addEventListener('mousemove', handleVerticalResizeMove);
+    document.addEventListener('mouseup', handleVerticalResizeUp);
+  };
+
+  const handleVerticalResizeMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingVerticalKey.current) return;
+    const key = isDraggingVerticalKey.current;
+    const delta = e.clientY - startDragY.current;
+    const nextHeight = Math.max(160, Math.min(650, startDragHeight.current + delta));
+    setPanelHeights((prev) => ({
+      ...prev,
+      [key]: nextHeight,
+    }));
+  }, []);
+
+  const handleVerticalResizeUp = useCallback(() => {
+    isDraggingVerticalKey.current = null;
+    document.removeEventListener('mousemove', handleVerticalResizeMove);
+    document.removeEventListener('mouseup', handleVerticalResizeUp);
+  }, [handleVerticalResizeMove]);
+
   // Dynamic tab titles based on tab count
   const getTabLabel = (draft: DraftTab) => {
     const isCompact = drafts.length > 3;
@@ -425,7 +501,11 @@ export default function DispatchRoute() {
 
   // Active Draft object for map route display
   const activeDraft = drafts.find((d) => d.id === activeDraftId);
-  const activeOperationalCount = (isDriversOpen ? 1 : 0) + (isMessagesOpen ? 1 : 0) + (isPhoneOpen ? 1 : 0);
+  const activePanels: ('drivers' | 'messages' | 'phone')[] = [];
+  if (isDriversOpen) activePanels.push('drivers');
+  if (isMessagesOpen) activePanels.push('messages');
+  if (isPhoneOpen) activePanels.push('phone');
+  const activeOperationalCount = activePanels.length;
 
   if (isAuthChecking) {
     return (
@@ -830,34 +910,140 @@ export default function DispatchRoute() {
 
         {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (MULTI-TASKING STACK) ─── */}
         {activeOperationalCount > 0 && (
-          <aside className="w-[390px] bg-slate-100 border-l border-slate-200 flex flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg">
-            {/* Master Header */}
-            <div className="h-9 px-3 bg-slate-900 text-white flex items-center justify-between shrink-0 text-xs">
+          <aside
+            className="relative bg-slate-100 border-l border-slate-200 flex flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg"
+            style={{ width: `${operationsWidth}px` }}
+          >
+            {/* Horizontal Resize Drag Handle on Left Edge */}
+            <div
+              onMouseDown={handleOperationsMouseDown}
+              className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 transition-colors z-30 group select-none"
+              title="Drag to resize Operations Panel width"
+            >
+              <div className="w-[1px] h-full bg-slate-300 group-hover:bg-blue-500 mx-auto" />
+            </div>
+
+            {/* Master Header with Views Dropdown */}
+            <div className="h-9 px-3 bg-slate-900 text-white flex items-center justify-between shrink-0 text-xs pl-4">
               <div className="flex items-center gap-2">
                 <span className="font-bold tracking-tight">Tactical Operations</span>
                 <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 font-bold text-[10px]">
                   {activeOperationalCount} Active
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDriversOpen(false);
-                  setIsMessagesOpen(false);
-                  setIsPhoneOpen(false);
-                }}
-                className="text-[11px] text-slate-400 hover:text-white transition-colors"
-                title="Close all operational panels"
-              >
-                ✕ Close All
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Views Dropdown */}
+                <div className="relative" ref={viewsDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsViewsDropdownOpen(!isViewsDropdownOpen)}
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors border border-slate-700"
+                    title="Select/deselect operational views"
+                  >
+                    <span>👁️ Views</span>
+                    <span className="text-[9px]">▾</span>
+                  </button>
+
+                  {isViewsDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white text-slate-800 rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        Operational Views
+                      </div>
+
+                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isDriversOpen}
+                          onChange={(e) => setIsDriversOpen(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="font-medium text-slate-700">🚗 Drivers Roster</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isMessagesOpen}
+                          onChange={(e) => setIsMessagesOpen(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="font-medium text-slate-700">💬 Messages</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isPhoneOpen}
+                          onChange={(e) => setIsPhoneOpen(e.target.checked)}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-medium text-slate-700">📞 Softphone</span>
+                      </label>
+
+                      <div className="border-t border-slate-100 mt-1 pt-1 px-2 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDriversOpen(true);
+                            setIsMessagesOpen(true);
+                            setIsPhoneOpen(true);
+                          }}
+                          className="text-[10px] text-blue-600 hover:underline font-semibold"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDriversOpen(false);
+                            setIsMessagesOpen(false);
+                            setIsPhoneOpen(false);
+                            setIsViewsDropdownOpen(false);
+                          }}
+                          className="text-[10px] text-red-500 hover:underline font-semibold"
+                        >
+                          Close All
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDriversOpen(false);
+                    setIsMessagesOpen(false);
+                    setIsPhoneOpen(false);
+                  }}
+                  className="text-[11px] text-slate-400 hover:text-white transition-colors"
+                  title="Close all operational panels"
+                >
+                  ✕ Close All
+                </button>
+              </div>
             </div>
 
             {/* Stacked Panels (Scrollable or Vertically Shared) */}
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-300 flex flex-col">
+            <div className="flex-1 overflow-y-auto flex flex-col">
               {/* 1. DRIVERS ROSTER CARD */}
               {isDriversOpen && (
-                <div className="flex flex-col bg-white shrink-0 min-h-[300px] max-h-[460px] overflow-hidden">
+                <>
+                  <div
+                    className={`flex flex-col bg-white overflow-hidden ${
+                      activePanels.length === 1
+                        ? 'flex-1 h-full min-h-0'
+                        : activePanels[activePanels.length - 1] === 'drivers'
+                        ? 'flex-1 min-h-[160px]'
+                        : 'shrink-0'
+                    }`}
+                    style={
+                      activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'drivers'
+                        ? { height: `${panelHeights.drivers}px` }
+                        : undefined
+                    }
+                  >
                   <div className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-1.5 font-bold text-xs">
                       <span>🚗 Drivers Roster</span>
@@ -965,11 +1151,35 @@ export default function DispatchRoute() {
                       })}
                   </div>
                 </div>
+                {activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'drivers' && (
+                    <div
+                      onMouseDown={(e) => handleVerticalResizeStart(e, 'drivers')}
+                      className="h-2 w-full cursor-row-resize bg-slate-200 hover:bg-blue-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
+                      title="Drag to resize Drivers Roster height"
+                    >
+                      <div className="w-8 h-1 bg-slate-400 group-hover:bg-white rounded-full" />
+                    </div>
+                  )}
+                </>
               )}
 
               {/* 2. MESSAGES CARD */}
               {isMessagesOpen && (
-                <div className="flex flex-col bg-white shrink-0 min-h-[320px] max-h-[460px] overflow-hidden">
+                <>
+                  <div
+                    className={`flex flex-col bg-white overflow-hidden ${
+                      activePanels.length === 1
+                        ? 'flex-1 h-full min-h-0'
+                        : activePanels[activePanels.length - 1] === 'messages'
+                        ? 'flex-1 min-h-[160px]'
+                        : 'shrink-0'
+                    }`}
+                    style={
+                      activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'messages'
+                        ? { height: `${panelHeights.messages}px` }
+                        : undefined
+                    }
+                  >
                   <div className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-1.5 font-bold text-xs">
                       <span>💬 Driver Messaging &amp; SMS</span>
@@ -1075,11 +1285,35 @@ export default function DispatchRoute() {
                     ))}
                   </div>
                 </div>
+                {activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'messages' && (
+                    <div
+                      onMouseDown={(e) => handleVerticalResizeStart(e, 'messages')}
+                      className="h-2 w-full cursor-row-resize bg-slate-200 hover:bg-blue-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
+                      title="Drag to resize Messages height"
+                    >
+                      <div className="w-8 h-1 bg-slate-400 group-hover:bg-white rounded-full" />
+                    </div>
+                  )}
+                </>
               )}
 
               {/* 3. SOFTPHONE CARD */}
               {isPhoneOpen && (
-                <div className="flex flex-col bg-slate-900 text-white shrink-0 min-h-[380px] p-3 space-y-2.5">
+                <>
+                  <div
+                    className={`flex flex-col bg-slate-900 text-white overflow-y-auto p-3 space-y-2.5 ${
+                      activePanels.length === 1
+                        ? 'flex-1 h-full min-h-0'
+                        : activePanels[activePanels.length - 1] === 'phone'
+                        ? 'flex-1 min-h-[220px]'
+                        : 'shrink-0'
+                    }`}
+                    style={
+                      activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'phone'
+                        ? { height: `${panelHeights.phone}px` }
+                        : undefined
+                    }
+                  >
                   <div className="flex items-center justify-between pb-1 border-b border-slate-800">
                     <div className="flex items-center gap-1.5 font-bold text-xs">
                       <span>📞 Tactical Softphone</span>
@@ -1194,7 +1428,17 @@ export default function DispatchRoute() {
                       </button>
                     )}
                   </div>
-                </div>
+                  </div>
+                  {activePanels.length > 1 && activePanels[activePanels.length - 1] !== 'phone' && (
+                    <div
+                      onMouseDown={(e) => handleVerticalResizeStart(e, 'phone')}
+                      className="h-2 w-full cursor-row-resize bg-slate-800 hover:bg-emerald-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
+                      title="Drag to resize Softphone height"
+                    >
+                      <div className="w-8 h-1 bg-slate-500 group-hover:bg-white rounded-full" />
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </aside>

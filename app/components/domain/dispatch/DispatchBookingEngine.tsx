@@ -43,6 +43,8 @@ export interface CarSeatsBreakdown {
   booster: number;
 }
 
+export type VehicleChoice = 'any' | 'sedan' | 'suv' | 'van';
+
 export interface ReturnTripDetails {
   returnTrip: boolean;
   returnPickupAddress: string;
@@ -56,8 +58,11 @@ export interface ReturnTripDetails {
   returnBags: number;
   returnCarSeats: boolean;
   returnCarSeatsBreakdown: CarSeatsBreakdown;
-  returnVehicles: Array<'sedan' | 'suv' | 'van'>;
+  returnVehicles: Array<VehicleChoice>;
   autoCreateReturnTrip: boolean;
+  returnEstimatedFare?: number;
+  returnEstimatedDurationMinutes?: number;
+  returnEstimatedDistanceMiles?: number;
 }
 
 export interface RepeatTripDetails {
@@ -88,8 +93,8 @@ export interface DispatchFormValues {
   bags: number;
   carSeats: boolean;
   carSeatsBreakdown: CarSeatsBreakdown;
-  selectedVehicles: Array<'sedan' | 'suv' | 'van'>;
-  vehicle: 'any' | 'sedan' | 'suv' | 'van';
+  selectedVehicles: Array<VehicleChoice>;
+  vehicle: VehicleChoice;
   paymentMethod: 'cash' | 'card' | 'account';
   cardDetails: CardDetails;
   corporateDetails: CorporateAccountDetails;
@@ -102,6 +107,8 @@ export interface DispatchFormValues {
   returnDetails: ReturnTripDetails;
   repeatDetails: RepeatTripDetails;
   estimatedFare: number;
+  returnEstimatedFare: number;
+  totalCalculatedFare: number;
   manualFare: string;
   isFareOverridden: boolean;
   estimatedDurationMinutes: number;
@@ -178,7 +185,7 @@ export function DispatchBookingEngine({
   const [boosterCount, setBoosterCount] = useState(0);
 
   // Multi-Vehicle Selection
-  const [selectedVehicles, setSelectedVehicles] = useState<Array<'sedan' | 'suv' | 'van'>>(['sedan']);
+  const [selectedVehicles, setSelectedVehicles] = useState<Array<VehicleChoice>>(['any']);
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'account'>('cash');
@@ -218,8 +225,11 @@ export function DispatchBookingEngine({
   const [returnRearFacing, setReturnRearFacing] = useState(0);
   const [returnFrontFacing, setReturnFrontFacing] = useState(0);
   const [returnBooster, setReturnBooster] = useState(0);
-  const [returnVehicles, setReturnVehicles] = useState<Array<'sedan' | 'suv' | 'van'>>(['sedan']);
+  const [returnVehicles, setReturnVehicles] = useState<Array<VehicleChoice>>(['any']);
   const [autoCreateReturnTrip, setAutoCreateReturnTrip] = useState(true);
+  const [returnEstimatedDurationMinutes, setReturnEstimatedDurationMinutes] = useState(0);
+  const [returnEstimatedDistanceMiles, setReturnEstimatedDistanceMiles] = useState(0);
+  const [returnEstimatedFare, setReturnEstimatedFare] = useState(0);
 
   // Repeat / Recurring Schedule
   const [repeat, setRepeat] = useState(false);
@@ -328,8 +338,10 @@ export function DispatchBookingEngine({
         setSelectedVehicles(['suv']);
       } else if (initialTrip.vehicleTier === 'wheelchair') {
         setSelectedVehicles(['van']);
-      } else {
+      } else if (initialTrip.vehicleTier === 'premium') {
         setSelectedVehicles(['sedan']);
+      } else {
+        setSelectedVehicles(['any']);
       }
 
       // Hydrate payment
@@ -581,6 +593,9 @@ export function DispatchBookingEngine({
         },
         returnVehicles,
         autoCreateReturnTrip,
+        returnEstimatedFare,
+        returnEstimatedDurationMinutes,
+        returnEstimatedDistanceMiles,
       },
       repeatDetails: {
         repeat,
@@ -592,6 +607,8 @@ export function DispatchBookingEngine({
         repeatsRoundTrip: returnTrip,
       },
       estimatedFare,
+      returnEstimatedFare,
+      totalCalculatedFare: returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare,
       manualFare,
       isFareOverridden,
       estimatedDurationMinutes,
@@ -664,6 +681,9 @@ export function DispatchBookingEngine({
     repeatUntilDate,
     repeatWeeksPattern,
     estimatedFare,
+    returnEstimatedFare,
+    returnEstimatedDurationMinutes,
+    returnEstimatedDistanceMiles,
     manualFare,
     isFareOverridden,
     estimatedDurationMinutes,
@@ -671,14 +691,14 @@ export function DispatchBookingEngine({
     onValuesChange,
   ]);
 
-  // Live route calculation & pricing
+  // Live route calculation & pricing (Outbound)
   useEffect(() => {
     if (!pickupAddress || !dropoffAddress) {
       if (!isFareOverridden) {
         setEstimatedFare(0);
-        setEstimatedDistanceMiles(0);
-        setEstimatedDurationMinutes(0);
       }
+      setEstimatedDistanceMiles(0);
+      setEstimatedDurationMinutes(0);
       return;
     }
 
@@ -703,6 +723,7 @@ export function DispatchBookingEngine({
             if (v === 'suv') tier = 'xl';
             if (v === 'van') tier = 'wheelchair';
             if (v === 'sedan') tier = 'premium';
+            if (v === 'any') tier = 'standard';
 
             const quote = calculateTripPricing(
               {
@@ -743,6 +764,83 @@ export function DispatchBookingEngine({
     isFareOverridden,
   ]);
 
+  // Return Route and Return Fare calculation
+  useEffect(() => {
+    if (!returnTrip) {
+      setReturnEstimatedDistanceMiles(0);
+      setReturnEstimatedDurationMinutes(0);
+      setReturnEstimatedFare(0);
+      return;
+    }
+
+    const retOrigin = returnPickupCoordinates || returnPickupAddress || dropoffCoordinates || dropoffAddress;
+    const retDestination = returnDropoffCoordinates || returnDropoffAddress || pickupCoordinates || pickupAddress;
+    const retWaypoints = returnIntermediateStops.map((s) => s.coordinates || s.address).filter(Boolean);
+
+    if (!retOrigin || !retDestination) {
+      setReturnEstimatedDistanceMiles(0);
+      setReturnEstimatedDurationMinutes(0);
+      setReturnEstimatedFare(0);
+      return;
+    }
+
+    let isMounted = true;
+    calculateLiveRoute({ origin: retOrigin, destination: retDestination, waypoints: retWaypoints })
+      .then((res) => {
+        if (!isMounted || !res) return;
+        setReturnEstimatedDistanceMiles(res.distanceMiles);
+        setReturnEstimatedDurationMinutes(res.durationMinutes);
+
+        const config = getAdminConfigService().getCachedSettings().pricing;
+        let retTotal = 0;
+        returnVehicles.forEach((v) => {
+          let tier: VehicleTier = 'standard';
+          if (v === 'suv') tier = 'xl';
+          if (v === 'van') tier = 'wheelchair';
+          if (v === 'sedan') tier = 'premium';
+          if (v === 'any') tier = 'standard';
+
+          const quote = calculateTripPricing(
+            {
+              distanceMiles: res.distanceMiles,
+              durationMinutes: res.durationMinutes,
+              vehicleTier: tier,
+              pickupDateTime:
+                returnDate && returnTime
+                  ? new Date(`${returnDate}T${returnTime}:00`)
+                  : new Date(),
+              intermediateStopsCount: returnIntermediateStops.length,
+            },
+            config
+          );
+          retTotal += quote.pricing.totalFare;
+        });
+
+        setReturnEstimatedFare(retTotal);
+      })
+      .catch((e) => {
+        console.warn('[DispatchBookingEngine] Return route calculation failed:', e);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    returnTrip,
+    returnPickupAddress,
+    returnPickupCoordinates,
+    returnDropoffAddress,
+    returnDropoffCoordinates,
+    returnIntermediateStops,
+    returnVehicles,
+    returnDate,
+    returnTime,
+    pickupAddress,
+    pickupCoordinates,
+    dropoffAddress,
+    dropoffCoordinates,
+  ]);
+
   // Swap outbound route
   const handleSwapRoute = () => {
     const tmpAddr = pickupAddress;
@@ -755,12 +853,15 @@ export function DispatchBookingEngine({
 
   // Swap return route
   const handleSwapReturnRoute = () => {
-    const tmpAddr = returnPickupAddress;
-    const tmpCoords = returnPickupCoordinates;
-    setReturnPickupAddress(returnDropoffAddress);
-    setReturnPickupCoordinates(returnDropoffCoordinates);
-    setReturnDropoffAddress(tmpAddr);
-    setReturnDropoffCoordinates(tmpCoords);
+    const currentReturnPickup = returnPickupAddress || dropoffAddress;
+    const currentReturnDropoff = returnDropoffAddress || pickupAddress;
+    const currentReturnPickupCoords = returnPickupCoordinates || dropoffCoordinates;
+    const currentReturnDropoffCoords = returnDropoffCoordinates || pickupCoordinates;
+
+    setReturnPickupAddress(currentReturnDropoff);
+    setReturnPickupCoordinates(currentReturnDropoffCoords);
+    setReturnDropoffAddress(currentReturnPickup);
+    setReturnDropoffCoordinates(currentReturnPickupCoords);
   };
 
   // Passenger increment with automatic vehicle upgrade
@@ -769,15 +870,15 @@ export function DispatchBookingEngine({
     // Check if nextPax exceeds capacity of current selected vehicles
     if (nextPax > totalMaxPassengers) {
       // Auto-upgrade:
-      // 1 vehicle Sedan -> SUV (cap 6)
+      // 1 vehicle Any/Sedan -> SUV (cap 6)
       // 1 vehicle SUV -> Van (cap 7)
-      // 1 vehicle Van -> add Sedan (cap 7 + 4 = 11)
-      if (selectedVehicles.length === 1 && selectedVehicles[0] === 'sedan') {
+      // 1 vehicle Van -> add Any (cap 7 + 4 = 11)
+      if (selectedVehicles.length === 1 && (selectedVehicles[0] === 'any' || selectedVehicles[0] === 'sedan')) {
         setSelectedVehicles(['suv']);
       } else if (selectedVehicles.length === 1 && selectedVehicles[0] === 'suv') {
         setSelectedVehicles(['van']);
       } else {
-        setSelectedVehicles([...selectedVehicles, 'sedan']);
+        setSelectedVehicles([...selectedVehicles, 'any']);
       }
     }
     setPassengers(nextPax);
@@ -800,7 +901,7 @@ export function DispatchBookingEngine({
 
   // Vehicle management
   const handleAddVehicle = () => {
-    setSelectedVehicles([...selectedVehicles, 'sedan']);
+    setSelectedVehicles([...selectedVehicles, 'any']);
   };
 
   const handleRemoveVehicle = (index: number) => {
@@ -809,7 +910,7 @@ export function DispatchBookingEngine({
     setSelectedVehicles(updated);
   };
 
-  const handleUpdateVehicleChoice = (index: number, choice: 'sedan' | 'suv' | 'van') => {
+  const handleUpdateVehicleChoice = (index: number, choice: VehicleChoice) => {
     const updated = [...selectedVehicles];
     updated[index] = choice;
     setSelectedVehicles(updated);
@@ -817,7 +918,7 @@ export function DispatchBookingEngine({
 
   // Return vehicles management
   const handleAddReturnVehicle = () => {
-    setReturnVehicles([...returnVehicles, 'sedan']);
+    setReturnVehicles([...returnVehicles, 'any']);
   };
 
   const handleRemoveReturnVehicle = (index: number) => {
@@ -825,7 +926,7 @@ export function DispatchBookingEngine({
     setReturnVehicles(returnVehicles.filter((_, i) => i !== index));
   };
 
-  const handleUpdateReturnVehicle = (index: number, choice: 'sedan' | 'suv' | 'van') => {
+  const handleUpdateReturnVehicle = (index: number, choice: VehicleChoice) => {
     const updated = [...returnVehicles];
     updated[index] = choice;
     setReturnVehicles(updated);
@@ -875,7 +976,7 @@ export function DispatchBookingEngine({
     setRearFacingCount(0);
     setFrontFacingCount(0);
     setBoosterCount(0);
-    setSelectedVehicles(['sedan']);
+    setSelectedVehicles(['any']);
     setPaymentMethod('cash');
     setCardPaymentType('terminal');
     setCardholderName('');
@@ -898,9 +999,12 @@ export function DispatchBookingEngine({
     setReturnRearFacing(0);
     setReturnFrontFacing(0);
     setReturnBooster(0);
-    setReturnVehicles(['sedan']);
+    setReturnVehicles(['any']);
     setRepeat(false);
     setEstimatedFare(0);
+    setReturnEstimatedFare(0);
+    setReturnEstimatedDurationMinutes(0);
+    setReturnEstimatedDistanceMiles(0);
     setManualFare('');
     setIsFareOverridden(false);
     setEstimatedDurationMinutes(0);
@@ -939,17 +1043,19 @@ export function DispatchBookingEngine({
     setIsSubmitting(true);
     const service = getBookingService();
 
-    const primaryVehicle = selectedVehicles[0] || 'sedan';
+    const primaryVehicle = selectedVehicles[0] || 'any';
     let tier: VehicleTier = 'standard';
     if (primaryVehicle === 'suv') tier = 'xl';
     else if (primaryVehicle === 'van') tier = 'wheelchair';
     else if (primaryVehicle === 'sedan') tier = 'premium';
+    else if (primaryVehicle === 'any') tier = 'standard';
 
     let method: PaymentMethod = 'cash';
     if (paymentMethod === 'card') method = 'card';
     if (paymentMethod === 'account') method = 'corporate';
 
-    const finalFare = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : estimatedFare;
+    const totalCalculatedFare = returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare;
+    const finalFare = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : totalCalculatedFare;
 
     const names = passengerName.trim().split(/\s+/);
     const firstName = names[0] || 'Guest';
@@ -1015,6 +1121,7 @@ export function DispatchBookingEngine({
             returnTrip: true,
             returnPickupAddress: returnPickupAddress || dropoffAddress,
             returnDropoffAddress: returnDropoffAddress || pickupAddress,
+            returnIntermediateStops,
             returnDate,
             returnTime,
             returnPassengers,
@@ -1027,6 +1134,9 @@ export function DispatchBookingEngine({
             },
             returnVehicles,
             autoCreateReturnTrip,
+            returnEstimatedFare,
+            returnEstimatedDurationMinutes,
+            returnEstimatedDistanceMiles,
           }
         : undefined,
       repeatDetails: repeat
@@ -1208,25 +1318,32 @@ export function DispatchBookingEngine({
                 luggageCount: returnBags,
                 specialRequests: returnSpecialRequests,
               },
-              vehicleTier: returnVehicles[0] === 'suv' ? 'xl' : returnVehicles[0] === 'van' ? 'wheelchair' : 'premium',
+              vehicleTier:
+                returnVehicles[0] === 'suv'
+                  ? 'xl'
+                  : returnVehicles[0] === 'van'
+                  ? 'wheelchair'
+                  : returnVehicles[0] === 'sedan'
+                  ? 'premium'
+                  : 'standard',
               driverNotes: notesForAll,
               pricing: {
                 baseFare: 5.0,
-                distanceMiles: estimatedDistanceMiles,
-                durationMinutes: estimatedDurationMinutes,
+                distanceMiles: returnEstimatedDistanceMiles || estimatedDistanceMiles,
+                durationMinutes: returnEstimatedDurationMinutes || estimatedDurationMinutes,
                 distanceRate: 2.5,
                 timeRate: 0.5,
                 vehicleMultiplier: 1.0,
                 surgeMultiplier: 1.0,
                 discountAmount: 0,
-                subtotal: finalFare,
-                totalFare: finalFare,
+                subtotal: returnEstimatedFare || estimatedFare,
+                totalFare: returnEstimatedFare || estimatedFare,
                 currency: 'USD',
               },
               payment: {
                 method,
                 status: 'pending',
-                amount: finalFare,
+                amount: returnEstimatedFare || estimatedFare,
               },
               metadata: {
                 ...metadataPayload,
@@ -1265,80 +1382,70 @@ export function DispatchBookingEngine({
           </div>
         )}
 
-        {/* ─── Timing Selector ─── */}
-        <div className="space-y-1.5">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
-            Pickup Time
+        {/* ─── Timing Selector (Reverted clean pill switch design) ─── */}
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700 text-xs">
+            <input
+              type="checkbox"
+              checked={timingType === 'later'}
+              onChange={(e) => setTimingType(e.target.checked ? 'later' : 'asap')}
+              className="sr-only"
+            />
+            <div
+              className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                timingType === 'later' ? 'bg-blue-600' : 'bg-slate-300'
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                  timingType === 'later' ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </div>
+            <span>Later</span>
           </label>
-          <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-200/70 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setTimingType('asap')}
-              className={`py-1.5 text-center rounded font-semibold transition-all ${
-                timingType === 'asap'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900'
-              }`}
-            >
-              ⚡ ASAP (Live)
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimingType('later')}
-              className={`py-1.5 text-center rounded font-semibold transition-all ${
-                timingType === 'later'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900'
-              }`}
-            >
-              📅 Schedule Later
-            </button>
-          </div>
 
-          {timingType === 'later' && (
-            <div className="grid grid-cols-2 gap-2 pt-1 animate-in fade-in duration-150">
-              <div>
-                <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Date</span>
-                <input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  required
-                  className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Time</span>
-                <input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  required
-                  className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+          {timingType === 'later' ? (
+            <div className="flex items-center gap-1.5 flex-1 animate-in fade-in duration-150">
+              <input
+                type="date"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                required
+                className="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              />
+              <input
+                type="time"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                required
+                className="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          ) : (
+            <div className="flex-1 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded text-slate-500 text-xs font-medium">
+              ASAP (Live / Immediate)
             </div>
           )}
         </div>
 
         {/* ─── Routing Section (Outbound) ─── */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">Route</label>
-            <button
-              type="button"
-              onClick={handleSwapRoute}
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1"
-              title="Reverse pickup and dropoff locations"
-            >
-              <span>⇄</span>
-              <span>Swap Route</span>
-            </button>
-          </div>
+          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+            Route
+          </label>
 
-          <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-1.5">
-            <div className="relative">
-              <div className="space-y-1.5">
+          <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
+            <div className="relative flex items-center gap-2">
+              <button
+                type="button"
+                title="Swap Pickup and Dropoff"
+                onClick={handleSwapRoute}
+                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors self-center text-sm font-bold"
+              >
+                ↕
+              </button>
+              <div className="flex-1 space-y-1.5">
                 <DispatchLocationInput
                   placeholder="Pickup Location"
                   value={pickupAddress}
@@ -1746,22 +1853,23 @@ export function DispatchBookingEngine({
                 className="p-1.5 bg-white border border-slate-300 rounded-lg shadow-2xs flex items-center gap-2"
               >
                 <span className="text-[10px] font-bold text-slate-400 w-5">#{idx + 1}</span>
-                <div className="flex-1 grid grid-cols-3 gap-1 p-0.5 bg-slate-100 rounded">
-                  {(['sedan', 'suv', 'van'] as const).map((tierKey) => {
+                <div className="flex-1 grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded">
+                  {(['any', 'sedan', 'suv', 'van'] as const).map((tierKey) => {
                     const isSelected = vChoice === tierKey;
                     const cap = vehicleCapacities[tierKey] || { maxPassengers: 4, maxBags: 3 };
+                    const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
                     return (
                       <button
                         type="button"
                         key={tierKey}
                         onClick={() => handleUpdateVehicleChoice(idx, tierKey)}
-                        className={`py-1 text-center rounded text-[11px] font-bold capitalize transition-all ${
+                        className={`py-1 text-center rounded text-[11px] font-bold transition-all ${
                           isSelected
                             ? 'bg-blue-600 text-white shadow-xs'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                         }`}
                       >
-                        {tierKey} <span className="text-[9px] opacity-80">({cap.maxPassengers}p)</span>
+                        {label} <span className="text-[9px] opacity-80">({cap.maxPassengers}p)</span>
                       </button>
                     );
                   })}
@@ -2039,78 +2147,90 @@ export function DispatchBookingEngine({
 
               {returnTrip && (
                 <div className="mt-1.5 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2.5">
-                  <div className="text-[10px] font-bold text-indigo-900 flex items-center justify-between">
-                    <span>🔁 RETURN LEG SPECIFICATIONS</span>
-                    <button
-                      type="button"
-                      onClick={handleSwapReturnRoute}
-                      className="text-[9px] bg-indigo-200 hover:bg-indigo-300 text-indigo-900 px-1.5 py-0.5 rounded font-bold"
-                    >
-                      ⇄ Swap Return Route
-                    </button>
+                  <div className="text-[10px] font-bold text-indigo-900 tracking-wide uppercase">
+                    🔁 RETURN LEG SPECIFICATIONS
                   </div>
 
-                  {/* Return Route Locations */}
-                  <div className="space-y-1.5 p-2 bg-white border border-indigo-200 rounded">
-                    <div className="text-[10px] font-bold text-indigo-800">Return Route</div>
-                    <DispatchLocationInput
-                      placeholder="Return Pickup Location"
-                      value={returnPickupAddress}
-                      variant="pickup"
-                      onChange={setReturnPickupAddress}
-                      onPlaceSelected={(p) => {
-                        setReturnPickupAddress(p.address);
-                        setReturnPickupCoordinates(p.coordinates);
-                      }}
-                      required
-                    />
-
-                    {returnIntermediateStops.map((stop, idx) => (
-                      <div key={idx} className="flex items-center gap-1">
+                  {/* Return Route Locations - Identical layout to Outbound */}
+                  <div className="p-2 bg-white border border-indigo-200 rounded-lg shadow-sm space-y-2">
+                    <div className="relative flex items-center gap-2">
+                      <button
+                        type="button"
+                        title="Swap Return Pickup and Dropoff"
+                        onClick={handleSwapReturnRoute}
+                        className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors self-center text-sm font-bold"
+                      >
+                        ↕
+                      </button>
+                      <div className="flex-1 space-y-1.5">
                         <DispatchLocationInput
-                          placeholder={`Return Stop #${idx + 1}`}
-                          value={stop.address}
-                          variant="stop"
-                          onChange={(val) => {
-                            const updated = [...returnIntermediateStops];
-                            updated[idx].address = val;
-                            setReturnIntermediateStops(updated);
-                          }}
+                          placeholder="Return Pickup Location"
+                          value={returnPickupAddress}
+                          variant="pickup"
+                          onChange={setReturnPickupAddress}
                           onPlaceSelected={(p) => {
-                            const updated = [...returnIntermediateStops];
-                            updated[idx] = { address: p.address, coordinates: p.coordinates };
-                            setReturnIntermediateStops(updated);
+                            setReturnPickupAddress(p.address);
+                            setReturnPickupCoordinates(p.coordinates);
                           }}
+                          required
                         />
-                        <button
-                          type="button"
-                          onClick={() => setReturnIntermediateStops(returnIntermediateStops.filter((_, i) => i !== idx))}
-                          className="text-slate-400 hover:text-red-500 px-1"
-                        >
-                          ✕
-                        </button>
+
+                        {returnIntermediateStops.map((stop, idx) => (
+                          <div key={idx} className="flex items-center gap-1">
+                            <DispatchLocationInput
+                              placeholder={`Return Stop #${idx + 1}`}
+                              value={stop.address}
+                              variant="stop"
+                              onChange={(val) => {
+                                const updated = [...returnIntermediateStops];
+                                updated[idx].address = val;
+                                setReturnIntermediateStops(updated);
+                              }}
+                              onPlaceSelected={(p) => {
+                                const updated = [...returnIntermediateStops];
+                                updated[idx] = { address: p.address, coordinates: p.coordinates };
+                                setReturnIntermediateStops(updated);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setReturnIntermediateStops(returnIntermediateStops.filter((_, i) => i !== idx))}
+                              className="text-slate-400 hover:text-red-500 px-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+
+                        <DispatchLocationInput
+                          placeholder="Return Dropoff Location"
+                          value={returnDropoffAddress}
+                          variant="dropoff"
+                          onChange={setReturnDropoffAddress}
+                          onPlaceSelected={(p) => {
+                            setReturnDropoffAddress(p.address);
+                            setReturnDropoffCoordinates(p.coordinates);
+                          }}
+                          required
+                        />
                       </div>
-                    ))}
+                    </div>
 
-                    <DispatchLocationInput
-                      placeholder="Return Dropoff Location"
-                      value={returnDropoffAddress}
-                      variant="dropoff"
-                      onChange={setReturnDropoffAddress}
-                      onPlaceSelected={(p) => {
-                        setReturnDropoffAddress(p.address);
-                        setReturnDropoffCoordinates(p.coordinates);
-                      }}
-                      required
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
-                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold"
-                    >
-                      + Add return stop
-                    </button>
+                    {/* Return Route Stats & Add Stop - Identical to Outbound */}
+                    <div className="flex items-center justify-between pt-1 border-t border-indigo-100 text-[11px] text-slate-500 font-medium">
+                      <div>
+                        Estimate:{' '}
+                        <span className="font-bold text-slate-700">{returnEstimatedDurationMinutes} min</span>,{' '}
+                        <span className="font-bold text-slate-700">{returnEstimatedDistanceMiles} mi</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
+                        className="text-indigo-600 hover:text-indigo-800 font-semibold"
+                      >
+                        + Add stop
+                      </button>
+                    </div>
                   </div>
 
                   {/* Return Date & Time */}
@@ -2272,19 +2392,22 @@ export function DispatchBookingEngine({
                     {returnVehicles.map((rv, rIdx) => (
                       <div key={rIdx} className="flex items-center gap-1 text-[11px]">
                         <span className="text-slate-400 font-bold text-[9px]">#{rIdx + 1}</span>
-                        <div className="flex-1 grid grid-cols-3 gap-1 p-0.5 bg-slate-100 rounded">
-                          {(['sedan', 'suv', 'van'] as const).map((tierKey) => (
-                            <button
-                              type="button"
-                              key={tierKey}
-                              onClick={() => handleUpdateReturnVehicle(rIdx, tierKey)}
-                              className={`py-0.5 text-center rounded text-[10px] font-bold capitalize ${
-                                rv === tierKey ? 'bg-indigo-600 text-white' : 'text-slate-600'
-                              }`}
-                            >
-                              {tierKey}
-                            </button>
-                          ))}
+                        <div className="flex-1 grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded">
+                          {(['any', 'sedan', 'suv', 'van'] as const).map((tierKey) => {
+                            const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
+                            return (
+                              <button
+                                type="button"
+                                key={tierKey}
+                                onClick={() => handleUpdateReturnVehicle(rIdx, tierKey)}
+                                className={`py-0.5 text-center rounded text-[10px] font-bold capitalize ${
+                                  rv === tierKey ? 'bg-indigo-600 text-white' : 'text-slate-600'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
                         </div>
                         {returnVehicles.length > 1 && (
                           <button
@@ -2437,41 +2560,64 @@ export function DispatchBookingEngine({
 
       {/* ─── Sticky Action Bar (Pinned Bottom) ─── */}
       <div className="sticky bottom-0 bg-white border-t border-slate-200 px-3 py-2 flex items-center justify-between shrink-0 shadow-sm z-20">
-        <div className="flex items-center gap-1.5">
-          {isFareOverridden ? (
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-blue-600">$</span>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={manualFare}
-                onChange={(e) => setManualFare(e.target.value)}
-                className="w-20 px-2 py-1 bg-white border border-blue-400 rounded font-mono font-bold text-sm text-blue-700"
-              />
-              <button
-                type="button"
-                onClick={() => setIsFareOverridden(false)}
-                className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            {isFareOverridden ? (
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-blue-600">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={manualFare}
+                  onChange={(e) => setManualFare(e.target.value)}
+                  className="w-20 px-2 py-1 bg-white border border-blue-400 rounded font-mono font-bold text-sm text-blue-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsFareOverridden(false)}
+                  className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+                >
+                  Reset
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => {
+                  setIsFareOverridden(true);
+                  const total = returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare;
+                  setManualFare(total ? total.toFixed(2) : '');
+                }}
+                className="cursor-pointer group flex items-baseline gap-1"
+                title="Click to manually override fare"
               >
-                Reset
-              </button>
-            </div>
-          ) : (
-            <div
-              onClick={() => {
-                setIsFareOverridden(true);
-                setManualFare(estimatedFare ? estimatedFare.toFixed(2) : '');
-              }}
-              className="cursor-pointer group flex items-baseline gap-1"
-              title="Click to manually override fare"
-            >
-              <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors">
-                ${estimatedFare ? estimatedFare.toFixed(2) : '0.00'}
-              </span>
-              <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-semibold">
-                (Est. ✎)
-              </span>
+                <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                  ${(returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare).toFixed(2)}
+                </span>
+                {repeat && (
+                  <span className="text-xs font-bold text-indigo-600">
+                    {repeatFrequency === 'daily'
+                      ? '/ day'
+                      : repeatFrequency === 'weekdays'
+                      ? '/ weekday'
+                      : repeatFrequency === 'weekly'
+                      ? repeatDays.length > 1
+                        ? `/ trip (${repeatDays.length}x/wk)`
+                        : '/ week'
+                      : '/ trip'}
+                  </span>
+                )}
+                <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-semibold">
+                  (Est. ✎)
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Subtitle breakdown for return trip */}
+          {returnTrip && (
+            <div className="text-[10px] text-slate-500 font-medium">
+              Round Trip: ${estimatedFare.toFixed(2)} out + ${returnEstimatedFare.toFixed(2)} ret
             </div>
           )}
         </div>
