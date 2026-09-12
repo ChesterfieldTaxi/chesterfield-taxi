@@ -8,6 +8,7 @@ import {
   AdminGeneralTab,
   AdminPricingTab,
   AdminFleetTab,
+  AdminStaffTab,
   AdminBookingsTab,
 } from '../components/domain/admin';
 import {
@@ -26,7 +27,7 @@ export function meta() {
   ];
 }
 
-type TabKey = 'general' | 'pricing' | 'fleet' | 'bookings';
+type TabKey = 'general' | 'pricing' | 'fleet' | 'staff' | 'bookings';
 
 interface TabItem {
   key: TabKey;
@@ -50,6 +51,11 @@ const TABS: TabItem[] = [
     key: 'fleet',
     label: 'Fleet Management',
     description: 'Vehicle categories, capacities, and tier multipliers',
+  },
+  {
+    key: 'staff',
+    label: 'Staff',
+    description: 'Manage admin and dispatcher roles',
   },
   {
     key: 'bookings',
@@ -309,6 +315,8 @@ export default function AdminLayout() {
               isLoading={isSavingConfig}
             />
           )}
+
+          {activeTab === 'staff' && <AdminStaffTab />}
 
           {activeTab === 'bookings' && <AdminBookingsTab />}
         </div>
