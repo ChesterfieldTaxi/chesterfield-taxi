@@ -244,7 +244,7 @@ export default function AdminLayout() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Dynamic Tab Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {TABS.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
@@ -252,7 +252,7 @@ export default function AdminLayout() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`flex items-center justify-center sm:justify-between px-4 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -261,7 +261,7 @@ export default function AdminLayout() {
                   <span className="truncate">{tab.label}</span>
                   {tab.badge && (
                     <span
-                      className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-md uppercase tracking-wider hidden sm:inline-block ${
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
                         isActive
                           ? 'bg-amber-500 text-slate-950 font-extrabold'
                           : 'bg-slate-100 text-slate-500'
