@@ -84,4 +84,12 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   ],
 };
 
+/**
+ * Public client-side Google Maps API key fallback.
+ * Strictly used for browser Places Autocomplete and Maps rendering.
+ * Domain/referrer security is enforced via Google Cloud Console HTTP restrictions.
+ */
+export const DEFAULT_GOOGLE_MAPS_KEY = 'AIzaSyCFgx7WQAm0TQXPveb9fThEuxyxRdvxgr4';
+
 export default COMPANY_CONFIG;
+

@@ -45,3 +45,65 @@
 .btn-brand-primary:active {
   filter: brightness(0.9);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Google Maps Places Autocomplete Dropdown Styling                          */
+/* -------------------------------------------------------------------------- */
+.pac-container {
+  background-color: #ffffff !important;
+  font-family: inherit !important;
+  z-index: 99999 !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+  margin-top: 6px !important;
+  padding: 4px 0 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+.pac-container::after {
+  /* Google logo footer polish */
+  background-size: 100px !important;
+  height: 18px !important;
+  margin-right: 8px !important;
+}
+
+.pac-item {
+  padding: 9px 14px !important;
+  cursor: pointer !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  color: #334155 !important;
+  border-top: 1px solid #f1f5f9 !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.pac-item:first-child {
+  border-top: none !important;
+}
+
+.pac-item:hover,
+.pac-item-selected {
+  background-color: #fef3c7 !important; /* amber-100 */
+}
+
+.pac-item-query {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important; /* slate-900 */
+  padding-right: 4px !important;
+}
+
+.pac-matched {
+  font-weight: 700 !important;
+  color: var(--color-primary, #f59e0b) !important;
+}
+
+.pac-icon {
+  margin-right: 10px !important;
+  margin-top: 0 !important;
+}
+

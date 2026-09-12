@@ -14,14 +14,21 @@
  */
 
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
+import { DEFAULT_GOOGLE_MAPS_KEY } from '../../../config/companyConfig';
 
 declare global {
   interface Window {
     google?: typeof google;
+    ENV?: {
+      VITE_GOOGLE_MAPS_API_KEY?: string;
+      [key: string]: string | undefined;
+    };
+    gm_authFailure?: () => void;
   }
 }
 
 export type GoogleMapsStatus = 'unconfigured' | 'loading' | 'ready' | 'error';
+
 
 export interface RegionalLatLng {
   lat: number;
@@ -60,26 +67,47 @@ export const ST_LOUIS_METRO_BOUNDS: RegionalBounds = {
 };
 
 /**
- * Extracts the Google Maps API key from Vite environment or node process.
+ * Extracts the Google Maps API key from window.ENV, Vite environment, node process,
+ * or the default verified client key fallback.
  */
 export function getGoogleMapsApiKey(): string {
+  // 1. Check window.ENV (injected by root SSR loader from production host environment)
+  try {
+    if (typeof window !== 'undefined' && window.ENV?.VITE_GOOGLE_MAPS_API_KEY) {
+      const key = String(window.ENV.VITE_GOOGLE_MAPS_API_KEY).trim();
+      if (key) return key;
+    }
+  } catch {
+    // Ignore window errors
+  }
+
+  // 2. Check Vite build-time environment variable
   try {
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
-      return String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY).trim();
+      const key = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY).trim();
+      if (key) return key;
     }
   } catch {
     // Ignore in non-Vite environments
   }
 
+  // 3. Check process.env (Node / SSR server environment)
   try {
     if (typeof process !== 'undefined' && process.env) {
-      return String(process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '').trim();
+      const key = String(
+        process.env.VITE_GOOGLE_MAPS_API_KEY ||
+        process.env.GOOGLE_MAPS_API_KEY ||
+        process.env.GOOGLE_MAPS_SERVER_API_KEY ||
+        ''
+      ).trim();
+      if (key) return key;
     }
   } catch {
     // Ignore in non-Node environments
   }
 
-  return '';
+  // 4. Default verified client key fallback
+  return DEFAULT_GOOGLE_MAPS_KEY || '';
 }
 
 // Module-level singleton state
@@ -175,11 +203,22 @@ export async function loadGoogleMaps(): Promise<typeof google | null> {
   lastErrorMessage = null;
   notifyListeners();
 
+  // Register global Google Maps auth failure handler to gracefully fallback if key/domain rejected
+  if (typeof window !== 'undefined' && !window.gm_authFailure) {
+    window.gm_authFailure = () => {
+      console.warn('[GoogleMapsLoader] Google Maps API authentication failed (gm_authFailure). Running in local fallback mode.');
+      currentStatus = 'error';
+      lastErrorMessage = 'Google Maps API authentication failed (check API key or referer restrictions in Google Cloud Console).';
+      notifyListeners();
+    };
+  }
+
   try {
     setOptions({
       key: apiKey,
       v: 'weekly',
       region: 'US',
+      libraries: ['places', 'routes', 'geometry'],
     });
   } catch (err) {
     console.warn('[GoogleMapsLoader] Error configuring options:', err);

@@ -702,7 +702,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                         onPlaceSelected={(details) => {
                           setForm((prev) => ({
                             ...prev,
-                            pickupAddress: details.formattedAddress || '',
+                            pickupAddress: details.formattedAddress || details.address || '',
                             pickupPlaceId: details.placeId,
                             pickupCoordinates: details.coordinates,
                           }));
@@ -813,7 +813,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                         onPlaceSelected={(details) => {
                           setForm((prev) => ({
                             ...prev,
-                            dropoffAddress: details.formattedAddress || '',
+                            dropoffAddress: details.formattedAddress || details.address || '',
                             dropoffPlaceId: details.placeId,
                             dropoffCoordinates: details.coordinates,
                           }));

@@ -69,6 +69,14 @@ export function LocationAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
+
+  // Stable callback references to prevent re-instantiating Autocomplete on every keystroke
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
+  onPlaceSelectedRef.current = onPlaceSelected;
 
   const generatedId = useId();
   const inputId = `${generatedId}-input`;
@@ -103,6 +111,11 @@ export function LocationAutocomplete({
       return;
     }
 
+    // Guard against duplicate instantiation on the same input element
+    if (autocompleteRef.current) {
+      return;
+    }
+
     try {
       if (typeof window.google?.maps?.places?.Autocomplete !== 'function') {
         return;
@@ -127,7 +140,7 @@ export function LocationAutocomplete({
 
         if (selectedAddress) {
           setInputValue(selectedAddress);
-          onChange?.(selectedAddress);
+          onChangeRef.current?.(selectedAddress);
           setIsOpen(false);
 
           let coordinates: GeoPoint | undefined;
@@ -147,9 +160,9 @@ export function LocationAutocomplete({
             coordinates,
           });
 
-          onPlaceSelected?.({
+          onPlaceSelectedRef.current?.({
             address: selectedAddress,
-            formattedAddress: place.formatted_address,
+            formattedAddress: place.formatted_address || selectedAddress,
             placeId: place.place_id,
             coordinates,
           });
@@ -157,16 +170,22 @@ export function LocationAutocomplete({
       });
 
       autocompleteRef.current = autocomplete;
-
-      return () => {
-        if (listener) {
-          google.maps.event.removeListener(listener);
-        }
-      };
+      listenerRef.current = listener;
     } catch (err) {
       console.warn('[LocationAutocomplete] Error initializing Google Places Autocomplete:', err);
     }
-  }, [mapsStatus, disabled, onChange, onPlaceSelected]);
+
+    return () => {
+      if (listenerRef.current) {
+        google.maps.event.removeListener(listenerRef.current);
+        listenerRef.current = null;
+      }
+      if (autocompleteRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, [mapsStatus, disabled]);
 
   // Handle clicking outside for the fallback dropdown
   useEffect(() => {
@@ -182,17 +201,28 @@ export function LocationAutocomplete({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInputValue(val);
-    onChange?.(val);
+    onChangeRef.current?.(val);
     // Only open local fallback dropdown if Google Maps is NOT active
     if (mapsStatus !== 'ready') {
       setIsOpen(true);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // If user presses enter while selecting an autocomplete suggestion, prevent form submission
+    if (e.key === 'Enter') {
+      const pacContainer = document.querySelector('.pac-container') as HTMLElement | null;
+      const isPacVisible = pacContainer && window.getComputedStyle(pacContainer).display !== 'none';
+      if (isPacVisible) {
+        e.preventDefault();
+      }
+    }
+  };
+
   const handleSelectLocation = (loc: string) => {
     setInputValue(loc);
-    onChange?.(loc);
-    onPlaceSelected?.({
+    onChangeRef.current?.(loc);
+    onPlaceSelectedRef.current?.({
       address: loc,
       formattedAddress: loc,
     });
@@ -247,6 +277,7 @@ export function LocationAutocomplete({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           onFocus={() => {
             // Only trigger local list when Google Maps Autocomplete is NOT attached
             if (!isGoogleLive) {
