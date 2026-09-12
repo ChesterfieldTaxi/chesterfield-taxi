@@ -188,8 +188,23 @@ export default function AdminLayout() {
 
           {/* User actions and public site link */}
           <div className="flex items-center gap-3 sm:gap-4">
+            {/* View Switcher: Dashboard (Active) vs Dispatch */}
+            <div className="flex items-center p-1 rounded-xl bg-slate-800 border border-slate-700">
+              <span className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm">
+                <span>📊</span>
+                <span>Dashboard</span>
+              </span>
+              <Link
+                to="/dispatch"
+                className="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+              >
+                <span>🚕</span>
+                <span>Dispatch</span>
+              </Link>
+            </div>
+
             {/* Sync Mode Pill */}
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
               <span
                 className={`w-2 h-2 rounded-full ${
                   isLiveFirebase ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
@@ -214,14 +229,6 @@ export default function AdminLayout() {
               className="text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
             >
               Form Layout ⚙
-            </Link>
-
-            {/* Launch Dispatch Console */}
-            <Link
-              to="/dispatch"
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-emerald-500/30 transition-colors flex items-center gap-1.5"
-            >
-              Launch Dispatch 🚀
             </Link>
 
             {/* Link to public portal */}
