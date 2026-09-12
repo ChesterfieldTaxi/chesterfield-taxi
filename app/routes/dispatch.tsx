@@ -8,7 +8,7 @@ import type { AppSettings } from '../core/types/config';
 import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
-import { loadGoogleMaps, isGoogleMapsReady, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
+import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
 import { SpinnerIcon } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 
@@ -59,46 +59,57 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     id: 'drv-104',
     name: 'Driver 104 (Sarah K.)',
     status: 'on_trip',
-    vehicle: 'Ford Explorer (#305)',
+    vehicle: 'Chevy Suburban (#301)',
     tier: 'SUV',
     phone: '(314) 555-0104',
-    zone: 'Lambert Airport En Route',
-    currentTripId: 'trip-1094',
+    zone: 'Lambert Airport (STL)',
+    currentTripId: 'tr-8831',
   },
   {
     id: 'drv-108',
     name: 'Driver 108 (David R.)',
     status: 'available',
-    vehicle: 'Dodge Grand Caravan (#402)',
-    tier: 'Van / Wheelchair',
+    vehicle: 'Ford Transit (#102)',
+    tier: 'Van',
     phone: '(314) 555-0108',
-    zone: 'Wildwood / Town & Country',
+    zone: 'Town and Country',
   },
   {
     id: 'drv-112',
     name: 'Driver 112 (James W.)',
-    status: 'offline',
-    vehicle: 'Lincoln Continental (#101)',
-    tier: 'Executive Sedan',
+    status: 'available',
+    vehicle: 'Lincoln Continental (#208)',
+    tier: 'Sedan',
     phone: '(314) 555-0112',
+    zone: 'Ballwin / Manchester',
+  },
+  {
+    id: 'drv-115',
+    name: 'Driver 115 (Alex M.)',
+    status: 'offline',
+    vehicle: 'Toyota Sienna (#105)',
+    tier: 'Van',
+    phone: '(314) 555-0115',
     zone: 'Off Duty',
   },
 ];
 
-export default function DispatchLayout() {
+export default function DispatchRoute() {
   const navigate = useNavigate();
 
-  // Auth & Config
+  // Auth & Settings state
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [settings, setSettings] = useState<AppSettings>(() => getAdminConfigService().getCachedSettings());
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  // Trips state
+  // Trips real-time state
   const [trips, setTrips] = useState<Trip[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
+  const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
+  const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
 
   // Draft Tabs state
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
@@ -108,7 +119,7 @@ export default function DispatchLayout() {
   const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
   const [nextDraftIdx, setNextDraftIdx] = useState(2);
 
-  // Operational Slide-Overs & Softphone Modals
+  // Operational Right Dock Tools (Multi-tasking, non-blocking)
   const [isDriversOpen, setIsDriversOpen] = useState(false);
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
   const [isPhoneOpen, setIsPhoneOpen] = useState(false);
@@ -144,8 +155,8 @@ export default function DispatchLayout() {
   const [callDuration, setCallDuration] = useState(0);
 
   // Resizable layout dimensions
-  const [sidebarWidth, setSidebarWidth] = useState(420); // 340px - 600px
-  const [queueHeight, setQueueHeight] = useState(250); // 180px - 50%
+  const [sidebarWidth, setSidebarWidth] = useState(430); // 340px - 620px
+  const [queueHeight, setQueueHeight] = useState(240); // 160px - 50%
 
   // Auth Guard
   useEffect(() => {
@@ -181,6 +192,12 @@ export default function DispatchLayout() {
     }
   }, []);
 
+  // When active draft tab changes, clear selected map trip so route defaults to active draft
+  useEffect(() => {
+    setSelectedMapTrip(null);
+    setShouldZoomMap(false);
+  }, [activeDraftId]);
+
   // Softphone call timer
   useEffect(() => {
     let interval: any;
@@ -194,8 +211,17 @@ export default function DispatchLayout() {
     return () => clearInterval(interval);
   }, [activeCallStatus]);
 
-  const handleSignOut = async () => {
-    await getAdminAuthService().signOut();
+  // Immediate Sign Out without awaiting async promises
+  const handleSignOut = () => {
+    setIsProfileMenuOpen(false);
+    try {
+      getAdminAuthService().signOut().catch(() => {});
+    } catch {}
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch {}
+    }
     navigate('/admin/login', { replace: true });
   };
 
@@ -218,59 +244,50 @@ export default function DispatchLayout() {
   const closeDraft = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (drafts.length === 1) {
-      setDrafts([{ id: `new-${nextDraftIdx}`, isNew: true }]);
-      setActiveDraftId(`new-${nextDraftIdx}`);
+      const resetDraft: DraftTab = { id: `new-${nextDraftIdx}`, isNew: true };
+      setDrafts([resetDraft]);
+      setActiveDraftId(resetDraft.id);
       setNextDraftIdx((n) => n + 1);
       return;
     }
 
     const filtered = drafts.filter((d) => d.id !== id);
     setDrafts(filtered);
-
     if (activeDraftId === id) {
-      const remainingIndex = Math.max(0, drafts.findIndex((d) => d.id === id) - 1);
-      setActiveDraftId(filtered[remainingIndex].id);
+      setActiveDraftId(filtered[filtered.length - 1].id);
     }
   };
 
-  // Open or switch to trip edit tab from queue
+  // Double-click to open edit tab for a trip
   const handleOpenEditTrip = (trip: Trip) => {
-    const editDraftId = `edit-${trip.id}`;
-    const existing = drafts.find((d) => d.id === editDraftId);
-    if (existing) {
-      setActiveDraftId(editDraftId);
-    } else {
-      if (drafts.length >= maxDrafts) {
-        alert(`Maximum of ${maxDrafts} tabs open. Close one first.`);
-        return;
-      }
-      const newDraft: DraftTab = {
-        id: editDraftId,
-        isNew: false,
-        trip,
-      };
-      setDrafts([...drafts, newDraft]);
-      setActiveDraftId(editDraftId);
+    const existingEdit = drafts.find((d) => !d.isNew && d.trip?.id === trip.id);
+    if (existingEdit) {
+      setActiveDraftId(existingEdit.id);
+      return;
     }
-    setSelectedQueueTripId(trip.id);
+
+    if (drafts.length >= maxDrafts) {
+      alert(`Maximum of ${maxDrafts} tabs open. Please close a tab before editing.`);
+      return;
+    }
+
+    const editDraft: DraftTab = {
+      id: `edit-${trip.id}`,
+      isNew: false,
+      trip,
+    };
+    setDrafts([...drafts, editDraft]);
+    setActiveDraftId(editDraft.id);
   };
 
-  // Assign driver from Drivers Slide-Over directly into current draft
+  // Assign driver to current active draft
   const handleAssignDriverToDraft = (driver: DriverRosterItem) => {
-    setDrafts((prev) =>
+    setDrivers((prev) =>
       prev.map((d) => {
-        if (d.id === activeDraftId) {
-          return {
-            ...d,
-            formValues: d.formValues
-              ? { ...d.formValues, driverId: driver.id }
-              : undefined,
-          };
-        }
+        if (d.id === driver.id) return { ...d, status: 'on_trip' };
         return d;
       })
     );
-    setIsDriversOpen(false);
   };
 
   // Send dispatch message
@@ -408,6 +425,7 @@ export default function DispatchLayout() {
 
   // Active Draft object for map route display
   const activeDraft = drafts.find((d) => d.id === activeDraftId);
+  const activeOperationalCount = (isDriversOpen ? 1 : 0) + (isMessagesOpen ? 1 : 0) + (isPhoneOpen ? 1 : 0);
 
   if (isAuthChecking) {
     return (
@@ -448,47 +466,55 @@ export default function DispatchLayout() {
 
           <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
-          {/* Drivers Slide-Over Trigger */}
+          {/* Drivers Dock Trigger (Toggles non-blocking side panel) */}
           <button
             type="button"
-            onClick={() => setIsDriversOpen(true)}
+            onClick={() => setIsDriversOpen(!isDriversOpen)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
               isDriversOpen
-                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             <span>🚗</span>
             <span>Drivers</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isDriversOpen ? 'bg-white' : 'bg-emerald-500 animate-pulse'
+              }`}
+            />
           </button>
 
-          {/* Messages Slide-Over Trigger */}
+          {/* Messages Dock Trigger (Toggles non-blocking side panel) */}
           <button
             type="button"
-            onClick={() => setIsMessagesOpen(true)}
+            onClick={() => setIsMessagesOpen(!isMessagesOpen)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
               isMessagesOpen
-                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             <span>💬</span>
             <span>Messages</span>
             {messages.length > 0 && (
-              <span className="text-[10px] bg-slate-200 text-slate-700 font-bold px-1.5 py-0.2 rounded-full">
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  isMessagesOpen ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
                 {messages.length}
               </span>
             )}
           </button>
 
-          {/* Phone Softphone Modal Trigger */}
+          {/* Phone Softphone Dock Trigger (Toggles non-blocking side panel) */}
           <button
             type="button"
-            onClick={() => setIsPhoneOpen(true)}
+            onClick={() => setIsPhoneOpen(!isPhoneOpen)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
               isPhoneOpen
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
@@ -550,7 +576,7 @@ export default function DispatchLayout() {
       </header>
 
       {/* ─────────────────────────────────────────────────────────────
-          2. WORKSPACE: LEFT PERSISTENT SIDEBAR + RIGHT STAGE & QUEUE
+          2. WORKSPACE: LEFT PERSISTENT SIDEBAR + CENTER MAP & QUEUE + RIGHT DOCKED PANEL
       ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* ─── A. LEFT SIDEBAR: TABBED DRAFT / EDIT ENGINE ─── */}
@@ -591,33 +617,16 @@ export default function DispatchLayout() {
               <button
                 type="button"
                 onClick={createDraft}
-                className="w-7 h-7 rounded hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm"
-                title="Create New Booking Draft"
+                className="h-7 px-2 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 font-bold text-sm flex items-center justify-center transition-colors shrink-0"
+                title="Open new draft booking tab"
               >
                 +
               </button>
             )}
-
-            {/* Tab Overflow Menu */}
-            {drafts.length > 4 && (
-              <div className="ml-auto flex items-center pr-1">
-                <select
-                  value={activeDraftId}
-                  onChange={(e) => setActiveDraftId(e.target.value)}
-                  className="text-[10px] bg-transparent border-none text-slate-500 font-bold focus:ring-0 cursor-pointer"
-                >
-                  {drafts.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {getTabLabel(d)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
 
-          {/* Booking Engine Instance for Active Tab */}
-          <div className="flex-1 overflow-hidden">
+          {/* Persistent Draft / Edit Form Container */}
+          <div className="flex-1 overflow-hidden relative">
             {drafts.map((d) => (
               <div
                 key={d.id}
@@ -633,10 +642,6 @@ export default function DispatchLayout() {
                   }}
                   onBookingSuccess={(savedTrip, isEdit) => {
                     if (isEdit) {
-                      setDrafts((prev) =>
-                        prev.map((item) => (item.id === d.id ? { ...item, trip: savedTrip } : item))
-                      );
-                    } else {
                       closeDraft(d.id, { stopPropagation: () => {} } as any);
                     }
                   }}
@@ -657,13 +662,15 @@ export default function DispatchLayout() {
           className="w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 transition-colors z-20 shrink-0"
         />
 
-        {/* ─── B. RIGHT COLUMN: MAP VIEW STAGE + BOTTOM DOCKED QUEUE ─── */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* ─── B. CENTER COLUMN: MAP VIEW STAGE + BOTTOM DOCKED QUEUE ─── */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
           {/* Live Google Map Stage */}
           <div className="flex-1 w-full h-full relative z-0">
             <LiveDispatchMap
               activeFormValues={activeDraft?.formValues}
               activeTrip={activeDraft?.trip}
+              selectedTrip={selectedMapTrip}
+              shouldZoom={shouldZoomMap}
             />
           </div>
 
@@ -745,11 +752,23 @@ export default function DispatchLayout() {
                     return (
                       <tr
                         key={trip.id}
-                        onDoubleClick={() => handleOpenEditTrip(trip)}
-                        onClick={() => setSelectedQueueTripId(trip.id)}
+                        onClick={() => {
+                          // Single click: show route without zooming in
+                          setSelectedQueueTripId(trip.id);
+                          setSelectedMapTrip(trip);
+                          setShouldZoomMap(false);
+                        }}
+                        onDoubleClick={() => {
+                          // Double click: open edit tab and zoom in on map route
+                          setSelectedQueueTripId(trip.id);
+                          setSelectedMapTrip(trip);
+                          setShouldZoomMap(true);
+                          handleOpenEditTrip(trip);
+                        }}
                         className={`cursor-pointer hover:bg-blue-50/70 transition-colors ${
-                          isSelected ? 'bg-blue-50' : ''
+                          isSelected ? 'bg-blue-50 font-medium' : ''
                         }`}
+                        title="Click to view route on map. Double-click to edit trip & zoom in."
                       >
                         <td className="py-1.5 px-3 font-mono text-[11px] font-semibold text-slate-600">
                           #{trip.id.slice(-6)}
@@ -783,6 +802,9 @@ export default function DispatchLayout() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
                               handleOpenEditTrip(trip);
                             }}
                             className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-600 hover:text-white border border-slate-300 text-[11px] font-bold text-slate-700 transition-colors"
@@ -805,384 +827,379 @@ export default function DispatchLayout() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          3. INTERACTIVE OPERATIONAL SLIDE-OVERS & MODALS
-      ───────────────────────────────────────────────────────────── */}
-
-      {/* ─── MODAL 1: DRIVERS SLIDE-OVER DRAWER ─── */}
-      {isDriversOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-slate-900/40 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="h-14 px-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (MULTI-TASKING STACK) ─── */}
+        {activeOperationalCount > 0 && (
+          <aside className="w-[390px] bg-slate-100 border-l border-slate-200 flex flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg">
+            {/* Master Header */}
+            <div className="h-9 px-3 bg-slate-900 text-white flex items-center justify-between shrink-0 text-xs">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🚗</span>
-                <div>
-                  <h3 className="font-bold text-sm">Fleet Drivers &amp; Live Status</h3>
-                  <div className="text-[11px] text-slate-400">
-                    {drivers.filter((d) => d.status === 'available').length} Available • {drivers.length} Total
-                  </div>
-                </div>
+                <span className="font-bold tracking-tight">Tactical Operations</span>
+                <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 font-bold text-[10px]">
+                  {activeOperationalCount} Active
+                </span>
               </div>
               <button
                 type="button"
-                onClick={() => setIsDriversOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white"
+                onClick={() => {
+                  setIsDriversOpen(false);
+                  setIsMessagesOpen(false);
+                  setIsPhoneOpen(false);
+                }}
+                className="text-[11px] text-slate-400 hover:text-white transition-colors"
+                title="Close all operational panels"
               >
-                ✕
+                ✕ Close All
               </button>
             </div>
 
-            {/* Driver Filter Tabs */}
-            <div className="p-3 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-xs">
-              {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => (
-                <button
-                  key={filterKey}
-                  type="button"
-                  onClick={() => setDriverFilter(filterKey)}
-                  className={`flex-1 py-1 text-center rounded font-semibold capitalize transition-all ${
-                    driverFilter === filterKey ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600'
-                  }`}
-                >
-                  {filterKey.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
-
-            {/* Drivers List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-              {drivers
-                .filter((d) => (driverFilter === 'all' ? true : d.status === driverFilter))
-                .map((driver) => {
-                  let badge = <Badge variant="success">Available</Badge>;
-                  if (driver.status === 'on_trip') badge = <Badge variant="info">On Trip</Badge>;
-                  if (driver.status === 'offline') badge = <Badge variant="neutral">Offline</Badge>;
-
-                  return (
-                    <div
-                      key={driver.id}
-                      className="p-3 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-slate-900 text-xs">{driver.name}</div>
-                          <div className="text-[11px] text-slate-500">{driver.vehicle} ({driver.tier})</div>
-                        </div>
-                        {badge}
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-100">
-                        <div>📍 {driver.zone}</div>
-                        <a
-                          href={`tel:${driver.phone}`}
-                          className="font-mono text-blue-600 hover:underline font-bold"
-                        >
-                          📞 {driver.phone}
-                        </a>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => handleAssignDriverToDraft(driver)}
-                          className="flex-1 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded border border-blue-200 transition-colors"
-                        >
-                          Assign to Active Draft
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDrivers((prev) =>
-                              prev.map((d) =>
-                                d.id === driver.id
-                                  ? {
-                                      ...d,
-                                      status:
-                                        d.status === 'available'
-                                          ? 'offline'
-                                          : d.status === 'offline'
-                                          ? 'available'
-                                          : 'available',
-                                    }
-                                  : d
-                              )
-                            );
-                          }}
-                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded border border-slate-300"
-                        >
-                          Toggle Status
-                        </button>
-                      </div>
+            {/* Stacked Panels (Scrollable or Vertically Shared) */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-300 flex flex-col">
+              {/* 1. DRIVERS ROSTER CARD */}
+              {isDriversOpen && (
+                <div className="flex flex-col bg-white shrink-0 min-h-[300px] max-h-[460px] overflow-hidden">
+                  <div className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <span>🚗 Drivers Roster</span>
+                      <span className="text-[10px] text-emerald-400">
+                        ({drivers.filter((d) => d.status === 'available').length} Avail)
+                      </span>
                     </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL 2: MESSAGES SLIDE-OVER DRAWER ─── */}
-      {isMessagesOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-slate-900/40 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200">
-            {/* Header */}
-            <div className="h-14 px-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">💬</span>
-                <div>
-                  <h3 className="font-bold text-sm">Dispatch Messaging &amp; Broadcast</h3>
-                  <div className="text-[11px] text-slate-400">Driver SMS &amp; Mobile Notifications</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMessagesOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Quick Preset Message Buttons */}
-            <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-1.5">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                Tactical Presets (Click to insert)
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  'Airport surge: high passenger volume at Lambert T1/T2.',
-                  'Traffic advisory: I-64 westbound heavy congestion near Clarkson.',
-                  'Check in with dispatch if available for scheduled pickup.',
-                  'Weather alert: rain/slick roads, please increase following distance.',
-                ].map((preset, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setMsgText(preset)}
-                    className="text-[11px] px-2 py-1 bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded text-slate-700 text-left transition-colors"
-                  >
-                    {preset.slice(0, 36)}...
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Compose Alert Form */}
-            <form onSubmit={handleSendMessage} className="p-3 bg-white border-b border-slate-200 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Send To</label>
-                  <select
-                    value={msgRecipient}
-                    onChange={(e) => setMsgRecipient(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"
-                  >
-                    <option value="All Drivers">📢 All Drivers (Broadcast)</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.name}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Priority</label>
-                  <select
-                    value={msgPriority}
-                    onChange={(e) => setMsgPriority(e.target.value as any)}
-                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="urgent">🚨 Urgent / High</option>
-                  </select>
-                </div>
-              </div>
-
-              <textarea
-                rows={2}
-                placeholder="Type dispatch message or driver instructions..."
-                value={msgText}
-                onChange={(e) => setMsgText(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded text-xs text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
-              />
-
-              <button
-                type="submit"
-                className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded shadow-xs transition-colors flex items-center justify-center gap-1.5"
-              >
-                <span>🚀</span>
-                <span>Send Dispatch Alert</span>
-              </button>
-            </form>
-
-            {/* Sent Messages History */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Recent Messages</div>
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`p-2.5 rounded-lg border text-xs space-y-1 ${
-                    m.priority === 'urgent'
-                      ? 'bg-red-50/70 border-red-200 text-red-900'
-                      : 'bg-slate-50 border-slate-200 text-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between font-bold text-[11px]">
-                    <span>To: {m.to}</span>
-                    <span className="text-slate-400 font-normal">{m.timestamp}</span>
-                  </div>
-                  <div className="text-slate-700">{m.text}</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                    <span>✓</span> Delivered to dispatch network
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── MODAL 3: TACTICAL SOFTPHONE KEYPAD MODAL ─── */}
-      {isPhoneOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-800 p-4 space-y-3 animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="text-lg text-emerald-400">📞</span>
-                <div>
-                  <h3 className="font-bold text-sm text-white">Tactical Softphone</h3>
-                  <div className="text-[10px] text-slate-400">Chesterfield Taxi Lines</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPhoneOpen(false)}
-                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Display / Dialed Number */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center">
-              {activeCallStatus !== 'idle' ? (
-                <div className="space-y-1">
-                  <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider animate-pulse">
-                    {activeCallStatus === 'calling' ? 'Calling...' : `Connected (${callDuration}s)`}
-                  </div>
-                  <div className="text-lg font-mono font-extrabold text-white">{dialedNumber}</div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <input
-                    type="text"
-                    readOnly
-                    placeholder="Dial number or select preset..."
-                    value={dialedNumber}
-                    className="w-full bg-transparent text-center font-mono font-bold text-base text-white focus:outline-none placeholder-slate-600"
-                  />
-                  {dialedNumber && (
                     <button
                       type="button"
-                      onClick={() => setDialedNumber((prev) => prev.slice(0, -1))}
-                      className="p-1 text-slate-400 hover:text-white"
-                      title="Backspace"
+                      onClick={() => setIsDriversOpen(false)}
+                      className="text-slate-400 hover:text-white text-xs px-1"
                     >
-                      ⌫
+                      ✕
                     </button>
-                  )}
+                  </div>
+
+                  {/* Filter tabs */}
+                  <div className="p-1.5 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-[11px]">
+                    {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => (
+                      <button
+                        key={filterKey}
+                        type="button"
+                        onClick={() => setDriverFilter(filterKey)}
+                        className={`flex-1 py-0.5 text-center rounded font-semibold capitalize transition-all ${
+                          driverFilter === filterKey ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600'
+                        }`}
+                      >
+                        {filterKey.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Drivers List */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+                    {drivers
+                      .filter((d) => (driverFilter === 'all' ? true : d.status === driverFilter))
+                      .map((driver) => {
+                        let badge = <Badge variant="success">Available</Badge>;
+                        if (driver.status === 'on_trip') badge = <Badge variant="info">On Trip</Badge>;
+                        if (driver.status === 'offline') badge = <Badge variant="neutral">Offline</Badge>;
+
+                        return (
+                          <div
+                            key={driver.id}
+                            className="p-2 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-1.5 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-slate-900 text-xs">{driver.name}</span>
+                                <span className="text-[10px] text-slate-500 ml-1.5">
+                                  {driver.vehicle} ({driver.tier})
+                                </span>
+                              </div>
+                              {badge}
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1 border-t border-slate-100">
+                              <div>📍 {driver.zone}</div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsPhoneOpen(true);
+                                  handleStartCall(driver.phone);
+                                }}
+                                className="font-mono text-blue-600 hover:underline font-bold"
+                              >
+                                📞 {driver.phone}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAssignDriverToDraft(driver)}
+                                className="flex-1 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] rounded border border-blue-200 transition-colors"
+                              >
+                                Assign to Active Draft
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDrivers((prev) =>
+                                    prev.map((d) =>
+                                      d.id === driver.id
+                                        ? {
+                                            ...d,
+                                            status:
+                                              d.status === 'available'
+                                                ? 'offline'
+                                                : d.status === 'offline'
+                                                ? 'available'
+                                                : 'available',
+                                          }
+                                        : d
+                                    )
+                                  );
+                                }}
+                                className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[10px] rounded border border-slate-300"
+                              >
+                                Toggle
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. MESSAGES CARD */}
+              {isMessagesOpen && (
+                <div className="flex flex-col bg-white shrink-0 min-h-[320px] max-h-[460px] overflow-hidden">
+                  <div className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <span>💬 Driver Messaging &amp; SMS</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMessagesOpen(false)}
+                      className="text-slate-400 hover:text-white text-xs px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Quick Preset Message Buttons */}
+                  <div className="p-2 bg-slate-50 border-b border-slate-200 space-y-1">
+                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                      Tactical Presets (Click to insert)
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        'Airport surge at Lambert T1/T2.',
+                        'Traffic advisory: I-64 westbound heavy congestion.',
+                        'Check in with dispatch if available.',
+                        'Weather alert: rain/slick roads, slow down.',
+                      ].map((preset, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setMsgText(preset)}
+                          className="text-[10px] px-1.5 py-0.5 bg-white border border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded text-slate-700 text-left transition-colors"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Compose Alert Form */}
+                  <form onSubmit={handleSendMessage} className="p-2 bg-white border-b border-slate-200 space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-500 uppercase">Send To</span>
+                        <select
+                          value={msgRecipient}
+                          onChange={(e) => setMsgRecipient(e.target.value)}
+                          className="w-full px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800"
+                        >
+                          <option value="All Drivers">📢 All Drivers</option>
+                          {drivers.map((d) => (
+                            <option key={d.id} value={d.name}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-bold text-slate-500 uppercase">Priority</span>
+                        <select
+                          value={msgPriority}
+                          onChange={(e) => setMsgPriority(e.target.value as any)}
+                          className="w-full px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="urgent">🚨 Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Type dispatch message or note..."
+                        value={msgText}
+                        onChange={(e) => setMsgText(e.target.value)}
+                        className="flex-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded transition-colors shrink-0"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Message History */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+                    {messages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`p-2 rounded-lg border text-xs space-y-0.5 ${
+                          m.priority === 'urgent'
+                            ? 'bg-red-50 border-red-300 text-red-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold text-[10px]">
+                          <span>To: {m.to}</span>
+                          <span className="text-slate-400">{m.timestamp}</span>
+                        </div>
+                        <p className="text-[11px] leading-snug">{m.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. SOFTPHONE CARD */}
+              {isPhoneOpen && (
+                <div className="flex flex-col bg-slate-900 text-white shrink-0 min-h-[380px] p-3 space-y-2.5">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <span>📞 Tactical Softphone</span>
+                      <span className="text-[10px] text-emerald-400 uppercase">({activeCallStatus})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPhoneOpen(false)}
+                      className="text-slate-400 hover:text-white text-xs px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Softphone Display */}
+                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      {activeCallStatus === 'connected' ? (
+                        <span className="text-emerald-400 animate-pulse">
+                          ● IN CALL ({Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')})
+                        </span>
+                      ) : activeCallStatus === 'calling' ? (
+                        <span className="text-amber-400 animate-pulse">CONNECTING...</span>
+                      ) : (
+                        'READY TO DIAL'
+                      )}
+                    </div>
+                    <div className="text-lg font-mono font-bold tracking-wider text-slate-100 min-h-[28px] truncate">
+                      {dialedNumber || '(Ready)'}
+                    </div>
+                  </div>
+
+                  {/* Speed Dial Presets */}
+                  <div className="space-y-1">
+                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Speed Dial</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { name: 'Dispatch Desk', num: '(314) 738-0100' },
+                        { name: 'Lambert STL', num: '(314) 890-1333' },
+                        { name: 'Mike T.', num: '(314) 555-0101' },
+                        { name: 'Sarah K.', num: '(314) 555-0104' },
+                      ].map((preset, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleStartCall(preset.num)}
+                          className="p-1 bg-slate-800/80 hover:bg-slate-800 rounded text-left border border-slate-700 transition-colors"
+                        >
+                          <div className="text-[10px] font-bold text-slate-200 truncate">{preset.name}</div>
+                          <div className="text-[9px] font-mono text-emerald-400">{preset.num}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 12-Key Numeric Dialpad */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                    {[
+                      { digit: '1', sub: '' },
+                      { digit: '2', sub: 'ABC' },
+                      { digit: '3', sub: 'DEF' },
+                      { digit: '4', sub: 'GHI' },
+                      { digit: '5', sub: 'JKL' },
+                      { digit: '6', sub: 'MNO' },
+                      { digit: '7', sub: 'PQRS' },
+                      { digit: '8', sub: 'TUV' },
+                      { digit: '9', sub: 'WXYZ' },
+                      { digit: '*', sub: '' },
+                      { digit: '0', sub: '+' },
+                      { digit: '#', sub: '' },
+                    ].map((btn) => (
+                      <button
+                        key={btn.digit}
+                        type="button"
+                        onClick={() => handleDialDigit(btn.digit)}
+                        className="h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-sm flex flex-col items-center justify-center transition-all"
+                      >
+                        <span>{btn.digit}</span>
+                        {btn.sub && <span className="text-[7px] text-slate-400 -mt-1">{btn.sub}</span>}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Call Actions */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {activeCallStatus === 'idle' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall()}
+                          className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                        >
+                          <span>📞</span>
+                          <span>Call</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDialedNumber('')}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
+                        >
+                          Clear
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleEndCall}
+                        className="w-full py-1.5 rounded-lg bg-red-600 hover:bg-red-500 font-bold text-xs text-white flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                      >
+                        <span>📵</span>
+                        <span>End Call</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Speed Dial Presets */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Speed Dial Presets</div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  { name: 'Dispatch Desk', num: '(314) 738-0100' },
-                  { name: 'Lambert Airport', num: '(314) 890-1333' },
-                  { name: 'Driver Mike T.', num: '(314) 555-0101' },
-                  { name: 'Driver Sarah K.', num: '(314) 555-0104' },
-                ].map((preset, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleStartCall(preset.num)}
-                    className="p-1.5 bg-slate-800/80 hover:bg-slate-800 rounded-lg text-left border border-slate-700 transition-colors"
-                  >
-                    <div className="text-[11px] font-bold text-slate-200 truncate">{preset.name}</div>
-                    <div className="text-[10px] font-mono text-emerald-400">{preset.num}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 12-Key Numeric Dialpad */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {[
-                { digit: '1', sub: '' },
-                { digit: '2', sub: 'ABC' },
-                { digit: '3', sub: 'DEF' },
-                { digit: '4', sub: 'GHI' },
-                { digit: '5', sub: 'JKL' },
-                { digit: '6', sub: 'MNO' },
-                { digit: '7', sub: 'PQRS' },
-                { digit: '8', sub: 'TUV' },
-                { digit: '9', sub: 'WXYZ' },
-                { digit: '*', sub: '' },
-                { digit: '0', sub: '+' },
-                { digit: '#', sub: '' },
-              ].map((btn) => (
-                <button
-                  key={btn.digit}
-                  type="button"
-                  onClick={() => handleDialDigit(btn.digit)}
-                  className="h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-base flex flex-col items-center justify-center transition-all"
-                >
-                  <span>{btn.digit}</span>
-                  {btn.sub && <span className="text-[8px] text-slate-400 -mt-1">{btn.sub}</span>}
-                </button>
-              ))}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-1">
-              {activeCallStatus === 'idle' ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleStartCall()}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all"
-                  >
-                    <span>📞</span>
-                    <span>Call Number</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDialedNumber('')}
-                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
-                  >
-                    Clear
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleEndCall}
-                  className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 font-bold text-sm text-white flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 transition-all"
-                >
-                  <span>📵</span>
-                  <span>End Call</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
@@ -1193,9 +1210,16 @@ export default function DispatchLayout() {
 interface LiveDispatchMapProps {
   activeFormValues?: DispatchFormValues;
   activeTrip?: Trip | null;
+  selectedTrip?: Trip | null;
+  shouldZoom?: boolean;
 }
 
-function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps) {
+function LiveDispatchMap({
+  activeFormValues,
+  activeTrip,
+  selectedTrip,
+  shouldZoom = false,
+}: LiveDispatchMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
@@ -1218,10 +1242,11 @@ function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps)
           directionsRendererRef.current = new gMaps.maps.DirectionsRenderer({
             map: mapInstanceRef.current,
             suppressMarkers: false,
+            preserveViewport: true,
             polylineOptions: {
               strokeColor: '#2563eb',
               strokeWeight: 5,
-              strokeOpacity: 0.8,
+              strokeOpacity: 0.85,
             },
           });
         }
@@ -1231,7 +1256,7 @@ function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps)
       });
   }, []);
 
-  // Update Route Polyline based on active draft or active trip
+  // Update Route Polyline based on selected queue trip or active draft
   useEffect(() => {
     if (!mapInstanceRef.current || !directionsRendererRef.current) return;
     if (typeof window.google?.maps?.DirectionsService !== 'function') return;
@@ -1240,14 +1265,26 @@ function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps)
     let destination: any = null;
     let waypoints: any[] = [];
 
-    if (activeFormValues?.pickupAddress && activeFormValues?.dropoffAddress) {
+    // Priority 1: User explicitly clicked or double-clicked a trip in queue table
+    if (selectedTrip?.pickupLocation?.address && selectedTrip?.dropoffLocation?.address) {
+      origin = selectedTrip.pickupLocation.coordinates || selectedTrip.pickupLocation.address;
+      destination = selectedTrip.dropoffLocation.coordinates || selectedTrip.dropoffLocation.address;
+      waypoints = (selectedTrip.intermediateStops || [])
+        .map((s) => s.coordinates || s.address)
+        .filter(Boolean)
+        .map((loc) => ({ location: loc, stopover: true }));
+    }
+    // Priority 2: Active form values in active draft tab
+    else if (activeFormValues?.pickupAddress && activeFormValues?.dropoffAddress) {
       origin = activeFormValues.pickupCoordinates || activeFormValues.pickupAddress;
       destination = activeFormValues.dropoffCoordinates || activeFormValues.dropoffAddress;
       waypoints = (activeFormValues.intermediateStops || [])
         .map((s) => s.coordinates || s.address)
         .filter(Boolean)
         .map((loc) => ({ location: loc, stopover: true }));
-    } else if (activeTrip?.pickupLocation?.address && activeTrip?.dropoffLocation?.address) {
+    }
+    // Priority 3: Active trip from edit draft
+    else if (activeTrip?.pickupLocation?.address && activeTrip?.dropoffLocation?.address) {
       origin = activeTrip.pickupLocation.coordinates || activeTrip.pickupLocation.address;
       destination = activeTrip.dropoffLocation.coordinates || activeTrip.dropoffLocation.address;
       waypoints = (activeTrip.intermediateStops || [])
@@ -1267,7 +1304,16 @@ function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps)
         },
         (result, status) => {
           if (status === window.google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
+            // If shouldZoom is false: preserveViewport keeps map view without zooming in!
+            // If shouldZoom is true: fit bounds tightly to the route
+            directionsRendererRef.current.setOptions({
+              preserveViewport: !shouldZoom,
+            });
             directionsRendererRef.current.setDirections(result);
+
+            if (shouldZoom && result?.routes?.[0]?.bounds && mapInstanceRef.current) {
+              mapInstanceRef.current.fitBounds(result.routes[0].bounds);
+            }
           }
         }
       );
@@ -1275,11 +1321,9 @@ function LiveDispatchMap({ activeFormValues, activeTrip }: LiveDispatchMapProps)
       // Clear route
       try {
         directionsRendererRef.current.setDirections({ routes: [] } as any);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
-  }, [activeFormValues, activeTrip]);
+  }, [activeFormValues, activeTrip, selectedTrip, shouldZoom]);
 
   return <div ref={mapContainerRef} className="w-full h-full" />;
 }

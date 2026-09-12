@@ -29,6 +29,18 @@ export interface CompanyBrandColors {
   secondary: string;
 }
 
+export interface CarSeatLimitsConfig {
+  maxRearFacing: number;
+  maxFrontFacing: number;
+  maxBooster: number;
+  maxTotalCarSeats: number;
+}
+
+export interface VehicleCapacityConfig {
+  maxPassengers: number;
+  maxBags: number;
+}
+
 export interface CompanyBrandConfig {
   name: string;
   tagline: string;
@@ -43,6 +55,8 @@ export interface CompanyBrandConfig {
   secondaryColor: string;
   colors?: CompanyBrandColors;
   maxDispatchDrafts?: number;
+  carSeatLimits: CarSeatLimitsConfig;
+  vehicleCapacities: Record<'sedan' | 'suv' | 'van' | 'any', VehicleCapacityConfig>;
 }
 
 export const COMPANY_CONFIG: CompanyBrandConfig = {
@@ -57,6 +71,18 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
     secondary: '#0f172a',
   },
   maxDispatchDrafts: 10,
+  carSeatLimits: {
+    maxRearFacing: 2,
+    maxFrontFacing: 3,
+    maxBooster: 3,
+    maxTotalCarSeats: 4,
+  },
+  vehicleCapacities: {
+    sedan: { maxPassengers: 4, maxBags: 3 },
+    suv: { maxPassengers: 6, maxBags: 5 },
+    van: { maxPassengers: 7, maxBags: 6 },
+    any: { maxPassengers: 4, maxBags: 3 },
+  },
   phone: {
     primary: '(314) 738-0100',
     primaryRaw: '+13147380100',

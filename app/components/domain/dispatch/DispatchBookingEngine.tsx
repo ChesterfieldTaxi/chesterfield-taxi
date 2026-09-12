@@ -4,6 +4,7 @@ import { getBookingService } from '../../../core/services/booking';
 import { calculateLiveRoute } from '../../../core/services/maps/live-routing.service';
 import { calculateTripPricing } from '../../../core/services/pricing';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DispatchLocationInput } from './DispatchLocationInput';
 import { SpinnerIcon } from '../../ui/Icons';
 
@@ -36,10 +37,26 @@ export interface CorporateAccountDetails {
   invoicingTerms: string;
 }
 
+export interface CarSeatsBreakdown {
+  rearFacing: number;
+  frontFacing: number;
+  booster: number;
+}
+
 export interface ReturnTripDetails {
   returnTrip: boolean;
+  returnPickupAddress: string;
+  returnPickupCoordinates?: GeoPoint;
+  returnDropoffAddress: string;
+  returnDropoffCoordinates?: GeoPoint;
+  returnIntermediateStops: Array<{ address: string; coordinates?: GeoPoint }>;
   returnDate: string;
   returnTime: string;
+  returnPassengers: number;
+  returnBags: number;
+  returnCarSeats: boolean;
+  returnCarSeatsBreakdown: CarSeatsBreakdown;
+  returnVehicles: Array<'sedan' | 'suv' | 'van'>;
   autoCreateReturnTrip: boolean;
 }
 
@@ -48,7 +65,9 @@ export interface RepeatTripDetails {
   repeatFrequency: 'daily' | 'weekdays' | 'weekly' | 'custom';
   repeatDays: string[];
   repeatOccurrences: number;
-  repeatEndDate: string;
+  repeatUntilDate: string;
+  repeatWeeksPattern: 'all' | 'odd' | 'even';
+  repeatsRoundTrip?: boolean;
 }
 
 export interface DispatchFormValues {
@@ -68,6 +87,8 @@ export interface DispatchFormValues {
   passengers: number;
   bags: number;
   carSeats: boolean;
+  carSeatsBreakdown: CarSeatsBreakdown;
+  selectedVehicles: Array<'sedan' | 'suv' | 'van'>;
   vehicle: 'any' | 'sedan' | 'suv' | 'van';
   paymentMethod: 'cash' | 'card' | 'account';
   cardDetails: CardDetails;
@@ -125,11 +146,12 @@ export function DispatchBookingEngine({
   const isEditMode = Boolean(initialTrip?.id);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
 
-  // Form State
+  // Form State: Timing
   const [timingType, setTimingType] = useState<'asap' | 'later'>('asap');
   const [scheduledDate, setScheduledDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [scheduledTime, setScheduledTime] = useState('12:00');
   
+  // Routing: Outbound
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupCoordinates, setPickupCoordinates] = useState<GeoPoint | undefined>();
   const [dropoffAddress, setDropoffAddress] = useState('');
@@ -147,13 +169,16 @@ export function DispatchBookingEngine({
   const [contactEmail, setContactEmail] = useState('');
   const [contactRole, setContactRole] = useState('Hotel Front Desk / Concierge');
 
-  // Details
+  // Details: Passengers, Bags, Car Seats with 3 counters
   const [passengers, setPassengers] = useState(1);
   const [bags, setBags] = useState(0);
   const [carSeats, setCarSeats] = useState(false);
+  const [rearFacingCount, setRearFacingCount] = useState(0);
+  const [frontFacingCount, setFrontFacingCount] = useState(0);
+  const [boosterCount, setBoosterCount] = useState(0);
 
-  // Vehicle
-  const [vehicle, setVehicle] = useState<'any' | 'sedan' | 'suv' | 'van'>('any');
+  // Multi-Vehicle Selection
+  const [selectedVehicles, setSelectedVehicles] = useState<Array<'sedan' | 'suv' | 'van'>>(['sedan']);
 
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'account'>('cash');
@@ -178,21 +203,35 @@ export function DispatchBookingEngine({
   const [notesForAll, setNotesForAll] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
-  // Return & Repeat
+  // Return Trip Details (Full independent leg & fleet)
   const [returnTrip, setReturnTrip] = useState(false);
+  const [returnPickupAddress, setReturnPickupAddress] = useState('');
+  const [returnPickupCoordinates, setReturnPickupCoordinates] = useState<GeoPoint | undefined>();
+  const [returnDropoffAddress, setReturnDropoffAddress] = useState('');
+  const [returnDropoffCoordinates, setReturnDropoffCoordinates] = useState<GeoPoint | undefined>();
+  const [returnIntermediateStops, setReturnIntermediateStops] = useState<Array<{ address: string; coordinates?: GeoPoint }>>([]);
   const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [returnTime, setReturnTime] = useState('17:00');
+  const [returnPassengers, setReturnPassengers] = useState(1);
+  const [returnBags, setReturnBags] = useState(0);
+  const [returnCarSeats, setReturnCarSeats] = useState(false);
+  const [returnRearFacing, setReturnRearFacing] = useState(0);
+  const [returnFrontFacing, setReturnFrontFacing] = useState(0);
+  const [returnBooster, setReturnBooster] = useState(0);
+  const [returnVehicles, setReturnVehicles] = useState<Array<'sedan' | 'suv' | 'van'>>(['sedan']);
   const [autoCreateReturnTrip, setAutoCreateReturnTrip] = useState(true);
 
+  // Repeat / Recurring Schedule
   const [repeat, setRepeat] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState<'daily' | 'weekdays' | 'weekly' | 'custom'>('weekdays');
   const [repeatDays, setRepeatDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [repeatOccurrences, setRepeatOccurrences] = useState(5);
-  const [repeatEndDate, setRepeatEndDate] = useState(() => {
+  const [repeatUntilDate, setRepeatUntilDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 14);
+    d.setDate(d.getDate() + 30);
     return d.toISOString().split('T')[0];
   });
+  const [repeatWeeksPattern, setRepeatWeeksPattern] = useState<'all' | 'odd' | 'even'>('all');
 
   // Pricing
   const [estimatedFare, setEstimatedFare] = useState(0);
@@ -203,6 +242,32 @@ export function DispatchBookingEngine({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Limits from centralized config
+  const carSeatLimits = COMPANY_CONFIG.carSeatLimits || {
+    maxRearFacing: 2,
+    maxFrontFacing: 3,
+    maxBooster: 3,
+    maxTotalCarSeats: 4,
+  };
+
+  const vehicleCapacities = COMPANY_CONFIG.vehicleCapacities || {
+    sedan: { maxPassengers: 4, maxBags: 3 },
+    suv: { maxPassengers: 6, maxBags: 5 },
+    van: { maxPassengers: 7, maxBags: 6 },
+    any: { maxPassengers: 4, maxBags: 3 },
+  };
+
+  // Compute fleet capacities from sum of selected vehicles
+  const totalMaxPassengers = selectedVehicles.reduce(
+    (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
+    0
+  );
+  const totalMaxBags = selectedVehicles.reduce(
+    (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
+    0
+  );
+  const totalCarSeats = rearFacingCount + frontFacingCount + boosterCount;
 
   // Hydrate from initialTrip if provided
   useEffect(() => {
@@ -215,89 +280,100 @@ export function DispatchBookingEngine({
             setScheduledDate(d.toISOString().split('T')[0]);
             setScheduledTime(d.toTimeString().slice(0, 5));
           }
-        } catch {
-          // keep defaults
-        }
+        } catch {}
       }
+
       setPickupAddress(initialTrip.pickupLocation?.address || '');
       setPickupCoordinates(initialTrip.pickupLocation?.coordinates);
       setDropoffAddress(initialTrip.dropoffLocation?.address || '');
       setDropoffCoordinates(initialTrip.dropoffLocation?.coordinates);
-      if (initialTrip.intermediateStops) {
+
+      if (initialTrip.intermediateStops && initialTrip.intermediateStops.length > 0) {
         setIntermediateStops(
-          initialTrip.intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates }))
+          initialTrip.intermediateStops.map((s) => ({
+            address: s.address,
+            coordinates: s.coordinates,
+          }))
         );
       }
-      const pName = `${initialTrip.passenger?.firstName || ''} ${initialTrip.passenger?.lastName || ''}`.trim();
-      setPassengerName(pName);
+
+      setPassengerName(
+        `${initialTrip.passenger?.firstName || ''} ${initialTrip.passenger?.lastName || ''}`.trim()
+      );
       setPhone(initialTrip.passenger?.phone || '');
       setEmail(initialTrip.passenger?.email || '');
+
       setPassengers(initialTrip.passenger?.passengerCount || 1);
       setBags(initialTrip.passenger?.luggageCount || 0);
-      setCarSeats(Boolean(initialTrip.passenger?.specialRequests?.toLowerCase().includes('car seat')));
 
-      // Hydrate metadata extensions
-      const meta = (initialTrip.metadata || {}) as any;
-      if (meta.additionalPassengers && Array.isArray(meta.additionalPassengers)) {
-        setAdditionalPassengers(meta.additionalPassengers);
+      const meta = (initialTrip.metadata || {}) as Record<string, any>;
+
+      // Hydrate car seats from specialRequests / metadata
+      const hasCarSeatReq = Boolean(
+        initialTrip.passenger?.specialRequests?.toLowerCase().includes('car seat')
+      );
+      setCarSeats(hasCarSeatReq);
+      if (meta.carSeatsBreakdown) {
+        setRearFacingCount(meta.carSeatsBreakdown.rearFacing || 0);
+        setFrontFacingCount(meta.carSeatsBreakdown.frontFacing || 0);
+        setBoosterCount(meta.carSeatsBreakdown.booster || 0);
+      } else if (hasCarSeatReq) {
+        setRearFacingCount(1);
       }
+
+      // Hydrate vehicle
+      if (meta.selectedVehicles && Array.isArray(meta.selectedVehicles)) {
+        setSelectedVehicles(meta.selectedVehicles);
+      } else if (initialTrip.vehicleTier === 'xl') {
+        setSelectedVehicles(['suv']);
+      } else if (initialTrip.vehicleTier === 'wheelchair') {
+        setSelectedVehicles(['van']);
+      } else {
+        setSelectedVehicles(['sedan']);
+      }
+
+      // Hydrate payment
+      if (initialTrip.payment?.method === 'card') setPaymentMethod('card');
+      else if (initialTrip.payment?.method === 'corporate') setPaymentMethod('account');
+      else setPaymentMethod('cash');
+
       if (meta.contactPerson) {
-        setIsBookerDifferent(Boolean(meta.contactPerson.isBookerDifferent));
+        setIsBookerDifferent(true);
         setContactName(meta.contactPerson.contactName || '');
         setContactPhone(meta.contactPerson.contactPhone || '');
         setContactEmail(meta.contactPerson.contactEmail || '');
         setContactRole(meta.contactPerson.contactRole || 'Hotel Front Desk / Concierge');
       }
+
+      if (meta.additionalPassengers && Array.isArray(meta.additionalPassengers)) {
+        setAdditionalPassengers(meta.additionalPassengers);
+      }
+
       if (meta.cardDetails) {
         setCardPaymentType(meta.cardDetails.cardPaymentType || 'terminal');
         setCardholderName(meta.cardDetails.cardholderName || '');
-        setCardNumber(meta.cardDetails.cardNumber || '');
-        setCardExp(meta.cardDetails.cardExp || '');
-        setSaveCardOnFile(Boolean(meta.cardDetails.saveCardOnFile));
       }
+
       if (meta.corporateDetails) {
         setCorporateAccount(meta.corporateDetails.corporateAccount || DEFAULT_CORPORATE_ACCOUNTS[0]);
         setBillingPo(meta.corporateDetails.billingPo || '');
         setAuthorizedBy(meta.corporateDetails.authorizedBy || '');
         setInvoicingTerms(meta.corporateDetails.invoicingTerms || 'Net 30 Direct Bill');
       }
-      if (meta.returnDetails) {
-        setReturnTrip(Boolean(meta.returnDetails.returnTrip));
-        setReturnDate(meta.returnDetails.returnDate || new Date().toISOString().split('T')[0]);
-        setReturnTime(meta.returnDetails.returnTime || '17:00');
-        setAutoCreateReturnTrip(Boolean(meta.returnDetails.autoCreateReturnTrip));
-      }
-      if (meta.repeatDetails) {
-        setRepeat(Boolean(meta.repeatDetails.repeat));
-        setRepeatFrequency(meta.repeatDetails.repeatFrequency || 'weekdays');
-        setRepeatDays(meta.repeatDetails.repeatDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-        setRepeatOccurrences(meta.repeatDetails.repeatOccurrences || 5);
-        setRepeatEndDate(meta.repeatDetails.repeatEndDate || '');
+
+      if (initialTrip.assignedDriverId) {
+        setDriverId(initialTrip.assignedDriverId);
       }
 
-      const tier = initialTrip.vehicleTier;
-      if (tier === 'xl') setVehicle('suv');
-      else if (tier === 'wheelchair') setVehicle('van');
-      else if (tier === 'premium') setVehicle('sedan');
-      else setVehicle('any');
+      if (initialTrip.driverNotes) {
+        setNotesForAll(initialTrip.driverNotes);
+      }
 
-      if (initialTrip.payment?.method === 'card') setPaymentMethod('card');
-      else if (initialTrip.payment?.method === 'corporate') setPaymentMethod('account');
-      else setPaymentMethod('cash');
-
-      setCompany(meta.company || DEFAULT_COMPANIES[0]);
-      setDriverId(initialTrip.assignedDriverId || 'unassigned');
-      setNotesForAll(initialTrip.driverNotes || initialTrip.pickupLocation?.notes || '');
-      setInternalNotes(meta.internalNotes || '');
-
-      const fare = initialTrip.pricing?.totalFare || 0;
-      setEstimatedFare(fare);
-      setManualFare(fare > 0 ? fare.toFixed(2) : '');
-      setIsFareOverridden(fare > 0);
-      setEstimatedDistanceMiles(initialTrip.pricing?.distanceMiles || 0);
-      setEstimatedDurationMinutes(initialTrip.pricing?.durationMinutes || 0);
+      if (initialTrip.pricing?.totalFare) {
+        setEstimatedFare(initialTrip.pricing.totalFare);
+      }
     } else {
-      // Try restore from localStorage for drafts
+      // Restore from localStorage draft
       try {
         const saved = localStorage.getItem(draftStorageKey);
         if (saved) {
@@ -306,6 +382,7 @@ export function DispatchBookingEngine({
           if (parsed.pickupCoordinates) setPickupCoordinates(parsed.pickupCoordinates);
           if (parsed.dropoffAddress) setDropoffAddress(parsed.dropoffAddress);
           if (parsed.dropoffCoordinates) setDropoffCoordinates(parsed.dropoffCoordinates);
+          if (parsed.intermediateStops) setIntermediateStops(parsed.intermediateStops);
           if (parsed.passengerName) setPassengerName(parsed.passengerName);
           if (parsed.phone) setPhone(parsed.phone);
           if (parsed.email) setEmail(parsed.email);
@@ -313,122 +390,127 @@ export function DispatchBookingEngine({
           if (parsed.isBookerDifferent !== undefined) setIsBookerDifferent(parsed.isBookerDifferent);
           if (parsed.contactName) setContactName(parsed.contactName);
           if (parsed.contactPhone) setContactPhone(parsed.contactPhone);
+          if (parsed.contactEmail) setContactEmail(parsed.contactEmail);
+          if (parsed.contactRole) setContactRole(parsed.contactRole);
           if (parsed.passengers) setPassengers(parsed.passengers);
           if (parsed.bags !== undefined) setBags(parsed.bags);
-          if (parsed.vehicle) setVehicle(parsed.vehicle);
+          if (parsed.carSeats !== undefined) setCarSeats(parsed.carSeats);
+          if (parsed.rearFacingCount !== undefined) setRearFacingCount(parsed.rearFacingCount);
+          if (parsed.frontFacingCount !== undefined) setFrontFacingCount(parsed.frontFacingCount);
+          if (parsed.boosterCount !== undefined) setBoosterCount(parsed.boosterCount);
+          if (parsed.selectedVehicles) setSelectedVehicles(parsed.selectedVehicles);
           if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
-          if (parsed.cardPaymentType) setCardPaymentType(parsed.cardPaymentType);
           if (parsed.corporateAccount) setCorporateAccount(parsed.corporateAccount);
           if (parsed.billingPo) setBillingPo(parsed.billingPo);
-          if (parsed.notesForAll) setNotesForAll(parsed.notesForAll);
-          if (parsed.internalNotes) setInternalNotes(parsed.internalNotes);
+          if (parsed.authorizedBy) setAuthorizedBy(parsed.authorizedBy);
+          if (parsed.invoicingTerms) setInvoicingTerms(parsed.invoicingTerms);
+          if (parsed.tariff) setTariff(parsed.tariff);
+          if (parsed.discount) setDiscount(parsed.discount);
           if (parsed.company) setCompany(parsed.company);
           if (parsed.driverId) setDriverId(parsed.driverId);
+          if (parsed.notesForAll) setNotesForAll(parsed.notesForAll);
+          if (parsed.internalNotes) setInternalNotes(parsed.internalNotes);
           if (parsed.returnTrip !== undefined) setReturnTrip(parsed.returnTrip);
+          if (parsed.returnPickupAddress) setReturnPickupAddress(parsed.returnPickupAddress);
+          if (parsed.returnDropoffAddress) setReturnDropoffAddress(parsed.returnDropoffAddress);
           if (parsed.repeat !== undefined) setRepeat(parsed.repeat);
-          if (parsed.estimatedFare) setEstimatedFare(parsed.estimatedFare);
-          if (parsed.manualFare) {
-            setManualFare(parsed.manualFare);
-            setIsFareOverridden(true);
-          }
+          if (parsed.repeatUntilDate) setRepeatUntilDate(parsed.repeatUntilDate);
+          if (parsed.repeatWeeksPattern) setRepeatWeeksPattern(parsed.repeatWeeksPattern);
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   }, [initialTrip, draftStorageKey]);
 
-  // Persist draft to local storage on changes (only if not editing live trip)
+  // When return trip is enabled, prefill return pickup with dropoff and return dropoff with pickup if empty
+  useEffect(() => {
+    if (returnTrip) {
+      if (!returnPickupAddress && dropoffAddress) {
+        setReturnPickupAddress(dropoffAddress);
+        setReturnPickupCoordinates(dropoffCoordinates);
+      }
+      if (!returnDropoffAddress && pickupAddress) {
+        setReturnDropoffAddress(pickupAddress);
+        setReturnDropoffCoordinates(pickupCoordinates);
+      }
+      setReturnPassengers(passengers);
+      setReturnBags(bags);
+      setReturnVehicles(selectedVehicles);
+    }
+  }, [returnTrip]);
+
+  // Persist draft to localStorage & notify parent of values changes
   useEffect(() => {
     if (isEditMode) return;
-    try {
-      const stateToSave = {
-        pickupAddress,
-        pickupCoordinates,
-        dropoffAddress,
-        dropoffCoordinates,
-        passengerName,
-        phone,
-        email,
-        additionalPassengers,
-        isBookerDifferent,
-        contactName,
-        contactPhone,
-        contactEmail,
-        contactRole,
-        passengers,
-        bags,
-        vehicle,
-        paymentMethod,
-        cardPaymentType,
-        cardholderName,
-        corporateAccount,
-        billingPo,
-        authorizedBy,
-        notesForAll,
-        internalNotes,
-        company,
-        driverId,
-        returnTrip,
-        returnDate,
-        returnTime,
-        autoCreateReturnTrip,
-        repeat,
-        repeatFrequency,
-        repeatDays,
-        repeatOccurrences,
-        repeatEndDate,
-        estimatedFare,
-        manualFare,
-      };
-      localStorage.setItem(draftStorageKey, JSON.stringify(stateToSave));
-    } catch {
-      // ignore
-    }
-  }, [
-    isEditMode,
-    draftStorageKey,
-    pickupAddress,
-    pickupCoordinates,
-    dropoffAddress,
-    dropoffCoordinates,
-    passengerName,
-    phone,
-    email,
-    additionalPassengers,
-    isBookerDifferent,
-    contactName,
-    contactPhone,
-    contactEmail,
-    contactRole,
-    passengers,
-    bags,
-    vehicle,
-    paymentMethod,
-    cardPaymentType,
-    cardholderName,
-    corporateAccount,
-    billingPo,
-    authorizedBy,
-    notesForAll,
-    internalNotes,
-    company,
-    driverId,
-    returnTrip,
-    returnDate,
-    returnTime,
-    autoCreateReturnTrip,
-    repeat,
-    repeatFrequency,
-    repeatDays,
-    repeatOccurrences,
-    repeatEndDate,
-    estimatedFare,
-    manualFare,
-  ]);
 
-  // Notify parent of values change (for map sync, etc.)
-  useEffect(() => {
+    const draftData = {
+      timingType,
+      scheduledDate,
+      scheduledTime,
+      pickupAddress,
+      pickupCoordinates,
+      dropoffAddress,
+      dropoffCoordinates,
+      intermediateStops,
+      passengerName,
+      phone,
+      email,
+      additionalPassengers,
+      isBookerDifferent,
+      contactName,
+      contactPhone,
+      contactEmail,
+      contactRole,
+      passengers,
+      bags,
+      carSeats,
+      rearFacingCount,
+      frontFacingCount,
+      boosterCount,
+      selectedVehicles,
+      paymentMethod,
+      cardPaymentType,
+      cardholderName,
+      corporateAccount,
+      billingPo,
+      authorizedBy,
+      invoicingTerms,
+      tariff,
+      discount,
+      company,
+      driverId,
+      notesForAll,
+      internalNotes,
+      returnTrip,
+      returnPickupAddress,
+      returnPickupCoordinates,
+      returnDropoffAddress,
+      returnDropoffCoordinates,
+      returnIntermediateStops,
+      returnDate,
+      returnTime,
+      returnPassengers,
+      returnBags,
+      returnCarSeats,
+      returnRearFacing,
+      returnFrontFacing,
+      returnBooster,
+      returnVehicles,
+      autoCreateReturnTrip,
+      repeat,
+      repeatFrequency,
+      repeatDays,
+      repeatOccurrences,
+      repeatUntilDate,
+      repeatWeeksPattern,
+      estimatedFare,
+      manualFare,
+      isFareOverridden,
+    };
+
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+    } catch {}
+
     onValuesChange?.({
       timingType,
       scheduledDate,
@@ -452,7 +534,13 @@ export function DispatchBookingEngine({
       passengers,
       bags,
       carSeats,
-      vehicle,
+      carSeatsBreakdown: {
+        rearFacing: rearFacingCount,
+        frontFacing: frontFacingCount,
+        booster: boosterCount,
+      },
+      selectedVehicles,
+      vehicle: selectedVehicles[0] || 'sedan',
       paymentMethod,
       cardDetails: {
         cardPaymentType,
@@ -476,8 +564,22 @@ export function DispatchBookingEngine({
       internalNotes,
       returnDetails: {
         returnTrip,
+        returnPickupAddress,
+        returnPickupCoordinates,
+        returnDropoffAddress,
+        returnDropoffCoordinates,
+        returnIntermediateStops,
         returnDate,
         returnTime,
+        returnPassengers,
+        returnBags,
+        returnCarSeats,
+        returnCarSeatsBreakdown: {
+          rearFacing: returnRearFacing,
+          frontFacing: returnFrontFacing,
+          booster: returnBooster,
+        },
+        returnVehicles,
         autoCreateReturnTrip,
       },
       repeatDetails: {
@@ -485,15 +587,19 @@ export function DispatchBookingEngine({
         repeatFrequency,
         repeatDays,
         repeatOccurrences,
-        repeatEndDate,
+        repeatUntilDate,
+        repeatWeeksPattern,
+        repeatsRoundTrip: returnTrip,
       },
-      estimatedFare: isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : estimatedFare,
+      estimatedFare,
       manualFare,
       isFareOverridden,
       estimatedDurationMinutes,
       estimatedDistanceMiles,
     });
   }, [
+    draftStorageKey,
+    isEditMode,
     timingType,
     scheduledDate,
     scheduledTime,
@@ -514,7 +620,10 @@ export function DispatchBookingEngine({
     passengers,
     bags,
     carSeats,
-    vehicle,
+    rearFacingCount,
+    frontFacingCount,
+    boosterCount,
+    selectedVehicles,
     paymentMethod,
     cardPaymentType,
     cardholderName,
@@ -533,14 +642,27 @@ export function DispatchBookingEngine({
     notesForAll,
     internalNotes,
     returnTrip,
+    returnPickupAddress,
+    returnPickupCoordinates,
+    returnDropoffAddress,
+    returnDropoffCoordinates,
+    returnIntermediateStops,
     returnDate,
     returnTime,
+    returnPassengers,
+    returnBags,
+    returnCarSeats,
+    returnRearFacing,
+    returnFrontFacing,
+    returnBooster,
+    returnVehicles,
     autoCreateReturnTrip,
     repeat,
     repeatFrequency,
     repeatDays,
     repeatOccurrences,
-    repeatEndDate,
+    repeatUntilDate,
+    repeatWeeksPattern,
     estimatedFare,
     manualFare,
     isFareOverridden,
@@ -573,25 +695,32 @@ export function DispatchBookingEngine({
 
         if (!isFareOverridden) {
           const config = getAdminConfigService().getCachedSettings().pricing;
-          let tier: VehicleTier = 'standard';
-          if (vehicle === 'suv') tier = 'xl';
-          if (vehicle === 'van') tier = 'wheelchair';
-          if (vehicle === 'sedan') tier = 'premium';
+          
+          // Calculate pricing for each selected vehicle and sum
+          let totalCalculated = 0;
+          selectedVehicles.forEach((v) => {
+            let tier: VehicleTier = 'standard';
+            if (v === 'suv') tier = 'xl';
+            if (v === 'van') tier = 'wheelchair';
+            if (v === 'sedan') tier = 'premium';
 
-          const quote = calculateTripPricing(
-            {
-              distanceMiles: res.distanceMiles,
-              durationMinutes: res.durationMinutes,
-              vehicleTier: tier,
-              pickupDateTime:
-                timingType === 'later' && scheduledDate && scheduledTime
-                  ? new Date(`${scheduledDate}T${scheduledTime}:00`)
-                  : new Date(),
-              intermediateStopsCount: intermediateStops.length,
-            },
-            config
-          );
-          setEstimatedFare(quote.pricing.totalFare);
+            const quote = calculateTripPricing(
+              {
+                distanceMiles: res.distanceMiles,
+                durationMinutes: res.durationMinutes,
+                vehicleTier: tier,
+                pickupDateTime:
+                  timingType === 'later' && scheduledDate && scheduledTime
+                    ? new Date(`${scheduledDate}T${scheduledTime}:00`)
+                    : new Date(),
+                intermediateStopsCount: intermediateStops.length,
+              },
+              config
+            );
+            totalCalculated += quote.pricing.totalFare;
+          });
+
+          setEstimatedFare(totalCalculated);
         }
       })
       .catch((e) => {
@@ -607,14 +736,14 @@ export function DispatchBookingEngine({
     dropoffAddress,
     dropoffCoordinates,
     intermediateStops,
-    vehicle,
+    selectedVehicles,
     timingType,
     scheduledDate,
     scheduledTime,
     isFareOverridden,
   ]);
 
-  // Reverse route
+  // Swap outbound route
   const handleSwapRoute = () => {
     const tmpAddr = pickupAddress;
     const tmpCoords = pickupCoordinates;
@@ -624,15 +753,96 @@ export function DispatchBookingEngine({
     setDropoffCoordinates(tmpCoords);
   };
 
-  // Add extra passenger
+  // Swap return route
+  const handleSwapReturnRoute = () => {
+    const tmpAddr = returnPickupAddress;
+    const tmpCoords = returnPickupCoordinates;
+    setReturnPickupAddress(returnDropoffAddress);
+    setReturnPickupCoordinates(returnDropoffCoordinates);
+    setReturnDropoffAddress(tmpAddr);
+    setReturnDropoffCoordinates(tmpCoords);
+  };
+
+  // Passenger increment with automatic vehicle upgrade
+  const handleIncrementPassengers = () => {
+    const nextPax = passengers + 1;
+    // Check if nextPax exceeds capacity of current selected vehicles
+    if (nextPax > totalMaxPassengers) {
+      // Auto-upgrade:
+      // 1 vehicle Sedan -> SUV (cap 6)
+      // 1 vehicle SUV -> Van (cap 7)
+      // 1 vehicle Van -> add Sedan (cap 7 + 4 = 11)
+      if (selectedVehicles.length === 1 && selectedVehicles[0] === 'sedan') {
+        setSelectedVehicles(['suv']);
+      } else if (selectedVehicles.length === 1 && selectedVehicles[0] === 'suv') {
+        setSelectedVehicles(['van']);
+      } else {
+        setSelectedVehicles([...selectedVehicles, 'sedan']);
+      }
+    }
+    setPassengers(nextPax);
+  };
+
+  const handleDecrementPassengers = () => {
+    setPassengers((p) => Math.max(1, p - 1));
+  };
+
+  // Add extra passenger with auto-upgrade
   const handleAddPassenger = () => {
     setAdditionalPassengers([...additionalPassengers, { name: '', phone: '' }]);
-    setPassengers((p) => p + 1);
+    handleIncrementPassengers();
   };
 
   const handleRemovePassenger = (index: number) => {
     setAdditionalPassengers(additionalPassengers.filter((_, i) => i !== index));
     setPassengers((p) => Math.max(1, p - 1));
+  };
+
+  // Vehicle management
+  const handleAddVehicle = () => {
+    setSelectedVehicles([...selectedVehicles, 'sedan']);
+  };
+
+  const handleRemoveVehicle = (index: number) => {
+    if (selectedVehicles.length <= 1) return;
+    const updated = selectedVehicles.filter((_, i) => i !== index);
+    setSelectedVehicles(updated);
+  };
+
+  const handleUpdateVehicleChoice = (index: number, choice: 'sedan' | 'suv' | 'van') => {
+    const updated = [...selectedVehicles];
+    updated[index] = choice;
+    setSelectedVehicles(updated);
+  };
+
+  // Return vehicles management
+  const handleAddReturnVehicle = () => {
+    setReturnVehicles([...returnVehicles, 'sedan']);
+  };
+
+  const handleRemoveReturnVehicle = (index: number) => {
+    if (returnVehicles.length <= 1) return;
+    setReturnVehicles(returnVehicles.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateReturnVehicle = (index: number, choice: 'sedan' | 'suv' | 'van') => {
+    const updated = [...returnVehicles];
+    updated[index] = choice;
+    setReturnVehicles(updated);
+  };
+
+  // Toggle Car Seats master switch
+  const handleToggleCarSeats = (checked: boolean) => {
+    setCarSeats(checked);
+    if (checked) {
+      if (rearFacingCount === 0 && frontFacingCount === 0 && boosterCount === 0) {
+        setRearFacingCount(1);
+      }
+    } else {
+      setRearFacingCount(0);
+      setFrontFacingCount(0);
+      setBoosterCount(0);
+    }
   };
 
   // Toggle Repeat Day
@@ -662,7 +872,10 @@ export function DispatchBookingEngine({
     setPassengers(1);
     setBags(0);
     setCarSeats(false);
-    setVehicle('any');
+    setRearFacingCount(0);
+    setFrontFacingCount(0);
+    setBoosterCount(0);
+    setSelectedVehicles(['sedan']);
     setPaymentMethod('cash');
     setCardPaymentType('terminal');
     setCardholderName('');
@@ -678,6 +891,14 @@ export function DispatchBookingEngine({
     setNotesForAll('');
     setInternalNotes('');
     setReturnTrip(false);
+    setReturnPickupAddress('');
+    setReturnDropoffAddress('');
+    setReturnIntermediateStops([]);
+    setReturnCarSeats(false);
+    setReturnRearFacing(0);
+    setReturnFrontFacing(0);
+    setReturnBooster(0);
+    setReturnVehicles(['sedan']);
     setRepeat(false);
     setEstimatedFare(0);
     setManualFare('');
@@ -688,9 +909,7 @@ export function DispatchBookingEngine({
 
     try {
       localStorage.removeItem(draftStorageKey);
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     onClearDraft?.();
   };
@@ -720,10 +939,11 @@ export function DispatchBookingEngine({
     setIsSubmitting(true);
     const service = getBookingService();
 
+    const primaryVehicle = selectedVehicles[0] || 'sedan';
     let tier: VehicleTier = 'standard';
-    if (vehicle === 'suv') tier = 'xl';
-    else if (vehicle === 'van') tier = 'wheelchair';
-    else if (vehicle === 'sedan') tier = 'premium';
+    if (primaryVehicle === 'suv') tier = 'xl';
+    else if (primaryVehicle === 'van') tier = 'wheelchair';
+    else if (primaryVehicle === 'sedan') tier = 'premium';
 
     let method: PaymentMethod = 'cash';
     if (paymentMethod === 'card') method = 'card';
@@ -740,12 +960,28 @@ export function DispatchBookingEngine({
       scheduledPickupTime = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
     }
 
+    const carSeatSummaryParts = [
+      rearFacingCount > 0 ? `${rearFacingCount} Rear-Facing` : null,
+      frontFacingCount > 0 ? `${frontFacingCount} Front-Facing` : null,
+      boosterCount > 0 ? `${boosterCount} Booster` : null,
+    ].filter(Boolean);
+
+    const specialRequests = carSeats && carSeatSummaryParts.length > 0
+      ? `Car Seats: ${carSeatSummaryParts.join(', ')}`
+      : undefined;
+
     const metadataPayload = {
       company,
       internalNotes,
       tariff,
       discount,
       additionalPassengers,
+      selectedVehicles,
+      carSeatsBreakdown: {
+        rearFacing: rearFacingCount,
+        frontFacing: frontFacingCount,
+        booster: boosterCount,
+      },
       contactPerson: isBookerDifferent
         ? {
             isBookerDifferent: true,
@@ -777,8 +1013,19 @@ export function DispatchBookingEngine({
       returnDetails: returnTrip
         ? {
             returnTrip: true,
+            returnPickupAddress: returnPickupAddress || dropoffAddress,
+            returnDropoffAddress: returnDropoffAddress || pickupAddress,
             returnDate,
             returnTime,
+            returnPassengers,
+            returnBags,
+            returnCarSeats,
+            returnCarSeatsBreakdown: {
+              rearFacing: returnRearFacing,
+              frontFacing: returnFrontFacing,
+              booster: returnBooster,
+            },
+            returnVehicles,
             autoCreateReturnTrip,
           }
         : undefined,
@@ -788,7 +1035,9 @@ export function DispatchBookingEngine({
             repeatFrequency,
             repeatDays,
             repeatOccurrences,
-            repeatEndDate,
+            repeatUntilDate,
+            repeatWeeksPattern,
+            repeatsRoundTrip: returnTrip,
           }
         : undefined,
     };
@@ -820,7 +1069,7 @@ export function DispatchBookingEngine({
             email,
             passengerCount: passengers,
             luggageCount: bags,
-            specialRequests: carSeats ? 'Car Seats Required' : undefined,
+            specialRequests,
           },
           vehicleTier: tier,
           bookingType: timingType === 'later' ? 'scheduled' : 'asap',
@@ -878,7 +1127,7 @@ export function DispatchBookingEngine({
             email,
             passengerCount: passengers,
             luggageCount: bags,
-            specialRequests: carSeats ? 'Car Seats Required' : undefined,
+            specialRequests,
           },
           vehicleTier: tier,
           driverNotes: notesForAll,
@@ -915,26 +1164,69 @@ export function DispatchBookingEngine({
               assignedDriverId: driverId,
               reason: `Directly assigned to ${driverId} by dispatcher`,
             });
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
 
         // Auto-create linked return booking if requested
         if (returnTrip && autoCreateReturnTrip && returnDate && returnTime) {
           try {
+            const retPickupAddr = returnPickupAddress.trim() || dropoffAddress;
+            const retDropoffAddr = returnDropoffAddress.trim() || pickupAddress;
             const returnScheduledTime = new Date(`${returnDate}T${returnTime}:00`).toISOString();
+            
+            const returnCarSeatSummaryParts = [
+              returnRearFacing > 0 ? `${returnRearFacing} Rear-Facing` : null,
+              returnFrontFacing > 0 ? `${returnFrontFacing} Front-Facing` : null,
+              returnBooster > 0 ? `${returnBooster} Booster` : null,
+            ].filter(Boolean);
+
+            const returnSpecialRequests = returnCarSeats && returnCarSeatSummaryParts.length > 0
+              ? `Car Seats: ${returnCarSeatSummaryParts.join(', ')}`
+              : undefined;
+
             const returnPayload: CreateTripInput = {
-              ...payload,
               bookingType: 'scheduled',
               scheduledPickupTime: returnScheduledTime,
               pickupLocation: {
-                address: dropoffAddress,
-                coordinates: dropoffCoordinates,
+                address: retPickupAddr,
+                coordinates: returnPickupCoordinates || dropoffCoordinates,
               },
               dropoffLocation: {
-                address: pickupAddress,
-                coordinates: pickupCoordinates,
+                address: retDropoffAddr,
+                coordinates: returnDropoffCoordinates || pickupCoordinates,
+              },
+              intermediateStops:
+                returnIntermediateStops.length > 0
+                  ? returnIntermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates }))
+                  : undefined,
+              passenger: {
+                firstName,
+                lastName,
+                phone,
+                email,
+                passengerCount: returnPassengers,
+                luggageCount: returnBags,
+                specialRequests: returnSpecialRequests,
+              },
+              vehicleTier: returnVehicles[0] === 'suv' ? 'xl' : returnVehicles[0] === 'van' ? 'wheelchair' : 'premium',
+              driverNotes: notesForAll,
+              pricing: {
+                baseFare: 5.0,
+                distanceMiles: estimatedDistanceMiles,
+                durationMinutes: estimatedDurationMinutes,
+                distanceRate: 2.5,
+                timeRate: 0.5,
+                vehicleMultiplier: 1.0,
+                surgeMultiplier: 1.0,
+                discountAmount: 0,
+                subtotal: finalFare,
+                totalFare: finalFare,
+                currency: 'USD',
+              },
+              payment: {
+                method,
+                status: 'pending',
+                amount: finalFare,
               },
               metadata: {
                 ...metadataPayload,
@@ -951,96 +1243,102 @@ export function DispatchBookingEngine({
 
         try {
           localStorage.removeItem(draftStorageKey);
-        } catch {
-          // ignore
-        }
+        } catch {}
 
         onBookingSuccess?.(createdTrip, false);
       }
     } catch (err: any) {
-      console.error('[DispatchBookingEngine] Submit failed:', err);
-      setSubmitError(err.message || 'Failed to submit booking. Please try again.');
+      setSubmitError(err?.message || 'Failed to save booking. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const displayFare =
-    isFareOverridden && manualFare
-      ? `$${parseFloat(manualFare) || 0}`
-      : estimatedFare > 0
-      ? `~$${Math.round(estimatedFare)}`
-      : '~$0';
-
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full text-slate-800 text-xs">
-      {/* Scrollable Form Body */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+    <form onSubmit={handleSubmit} className="flex flex-col h-full bg-slate-50 select-none text-xs">
+      {/* ─── Scrollable Form Body ─── */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3.5">
         {submitError && (
-          <div className="p-2 text-xs bg-red-50 border border-red-200 text-red-700 rounded font-medium">
-            {submitError}
+          <div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs font-semibold flex items-center gap-1.5">
+            <span>⚠</span>
+            <span>{submitError}</span>
           </div>
         )}
 
-        {/* ─── Timing Toggle & Date/Time ─── */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700">
-            <input
-              type="checkbox"
-              checked={timingType === 'later'}
-              onChange={(e) => setTimingType(e.target.checked ? 'later' : 'asap')}
-              className="sr-only"
-            />
-            <div
-              className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 ${
-                timingType === 'later' ? 'bg-blue-600' : 'bg-slate-300'
+        {/* ─── Timing Selector ─── */}
+        <div className="space-y-1.5">
+          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+            Pickup Time
+          </label>
+          <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-200/70 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setTimingType('asap')}
+              className={`py-1.5 text-center rounded font-semibold transition-all ${
+                timingType === 'asap'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-slate-900'
               }`}
             >
-              <div
-                className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-                  timingType === 'later' ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </div>
-            <span>Later</span>
-          </label>
+              ⚡ ASAP (Live)
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimingType('later')}
+              className={`py-1.5 text-center rounded font-semibold transition-all ${
+                timingType === 'later'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-slate-900'
+              }`}
+            >
+              📅 Schedule Later
+            </button>
+          </div>
 
-          {timingType === 'later' ? (
-            <div className="flex items-center gap-1 flex-1">
-              <input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-1/2 px-2 py-1 bg-white border border-slate-300 rounded text-slate-700 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              />
-              <input
-                type="time"
-                value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                className="w-1/2 px-2 py-1 bg-white border border-slate-300 rounded text-slate-700 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-          ) : (
-            <div className="flex-1 px-3 py-1 bg-slate-100 border border-slate-200 rounded text-slate-500 text-center font-medium">
-              ASAP (Immediate Ride)
+          {timingType === 'later' && (
+            <div className="grid grid-cols-2 gap-2 pt-1 animate-in fade-in duration-150">
+              <div>
+                <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Date</span>
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  required
+                  className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Time</span>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  required
+                  className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
             </div>
           )}
         </div>
 
-        {/* ─── Route Section ─── */}
+        {/* ─── Routing Section (Outbound) ─── */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">Route</label>
-          <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
-            <div className="relative flex items-center gap-2">
-              <button
-                type="button"
-                title="Swap Pickup and Dropoff"
-                onClick={handleSwapRoute}
-                className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-              >
-                ↕
-              </button>
-              <div className="flex-1 space-y-1.5">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">Route</label>
+            <button
+              type="button"
+              onClick={handleSwapRoute}
+              className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1"
+              title="Reverse pickup and dropoff locations"
+            >
+              <span>⇄</span>
+              <span>Swap Route</span>
+            </button>
+          </div>
+
+          <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-1.5">
+            <div className="relative">
+              <div className="space-y-1.5">
                 <DispatchLocationInput
                   placeholder="Pickup Location"
                   value={pickupAddress}
@@ -1094,7 +1392,7 @@ export function DispatchBookingEngine({
               </div>
             </div>
 
-            {/* Estimate & Add Stop */}
+            {/* Route Stats & Add Stop */}
             <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
               <div>
                 Estimate: <span className="font-bold text-slate-700">{estimatedDurationMinutes} min</span>,{' '}
@@ -1258,12 +1556,19 @@ export function DispatchBookingEngine({
           </div>
         </div>
 
-        {/* ─── Trip Details (Pax, Bags, Car Seats) ─── */}
+        {/* ─── Trip Details (Pax, Bags, Car Seats with 3-tier counters) ─── */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
-            Trip Details
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+              Trip Details
+            </label>
+            <span className="text-[10px] text-slate-500 font-medium">
+              Capacity: Max {totalMaxPassengers} Pax • {totalMaxBags} Bags
+            </span>
+          </div>
+
           <div className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
+            {/* Passengers Counter */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                 <span>👤</span>
@@ -1272,7 +1577,7 @@ export function DispatchBookingEngine({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setPassengers(Math.max(1, passengers - 1))}
+                  onClick={handleDecrementPassengers}
                   className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
                 >
                   -
@@ -1280,14 +1585,16 @@ export function DispatchBookingEngine({
                 <span className="w-5 text-center font-bold">{passengers}</span>
                 <button
                   type="button"
-                  onClick={() => setPassengers(Math.min(14, passengers + 1))}
-                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
+                  onClick={handleIncrementPassengers}
+                  title="Increments passengers. Auto-upgrades vehicles if capacity exceeded."
+                  className="w-6 h-6 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700"
                 >
                   +
                 </button>
               </div>
             </div>
 
+            {/* Bags Counter */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                 <span>🧳</span>
@@ -1296,7 +1603,7 @@ export function DispatchBookingEngine({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setBags(Math.max(0, bags - 1))}
+                  onClick={() => setBags((b) => Math.max(0, b - 1))}
                   className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
                 >
                   -
@@ -1304,7 +1611,7 @@ export function DispatchBookingEngine({
                 <span className="w-5 text-center font-bold">{bags}</span>
                 <button
                   type="button"
-                  onClick={() => setBags(Math.min(10, bags + 1))}
+                  onClick={() => setBags((b) => Math.min(totalMaxBags, b + 1))}
                   className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
                 >
                   +
@@ -1312,37 +1619,164 @@ export function DispatchBookingEngine({
               </div>
             </div>
 
-            <div className="pt-1 border-t border-slate-100">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={carSeats}
-                  onChange={(e) => setCarSeats(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="font-medium">Car Seats Required</span>
-              </label>
+            {/* Car Seats Master Toggle */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={carSeats}
+                    onChange={(e) => handleToggleCarSeats(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="font-semibold text-slate-800">Car Seats Required</span>
+                </label>
+                {carSeats && (
+                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    Total: {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
+                  </span>
+                )}
+              </div>
+
+              {/* 3 Car Seat Counters: Rear-Facing, Front-Facing, Booster */}
+              {carSeats && (
+                <div className="p-2 bg-amber-50/60 border border-amber-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                  {/* Rear-Facing (Infant) */}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div className="text-slate-700">
+                      <span className="font-semibold">Rear-Facing</span> (Infant)
+                      <span className="text-[10px] text-slate-400 ml-1">max {carSeatLimits.maxRearFacing}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRearFacingCount((c) => Math.max(0, c - 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center font-bold text-slate-800">{rearFacingCount}</span>
+                      <button
+                        type="button"
+                        disabled={rearFacingCount >= carSeatLimits.maxRearFacing || totalCarSeats >= carSeatLimits.maxTotalCarSeats}
+                        onClick={() => setRearFacingCount((c) => Math.min(carSeatLimits.maxRearFacing, c + 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Front-Facing (Toddler) */}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div className="text-slate-700">
+                      <span className="font-semibold">Front-Facing</span> (Toddler)
+                      <span className="text-[10px] text-slate-400 ml-1">max {carSeatLimits.maxFrontFacing}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setFrontFacingCount((c) => Math.max(0, c - 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center font-bold text-slate-800">{frontFacingCount}</span>
+                      <button
+                        type="button"
+                        disabled={frontFacingCount >= carSeatLimits.maxFrontFacing || totalCarSeats >= carSeatLimits.maxTotalCarSeats}
+                        onClick={() => setFrontFacingCount((c) => Math.min(carSeatLimits.maxFrontFacing, c + 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Booster (Youth) */}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div className="text-slate-700">
+                      <span className="font-semibold">Booster</span> (Youth)
+                      <span className="text-[10px] text-slate-400 ml-1">max {carSeatLimits.maxBooster}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBoosterCount((c) => Math.max(0, c - 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center font-bold text-slate-800">{boosterCount}</span>
+                      <button
+                        type="button"
+                        disabled={boosterCount >= carSeatLimits.maxBooster || totalCarSeats >= carSeatLimits.maxTotalCarSeats}
+                        onClick={() => setBoosterCount((c) => Math.min(carSeatLimits.maxBooster, c + 1))}
+                        className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ─── Vehicles (Segmented) ─── */}
+        {/* ─── Vehicles (Multi-Vehicle Selector with Inline Choices & Add/Remove) ─── */}
         <div>
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">Vehicles</label>
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/70 border border-slate-300 rounded-lg">
-            {(['any', 'sedan', 'suv', 'van'] as const).map((v) => (
-              <button
-                type="button"
-                key={v}
-                onClick={() => setVehicle(v)}
-                className={`py-1.5 text-center rounded font-semibold capitalize transition-all ${
-                  vehicle === v
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                }`}
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+              Vehicles ({selectedVehicles.length})
+            </label>
+            <button
+              type="button"
+              onClick={handleAddVehicle}
+              className="text-[11px] text-blue-600 hover:text-blue-800 font-bold"
+            >
+              + Add Vehicle
+            </button>
+          </div>
+
+          <div className="space-y-1.5">
+            {selectedVehicles.map((vChoice, idx) => (
+              <div
+                key={idx}
+                className="p-1.5 bg-white border border-slate-300 rounded-lg shadow-2xs flex items-center gap-2"
               >
-                {v}
-              </button>
+                <span className="text-[10px] font-bold text-slate-400 w-5">#{idx + 1}</span>
+                <div className="flex-1 grid grid-cols-3 gap-1 p-0.5 bg-slate-100 rounded">
+                  {(['sedan', 'suv', 'van'] as const).map((tierKey) => {
+                    const isSelected = vChoice === tierKey;
+                    const cap = vehicleCapacities[tierKey] || { maxPassengers: 4, maxBags: 3 };
+                    return (
+                      <button
+                        type="button"
+                        key={tierKey}
+                        onClick={() => handleUpdateVehicleChoice(idx, tierKey)}
+                        className={`py-1 text-center rounded text-[11px] font-bold capitalize transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                        }`}
+                      >
+                        {tierKey} <span className="text-[9px] opacity-80">({cap.maxPassengers}p)</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedVehicles.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveVehicle(idx)}
+                    className="p-1 text-slate-400 hover:text-red-500 rounded"
+                    title="Remove vehicle"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -1398,42 +1832,42 @@ export function DispatchBookingEngine({
                     placeholder="Cardholder Name"
                     value={cardholderName}
                     onChange={(e) => setCardholderName(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs"
                   />
                   <input
                     type="text"
+                    placeholder="16-Digit Card Number"
                     maxLength={19}
-                    placeholder="Card Number (•••• •••• •••• ••••)"
                     value={cardNumber}
                     onChange={(e) => setCardNumber(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono"
                   />
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1.5">
                     <input
                       type="text"
-                      maxLength={5}
                       placeholder="MM/YY"
+                      maxLength={5}
                       value={cardExp}
                       onChange={(e) => setCardExp(e.target.value)}
-                      className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center font-mono focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center font-mono"
                     />
                     <input
                       type="password"
-                      maxLength={4}
                       placeholder="CVC"
+                      maxLength={4}
                       value={cardCvc}
                       onChange={(e) => setCardCvc(e.target.value)}
-                      className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center font-mono focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center font-mono"
                     />
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-600 text-[11px] select-none">
+                  <label className="flex items-center gap-1.5 pt-1 text-[11px] text-slate-600 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={saveCardOnFile}
                       onChange={(e) => setSaveCardOnFile(e.target.checked)}
                       className="rounded border-slate-300 text-blue-600"
                     />
-                    <span>Save card on file for future rides</span>
+                    <span>Save card securely on file for future rides</span>
                   </label>
                 </div>
               )}
@@ -1442,16 +1876,14 @@ export function DispatchBookingEngine({
 
           {/* Corporate Account Sub-Panel */}
           {paymentMethod === 'account' && (
-            <div className="p-2 mb-2 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5">
-              <div className="text-[10px] uppercase font-bold text-amber-800 tracking-wide">
-                Corporate Direct Bill Account
-              </div>
+            <div className="p-2 mb-2 bg-amber-50/80 border border-amber-300 rounded-lg space-y-1.5">
+              <div className="text-[10px] font-bold text-amber-900 uppercase">Corporate Account Billing</div>
               <div>
                 <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Corporate Client</span>
                 <select
                   value={corporateAccount}
                   onChange={(e) => setCorporateAccount(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800 font-medium"
+                  className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800"
                 >
                   {DEFAULT_CORPORATE_ACCOUNTS.map((acc) => (
                     <option key={acc} value={acc}>
@@ -1460,7 +1892,7 @@ export function DispatchBookingEngine({
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 <div>
                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Billing PO / Code</span>
                   <input
@@ -1571,7 +2003,7 @@ export function DispatchBookingEngine({
             <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Notes for All</label>
             <textarea
               rows={2}
-              placeholder="e.g., Gate code is #1234, come to the side door..."
+              placeholder="e.g., Gate code is #1234, side door pickup..."
               value={notesForAll}
               onChange={(e) => setNotesForAll(e.target.value)}
               className="w-full p-2 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
@@ -1584,7 +2016,7 @@ export function DispatchBookingEngine({
             </label>
             <textarea
               rows={2}
-              placeholder="e.g., VIP client, handle with care..."
+              placeholder="e.g., VIP client, medical escort..."
               value={internalNotes}
               onChange={(e) => setInternalNotes(e.target.value)}
               className="w-full p-2 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
@@ -1593,7 +2025,7 @@ export function DispatchBookingEngine({
 
           {/* ─── Return Trip & Repeat Toggles with Extended Panels ─── */}
           <div className="pt-2 border-t border-slate-200 space-y-2">
-            {/* Return Trip */}
+            {/* Return Trip (Full Route, Details & Vehicles) */}
             <div>
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
@@ -1602,17 +2034,86 @@ export function DispatchBookingEngine({
                   onChange={(e) => setReturnTrip(e.target.checked)}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="font-bold text-slate-800">Return Trip</span>
+                <span className="font-bold text-slate-800">Return Trip (Round Trip)</span>
               </label>
 
               {returnTrip && (
-                <div className="mt-1.5 p-2 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-1.5">
+                <div className="mt-1.5 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2.5">
                   <div className="text-[10px] font-bold text-indigo-900 flex items-center justify-between">
-                    <span>🔁 REVERSED ROUTE SCHEDULE</span>
-                    <span className="text-[9px] bg-indigo-200 text-indigo-800 px-1 rounded">
-                      Dropoff &rarr; Pickup
-                    </span>
+                    <span>🔁 RETURN LEG SPECIFICATIONS</span>
+                    <button
+                      type="button"
+                      onClick={handleSwapReturnRoute}
+                      className="text-[9px] bg-indigo-200 hover:bg-indigo-300 text-indigo-900 px-1.5 py-0.5 rounded font-bold"
+                    >
+                      ⇄ Swap Return Route
+                    </button>
                   </div>
+
+                  {/* Return Route Locations */}
+                  <div className="space-y-1.5 p-2 bg-white border border-indigo-200 rounded">
+                    <div className="text-[10px] font-bold text-indigo-800">Return Route</div>
+                    <DispatchLocationInput
+                      placeholder="Return Pickup Location"
+                      value={returnPickupAddress}
+                      variant="pickup"
+                      onChange={setReturnPickupAddress}
+                      onPlaceSelected={(p) => {
+                        setReturnPickupAddress(p.address);
+                        setReturnPickupCoordinates(p.coordinates);
+                      }}
+                      required
+                    />
+
+                    {returnIntermediateStops.map((stop, idx) => (
+                      <div key={idx} className="flex items-center gap-1">
+                        <DispatchLocationInput
+                          placeholder={`Return Stop #${idx + 1}`}
+                          value={stop.address}
+                          variant="stop"
+                          onChange={(val) => {
+                            const updated = [...returnIntermediateStops];
+                            updated[idx].address = val;
+                            setReturnIntermediateStops(updated);
+                          }}
+                          onPlaceSelected={(p) => {
+                            const updated = [...returnIntermediateStops];
+                            updated[idx] = { address: p.address, coordinates: p.coordinates };
+                            setReturnIntermediateStops(updated);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setReturnIntermediateStops(returnIntermediateStops.filter((_, i) => i !== idx))}
+                          className="text-slate-400 hover:text-red-500 px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+
+                    <DispatchLocationInput
+                      placeholder="Return Dropoff Location"
+                      value={returnDropoffAddress}
+                      variant="dropoff"
+                      onChange={setReturnDropoffAddress}
+                      onPlaceSelected={(p) => {
+                        setReturnDropoffAddress(p.address);
+                        setReturnDropoffCoordinates(p.coordinates);
+                      }}
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold"
+                    >
+                      + Add return stop
+                    </button>
+                  </div>
+
+                  {/* Return Date & Time */}
                   <div className="grid grid-cols-2 gap-1.5">
                     <div>
                       <span className="block text-[9px] text-indigo-700 font-semibold mb-0.5">Return Date</span>
@@ -1633,6 +2134,171 @@ export function DispatchBookingEngine({
                       />
                     </div>
                   </div>
+
+                  {/* Return Trip Details: Pax & Bags */}
+                  <div className="p-2 bg-white border border-indigo-200 rounded grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-indigo-900 font-medium">Return Pax:</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setReturnPassengers((p) => Math.max(1, p - 1))}
+                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="w-4 text-center font-bold">{returnPassengers}</span>
+                        <button
+                          type="button"
+                          onClick={() => setReturnPassengers((p) => p + 1)}
+                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-indigo-900 font-medium">Return Bags:</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setReturnBags((b) => Math.max(0, b - 1))}
+                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="w-4 text-center font-bold">{returnBags}</span>
+                        <button
+                          type="button"
+                          onClick={() => setReturnBags((b) => b + 1)}
+                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Return Car Seats Toggle & Counters */}
+                  <div className="p-2 bg-white border border-indigo-200 rounded space-y-1.5">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-indigo-900 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={returnCarSeats}
+                        onChange={(e) => setReturnCarSeats(e.target.checked)}
+                        className="rounded border-indigo-300 text-indigo-600"
+                      />
+                      <span>Return Car Seats Required</span>
+                    </label>
+
+                    {returnCarSeats && (
+                      <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
+                        <div className="p-1 bg-indigo-50/50 rounded border border-indigo-100 text-center">
+                          <div className="text-slate-600 font-semibold mb-0.5">Rear-Facing</div>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setReturnRearFacing((c) => Math.max(0, c - 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold">{returnRearFacing}</span>
+                            <button
+                              type="button"
+                              onClick={() => setReturnRearFacing((c) => Math.min(carSeatLimits.maxRearFacing, c + 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-1 bg-indigo-50/50 rounded border border-indigo-100 text-center">
+                          <div className="text-slate-600 font-semibold mb-0.5">Front-Facing</div>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setReturnFrontFacing((c) => Math.max(0, c - 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold">{returnFrontFacing}</span>
+                            <button
+                              type="button"
+                              onClick={() => setReturnFrontFacing((c) => Math.min(carSeatLimits.maxFrontFacing, c + 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-1 bg-indigo-50/50 rounded border border-indigo-100 text-center">
+                          <div className="text-slate-600 font-semibold mb-0.5">Booster</div>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setReturnBooster((c) => Math.max(0, c - 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold">{returnBooster}</span>
+                            <button
+                              type="button"
+                              onClick={() => setReturnBooster((c) => Math.min(carSeatLimits.maxBooster, c + 1))}
+                              className="w-4 h-4 rounded bg-white border"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Return Vehicles Section */}
+                  <div className="p-2 bg-white border border-indigo-200 rounded space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-indigo-900">
+                      <span>Return Vehicles ({returnVehicles.length})</span>
+                      <button
+                        type="button"
+                        onClick={handleAddReturnVehicle}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800"
+                      >
+                        + Add Vehicle
+                      </button>
+                    </div>
+                    {returnVehicles.map((rv, rIdx) => (
+                      <div key={rIdx} className="flex items-center gap-1 text-[11px]">
+                        <span className="text-slate-400 font-bold text-[9px]">#{rIdx + 1}</span>
+                        <div className="flex-1 grid grid-cols-3 gap-1 p-0.5 bg-slate-100 rounded">
+                          {(['sedan', 'suv', 'van'] as const).map((tierKey) => (
+                            <button
+                              type="button"
+                              key={tierKey}
+                              onClick={() => handleUpdateReturnVehicle(rIdx, tierKey)}
+                              className={`py-0.5 text-center rounded text-[10px] font-bold capitalize ${
+                                rv === tierKey ? 'bg-indigo-600 text-white' : 'text-slate-600'
+                              }`}
+                            >
+                              {tierKey}
+                            </button>
+                          ))}
+                        </div>
+                        {returnVehicles.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveReturnVehicle(rIdx)}
+                            className="text-slate-400 hover:text-red-500 px-1"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
                   <label className="flex items-center gap-2 cursor-pointer text-indigo-900 text-[11px] select-none pt-0.5">
                     <input
                       type="checkbox"
@@ -1640,13 +2306,13 @@ export function DispatchBookingEngine({
                       onChange={(e) => setAutoCreateReturnTrip(e.target.checked)}
                       className="rounded border-indigo-300 text-indigo-600"
                     />
-                    <span>Automatically generate linked return booking in queue</span>
+                    <span className="font-semibold">Automatically generate linked return booking in queue</span>
                   </label>
                 </div>
               )}
             </div>
 
-            {/* Repeat / Recurring */}
+            {/* Repeat / Recurring (Until Date & Weeks Pattern) */}
             <div>
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
@@ -1659,9 +2325,14 @@ export function DispatchBookingEngine({
               </label>
 
               {repeat && (
-                <div className="mt-1.5 p-2 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2">
-                  <div className="text-[10px] font-bold text-emerald-900">
-                    🔄 RECURRING SCHEDULE
+                <div className="mt-1.5 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2">
+                  <div className="text-[10px] font-bold text-emerald-900 flex items-center justify-between">
+                    <span>🔄 RECURRING SCHEDULE</span>
+                    {returnTrip && (
+                      <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">
+                        Repeats Round Trip
+                      </span>
+                    )}
                   </div>
 
                   {/* Frequency Pills */}
@@ -1711,9 +2382,34 @@ export function DispatchBookingEngine({
                     </div>
                   </div>
 
-                  {/* Occurrences / End Date */}
+                  {/* Until Date Picker & Weeks Dropdown (All, Odd, Even) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-200/70">
+                    <div>
+                      <span className="block text-[9px] text-emerald-800 font-semibold mb-0.5">Until Date</span>
+                      <input
+                        type="date"
+                        value={repeatUntilDate}
+                        onChange={(e) => setRepeatUntilDate(e.target.value)}
+                        className="w-full px-2 py-1 bg-white border border-emerald-300 rounded text-xs text-slate-800 font-medium"
+                      />
+                    </div>
+                    <div>
+                      <span className="block text-[9px] text-emerald-800 font-semibold mb-0.5">Weeks Pattern</span>
+                      <select
+                        value={repeatWeeksPattern}
+                        onChange={(e) => setRepeatWeeksPattern(e.target.value as any)}
+                        className="w-full px-2 py-1 bg-white border border-emerald-300 rounded text-xs text-slate-800 font-medium"
+                      >
+                        <option value="all">All Weeks</option>
+                        <option value="odd">Odd Weeks</option>
+                        <option value="even">Even Weeks</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Occurrences Stepper */}
                   <div className="flex items-center justify-between pt-1 border-t border-emerald-200/70">
-                    <span className="text-[10px] font-semibold text-emerald-800">Occurrences</span>
+                    <span className="text-[10px] font-semibold text-emerald-800">Estimated Rides</span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -1725,7 +2421,7 @@ export function DispatchBookingEngine({
                       <span className="text-xs font-bold text-emerald-900">{repeatOccurrences} rides</span>
                       <button
                         type="button"
-                        onClick={() => setRepeatOccurrences(Math.min(30, repeatOccurrences + 1))}
+                        onClick={() => setRepeatOccurrences(Math.min(60, repeatOccurrences + 1))}
                         className="w-5 h-5 rounded bg-white border border-emerald-300 font-bold flex items-center justify-center text-emerald-800"
                       >
                         +
@@ -1748,52 +2444,62 @@ export function DispatchBookingEngine({
               <input
                 type="number"
                 step="0.01"
+                placeholder="0.00"
                 value={manualFare}
                 onChange={(e) => setManualFare(e.target.value)}
-                className="w-16 px-1.5 py-0.5 border border-blue-400 rounded text-blue-600 font-bold text-sm focus:outline-none"
+                className="w-20 px-2 py-1 bg-white border border-blue-400 rounded font-mono font-bold text-sm text-blue-700"
               />
               <button
                 type="button"
-                onClick={() => {
-                  setIsFareOverridden(false);
-                  setManualFare('');
-                }}
+                onClick={() => setIsFareOverridden(false)}
                 className="text-[10px] text-slate-400 hover:text-slate-600 underline"
               >
-                Auto
+                Reset
               </button>
             </div>
           ) : (
-            <button
-              type="button"
+            <div
               onClick={() => {
                 setIsFareOverridden(true);
-                setManualFare(estimatedFare.toFixed(2));
+                setManualFare(estimatedFare ? estimatedFare.toFixed(2) : '');
               }}
+              className="cursor-pointer group flex items-baseline gap-1"
               title="Click to manually override fare"
-              className="text-base font-extrabold text-blue-600 hover:text-blue-700 cursor-pointer"
             >
-              {displayFare}
-            </button>
+              <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                ${estimatedFare ? estimatedFare.toFixed(2) : '0.00'}
+              </span>
+              <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-semibold">
+                (Est. ✎)
+              </span>
+            </div>
           )}
         </div>
 
         <div className="flex items-center gap-2">
+          {!isEditMode && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors"
+            >
+              Clear
+            </button>
+          )}
+
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1 disabled:opacity-50 transition-colors"
+            className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
-            {isSubmitting && <SpinnerIcon className="w-3 h-3 animate-spin text-white" />}
-            {isEditMode ? 'Save Changes' : 'Book'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleClear}
-            className="px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 text-slate-600 font-semibold text-xs transition-colors"
-          >
-            Clear
+            {isSubmitting ? (
+              <>
+                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <span>{isEditMode ? 'Update Booking' : 'Book Trip'}</span>
+            )}
           </button>
         </div>
       </div>

@@ -138,9 +138,15 @@ export default function AdminLayout() {
     }
   };
 
-  const handleSignOut = async () => {
-    const authService = getAdminAuthService();
-    await authService.signOut();
+  const handleSignOut = () => {
+    try {
+      getAdminAuthService().signOut().catch(() => {});
+    } catch {}
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch {}
+    }
     navigate('/admin/login', { replace: true });
   };
 
