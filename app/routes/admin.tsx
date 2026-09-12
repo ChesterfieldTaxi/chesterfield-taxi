@@ -216,6 +216,14 @@ export default function AdminLayout() {
               Form Layout ⚙
             </Link>
 
+            {/* Launch Dispatch Console */}
+            <Link
+              to="/dispatch"
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-emerald-500/30 transition-colors flex items-center gap-1.5"
+            >
+              Launch Dispatch 🚀
+            </Link>
+
             {/* Link to public portal */}
             <a
               href="/"

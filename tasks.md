@@ -113,6 +113,7 @@
 - [x] 16.8 Wire up site-wide dynamic branding variables so saved colors from Admin Settings update CSS variables across the booking portal.
 - [x] 16.9 Run `npm run typecheck` to confirm zero TypeScript compilation errors.
 - [x] 16.10 Run `npm run build` to confirm clean SSR and client production bundles.
+- [x] 16.11 Execute Phase 16 Dual-View Architecture (Executive Admin Dashboard vs. Tactical Dispatch Console).
 
 ## Phase 17: Multi-Stop Routing, Dynamic Branding CSS Injection, & Advanced Pricing Rules
 - [x] 17.1 Update `spec.md` with Section 13 and `tasks.md` with Phase 17 sub-tasks.

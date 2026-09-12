@@ -1005,7 +1005,7 @@ export function BookingEngine({
   return (
     <div className={`w-full max-w-6xl mx-auto ${className}`}>
       {/* Mode Badge for Dispatcher/Admin */}
-      {mode !== 'customer' && (
+      {mode === 'admin' && (
         <div className="mb-6 flex items-center justify-between bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-md border border-slate-800">
           <div className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -2050,7 +2050,7 @@ export function BookingEngine({
       </div>
 
       {/* Sticky Bottom Summary Footer */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl py-3 px-4 sm:px-8">
+      <div className={`${mode === 'customer' ? 'fixed inset-x-0' : 'sticky'} bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl py-3 px-4 sm:px-8 mt-6`}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           {/* Left summary info */}
           <div className="text-left w-full sm:w-auto truncate">

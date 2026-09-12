@@ -42,6 +42,7 @@ export interface CompanyBrandConfig {
   primaryColor: string;
   secondaryColor: string;
   colors?: CompanyBrandColors;
+  maxDispatchDrafts?: number;
 }
 
 export const COMPANY_CONFIG: CompanyBrandConfig = {
@@ -55,6 +56,7 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
     primary: '#f59e0b',
     secondary: '#0f172a',
   },
+  maxDispatchDrafts: 10,
   phone: {
     primary: '(314) 738-0100',
     primaryRaw: '+13147380100',
