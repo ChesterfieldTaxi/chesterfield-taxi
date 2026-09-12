@@ -14,6 +14,8 @@ import {
   TrashIcon,
 } from '../../ui/Icons';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
+import { getFleetService } from '../../../core/services/fleet/fleet.service';
+
 
 export interface AdminFleetTabProps {
   settings: AppSettings;
@@ -114,6 +116,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
   const handleDeleteCar = (carId: string) => {
     if (confirm('Are you sure you want to remove this car from the fleet?')) {
       setFleet((prev) => prev.filter((c) => c.id !== carId));
+      getFleetService().deleteAsset(carId).catch((err) => console.warn('[AdminFleetTab] Fleet delete error:', err));
     }
   };
 
@@ -143,7 +146,13 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
     });
 
     setSelectedCarForMaintenance((prev) =>
-      prev ? { ...prev, maintenanceHistory: updatedHistory, mileage: newMileage } : null
+      prev
+        ? {
+            ...prev,
+            maintenanceHistory: updatedHistory,
+            mileage: newMileage,
+          }
+        : null
     );
 
     setNewMaintenanceRecord({
@@ -161,6 +170,31 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       setSaveSuccess(false);
       setSaveError(null);
       await onSave({ fleet });
+
+      // Sync physical assets to Firestore collection /fleet
+      const fleetService = getFleetService();
+      for (const car of fleet) {
+        fleetService
+          .saveAsset({
+            id: car.id,
+            unitNumber: car.unitNumber,
+            vehicleTypeId: car.vehicleTypeId,
+            make: car.make,
+            model: car.model,
+            year: car.year,
+            color: car.color,
+            licensePlate: car.licensePlate,
+            vin: car.vin,
+            assignedDriverName: car.assignedDriverName,
+            insurancePolicy: car.insurancePolicy || '',
+            insuranceExpiry: car.insuranceExpiry || '',
+            mileage: car.mileage,
+            status: car.status as any,
+            maintenanceHistory: car.maintenanceHistory as any,
+          })
+          .catch((err) => console.warn('[AdminFleetTab] FleetService sync error:', err));
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: unknown) {

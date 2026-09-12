@@ -15,11 +15,20 @@ export interface CompanyConfig {
   address: string;
 }
 
+export interface LocalizationConfig {
+  currency: string; // e.g. "USD"
+  currencySymbol: string; // e.g. "$"
+  timezone: string; // e.g. "America/Chicago"
+  timeFormat: '12h' | '24h';
+  dateFormat: string; // e.g. "MM/DD/YYYY"
+}
+
 export interface BrandingConfig {
   primaryColor: string;
   secondaryColor: string;
   logoUrl?: string;
 }
+
 
 export interface DynamicPricingConfig {
   baseFare: number;
@@ -77,6 +86,7 @@ export interface AppSettings {
   pricing: DynamicPricingConfig;
   vehicles: VehicleTierConfig[]; // Vehicle Types (tiers/classes)
   fleet?: FleetCarConfig[]; // Physical Fleet Cars
+  localization?: LocalizationConfig;
   publicFormVersion?: 'v1' | 'v2';
   updatedAt?: string;
   updatedBy?: string;

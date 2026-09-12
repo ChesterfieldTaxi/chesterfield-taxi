@@ -14,12 +14,17 @@ import {
 import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseApp, isFirebaseConfigured } from '../firebase';
 
+export type UserRole = 'customer' | 'driver' | 'dispatcher' | 'admin';
+
 export interface AdminUser {
   uid: string;
   email: string | null;
   displayName?: string | null;
   isDemo?: boolean;
-  role?: 'customer' | 'dispatcher' | 'admin';
+  role?: UserRole;
+  phone?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+  assignedVehicleUnit?: string;
 }
 
 const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
@@ -31,7 +36,7 @@ export class AdminAuthService {
     this.isConfigured = isFirebaseConfigured();
   }
 
-  private async fetchUserRole(user: User): Promise<'customer' | 'dispatcher' | 'admin'> {
+  private async fetchUserRole(user: User): Promise<UserRole> {
     if (!this.isConfigured) return 'customer';
 
     try {
@@ -42,13 +47,13 @@ export class AdminAuthService {
       if (userSnap.exists()) {
         const data = userSnap.data();
         if (data && data.role) {
-          return data.role as 'customer' | 'dispatcher' | 'admin';
+          return data.role as UserRole;
         }
       }
 
       // Auto-provision primary admin if it's the specific admin email
       if (user.email === 'admin@chesterfieldtaxi.com') {
-        const adminRole = 'admin';
+        const adminRole: UserRole = 'admin';
         await setDoc(userRef, { role: adminRole, email: user.email }, { merge: true });
         return adminRole;
       }
@@ -60,6 +65,7 @@ export class AdminAuthService {
       return 'customer';
     }
   }
+
 
   // Note: getCurrentUser is synchronous. It will return the base user but might not have the fully
   // hydrated role if it hasn't been cached. For accurate roles, prefer onAuthStateChanged or signIn.
@@ -156,12 +162,23 @@ export class AdminAuthService {
     }
 
     // Local / Offline demo mode authentication
-    if (trimmedEmail === 'admin@chesterfieldtaxi.com' || trimmedEmail.includes('admin') || trimmedEmail.includes('dispatch')) {
-      const role = trimmedEmail.includes('admin') ? 'admin' : 'dispatcher';
+    if (
+      trimmedEmail === 'admin@chesterfieldtaxi.com' ||
+      trimmedEmail.includes('admin') ||
+      trimmedEmail.includes('dispatch') ||
+      trimmedEmail.includes('driver')
+    ) {
+      const role: UserRole = trimmedEmail.includes('admin')
+        ? 'admin'
+        : trimmedEmail.includes('driver')
+        ? 'driver'
+        : 'dispatcher';
       const demoUser: AdminUser = {
         uid: 'demo_admin_uid_001',
         email: trimmedEmail,
-        displayName: 'Chesterfield ' + (role === 'admin' ? 'Admin' : 'Dispatcher'),
+        displayName:
+          'Chesterfield ' +
+          (role === 'admin' ? 'Admin' : role === 'driver' ? 'Driver' : 'Dispatcher'),
         isDemo: true,
         role,
       };

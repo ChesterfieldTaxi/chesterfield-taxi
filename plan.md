@@ -30,3 +30,38 @@ Trips stored in Firestore will strictly adhere to the following state transition
 ## 5. Targeting Arrays
 - The `Trip` document model will utilize an `offeredToIds` array to manage driver broadcasting.
 - Firestore Security Rules will rely on this array to permit only targeted drivers to read or accept the specific trip offer.
+
+## 6. Phase 18 Admin Console Architecture & Data Models
+### 6.1 Firestore Collection Schemas
+- `/fleet` (Physical Assets):
+  - Document ID: string (`asset-{id}`)
+  - `unitNumber`: string (e.g., 'Cab #101')
+  - `vehicleTypeId`: string (references `/config/appSettings.vehicles[].id`)
+  - `make`: string, `model`: string, `year`: number, `color`: string
+  - `licensePlate`: string, `vin`: string
+  - `insurancePolicy`: string, `insuranceExpiry`: string (ISO date string)
+  - `mileage`: number (odometer)
+  - `status`: `'active' | 'maintenance' | 'out_of_service' | 'inspecting'`
+  - `assignedDriverId`?: string, `assignedDriverName`?: string
+  - `maintenanceHistory`?: MaintenanceRecord[]
+- `/zones` (Operational Geofences):
+  - Document ID: string (`zone-{slug}`)
+  - `name`: string, `description`?: string
+  - `type`: `'radius' | 'polygon'`
+  - `center`?: `{ lat: number, lng: number }`, `radiusMiles`?: number
+  - `vertices`?: `Array<{ lat: number, lng: number }>`
+  - `color`: string (hex color code for map rendering)
+  - `surchargeMultiplier`?: number, `flatFee`?: number
+  - `isActive`: boolean
+- `/users` (RBAC & Roster Management):
+  - Document ID: Firebase Auth UID
+  - `email`: string, `displayName`?: string, `phone`?: string
+  - `role`: `'driver' | 'dispatcher' | 'admin' | 'customer'`
+  - `status`: `'active' | 'inactive' | 'suspended'`
+  - `assignedVehicleUnit`?: string
+
+### 6.2 Consolidated Admin Navigation & Sub-Navigation Architecture
+- Dedicated 7-Tab Navigation Layout (`Dashboard`, `General`, `Rates`, `Vehicles`, `Zones`, `Operators`, `Advanced`) paired with a persistent, high-contrast `Dispatch Console` CTA header button.
+- Sub-Navigation State Machine: Under `Vehicles`, users can toggle seamlessly between `Vehicle Types` (service classes & capacity limits) and `Physical Fleet` (asset registry & maintenance records).
+- Graceful URL backwards-compatibility automatically maps legacy parameters (`?tab=pricing`, `?tab=fleet`, `?tab=staff`, `?tab=bookings`) to the new consolidated views.
+

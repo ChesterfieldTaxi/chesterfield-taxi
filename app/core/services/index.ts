@@ -7,5 +7,8 @@ export * from './firebase';
 export * from './config/admin-config.service';
 export * from './auth/admin-auth.service';
 export * from './firestore-sanitizer';
+export * from './fleet/fleet.service';
+export * from './zones/zone.service';
+
 
 

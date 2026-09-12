@@ -5,24 +5,21 @@ import { getAdminConfigService } from '../core/services/config/admin-config.serv
 import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
 import {
-  AdminGeneralTab,
-  AdminPricingTab,
-  AdminVehiclesTab,
-  AdminFleetTab,
-  AdminStaffTab,
-  AdminBookingsTab,
   AdminDashboardTab,
+  AdminGeneralTab,
+  AdminRatesTab,
+  AdminVehiclesTab,
+  AdminZonesTab,
+  AdminOperatorsTab,
+  AdminAdvancedTab,
+  AdminBookingsTab,
   AdminLayoutTab,
 } from '../components/domain/admin';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
   CarIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
   SpinnerIcon,
-  ClockIcon,
 } from '../components/ui/Icons';
-import { Button } from '../components/ui/Button';
 
 export function meta() {
   return [
@@ -31,55 +28,63 @@ export function meta() {
   ];
 }
 
-type TabKey = 'dashboard' | 'layout' | 'general' | 'pricing' | 'vehicles' | 'fleet' | 'bookings' | 'staff';
+export type AdminTabKey =
+  | 'dashboard'
+  | 'general'
+  | 'rates'
+  | 'vehicles'
+  | 'zones'
+  | 'operators'
+  | 'advanced'
+  // Legacy tab aliases
+  | 'pricing'
+  | 'fleet'
+  | 'staff'
+  | 'bookings'
+  | 'layout';
 
 interface TabItem {
-  key: TabKey;
+  key: AdminTabKey;
   label: string;
   badge?: string;
   description: string;
 }
 
-const TABS: TabItem[] = [
+const PRIMARY_TABS: TabItem[] = [
   {
     key: 'dashboard',
-    label: '📊 Executive Dashboard',
-    description: 'Real-time booking volume, revenue metrics, and dispatch operations launcher',
-  },
-  {
-    key: 'layout',
-    label: '🎨 Form Layout',
-    description: 'Switch between Modern Interactive (V2) and Classic Streamlined (V1) public booking layout',
+    label: '📊 Dashboard',
+    description: 'KPI summary cards, revenue charts, active trip volume, and unassigned booking alerts',
   },
   {
     key: 'general',
-    label: '🏢 General & Business',
-    description: 'Company identity, contact info, operating hours, and booking rules',
+    label: '🏢 General',
+    description: 'Company details, localization, 24/7 operating hours, and branding settings preview',
   },
   {
-    key: 'pricing',
-    label: '💵 Rates & Pricing',
-    description: 'Base fares, per-mile/minute rates, surge settings, and airport fees',
+    key: 'rates',
+    label: '💵 Rates',
+    description: 'Base pricing rules, real-time fare simulator, named pricing rules, and distance tier tables',
   },
   {
     key: 'vehicles',
-    label: '🚗 Vehicles (Types)',
-    description: 'Vehicle classes, passenger/luggage capacities, base fare multipliers, and active tiers',
+    label: '🚗 Vehicles',
+    description: 'Dual-section management: Vehicle service classes & physical motorized fleet asset inventory',
   },
   {
-    key: 'fleet',
-    label: '🚕 Fleet (Cars)',
-    description: 'Physical fleet inventory, makes, models, license plates, VINs, mileage, and maintenance logs',
+    key: 'zones',
+    label: '📍 Zones',
+    description: 'Geofence map manager for drawing and saving named polygon and radius surcharge zones',
   },
   {
-    key: 'bookings',
-    label: '📋 Reservations',
-    description: 'Live trip queue, driver assignment, dispatch creation, and status management',
+    key: 'operators',
+    label: '👥 Operators',
+    description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
   },
   {
-    key: 'staff',
-    label: '👥 Operators & Staff',
-    description: 'Manage dispatcher and admin roles and access permissions',
+    key: 'advanced',
+    label: '⚙️ Advanced',
+    description: 'Sensitive system configurations, API key controls, Firestore rule parameters, and audit logging',
   },
 ];
 
@@ -100,12 +105,34 @@ export default function AdminLayout() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isLiveFirebase, setIsLiveFirebase] = useState(false);
 
-  // Active tab derived reactively from location.search
+  // Active tab derived reactively from location.search with legacy aliasing
   const searchParams = new URLSearchParams(location.search);
-  const activeTab: TabKey = (searchParams.get('tab') as TabKey) || 'dashboard';
+  const rawTab = (searchParams.get('tab') as AdminTabKey) || 'dashboard';
 
-  const handleTabChange = (key: TabKey) => {
-    setSearchParams({ tab: key });
+  // Normalize legacy tab query parameters
+  let normalizedTab: AdminTabKey = rawTab;
+  let subSection: 'types' | 'fleet' | undefined = undefined;
+
+  if (rawTab === 'pricing') {
+    normalizedTab = 'rates';
+  } else if (rawTab === 'fleet') {
+    normalizedTab = 'vehicles';
+    subSection = 'fleet';
+  } else if (rawTab === 'staff') {
+    normalizedTab = 'operators';
+  }
+
+  const subParam = searchParams.get('sub');
+  if (subParam === 'fleet' || subParam === 'types') {
+    subSection = subParam;
+  }
+
+  const handleTabChange = (key: AdminTabKey, sub?: 'types' | 'fleet') => {
+    const params: Record<string, string> = { tab: key };
+    if (sub) {
+      params.sub = sub;
+    }
+    setSearchParams(params);
   };
 
   // Client-side Firebase Auth Route Guard
@@ -186,16 +213,17 @@ export default function AdminLayout() {
     );
   }
 
-  const currentTabObj = TABS.find((t) => t.key === activeTab) || TABS[0];
+  const currentTabObj =
+    PRIMARY_TABS.find((t) => t.key === normalizedTab) || PRIMARY_TABS[0];
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col">
       {/* ─── Top Navigation Bar ─── */}
       <header className="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand Wordmark & Mode Badge */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
               <CarIcon className="w-5 h-5" />
             </div>
             <div>
@@ -208,14 +236,13 @@ export default function AdminLayout() {
                 </span>
               </div>
               <span className="text-[11px] text-slate-400">
-                Phase 9: Config &amp; Dispatch Sync
+                Phase 18: Admin Navigation &amp; Operations Restructure
               </span>
             </div>
           </div>
 
-          {/* User actions and public site link */}
-          {/* User actions and public site link */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          {/* User actions, Prominent Dispatch Button, and public site link */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             {/* Sync Mode Pill */}
             <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs">
               <span
@@ -228,15 +255,15 @@ export default function AdminLayout() {
               </span>
             </div>
 
-            {/* Link to dispatch console */}
+            {/* Prominent Header CTA: Direct Route to /dispatch 3-pane console */}
             <Link
               to="/dispatch"
               reloadDocument
-              className="text-xs text-white font-bold px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-400/30 transition-colors flex items-center gap-1.5 shadow-sm"
-              title="Open Tactical Dispatch Console"
+              className="text-xs sm:text-sm text-slate-950 font-black px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 shadow-md hover:shadow-lg border border-amber-300 transition-all flex items-center gap-2 transform active:scale-95"
+              title="Launch Live 3-Pane Dispatch Console"
             >
-              <span>🚕</span>
-              <span>Dispatch Console</span>
+              <span className="text-base">🚕</span>
+              <span>Launch Dispatch Console</span>
             </Link>
 
             {/* Link to public portal */}
@@ -244,9 +271,9 @@ export default function AdminLayout() {
               href="/"
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-amber-400 hover:text-amber-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              className="hidden md:inline-flex text-xs text-amber-400 hover:text-amber-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
             >
-              View Public Site &rarr;
+              Public Site &rarr;
             </a>
 
             {/* Unified User Dropdown across all admin pages */}
@@ -261,11 +288,11 @@ export default function AdminLayout() {
 
       {/* ─── Main Admin Workspace ─── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Dynamic Tab Selector Bar */}
+        {/* Dynamic 7-Tab Navigation Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            {TABS.map((tab) => {
-              const isActive = activeTab === tab.key;
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            {PRIMARY_TABS.map((tab) => {
+              const isActive = normalizedTab === tab.key;
               return (
                 <button
                   key={tab.key}
@@ -278,17 +305,6 @@ export default function AdminLayout() {
                   }`}
                 >
                   <span className="truncate">{tab.label}</span>
-                  {tab.badge && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
-                        isActive
-                          ? 'bg-amber-500 text-slate-950 font-extrabold'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {tab.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -305,56 +321,69 @@ export default function AdminLayout() {
           </div>
 
           <div className="text-[11px] text-slate-400">
-            Document: <span className="font-mono text-slate-600">config/appSettings</span>
+            Active Store:{' '}
+            <span className="font-mono text-slate-600">
+              {normalizedTab === 'zones'
+                ? 'Firestore /zones'
+                : normalizedTab === 'operators'
+                ? 'Firestore /users'
+                : normalizedTab === 'vehicles' && subSection === 'fleet'
+                ? 'Firestore /fleet'
+                : 'config/appSettings'}
+            </span>
           </div>
         </div>
 
         {/* Dynamic Tab Body */}
         <div>
-          {activeTab === 'dashboard' && (
+          {normalizedTab === 'dashboard' && (
             <AdminDashboardTab
               settings={settings}
-              onNavigateTab={handleTabChange}
+              onNavigateTab={(tab) => handleTabChange(tab as AdminTabKey)}
             />
           )}
 
-          {activeTab === 'general' && (
+          {normalizedTab === 'general' && (
             <AdminGeneralTab
               settings={settings}
               onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
+              isLoading={isSavingConfig || isConfigLoading}
             />
           )}
 
-          {activeTab === 'pricing' && (
-            <AdminPricingTab
+          {normalizedTab === 'rates' && (
+            <AdminRatesTab
               settings={settings}
               onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
+              isLoading={isSavingConfig || isConfigLoading}
             />
           )}
 
-          {activeTab === 'vehicles' && (
+          {normalizedTab === 'vehicles' && (
             <AdminVehiclesTab
               settings={settings}
               onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
+              isLoading={isSavingConfig || isConfigLoading}
+              initialSubTab={subSection || 'types'}
             />
           )}
 
-          {activeTab === 'fleet' && (
-            <AdminFleetTab
+          {normalizedTab === 'zones' && <AdminZonesTab />}
+
+          {normalizedTab === 'operators' && <AdminOperatorsTab />}
+
+          {normalizedTab === 'advanced' && (
+            <AdminAdvancedTab
               settings={settings}
               onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
+              isLoading={isSavingConfig || isConfigLoading}
             />
           )}
 
-          {activeTab === 'staff' && <AdminStaffTab />}
+          {/* Legacy Backward Compatibility Fallbacks */}
+          {normalizedTab === 'bookings' && <AdminBookingsTab />}
 
-          {activeTab === 'bookings' && <AdminBookingsTab />}
-
-          {activeTab === 'layout' && (
+          {normalizedTab === 'layout' && (
             <AdminLayoutTab
               settings={settings}
               onSave={handleSaveSettings}

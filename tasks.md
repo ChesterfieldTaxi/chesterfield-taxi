@@ -129,3 +129,22 @@
 - [x] 17.11 Add itemized fare breakdown lines for multi-stop surcharges, tolls, peak demand surge, airport fee, and courtesy discounts across both booking engines.
 - [x] 17.12 Run `npm run typecheck` to confirm complete TypeScript compilation with zero errors.
 - [x] 17.13 Run `npm run build` to confirm production SSR and client bundles compile cleanly.
+
+## Phase 18: Admin Console Navigation & Management Restructure
+- [x] 18.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md with Phase 18 specifications, schemas, and task tracking.
+- [x] 18.2 Define Firestore schemas and TypeScript models for `/fleet` (`PhysicalFleetAsset`) and `/zones` (`ZoneGeofence`).
+- [x] 18.3 Implement `FleetService` (`app/core/services/fleet/fleet.service.ts`) with Firestore `/fleet` collection CRUD, real-time listeners, and resilient offline fallback.
+- [x] 18.4 Implement `ZoneService` (`app/core/services/zones/zone.service.ts`) with Firestore `/zones` collection CRUD, regional St. Louis presets, and offline fallback.
+- [x] 18.5 Update `AdminAuthService` and `/users` data model to support RBAC roles (`driver`, `dispatcher`, `admin`, `customer`) and operational metadata.
+- [x] 18.6 Refactor `/admin` layout (`app/routes/admin.tsx`) with 8 clean dedicated views/elements, sub-navigation routing, and prominent header Dispatch CTA button.
+- [x] 18.7 Update `AdminDashboardTab.tsx` with KPI summary cards, revenue charts, active trip volume visualizer, and unassigned booking alert banner.
+- [x] 18.8 Update `AdminGeneralTab.tsx` with full company profile, localization parameters (timezone, currency, date formatting), 24/7 operating hours, and live dynamic branding preview.
+- [x] 18.9 Create `AdminRatesTab.tsx` with active dynamic pricing parameters + Phase 19 Named Pricing Rules and Step Increment Tables shells.
+- [x] 18.10 Restructure `AdminVehiclesTab.tsx` with dual split sub-navigation: Section 1 (Vehicle Types) and Section 2 (Physical Fleet Asset Manager wired to `/fleet`).
+- [x] 18.11 Create `AdminZonesTab.tsx` geofence map manager with interactive polygon/radius drawing tools, zone list drawer, and `/zones` Firestore sync.
+- [x] 18.12 Create `AdminOperatorsTab.tsx` wired directly to `/users` with filtering for 'driver', 'dispatcher', and 'admin' roles, contact details, and status toggles.
+- [x] 18.13 Create `AdminAdvancedTab.tsx` with sensitive system configurations, API key health monitors, Firestore rule parameters, and audit logging table.
+- [x] 18.14 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
+- [x] 18.15 Run `npm run build` to confirm production client and SSR build stability.
+- [x] 18.16 Mark Phase 18 complete in tasks.md upon verification.
+

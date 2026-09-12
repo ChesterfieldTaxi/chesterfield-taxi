@@ -192,3 +192,22 @@ The booking portal will guide the user through a sequential, config-driven flow:
     - Courtesy discount credit (`manualDiscount`).
     - Agreed total flat fare override (`manualFare` + `overrideReason`).
   - Itemized transparent fare breakdown showing all baseline, surcharge, toll, surge, discount, and override line items.
+
+### 14. Phase 18: Admin Console Navigation & Management Restructure
+- **Consolidated 8-Element Admin Architecture:**
+  - Standardized the `/admin` navigation experience with 8 clean, dedicated views and controls:
+    1. **Dashboard**: High-level KPI summary cards (Total Bookings, Active Dispatched Trips, Revenue, Fleet Utilization), interactive visual revenue & trip charts, active trip volume breakdown, and an unassigned booking alert banner with quick dispatch jump links.
+    2. **General**: Company contact details, legal business metadata, regional localization (timezone, currency, date formatting), 24/7 operating hours configurations, and live dynamic branding preview with color pickers.
+    3. **Rates**: Dedicated pricing control center hosting live base rates, mileage, minute, tolls, and surge parameters, alongside structured shell interfaces ready for Phase 19 Named Pricing Rules and Step Increment Tables.
+    4. **Vehicles**: Unified dual-section fleet and asset manager with split sub-navigation:
+       - *Section 1 (Vehicle Types)*: Class definitions (Sedan, SUV, Van, Wheelchair/Limo), capacity limits, luggage constraints, and base fare multipliers.
+       - *Section 2 (Physical Fleet)*: Asset management table tracking Vehicle #, Type, Make, Model, Year, Color, License Plate, VIN, Insurance details, odometer mileage, status toggles, and maintenance history logs.
+    5. **Zones**: Geofence map manager for drawing and saving named polygon and radius zones. Visualizes regional operational zones (Chesterfield Valley, Spirit Airport SUS, Lambert Airport STL, West County Corridor, Downtown Metro) with configurable surge multipliers, flat fees, and interactive polygon/radius geometry.
+    6. **Operators**: Integrated staff and driver roster table with role management (RBAC), contact info (name, email, phone), and status toggles (Active vs Suspended). Direct synchronization with Firestore `/users` with filtering for `driver`, `dispatcher`, and `admin` roles.
+    7. **Advanced**: Sensitive system configurations (maintenance mode, max dispatch drafts, auto-dispatch interval), API key health monitors (Google Maps, Resend, Firebase), Firestore rule security parameters, and audit logging table tracking administrative actions.
+    8. **Dispatch Button**: High-visibility header CTA button that routes the user directly to the `/dispatch` 3-pane console.
+- **Dedicated Firestore Schemas:**
+  - `/fleet`: Independent collection storing physical asset records (`PhysicalFleetAsset`).
+  - `/zones`: Dedicated collection storing regional geofence definitions (`ZoneGeofence`).
+  - `/users`: Role-based user documents with support for `'driver' | 'dispatcher' | 'admin'` roles and operational contact records.
+
