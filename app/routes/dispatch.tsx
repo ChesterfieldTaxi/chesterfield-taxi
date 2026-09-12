@@ -321,52 +321,53 @@ function DispatchMap({ activeTrip }: { activeTrip: Trip | null }) {
   const directionsRenderer = React.useRef<google.maps.DirectionsRenderer | null>(null);
 
   useEffect(() => {
-    import('@googlemaps/js-api-loader').then(({ Loader }) => {
-      const loader = new Loader({
-        apiKey: typeof window !== 'undefined' && window.ENV?.VITE_GOOGLE_MAPS_API_KEY ? window.ENV.VITE_GOOGLE_MAPS_API_KEY : '',
-        version: "weekly",
-      });
-
-      (loader as any).importLibrary('maps').then(() => {
-        if (!mapRef.current) return;
+    import('@googlemaps/js-api-loader').then((api) => {
+      if (api.setOptions) {
+        api.setOptions({
+          key: typeof window !== 'undefined' && window.ENV?.VITE_GOOGLE_MAPS_API_KEY ? window.ENV.VITE_GOOGLE_MAPS_API_KEY : '',
+          v: "weekly",
+        });
         
-        if (!mapInstance.current) {
-          mapInstance.current = new google.maps.Map(mapRef.current, {
-            center: { lat: 38.6270, lng: -90.1994 }, // Default to St. Louis
-            zoom: 10,
-            disableDefaultUI: true,
-            zoomControl: true,
-          });
-          directionsRenderer.current = new google.maps.DirectionsRenderer({
-            map: mapInstance.current,
-            suppressMarkers: false,
-          });
-        }
-
-        if (activeTrip && activeTrip.pickupLocation?.coordinates && activeTrip.dropoffLocation?.coordinates) {
-          const originLatLng = { lat: activeTrip.pickupLocation.coordinates.lat, lng: activeTrip.pickupLocation.coordinates.lng };
-          const destLatLng = { lat: activeTrip.dropoffLocation.coordinates.lat, lng: activeTrip.dropoffLocation.coordinates.lng };
+        api.importLibrary('maps').then(() => {
+          if (!mapRef.current) return;
           
-          const directionsService = new google.maps.DirectionsService();
-          directionsService.route({
-            origin: originLatLng,
-            destination: destLatLng,
-            travelMode: google.maps.TravelMode.DRIVING,
-          }, (result, status) => {
-            if (status === google.maps.DirectionsStatus.OK && directionsRenderer.current) {
-              directionsRenderer.current.setDirections(result);
-            } else {
-               // Fallback just center map on pickup
-               mapInstance.current?.setCenter(originLatLng);
-               mapInstance.current?.setZoom(12);
-            }
-          });
-        } else if (directionsRenderer.current) {
-           directionsRenderer.current.setDirections({ routes: [] } as any); // Clear directions
-        }
-      }).catch((err: unknown) => {
-         console.warn("Failed to load google maps for dispatcher map:", err);
-      });
+          if (!mapInstance.current) {
+            mapInstance.current = new google.maps.Map(mapRef.current, {
+              center: { lat: 38.6270, lng: -90.1994 }, // Default to St. Louis
+              zoom: 10,
+              disableDefaultUI: true,
+              zoomControl: true,
+            });
+            directionsRenderer.current = new google.maps.DirectionsRenderer({
+              map: mapInstance.current,
+              suppressMarkers: false,
+            });
+          }
+
+          if (activeTrip && activeTrip.pickupLocation?.coordinates && activeTrip.dropoffLocation?.coordinates) {
+            const originLatLng = { lat: activeTrip.pickupLocation.coordinates.lat, lng: activeTrip.pickupLocation.coordinates.lng };
+            const destLatLng = { lat: activeTrip.dropoffLocation.coordinates.lat, lng: activeTrip.dropoffLocation.coordinates.lng };
+            
+            const directionsService = new google.maps.DirectionsService();
+            directionsService.route({
+              origin: originLatLng,
+              destination: destLatLng,
+              travelMode: google.maps.TravelMode.DRIVING,
+            }, (result, status) => {
+              if (status === google.maps.DirectionsStatus.OK && directionsRenderer.current) {
+                directionsRenderer.current.setDirections(result);
+              } else {
+                 mapInstance.current?.setCenter(originLatLng);
+                 mapInstance.current?.setZoom(12);
+              }
+            });
+          } else if (directionsRenderer.current) {
+             directionsRenderer.current.setDirections({ routes: [] } as any);
+          }
+        }).catch((err: unknown) => {
+           console.warn("Failed to load google maps for dispatcher map:", err);
+        });
+      }
     });
   }, [activeTrip]);
 
