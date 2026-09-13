@@ -20,28 +20,28 @@ export function meta() {
 
 const GUARANTEES = [
   {
-    icon: <ShieldCheckIcon className="w-4 h-4 text-amber-500" />,
+    icon: <ShieldCheckIcon className="w-4 h-4 text-blue-600" />,
     text: 'Upfront fixed fare guarantee — no surprise surge rates',
   },
   {
-    icon: <ClockIcon className="w-4 h-4 text-amber-500" />,
+    icon: <ClockIcon className="w-4 h-4 text-blue-600" />,
     text: '24/7 live dispatch desk with real-time flight radar tracking',
   },
   {
-    icon: <CarIcon className="w-4 h-4 text-amber-500" />,
+    icon: <CarIcon className="w-4 h-4 text-blue-600" />,
     text: 'Premium Sedans, Executive SUVs, and WAV Wheelchair Accessible fleet',
   },
 ];
 
 export default function BookRoute() {
   return (
-    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 flex-1 pb-28">
+    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-28">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Bar */}
         <div className="text-center mb-8 space-y-2">
-          <div className="inline-flex items-center gap-2 bg-amber-100/80 text-amber-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-blue-200">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }} />
             {COMPANY_CONFIG.name} Reservation System
           </div>
 

@@ -506,7 +506,7 @@ export function AdminZonesTab() {
                 variant="outline"
                 size="sm"
                 onClick={handleResetZones}
-                className="text-xs text-slate-600 hover:text-slate-900"
+                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Reset Presets
               </Button>
@@ -530,7 +530,7 @@ export function AdminZonesTab() {
                 variant="outline"
                 size="sm"
                 onClick={handleResetGroups}
-                className="text-xs text-slate-600 hover:text-slate-900"
+                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Reset Presets
               </Button>
@@ -554,7 +554,7 @@ export function AdminZonesTab() {
                 variant="outline"
                 size="sm"
                 onClick={handleResetCollections}
-                className="text-xs text-slate-600 hover:text-slate-900"
+                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Reset Presets
               </Button>

@@ -30,14 +30,20 @@ export function Footer() {
           {/* Column 1: Brand & Overview */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 shadow-sm">
+              <div
+                style={{
+                  backgroundColor: 'var(--brand-primary, #2563eb)',
+                  color: 'var(--btn-primary-text, #ffffff)',
+                }}
+                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+              >
                 <CarIcon className="w-6 h-6" />
               </div>
               <div>
                 <span className="text-lg font-extrabold tracking-tight text-white block leading-none">
                   {COMPANY_CONFIG.name}
                 </span>
-                <span className="text-[10px] font-bold tracking-widest text-amber-400 uppercase leading-none mt-1 block">
+                <span className="text-[10px] font-bold tracking-widest text-blue-400 uppercase leading-none mt-1 block">
                   {COMPANY_CONFIG.tagline}
                 </span>
               </div>
@@ -48,15 +54,15 @@ export function Footer() {
               Delivering dependable, upfront-priced rides {COMPANY_CONFIG.operatingHours.toLowerCase()}.
             </p>
 
-            <div className="flex items-center gap-2 text-xs text-amber-400/90 font-medium">
-              <ShieldCheckIcon className="w-4 h-4 text-amber-500 shrink-0" />
+            <div className="flex items-center gap-2 text-xs text-blue-400/90 font-medium">
+              <ShieldCheckIcon className="w-4 h-4 text-blue-400 shrink-0" />
               <span>Fully Licensed, Insured &amp; Background-Checked</span>
             </div>
           </div>
 
           {/* Column 2: Quick Links */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-4">
               Quick Navigation
             </h3>
             <ul className="space-y-2.5 text-sm">
@@ -66,7 +72,7 @@ export function Footer() {
                     to={link.path}
                     className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 group"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-700 group-hover:bg-amber-400 transition-colors" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-700 group-hover:bg-blue-400 transition-colors" />
                     <span>{link.label}</span>
                   </Link>
                 </li>
@@ -76,36 +82,36 @@ export function Footer() {
 
           {/* Column 3: Service Area Coverage */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-4">
               Service Areas
             </h3>
             <ul className="space-y-2 text-xs text-slate-400">
               {COMPANY_CONFIG.serviceAreas.map((area) => (
                 <li key={area} className="flex items-center gap-2">
-                  <MapPinIcon className="w-3.5 h-3.5 text-amber-500/80 shrink-0" />
+                  <MapPinIcon className="w-3.5 h-3.5 text-blue-400/80 shrink-0" />
                   <span>{area}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Column 4: 24/7 Dispatch Contact */}
+          {/* Column 4: 24/7 Dispatch Desk */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-4">
               24/7 Dispatch Desk
             </h3>
 
             <div className="space-y-3">
               <a
                 href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 transition-all group"
+                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
               >
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <PhoneIcon className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-400 block">Instant Phone Dispatch</span>
-                  <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
+                  <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
                     {COMPANY_CONFIG.phone.dispatch}
                   </span>
                 </div>
@@ -113,14 +119,14 @@ export function Footer() {
 
               <a
                 href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
-                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-amber-500/50 transition-all group"
+                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
               >
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <MailIcon className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-400 block">Support &amp; Accounts</span>
-                  <span className="text-xs font-medium text-white truncate group-hover:text-amber-400 transition-colors">
+                  <span className="text-xs font-medium text-white truncate group-hover:text-blue-400 transition-colors">
                     {COMPANY_CONFIG.email.dispatch}
                   </span>
                 </div>
@@ -141,16 +147,16 @@ export function Footer() {
             &copy; {currentYear} {COMPANY_CONFIG.legalName}. All rights reserved. Registered in Missouri.
           </p>
           <div className="flex items-center gap-6">
-            <Link to="/book" className="hover:text-amber-400 transition-colors">
+            <Link to="/book" className="hover:text-blue-400 transition-colors">
               Online Booking
             </Link>
-            <Link to="/services" className="hover:text-amber-400 transition-colors">
+            <Link to="/services" className="hover:text-blue-400 transition-colors">
               Airport Rates
             </Link>
-            <Link to="/contact" className="hover:text-amber-400 transition-colors">
+            <Link to="/contact" className="hover:text-blue-400 transition-colors">
               Support
             </Link>
-            <Link to="/admin" className="hover:text-amber-400 transition-colors">
+            <Link to="/admin" className="hover:text-blue-400 transition-colors">
               Staff Portal
             </Link>
           </div>

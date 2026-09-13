@@ -58,17 +58,23 @@ export function Navbar() {
           {/* Brand Logo & Wordmark */}
           <Link
             to="/"
-            className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-xl"
+            className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl"
             aria-label="Chesterfield Taxi Home"
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-sm group-hover:bg-amber-400 transition-colors">
-              <CarIcon className="w-6 h-6 text-slate-950" />
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-colors"
+              style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }}
+            >
+              <CarIcon className="w-6 h-6 text-white" />
             </div>
             <div>
               <span className="text-lg font-extrabold tracking-tight text-slate-950 block leading-none">
                 {companySettings.name || COMPANY_CONFIG.name}
               </span>
-              <span className="text-[11px] font-bold tracking-wider text-amber-600 uppercase leading-none mt-1 block">
+              <span 
+                className="text-[11px] font-bold tracking-wider uppercase leading-none mt-1 block"
+                style={{ color: 'var(--brand-primary, #2563eb)' }}
+              >
                 {COMPANY_CONFIG.tagline}
               </span>
             </div>
@@ -84,7 +90,7 @@ export function Navbar() {
                 className={({ isActive }) =>
                   `px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
                     isActive
-                      ? 'bg-amber-500/10 text-amber-700 font-bold border border-amber-500/20'
+                      ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
                   }`
                 }
@@ -99,7 +105,7 @@ export function Navbar() {
               className={({ isActive }) =>
                 `px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   isActive
-                    ? 'bg-slate-900 text-amber-400 font-bold'
+                    ? 'bg-slate-900 text-blue-400 font-bold'
                     : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                 }`
               }
@@ -117,14 +123,19 @@ export function Navbar() {
               href={`tel:${companySettings.phone ? companySettings.phone.replace(/[^0-9+]/g, '') : COMPANY_CONFIG.phone.primaryRaw}`}
               className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-950 text-sm font-semibold px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"
             >
-              <PhoneIcon className="w-4 h-4 text-amber-500" />
+              <PhoneIcon className="w-4 h-4 text-blue-600" />
               <span>{companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
 
             {/* Prominent Book Now CTA */}
             <Link
               to="/book"
-              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-extrabold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+              style={{
+                backgroundColor: 'var(--btn-primary-bg, #2563eb)',
+                color: 'var(--btn-primary-text, #ffffff)',
+                borderRadius: 'var(--btn-radius, 12px)',
+              }}
+              className="inline-flex items-center gap-2 font-extrabold text-sm px-5 py-2.5 shadow-sm hover:opacity-90 active:opacity-95 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               <CarIcon className="w-4 h-4" />
               <span>Book Now</span>
@@ -135,7 +146,12 @@ export function Navbar() {
           <div className="flex items-center gap-2 md:hidden">
             <Link
               to="/book"
-              className="inline-flex items-center gap-1.5 bg-amber-500 text-slate-950 text-xs font-bold px-3 py-2 rounded-xl shadow-xs"
+              style={{
+                backgroundColor: 'var(--btn-primary-bg, #2563eb)',
+                color: 'var(--btn-primary-text, #ffffff)',
+                borderRadius: 'var(--btn-radius, 10px)',
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 shadow-xs hover:opacity-90 transition-all"
             >
               Book Now
             </Link>
@@ -143,7 +159,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              className="p-2 rounded-xl text-slate-700 hover:text-slate-950 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="p-2 rounded-xl text-slate-700 hover:text-slate-950 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
               aria-expanded={mobileMenuOpen}
             >
@@ -170,7 +186,7 @@ export function Navbar() {
                 className={({ isActive }) =>
                   `px-4 py-3 rounded-xl text-base font-semibold transition-all ${
                     isActive
-                      ? 'bg-amber-50 text-amber-900 font-bold border-l-4 border-amber-500 pl-3'
+                      ? 'bg-blue-50 text-blue-900 font-bold border-l-4 border-blue-600 pl-3'
                       : 'text-slate-700 hover:bg-slate-50'
                   }`
                 }
@@ -184,12 +200,12 @@ export function Navbar() {
               className={({ isActive }) =>
                 `px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
                   isActive
-                    ? 'bg-slate-900 text-amber-400 font-bold'
+                    ? 'bg-slate-900 text-blue-400 font-bold'
                     : 'text-slate-500 hover:bg-slate-50'
                 }`
               }
             >
-              <ShieldCheckIcon className="w-4 h-4 text-amber-500" />
+              <ShieldCheckIcon className="w-4 h-4 text-blue-500" />
               <span>Operator &amp; Admin Console</span>
             </NavLink>
           </nav>
@@ -197,7 +213,12 @@ export function Navbar() {
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
             <Link
               to="/book"
-              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-base py-3 px-4 rounded-xl shadow-sm transition-all"
+              style={{
+                backgroundColor: 'var(--btn-primary-bg, #2563eb)',
+                color: 'var(--btn-primary-text, #ffffff)',
+                borderRadius: 'var(--btn-radius, 12px)',
+              }}
+              className="w-full flex items-center justify-center gap-2 font-extrabold text-base py-3 px-4 shadow-sm hover:opacity-90 transition-all"
             >
               <CarIcon className="w-5 h-5" />
               <span>Book Online Now</span>
@@ -207,7 +228,7 @@ export function Navbar() {
               href={`tel:${companySettings.phone ? companySettings.phone.replace(/[^0-9+]/g, '') : COMPANY_CONFIG.phone.primaryRaw}`}
               className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
             >
-              <PhoneIcon className="w-4 h-4 text-amber-600" />
+              <PhoneIcon className="w-4 h-4 text-blue-600" />
               <span>Call Dispatch: {companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
           </div>

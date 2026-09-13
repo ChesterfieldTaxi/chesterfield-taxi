@@ -112,15 +112,21 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/30 flex flex-col justify-center items-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/30 flex flex-col justify-center items-center px-4 py-12">
       <div className="w-full max-w-md">
         {/* Brand header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 mb-4">
+          <div
+            style={{
+              backgroundColor: 'var(--brand-primary, #2563eb)',
+              color: 'var(--btn-primary-text, #ffffff)',
+            }}
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl shadow-lg shadow-blue-500/20 mb-4"
+          >
             <CarIcon className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Chesterfield Taxi</h1>
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-500 mt-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mt-1">
             Dispatch &amp; Configuration Console
           </p>
         </div>
@@ -129,7 +135,7 @@ export default function AdminLogin() {
           <CardHeader className="border-b border-slate-800/80 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg text-white">Administrator Access</CardTitle>
-              <ShieldCheckIcon className="w-5 h-5 text-amber-500" />
+              <ShieldCheckIcon className="w-5 h-5 text-blue-400" />
             </div>
             <CardDescription className="text-xs text-slate-400">
               Sign in with your Firebase operator credentials to access pricing rules, fleet settings, and live bookings.
@@ -164,7 +170,7 @@ export default function AdminLogin() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@chesterfieldtaxi.com"
                     required
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -183,7 +189,7 @@ export default function AdminLogin() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -195,7 +201,11 @@ export default function AdminLogin() {
                 variant="primary"
                 size="md"
                 isLoading={isLoading}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold"
+                style={{
+                  backgroundColor: 'var(--btn-primary-bg, #2563eb)',
+                  color: 'var(--btn-primary-text, #ffffff)',
+                }}
+                className="w-full font-bold hover:opacity-95"
               >
                 Sign In to Console
               </Button>
@@ -206,7 +216,7 @@ export default function AdminLogin() {
                   type="button"
                   onClick={() => handleDemoLogin('admin')}
                   disabled={isLoading}
-                  className="w-full text-center text-xs text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
                 >
                   {isConfigured
                     ? 'Quick Access: Admin Demo Credentials'
@@ -216,7 +226,7 @@ export default function AdminLogin() {
                   type="button"
                   onClick={() => handleDemoLogin('dispatcher')}
                   disabled={isLoading}
-                  className="w-full text-center text-xs text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
                 >
                   {isConfigured
                     ? 'Quick Access: Dispatcher Demo Credentials'

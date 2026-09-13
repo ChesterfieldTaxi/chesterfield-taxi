@@ -306,10 +306,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             variant="primary"
             size="sm"
             onClick={() => setShowAddCarModal(true)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold whitespace-nowrap shrink-0 px-3.5"
           >
-            <PlusIcon className="w-4 h-4" />
-            Add Fleet Car
+            <PlusIcon className="w-4 h-4 shrink-0" />
+            <span>Add Fleet Car</span>
           </Button>
         </div>
       </div>

@@ -7,15 +7,15 @@ import type { BrandingConfig } from '../core/types/config';
 
 export default function PublicLayout() {
   const [branding, setBranding] = useState<BrandingConfig>({
-    primaryColor: COMPANY_CONFIG.primaryColor || '#f59e0b',
+    primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb',
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a',
     headingFont: COMPANY_CONFIG.headingFont || 'Inter',
     bodyFont: COMPANY_CONFIG.bodyFont || 'Inter',
     headingColor: COMPANY_CONFIG.headingColor || '#0f172a',
     bodyTextColor: COMPANY_CONFIG.bodyTextColor || '#334155',
     mutedTextColor: COMPANY_CONFIG.mutedTextColor || '#64748b',
-    btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#f59e0b',
-    btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#020617',
+    btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#2563eb',
+    btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#ffffff',
     btnSecondaryBg: COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
     btnSecondaryText: COMPANY_CONFIG.btnSecondaryText || '#ffffff',
     btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '8px',
@@ -44,7 +44,7 @@ export default function PublicLayout() {
 
   return (
     <div 
-      className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-amber-500 selection:text-slate-950"
+      className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white"
       style={{
         '--color-primary': branding.primaryColor,
         '--color-secondary': branding.secondaryColor,
@@ -53,8 +53,8 @@ export default function PublicLayout() {
         '--color-heading': branding.headingColor || '#0f172a',
         '--color-text-main': branding.bodyTextColor || '#334155',
         '--color-text-muted': branding.mutedTextColor || '#64748b',
-        '--btn-primary-bg': branding.btnPrimaryBg || '#f59e0b',
-        '--btn-primary-text': branding.btnPrimaryText || '#020617',
+        '--btn-primary-bg': branding.btnPrimaryBg || '#2563eb',
+        '--btn-primary-text': branding.btnPrimaryText || '#ffffff',
         '--btn-secondary-bg': branding.btnSecondaryBg || '#0f172a',
         '--btn-secondary-text': branding.btnSecondaryText || '#ffffff',
         '--btn-radius': branding.btnBorderRadius || '8px',

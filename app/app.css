@@ -1,16 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Lato:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@500;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
 :root {
-  --color-primary: #f59e0b;
+  --color-primary: #2563eb;
   --color-secondary: #0f172a;
   --brand-primary: var(--color-primary);
   --brand-secondary: var(--color-secondary);
   --color-heading: #0f172a;
   --color-text-main: #334155;
   --color-text-muted: #64748b;
-  --btn-primary-bg: #f59e0b;
-  --btn-primary-text: #020617;
+  --btn-primary-bg: #2563eb;
+  --btn-primary-text: #ffffff;
   --btn-secondary-bg: #0f172a;
   --btn-secondary-text: #ffffff;
   --btn-radius: 8px;
@@ -19,6 +24,7 @@
   --font-heading: 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
 }
+
 
 /* Dynamic Branding Utility Classes & Overrides */
 .brand-bg-primary {

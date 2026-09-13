@@ -38,6 +38,11 @@ import {
   PlaneLandingIcon,
   InfoIcon,
   PlusIcon,
+  LuggageIcon,
+  CreditCardIcon,
+  DollarSignIcon,
+  BuildingIcon,
+  HistoryIcon,
 } from '../ui/Icons';
 
 export interface BookingEngineV2Props {
@@ -1205,8 +1210,8 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
       {/* ─── 24/7 Dispatch Review & Reassurance Notice Banner ─── */}
       <div className="mb-5 p-3.5 bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-xl shadow-md border border-blue-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600/40 border border-blue-400/50 flex items-center justify-center shrink-0 text-amber-400 text-lg">
-            ⚡
+          <div className="w-9 h-9 rounded-lg bg-blue-600/40 border border-blue-400/50 flex items-center justify-center shrink-0 text-blue-300 text-lg">
+            <ShieldCheckIcon className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -1543,7 +1548,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
               {/* Primary Passenger */}
               <div className="space-y-2">
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400">👤</span>
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <UserIcon className="w-3.5 h-3.5" />
+                  </div>
                   <input
                     type="text"
                     name="passengerName"
@@ -1560,7 +1567,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400">📞</span>
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <PhoneIcon className="w-3.5 h-3.5" />
+                    </div>
                     <input
                       type="tel"
                       name="passengerPhone"
@@ -1575,7 +1584,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                     )}
                   </div>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400">✉️</span>
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <MailIcon className="w-3.5 h-3.5" />
+                    </div>
                     <input
                       type="email"
                       name="passengerEmail"
@@ -1718,7 +1729,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                   {/* Passengers Counter */}
                   <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2 text-slate-700 font-medium text-xs">
-                      <span>👤</span>
+                      <UserIcon className="w-4 h-4 text-slate-500 shrink-0" />
                       <div>
                         <div className="font-semibold text-slate-800">Total Passengers</div>
                         <div className="text-[10px] text-slate-400">Max Cap: {totalMaxPassengers} Pax</div>
@@ -1746,7 +1757,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                   {/* Bags Counter */}
                   <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2 text-slate-700 font-medium text-xs">
-                      <span>🧳</span>
+                      <LuggageIcon className="w-4 h-4 text-slate-500 shrink-0" />
                       <div>
                         <div className="font-semibold text-slate-800">Total Luggage</div>
                         <div className="text-[10px] text-slate-400">Max Cap: {totalMaxBags} Bags</div>
@@ -2082,9 +2093,15 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                           </div>
                           <p className="text-[11px] text-slate-500 mb-2">{tier.desc}</p>
                           <div className="flex items-center gap-2 text-[10px] text-slate-600 font-semibold">
-                            <span>👤 {tier.passengers} Pax</span>
+                            <span className="inline-flex items-center gap-1">
+                              <UserIcon className="w-3 h-3 text-slate-400" />
+                              {tier.passengers} Pax
+                            </span>
                             <span>•</span>
-                            <span>🧳 {tier.bags} Bags</span>
+                            <span className="inline-flex items-center gap-1">
+                              <LuggageIcon className="w-3 h-3 text-slate-400" />
+                              {tier.bags} Bags
+                            </span>
                           </div>
 
                           {tier.isRestricted && (
@@ -2325,9 +2342,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                     ? bookingConfig.acceptedPaymentMethods
                     : ['card', 'cash', 'account'];
                 const allMethods = [
-                  { key: 'card' as const, label: 'Credit Card', icon: '💳' },
-                  { key: 'cash' as const, label: 'Cash in Cab', icon: '💵' },
-                  { key: 'account' as const, label: 'Corporate Direct', icon: '🏢' },
+                  { key: 'card' as const, label: 'Credit Card', Icon: CreditCardIcon },
+                  { key: 'cash' as const, label: 'Cash in Cab', Icon: DollarSignIcon },
+                  { key: 'account' as const, label: 'Corporate Direct', Icon: BuildingIcon },
                 ];
                 const methodsToRender = allMethods.filter((m) => allowed.includes(m.key));
                 const colClass =
@@ -2350,7 +2367,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                             : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                         }`}
                       >
-                        <span>{m.icon}</span>
+                        <m.Icon className="w-3.5 h-3.5 shrink-0" />
                         <span>{m.label}</span>
                       </button>
                     ))}
@@ -2439,7 +2456,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
               {/* Cash Sub-panel */}
               {form.paymentMethod === 'cash' && (
                 <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex items-center gap-2">
-                  <span className="text-base text-emerald-600">💵</span>
+                  <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>You may pay cash directly to your chauffeur upon completion of your trip. Exact change is appreciated.</span>
                 </div>
               )}
@@ -2496,7 +2513,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-extrabold text-slate-900 text-base">Trip Summary</h3>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full">
                   Status: UNCONFIRMED
                 </span>
               </div>
@@ -2505,7 +2522,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
               <div className="space-y-2.5 text-xs">
                 {/* Timing */}
                 <div className="flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5">🕒</span>
+                  <ClockIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Pickup Time</span>
                     <span className="font-semibold text-slate-800">
@@ -2518,7 +2535,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
                 {/* Route */}
                 <div className="flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5">📍</span>
+                  <MapPinIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                   <div className="flex-1 overflow-hidden">
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Route</span>
                     <p className="font-semibold text-slate-800 truncate" title={form.pickupAddress || 'Enter pickup'}>
@@ -2537,7 +2554,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
                 {/* Fleet & Capacity */}
                 <div className="flex items-start gap-2">
-                  <span className="text-slate-400 mt-0.5">🚗</span>
+                  <CarIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
                     <span className="font-semibold text-slate-800 capitalize">
@@ -2550,7 +2567,7 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
                 {form.returnTrip && form.returnDate && (
                   <div className="flex items-start gap-2">
-                    <span className="text-slate-400 mt-0.5">🔁</span>
+                    <HistoryIcon className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-[10px] text-indigo-600 font-bold uppercase block">Return Pickup</span>
                       <span className="font-semibold text-slate-800">
@@ -2562,9 +2579,9 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
 
                 {totalCarSeats > 0 && (
                   <div className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">💺</span>
+                    <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
                     <div>
-                      <span className="text-[10px] text-amber-700 font-bold uppercase block">Child Safety Seats</span>
+                      <span className="text-[10px] text-blue-700 font-bold uppercase block">Child Safety Seats</span>
                       <span className="font-semibold text-slate-800">
                         {totalCarSeats} Seat(s) Requested
                       </span>
@@ -2615,7 +2632,11 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--brand-primary)',
+                  color: 'var(--btn-primary-text)',
+                }}
+                className="w-full py-3 px-4 hover:opacity-95 active:opacity-90 font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>

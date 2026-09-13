@@ -14,7 +14,7 @@ import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
 import { hasValidRoutePair } from '../core/hooks/useDebounceRoute';
 import { resolveMockCoordinates } from '../core/services/maps/mock-routing';
-import { SpinnerIcon } from '../components/ui/Icons';
+import { SpinnerIcon, RadioIcon, CarIcon, MailIcon, PhoneIcon, MapPinIcon } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
 
@@ -1292,7 +1292,7 @@ export default function DispatchRoute() {
             type="button"
             className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
           >
-            <span>🚕</span>
+            <RadioIcon className="w-3.5 h-3.5 shrink-0" />
             <span>Dispatch</span>
           </button>
 
@@ -1308,7 +1308,7 @@ export default function DispatchRoute() {
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
-            <span>🚗</span>
+            <CarIcon className="w-3.5 h-3.5 shrink-0" />
             <span>Drivers</span>
             <span
               className={`w-2 h-2 rounded-full ${
@@ -1327,7 +1327,7 @@ export default function DispatchRoute() {
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
-            <span>💬</span>
+            <MailIcon className="w-3.5 h-3.5 shrink-0" />
             <span>Messages</span>
             {messages.length > 0 && (
               <span
@@ -1350,7 +1350,7 @@ export default function DispatchRoute() {
                 : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
-            <span>📞</span>
+            <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
             <span>Phone</span>
           </button>
         </div>
@@ -2198,7 +2198,8 @@ export default function DispatchRoute() {
                       title={minimizedPanels.drivers ? 'Click to expand' : 'Click to minimize'}
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <span>🚗 Drivers Roster</span>
+                        <CarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span>Drivers Roster</span>
                         <span className="text-[10px] text-emerald-400">
                           ({drivers.filter((d) => d.status === 'available').length} Avail)
                         </span>

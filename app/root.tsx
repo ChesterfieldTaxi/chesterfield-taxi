@@ -35,15 +35,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       lang="en"
       style={
         {
-          "--color-primary": COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--color-primary": COMPANY_CONFIG.primaryColor || "#2563eb",
           "--color-secondary": COMPANY_CONFIG.secondaryColor || "#0f172a",
-          "--brand-primary": COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--brand-primary": COMPANY_CONFIG.primaryColor || "#2563eb",
           "--brand-secondary": COMPANY_CONFIG.secondaryColor || "#0f172a",
           "--color-heading": COMPANY_CONFIG.headingColor || "#0f172a",
           "--color-text-main": COMPANY_CONFIG.bodyTextColor || "#334155",
           "--color-text-muted": COMPANY_CONFIG.mutedTextColor || "#64748b",
-          "--btn-primary-bg": COMPANY_CONFIG.btnPrimaryBg || "#f59e0b",
-          "--btn-primary-text": COMPANY_CONFIG.btnPrimaryText || "#020617",
+          "--btn-primary-bg": COMPANY_CONFIG.btnPrimaryBg || "#2563eb",
+          "--btn-primary-text": COMPANY_CONFIG.btnPrimaryText || "#ffffff",
           "--btn-secondary-bg": COMPANY_CONFIG.btnSecondaryBg || "#0f172a",
           "--btn-secondary-text": COMPANY_CONFIG.btnSecondaryText || "#ffffff",
           "--btn-radius": COMPANY_CONFIG.btnBorderRadius || "8px",

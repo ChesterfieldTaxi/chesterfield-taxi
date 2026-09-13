@@ -43,7 +43,7 @@ const SERVICES: ServiceItem[] = [
     title: 'Airport Transfers (STL & SUS)',
     subtitle: 'Lambert-St. Louis International & Spirit of St. Louis Airport',
     badge: 'High Frequency',
-    icon: <PlaneIcon className="w-6 h-6 text-amber-500" />,
+    icon: <PlaneIcon className="w-6 h-6 text-blue-600" />,
     description:
       'Eliminate the stress of airport parking and unreliable rideshare surges. We provide guaranteed curb-to-curb departures and scheduled arrivals with live flight number tracking.',
     features: [
@@ -60,7 +60,7 @@ const SERVICES: ServiceItem[] = [
     title: 'Corporate Travel & Executive Accounts',
     subtitle: 'Streamlined billing and executive transportation for businesses',
     badge: 'Business Class',
-    icon: <BuildingIcon className="w-6 h-6 text-amber-500" />,
+    icon: <BuildingIcon className="w-6 h-6 text-blue-600" />,
     description:
       'Designed for corporate headquarters, law firms, and medical facilities throughout Chesterfield Valley and Maryville Centre. Enjoy consolidated monthly billing and VIP chauffeur standards.',
     features: [
@@ -77,7 +77,7 @@ const SERVICES: ServiceItem[] = [
     title: 'Special Events & Wedding Shuttles',
     subtitle: 'Reliable group transit for weddings, galas, and game days',
     badge: 'Group & Events',
-    icon: <SparklesIcon className="w-6 h-6 text-amber-500" />,
+    icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
     description:
       'Arrive in comfort and style. We coordinate seamless group arrivals and departures for wedding parties, charity galas, and sporting events at Enterprise Center or Busch Stadium.',
     features: [
@@ -94,7 +94,7 @@ const SERVICES: ServiceItem[] = [
     title: 'Hourly As-Directed Chauffeur',
     subtitle: 'Flexible personal driver on standby for multi-stop schedules',
     badge: 'Maximum Flexibility',
-    icon: <ClockIcon className="w-6 h-6 text-amber-500" />,
+    icon: <ClockIcon className="w-6 h-6 text-blue-600" />,
     description:
       'Need a vehicle at your command for executive roadshows, medical appointments, or regional wine tours? Our hourly charter service keeps your professional driver on standby.',
     features: [
@@ -119,7 +119,7 @@ const FLEET_TIERS = [
     name: 'Executive SUV',
     capacity: 'Up to 6 Passengers &bull; 6 Luggage',
     description: 'Full-size luxury SUVs with leather seating, rear climate controls, and immense luggage volume.',
-    icon: <SparklesIcon className="w-6 h-6 text-amber-500" />,
+    icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
   },
   {
     name: 'Wheelchair Accessible (WAV)',
@@ -136,7 +136,7 @@ export default function ServicesRoute() {
         
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-amber-100/90 text-amber-950 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-amber-300">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
             {COMPANY_CONFIG.name} Services
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
@@ -154,11 +154,11 @@ export default function ServicesRoute() {
             <Card
               key={service.id}
               variant="elevated"
-              className="border-slate-200/80 hover:border-amber-400/80 transition-all bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs"
+              className="border-slate-200/80 hover:border-blue-400/80 transition-all bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs"
             >
               <div className="space-y-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
                     {service.icon}
                   </div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-100 text-slate-700">
@@ -170,7 +170,7 @@ export default function ServicesRoute() {
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
                     {service.title}
                   </h2>
-                  <p className="text-xs font-semibold text-amber-600 mt-0.5">
+                  <p className="text-xs font-semibold text-blue-600 mt-0.5">
                     {service.subtitle}
                   </p>
                 </div>
@@ -187,7 +187,7 @@ export default function ServicesRoute() {
                   <ul className="space-y-1.5 text-xs text-slate-600">
                     {service.features.map((feat, idx) => (
                       <li key={idx} className="flex items-start gap-2">
-                        <CheckIcon className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <CheckIcon className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </li>
                     ))}
@@ -203,7 +203,7 @@ export default function ServicesRoute() {
 
                 <Link
                   to="/book"
-                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 text-xs font-extrabold px-5 py-2.5 rounded-xl transition-colors shadow-xs"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-blue-400 hover:text-blue-300 text-xs font-extrabold px-5 py-2.5 rounded-xl transition-colors shadow-xs"
                 >
                   <span>Book This Service</span>
                   <ChevronRightIcon className="w-3.5 h-3.5 stroke-[3]" />
@@ -216,7 +216,7 @@ export default function ServicesRoute() {
         {/* Fleet Categories Section */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-10 shadow-xs space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Our Modern Fleet
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
@@ -240,7 +240,7 @@ export default function ServicesRoute() {
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{tier.name}</h3>
                     <p
-                      className="text-xs font-semibold text-amber-700 mt-0.5"
+                      className="text-xs font-semibold text-blue-700 mt-0.5"
                       dangerouslySetInnerHTML={{ __html: tier.capacity }}
                     />
                   </div>
@@ -251,7 +251,7 @@ export default function ServicesRoute() {
 
                 <Link
                   to="/book"
-                  className="text-xs font-bold text-slate-900 hover:text-amber-600 inline-flex items-center gap-1 transition-colors"
+                  className="text-xs font-bold text-slate-900 hover:text-blue-600 inline-flex items-center gap-1 transition-colors"
                 >
                   <span>Select in Booking Wizard</span>
                   <ChevronRightIcon className="w-3 h-3 stroke-[3]" />
@@ -262,12 +262,18 @@ export default function ServicesRoute() {
         </div>
 
         {/* CTA Strip */}
-        <div className="bg-amber-500 rounded-3xl p-8 sm:p-10 text-slate-950 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md">
+        <div
+          style={{
+            backgroundColor: 'var(--brand-primary, #2563eb)',
+            color: 'var(--btn-primary-text, #ffffff)',
+          }}
+          className="rounded-3xl p-8 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md"
+        >
           <div className="space-y-1 text-center sm:text-left">
             <h3 className="text-2xl font-extrabold tracking-tight">
               Have a custom corporate or multi-car request?
             </h3>
-            <p className="text-sm font-medium text-slate-900">
+            <p className="text-sm font-medium opacity-90">
               Speak directly with our Chesterfield operations manager for tailored itinerary pricing.
             </p>
           </div>

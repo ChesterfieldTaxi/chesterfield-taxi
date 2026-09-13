@@ -201,7 +201,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     address: COMPANY_CONFIG.address.formatted,
   },
   branding: {
-    primaryColor: COMPANY_CONFIG.primaryColor || '#f59e0b', // Amber-500
+    primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb', // Cobalt-600
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a', // Slate-900
     logoUrl: '',
     headingFont: COMPANY_CONFIG.headingFont || 'Inter',
@@ -209,8 +209,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     headingColor: COMPANY_CONFIG.headingColor || '#0f172a',
     bodyTextColor: COMPANY_CONFIG.bodyTextColor || '#334155',
     mutedTextColor: COMPANY_CONFIG.mutedTextColor || '#64748b',
-    btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#f59e0b',
-    btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#020617',
+    btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#2563eb',
+    btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#ffffff',
     btnSecondaryBg: COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
     btnSecondaryText: COMPANY_CONFIG.btnSecondaryText || '#ffffff',
     btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '8px',

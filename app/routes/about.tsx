@@ -33,25 +33,25 @@ const STATS = [
 
 const PILLARS = [
   {
-    icon: <ShieldCheckIcon className="w-6 h-6 text-amber-500" />,
+    icon: <ShieldCheckIcon className="w-6 h-6 text-blue-600" />,
     title: 'Rigorous Driver Screening & Training',
     description:
       'Every driver in our fleet undergoes multi-jurisdictional criminal background checks, DMV record monitoring, and regular substance screenings. Our drivers are courteous, seasoned professionals who know the quickest routes through West County traffic.',
   },
   {
-    icon: <CarIcon className="w-6 h-6 text-amber-500" />,
+    icon: <CarIcon className="w-6 h-6 text-blue-600" />,
     title: 'Immaculate Fleet Maintenance',
     description:
       'Our vehicles are subject to scheduled mechanical inspections and daily interior detailing. We maintain non-smoking, climate-controlled cabins equipped with GPS navigation to guarantee a smooth, comfortable commute.',
   },
   {
-    icon: <ClockIcon className="w-6 h-6 text-amber-500" />,
+    icon: <ClockIcon className="w-6 h-6 text-blue-600" />,
     title: 'Upfront Fare Guarantee',
     description:
       'We reject predatory surge algorithms. When bad weather strikes or flights arrive late, our rates remain transparent and predictable. What you are quoted in our booking system is what you pay.',
   },
   {
-    icon: <AccessibilityIcon className="w-6 h-6 text-amber-500" />,
+    icon: <AccessibilityIcon className="w-6 h-6 text-blue-600" />,
     title: 'Wheelchair & Mobility Accessibility (WAV)',
     description:
       'Transportation is an essential public service. We maintain dedicated wheelchair-accessible vans operated by drivers trained in certified four-point tie-down securement protocols and compassionate mobility assistance.',
@@ -65,7 +65,7 @@ export default function AboutRoute() {
         
         {/* Page Header & Mission */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 bg-amber-100/90 text-amber-950 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-amber-300">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
             About {COMPANY_CONFIG.name}
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
@@ -81,7 +81,7 @@ export default function AboutRoute() {
         <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-12 shadow-xs">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-7 space-y-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-600">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 Our Heritage &amp; Mission
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
@@ -102,22 +102,22 @@ export default function AboutRoute() {
             </div>
 
             <div className="lg:col-span-5 bg-slate-950 text-white p-8 rounded-2xl space-y-6">
-              <h3 className="text-lg font-bold text-amber-400">Our Operational Promise</h3>
+              <h3 className="text-lg font-bold text-blue-400">Our Operational Promise</h3>
               <ul className="space-y-3 text-sm text-slate-300">
                 <li className="flex items-start gap-2.5">
-                  <CheckIcon className="w-4 h-4 text-amber-400 shrink-0 mt-1 stroke-[3]" />
+                  <CheckIcon className="w-4 h-4 text-blue-400 shrink-0 mt-1 stroke-[3]" />
                   <span>Always on time — we dispatch vehicles ahead of your reservation.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
-                  <CheckIcon className="w-4 h-4 text-amber-400 shrink-0 mt-1 stroke-[3]" />
+                  <CheckIcon className="w-4 h-4 text-blue-400 shrink-0 mt-1 stroke-[3]" />
                   <span>Transparent rates with zero hidden airport baggage surcharges.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
-                  <CheckIcon className="w-4 h-4 text-amber-400 shrink-0 mt-1 stroke-[3]" />
+                  <CheckIcon className="w-4 h-4 text-blue-400 shrink-0 mt-1 stroke-[3]" />
                   <span>Licensed by the St. Louis Metropolitan Taxicab Commission.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
-                  <CheckIcon className="w-4 h-4 text-amber-400 shrink-0 mt-1 stroke-[3]" />
+                  <CheckIcon className="w-4 h-4 text-blue-400 shrink-0 mt-1 stroke-[3]" />
                   <span>Real human dispatchers standing by 24/7 on the phone.</span>
                 </li>
               </ul>
@@ -130,9 +130,9 @@ export default function AboutRoute() {
           {STATS.map((stat) => (
             <div
               key={stat.label}
-              className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs text-center space-y-1 hover:border-amber-400 transition-colors"
+              className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs text-center space-y-1 hover:border-blue-400 transition-colors"
             >
-              <span className="text-3xl sm:text-4xl font-black text-amber-500 block tracking-tight">
+              <span className="text-3xl sm:text-4xl font-black text-blue-600 block tracking-tight">
                 {stat.value}
               </span>
               <span className="text-sm font-extrabold text-slate-900 block">{stat.label}</span>
@@ -144,7 +144,7 @@ export default function AboutRoute() {
         {/* Safety & Quality Pillars */}
         <div className="space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-600">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Safety &amp; Compliance
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
@@ -162,7 +162,7 @@ export default function AboutRoute() {
                 variant="default"
                 className="p-8 rounded-3xl bg-white border-slate-200/80 space-y-3"
               >
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                   {pillar.icon}
                 </div>
                 <h3 className="text-lg font-extrabold text-slate-900">{pillar.title}</h3>
@@ -186,7 +186,11 @@ export default function AboutRoute() {
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
             <Link
               to="/book"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-xs transition-colors"
+              style={{
+                backgroundColor: 'var(--btn-primary-bg, #2563eb)',
+                color: 'var(--btn-primary-text, #ffffff)',
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-xs transition-colors hover:opacity-95"
             >
               <span>Book Online</span>
               <ChevronRightIcon className="w-4 h-4 stroke-[3]" />

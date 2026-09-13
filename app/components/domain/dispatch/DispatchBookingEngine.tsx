@@ -8,7 +8,7 @@ import { getAdminConfigService } from '../../../core/services/config/admin-confi
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
-import { SpinnerIcon, PlusIcon, UserIcon, PhoneIcon, MailIcon } from '../../ui/Icons';
+import { SpinnerIcon, PlusIcon, UserIcon, PhoneIcon, MailIcon, LuggageIcon } from '../../ui/Icons';
 
 export interface AdditionalPassenger {
   name: string;
@@ -1743,9 +1743,9 @@ export function DispatchBookingEngine({
           <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
             {/* Primary Passenger */}
             <div className="relative">
-              <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                 <UserIcon className="w-3.5 h-3.5" />
-              </span>
+              </div>
               <input
                 type="text"
                 placeholder="Primary Passenger Name"
@@ -1758,9 +1758,9 @@ export function DispatchBookingEngine({
 
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
-                <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                   <PhoneIcon className="w-3.5 h-3.5" />
-                </span>
+                </div>
                 <input
                   type="tel"
                   placeholder="Phone Number"
@@ -1771,9 +1771,9 @@ export function DispatchBookingEngine({
                 />
               </div>
               <div className="relative">
-                <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                   <MailIcon className="w-3.5 h-3.5" />
-                </span>
+                </div>
                 <input
                   type="email"
                   placeholder="Email (optional)"
@@ -1895,7 +1895,7 @@ export function DispatchBookingEngine({
             {/* Passengers Counter */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                <span>👤</span>
+                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
                 <span>Total Passengers</span>
               </div>
               <div className="flex items-center gap-2">
@@ -1921,7 +1921,7 @@ export function DispatchBookingEngine({
             {/* Bags Counter */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                <span>🧳</span>
+                <LuggageIcon className="w-3.5 h-3.5 text-slate-500" />
                 <span>Bags</span>
               </div>
               <div className="flex items-center gap-2">
