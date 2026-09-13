@@ -176,4 +176,37 @@
 - [x] 20.10 Update Live Fare Matrix Simulator in `AdminRatesTab.tsx` with expanded inputs and audit trail trace showing rule inheritance cascades and step calculation breakdowns.
 - [x] 20.11 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
 - [x] 20.12 Run `npm run build` to confirm production build stability and mark Phase 20 complete in tasks.md.
+## Phase 20.B: API Cost Optimization Protocol for Google Maps & Directions Services
+- [x] 20.B.1 Documentation & Specification updates for API Cost Optimization Protocol.
+- [x] 20.B.2 Developer & Offline Mock Mode in `companyConfig.ts` (`enableRealtimeRouting: false`).
+- [x] 20.B.3 Client-Side Route Caching Module (`RouteCache` in `app/core/services/maps/route-cache.ts` using sessionStorage/memory fallback, keyed by `originPlaceId_destPlaceId_waypoints`).
+- [x] 20.B.4 Pure Local Mock Routing Engine (`mock-routing.ts`) with Haversine distance × 1.25x road curvature factor, duration estimation, and straight-line polyline encoder.
+- [x] 20.B.5 Debounce & Trigger Guarding Hook/Helpers (`useDebounceRoute.ts`) enforcing 800ms quiet period and requiring valid Google `place_id`s or explicit Lat/Lng coordinates.
+- [x] 20.B.6 Integrate cost optimization and offline mock mode into `live-routing.service.ts` and `server-route.service.ts`.
+- [x] 20.B.7 Update booking engines (`BookingEngineV2.tsx`, `BookingEngine.tsx`, `DispatchBookingEngine.tsx`) with 800ms debounce and trigger guards.
+- [x] 20.B.8 Update Tactical Dispatch Map in `dispatch.tsx` with 800ms debounce, trigger guards, and offline mock polyline rendering.
+- [x] 20.B.9 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
+- [x] 20.B.10 Run `npm run build` to confirm production build stability.
 
+## Phase 21: Public Booking Engine Overhaul & Dispatcher Confirmation Workflow
+- [x] 21.1 Documentation Updates: Update `spec.md`, `plan.md`, and `tasks.md` to define Phase 21 scope (Customer Booking Engine alignment with Phase 20 Pricing Engine, UNCONFIRMED trip status lifecycle, and Dispatcher Accept/Decline Email Workflows).
+- [x] 21.2 Core Data Models & State Machine: Expand `TripStatus` in `app/core/types/trip.ts` with `'UNCONFIRMED'`, `'CONFIRMED'`, `'DECLINED'` and configure allowed transitions in `TRIP_STATE_TRANSITIONS`.
+- [x] 21.3 Pricing Engine Configuration Bridge: Update `toPricingConfig` in `admin-config.service.ts` to map step increments, condition surcharges, delay rate, and named pricing rules.
+- [x] 21.4 Spatial Entity Evaluation in Booking Services: Update `calculateQuote` in `firebase-booking.service.ts` and `mock-booking.service.ts` to match pickup/dropoff against zones, zone groups, and location collections.
+- [x] 21.5 Public Booking Engine & Equipment UI: Connect `BookingEngineV2.tsx` to Phase 20 pricing pipeline, add infant/toddler/booster car seat selectors and luggage options, and force customer submissions to save with `status: 'UNCONFIRMED'`.
+- [x] 21.6 Customer Booking Status Enforcement: Update `BookingEngine.tsx`, `firebase-booking.service.ts`, and `mock-booking.service.ts` to enforce `status: 'UNCONFIRMED'` for public customer submissions.
+- [x] 21.7 Transactional Decline Email System: Add `BookingDeclinedEmailPayload`, `renderBookingDeclinedEmail`, `sendBookingDeclined`, and `/api/send-email` routing in email services.
+- [x] 21.8 Dispatcher Review & Confirmation Workflow (`/dispatch`): Add interactive "Unconfirmed" filter pill/badge with pulsing alert animation, queue table row highlighting, and Dispatcher Review Action Modal (Accept & Decline workflows).
+
+## Phase 21.B: Customer Booking Engine Redesign (Dispatch-Aligned UI & Restrictions)
+- [x] 21.B.1 Redesign layout of `BookingEngineV2.tsx` to match the compact, professional card language of `DispatchBookingEngine.tsx` with slate-50 backdrop and rounded-xl bordered cards.
+- [x] 21.B.2 Implement dispatch-style Timing Selector (segmented toggle between Now (ASAP) and Later (Scheduled) with side-by-side date/time pickers).
+- [x] 21.B.3 Implement Route & Stops container with Route Swap button (`↕`), `DispatchLocationInput` autocomplete, up to 5 intermediate stops with reordering, and live route stats.
+- [x] 21.B.4 Implement Airport Transfer Assistance card for STL Lambert & SUS Spirit with flight details, checked baggage tracking, and curbside pickup terminal guidance.
+- [x] 21.B.5 Implement Passenger & Booker drawer with primary passenger fields, `+ Add Passenger`, and expandable Booker/Contact Person details with role selector.
+- [x] 21.B.6 Implement Trip Details with Pax & Bags steppers, Luggage classification, and 3-tier Child Safety Seat steppers (Rear-Facing, Front-Facing, Booster) enforcing Missouri child passenger safety law and company caps.
+- [x] 21.B.7 Enforce Customer Restrictions: No manual fare override, no driver/company assignment, customer vehicle capacity locks (e.g. Sedan locked for >4 pax or >3 bags), 30-minute advance scheduling guard, and mandatory `UNCONFIRMED` trip status.
+- [x] 21.B.8 Implement Return Trip (Round Trip) with pre-filled return leg, return schedule pickers, return equipment steppers, and combined round-trip fare calculation.
+- [x] 21.B.9 Implement Payment Method selector (Cash in Cab, Credit Card with contactless in-cab terminal vs card on file, and Corporate Account direct billing).
+- [x] 21.B.10 Build Right-Hand Sticky Summary Card with itemized price breakdown, Zero Surge Pricing Guarantee badge, 24/7 Dispatch Review notice, and direct dispatch hotline.
+- [x] 21.B.11 Run `npm run typecheck` and `npm run build` to verify 0 errors.

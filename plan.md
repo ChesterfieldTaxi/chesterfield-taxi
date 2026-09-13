@@ -185,3 +185,42 @@ Trips stored in Firestore will strictly adhere to the following state transition
   - Excess delay minutes beyond grace period converted to seconds and evaluated as steps = ceil(excess_seconds / step_seconds).
 - Pure Inheritance Resolution:
   - Resolves `parentRuleId` recursively with cycle guard, merging parent base fares, mileage rates, minute rates, and default surcharges, before applying child delta overrides.
+
+## 9. Phase 21 Architecture: Public Booking Engine & Confirmation Workflow
+
+### 9.1 Trip Lifecycle State Machine Expansion
+- Extended `TripStatus` literal types:
+  - Added `'UNCONFIRMED'`, `'CONFIRMED'`, `'DECLINED'` (and lowercase aliases).
+- Valid State Transitions:
+  - `UNCONFIRMED` -> `['CONFIRMED', 'DECLINED', 'cancelled', 'pending']`
+  - `CONFIRMED` -> `['pending', 'offered', 'assigned', 'cancelled']`
+  - `DECLINED` -> `['cancelled']` (terminal state)
+  - `pending` -> `['CONFIRMED', 'offered', 'assigned', 'cancelled']`
+- Web customer bookings created with `status: 'UNCONFIRMED'`.
+
+### 9.2 Pricing Pipeline Bridge & Spatial Evaluation
+- `calculateQuote` in `firebase-booking.service.ts` & `mock-booking.service.ts`:
+  - Retrieves active `ZoneGeofence`, `ZoneGroup`, and `LocationCollection` registries.
+  - Matches pickup/dropoff coordinates against geofences using Haversine distance and ray-casting.
+  - Hydrates `PricingInput` with matched `zoneIds`, `zoneGroupIds`, `locationCollectionIds`, `carSeatsBreakdown`, and `equipment`.
+  - Forwards `stepIncrementTiers`, `delayRate`, `conditionSurcharges`, and active named pricing rules via `PricingConfig`.
+
+### 9.3 Equipment & Safety Configuration
+- Enforces `COMPANY_CONFIG.carSeatLimits`:
+  - `maxRearFacing: 2` (Infant)
+  - `maxFrontFacing: 3` (Toddler)
+  - `maxBooster: 3` (Youth Booster)
+  - `maxTotalCarSeats: 4` (Total combined ceiling)
+- Luggage options schema:
+  - `luggageCount`: number
+  - `hasOversizedLuggage`: boolean
+  - `luggageType`: `'standard' | 'oversized' | 'carryon_only'`
+
+### 9.4 Dispatcher Review & Transactional Email Workflows
+- Bottom trip queue filter in `/dispatch`:
+  - Filter pill `pillFilter === 'unconfirmed'` with count badge and pulse alert.
+  - Row highlighting for pending unconfirmed bookings.
+- Review Action Modal:
+  - **Accept Action**: calls `updateTripStatus(tripId, 'CONFIRMED')` and dispatches `sendBookingConfirmation(payload)` via Resend API.
+  - **Decline Action**: calls `updateTripStatus(tripId, 'DECLINED')` and dispatches `sendBookingDeclined(payload)` with preset or custom reason via Resend API.
+

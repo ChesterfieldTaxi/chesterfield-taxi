@@ -11,6 +11,7 @@ import type {
   CreateTripInput,
   TripStatus,
   TripStatusHistoryEntry,
+  GeoPoint,
 } from '../../types';
 import { isValidTripTransition } from '../../types';
 import type {
@@ -22,6 +23,14 @@ import type {
 import { calculateTripPricing } from '../pricing';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
 import { getAdminConfigService } from '../config/admin-config.service';
+import {
+  getZoneService,
+  isCoordinateInZone,
+  isCoordinateInZoneGroup,
+  isCoordinateNearLocationCollection,
+} from '../zones/zone.service';
+import { getPricingRulesService } from '../pricing/pricing-rules.service';
+
 
 const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
 
@@ -107,7 +116,10 @@ export class MockBookingService implements IBookingService {
         const liveResult = await calculateLiveRoute({
           origin,
           destination,
+          originPlaceId: request.pickupLocation.placeId,
+          destinationPlaceId: request.dropoffLocation.placeId,
           waypoints,
+          waypointPlaceIds: request.intermediateStops?.map((s) => s.placeId || ''),
         });
         if (liveResult) {
           distanceMiles = liveResult.distanceMiles;
@@ -148,6 +160,62 @@ export class MockBookingService implements IBookingService {
     const settings = await adminConfig.getSettings();
     const dynamicPricingConfig = adminConfig.toPricingConfig(settings);
 
+    // Hydrate namedPricingRules from PricingRulesService
+    try {
+      const pricingRulesService = getPricingRulesService();
+      const allRules = await pricingRulesService.getRules();
+      dynamicPricingConfig.namedPricingRules = allRules.filter((r) => r.isActive);
+    } catch (rulesErr) {
+      console.warn('[MockBookingService] Could not load active pricing rules:', rulesErr);
+    }
+
+    const validIntermediateStops = (request.intermediateStops ?? []).filter((s) => {
+      if (s.coordinates) return true;
+      if (s.address && s.address.trim().length > 0) return true;
+      return false;
+    });
+
+    // Resolve spatial containment (Zones, Zone Groups, Location Collections)
+    const matchedZoneIds = new Set<string>(request.zoneIds || []);
+    const matchedZoneGroupIds = new Set<string>(request.zoneGroupIds || []);
+    const matchedLocationCollectionIds = new Set<string>(request.locationCollectionIds || []);
+
+    const coordsToTest = [
+      request.pickupLocation.coordinates,
+      request.dropoffLocation.coordinates,
+      ...validIntermediateStops.map((s) => s.coordinates),
+    ].filter((c): c is GeoPoint => Boolean(c && typeof c.lat === 'number' && typeof c.lng === 'number'));
+
+    if (coordsToTest.length > 0) {
+      try {
+        const zoneService = getZoneService();
+        const zones = await zoneService.getZones();
+        const zoneGroups = await zoneService.getZoneGroups();
+        const locationColls = await zoneService.getLocationCollections();
+
+        for (const coord of coordsToTest) {
+          for (const zone of zones) {
+            if (isCoordinateInZone(coord, zone)) {
+              matchedZoneIds.add(zone.id);
+            }
+          }
+          for (const group of zoneGroups) {
+            if (isCoordinateInZoneGroup(coord, group, zones)) {
+              matchedZoneGroupIds.add(group.id);
+            }
+          }
+          for (const coll of locationColls) {
+            const matchResult = isCoordinateNearLocationCollection(coord, coll);
+            if (matchResult.matches) {
+              matchedLocationCollectionIds.add(coll.id);
+            }
+          }
+        }
+      } catch (spatialErr) {
+        console.warn('[MockBookingService] Spatial entity evaluation warning:', spatialErr);
+      }
+    }
+
     const { pricing } = calculateTripPricing(
       {
         distanceMiles,
@@ -156,6 +224,24 @@ export class MockBookingService implements IBookingService {
         pickupDateTime,
         promoCode: request.promoCode,
         isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
+        intermediateStopsCount: validIntermediateStops.length,
+        tolls: request.tolls,
+        customTollsOrFees: request.customTollsOrFees,
+        bypassSurge: request.bypassSurge,
+        waiveMultiStopFees: request.waiveMultiStopFees,
+        waiveAirportFee: request.waiveAirportFee,
+        manualDiscount: request.manualDiscount,
+        manualFareOverride: request.manualFareOverride,
+        carSeatsBreakdown: request.carSeatsBreakdown,
+        passengers: request.passengerCount,
+        equipment: {
+          carSeats: request.carSeatsCount || (request.carSeatsBreakdown?.total ?? 0),
+          luggageCount: request.luggageCount,
+          ...request.equipment,
+        },
+        zoneIds: Array.from(matchedZoneIds),
+        zoneGroupIds: Array.from(matchedZoneGroupIds),
+        locationCollectionIds: Array.from(matchedLocationCollectionIds),
       },
       dynamicPricingConfig
     );
@@ -172,23 +258,25 @@ export class MockBookingService implements IBookingService {
     };
   }
 
-
   public async createBooking(payload: CreateTripInput): Promise<Trip> {
     const now = new Date().toISOString();
     const id = payload.id ?? `trip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
 
     const initialHistoryEntry: TripStatusHistoryEntry = {
       from: null,
-      to: 'pending',
+      to: initialStatus,
       timestamp: now,
       actorRole: 'passenger',
-      reason: 'Booking submitted via web portal',
+      reason: initialStatus === 'UNCONFIRMED'
+        ? 'Web booking submitted by customer (pending dispatcher review)'
+        : 'Booking submitted via system',
     };
 
     const newTrip: Trip = {
       ...payload,
       id,
-      status: 'pending',
+      status: initialStatus,
       offeredToIds: [],
       rejectedByIds: [],
       assignedDriverId: null,

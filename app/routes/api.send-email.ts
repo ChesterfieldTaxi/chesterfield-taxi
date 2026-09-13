@@ -39,6 +39,9 @@ export async function action({ request }: ActionFunctionArgs) {
       case 'status_update':
         result = await emailService.sendStatusUpdateNotification(body.payload);
         break;
+      case 'booking_declined':
+        result = await emailService.sendBookingDeclined(body.payload);
+        break;
       default:
         return Response.json(
           { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },

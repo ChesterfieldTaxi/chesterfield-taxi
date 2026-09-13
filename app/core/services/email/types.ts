@@ -87,6 +87,22 @@ export interface StatusUpdateEmailPayload {
   statusReason?: string;
 }
 
+export interface BookingDeclinedEmailPayload {
+  tripId: string;
+  passenger: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  pickupAddress: string;
+  dropoffAddress: string;
+  pickupTime: string;
+  vehicleTier?: string;
+  reason: string;
+  customNotes?: string;
+}
+
 export interface EmailDispatchResult {
   success: boolean;
   messageId?: string;
@@ -100,7 +116,8 @@ export interface EmailDispatchResult {
 export type EmailDispatchApiRequest =
   | { type: 'booking_confirmation'; payload: BookingConfirmationEmailPayload }
   | { type: 'dispatcher_alert'; payload: AdminDispatchAlertEmailPayload }
-  | { type: 'status_update'; payload: StatusUpdateEmailPayload };
+  | { type: 'status_update'; payload: StatusUpdateEmailPayload }
+  | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload };
 
 /**
  * Transactional Email Dispatch Service Interface
@@ -111,6 +128,13 @@ export interface IEmailDispatchService {
    */
   sendBookingConfirmation(
     payload: BookingConfirmationEmailPayload
+  ): Promise<EmailDispatchResult>;
+
+  /**
+   * Sends booking declined notification email to the passenger.
+   */
+  sendBookingDeclined(
+    payload: BookingDeclinedEmailPayload
   ): Promise<EmailDispatchResult>;
 
   /**

@@ -6,6 +6,7 @@ import { calculateLiveRoute } from '../../../core/services/maps/live-routing.ser
 import { calculateTripPricing, getPricingRulesService } from '../../../core/services/pricing';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
 import { SpinnerIcon } from '../../ui/Icons';
 
@@ -733,7 +734,7 @@ export function DispatchBookingEngine({
     onValuesChange,
   ]);
 
-  // Live route calculation & pricing (Outbound)
+  // Live route calculation & pricing (Outbound, wrapped in 800ms debounce & trigger guard)
   useEffect(() => {
     if (!pickupAddress || !dropoffAddress) {
       if (!isFareOverridden) {
@@ -744,66 +745,75 @@ export function DispatchBookingEngine({
       return;
     }
 
-    let isMounted = true;
     const origin = pickupCoordinates || pickupAddress;
     const destination = dropoffCoordinates || dropoffAddress;
+
+    // Trigger Guard: Ensure both origin and destination have valid coordinates or placeIds
+    if (!hasValidRoutePair(origin, destination)) {
+      return;
+    }
+
+    let isMounted = true;
     const waypoints = intermediateStops.map((s) => s.coordinates || s.address).filter(Boolean);
 
-    calculateLiveRoute({ origin, destination, waypoints })
-      .then((res) => {
-        if (!isMounted || !res) return;
-        setEstimatedDistanceMiles(res.distanceMiles);
-        setEstimatedDurationMinutes(res.durationMinutes);
+    const timer = setTimeout(() => {
+      calculateLiveRoute({ origin, destination, waypoints })
+        .then((res) => {
+          if (!isMounted || !res) return;
+          setEstimatedDistanceMiles(res.distanceMiles);
+          setEstimatedDurationMinutes(res.durationMinutes);
 
-        if (!isFareOverridden) {
-          const config = getAdminConfigService().getCachedSettings().pricing;
-          
-          // Calculate pricing for each selected vehicle and sum
-          let totalCalculated = 0;
-          selectedVehicles.forEach((v) => {
-            let tier: VehicleTier = 'standard';
-            if (v === 'suv') tier = 'xl';
-            if (v === 'van') tier = 'wheelchair';
-            if (v === 'sedan') tier = 'premium';
-            if (v === 'any') tier = 'standard';
+          if (!isFareOverridden) {
+            const config = getAdminConfigService().getCachedSettings().pricing;
+            
+            // Calculate pricing for each selected vehicle and sum
+            let totalCalculated = 0;
+            selectedVehicles.forEach((v) => {
+              let tier: VehicleTier = 'standard';
+              if (v === 'suv') tier = 'xl';
+              if (v === 'van') tier = 'wheelchair';
+              if (v === 'sedan') tier = 'premium';
+              if (v === 'any') tier = 'standard';
 
-            const quote = calculateTripPricing(
-              {
-                distanceMiles: res.distanceMiles,
-                durationMinutes: res.durationMinutes,
-                vehicleTier: tier,
-                pickupDateTime:
-                  timingType === 'later' && scheduledDate && scheduledTime
-                    ? new Date(`${scheduledDate}T${scheduledTime}:00`)
-                    : new Date(),
-                intermediateStopsCount: intermediateStops.length,
-                carSeatsBreakdown: {
-                  rearFacing: rearFacingCount,
-                  frontFacing: frontFacingCount,
-                  booster: boosterCount,
-                  total: rearFacingCount + frontFacingCount + boosterCount,
+              const quote = calculateTripPricing(
+                {
+                  distanceMiles: res.distanceMiles,
+                  durationMinutes: res.durationMinutes,
+                  vehicleTier: tier,
+                  pickupDateTime:
+                    timingType === 'later' && scheduledDate && scheduledTime
+                      ? new Date(`${scheduledDate}T${scheduledTime}:00`)
+                      : new Date(),
+                  intermediateStopsCount: intermediateStops.length,
+                  carSeatsBreakdown: {
+                    rearFacing: rearFacingCount,
+                    frontFacing: frontFacingCount,
+                    booster: boosterCount,
+                    total: rearFacingCount + frontFacingCount + boosterCount,
+                  },
+                  passengers,
+                  accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
+                  selectedRuleId: selectedRuleId || undefined,
                 },
-                passengers,
-                accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
-                selectedRuleId: selectedRuleId || undefined,
-              },
-              {
-                ...config,
-                namedPricingRules: availableNamedRules,
-              }
-            );
-            totalCalculated += quote.pricing.totalFare;
-          });
+                {
+                  ...config,
+                  namedPricingRules: availableNamedRules,
+                }
+              );
+              totalCalculated += quote.pricing.totalFare;
+            });
 
-          setEstimatedFare(totalCalculated);
-        }
-      })
-      .catch((e) => {
-        console.warn('[DispatchBookingEngine] Route calculation failed:', e);
-      });
+            setEstimatedFare(totalCalculated);
+          }
+        })
+        .catch((e) => {
+          console.warn('[DispatchBookingEngine] Route calculation failed:', e);
+        });
+    }, 800);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [
     pickupAddress,
@@ -845,58 +855,67 @@ export function DispatchBookingEngine({
       return;
     }
 
+    // Trigger Guard: Ensure both return origin and destination have valid coordinates or placeIds
+    if (!hasValidRoutePair(retOrigin, retDestination)) {
+      return;
+    }
+
     let isMounted = true;
-    calculateLiveRoute({ origin: retOrigin, destination: retDestination, waypoints: retWaypoints })
-      .then((res) => {
-        if (!isMounted || !res) return;
-        setReturnEstimatedDistanceMiles(res.distanceMiles);
-        setReturnEstimatedDurationMinutes(res.durationMinutes);
 
-        const config = getAdminConfigService().getCachedSettings().pricing;
-        let retTotal = 0;
-        returnVehicles.forEach((v) => {
-          let tier: VehicleTier = 'standard';
-          if (v === 'suv') tier = 'xl';
-          if (v === 'van') tier = 'wheelchair';
-          if (v === 'sedan') tier = 'premium';
-          if (v === 'any') tier = 'standard';
+    const timer = setTimeout(() => {
+      calculateLiveRoute({ origin: retOrigin, destination: retDestination, waypoints: retWaypoints })
+        .then((res) => {
+          if (!isMounted || !res) return;
+          setReturnEstimatedDistanceMiles(res.distanceMiles);
+          setReturnEstimatedDurationMinutes(res.durationMinutes);
 
-          const quote = calculateTripPricing(
-            {
-              distanceMiles: res.distanceMiles,
-              durationMinutes: res.durationMinutes,
-              vehicleTier: tier,
-              pickupDateTime:
-                returnDate && returnTime
-                  ? new Date(`${returnDate}T${returnTime}:00`)
-                  : new Date(),
-              intermediateStopsCount: returnIntermediateStops.length,
-              carSeatsBreakdown: {
-                rearFacing: returnRearFacing,
-                frontFacing: returnFrontFacing,
-                booster: returnBooster,
-                total: returnRearFacing + returnFrontFacing + returnBooster,
+          const config = getAdminConfigService().getCachedSettings().pricing;
+          let retTotal = 0;
+          returnVehicles.forEach((v) => {
+            let tier: VehicleTier = 'standard';
+            if (v === 'suv') tier = 'xl';
+            if (v === 'van') tier = 'wheelchair';
+            if (v === 'sedan') tier = 'premium';
+            if (v === 'any') tier = 'standard';
+
+            const quote = calculateTripPricing(
+              {
+                distanceMiles: res.distanceMiles,
+                durationMinutes: res.durationMinutes,
+                vehicleTier: tier,
+                pickupDateTime:
+                  returnDate && returnTime
+                    ? new Date(`${returnDate}T${returnTime}:00`)
+                    : new Date(),
+                intermediateStopsCount: returnIntermediateStops.length,
+                carSeatsBreakdown: {
+                  rearFacing: returnRearFacing,
+                  frontFacing: returnFrontFacing,
+                  booster: returnBooster,
+                  total: returnRearFacing + returnFrontFacing + returnBooster,
+                },
+                passengers: returnPassengers,
+                accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
+                selectedRuleId: selectedRuleId || undefined,
               },
-              passengers: returnPassengers,
-              accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
-              selectedRuleId: selectedRuleId || undefined,
-            },
-            {
-              ...config,
-              namedPricingRules: availableNamedRules,
-            }
-          );
-          retTotal += quote.pricing.totalFare;
-        });
+              {
+                ...config,
+                namedPricingRules: availableNamedRules,
+              }
+            );
+            retTotal += quote.pricing.totalFare;
+          });
 
-        setReturnEstimatedFare(retTotal);
-      })
-      .catch((e) => {
-        console.warn('[DispatchBookingEngine] Return route calculation failed:', e);
-      });
+          setReturnEstimatedFare(retTotal);
+        })
+        .catch((e) => {
+          console.warn('[DispatchBookingEngine] Return route calculation failed:', e);
+        });
+    }, 800);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [
     returnTrip,

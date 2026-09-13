@@ -291,3 +291,36 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Delay wait-time step calculation (e.g. $0.60 per 60s/90s under threshold after grace period).
   - Live Fare Matrix Simulator integration with interactive audit trail logging displaying parent rule cascades and step calculation breakdowns.
 
+### 17. Phase 21: Public Booking Engine Overhaul & Dispatcher Confirmation Workflow
+- **Public Customer Booking Engine Alignment with Phase 20 Pricing Engine (`/book`):**
+  - Connect the customer booking wizard directly into the full multi-tier pricing evaluation pipeline.
+  - Evaluate Zone Groups, Location Collections, and geographic geofences server-side and client-side based on pickup and destination coordinates.
+  - Apply decaying step-increment rate brackets and condition-based surcharges to upfront quote generation.
+- **Granular Equipment & Passenger Selectors:**
+  - Car seat breakdown selector by category: Infant (Rear-Facing, max 2), Toddler (Front-Facing, max 3), and Youth Booster (max 3), strictly enforcing the platform vehicle safety limit of 4 total child seats.
+  - Granular luggage options: Total bags counter, luggage classification (Checked, Carry-on, Oversized / Sports / Strollers), and passenger counts.
+  - Calculate real-time equipment surcharges and validate vehicle category capacity before final submission.
+- **UNCONFIRMED Trip Status Lifecycle:**
+  - Force all customer-submitted web bookings to enter the system with initial `status: 'UNCONFIRMED'`.
+  - Record audit log entry in `statusHistory`: `from: null, to: 'UNCONFIRMED', actorRole: 'passenger', reason: 'Web booking submitted by customer (pending dispatcher review)'`.
+  - Disallow direct driver assignment or dispatch until confirmed by a dispatcher.
+- **Dispatcher Review & Confirmation Workflow (`/dispatch`):**
+  - **Unconfirmed Filter & Visual Alert Badge**:
+    - High-visibility interactive filter pill in bottom trip queue with alert badge and pulsing animations when unconfirmed web bookings are pending.
+    - Prominent visual alert highlighting for pending unconfirmed rows in the bottom trips queue table.
+  - **Dispatcher Review Action Modal**:
+    - Comprehensive booking review modal summarizing passenger details, requested vehicle tier, route details, pickup date/time, car seats breakdown (infant/toddler/booster), luggage options, and price breakdown.
+    - **Accept Action**:
+      - Updates trip status to `'CONFIRMED'`.
+      - Automatically dispatches formal passenger confirmation email via transactional email service (Resend).
+      - Transitions booking to active dispatch pipeline for driver assignment.
+    - **Decline Action**:
+      - Interactive rejection interface offering preset standard rejection reasons:
+        1. "No driver availability"
+        2. "Outside service boundary"
+        3. "Vehicle class unavailable"
+        4. "Custom message" (with dispatcher message input).
+      - Updates trip status to `'DECLINED'`.
+      - Automatically dispatches courteous notification email to the passenger citing the rejection reason and providing 24/7 dispatch desk contact options.
+
+

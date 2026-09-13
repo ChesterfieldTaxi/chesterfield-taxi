@@ -12,8 +12,11 @@ import { DispatchBookingEngine, type DispatchFormValues } from '../components/do
 import { CustomDateTimePicker, type DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
+import { hasValidRoutePair } from '../core/hooks/useDebounceRoute';
+import { resolveMockCoordinates } from '../core/services/maps/mock-routing';
 import { SpinnerIcon } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
+import { getEmailDispatchService } from '../core/services/email/resend-email.service';
 
 export function meta() {
   return [
@@ -111,12 +114,20 @@ export default function DispatchRoute() {
   const [filterPreset, setFilterPreset] = useState<string>('all');
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
-  const [pillFilter, setPillFilter] = useState<'all' | 'pending' | 'assigned' | 'completed' | 'cancelled' | 'unassigned'>('all');
+  const [pillFilter, setPillFilter] = useState<'all' | 'unconfirmed' | 'pending' | 'assigned' | 'completed' | 'cancelled' | 'unassigned'>('all');
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
+
+  // Dispatcher Review Modal State for UNCONFIRMED web bookings
+  const [reviewTrip, setReviewTrip] = useState<Trip | null>(null);
+  const [reviewDeclineMode, setReviewDeclineMode] = useState<boolean>(false);
+  const [selectedDeclineReason, setSelectedDeclineReason] = useState<string>('No driver availability');
+  const [reviewCustomNotes, setReviewCustomNotes] = useState<string>('');
+  const [isProcessingReview, setIsProcessingReview] = useState<boolean>(false);
+  const [reviewAlert, setReviewAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Custom DateTime Range Picker State
   const [dateTimeRange, setDateTimeRange] = useState<DateTimeRange>({
@@ -314,6 +325,142 @@ export default function DispatchRoute() {
     });
     return () => unsub();
   }, []);
+
+  const handleOpenReviewModal = (trip: Trip) => {
+    setReviewTrip(trip);
+    setReviewDeclineMode(false);
+    setSelectedDeclineReason('No driver availability');
+    setReviewCustomNotes('');
+    setReviewAlert(null);
+  };
+
+  const handleConfirmTrip = async () => {
+    if (!reviewTrip) return;
+    setIsProcessingReview(true);
+    setReviewAlert(null);
+    try {
+      const bookingService = getBookingService();
+      if (bookingService.updateTripStatus) {
+        await bookingService.updateTripStatus(reviewTrip.id, 'CONFIRMED', {
+          actorRole: 'admin',
+          reason: 'Dispatcher accepted web booking',
+        });
+      } else if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, { status: 'CONFIRMED' });
+      }
+
+      // Dispatch confirmation email to passenger
+      const emailService = getEmailDispatchService();
+      await emailService.sendBookingConfirmation({
+        tripId: reviewTrip.id,
+        passenger: {
+          firstName: reviewTrip.passenger.firstName,
+          lastName: reviewTrip.passenger.lastName,
+          email: reviewTrip.passenger.email,
+          phone: reviewTrip.passenger.phone,
+        },
+        pickupAddress: reviewTrip.pickupLocation.address,
+        dropoffAddress: reviewTrip.dropoffLocation.address,
+        pickupTime:
+          reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+            ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate Ride (ASAP)',
+        bookingType: reviewTrip.bookingType,
+        vehicleTier: reviewTrip.vehicleTier,
+        passengerCount: reviewTrip.passenger.passengerCount,
+        luggageCount: reviewTrip.passenger.luggageCount,
+        totalFare: reviewTrip.pricing?.totalFare || 0,
+        currency: reviewTrip.pricing?.currency || 'USD',
+        paymentMethod: reviewTrip.payment?.method || 'cash',
+        specialRequests: reviewTrip.passenger.specialRequests,
+      });
+
+      // Update local state
+      setTrips((prev) =>
+        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'CONFIRMED' as TripStatus }) : t))
+      );
+
+      setReviewAlert({
+        type: 'success',
+        message: `Booking #${reviewTrip.id} confirmed! Confirmation email dispatched to ${reviewTrip.passenger.email}.`,
+      });
+      setTimeout(() => {
+        setReviewTrip(null);
+      }, 1500);
+    } catch (err: unknown) {
+      console.error('Failed to confirm trip:', err);
+      setReviewAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to confirm trip.',
+      });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
+  const handleDeclineTrip = async () => {
+    if (!reviewTrip) return;
+    setIsProcessingReview(true);
+    setReviewAlert(null);
+    try {
+      const reasonToSave =
+        selectedDeclineReason === 'Custom message'
+          ? reviewCustomNotes.trim() || 'Trip request declined by dispatch'
+          : selectedDeclineReason;
+
+      const bookingService = getBookingService();
+      if (bookingService.updateTripStatus) {
+        await bookingService.updateTripStatus(reviewTrip.id, 'DECLINED', {
+          actorRole: 'admin',
+          reason: reasonToSave,
+        });
+      } else if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, { status: 'DECLINED' });
+      }
+
+      // Dispatch decline notification email to passenger
+      const emailService = getEmailDispatchService();
+      await emailService.sendBookingDeclined({
+        tripId: reviewTrip.id,
+        passenger: {
+          firstName: reviewTrip.passenger.firstName,
+          lastName: reviewTrip.passenger.lastName,
+          email: reviewTrip.passenger.email,
+          phone: reviewTrip.passenger.phone,
+        },
+        pickupAddress: reviewTrip.pickupLocation.address,
+        dropoffAddress: reviewTrip.dropoffLocation.address,
+        pickupTime:
+          reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+            ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate Ride (ASAP)',
+        vehicleTier: reviewTrip.vehicleTier,
+        reason: selectedDeclineReason,
+        customNotes: reviewCustomNotes.trim() || undefined,
+      });
+
+      // Update local state
+      setTrips((prev) =>
+        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'DECLINED' as TripStatus }) : t))
+      );
+
+      setReviewAlert({
+        type: 'success',
+        message: `Booking #${reviewTrip.id} declined. Notification email sent to ${reviewTrip.passenger.email}.`,
+      });
+      setTimeout(() => {
+        setReviewTrip(null);
+      }, 1500);
+    } catch (err: unknown) {
+      console.error('Failed to decline trip:', err);
+      setReviewAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to decline trip.',
+      });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
 
   const handleOpenDriverModal = (trip: Trip) => {
     setDriverModalTrip(trip);
@@ -981,6 +1128,7 @@ export default function DispatchRoute() {
     if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
 
     // Filter pills
+    if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') return false;
     if (pillFilter === 'pending' && trip.status !== 'pending') return false;
     if (pillFilter === 'assigned' && trip.status !== 'assigned') return false;
     if (pillFilter === 'completed' && trip.status !== 'completed') return false;
@@ -1078,11 +1226,33 @@ export default function DispatchRoute() {
   };
 
   const unconfirmedCount = trips.filter(
-    (t) => t.status === 'pending' || !t.assignedDriverId
+    (t) => t.status === 'UNCONFIRMED' || t.status === 'unconfirmed'
   ).length;
 
   const getStatusBadge = (status: TripStatus) => {
     switch (status) {
+      case 'UNCONFIRMED':
+      case 'unconfirmed':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Unconfirmed
+          </span>
+        );
+      case 'CONFIRMED':
+      case 'confirmed':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+            Confirmed
+          </span>
+        );
+      case 'DECLINED':
+      case 'declined':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+            Declined
+          </span>
+        );
       case 'pending':
         return <Badge variant="warning">Pending</Badge>;
       case 'offered':
@@ -1426,13 +1596,35 @@ export default function DispatchRoute() {
                   />
                 </div>
 
-                {/* 2. Unconfirmed Count Badge */}
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-bold shadow-2xs shrink-0 h-7">
-                  <span>Unconfirmed</span>
-                  <span className="min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center font-bold">
+                {/* 2. Unconfirmed Filter Pill / Badge */}
+                <button
+                  type="button"
+                  onClick={() => setPillFilter((prev) => (prev === 'unconfirmed' ? 'all' : 'unconfirmed'))}
+                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold shadow-2xs shrink-0 h-7 cursor-pointer transition-all ${
+                    pillFilter === 'unconfirmed'
+                      ? 'bg-amber-600 text-white ring-2 ring-amber-400 ring-offset-1 shadow-sm'
+                      : unconfirmedCount > 0
+                      ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 animate-pulse'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                  }`}
+                  title="Filter pending unconfirmed bookings"
+                >
+                  <span className="flex items-center gap-1">
+                    {unconfirmedCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />}
+                    <span>Unconfirmed</span>
+                  </span>
+                  <span
+                    className={`min-w-4 h-4 px-1 rounded-full text-[10px] flex items-center justify-center font-bold ${
+                      pillFilter === 'unconfirmed'
+                        ? 'bg-white text-amber-700'
+                        : unconfirmedCount > 0
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
                     {unconfirmedCount}
                   </span>
-                </div>
+                </button>
 
                 {/* 3. Status Dropdown */}
                 <div className="relative shrink-0">
@@ -1442,10 +1634,13 @@ export default function DispatchRoute() {
                     className="h-7 px-2 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
                   >
                     <option value="all">Status: None ▾</option>
+                    <option value="UNCONFIRMED">Status: Unconfirmed ▾</option>
+                    <option value="CONFIRMED">Status: Confirmed ▾</option>
                     <option value="pending">Status: Pending ▾</option>
                     <option value="assigned">Status: Assigned ▾</option>
                     <option value="completed">Status: Completed ▾</option>
                     <option value="cancelled">Status: Cancelled ▾</option>
+                    <option value="DECLINED">Status: Declined ▾</option>
                   </select>
                 </div>
 
@@ -1720,6 +1915,8 @@ export default function DispatchRoute() {
                         })}`
                       : 'ASAP';
 
+                    const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+
                     return (
                       <tr
                         key={trip.id}
@@ -1736,8 +1933,14 @@ export default function DispatchRoute() {
                           setShouldZoomMap(true);
                           handleOpenEditTrip(trip);
                         }}
-                        className={`cursor-pointer hover:bg-blue-50/70 transition-colors ${
-                          isSelected ? 'bg-blue-50 font-medium' : isChecked ? 'bg-blue-50/40' : ''
+                        className={`cursor-pointer transition-colors ${
+                          isUnconfirmedTrip
+                            ? 'bg-amber-50/70 border-l-4 border-l-amber-500 hover:bg-amber-100/70'
+                            : isSelected
+                            ? 'bg-blue-50 font-medium hover:bg-blue-50/70'
+                            : isChecked
+                            ? 'bg-blue-50/40 hover:bg-blue-50/70'
+                            : 'hover:bg-blue-50/70'
                         }`}
                         title="Click to view route on map. Double-click to edit trip & zoom in."
                       >
@@ -1780,6 +1983,20 @@ export default function DispatchRoute() {
                         <td className="py-2 px-3">{getStatusBadge(trip.status)}</td>
                         <td className="py-2 px-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            {isUnconfirmedTrip && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReviewModal(trip);
+                                }}
+                                className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1 animate-pulse"
+                                title="Review and Accept or Decline customer web booking"
+                              >
+                                <span>Review</span>
+                                <span>📋</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2745,6 +2962,346 @@ export default function DispatchRoute() {
           </div>
         </div>
       )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          DISPATCHER REVIEW ACTION MODAL (UNCONFIRMED Bookings)
+      ───────────────────────────────────────────────────────────── */}
+      {reviewTrip && (() => {
+        const tripMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+        const carSeatsBreakdown = (tripMeta.carSeatsBreakdown || {}) as {
+          rearFacing?: number;
+          frontFacing?: number;
+          booster?: number;
+        };
+        const bookerName = tripMeta.bookerName ? String(tripMeta.bookerName) : null;
+        const bookerPhone = tripMeta.bookerPhone ? String(tripMeta.bookerPhone) : null;
+        const corporateOrgName = tripMeta.corporateOrgName ? String(tripMeta.corporateOrgName) : null;
+        const flightNumber = tripMeta.flightNumber ? String(tripMeta.flightNumber) : null;
+        const airline = tripMeta.airline ? String(tripMeta.airline) : '';
+        const luggageType = tripMeta.luggageType ? String(tripMeta.luggageType) : 'Standard';
+        const oversizedLuggageNotes = tripMeta.oversizedLuggageNotes ? String(tripMeta.oversizedLuggageNotes) : null;
+        const hasOversizedLuggage = Boolean(tripMeta.hasOversizedLuggage);
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Modal Header */}
+              <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-bold text-xl flex items-center justify-center shadow-md">
+                    📋
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-extrabold tracking-tight">Review Web Booking</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider animate-pulse">
+                        Pending Review
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      Trip #{reviewTrip.id} • Created {new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReviewTrip(null)}
+                  className="text-slate-400 hover:text-white text-lg w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Notification alert banner */}
+              {reviewAlert && (
+                <div
+                  className={`px-5 py-3 text-xs font-bold flex items-center gap-2 ${
+                    reviewAlert.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-200'
+                      : 'bg-red-50 text-red-800 border-b border-red-200'
+                  }`}
+                >
+                  <span>{reviewAlert.type === 'success' ? '✓' : '⚠️'}</span>
+                  <span>{reviewAlert.message}</span>
+                </div>
+              )}
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+                {/* Customer & Route Overview */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Passenger Card */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                    <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Customer Details</div>
+                    <div className="text-sm font-extrabold text-slate-900">
+                      {reviewTrip.passenger.firstName} {reviewTrip.passenger.lastName}
+                    </div>
+                    <div className="space-y-1 text-slate-600">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400">📞</span>
+                        <a href={`tel:${reviewTrip.passenger.phone}`} className="hover:underline font-mono text-blue-600">
+                          {reviewTrip.passenger.phone}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400">✉️</span>
+                        <a href={`mailto:${reviewTrip.passenger.email}`} className="hover:underline font-mono text-blue-600">
+                          {reviewTrip.passenger.email}
+                        </a>
+                      </div>
+                      {bookerName && (
+                        <div className="pt-1 text-[11px] text-slate-500">
+                          <span className="font-semibold">Booker:</span> {bookerName} ({bookerPhone || 'No phone'})
+                        </div>
+                      )}
+                      {corporateOrgName && (
+                        <div className="pt-1 text-[11px] text-slate-500">
+                          <span className="font-semibold">Corporate:</span> {corporateOrgName}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timing & Vehicle */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                    <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Schedule & Vehicle</div>
+                    <div className="text-sm font-extrabold text-slate-900">
+                      {reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+                        ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+                        : 'Immediate Dispatch (ASAP)'}
+                    </div>
+                    <div className="space-y-1 text-slate-600">
+                      <div>
+                        <span className="font-semibold">Vehicle Class: </span>
+                        <span className="capitalize font-bold text-slate-800">{reviewTrip.vehicleTier || 'Standard Sedan'}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Estimated Fare: </span>
+                        <span className="font-mono font-extrabold text-emerald-700 text-sm">
+                          ${reviewTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                        </span>{' '}
+                        <span className="text-[10px] text-slate-500 uppercase">({reviewTrip.payment?.method || 'Cash'})</span>
+                      </div>
+                      {flightNumber && (
+                        <div className="text-[11px] text-blue-700 font-semibold">
+                          ✈️ Flight: {airline} #{flightNumber}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Route */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Route</div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                      <div>
+                        <span className="font-bold text-slate-800">Pickup: </span>
+                        <span className="text-slate-700">{reviewTrip.pickupLocation.address}</span>
+                      </div>
+                    </div>
+                    {reviewTrip.intermediateStops && reviewTrip.intermediateStops.length > 0 && (
+                      <div className="pl-4 space-y-1 text-[11px] text-slate-600 border-l-2 border-slate-200 ml-1">
+                        {reviewTrip.intermediateStops.map((stop, i) => (
+                          <div key={i}>Stop {i + 1}: {stop.address}</div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
+                      <div>
+                        <span className="font-bold text-slate-800">Dropoff: </span>
+                        <span className="text-slate-700">{reviewTrip.dropoffLocation.address}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Equipment & Child Seats Breakdown */}
+                <div className="p-3.5 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-2">
+                  <div className="font-bold text-amber-900 uppercase tracking-wider text-[10px] flex items-center justify-between">
+                    <span>Safety Equipment & Luggage Specification</span>
+                    <span className="font-mono text-amber-700">
+                      Passengers: {reviewTrip.passenger.passengerCount} • Luggage: {reviewTrip.passenger.luggageCount}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
+                      <div className="text-[10px] text-slate-500">Infant (Rear)</div>
+                      <div className="font-mono font-bold text-sm text-slate-900">
+                        {carSeatsBreakdown.rearFacing ?? 0}
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
+                      <div className="text-[10px] text-slate-500">Toddler (Front)</div>
+                      <div className="font-mono font-bold text-sm text-slate-900">
+                        {carSeatsBreakdown.frontFacing ?? 0}
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
+                      <div className="text-[10px] text-slate-500">Youth Booster</div>
+                      <div className="font-mono font-bold text-sm text-slate-900">
+                        {carSeatsBreakdown.booster ?? 0}
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
+                      <div className="text-[10px] text-slate-500">Luggage Type</div>
+                      <div className="font-bold text-xs capitalize text-slate-900 truncate">
+                        {luggageType}
+                      </div>
+                    </div>
+                  </div>
+                  {hasOversizedLuggage && oversizedLuggageNotes && (
+                    <div className="p-2 bg-white rounded-lg border border-amber-200 text-[11px] text-amber-900">
+                      <span className="font-bold">Oversized Cargo: </span>
+                      {oversizedLuggageNotes}
+                    </div>
+                  )}
+                  {reviewTrip.passenger.specialRequests && (
+                    <div className="p-2 bg-white rounded-lg border border-amber-200 text-[11px] text-slate-700">
+                      <span className="font-bold">Special Requests: </span>
+                      {reviewTrip.passenger.specialRequests}
+                    </div>
+                  )}
+                </div>
+
+                {/* Decline View (if toggled) */}
+                {reviewDeclineMode && (
+                  <div className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-3 animate-in fade-in duration-100">
+                    <div className="font-bold text-red-900 flex items-center justify-between">
+                      <span>Select Reason for Declining Booking</span>
+                      <span className="text-[10px] text-red-700">Passenger will receive notification email</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {[
+                        'No driver availability',
+                        'Outside service boundary',
+                        'Vehicle class unavailable',
+                        'Custom message',
+                      ].map((reason) => (
+                        <label
+                          key={reason}
+                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
+                            selectedDeclineReason === reason
+                              ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
+                              : 'bg-red-50/50 border-red-100 text-red-800 hover:bg-white'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="declineReason"
+                            value={reason}
+                            checked={selectedDeclineReason === reason}
+                            onChange={(e) => setSelectedDeclineReason(e.target.value)}
+                            className="text-red-600 focus:ring-red-500"
+                          />
+                          <span>{reason}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        {selectedDeclineReason === 'Custom message'
+                          ? 'Custom Explanation (Required for passenger email):'
+                          : 'Additional Notes / Guidance (Optional):'}
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={reviewCustomNotes}
+                        onChange={(e) => setReviewCustomNotes(e.target.value)}
+                        placeholder={
+                          selectedDeclineReason === 'Custom message'
+                            ? 'Explain why this ride request cannot be serviced...'
+                            : 'Optional note to customer...'
+                        }
+                        className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-red-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Actions Footer */}
+              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReviewTrip(null)}
+                  disabled={isProcessingReview}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Close
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {!reviewDeclineMode ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview}
+                        onClick={() => setReviewDeclineMode(true)}
+                        className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Decline...
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview}
+                        onClick={handleConfirmTrip}
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {isProcessingReview ? (
+                          <>
+                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                            <span>Confirming...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>✓ Confirm & Accept Booking</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview}
+                        onClick={() => setReviewDeclineMode(false)}
+                        className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          isProcessingReview ||
+                          (selectedDeclineReason === 'Custom message' && !reviewCustomNotes.trim())
+                        }
+                        onClick={handleDeclineTrip}
+                        className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isProcessingReview ? (
+                          <>
+                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                            <span>Declining...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Send Rejection & Decline Trip</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2768,6 +3325,7 @@ function LiveDispatchMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const mockPolylineRef = useRef<google.maps.Polyline | null>(null);
 
   // Initialize Map
   useEffect(() => {
@@ -2808,13 +3366,18 @@ function LiveDispatchMap({
           directionsRendererRef.current.setMap(null);
         } catch {}
       }
+      if (mockPolylineRef.current) {
+        try {
+          mockPolylineRef.current.setMap(null);
+        } catch {}
+        mockPolylineRef.current = null;
+      }
     };
   }, []);
 
-  // Update Route Polyline based on selected queue trip or active draft
+  // Update Route Polyline based on selected queue trip or active draft (debounced 800ms & trigger guarded)
   useEffect(() => {
-    if (!mapInstanceRef.current || !directionsRendererRef.current) return;
-    if (typeof window.google?.maps?.DirectionsService !== 'function') return;
+    if (!mapInstanceRef.current) return;
 
     let origin: any = null;
     let destination: any = null;
@@ -2848,7 +3411,60 @@ function LiveDispatchMap({
         .map((loc) => ({ location: loc, stopover: true }));
     }
 
-    if (origin && destination) {
+    // Offline / Developer Mock Mode: Zero Google Directions API cost
+    if (!COMPANY_CONFIG.enableRealtimeRouting) {
+      try {
+        directionsRendererRef.current?.setDirections({ routes: [] } as any);
+      } catch {}
+
+      if (mockPolylineRef.current) {
+        mockPolylineRef.current.setMap(null);
+        mockPolylineRef.current = null;
+      }
+
+      if (origin && destination && window.google?.maps?.Polyline) {
+        const originCoord = resolveMockCoordinates(origin);
+        const destCoord = resolveMockCoordinates(destination);
+        const wpCoords = waypoints.map((w) => resolveMockCoordinates(w.location));
+        const path = [originCoord, ...wpCoords, destCoord];
+
+        mockPolylineRef.current = new window.google.maps.Polyline({
+          path,
+          strokeColor: '#2563eb',
+          strokeWeight: 5,
+          strokeOpacity: 0.85,
+          map: mapInstanceRef.current,
+        });
+
+        if (shouldZoom && window.google?.maps?.LatLngBounds) {
+          const bounds = new window.google.maps.LatLngBounds();
+          path.forEach((pt) => bounds.extend(pt));
+          mapInstanceRef.current.fitBounds(bounds);
+        }
+      }
+      return;
+    }
+
+    // Clean up mock polyline when live routing is enabled
+    if (mockPolylineRef.current) {
+      mockPolylineRef.current.setMap(null);
+      mockPolylineRef.current = null;
+    }
+
+    // Trigger Guard: Ensure both endpoints have valid place_id or Lat/Lng coordinates
+    if (!origin || !destination || !hasValidRoutePair(origin, destination)) {
+      try {
+        directionsRendererRef.current?.setDirections({ routes: [] } as any);
+      } catch {}
+      return;
+    }
+
+    if (typeof window.google?.maps?.DirectionsService !== 'function' || !directionsRendererRef.current) {
+      return;
+    }
+
+    // 800ms debounce quiet period before calling Google Directions API
+    const timer = setTimeout(() => {
       const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
@@ -2859,8 +3475,6 @@ function LiveDispatchMap({
         },
         (result, status) => {
           if (status === window.google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
-            // If shouldZoom is false: preserveViewport keeps map view without zooming in!
-            // If shouldZoom is true: fit bounds tightly to the route
             directionsRendererRef.current.setOptions({
               preserveViewport: !shouldZoom,
             });
@@ -2872,12 +3486,11 @@ function LiveDispatchMap({
           }
         }
       );
-    } else {
-      // Clear route
-      try {
-        directionsRendererRef.current.setDirections({ routes: [] } as any);
-      } catch {}
-    }
+    }, 800);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [activeFormValues, activeTrip, selectedTrip, shouldZoom]);
 
   return <div ref={mapContainerRef} className="w-full h-full" />;

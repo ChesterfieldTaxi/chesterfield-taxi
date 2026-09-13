@@ -16,6 +16,7 @@
 import { doc, getDoc, setDoc, onSnapshot, type Firestore } from 'firebase/firestore';
 import type {
   AppSettings,
+  CustomerBookingConfig,
   IAdminConfigService,
   VehicleTierConfig,
 } from '../../types/config';
@@ -24,6 +25,20 @@ import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+
+export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
+  allowMultiVehicle: false,
+  maxVehiclesAllowed: 3,
+  multiVehicleCallPhone: COMPANY_CONFIG.phone.dispatch,
+  multiVehicleCallEmail: COMPANY_CONFIG.email.dispatch,
+  multiVehicleCustomNote: '',
+  allowImmediateAsap: true,
+  minAdvanceNoticeMinutes: 30,
+  requireFlightNumberForAirport: false,
+  allowRoundTrip: true,
+  allowChildSafetySeats: true,
+  acceptedPaymentMethods: ['card', 'cash', 'account'],
+};
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   company: {
@@ -211,6 +226,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
   ],
   publicFormVersion: COMPANY_CONFIG.publicFormVersion || 'v2',
+  customerBookingConfig: { ...DEFAULT_CUSTOMER_BOOKING_CONFIG },
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -277,7 +293,11 @@ export class AdminConfigService implements IAdminConfigService {
       vehicles: incoming.vehicles && incoming.vehicles.length > 0
         ? incoming.vehicles
         : DEFAULT_APP_SETTINGS.vehicles,
-      publicFormVersion: incoming.publicFormVersion || DEFAULT_APP_SETTINGS.publicFormVersion || 'v2',
+      publicFormVersion: 'v2',
+      customerBookingConfig: {
+        ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
+        ...(incoming.customerBookingConfig || {}),
+      },
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };
@@ -325,6 +345,12 @@ export class AdminConfigService implements IAdminConfigService {
         ...this.cachedSettings.pricing,
         ...(updates.pricing || {}),
       },
+      customerBookingConfig: updates.customerBookingConfig
+        ? {
+            ...(this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
+            ...updates.customerBookingConfig,
+          }
+        : (this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
       vehicles: updates.vehicles || this.cachedSettings.vehicles,
       updatedAt: new Date().toISOString(),
     };
@@ -409,6 +435,11 @@ export class AdminConfigService implements IAdminConfigService {
       airportSurcharge: settings.pricing.airportFee,
       currency: 'USD',
       manualSurgeMultiplier: settings.pricing.surgeMultiplier,
+      flagDropIncludedMiles: settings.pricing.flagDropIncludedMiles,
+      useStepIncrements: settings.pricing.useStepIncrements,
+      stepIncrementTiers: settings.pricing.stepIncrementTiers,
+      delayRate: settings.pricing.delayRate,
+      conditionSurcharges: settings.pricing.conditionSurcharges,
     };
   }
 }

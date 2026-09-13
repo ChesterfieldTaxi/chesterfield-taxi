@@ -27,6 +27,22 @@ export interface QuoteRequest {
   scheduledPickupTime?: string; // ISO 8601 string
   passengerCount?: number;
   luggageCount?: number;
+  carSeatsBreakdown?: {
+    rearFacing?: number;
+    frontFacing?: number;
+    booster?: number;
+    total?: number;
+  };
+  carSeatsCount?: number;
+  equipment?: {
+    carSeats?: number;
+    luggageCount?: number;
+    hasOversizedLuggage?: boolean;
+    [key: string]: unknown;
+  };
+  zoneIds?: string[];
+  zoneGroupIds?: string[];
+  locationCollectionIds?: string[];
   promoCode?: string;
   tolls?: number;
   customTollsOrFees?: number;

@@ -46,20 +46,26 @@ export function BookingConfirmation({
     corporate: 'Corporate Billing Account',
   }[trip.payment.method];
 
+  const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+
   return (
-    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden border-emerald-200/70 shadow-lg ${className}`}>
+    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-300 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
       {/* Top Banner */}
-      <div className="bg-emerald-600 px-6 py-8 text-center text-white relative">
-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 text-emerald-600 shadow-md">
-          <CheckIcon className="w-8 h-8 stroke-[3]" />
+      <div className={`${isUnconfirmed ? 'bg-slate-900 text-white' : 'bg-emerald-600 text-white'} px-6 py-8 text-center relative`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-500 text-slate-950 font-bold text-2xl' : 'bg-white text-emerald-600'}`}>
+          {isUnconfirmed ? '📋' : <CheckIcon className="w-8 h-8 stroke-[3]" />}
         </div>
-        <h2 className="text-2xl font-extrabold tracking-tight">Booking Confirmed!</h2>
-        <p className="text-emerald-100 text-sm mt-1 max-w-md mx-auto">
-          Your reservation has entered the Chesterfield dispatch system.
+        <h2 className="text-2xl font-extrabold tracking-tight">
+          {isUnconfirmed ? 'Ride Request Received!' : 'Booking Confirmed!'}
+        </h2>
+        <p className={`${isUnconfirmed ? 'text-slate-300' : 'text-emerald-100'} text-sm mt-1 max-w-md mx-auto`}>
+          {isUnconfirmed
+            ? 'Your request has entered our dispatch queue. Our dispatchers will review and confirm your ride shortly.'
+            : 'Your reservation has entered the Chesterfield dispatch system.'}
         </p>
 
-        <div className="mt-4 inline-flex items-center gap-2 bg-emerald-700/60 px-4 py-1.5 rounded-full text-xs font-mono">
-          <span className="text-emerald-200">Trip Reference:</span>
+        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-slate-800' : 'bg-emerald-700/60'} px-4 py-1.5 rounded-full text-xs font-mono`}>
+          <span className={isUnconfirmed ? 'text-amber-400' : 'text-emerald-200'}>Trip Reference:</span>
           <span className="font-bold text-white tracking-wider">{trip.id}</span>
         </div>
       </div>
@@ -71,13 +77,13 @@ export function BookingConfirmation({
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
               Dispatch State Machine
             </span>
-            <span className="text-sm font-bold text-slate-900 capitalize flex items-center gap-1.5 mt-0.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-              Status: {trip.status} (Awaiting Dispatch)
+            <span className="text-sm font-bold text-slate-900 uppercase flex items-center gap-1.5 mt-0.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+              Status: {trip.status} {isUnconfirmed ? '(Pending Dispatcher Confirmation)' : '(Confirmed)'}
             </span>
           </div>
-          <Badge variant="warning" size="md">
-            Broadcast Pending
+          <Badge variant={isUnconfirmed ? 'warning' : 'success'} size="md">
+            {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
           </Badge>
         </div>
 

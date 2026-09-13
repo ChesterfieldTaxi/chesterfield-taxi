@@ -12,6 +12,8 @@
  */
 
 import type { GeoPoint } from '../../types';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { encodePolyline } from './mock-routing';
 import type {
   IServerRouteService,
   RouteRequest,
@@ -149,12 +151,14 @@ export class ServerRouteService implements IServerRouteService {
         return this.getDefaultEstimatedRoute(request);
       }
 
-      // Check if server API key is configured for live HTTP Google Maps query
-      const serverApiKey = this.getServerApiKey();
-      if (serverApiKey) {
-        const liveResult = await this.queryGoogleDirectionsApi(request, serverApiKey);
-        if (liveResult) {
-          return liveResult;
+      // Check if realtime routing is enabled and server API key is configured
+      if (COMPANY_CONFIG.enableRealtimeRouting) {
+        const serverApiKey = this.getServerApiKey();
+        if (serverApiKey) {
+          const liveResult = await this.queryGoogleDirectionsApi(request, serverApiKey);
+          if (liveResult) {
+            return liveResult;
+          }
         }
       }
 
@@ -173,8 +177,8 @@ export class ServerRouteService implements IServerRouteService {
         totalStraightMiles += isNaN(segMiles) ? 5 : segMiles;
       }
 
-      // Scale by 1.30 to approximate suburban St. Louis road network grid
-      const roadNetworkFactor = 1.30;
+      // Scale by 1.25x road curvature factor
+      const roadNetworkFactor = 1.25;
       const distanceMiles = Math.max(0.5, Math.round(totalStraightMiles * roadNetworkFactor * 10) / 10);
       const distanceMeters = Math.round(distanceMiles * 1609.34);
 
@@ -194,8 +198,12 @@ export class ServerRouteService implements IServerRouteService {
         endAddress: resolveEndpointAddress(request.destination, 'St. Louis Metro Area, MO'),
         startLocation: points[0],
         endLocation: points[points.length - 1],
-        overviewPolyline: '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
-        warnings: [],
+        overviewPolyline: encodePolyline(points),
+        warnings: [
+          COMPANY_CONFIG.enableRealtimeRouting
+            ? 'Estimated route applied.'
+            : 'Developer mock route applied (enableRealtimeRouting: false, 1.25x curvature factor). Zero API cost.',
+        ],
         isLiveGoogleResult: false,
         calculatedAt: new Date().toISOString(),
       };

@@ -14,13 +14,20 @@
  */
 
 import { isGoogleMapsReady, loadGoogleMaps } from './google-maps-loader';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { routeCache } from './route-cache';
+import { calculateMockRoute } from './mock-routing';
+import { hasValidRoutingEndpoint } from '../../hooks/useDebounceRoute';
 
 export type RouteEndpointInput = string | google.maps.LatLngLiteral | { lat: number; lng: number };
 
 export interface LiveRouteRequest {
   origin: RouteEndpointInput;
   destination: RouteEndpointInput;
+  originPlaceId?: string;
+  destinationPlaceId?: string;
   waypoints?: RouteEndpointInput[];
+  waypointPlaceIds?: string[];
   avoidTolls?: boolean;
   avoidHighways?: boolean;
 }
@@ -95,6 +102,52 @@ export function resetRoutingApiDenial(): void {
  * @returns LiveRouteResult if successful, or null if Google Maps is unavailable/fails.
  */
 export async function calculateLiveRoute(request: LiveRouteRequest): Promise<LiveRouteResult | null> {
+  const { origin, destination, waypoints = [], avoidTolls = false, avoidHighways = false } = request;
+
+  if (!origin || !destination) {
+    return null;
+  }
+  if (typeof origin === 'string' && origin.trim().length === 0) {
+    return null;
+  }
+  if (typeof destination === 'string' && destination.trim().length === 0) {
+    return null;
+  }
+
+  // 1. Developer & Offline Mock Mode: Check companyConfig toggle
+  if (!COMPANY_CONFIG.enableRealtimeRouting) {
+    console.log('[LiveRoutingService] Developer mock routing active (enableRealtimeRouting: false). Returning Haversine 1.25x curvature route for zero API cost.');
+    return calculateMockRoute(request);
+  }
+
+  // 2. Client-Side Route Caching: Check RouteCache before making Google API call
+  const cacheKey = routeCache.buildKey(
+    origin,
+    destination,
+    waypoints,
+    request.originPlaceId,
+    request.destinationPlaceId,
+    request.waypointPlaceIds
+  );
+  const cached = routeCache.get(cacheKey);
+  if (cached) {
+    console.log('[LiveRoutingService] Instant RouteCache hit for key:', cacheKey);
+    return cached;
+  }
+
+  // 3. Debounce & Trigger Guarding: Only call Directions API if both origin and destination
+  // possess valid Google place_ids or explicit Lat/Lng coordinates.
+  const hasValidOrigin = hasValidRoutingEndpoint(origin, request.originPlaceId);
+  const hasValidDestination = hasValidRoutingEndpoint(destination, request.destinationPlaceId);
+
+  if (!hasValidOrigin || !hasValidDestination) {
+    console.warn(
+      '[LiveRoutingService] Execution guard halted Google Directions API call: Origin or Destination lacks valid place_id or Lat/Lng coordinates.',
+      { origin, destination, originPlaceId: request.originPlaceId, destinationPlaceId: request.destinationPlaceId }
+    );
+    return null;
+  }
+
   // If Directions API is not authorized on this API key, avoid spamming Google's endpoint
   if (directionsApiDenied) {
     return null;
@@ -106,18 +159,6 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
     if (!loaded || !isGoogleMapsReady()) {
       return null;
     }
-  }
-
-  const { origin, destination, waypoints = [], avoidTolls = false, avoidHighways = false } = request;
-
-  if (!origin || !destination) {
-    return null;
-  }
-  if (typeof origin === 'string' && origin.trim().length === 0) {
-    return null;
-  }
-  if (typeof destination === 'string' && destination.trim().length === 0) {
-    return null;
   }
 
   try {
@@ -205,7 +246,7 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       legs,
     });
 
-    return {
+    const liveResult: LiveRouteResult = {
       distanceMiles,
       distanceMeters: totalMeters,
       durationMinutes,
@@ -218,6 +259,11 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       isLiveGoogleResult: true,
       legs,
     };
+
+    // Client-Side Route Caching: Save to RouteCache
+    routeCache.set(cacheKey, liveResult);
+
+    return liveResult;
   } catch (err: unknown) {
     const errorStr = String(err);
     if (errorStr.includes('REQUEST_DENIED') || errorStr.includes('not authorized') || errorStr.includes('Directions Service')) {

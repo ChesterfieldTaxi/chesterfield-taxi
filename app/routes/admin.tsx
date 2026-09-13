@@ -36,6 +36,7 @@ export type AdminTabKey =
   | 'vehicles'
   | 'zones'
   | 'operators'
+  | 'form'
   | 'advanced'
   // Legacy tab aliases
   | 'pricing'
@@ -81,6 +82,11 @@ const PRIMARY_TABS: TabItem[] = [
     key: 'operators',
     label: '👥 Operators',
     description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
+  },
+  {
+    key: 'form',
+    label: '📋 Customer Form',
+    description: 'Public booking form configuration, multi-vehicle dispatch engine, and assistance notices',
   },
   {
     key: 'advanced',
@@ -302,7 +308,7 @@ export default function AdminLayout() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Dynamic 7-Tab Navigation Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             {PRIMARY_TABS.map((tab) => {
               const isActive = normalizedTab === tab.key;
               return (
@@ -361,6 +367,14 @@ export default function AdminLayout() {
 
           {normalizedTab === 'operators' && <AdminOperatorsTab />}
 
+          {(normalizedTab === 'form' || normalizedTab === 'layout') && (
+            <AdminLayoutTab
+              settings={settings}
+              onSave={handleSaveSettings}
+              isLoading={isSavingConfig}
+            />
+          )}
+
           {normalizedTab === 'advanced' && (
             <AdminAdvancedTab
               settings={settings}
@@ -371,14 +385,6 @@ export default function AdminLayout() {
 
           {/* Legacy Backward Compatibility Fallbacks */}
           {normalizedTab === 'bookings' && <AdminBookingsTab />}
-
-          {normalizedTab === 'layout' && (
-            <AdminLayoutTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
-            />
-          )}
         </div>
 
         {/* Outlet for any nested routes */}

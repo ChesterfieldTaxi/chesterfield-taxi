@@ -12,6 +12,7 @@ import type {
   BookingConfirmationEmailPayload,
   AdminDispatchAlertEmailPayload,
   StatusUpdateEmailPayload,
+  BookingDeclinedEmailPayload,
   EmailDispatchResult,
   EmailDispatchApiRequest,
 } from './types';
@@ -19,6 +20,7 @@ import {
   renderPassengerConfirmationEmail,
   renderDispatcherAlertEmail,
   renderStatusUpdateEmail,
+  renderBookingDeclinedEmail,
 } from './email-templates';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
@@ -213,6 +215,22 @@ export class ResendEmailService implements IEmailDispatchService {
       rendered.text
     );
   }
+
+  /**
+   * Sends booking declined notification to passenger.
+   */
+  public async sendBookingDeclined(
+    payload: BookingDeclinedEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderBookingDeclinedEmail(payload);
+    return this.dispatch(
+      { type: 'booking_declined', payload },
+      payload.passenger.email,
+      rendered.subject,
+      rendered.html,
+      rendered.text
+    );
+  }
 }
 
 /**
@@ -235,6 +253,23 @@ export class StubEmailDispatchService implements IEmailDispatchService {
     };
     this.dispatchedEmails.push(result);
     console.info(`[StubEmailDispatch] Confirmation sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
+    return result;
+  }
+
+  public async sendBookingDeclined(
+    payload: BookingDeclinedEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderBookingDeclinedEmail(payload);
+    const result: EmailDispatchResult = {
+      success: true,
+      simulated: true,
+      messageId: `stub_declined_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      recipient: payload.passenger.email,
+      subject: rendered.subject,
+      dispatchedAt: new Date().toISOString(),
+    };
+    this.dispatchedEmails.push(result);
+    console.info(`[StubEmailDispatch] Booking declined email sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
     return result;
   }
 

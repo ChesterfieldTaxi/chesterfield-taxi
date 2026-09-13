@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Trip } from '../../core/types';
-import { BookingEngine } from './BookingEngine';
+import { BookingEngineV2 } from './BookingEngineV2';
 
 export interface BookingFormProps {
   className?: string;
@@ -10,19 +10,13 @@ export interface BookingFormProps {
 /**
  * BookingForm
  * 
- * Backwards-compatible wrapper delegating to the unified Master Booking Engine (<BookingEngine />)
- * in customer mode.
+ * Backwards-compatible wrapper delegating to the unified Customer Booking Engine (<BookingEngineV2 />).
  */
 export function BookingForm({ className = '', onBookingSuccess }: BookingFormProps) {
   return (
-    <BookingEngine
-      mode="customer"
+    <BookingEngineV2
       className={className}
-      onBookingSuccess={(trips) => {
-        if (trips.length > 0 && onBookingSuccess) {
-          onBookingSuccess(trips[0]);
-        }
-      }}
+      onBookingSuccess={onBookingSuccess}
     />
   );
 }

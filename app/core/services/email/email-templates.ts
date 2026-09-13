@@ -10,6 +10,7 @@ import type {
   BookingConfirmationEmailPayload,
   AdminDispatchAlertEmailPayload,
   StatusUpdateEmailPayload,
+  BookingDeclinedEmailPayload,
 } from './types';
 
 export interface RenderedEmail {
@@ -607,3 +608,115 @@ Need help? Call 24/7 Dispatch at ${COMPANY_CONFIG.phone.dispatch}.
 
   return { subject, html, text };
 }
+
+/**
+ * Renders the Booking Declined notification email.
+ */
+export function renderBookingDeclinedEmail(
+  payload: BookingDeclinedEmailPayload
+): RenderedEmail {
+  const subject = `Booking Update: Ride #${payload.tripId} - ${COMPANY_CONFIG.name}`;
+
+  const html = renderEmailShell(
+    `
+    <div style="margin-bottom: 24px; text-align: center;">
+      <div style="display: inline-block; width: 48px; height: 48px; border-radius: 24px; background-color: #fef2f2; border: 1px solid #fecaca; line-height: 48px; font-size: 24px;">
+        ⚠️
+      </div>
+      <h2 style="font-size: 20px; font-weight: 700; color: #991b1b; margin: 12px 0 4px 0;">Ride Request Status Update</h2>
+      <p style="font-size: 14px; color: #64748b; margin: 0;">Trip ID #${payload.tripId}</p>
+    </div>
+
+    <p style="font-size: 15px; color: #334155; line-height: 1.6; margin-bottom: 16px;">
+      Dear ${payload.passenger.firstName} ${payload.passenger.lastName},
+    </p>
+
+    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin-bottom: 20px;">
+      Thank you for your booking request with ${COMPANY_CONFIG.name}. After reviewing current fleet availability and service schedules, our dispatch team is unfortunately unable to accommodate this specific ride request at this time.
+    </p>
+
+    <!-- Reason Box -->
+    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+      <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: #991b1b; margin-bottom: 4px;">
+        Reason Provided by Dispatch
+      </div>
+      <div style="font-size: 15px; font-weight: 600; color: #7f1d1d; margin-bottom: ${payload.customNotes ? '8px' : '0'};">
+        ${payload.reason}
+      </div>
+      ${
+        payload.customNotes
+          ? `<div style="font-size: 13px; color: #991b1b; font-style: italic; border-top: 1px dashed #fecaca; padding-top: 8px;">
+              "${payload.customNotes}"
+             </div>`
+          : ''
+      }
+    </div>
+
+    <!-- Requested Itinerary -->
+    <div class="summary-card">
+      <div class="summary-title">Original Ride Request Details</div>
+
+      <div class="route-point">
+        <div class="route-dot pickup-dot"></div>
+        <div class="route-address">
+          <div class="route-label">Pickup Address</div>
+          <div class="route-value">${payload.pickupAddress}</div>
+        </div>
+      </div>
+
+      <div class="route-point">
+        <div class="route-dot dropoff-dot"></div>
+        <div class="route-address">
+          <div class="route-label">Dropoff Address</div>
+          <div class="route-value">${payload.dropoffAddress}</div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px dashed #cbd5e1; margin-top: 12px; padding-top: 12px; display: flex; justify-content: space-between; font-size: 13px;">
+        <span style="color: #64748b;">Requested Pickup:</span>
+        <span style="font-weight: 600; color: #0f172a;">${payload.pickupTime}</span>
+      </div>
+    </div>
+
+    <!-- Need assistance box -->
+    <div class="dispatch-box">
+      <div style="font-size: 14px; font-weight: 700; color: #713f12; margin-bottom: 4px;">
+        Need assistance or want to adjust your schedule?
+      </div>
+      <div style="font-size: 13px; color: #713f12; line-height: 1.5;">
+        Our live dispatchers are standing by 24/7 to help explore alternate pickup times or nearby routing options. Please give us a direct call at 
+        <a href="tel:${COMPANY_CONFIG.phone.primaryRaw}" style="font-weight: 700; color: #0f172a; text-decoration: underline;">
+          ${COMPANY_CONFIG.phone.dispatch}
+        </a>.
+      </div>
+    </div>
+    `,
+    `Notice regarding your ride request #${payload.tripId}`
+  );
+
+  const text = `
+========================================
+${COMPANY_CONFIG.name} - RIDE REQUEST UPDATE
+========================================
+Trip ID: #${payload.tripId}
+Status: DECLINED
+
+Dear ${payload.passenger.firstName} ${payload.passenger.lastName},
+
+Thank you for your booking request with ${COMPANY_CONFIG.name}. After reviewing fleet capacity, our dispatch team is unfortunately unable to accommodate this request at this time.
+
+Reason: ${payload.reason}
+${payload.customNotes ? `Additional notes: ${payload.customNotes}\n` : ''}
+
+Requested Route:
+- Pickup: ${payload.pickupAddress} at ${payload.pickupTime}
+- Dropoff: ${payload.dropoffAddress}
+
+If you would like to explore alternative pickup times or discuss options with a live dispatcher, please call us 24/7 at ${COMPANY_CONFIG.phone.dispatch}.
+========================================
+© ${new Date().getFullYear()} ${COMPANY_CONFIG.legalName}
+  `.trim();
+
+  return { subject, html, text };
+}
+

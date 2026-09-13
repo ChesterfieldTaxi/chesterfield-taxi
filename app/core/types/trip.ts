@@ -10,9 +10,22 @@
  * State machine literal types for Trip lifecycle.
  */
 export type CoreTripStatus = 'pending' | 'offered' | 'assigned' | 'completed';
-export type TripStatus = CoreTripStatus | 'cancelled';
+export type TripConfirmationStatus =
+  | 'UNCONFIRMED'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'unconfirmed'
+  | 'confirmed'
+  | 'declined';
+export type TripStatus = CoreTripStatus | TripConfirmationStatus | 'cancelled';
 
 export const TRIP_STATUSES: readonly TripStatus[] = [
+  'UNCONFIRMED',
+  'CONFIRMED',
+  'DECLINED',
+  'unconfirmed',
+  'confirmed',
+  'declined',
   'pending',
   'offered',
   'assigned',
@@ -24,7 +37,13 @@ export const TRIP_STATUSES: readonly TripStatus[] = [
  * Valid state transitions mapping adhering strictly to the dispatch state machine.
  */
 export const TRIP_STATE_TRANSITIONS = {
-  pending: ['offered', 'assigned', 'cancelled'],
+  UNCONFIRMED: ['CONFIRMED', 'DECLINED', 'cancelled', 'pending'],
+  CONFIRMED: ['pending', 'offered', 'assigned', 'cancelled'],
+  DECLINED: ['cancelled'],
+  unconfirmed: ['CONFIRMED', 'confirmed', 'DECLINED', 'declined', 'cancelled', 'pending'],
+  confirmed: ['pending', 'offered', 'assigned', 'cancelled'],
+  declined: ['cancelled'],
+  pending: ['CONFIRMED', 'confirmed', 'offered', 'assigned', 'cancelled'],
   offered: ['assigned', 'pending', 'cancelled'],
   assigned: ['completed', 'cancelled'],
   completed: [],
@@ -183,4 +202,5 @@ export type CreateTripInput = Omit<
   'id' | 'status' | 'offeredToIds' | 'rejectedByIds' | 'assignedDriverId' | 'statusHistory' | 'createdAt' | 'updatedAt'
 > & {
   id?: string;
+  status?: TripStatus;
 };

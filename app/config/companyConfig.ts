@@ -54,6 +54,13 @@ export interface CompanyBrandConfig {
   primaryColor: string;
   secondaryColor: string;
   colors?: CompanyBrandColors;
+  /**
+   * Google Maps & Directions API Realtime Routing Toggle.
+   * When false (recommended for development/testing), routing falls back to
+   * a local Haversine distance engine multiplied by 1.25x road curvature factor
+   * with a straight-line polyline for zero API cost.
+   */
+  enableRealtimeRouting: boolean;
   // Phase 19: Granular Branding Studio Tokens
   headingFont?: string;
   bodyFont?: string;
@@ -79,6 +86,7 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   publicFormVersion: 'v2',
   primaryColor: '#f59e0b',
   secondaryColor: '#0f172a',
+  enableRealtimeRouting: false,
   headingFont: 'Inter',
   bodyFont: 'Inter',
   headingColor: '#0f172a',

@@ -20,12 +20,14 @@ import {
   getRoleFormConfig,
 } from '../../config/roleFormConfig';
 import { usePassengerLookup } from '../../core/hooks/usePassengerLookup';
+import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import type { PassengerProfile } from '../../core/services/booking/passenger-lookup.service';
 import { LocationAutocomplete, type PlaceSelectedDetails } from './LocationAutocomplete';
 import { VehicleTierSelector } from './VehicleTierSelector';
 import { AirportDetectedBanner } from './AirportDetectedBanner';
 import { LuggageCapacityWarning } from './LuggageCapacityWarning';
 import { BookingConfirmation, type EmailDeliveryFeedback } from './BookingConfirmation';
+import { BookingEngineV2 } from './BookingEngineV2';
 import {
   Button,
   Card,
@@ -83,6 +85,18 @@ export function BookingEngine({
   onBookingSuccess,
   className = '',
 }: BookingEngineProps) {
+  // If in customer mode, render the modern dispatch-styled BookingEngineV2
+  if ((mode as unknown) === 'customer') {
+    return (
+      <BookingEngineV2
+        className={className}
+        onBookingSuccess={(trip) => {
+          onBookingSuccess?.([trip]);
+        }}
+      />
+    );
+  }
+
   // 1. Resolve role configuration
   const roleConfig = useMemo(
     () => getRoleFormConfig(mode, configOverrides),
@@ -440,19 +454,40 @@ export function BookingEngine({
     formValues.manualFare,
   ]);
 
-  // Recalculate quote when relevant fields change
+  // Recalculate quote when relevant fields change (wrapped in 800ms debounce & trigger guards)
   useEffect(() => {
-    if (formValues.pickupAddress && formValues.dropoffAddress) {
-      refreshQuote();
+    if (!formValues.pickupAddress || !formValues.dropoffAddress) {
+      return;
     }
+
+    // Trigger Guard: Ensure both origin and destination have valid place_ids or coordinates
+    const hasValidEndpoints = hasValidRoutePair(
+      formValues.pickupAddress_coordinates || formValues.pickupAddress,
+      formValues.dropoffAddress_coordinates || formValues.dropoffAddress,
+      formValues.pickupAddress_placeId as string | undefined,
+      formValues.dropoffAddress_placeId as string | undefined
+    );
+
+    if (!hasValidEndpoints) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      refreshQuote();
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [
     formValues.pickupAddress,
+    formValues.pickupAddress_placeId,
     formValues.pickupAddress_coordinates,
     formValues.dropoffAddress,
+    formValues.dropoffAddress_placeId,
     formValues.dropoffAddress_coordinates,
     formValues.intermediateStops,
     formValues.hasIntermediateStop,
     formValues.intermediateStopAddress,
+    formValues.intermediateStopAddress_placeId,
     formValues.intermediateStopAddress_coordinates,
     formValues.vehicleTier,
     formValues.promoCode,
@@ -751,6 +786,7 @@ export function BookingEngine({
             specialRequests: mergedSpecialRequests ?? '',
           },
           vehicleTier: (formValues.vehicleTier as VehicleTier) || 'standard',
+          status: (mode === 'customer' ? 'UNCONFIRMED' : 'pending'),
           pricing: effectivePricing,
           payment: {
             method: (formValues.paymentMethod as PaymentMethod) || 'card',

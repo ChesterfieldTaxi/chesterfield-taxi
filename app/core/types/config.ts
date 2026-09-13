@@ -180,6 +180,20 @@ export interface FleetCarConfig {
   maintenanceHistory?: MaintenanceRecord[];
 }
 
+export interface CustomerBookingConfig {
+  allowMultiVehicle: boolean;
+  maxVehiclesAllowed: number;
+  multiVehicleCallPhone?: string;
+  multiVehicleCallEmail?: string;
+  multiVehicleCustomNote?: string;
+  allowImmediateAsap: boolean;
+  minAdvanceNoticeMinutes: number;
+  requireFlightNumberForAirport: boolean;
+  allowRoundTrip: boolean;
+  allowChildSafetySeats: boolean;
+  acceptedPaymentMethods: Array<'card' | 'cash' | 'account'>;
+}
+
 export interface AppSettings {
   company: CompanyConfig;
   branding: BrandingConfig;
@@ -188,6 +202,7 @@ export interface AppSettings {
   fleet?: FleetCarConfig[]; // Physical Fleet Cars
   localization?: LocalizationConfig;
   publicFormVersion?: 'v1' | 'v2';
+  customerBookingConfig?: CustomerBookingConfig;
   updatedAt?: string;
   updatedBy?: string;
 }
