@@ -8,7 +8,7 @@ import { getAdminConfigService } from '../../../core/services/config/admin-confi
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
-import { SpinnerIcon } from '../../ui/Icons';
+import { SpinnerIcon, PlusIcon, UserIcon, PhoneIcon, MailIcon } from '../../ui/Icons';
 
 export interface AdditionalPassenger {
   name: string;
@@ -1717,9 +1717,10 @@ export function DispatchBookingEngine({
               <button
                 type="button"
                 onClick={() => setIntermediateStops([...intermediateStops, { address: '' }])}
-                className="text-blue-600 hover:text-blue-700 font-semibold"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
               >
-                + Add stop
+                <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+                <span>Add stop</span>
               </button>
             </div>
           </div>
@@ -1727,21 +1728,24 @@ export function DispatchBookingEngine({
 
         {/* ─── Passengers Section ─── */}
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1.5">
             <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">Passengers</label>
             <button
               type="button"
               onClick={handleAddPassenger}
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-bold"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
             >
-              + Add passenger
+              <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span>Add passenger</span>
             </button>
           </div>
 
           <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
             {/* Primary Passenger */}
             <div className="relative">
-              <span className="absolute left-2.5 top-2 text-slate-400">👤</span>
+              <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                <UserIcon className="w-3.5 h-3.5" />
+              </span>
               <input
                 type="text"
                 placeholder="Primary Passenger Name"
@@ -1754,7 +1758,9 @@ export function DispatchBookingEngine({
 
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
-                <span className="absolute left-2.5 top-2 text-slate-400">📞</span>
+                <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                  <PhoneIcon className="w-3.5 h-3.5" />
+                </span>
                 <input
                   type="tel"
                   placeholder="Phone Number"
@@ -1765,7 +1771,9 @@ export function DispatchBookingEngine({
                 />
               </div>
               <div className="relative">
-                <span className="absolute left-2.5 top-2 text-slate-400">✉️</span>
+                <span className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none">
+                  <MailIcon className="w-3.5 h-3.5" />
+                </span>
                 <input
                   type="email"
                   placeholder="Email (optional)"

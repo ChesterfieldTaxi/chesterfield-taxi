@@ -22,6 +22,11 @@ import {
   ClockIcon,
   CarIcon,
   InfoIcon,
+  FileTextIcon,
+  ShieldIcon,
+  HistoryIcon,
+  SettingsIcon,
+  DownloadIcon,
 } from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
@@ -206,7 +211,8 @@ export function AdminAdvancedTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📋 Customer Form Controls</span>
+            <FileTextIcon className="w-4 h-4 shrink-0" />
+            <span>Customer Form Controls</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 formConfig.allowMultiVehicle ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'
@@ -225,7 +231,8 @@ export function AdminAdvancedTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>🛡️ Security &amp; Access</span>
+            <ShieldIcon className="w-4 h-4 shrink-0" />
+            <span>Security &amp; Access</span>
           </button>
 
           <button
@@ -237,7 +244,8 @@ export function AdminAdvancedTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📜 Config Audit Trail</span>
+            <HistoryIcon className="w-4 h-4 shrink-0" />
+            <span>Config Audit Trail</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -256,7 +264,8 @@ export function AdminAdvancedTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>⚙️ System Ops &amp; Backups</span>
+            <SettingsIcon className="w-4 h-4 shrink-0" />
+            <span>System Ops &amp; Backups</span>
           </button>
         </div>
 
@@ -266,9 +275,10 @@ export function AdminAdvancedTab({
             variant="outline"
             size="sm"
             onClick={handleExportAuditLogs}
-            className="text-xs font-bold"
+            className="text-xs font-bold inline-flex items-center gap-1.5"
           >
-            📥 Export Audit Log (JSON)
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Export Audit Log (JSON)</span>
           </Button>
         )}
 
@@ -278,9 +288,10 @@ export function AdminAdvancedTab({
             variant="outline"
             size="sm"
             onClick={handleExportFullConfig}
-            className="text-xs font-bold"
+            className="text-xs font-bold inline-flex items-center gap-1.5"
           >
-            💾 Export Full System Config
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Export Full System Config</span>
           </Button>
         )}
       </div>

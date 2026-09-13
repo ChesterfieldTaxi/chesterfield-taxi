@@ -9,7 +9,7 @@ import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
 import { Input } from '../../ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
-import { SpinnerIcon, ShieldCheckIcon, UserIcon, TrashIcon, LockIcon, PlusIcon, PhoneIcon } from '../../ui/Icons';
+import { SpinnerIcon, ShieldCheckIcon, UserIcon, TrashIcon, LockIcon, PlusIcon, PhoneIcon, CarIcon, RadioIcon, ShieldIcon } from '../../ui/Icons';
 
 export interface OperatorUser {
   uid: string;
@@ -362,10 +362,10 @@ export function AdminOperatorsTab() {
           variant="primary"
           size="sm"
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold text-xs"
+          leftIcon={<PlusIcon className="w-4 h-4" />}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
         >
-          <PlusIcon className="w-4 h-4" />
-          <span>Provision Operator</span>
+          Provision Operator
         </Button>
       </div>
 
@@ -405,7 +405,8 @@ export function AdminOperatorsTab() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🚕 Drivers</span>
+            <CarIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Drivers</span>
             <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full">
               {roleCounts.driver}
             </span>
@@ -419,7 +420,8 @@ export function AdminOperatorsTab() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🎧 Dispatchers</span>
+            <RadioIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Dispatchers</span>
             <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.2 rounded-full">
               {roleCounts.dispatcher}
             </span>
@@ -433,7 +435,8 @@ export function AdminOperatorsTab() {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🛡️ Admins</span>
+            <ShieldIcon className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span>Admins</span>
             <span className="text-[10px] bg-purple-100 text-purple-800 font-extrabold px-1.5 py-0.2 rounded-full">
               {roleCounts.admin}
             </span>

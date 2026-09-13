@@ -1,7 +1,7 @@
 import React from 'react';
 import { SpinnerIcon } from './Icons';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'blue';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -14,9 +14,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--color-primary,#f59e0b)] hover:opacity-95 hover:brightness-95 active:brightness-90 text-slate-950 font-semibold shadow-xs hover:shadow focus-visible:ring-[var(--color-primary,#f59e0b)] border border-black/10 transition-all',
+    'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold shadow-xs hover:shadow focus-visible:ring-blue-500 border border-blue-600 transition-all',
+  blue:
+    'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold shadow-xs hover:shadow focus-visible:ring-blue-500 border border-blue-600 transition-all',
   secondary:
-    'bg-[var(--color-secondary,#0f172a)] hover:opacity-95 hover:brightness-110 active:brightness-90 text-white font-medium shadow-xs focus-visible:ring-[var(--color-secondary,#0f172a)] border border-slate-700 transition-all',
+    'bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-medium shadow-xs focus-visible:ring-slate-700 border border-slate-700 transition-all',
   outline:
     'bg-transparent hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-medium border border-slate-300 focus-visible:ring-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
   ghost:

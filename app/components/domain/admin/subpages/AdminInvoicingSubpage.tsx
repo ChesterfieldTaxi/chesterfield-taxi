@@ -8,7 +8,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../..
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
 import { Alert } from '../../../ui/Alert';
-import { SpinnerIcon } from '../../../ui/Icons';
+import {
+  SpinnerIcon,
+  FileTextIcon,
+  BuildingIcon,
+  CreditCardIcon,
+  PlusIcon,
+} from '../../../ui/Icons';
 
 export type InvoicingSubTab = 'ledger' | 'accounts' | 'gateways';
 
@@ -184,7 +190,8 @@ export function AdminInvoicingSubpage({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📑 Invoices & Billing Ledger</span>
+            <FileTextIcon className="w-4 h-4 shrink-0" />
+            <span>Invoices &amp; Billing Ledger</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'ledger' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -203,7 +210,8 @@ export function AdminInvoicingSubpage({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>🏢 Corporate Direct Accounts</span>
+            <BuildingIcon className="w-4 h-4 shrink-0" />
+            <span>Corporate Direct Accounts</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'accounts' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -222,7 +230,8 @@ export function AdminInvoicingSubpage({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>💳 Payment Gateway & Processing</span>
+            <CreditCardIcon className="w-4 h-4 shrink-0" />
+            <span>Payment Gateway &amp; Processing</span>
           </button>
         </div>
 
@@ -232,9 +241,10 @@ export function AdminInvoicingSubpage({
             variant="primary"
             size="sm"
             onClick={() => setIsNewInvoiceModalOpen(true)}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            leftIcon={<PlusIcon className="w-4 h-4" />}
+            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm active:scale-95"
           >
-            + Generate Invoice
+            Generate Invoice
           </Button>
         )}
 
@@ -244,9 +254,10 @@ export function AdminInvoicingSubpage({
             variant="primary"
             size="sm"
             onClick={() => setIsNewAccountModalOpen(true)}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            leftIcon={<PlusIcon className="w-4 h-4" />}
+            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm active:scale-95"
           >
-            + Add Corporate Client
+            Add Corporate Client
           </Button>
         )}
       </div>

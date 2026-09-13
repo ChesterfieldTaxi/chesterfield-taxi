@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Alert } from '../../ui/Alert';
-import { InfoIcon } from '../../ui/Icons';
+import { InfoIcon, CarIcon } from '../../ui/Icons';
 
 interface AdminLayoutTabProps {
   settings: AppSettings;
@@ -112,7 +112,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
           <CardHeader className="border-b border-slate-100 bg-slate-50/60 p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="p-2 bg-blue-100 text-blue-700 rounded-lg text-base">🚗</span>
+                <span className="p-2 bg-blue-100 text-blue-700 rounded-lg"><CarIcon className="w-5 h-5" /></span>
                 <div>
                   <CardTitle className="text-base text-slate-900 font-bold">
                     Multi-Vehicle &amp; Group Booking Engine

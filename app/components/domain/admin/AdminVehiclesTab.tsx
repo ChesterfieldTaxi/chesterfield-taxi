@@ -13,6 +13,7 @@ import {
   CheckIcon,
   PlusIcon,
   TrashIcon,
+  TagIcon,
 } from '../../ui/Icons';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
 import { AdminFleetTab } from './AdminFleetTab';
@@ -137,7 +138,8 @@ export function AdminVehiclesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🏷️ Vehicle Classes</span>
+            <TagIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Vehicle Classes</span>
             <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
               {vehicles.length}
             </span>
@@ -151,7 +153,8 @@ export function AdminVehiclesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🚐 Physical Fleet</span>
+            <CarIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Physical Fleet</span>
             <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">
               {settings.fleet?.length || 4} Cars
             </span>
@@ -186,7 +189,7 @@ export function AdminVehiclesTab({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
             <div>
               <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm">🚗</span>
+                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm"><CarIcon className="w-4 h-4" /></span>
                 <h3 className="text-base font-extrabold text-slate-900">Vehicle Types (Service Classes)</h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
@@ -210,9 +213,9 @@ export function AdminVehiclesTab({
                 variant="primary"
                 size="sm"
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700"
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-sm active:scale-95"
               >
-                <PlusIcon className="w-4 h-4" />
                 Add Vehicle Type
               </Button>
             </div>

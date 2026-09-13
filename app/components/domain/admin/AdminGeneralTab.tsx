@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '../../ui/Input';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
-import { CheckIcon, SparklesIcon, CarIcon, ClockIcon } from '../../ui/Icons';
+import { CheckIcon, SparklesIcon, CarIcon, ClockIcon, BuildingIcon } from '../../ui/Icons';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export interface AdminGeneralTabProps {
@@ -311,8 +311,8 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                 : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <SparklesIcon className="w-4 h-4 text-amber-300" />
-            <span>🎨 Dynamic Branding Studio</span>
+            <SparklesIcon className="w-4 h-4 shrink-0" />
+            <span>Dynamic Branding Studio</span>
             {hasUnpublishedChanges && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Unpublished changes" />
             )}
@@ -326,7 +326,8 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                 : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <span>🏢 Business Profile &amp; Localization</span>
+            <BuildingIcon className="w-4 h-4 shrink-0" />
+            <span>Business Profile &amp; Localization</span>
           </button>
         </div>
 

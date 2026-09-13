@@ -4,7 +4,17 @@ import { getBookingService } from '../../../core/services/booking';
 import type { AppSettings } from '../../../core/types/config';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
-import { SpinnerIcon } from '../../ui/Icons';
+import {
+  SpinnerIcon,
+  BarChartIcon,
+  ActivityIcon,
+  LayersIcon,
+  AlertTriangleIcon,
+  FileTextIcon,
+  CarIcon,
+  DollarSignIcon,
+  ZapIcon,
+} from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 
 export type DashboardSubTab = 'overview' | 'telemetry' | 'analytics';
@@ -132,7 +142,8 @@ export function AdminDashboardTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📊 Operational Overview</span>
+            <BarChartIcon className="w-4 h-4 shrink-0" />
+            <span>Operational Overview</span>
           </button>
 
           <button
@@ -144,7 +155,8 @@ export function AdminDashboardTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>🛰️ System Telemetry &amp; APIs</span>
+            <ActivityIcon className="w-4 h-4 shrink-0" />
+            <span>System Telemetry &amp; APIs</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </button>
 
@@ -157,7 +169,8 @@ export function AdminDashboardTab({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📈 Route &amp; Fleet Analytics</span>
+            <LayersIcon className="w-4 h-4 shrink-0" />
+            <span>Route &amp; Fleet Analytics</span>
           </button>
         </div>
 
@@ -176,7 +189,7 @@ export function AdminDashboardTab({
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-xs shrink-0">
-                    ⚠️
+                    <AlertTriangleIcon className="w-5 h-5 text-slate-950" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -209,7 +222,7 @@ export function AdminDashboardTab({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total Bookings
             </span>
-            <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm">📋</span>
+            <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><FileTextIcon className="w-4 h-4" /></span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">
@@ -229,7 +242,7 @@ export function AdminDashboardTab({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Active Trips
             </span>
-            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm">🚕</span>
+            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><CarIcon className="w-4 h-4" /></span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-emerald-600">
@@ -249,7 +262,7 @@ export function AdminDashboardTab({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Total Revenue
             </span>
-            <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600 text-sm">💰</span>
+            <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600"><DollarSignIcon className="w-4 h-4" /></span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">
@@ -268,7 +281,7 @@ export function AdminDashboardTab({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Fleet Capacity
             </span>
-            <span className="p-1.5 rounded-lg bg-purple-50 text-purple-600 text-sm">⚡</span>
+            <span className="p-1.5 rounded-lg bg-purple-50 text-purple-600"><ZapIcon className="w-4 h-4" /></span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">

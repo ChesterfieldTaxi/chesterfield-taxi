@@ -5,7 +5,7 @@ import { getBookingService } from '../../../../core/services/booking';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
-import { SpinnerIcon, UserIcon } from '../../../ui/Icons';
+import { SpinnerIcon, UserIcon, UsersIcon, BuildingIcon } from '../../../ui/Icons';
 
 export type CustomersSubTab = 'directory' | 'corporate';
 
@@ -153,7 +153,8 @@ export function AdminCustomersSubpage({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>👤 Passenger Directory</span>
+            <UsersIcon className="w-4 h-4 shrink-0" />
+            <span>Passenger Directory</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'directory' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -172,7 +173,8 @@ export function AdminCustomersSubpage({
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>🏢 Corporate Client Accounts</span>
+            <BuildingIcon className="w-4 h-4 shrink-0" />
+            <span>Corporate Client Accounts</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'corporate' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'

@@ -18,7 +18,7 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
-import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon } from '../../ui/Icons';
+import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon } from '../../ui/Icons';
 
 type AdminZonesSubTab = 'zones' | 'groups' | 'collections';
 
@@ -452,13 +452,14 @@ export function AdminZonesTab() {
               setIsEditingGroup(false);
               setIsEditingCollection(false);
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeSubTab === 'zones'
                 ? 'bg-white text-blue-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Operational Zones ({zones.length})
+            <MapPinIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Operational Zones ({zones.length})</span>
           </button>
           <button
             type="button"
@@ -468,13 +469,14 @@ export function AdminZonesTab() {
               setIsEditingGroup(false);
               setIsEditingCollection(false);
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeSubTab === 'groups'
                 ? 'bg-white text-indigo-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Zone Groups ({zoneGroups.length})
+            <LayersIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span>Zone Groups ({zoneGroups.length})</span>
           </button>
           <button
             type="button"
@@ -484,13 +486,14 @@ export function AdminZonesTab() {
               setIsEditingGroup(false);
               setIsEditingCollection(false);
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeSubTab === 'collections'
                 ? 'bg-white text-emerald-700 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Location Collections ({locationCollections.length})
+            <CompassIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Location Collections ({locationCollections.length})</span>
           </button>
         </div>
 
@@ -512,10 +515,10 @@ export function AdminZonesTab() {
                 variant="primary"
                 size="sm"
                 onClick={handleStartCreateZone}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold text-xs"
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
-                <PlusIcon className="w-4 h-4" />
-                <span>Create Zone</span>
+                Create Zone
               </Button>
             </>
           )}
@@ -536,10 +539,10 @@ export function AdminZonesTab() {
                 variant="primary"
                 size="sm"
                 onClick={handleStartCreateGroup}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 font-bold text-xs"
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
-                <PlusIcon className="w-4 h-4" />
-                <span>Create Zone Group</span>
+                Create Zone Group
               </Button>
             </>
           )}
@@ -560,10 +563,10 @@ export function AdminZonesTab() {
                 variant="primary"
                 size="sm"
                 onClick={handleStartCreateCollection}
-                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
-                <PlusIcon className="w-4 h-4" />
-                <span>Create Collection</span>
+                Create Collection
               </Button>
             </>
           )}
@@ -1491,9 +1494,10 @@ export function AdminZonesTab() {
                           variant="primary"
                           size="sm"
                           onClick={handleAddPoiToCollection}
-                          className="h-8 bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
+                          leftIcon={<PlusIcon className="w-3.5 h-3.5" />}
+                          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs hover:shadow-xs active:scale-95"
                         >
-                          + Add Point
+                          Add Point
                         </Button>
                       </div>
                     </div>

@@ -15,7 +15,18 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '../../ui/Input';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
-import { CheckIcon, SparklesIcon, ClockIcon, CarIcon, UserIcon } from '../../ui/Icons';
+import {
+  CheckIcon,
+  SparklesIcon,
+  ClockIcon,
+  CarIcon,
+  UserIcon,
+  ZapIcon,
+  FileTextIcon,
+  LayersIcon,
+  BabyIcon,
+  PlusIcon,
+} from '../../ui/Icons';
 import {
   getPricingRulesService,
   DEFAULT_NAMED_PRICING_RULES,
@@ -378,7 +389,8 @@ export function AdminRatesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>⚡ Base &amp; Simulator</span>
+            <ZapIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+            <span>Base &amp; Simulator</span>
           </button>
           <button
             type="button"
@@ -389,7 +401,8 @@ export function AdminRatesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>📜 Named Rules</span>
+            <FileTextIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+            <span>Named Rules</span>
             <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
               {namedRules.length}
             </span>
@@ -403,7 +416,8 @@ export function AdminRatesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>📈 Step Increments</span>
+            <LayersIcon className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+            <span>Step Increments</span>
             {pricing.useStepIncrements && (
               <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">
                 ON
@@ -419,7 +433,8 @@ export function AdminRatesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🚼 Extras &amp; Equipment</span>
+            <BabyIcon className="w-3.5 h-3.5 shrink-0 text-rose-500" />
+            <span>Extras &amp; Equipment</span>
           </button>
         </div>
 
@@ -939,15 +954,17 @@ export function AdminRatesTab({
                   size="sm"
                   onClick={handleResetRulesToDefaults}
                 >
-                  ↺ Reset Regional Defaults
+                  Reset Regional Defaults
                 </Button>
                 <Button
                   type="button"
                   variant="primary"
                   size="sm"
                   onClick={handleOpenCreateRule}
+                  leftIcon={<PlusIcon className="w-4 h-4" />}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-sm active:scale-95"
                 >
-                  + Add Named Rule
+                  Add Named Rule
                 </Button>
               </div>
             </div>
@@ -1331,8 +1348,10 @@ export function AdminRatesTab({
             <div className="mt-4 flex justify-between items-center">
               <Button
                 type="button"
-                variant="outline"
+                variant="primary"
                 size="sm"
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-sm active:scale-95"
                 onClick={() => {
                   const tiers = pricing.stepIncrementTiers || [];
                   const lastTier = tiers[tiers.length - 1];
@@ -1348,7 +1367,7 @@ export function AdminRatesTab({
                   setPricing({ ...pricing, stepIncrementTiers: [...tiers, newTier] });
                 }}
               >
-                + Add Distance Bracket Tier
+                Add Distance Bracket Tier
               </Button>
             </div>
 
@@ -2398,12 +2417,14 @@ export function AdminRatesTab({
                     </div>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="primary"
                       size="sm"
+                      leftIcon={<PlusIcon className="w-3.5 h-3.5" />}
                       onClick={handleAddSurchargeAdder}
                       disabled={!newAdderName.trim() || newAdderAmount <= 0}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
                     >
-                      + Add
+                      Add Surcharge
                     </Button>
                   </div>
                 </div>

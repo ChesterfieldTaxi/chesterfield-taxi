@@ -23,6 +23,15 @@ import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
   CarIcon,
   SpinnerIcon,
+  BarChartIcon,
+  HistoryIcon,
+  CreditCardIcon,
+  UsersIcon,
+  DollarSignIcon,
+  MapPinIcon,
+  UserCheckIcon,
+  SettingsIcon,
+  RadioIcon,
 } from '../components/ui/Icons';
 
 export function meta() {
@@ -54,6 +63,7 @@ export type AdminTabKey =
 interface TabItem {
   key: AdminTabKey;
   label: string;
+  icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   description: string;
 }
@@ -61,47 +71,56 @@ interface TabItem {
 const PRIMARY_TABS: TabItem[] = [
   {
     key: 'dashboard',
-    label: '📊 Dashboard',
+    label: 'Dashboard',
+    icon: BarChartIcon,
     description: 'KPI summary cards, revenue charts, system telemetry, and analytics',
   },
   {
     key: 'trips',
-    label: '📜 Trips',
+    label: 'Trips',
+    icon: HistoryIcon,
     description: 'Active dispatch queue, searchable trip archive, CSV export, and exceptions',
   },
   {
     key: 'invoicing',
-    label: '💳 Invoicing',
+    label: 'Invoicing',
+    icon: CreditCardIcon,
     description: 'Billing ledger, corporate accounts, and payment gateway options',
   },
   {
     key: 'customers',
-    label: '👥 Customers',
+    label: 'Customers',
+    icon: UsersIcon,
     description: 'Searchable passenger directory, corporate accounts, and VIP statuses',
   },
   {
     key: 'rates',
-    label: '💵 Rates',
+    label: 'Rates',
+    icon: DollarSignIcon,
     description: 'Base pricing rules, real-time fare simulator, named pricing rules, and distance tier tables',
   },
   {
     key: 'vehicles',
-    label: '🚗 Vehicles',
+    label: 'Vehicles',
+    icon: CarIcon,
     description: 'Vehicle service classes & physical motorized fleet asset inventory',
   },
   {
     key: 'zones',
-    label: '📍 Zones',
+    label: 'Zones',
+    icon: MapPinIcon,
     description: 'Geofence map manager for drawing and saving named polygon and radius surcharge zones',
   },
   {
     key: 'operators',
-    label: '👔 Operators',
+    label: 'Operators',
+    icon: UserCheckIcon,
     description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
   },
   {
     key: 'advanced',
-    label: '⚙️ Advanced',
+    label: 'Advanced',
+    icon: SettingsIcon,
     description: 'Customer booking form controls, security parameters, system telemetry, and audit trail',
   },
 ];
@@ -340,7 +359,7 @@ export default function AdminLayout() {
               className="text-xs sm:text-sm text-slate-950 font-black px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 shadow-md hover:shadow-lg border border-amber-300 transition-all flex items-center gap-2 transform active:scale-95"
               title="Launch Live 3-Pane Dispatch Console"
             >
-              <span className="text-base">🚕</span>
+              <RadioIcon className="w-4 h-4 text-slate-950 shrink-0" />
               <span>Launch Dispatch Console</span>
             </Link>
 
@@ -371,46 +390,25 @@ export default function AdminLayout() {
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5">
             {PRIMARY_TABS.map((tab) => {
               const isActive = normalizedTab === tab.key;
+              const Icon = tab.icon;
               return (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`flex items-center justify-center gap-1 px-2.5 py-2.5 rounded-xl text-xs sm:text-xs font-bold transition-all text-center ${
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-xs font-bold transition-all text-center ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
                   <span className="truncate">{tab.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
-
-        {/* Dynamic Secondary Subpages Navigation Bar */}
-        {currentSubList && currentSubList.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            {currentSubList.map((sub) => {
-              const isSubActive = effectiveSub === sub.key;
-              return (
-                <button
-                  key={sub.key}
-                  type="button"
-                  onClick={() => handleSubChange(sub.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    isSubActive
-                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                  }`}
-                >
-                  {sub.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* Dynamic Tab Body */}
         <div className="pt-2">

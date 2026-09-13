@@ -9,6 +9,11 @@ import { Alert } from '../../../ui/Alert';
 import {
   ClockIcon,
   SpinnerIcon,
+  ActivityIcon,
+  HistoryIcon,
+  AlertTriangleIcon,
+  DownloadIcon,
+  CarIcon,
 } from '../../../ui/Icons';
 
 export type TripsSubTab = 'dispatch' | 'history' | 'exceptions';
@@ -227,7 +232,8 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>🚨 Active Dispatch Queue</span>
+            <ActivityIcon className="w-4 h-4 shrink-0" />
+            <span>Active Dispatch Queue</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'dispatch' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -246,7 +252,8 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>📜 Trip History & Search</span>
+            <HistoryIcon className="w-4 h-4 shrink-0" />
+            <span>Trip History & Search</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'history' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -265,7 +272,8 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <span>⚠️ Exceptions & Cancellations</span>
+            <AlertTriangleIcon className="w-4 h-4 shrink-0" />
+            <span>Exceptions & Cancellations</span>
             <span
               className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 activeSub === 'exceptions' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
@@ -283,18 +291,20 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
-            className="text-xs font-bold"
+            className="text-xs font-bold inline-flex items-center gap-1.5"
           >
-            📥 Export CSV
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Export CSV</span>
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleExportJSON}
-            className="text-xs font-bold"
+            className="text-xs font-bold inline-flex items-center gap-1.5"
           >
-            📋 Export JSON
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>Export JSON</span>
           </Button>
         </div>
       </div>

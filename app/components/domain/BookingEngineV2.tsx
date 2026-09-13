@@ -37,6 +37,7 @@ import {
   CheckIcon,
   PlaneLandingIcon,
   InfoIcon,
+  PlusIcon,
 } from '../ui/Icons';
 
 export interface BookingEngineV2Props {
@@ -1444,9 +1445,10 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                     <button
                       type="button"
                       onClick={handleAddStop}
-                      className="text-blue-600 hover:text-blue-800 font-bold text-xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 shadow-2xs hover:shadow-xs active:scale-95 transition-all"
                     >
-                      + Add Stop
+                      <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Add Stop</span>
                     </button>
                   )}
                 </div>
@@ -1948,9 +1950,10 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                       type="button"
                       disabled={form.selectedVehicles.length >= (bookingConfig.maxVehiclesAllowed || 3)}
                       onClick={handleAddVehicle}
-                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-300 rounded-md text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      + Add Vehicle
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      <span>Add Vehicle</span>
                     </button>
                   )}
                 </div>
