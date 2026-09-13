@@ -188,10 +188,86 @@ export interface CustomerBookingConfig {
   multiVehicleCustomNote?: string;
   allowImmediateAsap: boolean;
   minAdvanceNoticeMinutes: number;
+  maxAdvanceBookingDays?: number; // e.g. 90 days
+  asapSearchRadiusMiles?: number; // e.g. 25 miles
   requireFlightNumberForAirport: boolean;
+  airportMeetAndGreetOptions?: 'curbside' | 'baggage_claim' | 'both';
+  flightDelayGraceMinutes?: number; // e.g. 45 min
   allowRoundTrip: boolean;
+  roundTripDiscountPercent?: number; // e.g. 5%
   allowChildSafetySeats: boolean;
+  carSeatRentalFeePerUnit?: number; // e.g. $10
+  maxChildSeatsAllowed?: number; // e.g. 4
+  freeCancellationWindowMinutes?: number; // e.g. 120 min
+  lateCancellationFeePercent?: number; // e.g. 25%
+  noShowFeeAmount?: number; // e.g. $50
+  cardPreAuthThresholdAmount?: number; // e.g. $100 requires card on file
   acceptedPaymentMethods: Array<'card' | 'cash' | 'account'>;
+  allowDriverNotes?: boolean;
+  allowPetRequest?: boolean;
+  allowWheelchairRequest?: boolean;
+  allowLuggageSpecialRequest?: boolean;
+  publicFormBanner?: {
+    enabled: boolean;
+    text: string;
+    type: 'info' | 'warning' | 'alert';
+  };
+}
+
+export interface CorporateAccountConfig {
+  id: string;
+  companyName: string;
+  accountNumber: string;
+  billingCycle: 'net15' | 'net30' | 'net60' | 'immediate';
+  creditLimit: number;
+  billingContactName: string;
+  billingContactEmail: string;
+  billingContactPhone?: string;
+  discountPercent: number;
+  poRequired: boolean;
+  isActive: boolean;
+  authorizedBookers?: string[];
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  invoiceNumber: string;
+  corporateAccountId?: string;
+  customerName: string;
+  customerEmail: string;
+  tripIds: string[];
+  totalAmount: number;
+  status: 'draft' | 'issued' | 'paid' | 'overdue';
+  dueDate: string;
+  issuedDate: string;
+  paidDate?: string;
+  lineItems: Array<{ description: string; amount: number }>;
+  notes?: string;
+}
+
+export interface SecurityControlsConfig {
+  sessionTimeoutMinutes: number; // e.g. 60
+  require2FA: boolean;
+  enableIpAllowlist?: boolean;
+  allowedIpRanges?: string[];
+  maxFailedLoginAttempts: number; // e.g. 5
+  passwordExpiryDays: number; // e.g. 90
+  requireSpecialChars: boolean;
+  auditLoggingEnabled: boolean;
+}
+
+export interface ConfigAuditEntry {
+  id: string;
+  timestamp: string;
+  operatorId: string;
+  operatorEmail: string;
+  tab: string;
+  section: string;
+  action: string;
+  ipAddress: string;
+  changes?: Record<string, { before: any; after: any }>;
 }
 
 export interface AppSettings {
@@ -203,6 +279,10 @@ export interface AppSettings {
   localization?: LocalizationConfig;
   publicFormVersion?: 'v1' | 'v2';
   customerBookingConfig?: CustomerBookingConfig;
+  corporateAccounts?: CorporateAccountConfig[];
+  invoices?: InvoiceRecord[];
+  securityControls?: SecurityControlsConfig;
+  configAuditTrail?: ConfigAuditEntry[];
   updatedAt?: string;
   updatedBy?: string;
 }

@@ -1,418 +1,1164 @@
-import React, { useState } from 'react';
-import type { AppSettings } from '../../../core/types/config';
+import React, { useState, useEffect } from 'react';
+import type {
+  AppSettings,
+  CustomerBookingConfig,
+  SecurityControlsConfig,
+  ConfigAuditEntry,
+} from '../../../core/types/config';
+import {
+  DEFAULT_CUSTOMER_BOOKING_CONFIG,
+  DEFAULT_SECURITY_CONTROLS,
+} from '../../../core/services/config/admin-config.service';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
-import { ShieldCheckIcon, CheckIcon, SpinnerIcon, LockIcon } from '../../ui/Icons';
+import {
+  ShieldCheckIcon,
+  CheckIcon,
+  SpinnerIcon,
+  LockIcon,
+  ClockIcon,
+  CarIcon,
+  InfoIcon,
+} from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
+
+export type AdvancedSubTab = 'form' | 'security' | 'audit' | 'system';
 
 export interface AdminAdvancedTabProps {
   settings: AppSettings;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   isLoading?: boolean;
+  initialSubTab?: string;
 }
 
-interface AuditLogEntry {
-  id: string;
-  timestamp: string;
-  operator: string;
-  action: string;
-  category: 'auth' | 'pricing' | 'fleet' | 'zones' | 'system';
-  ipAddress: string;
-  status: 'success' | 'warning' | 'error';
-}
+export function AdminAdvancedTab({
+  settings,
+  onSave,
+  isLoading = false,
+  initialSubTab = 'form',
+}: AdminAdvancedTabProps) {
+  // Normalize initialSubTab: 'customer-form' or 'form' opens 'form'
+  const normalizedInitial =
+    initialSubTab === 'customer-form' || initialSubTab === 'form'
+      ? 'form'
+      : (initialSubTab as AdvancedSubTab) || 'form';
 
-const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'log-001',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    operator: 'admin@chesterfieldtaxi.com',
-    action: 'Phase 18 Admin Console Navigation & Management Restructure Initialized',
-    category: 'system',
-    ipAddress: '192.168.1.100',
-    status: 'success',
-  },
-  {
-    id: 'log-002',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    operator: 'admin@chesterfieldtaxi.com',
-    action: 'Updated Geofence Zones: Spirit of St. Louis Airport & Chesterfield Valley Core',
-    category: 'zones',
-    ipAddress: '192.168.1.100',
-    status: 'success',
-  },
-  {
-    id: 'log-003',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    operator: 'dispatch@chesterfieldtaxi.com',
-    action: 'Modified active vehicle status: Unit #102 assigned to Sarah Connor',
-    category: 'fleet',
-    ipAddress: '192.168.1.104',
-    status: 'success',
-  },
-  {
-    id: 'log-004',
-    timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-    operator: 'admin@chesterfieldtaxi.com',
-    action: 'Verified Firestore collection schemas: /fleet, /zones, /users, /config',
-    category: 'system',
-    ipAddress: '192.168.1.100',
-    status: 'success',
-  },
-  {
-    id: 'log-005',
-    timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    operator: 'admin@chesterfieldtaxi.com',
-    action: 'Adjusted base flagdrop fare to $4.00 and per-mile rate to $2.75',
-    category: 'pricing',
-    ipAddress: '192.168.1.100',
-    status: 'success',
-  },
-];
+  const [activeSub, setActiveSub] = useState<AdvancedSubTab>(normalizedInitial);
 
-export function AdminAdvancedTab({ settings, onSave, isLoading = false }: AdminAdvancedTabProps) {
+  useEffect(() => {
+    if (initialSubTab === 'customer-form' || initialSubTab === 'form') {
+      setActiveSub('form');
+    } else if (initialSubTab === 'security' || initialSubTab === 'audit' || initialSubTab === 'system') {
+      setActiveSub(initialSubTab as AdvancedSubTab);
+    }
+  }, [initialSubTab]);
+
+  // ─── 1. Customer Form Feature Config State ───
+  const [formConfig, setFormConfig] = useState<CustomerBookingConfig>({
+    ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
+    ...(settings.customerBookingConfig || {}),
+  });
+
+  // ─── 2. Security Controls State ───
+  const [securityConfig, setSecurityConfig] = useState<SecurityControlsConfig>({
+    ...DEFAULT_SECURITY_CONTROLS,
+    ...(settings.securityControls || {}),
+  });
+
+  // ─── 3. System & Maintenance State ───
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceBanner, setMaintenanceBanner] = useState(
     'Scheduled system maintenance in progress. Please call dispatch directly at (314) 738-0100.'
   );
-  const [maxDrafts, setMaxDrafts] = useState(8);
-  const [autoArchiveDays, setAutoArchiveDays] = useState('60');
-  const [require2FA, setRequire2FA] = useState(false);
 
+  // Status feedback
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOGS);
-  const [auditFilter, setAuditFilter] = useState<string>('all');
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Audit search & filter
+  const [auditSearch, setAuditSearch] = useState('');
+  const auditLogs: ConfigAuditEntry[] = settings.configAuditTrail || [];
 
   const firebaseStatus = isFirebaseConfigured();
 
-  const handleSaveAdvanced = async (e: React.FormEvent) => {
+  // Save Customer Booking Form Settings
+  const handleSaveCustomerForm = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsSaving(true);
-      setSaveSuccess(false);
+      setSaveSuccessMessage(null);
+      setSaveError(null);
 
-      // Record in audit log
-      const newEntry: AuditLogEntry = {
-        id: `log-${Date.now().toString(36)}`,
-        timestamp: new Date().toISOString(),
-        operator: 'admin@chesterfieldtaxi.com',
-        action: `Updated system configurations: Maintenance Mode = ${maintenanceMode ? 'ON' : 'OFF'}, Max Drafts = ${maxDrafts}`,
-        category: 'system',
-        ipAddress: '127.0.0.1',
-        status: 'success',
-      };
+      await onSave({
+        customerBookingConfig: formConfig,
+        updatedAt: new Date().toISOString(),
+      });
 
-      setAuditLogs((prev) => [newEntry, ...prev]);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3500);
+      setSaveSuccessMessage('Customer booking form configurations successfully synchronized.');
+      setTimeout(() => setSaveSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save customer form settings.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const filteredLogs = auditLogs.filter(
-    (log) => auditFilter === 'all' || log.category === auditFilter
-  );
+  // Save Security Controls
+  const handleSaveSecurity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSaving(true);
+      setSaveSuccessMessage(null);
+      setSaveError(null);
 
-  const handleExportLogs = () => {
+      await onSave({
+        securityControls: securityConfig,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setSaveSuccessMessage('Security and session access controls updated.');
+      setTimeout(() => setSaveSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to update security controls.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Toggle Payment Methods
+  const togglePaymentMethod = (method: 'card' | 'cash' | 'account') => {
+    setFormConfig((prev) => {
+      const exists = prev.acceptedPaymentMethods.includes(method);
+      let updated: Array<'card' | 'cash' | 'account'>;
+      if (exists) {
+        if (prev.acceptedPaymentMethods.length <= 1) return prev;
+        updated = prev.acceptedPaymentMethods.filter((m) => m !== method);
+      } else {
+        updated = [...prev.acceptedPaymentMethods, method];
+      }
+      return { ...prev, acceptedPaymentMethods: updated };
+    });
+  };
+
+  // Export Audit Logs
+  const handleExportAuditLogs = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `chesterfield_audit_logs_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute('download', `chesterfield_config_audit_${new Date().toISOString().slice(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
   };
 
+  // Export Full Configuration Backup
+  const handleExportFullConfig = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(settings, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `chesterfield_full_config_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  // Purge Local Storage Cache
+  const handlePurgeCache = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('chesterfield_taxi_app_settings');
+      setSaveSuccessMessage('Local offline cache purged. Refreshing configuration from Firestore...');
+      setTimeout(() => window.location.reload(), 1500);
+    }
+  };
+
+  // Computed phone / email fallbacks
+  const displayPhone = formConfig.multiVehicleCallPhone || COMPANY_CONFIG.phone.dispatch;
+  const displayEmail = formConfig.multiVehicleCallEmail || COMPANY_CONFIG.email.dispatch;
+
+  // Filtered audit logs
+  const filteredAuditLogs = auditLogs.filter((log) => {
+    if (!auditSearch.trim()) return true;
+    const q = auditSearch.toLowerCase();
+    return (
+      log.action.toLowerCase().includes(q) ||
+      log.operatorEmail.toLowerCase().includes(q) ||
+      log.section.toLowerCase().includes(q) ||
+      log.tab.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      {/* ─── Advanced Top Header ─── */}
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            System Diagnostics &amp; Security Controls
-          </span>
-          <span className="hidden sm:inline-block text-xs text-slate-400">
-            API Monitors, Maintenance Flags &amp; Audit Trail
-          </span>
+      {/* ─── Sub-Navigation Pills ─── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveSub('form')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+              activeSub === 'form'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <span>📋 Customer Form Controls</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                formConfig.allowMultiVehicle ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {formConfig.allowMultiVehicle ? 'Multi-Cab Active' : 'Single-Cab'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSub('security')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+              activeSub === 'security'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <span>🛡️ Security &amp; Access</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSub('audit')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+              activeSub === 'audit'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <span>📜 Config Audit Trail</span>
+            <span
+              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                activeSub === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {auditLogs.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSub('system')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+              activeSub === 'system'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <span>⚙️ System Ops &amp; Backups</span>
+          </button>
         </div>
 
-        <Badge variant="warning" size="sm" className="font-mono text-[11px]">
-          Privileged Access
-        </Badge>
+        {activeSub === 'audit' && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportAuditLogs}
+            className="text-xs font-bold"
+          >
+            📥 Export Audit Log (JSON)
+          </Button>
+        )}
+
+        {activeSub === 'system' && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportFullConfig}
+            className="text-xs font-bold"
+          >
+            💾 Export Full System Config
+          </Button>
+        )}
       </div>
 
-      {saveSuccess && (
-        <Alert variant="success" title="System Configuration Updated">
-          Advanced settings updated. Changes recorded in security audit log.
+      {saveSuccessMessage && (
+        <Alert variant="success" className="animate-in fade-in text-xs font-semibold">
+          {saveSuccessMessage}
         </Alert>
       )}
 
-      {/* ─── API Key Health & Infrastructure Monitors ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Firestore Monitor */}
-        <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Database</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-          </div>
-          <div className="font-extrabold text-sm text-slate-900">Firestore NoSQL</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {firebaseStatus ? 'Connected & Enforced' : 'Offline / LocalStorage Fallback'}
-          </div>
-          <div className="mt-2 text-[10px] font-mono text-slate-400">
-            Rules: Strict RBAC Active
-          </div>
-        </Card>
+      {saveError && (
+        <Alert variant="error" className="animate-in fade-in text-xs">
+          {saveError}
+        </Alert>
+      )}
 
-        {/* Google Maps Monitor */}
-        <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mapping API</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-          </div>
-          <div className="font-extrabold text-sm text-slate-900">Google Places / Roads</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            Distance Matrix &amp; Geocoding
-          </div>
-          <div className="mt-2 text-[10px] font-mono text-slate-400">
-            Latency: ~42ms (Optimal)
-          </div>
-        </Card>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SUBPAGE 1: CUSTOMER FORM CARD (TURBOCHARGED EXTENSIVE CONTROLS)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeSub === 'form' && (
+        <form onSubmit={handleSaveCustomerForm} className="space-y-6">
+          {/* Card 1: Multi-Vehicle & Group Transport Policy */}
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <CarIcon className="w-5 h-5 text-blue-600" />
+                    Multi-Vehicle Dispatch &amp; Large Party Assistance
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">
+                    Configure customer self-service vehicle addition or automatic routing to dispatch for group transport.
+                  </CardDescription>
+                </div>
+                <Badge
+                  variant={formConfig.allowMultiVehicle ? 'success' : 'default'}
+                  size="sm"
+                  className="font-bold text-[10px]"
+                >
+                  {formConfig.allowMultiVehicle ? 'Multi-Vehicle Allowed' : 'Dispatch Assistance Notice'}
+                </Badge>
+              </div>
+            </CardHeader>
 
-        {/* VoIP / Softphone Gateway */}
-        <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">VoIP Telephony</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          </div>
-          <div className="font-extrabold text-sm text-slate-900">Browser Softphone</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            WebRTC Audio Ready
-          </div>
-          <div className="mt-2 text-[10px] font-mono text-slate-400">
-            DID: (314) 738-0100
-          </div>
-        </Card>
-
-        {/* Transaction Engine */}
-        <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quoting Engine</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-          </div>
-          <div className="font-extrabold text-sm text-slate-900">Pure Functional Pipeline</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            Multi-stop &amp; Surge Multipliers
-          </div>
-          <div className="mt-2 text-[10px] font-mono text-slate-400">
-            Phase 18 Active
-          </div>
-        </Card>
-      </div>
-
-      {/* ─── Sensitive System Configuration Form ─── */}
-      <form onSubmit={handleSaveAdvanced} className="space-y-6">
-        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-          <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4">
-            <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <LockIcon className="w-4 h-4 text-amber-500" />
-              Operational Controls &amp; Safety Parameters
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Configure system-wide limits, dispatch draft maximums, and public maintenance states.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-5">
-            {/* Maintenance Mode Toggle */}
-            <div className="flex items-start justify-between p-4 rounded-xl border border-amber-200 bg-amber-50/40">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
+            <CardContent className="p-6 space-y-6">
+              {/* Master Switch */}
+              <div className="flex items-start justify-between p-4 rounded-xl border border-blue-200/80 bg-blue-50/30">
+                <div className="space-y-1 pr-4">
                   <h4 className="text-xs font-extrabold text-slate-900">
-                    Maintenance Mode (Public Portal Lock)
+                    Allow Customers to Select Multiple Vehicles on <code>/book</code>
                   </h4>
-                  {maintenanceMode && (
-                    <Badge variant="error" size="sm">
-                      Active: Public Bookings Blocked
-                    </Badge>
+                  <p className="text-[11px] text-slate-600">
+                    When enabled, riders see the <strong>&ldquo;+ Add Vehicle&rdquo;</strong> button to book multiple sedans/SUVs simultaneously in a single reservation. When disabled, customers see an advisory note to call or email dispatch.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={formConfig.allowMultiVehicle}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({ ...prev, allowMultiVehicle: e.target.checked }))
+                    }
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                </label>
+              </div>
+
+              {/* Dynamic controls based on toggle */}
+              {formConfig.allowMultiVehicle ? (
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3 animate-in fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900">
+                        Maximum Vehicles per Customer Booking
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Limits simultaneous fleet allocation per single checkout.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormConfig((prev) => ({
+                            ...prev,
+                            maxVehiclesAllowed: Math.max(2, prev.maxVehiclesAllowed - 1),
+                          }))
+                        }
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 flex items-center justify-center shadow-xs"
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-black text-slate-900 text-base w-6 text-center">
+                        {formConfig.maxVehiclesAllowed}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormConfig((prev) => ({
+                            ...prev,
+                            maxVehiclesAllowed: Math.min(10, prev.maxVehiclesAllowed + 1),
+                          }))
+                        }
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 flex items-center justify-center shadow-xs"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Dispatch Phone for Assistance
+                      </label>
+                      <Input
+                        value={formConfig.multiVehicleCallPhone || ''}
+                        onChange={(e) =>
+                          setFormConfig((prev) => ({
+                            ...prev,
+                            multiVehicleCallPhone: e.target.value,
+                          }))
+                        }
+                        placeholder={COMPANY_CONFIG.phone.dispatch}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Dispatch Email for Assistance
+                      </label>
+                      <Input
+                        value={formConfig.multiVehicleCallEmail || ''}
+                        onChange={(e) =>
+                          setFormConfig((prev) => ({
+                            ...prev,
+                            multiVehicleCallEmail: e.target.value,
+                          }))
+                        }
+                        placeholder={COMPANY_CONFIG.email.dispatch}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Custom Assistance Note (Optional Override)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={formConfig.multiVehicleCustomNote || ''}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          multiVehicleCustomNote: e.target.value,
+                        }))
+                      }
+                      placeholder="Need more than 1 vehicle? Call or email dispatch for group discounts and coordinated multi-vehicle arrivals."
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Live Notice Preview */}
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
+                      Live Customer Notice Preview (Rendered on <code>/book</code>)
+                    </span>
+                    <div className="flex items-start gap-2.5 text-xs text-amber-900">
+                      <span className="text-base shrink-0">ℹ️</span>
+                      <div>
+                        <p className="font-semibold">
+                          {formConfig.multiVehicleCustomNote || (
+                            <>
+                              Need more than 1 vehicle? For group travel or multi-car bookings, please call our 24/7 dispatch at{' '}
+                              <strong className="underline">{displayPhone}</strong> or email{' '}
+                              <strong className="underline">{displayEmail}</strong>.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Scheduling Windows & Airport Rules */}
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <ClockIcon className="w-5 h-5 text-amber-600" />
+                Scheduling Windows, Lead Times &amp; Flight Tracking
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Operational boundaries for immediate ASAP requests, scheduled advance pickups, and airport delay grace periods.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Allow On-Demand ASAP Rides
+                  </label>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-500">Immediate pickup option</span>
+                    <input
+                      type="checkbox"
+                      checked={formConfig.allowImmediateAsap}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({ ...prev, allowImmediateAsap: e.target.checked }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Min Advance Notice (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="15"
+                    max="1440"
+                    step="15"
+                    value={formConfig.minAdvanceNoticeMinutes}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        minAdvanceNoticeMinutes: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Lead time for scheduled trips</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Max Advance Booking (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="7"
+                    max="365"
+                    value={formConfig.maxAdvanceBookingDays || 90}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        maxAdvanceBookingDays: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Future calendar limit</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    ASAP Search Radius (Miles)
+                  </label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="100"
+                    value={formConfig.asapSearchRadiusMiles || 25}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        asapSearchRadiusMiles: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Geographic limit for ASAP calls</span>
+                </div>
+              </div>
+
+              {/* Airport & Flight Tracking Controls */}
+              <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  ✈️ Airport Transfers &amp; Meet-and-Greet Policy
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Require Flight # for Airports</p>
+                      <p className="text-[10px] text-slate-500">STL Lambert &amp; Spirit Airport transfers</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formConfig.requireFlightNumberForAirport}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          requireFlightNumberForAirport: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <label className="text-xs font-bold text-slate-800 block mb-1">
+                      Airport Meet &amp; Greet Preference
+                    </label>
+                    <select
+                      value={formConfig.airportMeetAndGreetOptions || 'curbside'}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          airportMeetAndGreetOptions: e.target.value as any,
+                        }))
+                      }
+                      className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
+                    >
+                      <option value="curbside">Curbside Pickup Only</option>
+                      <option value="baggage_claim">Baggage Claim Inside Escort</option>
+                      <option value="both">Customer Choice at Booking</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <label className="text-xs font-bold text-slate-800 block mb-1">
+                      Flight Delay Grace Period (Mins)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      step="5"
+                      value={formConfig.flightDelayGraceMinutes || 45}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          flightDelayGraceMinutes: Number(e.target.value),
+                        }))
+                      }
+                      className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-bold"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Complimentary airport wait time</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Equipment, Child Seats & Cancellation Penalties */}
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <ShieldCheckIcon className="w-5 h-5 text-emerald-600" />
+                Equipment Add-ons, Child Safety Seats &amp; Cancellation Terms
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Child seat inventory fees, return trip incentives, and cancellation thresholds.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">Child Safety Seats</label>
+                    <input
+                      type="checkbox"
+                      checked={formConfig.allowChildSafetySeats}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          allowChildSafetySeats: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+                  {formConfig.allowChildSafetySeats && (
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Fee per unit:</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-xs font-bold">$</span>
+                        <input
+                          type="number"
+                          value={formConfig.carSeatRentalFeePerUnit || 10}
+                          onChange={(e) =>
+                            setFormConfig((prev) => ({
+                              ...prev,
+                              carSeatRentalFeePerUnit: Number(e.target.value),
+                            }))
+                          }
+                          className="w-16 px-1.5 py-0.5 border border-slate-200 rounded text-xs font-bold"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-600">
-                  When enabled, public customers visiting <code>/book</code> will see a maintenance message redirecting them to phone dispatch. Dispatchers and Admins remain unaffected.
-                </p>
-                {maintenanceMode && (
-                  <div className="pt-2">
-                    <Input
-                      label="Customer Maintenance Banner Message"
-                      value={maintenanceBanner}
-                      onChange={(e) => setMaintenanceBanner(e.target.value)}
-                      className="text-xs"
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800">Round Trip Booking</label>
+                    <input
+                      type="checkbox"
+                      checked={formConfig.allowRoundTrip}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          allowRoundTrip: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+                  {formConfig.allowRoundTrip && (
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Return discount (%):</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="25"
+                        value={formConfig.roundTripDiscountPercent || 5}
+                        onChange={(e) =>
+                          setFormConfig((prev) => ({
+                            ...prev,
+                            roundTripDiscountPercent: Number(e.target.value),
+                          }))
+                        }
+                        className="w-16 px-1.5 py-0.5 border border-slate-200 rounded text-xs font-bold mt-0.5"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Free Cancellation (Mins)
+                  </label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="1440"
+                    step="30"
+                    value={formConfig.freeCancellationWindowMinutes || 120}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        freeCancellationWindowMinutes: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Full refund window</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Card Pre-Auth Threshold ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={formConfig.cardPreAuthThresholdAmount || 100}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        cardPreAuthThresholdAmount: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Fares above require card on file</span>
+                </div>
+              </div>
+
+              {/* Payment Methods Checkboxes */}
+              <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl">
+                <span className="text-xs font-bold text-slate-800 block mb-2">
+                  Accepted Customer Payment Methods:
+                </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formConfig.acceptedPaymentMethods.includes('card')}
+                      onChange={() => togglePaymentMethod('card')}
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                    <span>💳 Credit / Debit Card (Online Pre-Auth)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formConfig.acceptedPaymentMethods.includes('cash')}
+                      onChange={() => togglePaymentMethod('cash')}
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                    <span>💵 Cash to Driver in Cab</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formConfig.acceptedPaymentMethods.includes('account')}
+                      onChange={() => togglePaymentMethod('account')}
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                    <span>🏢 Corporate Direct Billing Account</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Public Emergency Announcement Banner */}
+              <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-rose-950">
+                      Public Announcement / Weather Advisory Banner
+                    </h4>
+                    <p className="text-[11px] text-rose-700">
+                      Renders a high-visibility alert banner at the top of the customer booking form.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formConfig.publicFormBanner?.enabled || false}
+                    onChange={(e) =>
+                      setFormConfig((prev) => ({
+                        ...prev,
+                        publicFormBanner: {
+                          enabled: e.target.checked,
+                          text: prev.publicFormBanner?.text || 'Weather Advisory: Due to heavy snow, expect 15-minute additional travel times.',
+                          type: prev.publicFormBanner?.type || 'warning',
+                        },
+                      }))
+                    }
+                    className="w-4 h-4 rounded text-rose-600"
+                  />
+                </div>
+
+                {formConfig.publicFormBanner?.enabled && (
+                  <div className="space-y-2 pt-2 border-t border-rose-200">
+                    <input
+                      type="text"
+                      value={formConfig.publicFormBanner.text}
+                      onChange={(e) =>
+                        setFormConfig((prev) => ({
+                          ...prev,
+                          publicFormBanner: {
+                            ...prev.publicFormBanner!,
+                            text: e.target.value,
+                          },
+                        }))
+                      }
+                      className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-lg text-xs"
+                      placeholder="Enter emergency or operational notice..."
                     />
                   </div>
                 )}
               </div>
+            </CardContent>
 
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+            <CardFooter className="border-t border-slate-100 bg-slate-50/50 p-4 flex justify-end">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isSaving}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2"
+              >
+                {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin mr-2" /> : null}
+                Save All Customer Form Controls
+              </Button>
+            </CardFooter>
+          </Card>
+        </form>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SUBPAGE 2: SECURITY & ACCESS CONTROLS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeSub === 'security' && (
+        <form onSubmit={handleSaveSecurity} className="space-y-6">
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <LockIcon className="w-5 h-5 text-amber-600" />
+                Security, Authentication &amp; IP Access Controls
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Enforce dispatcher 2FA, idle session timeouts, and IP allowlist restrictions for the administration console.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs">Enforce Two-Factor Authentication (2FA)</span>
+                    <input
+                      type="checkbox"
+                      checked={securityConfig.require2FA}
+                      onChange={(e) =>
+                        setSecurityConfig((prev) => ({ ...prev, require2FA: e.target.checked }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Requires SMS or Authenticator TOTP token upon dispatcher and administrator login.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs">IP Address Allowlisting</span>
+                    <input
+                      type="checkbox"
+                      checked={securityConfig.enableIpAllowlist || false}
+                      onChange={(e) =>
+                        setSecurityConfig((prev) => ({
+                          ...prev,
+                          enableIpAllowlist: e.target.checked,
+                        }))
+                      }
+                      className="w-4 h-4 rounded text-blue-600"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Restricts admin console access strictly to approved dispatch office static IPs.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Idle Session Timeout (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="15"
+                    max="480"
+                    value={securityConfig.sessionTimeoutMinutes}
+                    onChange={(e) =>
+                      setSecurityConfig((prev) => ({
+                        ...prev,
+                        sessionTimeoutMinutes: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Max Failed Login Attempts
+                  </label>
+                  <input
+                    type="number"
+                    min="3"
+                    max="10"
+                    value={securityConfig.maxFailedLoginAttempts}
+                    onChange={(e) =>
+                      setSecurityConfig((prev) => ({
+                        ...prev,
+                        maxFailedLoginAttempts: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Password Expiration (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="365"
+                    value={securityConfig.passwordExpiryDays}
+                    onChange={(e) =>
+                      setSecurityConfig((prev) => ({
+                        ...prev,
+                        passwordExpiryDays: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                  />
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="border-t border-slate-100 bg-slate-50/50 p-4 flex justify-end">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isSaving}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2"
+              >
+                {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin mr-2" /> : null}
+                Save Security Configuration
+              </Button>
+            </CardFooter>
+          </Card>
+        </form>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SUBPAGE 3: CONFIGURATION AUDIT TRAIL
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeSub === 'audit' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+            <input
+              type="text"
+              placeholder="Search audit trail by operator, action, section, or IP..."
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+              className="w-full max-w-md px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-slate-500 font-semibold whitespace-nowrap">
+              {filteredAuditLogs.length} Logged Actions
+            </span>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">Timestamp</th>
+                    <th className="px-4 py-3">Operator</th>
+                    <th className="px-4 py-3">Section</th>
+                    <th className="px-4 py-3">Action Description</th>
+                    <th className="px-4 py-3">IP Address</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredAuditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-4 py-3 font-mono text-slate-500 whitespace-nowrap">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                        {log.operatorEmail}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Badge variant="info" size="sm" className="font-mono text-[10px] uppercase">
+                          {log.tab}:{log.section}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">
+                        {log.action}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                        {log.ipAddress}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SUBPAGE 4: SYSTEM OPS & TELEMETRY
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeSub === 'system' && (
+        <div className="space-y-6">
+          {/* Infrastructure Health Monitors (from screenshot media_1789324367315.png) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">DATABASE</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="font-extrabold text-sm text-slate-900">Firestore NoSQL</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                {firebaseStatus ? 'Connected & Enforced' : 'Offline / LocalStorage Fallback'}
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-400">
+                Rules: Strict RBAC Active
+              </div>
+            </Card>
+
+            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">MAPPING API</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="font-extrabold text-sm text-slate-900">Google Places / Roads</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Distance Matrix &amp; Geocoding
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-400">
+                Latency: ~42ms (Optimal)
+              </div>
+            </Card>
+
+            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">VOIP TELEPHONY</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+              </div>
+              <div className="font-extrabold text-sm text-slate-900">Browser Softphone</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                WebRTC Audio Ready
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-400">
+                DID: (314) 738-0100
+              </div>
+            </Card>
+
+            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">QUOTING ENGINE</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="font-extrabold text-sm text-slate-900">Pure Functional Pipeline</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Multi-stop &amp; Surge Multipliers
+              </div>
+              <div className="mt-2 text-[10px] font-mono text-slate-400">
+                Phase 18 Active
+              </div>
+            </Card>
+          </div>
+
+          {/* Maintenance Lock & Cache Operations */}
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <CardTitle className="text-base font-bold text-slate-900">
+                Maintenance Mode &amp; Local Storage Cache
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Temporarily lock public booking access or purge browser-side configuration caching.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Maintenance Mode</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Blocks customer booking access while leaving admin dispatch fully operable.
+                  </p>
+                </div>
                 <input
                   type="checkbox"
                   checked={maintenanceMode}
                   onChange={(e) => setMaintenanceMode(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Max Concurrent Dispatch Tabs
-                </label>
-                <Input
-                  type="number"
-                  min="2"
-                  max="20"
-                  value={maxDrafts}
-                  onChange={(e) => setMaxDrafts(parseInt(e.target.value) || 8)}
-                  helperText="Maximum simultaneous draft bookings in /dispatch"
+                  className="w-4 h-4 rounded text-blue-600"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Completed Trip Auto-Archive
-                </label>
-                <select
-                  value={autoArchiveDays}
-                  onChange={(e) => setAutoArchiveDays(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="30">30 Days</option>
-                  <option value="60">60 Days (Recommended)</option>
-                  <option value="90">90 Days</option>
-                  <option value="never">Never (Keep all in active collection)</option>
-                </select>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Older records moved to cold storage
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Enforce Two-Factor Auth (2FA)
-                </label>
-                <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50">
-                  <span className="text-xs text-slate-700">Require for Staff</span>
-                  <input
-                    type="checkbox"
-                    checked={require2FA}
-                    onChange={(e) => setRequire2FA(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded"
-                  />
+              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Purge Local Configuration Cache</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Clears client-side <code>localStorage</code> copy and forces immediate hydration from Firestore.
+                  </p>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Mandatory OTP for Admin logins
-                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePurgeCache}
+                  className="text-xs font-bold text-rose-700 border-rose-300 hover:bg-rose-50"
+                >
+                  Purge Local Cache
+                </Button>
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className="bg-slate-50/50 p-4 border-t border-slate-100 flex justify-end">
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              isLoading={isSaving || isLoading}
-              leftIcon={<CheckIcon className="w-4 h-4" />}
-            >
-              Save Advanced Configurations
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
-
-      {/* ─── Security Audit Log Table ─── */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs overflow-hidden">
-        <CardHeader className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>📜</span>
-              <span>Administrative Audit Trail</span>
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Immutable log of configuration updates, rate changes, geofence edits, and operator account provisioning.
-            </CardDescription>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={auditFilter}
-              onChange={(e) => setAuditFilter(e.target.value)}
-              className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700"
-            >
-              <option value="all">All Events</option>
-              <option value="system">System</option>
-              <option value="pricing">Pricing</option>
-              <option value="zones">Zones</option>
-              <option value="fleet">Fleet</option>
-            </select>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportLogs}
-              className="text-xs"
-            >
-              Export JSON
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-left text-xs divide-y divide-slate-100">
-            <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="px-4 py-2.5">Timestamp</th>
-                <th className="px-4 py-2.5">Operator</th>
-                <th className="px-4 py-2.5">Category</th>
-                <th className="px-4 py-2.5">Action Details</th>
-                <th className="px-4 py-2.5">IP Address</th>
-                <th className="px-4 py-2.5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
-                    {log.operator}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="capitalize px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                      {log.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 max-w-md">
-                    {log.action}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-400">
-                    {log.ipAddress}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      {log.status.toUpperCase()}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

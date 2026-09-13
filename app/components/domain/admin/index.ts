@@ -10,3 +10,6 @@ export * from './AdminAdvancedTab';
 export * from './AdminDashboardTab';
 export * from './AdminBookingsTab';
 export * from './AdminLayoutTab';
+export * from './subpages/AdminTripsSubpage';
+export * from './subpages/AdminInvoicingSubpage';
+export * from './subpages/AdminCustomersSubpage';

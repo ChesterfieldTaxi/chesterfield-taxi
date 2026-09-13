@@ -29,6 +29,7 @@ export interface AdminRatesTabProps {
   settings: AppSettings;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   isLoading?: boolean;
+  initialSubTab?: 'base' | 'named_rules' | 'step_increments' | 'condition_surcharges';
 }
 
 const DEFAULT_CONDITION_SURCHARGES: ConditionSurchargeConfig = {
@@ -44,9 +45,20 @@ const DEFAULT_CONDITION_SURCHARGES: ConditionSurchargeConfig = {
   zoneSurcharges: {},
 };
 
-export function AdminRatesTab({ settings, onSave, isLoading = false }: AdminRatesTabProps) {
+export function AdminRatesTab({
+  settings,
+  onSave,
+  isLoading = false,
+  initialSubTab = 'base',
+}: AdminRatesTabProps) {
   // Rates Sub-section: 4 tabs
-  const [activeSubTab, setActiveSubTab] = useState<'base' | 'named_rules' | 'step_increments' | 'condition_surcharges'>('base');
+  const [activeSubTab, setActiveSubTab] = useState<'base' | 'named_rules' | 'step_increments' | 'condition_surcharges'>(initialSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   const [pricing, setPricing] = useState<DynamicPricingConfig>({
     ...settings.pricing,

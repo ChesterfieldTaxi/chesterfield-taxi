@@ -17,6 +17,10 @@ import { doc, getDoc, setDoc, onSnapshot, type Firestore } from 'firebase/firest
 import type {
   AppSettings,
   CustomerBookingConfig,
+  CorporateAccountConfig,
+  InvoiceRecord,
+  SecurityControlsConfig,
+  ConfigAuditEntry,
   IAdminConfigService,
   VehicleTierConfig,
 } from '../../types/config';
@@ -34,11 +38,160 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   multiVehicleCustomNote: '',
   allowImmediateAsap: true,
   minAdvanceNoticeMinutes: 30,
+  maxAdvanceBookingDays: 90,
+  asapSearchRadiusMiles: 25,
   requireFlightNumberForAirport: false,
+  airportMeetAndGreetOptions: 'curbside',
+  flightDelayGraceMinutes: 45,
   allowRoundTrip: true,
+  roundTripDiscountPercent: 5,
   allowChildSafetySeats: true,
+  carSeatRentalFeePerUnit: 10,
+  maxChildSeatsAllowed: 4,
+  freeCancellationWindowMinutes: 120,
+  lateCancellationFeePercent: 25,
+  noShowFeeAmount: 50,
+  cardPreAuthThresholdAmount: 100,
   acceptedPaymentMethods: ['card', 'cash', 'account'],
+  allowDriverNotes: true,
+  allowPetRequest: true,
+  allowWheelchairRequest: true,
+  allowLuggageSpecialRequest: true,
+  publicFormBanner: {
+    enabled: false,
+    text: '24/7 Airport & Regional Chauffeur Service across Greater St. Louis.',
+    type: 'info',
+  },
 };
+
+export const DEFAULT_CORPORATE_ACCOUNTS: CorporateAccountConfig[] = [
+  {
+    id: 'corp-001',
+    companyName: 'Bayer Crop Science (St. Louis HQ)',
+    accountNumber: 'CORP-BAY-902',
+    billingCycle: 'net30',
+    creditLimit: 15000,
+    billingContactName: 'Laura Vance',
+    billingContactEmail: 'laura.vance@bayer.example.com',
+    billingContactPhone: '(314) 694-1000',
+    discountPercent: 10,
+    poRequired: true,
+    isActive: true,
+    authorizedBookers: ['laura.vance@bayer.example.com', 'traveldesk@bayer.example.com'],
+    notes: 'Executive transfers and weekly guest airport shuttles.',
+    createdAt: '2026-01-15T09:00:00Z',
+  },
+  {
+    id: 'corp-002',
+    companyName: 'Mercy Hospital St. Louis - Patient Transport',
+    accountNumber: 'CORP-MRC-441',
+    billingCycle: 'net15',
+    creditLimit: 8500,
+    billingContactName: 'Marcus Bennett',
+    billingContactEmail: 'transport.billing@mercy.example.com',
+    billingContactPhone: '(314) 251-6000',
+    discountPercent: 12,
+    poRequired: false,
+    isActive: true,
+    authorizedBookers: ['transport.billing@mercy.example.com'],
+    notes: 'Priority discharge and non-emergency wheelchair medical transport.',
+    createdAt: '2026-02-01T10:30:00Z',
+  },
+  {
+    id: 'corp-003',
+    companyName: 'Drury Plaza Hotel Chesterfield Valley',
+    accountNumber: 'CORP-DRY-108',
+    billingCycle: 'net30',
+    creditLimit: 5000,
+    billingContactName: 'Front Desk Lead',
+    billingContactEmail: 'guestservices.valley@druryhotels.example.com',
+    billingContactPhone: '(636) 532-3300',
+    discountPercent: 5,
+    poRequired: false,
+    isActive: true,
+    authorizedBookers: ['guestservices.valley@druryhotels.example.com'],
+    notes: 'Direct guest airport billing and local corporate transfers.',
+    createdAt: '2026-03-10T14:15:00Z',
+  },
+];
+
+export const DEFAULT_INVOICES: InvoiceRecord[] = [
+  {
+    id: 'inv-2026-001',
+    invoiceNumber: 'INV-2026-0089',
+    corporateAccountId: 'corp-001',
+    customerName: 'Bayer Crop Science',
+    customerEmail: 'laura.vance@bayer.example.com',
+    tripIds: ['trip-8812', 'trip-8834', 'trip-8890'],
+    totalAmount: 384.50,
+    status: 'paid',
+    issuedDate: '2026-08-31',
+    dueDate: '2026-09-30',
+    paidDate: '2026-09-08',
+    lineItems: [
+      { description: 'STL Lambert Airport Shuttle (3 transfers)', amount: 255.00 },
+      { description: 'Chesterfield Valley to Downtown Chauffeur', amount: 129.50 },
+    ],
+    notes: 'Paid via Corporate Wire Transfer',
+  },
+  {
+    id: 'inv-2026-002',
+    invoiceNumber: 'INV-2026-0094',
+    corporateAccountId: 'corp-002',
+    customerName: 'Mercy Hospital St. Louis',
+    customerEmail: 'transport.billing@mercy.example.com',
+    tripIds: ['trip-9102', 'trip-9145'],
+    totalAmount: 198.20,
+    status: 'issued',
+    issuedDate: '2026-09-05',
+    dueDate: '2026-09-20',
+    lineItems: [
+      { description: 'WAV Accessible Patient Transport (2 runs)', amount: 198.20 },
+    ],
+    notes: 'Net-15 Direct Billing',
+  },
+];
+
+export const DEFAULT_SECURITY_CONTROLS: SecurityControlsConfig = {
+  sessionTimeoutMinutes: 60,
+  require2FA: false,
+  enableIpAllowlist: false,
+  allowedIpRanges: ['192.168.1.0/24', '10.0.0.0/16'],
+  maxFailedLoginAttempts: 5,
+  passwordExpiryDays: 90,
+  requireSpecialChars: true,
+  auditLoggingEnabled: true,
+};
+
+export const DEFAULT_CONFIG_AUDIT_TRAIL: ConfigAuditEntry[] = [
+  {
+    id: 'aud-001',
+    timestamp: '2026-09-13T12:00:00Z',
+    operatorId: 'admin@chesterfieldtaxi.com',
+    operatorEmail: 'admin@chesterfieldtaxi.com',
+    tab: 'advanced',
+    section: 'customer-form',
+    action: 'Updated Public Customer Form: Activated Multi-Vehicle Dispatch Engine',
+    ipAddress: '192.168.1.100',
+    changes: {
+      allowMultiVehicle: { before: false, after: true },
+      maxVehiclesAllowed: { before: 1, after: 3 },
+    },
+  },
+  {
+    id: 'aud-002',
+    timestamp: '2026-09-13T11:15:00Z',
+    operatorId: 'admin@chesterfieldtaxi.com',
+    operatorEmail: 'admin@chesterfieldtaxi.com',
+    tab: 'rates',
+    section: 'base-rates',
+    action: 'Adjusted Flag Drop Base Rate to $5.00 and Mileage to $2.25/mi',
+    ipAddress: '192.168.1.100',
+    changes: {
+      baseFare: { before: 4.50, after: 5.00 },
+    },
+  },
+];
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   company: {
@@ -227,6 +380,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   ],
   publicFormVersion: COMPANY_CONFIG.publicFormVersion || 'v2',
   customerBookingConfig: { ...DEFAULT_CUSTOMER_BOOKING_CONFIG },
+  corporateAccounts: [...DEFAULT_CORPORATE_ACCOUNTS],
+  invoices: [...DEFAULT_INVOICES],
+  securityControls: { ...DEFAULT_SECURITY_CONTROLS },
+  configAuditTrail: [...DEFAULT_CONFIG_AUDIT_TRAIL],
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -293,11 +450,27 @@ export class AdminConfigService implements IAdminConfigService {
       vehicles: incoming.vehicles && incoming.vehicles.length > 0
         ? incoming.vehicles
         : DEFAULT_APP_SETTINGS.vehicles,
+      fleet: incoming.fleet && incoming.fleet.length > 0
+        ? incoming.fleet
+        : DEFAULT_APP_SETTINGS.fleet,
       publicFormVersion: 'v2',
       customerBookingConfig: {
         ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
         ...(incoming.customerBookingConfig || {}),
       },
+      corporateAccounts: incoming.corporateAccounts && incoming.corporateAccounts.length > 0
+        ? incoming.corporateAccounts
+        : DEFAULT_APP_SETTINGS.corporateAccounts,
+      invoices: incoming.invoices && incoming.invoices.length > 0
+        ? incoming.invoices
+        : DEFAULT_APP_SETTINGS.invoices,
+      securityControls: {
+        ...DEFAULT_SECURITY_CONTROLS,
+        ...(incoming.securityControls || {}),
+      },
+      configAuditTrail: incoming.configAuditTrail && incoming.configAuditTrail.length > 0
+        ? incoming.configAuditTrail
+        : DEFAULT_APP_SETTINGS.configAuditTrail,
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };
@@ -330,6 +503,24 @@ export class AdminConfigService implements IAdminConfigService {
   }
 
   public async updateSettings(updates: Partial<AppSettings>): Promise<AppSettings> {
+    // Generate an automatic audit entry if audit logging is enabled
+    const auditEnabled = updates.securityControls?.auditLoggingEnabled ?? this.cachedSettings.securityControls?.auditLoggingEnabled ?? true;
+    let updatedAuditTrail = updates.configAuditTrail || this.cachedSettings.configAuditTrail || [...DEFAULT_CONFIG_AUDIT_TRAIL];
+
+    if (auditEnabled && !updates.configAuditTrail) {
+      const auditEntry: ConfigAuditEntry = {
+        id: `aud-${Date.now().toString(36)}`,
+        timestamp: new Date().toISOString(),
+        operatorId: updates.updatedBy || 'admin@chesterfieldtaxi.com',
+        operatorEmail: updates.updatedBy || 'admin@chesterfieldtaxi.com',
+        tab: 'system',
+        section: 'config-update',
+        action: 'Admin Console settings updated',
+        ipAddress: '192.168.1.100',
+      };
+      updatedAuditTrail = [auditEntry, ...updatedAuditTrail].slice(0, 100);
+    }
+
     const merged: AppSettings = {
       ...this.cachedSettings,
       ...updates,
@@ -351,7 +542,17 @@ export class AdminConfigService implements IAdminConfigService {
             ...updates.customerBookingConfig,
           }
         : (this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
+      corporateAccounts: updates.corporateAccounts || this.cachedSettings.corporateAccounts,
+      invoices: updates.invoices || this.cachedSettings.invoices,
+      securityControls: updates.securityControls
+        ? {
+            ...(this.cachedSettings.securityControls || DEFAULT_SECURITY_CONTROLS),
+            ...updates.securityControls,
+          }
+        : (this.cachedSettings.securityControls || DEFAULT_SECURITY_CONTROLS),
+      configAuditTrail: updatedAuditTrail,
       vehicles: updates.vehicles || this.cachedSettings.vehicles,
+      fleet: updates.fleet || this.cachedSettings.fleet,
       updatedAt: new Date().toISOString(),
     };
 

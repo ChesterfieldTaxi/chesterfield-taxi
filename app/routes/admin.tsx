@@ -13,6 +13,9 @@ import {
   AdminZonesTab,
   AdminOperatorsTab,
   AdminAdvancedTab,
+  AdminTripsSubpage,
+  AdminInvoicingSubpage,
+  AdminCustomersSubpage,
   AdminBookingsTab,
   AdminLayoutTab,
 } from '../components/domain/admin';
@@ -31,14 +34,17 @@ export function meta() {
 
 export type AdminTabKey =
   | 'dashboard'
-  | 'general'
+  | 'trips'
+  | 'invoicing'
+  | 'customers'
   | 'rates'
   | 'vehicles'
   | 'zones'
   | 'operators'
-  | 'form'
   | 'advanced'
   // Legacy tab aliases
+  | 'general'
+  | 'form'
   | 'pricing'
   | 'fleet'
   | 'staff'
@@ -56,12 +62,22 @@ const PRIMARY_TABS: TabItem[] = [
   {
     key: 'dashboard',
     label: '📊 Dashboard',
-    description: 'KPI summary cards, revenue charts, active trip volume, and unassigned booking alerts',
+    description: 'KPI summary cards, revenue charts, system telemetry, and analytics',
   },
   {
-    key: 'general',
-    label: '🏢 General',
-    description: 'Company details, localization, 24/7 operating hours, and branding settings preview',
+    key: 'trips',
+    label: '📜 Trips',
+    description: 'Active dispatch queue, searchable trip archive, CSV export, and exceptions',
+  },
+  {
+    key: 'invoicing',
+    label: '💳 Invoicing',
+    description: 'Billing ledger, corporate accounts, and payment gateway options',
+  },
+  {
+    key: 'customers',
+    label: '👥 Customers',
+    description: 'Searchable passenger directory, corporate accounts, and VIP statuses',
   },
   {
     key: 'rates',
@@ -71,7 +87,7 @@ const PRIMARY_TABS: TabItem[] = [
   {
     key: 'vehicles',
     label: '🚗 Vehicles',
-    description: 'Dual-section management: Vehicle service classes & physical motorized fleet asset inventory',
+    description: 'Vehicle service classes & physical motorized fleet asset inventory',
   },
   {
     key: 'zones',
@@ -80,20 +96,53 @@ const PRIMARY_TABS: TabItem[] = [
   },
   {
     key: 'operators',
-    label: '👥 Operators',
+    label: '👔 Operators',
     description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
-  },
-  {
-    key: 'form',
-    label: '📋 Customer Form',
-    description: 'Public booking form configuration, multi-vehicle dispatch engine, and assistance notices',
   },
   {
     key: 'advanced',
     label: '⚙️ Advanced',
-    description: 'Sensitive system configurations, API key controls, Firestore rule parameters, and audit logging',
+    description: 'Customer booking form controls, security parameters, system telemetry, and audit trail',
   },
 ];
+
+export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = {
+  dashboard: [
+    { key: 'overview', label: '📊 Overview' },
+    { key: 'telemetry', label: '🛰️ Infrastructure & Telemetry' },
+    { key: 'analytics', label: '📈 Analytics & Corridors' },
+  ],
+  trips: [
+    { key: 'dispatch', label: '🚕 Active Queue' },
+    { key: 'history', label: '📜 Trip History & Archive' },
+    { key: 'exceptions', label: '⚠️ Exceptions & Cancellations' },
+  ],
+  invoicing: [
+    { key: 'ledger', label: '📑 Invoices & Statements' },
+    { key: 'accounts', label: '🏢 Corporate Direct Accounts' },
+    { key: 'gateways', label: '💳 Payment Gateways & Terminals' },
+  ],
+  customers: [
+    { key: 'directory', label: '👤 Passenger Directory' },
+    { key: 'corporate', label: '🏢 Corporate Client Accounts' },
+  ],
+  rates: [
+    { key: 'base', label: '💵 Standard Base Rates' },
+    { key: 'named_rules', label: '⚡ Named Surge Rules' },
+    { key: 'step_increments', label: '📏 Distance Tiers' },
+    { key: 'condition_surcharges', label: '➕ Condition Surcharges' },
+  ],
+  vehicles: [
+    { key: 'types', label: '🏷️ Service Classes' },
+    { key: 'fleet', label: '🚗 Physical Motor Fleet' },
+  ],
+  advanced: [
+    { key: 'form', label: '📋 Customer Booking Form' },
+    { key: 'security', label: '🛡️ Security & 2FA' },
+    { key: 'audit', label: '📜 Config Audit Trail' },
+    { key: 'system', label: '⚙️ System Ops & Backups' },
+  ],
+};
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -118,28 +167,39 @@ export default function AdminLayout() {
 
   // Normalize legacy tab query parameters
   let normalizedTab: AdminTabKey = rawTab;
-  let subSection: 'types' | 'fleet' | undefined = undefined;
+  let activeSubParam = searchParams.get('sub') || undefined;
 
   if (rawTab === 'pricing') {
     normalizedTab = 'rates';
   } else if (rawTab === 'fleet') {
     normalizedTab = 'vehicles';
-    subSection = 'fleet';
+    activeSubParam = 'fleet';
   } else if (rawTab === 'staff') {
     normalizedTab = 'operators';
+  } else if (rawTab === 'bookings') {
+    normalizedTab = 'trips';
+  } else if (rawTab === 'form' || rawTab === 'layout') {
+    normalizedTab = 'advanced';
+    activeSubParam = 'form';
   }
 
-  const subParam = searchParams.get('sub');
-  if (subParam === 'fleet' || subParam === 'types') {
-    subSection = subParam;
-  }
+  // Current subpages for the active tab
+  const currentSubList = SUB_PAGES[normalizedTab];
+  const effectiveSub = activeSubParam || (currentSubList ? currentSubList[0].key : undefined);
 
-  const handleTabChange = (key: AdminTabKey, sub?: 'types' | 'fleet') => {
+  const handleTabChange = (key: AdminTabKey, sub?: string) => {
     const params: Record<string, string> = { tab: key };
+    const subList = SUB_PAGES[key];
     if (sub) {
       params.sub = sub;
+    } else if (subList && subList.length > 0) {
+      params.sub = subList[0].key;
     }
     setSearchParams(params);
+  };
+
+  const handleSubChange = (subKey: string) => {
+    setSearchParams({ tab: normalizedTab, sub: subKey });
   };
 
   // Client-side Firebase Auth Route Guard
@@ -305,10 +365,10 @@ export default function AdminLayout() {
       </header>
 
       {/* ─── Main Admin Workspace ─── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Dynamic 7-Tab Navigation Selector Bar */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {/* Dynamic 9-Tab Navigation Selector Bar */}
         <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5">
             {PRIMARY_TABS.map((tab) => {
               const isActive = normalizedTab === tab.key;
               return (
@@ -316,7 +376,7 @@ export default function AdminLayout() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
+                  className={`flex items-center justify-center gap-1 px-2.5 py-2.5 rounded-xl text-xs sm:text-xs font-bold transition-all text-center ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -329,20 +389,56 @@ export default function AdminLayout() {
           </div>
         </div>
 
+        {/* Dynamic Secondary Subpages Navigation Bar */}
+        {currentSubList && currentSubList.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+            {currentSubList.map((sub) => {
+              const isSubActive = effectiveSub === sub.key;
+              return (
+                <button
+                  key={sub.key}
+                  type="button"
+                  onClick={() => handleSubChange(sub.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    isSubActive
+                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Dynamic Tab Body */}
-        <div>
+        <div className="pt-2">
           {normalizedTab === 'dashboard' && (
             <AdminDashboardTab
               settings={settings}
               onNavigateTab={(tab) => handleTabChange(tab as AdminTabKey)}
+              initialSubTab={effectiveSub as any}
             />
           )}
 
-          {normalizedTab === 'general' && (
-            <AdminGeneralTab
+          {normalizedTab === 'trips' && (
+            <AdminTripsSubpage initialSubTab={effectiveSub as any} />
+          )}
+
+          {normalizedTab === 'invoicing' && (
+            <AdminInvoicingSubpage
               settings={settings}
               onSave={handleSaveSettings}
               isLoading={isSavingConfig || isConfigLoading}
+              initialSubTab={effectiveSub as any}
+            />
+          )}
+
+          {normalizedTab === 'customers' && (
+            <AdminCustomersSubpage
+              settings={settings}
+              initialSubTab={effectiveSub as any}
             />
           )}
 
@@ -351,6 +447,7 @@ export default function AdminLayout() {
               settings={settings}
               onSave={handleSaveSettings}
               isLoading={isSavingConfig || isConfigLoading}
+              initialSubTab={effectiveSub as any}
             />
           )}
 
@@ -359,7 +456,7 @@ export default function AdminLayout() {
               settings={settings}
               onSave={handleSaveSettings}
               isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab={subSection || 'types'}
+              initialSubTab={effectiveSub as any}
             />
           )}
 
@@ -367,24 +464,36 @@ export default function AdminLayout() {
 
           {normalizedTab === 'operators' && <AdminOperatorsTab />}
 
-          {(normalizedTab === 'form' || normalizedTab === 'layout') && (
-            <AdminLayoutTab
+          {normalizedTab === 'advanced' && (
+            <AdminAdvancedTab
               settings={settings}
               onSave={handleSaveSettings}
-              isLoading={isSavingConfig}
+              isLoading={isSavingConfig || isConfigLoading}
+              initialSubTab={effectiveSub}
             />
           )}
 
-          {normalizedTab === 'advanced' && (
-            <AdminAdvancedTab
+          {/* Legacy Backward Compatibility Fallbacks */}
+          {normalizedTab === 'general' && (
+            <AdminGeneralTab
               settings={settings}
               onSave={handleSaveSettings}
               isLoading={isSavingConfig || isConfigLoading}
             />
           )}
 
-          {/* Legacy Backward Compatibility Fallbacks */}
-          {normalizedTab === 'bookings' && <AdminBookingsTab />}
+          {(normalizedTab === 'form' || normalizedTab === 'layout') && (
+            <AdminAdvancedTab
+              settings={settings}
+              onSave={handleSaveSettings}
+              isLoading={isSavingConfig || isConfigLoading}
+              initialSubTab="form"
+            />
+          )}
+
+          {normalizedTab === 'bookings' && (
+            <AdminTripsSubpage initialSubTab="dispatch" />
+          )}
         </div>
 
         {/* Outlet for any nested routes */}
