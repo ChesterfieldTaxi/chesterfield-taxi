@@ -101,9 +101,9 @@ export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
     updatedAt: '2026-09-01T00:00:00.000Z',
   },
   {
-    id: 'rule-corporate-preferred',
-    name: 'Corporate Preferred Account Rate',
-    description: 'Exclusive 10% rate reduction for verified corporate direct bill accounts.',
+    id: 'rule-base-corporate',
+    name: 'Base Corporate Partner Standard',
+    description: 'Baseline parent contract for all corporate accounts: 10% discount on standard mileage and fees.',
     priority: 75,
     isActive: true,
     allowDriverSelection: true,
@@ -113,6 +113,63 @@ export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
     modifier: {
       type: 'multiplier',
       value: 0.90,
+    },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'rule-corporate-lambert-vip',
+    name: 'Lambert Corporate Executive Shuttle (Child Rule)',
+    description: 'Inherits base corporate 10% discount, adds $4.00 executive greeting surcharge, and halts lower-priority rule cascading.',
+    parentRuleId: 'rule-base-corporate',
+    stopProcessingOnMatch: true,
+    priority: 92,
+    isActive: true,
+    allowDriverSelection: true,
+    triggers: {
+      zoneIds: ['zone-lambert-airport'],
+      accountTypes: ['corporate'],
+    },
+    modifier: {
+      type: 'surcharge_flat',
+      value: 4.00,
+      surchargeAdders: [
+        { id: 'add-exec-curbside', name: 'Executive Curbside Greeter', amount: 4.00, type: 'flat' },
+      ],
+    },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'rule-metro-west-corridor',
+    name: 'Metro West Corridor Unified Suburban Commute',
+    description: 'Flat corridor 5% volume incentive within the Metro West Zone Group cluster.',
+    priority: 72,
+    isActive: true,
+    allowDriverSelection: false,
+    triggers: {
+      zoneGroupIds: ['group-metro-west'],
+    },
+    modifier: {
+      type: 'multiplier',
+      value: 0.95,
+    },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'rule-sports-arena-event',
+    name: 'Stadium & Arena Major Event Traffic Rate',
+    description: 'Flat $6.00 event surge when picking up or dropping off near sports & entertainment venues.',
+    priority: 82,
+    isActive: true,
+    allowDriverSelection: true,
+    triggers: {
+      locationCollectionIds: ['coll-sports-venues'],
+    },
+    modifier: {
+      type: 'surcharge_flat',
+      value: 6.00,
     },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -161,12 +218,21 @@ export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
 
 export interface RuleEvaluationInput {
   distanceMiles: number;
+  durationMinutes?: number;
   pickupDate?: string; // "YYYY-MM-DD"
   pickupTime?: string; // "HH:MM" 24h
   zoneIds?: string[];
+  zoneGroupIds?: string[];
+  locationCollectionIds?: string[];
   accountType?: 'retail' | 'corporate' | 'vip';
+  accountTags?: string[];
   vehicleTier?: string;
   selectedRuleId?: string;
+  equipment?: {
+    carSeats?: number;
+    luggageCount?: number;
+  };
+  passengers?: number;
 }
 
 export interface EvaluatedRulesSummary {
@@ -175,6 +241,11 @@ export interface EvaluatedRulesSummary {
   multiplier: number;
   surchargeFlat: number;
   surchargePercent: number;
+  baseFareOverride?: number;
+  perMileRateOverride?: number;
+  perMinuteRateOverride?: number;
+  surchargeAdders?: import('../../types/config').RuleSurchargeAdder[];
+  stoppedProcessingByRule?: NamedPricingRule;
   auditTrail: string[];
 }
 
@@ -343,10 +414,121 @@ export class PricingRulesService {
     }
     return DEFAULT_NAMED_PRICING_RULES;
   }
+
+  /**
+   * Adjusts priority ranking of a rule up or down in the prioritized list.
+   */
+  public async reorderRule(ruleId: string, direction: 'up' | 'down'): Promise<NamedPricingRule[]> {
+    const current = [...this.getCachedRules()].sort((a, b) => b.priority - a.priority);
+    const idx = current.findIndex((r) => r.id === ruleId);
+    if (idx < 0) return current;
+
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= current.length) return current;
+
+    // Swap priorities
+    const tempPriority = current[idx].priority;
+    current[idx].priority = current[targetIdx].priority;
+    current[targetIdx].priority = tempPriority;
+
+    // Ensure distinct priority ordering if equal
+    if (current[idx].priority === current[targetIdx].priority) {
+      if (direction === 'up') {
+        current[idx].priority += 1;
+      } else {
+        current[idx].priority = Math.max(1, current[idx].priority - 1);
+      }
+    }
+
+    current.sort((a, b) => b.priority - a.priority);
+    this.setCachedRules(current);
+
+    if (this.isConfigured && this.db) {
+      try {
+        await this.saveRule(current[idx]);
+        await this.saveRule(current[targetIdx]);
+      } catch (err) {
+        console.warn('[PricingRulesService] Reorder Firestore error:', err);
+      }
+    }
+
+    return current;
+  }
+}
+
+/**
+ * Resolves rule inheritance recursively.
+ * Cycles in the parent tree are detected and broken cleanly.
+ */
+export function resolveRuleInheritance(
+  rule: NamedPricingRule,
+  allRules: NamedPricingRule[],
+  visited: Set<string> = new Set<string>()
+): NamedPricingRule {
+  if (!rule.parentRuleId) {
+    return { ...rule };
+  }
+
+  if (visited.has(rule.id)) {
+    console.warn(`[PricingRules] Cycle detected in inheritance tree for rule: ${rule.id}`);
+    return { ...rule };
+  }
+
+  const parentRule = allRules.find((r) => r.id === rule.parentRuleId);
+  if (!parentRule) {
+    return { ...rule };
+  }
+
+  const newVisited = new Set(visited);
+  newVisited.add(rule.id);
+
+  const resolvedParent = resolveRuleInheritance(parentRule, allRules, newVisited);
+
+  // Merge triggers: Child takes precedence or merges with parent
+  const mergedTriggers: PricingRuleTrigger = {
+    ...resolvedParent.triggers,
+    ...rule.triggers,
+    zoneIds: rule.triggers.zoneIds?.length ? rule.triggers.zoneIds : resolvedParent.triggers.zoneIds,
+    zoneGroupIds: rule.triggers.zoneGroupIds?.length ? rule.triggers.zoneGroupIds : resolvedParent.triggers.zoneGroupIds,
+    locationCollectionIds: rule.triggers.locationCollectionIds?.length
+      ? rule.triggers.locationCollectionIds
+      : resolvedParent.triggers.locationCollectionIds,
+    timeWindows: rule.triggers.timeWindows?.length ? rule.triggers.timeWindows : resolvedParent.triggers.timeWindows,
+    daysOfWeek: rule.triggers.daysOfWeek?.length ? rule.triggers.daysOfWeek : resolvedParent.triggers.daysOfWeek,
+    holidayDates: rule.triggers.holidayDates?.length ? rule.triggers.holidayDates : resolvedParent.triggers.holidayDates,
+    accountTypes: rule.triggers.accountTypes?.length ? rule.triggers.accountTypes : resolvedParent.triggers.accountTypes,
+    accountTags: rule.triggers.accountTags?.length ? rule.triggers.accountTags : resolvedParent.triggers.accountTags,
+    vehicleTiers: rule.triggers.vehicleTiers?.length ? rule.triggers.vehicleTiers : resolvedParent.triggers.vehicleTiers,
+    equipment: rule.triggers.equipment ?? resolvedParent.triggers.equipment,
+    passengers: rule.triggers.passengers ?? resolvedParent.triggers.passengers,
+  };
+
+  // Merge modifiers: Child overrides, and surcharge adders accumulate
+  const mergedModifier: PricingRuleModifier = {
+    ...resolvedParent.modifier,
+    ...rule.modifier,
+    baseFareOverride: rule.modifier.baseFareOverride ?? resolvedParent.modifier.baseFareOverride,
+    perMileRateOverride: rule.modifier.perMileRateOverride ?? resolvedParent.modifier.perMileRateOverride,
+    perMinuteRateOverride: rule.modifier.perMinuteRateOverride ?? resolvedParent.modifier.perMinuteRateOverride,
+    surchargeAdders: [
+      ...(resolvedParent.modifier.surchargeAdders || []),
+      ...(rule.modifier.surchargeAdders || []),
+    ],
+  };
+
+  return {
+    ...resolvedParent,
+    ...rule,
+    triggers: mergedTriggers,
+    modifier: mergedModifier,
+    stopProcessingOnMatch: rule.stopProcessingOnMatch ?? resolvedParent.stopProcessingOnMatch,
+    allowDriverSelection: rule.allowDriverSelection ?? resolvedParent.allowDriverSelection,
+  };
 }
 
 /**
  * Pure evaluation function for condition-based pricing rules.
+ * Supports rule inheritance, execution flow halting, and full condition checks.
  * Runs with 0 side-effects.
  */
 export function evaluateApplicablePricingRules(
@@ -355,6 +537,7 @@ export function evaluateApplicablePricingRules(
 ): EvaluatedRulesSummary {
   const matchedRules: NamedPricingRule[] = [];
   const auditTrail: string[] = [];
+  let stoppedProcessingByRule: NamedPricingRule | undefined = undefined;
 
   // Parse time and day of week
   let dayOfWeek: number | undefined = undefined;
@@ -374,16 +557,21 @@ export function evaluateApplicablePricingRules(
 
   // If a specific rule is selected manually (e.g. by dispatcher or driver)
   if (input.selectedRuleId) {
-    const manualRule = rules.find((r) => r.id === input.selectedRuleId && r.isActive);
-    if (manualRule) {
+    const rawRule = rules.find((r) => r.id === input.selectedRuleId && r.isActive);
+    if (rawRule) {
+      const manualRule = resolveRuleInheritance(rawRule, rules);
       matchedRules.push(manualRule);
-      auditTrail.push(`Manual named rule selected: "${manualRule.name}" (${manualRule.modifier.type} = ${manualRule.modifier.value})`);
+      auditTrail.push(
+        `Manual named rule selected: "${manualRule.name}" (${manualRule.modifier.type} = ${manualRule.modifier.value})`
+      );
     }
   } else {
     // Dynamic rule evaluation sorted by priority
     const activeRules = rules.filter((r) => r.isActive).sort((a, b) => b.priority - a.priority);
 
-    for (const rule of activeRules) {
+    for (const rawRule of activeRules) {
+      // Resolve inheritance from parent rules
+      const rule = resolveRuleInheritance(rawRule, rules);
       const { triggers } = rule;
       let matches = true;
 
@@ -395,7 +583,23 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 2. Distance range check
+      // 2. Zone Group check
+      if (matches && triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
+        const hasGroupMatch = input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid));
+        if (!hasGroupMatch) {
+          matches = false;
+        }
+      }
+
+      // 3. Location Collection POI check
+      if (matches && triggers.locationCollectionIds && triggers.locationCollectionIds.length > 0) {
+        const hasCollMatch = input.locationCollectionIds?.some((cid) => triggers.locationCollectionIds!.includes(cid));
+        if (!hasCollMatch) {
+          matches = false;
+        }
+      }
+
+      // 4. Distance range check
       if (matches && typeof triggers.minDistanceMiles === 'number') {
         if (input.distanceMiles < triggers.minDistanceMiles) {
           matches = false;
@@ -407,14 +611,26 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 3. Days of week check
+      // 5. Trip Duration range check
+      if (matches && typeof triggers.minDurationMinutes === 'number' && input.durationMinutes !== undefined) {
+        if (input.durationMinutes < triggers.minDurationMinutes) {
+          matches = false;
+        }
+      }
+      if (matches && typeof triggers.maxDurationMinutes === 'number' && input.durationMinutes !== undefined) {
+        if (input.durationMinutes > triggers.maxDurationMinutes) {
+          matches = false;
+        }
+      }
+
+      // 6. Days of week check
       if (matches && triggers.daysOfWeek && triggers.daysOfWeek.length > 0) {
         if (dayOfWeek === undefined || !triggers.daysOfWeek.includes(dayOfWeek)) {
           matches = false;
         }
       }
 
-      // 4. Time windows check
+      // 7. Time windows check
       if (matches && triggers.timeWindows && triggers.timeWindows.length > 0) {
         if (!timeStr) {
           matches = false;
@@ -426,30 +642,76 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 5. Holiday dates check
+      // 8. Holiday dates check
       if (matches && triggers.holidayDates && triggers.holidayDates.length > 0) {
         if (!input.pickupDate || !triggers.holidayDates.includes(input.pickupDate)) {
           matches = false;
         }
       }
 
-      // 6. Account type check
+      // 9. Account type check
       if (matches && triggers.accountTypes && triggers.accountTypes.length > 0) {
         if (!input.accountType || !triggers.accountTypes.includes(input.accountType)) {
           matches = false;
         }
       }
 
-      // 7. Vehicle tier check
+      // 10. Account tags check
+      if (matches && triggers.accountTags && triggers.accountTags.length > 0) {
+        if (!input.accountTags || !input.accountTags.some((tag) => triggers.accountTags!.includes(tag))) {
+          matches = false;
+        }
+      }
+
+      // 11. Vehicle tier check
       if (matches && triggers.vehicleTiers && triggers.vehicleTiers.length > 0) {
         if (!input.vehicleTier || !triggers.vehicleTiers.includes(input.vehicleTier)) {
           matches = false;
         }
       }
 
+      // 12. Equipment filters check (car seats, luggage)
+      if (matches && triggers.equipment) {
+        if (
+          typeof triggers.equipment.minCarSeats === 'number' &&
+          (input.equipment?.carSeats ?? 0) < triggers.equipment.minCarSeats
+        ) {
+          matches = false;
+        }
+        if (
+          typeof triggers.equipment.minLuggage === 'number' &&
+          (input.equipment?.luggageCount ?? 0) < triggers.equipment.minLuggage
+        ) {
+          matches = false;
+        }
+      }
+
+      // 13. Passenger count filters check
+      if (matches && triggers.passengers) {
+        const passengerCount = input.passengers ?? 1;
+        if (typeof triggers.passengers.min === 'number' && passengerCount < triggers.passengers.min) {
+          matches = false;
+        }
+        if (typeof triggers.passengers.max === 'number' && passengerCount > triggers.passengers.max) {
+          matches = false;
+        }
+      }
+
       if (matches) {
         matchedRules.push(rule);
-        auditTrail.push(`Triggered Rule: "${rule.name}" (Priority ${rule.priority}) -> ${rule.modifier.type} ${rule.modifier.value}`);
+        const parentNotice = rawRule.parentRuleId ? ` [↳ Inherits: ${rawRule.parentRuleId}]` : '';
+        auditTrail.push(
+          `Triggered Rule: "${rule.name}" (Priority ${rule.priority})${parentNotice} -> ${rule.modifier.type} ${rule.modifier.value}`
+        );
+
+        // Rule Execution Control: Halt further processing on match
+        if (rule.stopProcessingOnMatch) {
+          auditTrail.push(
+            `Rule "${rule.name}" has [Stop Processing On Match] active. Skipping remaining lower-priority rules.`
+          );
+          stoppedProcessingByRule = rule;
+          break;
+        }
       }
     }
   }
@@ -460,9 +722,15 @@ export function evaluateApplicablePricingRules(
   let multiplier = 1.0;
   let surchargeFlat = 0;
   let surchargePercent = 0;
+  let baseFareOverride: number | undefined = undefined;
+  let perMileRateOverride: number | undefined = undefined;
+  let perMinuteRateOverride: number | undefined = undefined;
+  const surchargeAdders: import('../../types/config').RuleSurchargeAdder[] = [];
 
   for (const rule of matchedRules) {
-    const { type, value } = rule.modifier;
+    const { type, value, baseFareOverride: bfo, perMileRateOverride: pmro, perMinuteRateOverride: ptmro, surchargeAdders: sAdders } =
+      rule.modifier;
+
     if (type === 'flat_override') {
       if (flatOverride === undefined) {
         flatOverride = value;
@@ -474,6 +742,19 @@ export function evaluateApplicablePricingRules(
     } else if (type === 'surcharge_percent') {
       surchargePercent += value;
     }
+
+    if (typeof bfo === 'number' && baseFareOverride === undefined) {
+      baseFareOverride = bfo;
+    }
+    if (typeof pmro === 'number' && perMileRateOverride === undefined) {
+      perMileRateOverride = pmro;
+    }
+    if (typeof ptmro === 'number' && perMinuteRateOverride === undefined) {
+      perMinuteRateOverride = ptmro;
+    }
+    if (sAdders && sAdders.length > 0) {
+      surchargeAdders.push(...sAdders);
+    }
   }
 
   return {
@@ -482,6 +763,11 @@ export function evaluateApplicablePricingRules(
     multiplier,
     surchargeFlat,
     surchargePercent,
+    baseFareOverride,
+    perMileRateOverride,
+    perMinuteRateOverride,
+    surchargeAdders,
+    stoppedProcessingByRule,
     auditTrail,
   };
 }

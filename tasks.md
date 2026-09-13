@@ -163,4 +163,17 @@
 - [x] 19.12 Run `npm run build` to verify clean SSR and client production builds.
 - [x] 19.13 Mark Phase 19 complete in tasks.md upon verification.
 
+## Phase 20: Advanced Condition Rules Engine, Rule Inheritance & Geographic Entity Manager
+- [x] 20.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to reflect Phase 20 scope (Zone Groups, Named Location Collections, Rule Inheritance Cascades, Visual IF/THEN Pricing Rule Builder, Incremental Step Rate Engines).
+- [x] 20.2 Define Firestore data models & types for `/zoneGroups` (`ZoneGroup`), `/locationCollections` (`LocationCollection`, `LocationPoint`), and extended `/pricingRules` (`parentRuleId`, `stopProcessingOnMatch`, triggers, delta overrides).
+- [x] 20.3 Update `ZoneService` (`app/core/services/zones/zone.service.ts`) with `/zoneGroups` and `/locationCollections` Firestore CRUD, regional seed presets, and spatial containment functions.
+- [x] 20.4 Enhance Geofence Manager in `AdminZonesTab.tsx` with dedicated sub-tabs for Zones, Zone Groups, and Location Collections with interactive map visualizer badges.
+- [x] 20.5 Implement Rule Inheritance Resolver with recursive parent/child lookup and cycle detection in `PricingRulesService` (`app/core/services/pricing/pricing-rules.service.ts`).
+- [x] 20.6 Enhance `evaluateApplicablePricingRules` to support Zone Groups, Location Collections, account tags, duration limits, equipment/passenger counts, and `stopProcessingOnMatch`.
+- [x] 20.7 Refactor Named Rules sub-tab in `AdminRatesTab.tsx` into a drag-and-drop prioritized list with visual priority ranking controls.
+- [x] 20.8 Build Visual IF/THEN Condition Rule Builder Drawer in `AdminRatesTab.tsx` with declarative trigger blocks, parent inheritance selectors, delta overrides, and execution controls.
+- [x] 20.9 Extend Granular Step-Increment Fare Calculation Engine in `rules.ts` & `pipeline.ts` with decaying distance brackets and delay time step increments.
+- [x] 20.10 Update Live Fare Matrix Simulator in `AdminRatesTab.tsx` with expanded inputs and audit trail trace showing rule inheritance cascades and step calculation breakdowns.
+- [x] 20.11 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
+- [x] 20.12 Run `npm run build` to confirm production build stability and mark Phase 20 complete in tasks.md.
 

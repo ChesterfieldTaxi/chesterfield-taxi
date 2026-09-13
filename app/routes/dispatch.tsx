@@ -133,7 +133,7 @@ export default function DispatchRoute() {
   type FilterType = 'driver' | 'vehicle' | 'company' | 'payment_type' | 'tariff' | 'has_car_seat';
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
   const addFilterRef = useRef<HTMLDivElement>(null);
-  const [activeFilterKeys, setActiveFilterKeys] = useState<FilterType[]>(['driver', 'has_car_seat', 'vehicle']);
+  const [activeFilterKeys, setActiveFilterKeys] = useState<FilterType[]>([]);
   const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>('all');
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>('all');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>('all');
@@ -1126,19 +1126,6 @@ export default function DispatchRoute() {
             <span>Dispatch</span>
           </button>
 
-          {/* Admin Dashboard Switcher */}
-          {user?.role === 'admin' && (
-            <Link
-              to="/admin?tab=dashboard"
-              reloadDocument
-              className="px-3 py-1.5 rounded-lg text-slate-700 hover:text-slate-950 hover:bg-slate-100 font-semibold text-xs flex items-center gap-1.5 transition-colors"
-              title="Go to Admin Management Dashboard with KPIs, Stats, and Settings"
-            >
-              <span>📊</span>
-              <span>Dashboard</span>
-            </Link>
-          )}
-
           <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
           {/* Drivers Dock Trigger (Toggles non-blocking side panel) */}
@@ -1410,19 +1397,19 @@ export default function DispatchRoute() {
             style={{ height: `${queueHeight}px` }}
             className="w-full bg-white border-t border-slate-200 flex flex-col shrink-0 z-10 shadow-md"
           >
-            {/* ─── Modern Filter & Trips Control Bar (Matching user specification) ─── */}
-            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            {/* ─── Modern Filter & Trips Control Bar (Non-wrapping, compact, pop over map) ─── */}
+            <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 min-w-0 h-11">
               {/* Left Side: Date Range button, Unconfirmed Badge, Status Dropdown, + Add Filter, Filter Pills, Display Count */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* 1. Select Date Range Popover Button */}
-                <div className="relative" ref={datePickerTriggerRef}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {/* 1. Select Date Range Popover Button (Intelligently pops UP over the map) */}
+                <div className="relative shrink-0" ref={datePickerTriggerRef}>
                   <button
                     type="button"
                     onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer h-7"
                   >
                     <span>📅</span>
-                    <span>{getDateRangeButtonLabel()}</span>
+                    <span className="truncate max-w-[150px]">{getDateRangeButtonLabel()}</span>
                     <span className="text-[10px] text-slate-400">▾</span>
                   </button>
 
@@ -1430,6 +1417,7 @@ export default function DispatchRoute() {
                     isOpen={isDatePickerOpen}
                     onClose={() => setIsDatePickerOpen(false)}
                     value={dateTimeRange}
+                    placement="top"
                     onChange={(newRange) => {
                       setDateTimeRange(newRange);
                       setFilterStartDate(newRange.startDate);
@@ -1439,7 +1427,7 @@ export default function DispatchRoute() {
                 </div>
 
                 {/* 2. Unconfirmed Count Badge */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-bold shadow-2xs">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-bold shadow-2xs shrink-0 h-7">
                   <span>Unconfirmed</span>
                   <span className="min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center font-bold">
                     {unconfirmedCount}
@@ -1447,11 +1435,11 @@ export default function DispatchRoute() {
                 </div>
 
                 {/* 3. Status Dropdown */}
-                <div className="relative">
+                <div className="relative shrink-0">
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                    className="h-7 px-2 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
                   >
                     <option value="all">Status: None ▾</option>
                     <option value="pending">Status: Pending ▾</option>
@@ -1462,18 +1450,18 @@ export default function DispatchRoute() {
                 </div>
 
                 {/* 4. + Add Filter Dropdown */}
-                <div className="relative" ref={addFilterRef}>
+                <div className="relative shrink-0" ref={addFilterRef}>
                   <button
                     type="button"
                     onClick={() => setIsAddFilterOpen(!isAddFilterOpen)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-7"
                   >
                     <span>+ Add Filter</span>
                     <span className="text-[10px] text-slate-400">▾</span>
                   </button>
 
                   {isAddFilterOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute bottom-full left-0 mb-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
                       {[
                         { key: 'driver', label: 'Driver' },
                         { key: 'vehicle', label: 'Vehicle' },
@@ -1503,159 +1491,161 @@ export default function DispatchRoute() {
                   )}
                 </div>
 
-                {/* 5. Active Filter Pills */}
-                {/* Pill: Driver */}
-                {activeFilterKeys.includes('driver') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2.5 py-0.5 text-xs text-slate-700 shadow-2xs">
-                    <span className="font-semibold text-slate-500">Driver:</span>
-                    <select
-                      value={selectedDriverFilter}
-                      onChange={(e) => setSelectedDriverFilter(e.target.value)}
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">All Drivers ▾</option>
-                      {drivers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'driver'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Driver filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                {/* 5. Active Filter Pills (Horizontally scrollable without breaking toolbar layout) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 py-0.5">
+                  {/* Pill: Driver */}
+                  {activeFilterKeys.includes('driver') && (
+                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                      <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
+                      <select
+                        value={selectedDriverFilter}
+                        onChange={(e) => setSelectedDriverFilter(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="all">All Drivers ▾</option>
+                        {drivers.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'driver'))}
+                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Driver filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
-                {/* Pill: Has Car Seat */}
-                {activeFilterKeys.includes('has_car_seat') && (
-                  <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs font-bold text-blue-800 shadow-2xs">
-                    <span>Has Car Seat</span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
-                      className="text-blue-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Car Seat filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  {/* Pill: Has Car Seat */}
+                  {activeFilterKeys.includes('has_car_seat') && (
+                    <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
+                      <span className="text-[11px]">Has Car Seat</span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
+                        className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Car Seat filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
-                {/* Pill: Vehicle */}
-                {activeFilterKeys.includes('vehicle') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2.5 py-0.5 text-xs text-slate-700 shadow-2xs">
-                    <span className="font-semibold text-slate-500">Vehicle:</span>
-                    <select
-                      value={selectedVehicleFilter}
-                      onChange={(e) => setSelectedVehicleFilter(e.target.value)}
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">All Vehicles ▾</option>
-                      {settings.vehicles.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'vehicle'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Vehicle filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  {/* Pill: Vehicle */}
+                  {activeFilterKeys.includes('vehicle') && (
+                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                      <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
+                      <select
+                        value={selectedVehicleFilter}
+                        onChange={(e) => setSelectedVehicleFilter(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="all">All Vehicles ▾</option>
+                        {settings.vehicles.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'vehicle'))}
+                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Vehicle filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
-                {/* Pill: Company */}
-                {activeFilterKeys.includes('company') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2.5 py-0.5 text-xs text-slate-700 shadow-2xs">
-                    <span className="font-semibold text-slate-500">Company:</span>
-                    <select
-                      value={selectedCompanyFilter}
-                      onChange={(e) => setSelectedCompanyFilter(e.target.value)}
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">All Companies ▾</option>
-                      <option value="Chesterfield">Chesterfield Corporate</option>
-                      <option value="Medical">Medical Express</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'company'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Company filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  {/* Pill: Company */}
+                  {activeFilterKeys.includes('company') && (
+                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                      <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
+                      <select
+                        value={selectedCompanyFilter}
+                        onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="all">All Companies ▾</option>
+                        <option value="Chesterfield">Chesterfield Corporate</option>
+                        <option value="Medical">Medical Express</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'company'))}
+                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Company filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
-                {/* Pill: Payment Type */}
-                {activeFilterKeys.includes('payment_type') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2.5 py-0.5 text-xs text-slate-700 shadow-2xs">
-                    <span className="font-semibold text-slate-500">Payment:</span>
-                    <select
-                      value={selectedPaymentFilter}
-                      onChange={(e) => setSelectedPaymentFilter(e.target.value)}
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">All Methods ▾</option>
-                      <option value="card">Credit Card</option>
-                      <option value="cash">Cash in Cab</option>
-                      <option value="account">Corporate Account</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'payment_type'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Payment filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  {/* Pill: Payment Type */}
+                  {activeFilterKeys.includes('payment_type') && (
+                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                      <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
+                      <select
+                        value={selectedPaymentFilter}
+                        onChange={(e) => setSelectedPaymentFilter(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="all">All Methods ▾</option>
+                        <option value="card">Credit Card</option>
+                        <option value="cash">Cash in Cab</option>
+                        <option value="account">Corporate Account</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'payment_type'))}
+                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Payment filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
 
-                {/* Pill: Tariff */}
-                {activeFilterKeys.includes('tariff') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2.5 py-0.5 text-xs text-slate-700 shadow-2xs">
-                    <span className="font-semibold text-slate-500">Tariff:</span>
-                    <select
-                      value={selectedTariffFilter}
-                      onChange={(e) => setSelectedTariffFilter(e.target.value)}
-                      className="text-xs font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                    >
-                      <option value="all">Standard Tariff ▾</option>
-                      <option value="surge">Surge Rate</option>
-                      <option value="airport">Flat Airport Rate</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'tariff'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-xs cursor-pointer"
-                      title="Remove Tariff filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  {/* Pill: Tariff */}
+                  {activeFilterKeys.includes('tariff') && (
+                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                      <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
+                      <select
+                        value={selectedTariffFilter}
+                        onChange={(e) => setSelectedTariffFilter(e.target.value)}
+                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="all">Standard Tariff ▾</option>
+                        <option value="surge">Surge Rate</option>
+                        <option value="airport">Flat Airport Rate</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'tariff'))}
+                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                        title="Remove Tariff filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* 6. Displaying X trips text */}
-                <span className="text-xs text-slate-500 font-medium ml-1">
+                <span className="text-[11px] text-slate-500 font-medium shrink-0 whitespace-nowrap ml-1 hidden sm:inline">
                   Displaying {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'}
                 </span>
               </div>
 
               {/* Right Side: Search Bar & Selection Badge */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {selectedTripIds.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-blue-600 text-white px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-blue-600 text-white px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-2xs shrink-0 h-7">
                     <span>✓ {selectedTripIds.length} Selected</span>
                     <button
                       type="button"
@@ -1667,13 +1657,13 @@ export default function DispatchRoute() {
                   </div>
                 )}
 
-                <div className="relative">
+                <div className="relative shrink-0">
                   <input
                     type="text"
                     placeholder="🔍 Search trips..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs w-48 sm:w-56 focus:ring-1 focus:ring-blue-500 shadow-2xs focus:outline-hidden"
+                    className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs w-36 sm:w-44 focus:w-52 transition-all focus:ring-1 focus:ring-blue-500 shadow-2xs focus:outline-hidden h-7"
                   />
                   {searchTerm && (
                     <button

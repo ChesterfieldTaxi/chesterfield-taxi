@@ -55,11 +55,11 @@ export function UserDropdown({ email, onSignOut, variant = 'light' }: UserDropdo
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100">
           {/* User Header */}
           <div className="px-4 py-2 border-b border-slate-100">
-            <span className="text-xs text-slate-500 font-medium block">Signed in as</span>
-            <span className="text-sm font-bold text-slate-900 truncate block mt-0.5">
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Signed in as</span>
+            <span className="text-xs font-bold text-slate-900 truncate block mt-0.5">
               {displayEmail}
             </span>
           </div>
@@ -67,13 +67,42 @@ export function UserDropdown({ email, onSignOut, variant = 'light' }: UserDropdo
           {/* Navigation Links */}
           <div className="py-1">
             <Link
+              to="/dispatch"
+              reloadDocument
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+            >
+              <span className="text-base leading-none">🚕</span>
+              <div>
+                <span className="font-bold block text-slate-800">Dispatch Console</span>
+                <span className="text-[10px] text-slate-400 font-normal">Live map & booking operations</span>
+              </div>
+            </Link>
+
+            <Link
+              to="/admin?tab=dashboard"
+              reloadDocument
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+            >
+              <span className="text-base leading-none">📊</span>
+              <div>
+                <span className="font-bold block text-slate-800">Admin Dashboard</span>
+                <span className="text-[10px] text-slate-400 font-normal">Analytics, stats & KPIs</span>
+              </div>
+            </Link>
+
+            <Link
               to="/admin?tab=general"
               reloadDocument
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+              className="flex items-center gap-2.5 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
             >
-              <span className="text-base text-slate-400 leading-none">⚙️</span>
-              <span>Admin Settings</span>
+              <span className="text-base leading-none">⚙️</span>
+              <div>
+                <span className="font-bold block text-slate-800">Admin Settings</span>
+                <span className="text-[10px] text-slate-400 font-normal">Company config & rate rules</span>
+              </div>
             </Link>
           </div>
 

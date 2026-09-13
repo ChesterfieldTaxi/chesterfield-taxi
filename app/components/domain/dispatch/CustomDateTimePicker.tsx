@@ -13,6 +13,13 @@ export interface CustomDateTimePickerProps {
   onChange: (range: DateTimeRange) => void;
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Popover placement relative to trigger:
+   * 'top' = pop upwards (over the map)
+   * 'bottom' = pop downwards
+   * 'auto' = intelligent detection based on available viewport space (defaults to top if >=320px above)
+   */
+  placement?: 'auto' | 'top' | 'bottom';
 }
 
 const PRESETS = [
@@ -44,8 +51,39 @@ export function CustomDateTimePicker({
   onChange,
   isOpen,
   onClose,
+  placement = 'auto',
 }: CustomDateTimePickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Intelligent placement calculation: determines if it pops upwards (over the map) or downwards
+  const [computedPlacement, setComputedPlacement] = useState<'top' | 'bottom'>('top');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (placement === 'top') {
+      setComputedPlacement('top');
+      return;
+    }
+    if (placement === 'bottom') {
+      setComputedPlacement('bottom');
+      return;
+    }
+    // Auto placement: measure viewport space above trigger
+    const parentEl = containerRef.current?.parentElement;
+    if (parentEl) {
+      const rect = parentEl.getBoundingClientRect();
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // If there is >= 300px above the trigger (or more room above than below), pop UP over map
+      if (spaceAbove >= 300 || spaceAbove > spaceBelow) {
+        setComputedPlacement('top');
+      } else {
+        setComputedPlacement('bottom');
+      }
+    } else {
+      setComputedPlacement('top');
+    }
+  }, [isOpen, placement]);
 
   // Internal draft state while picker is open
   const [draftStart, setDraftStart] = useState<string>(value.startDate);
@@ -352,7 +390,9 @@ export function CustomDateTimePicker({
   return (
     <div
       ref={containerRef}
-      className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col md:flex-row text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+      className={`absolute left-0 ${
+        computedPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+      } bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col md:flex-row text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150 overflow-hidden max-w-[calc(100vw-32px)]`}
       style={{ minWidth: '640px' }}
     >
       {/* ─── 1. Left Sidebar of Presets ─── */}

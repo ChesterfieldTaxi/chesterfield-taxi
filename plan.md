@@ -114,4 +114,74 @@ Trips stored in Firestore will strictly adhere to the following state transition
 - Isolated Studio State: Edits update only local component draft state in the Live Preview Canvas. Clicking "Publish Changes to Site-Wide" writes to Firestore and updates root CSS custom properties.
 - Universal CSS Injection: Injects root variables in `root.tsx`, `layout.tsx`, and `admin.tsx`.
 
+## 8. Phase 20 Architecture & Firestore Schemas
 
+### 8.1 Geographic Entity Engine Schemas
+- `/zones` (Operational Geofences):
+  - Document ID: string (`zone-{slug}`)
+  - `name`: string, `description`?: string
+  - `type`: `'radius' | 'polygon'`
+  - `center`?: `{ lat: number, lng: number }`, `radiusMiles`?: number
+  - `vertices`?: `Array<{ lat: number, lng: number }>`
+  - `color`: string (hex color code for map rendering)
+  - `surchargeMultiplier`?: number, `flatFee`?: number
+  - `isActive`: boolean
+
+- `/zoneGroups` (Grouped Geofence Clusters):
+  - Document ID: string (`group-{slug}`)
+  - `name`: string (e.g. 'Metro West Corridor', 'Aviation Hubs')
+  - `description`?: string
+  - `zoneIds`: string[] (references `/zones` documents)
+  - `color`: string
+  - `surchargeMultiplier`?: number, `flatFee`?: number
+  - `isActive`: boolean
+  - `createdAt`?: string, `updatedAt`?: string
+
+- `/locationCollections` (Point-of-Interest Curated Registries):
+  - Document ID: string (`collection-{slug}`)
+  - `name`: string (e.g. 'Regional Aviation Hubs', 'Sports & Entertainment Arenas')
+  - `description`?: string
+  - `category`?: string
+  - `locations`: Array<{
+      id: string;
+      name: string;
+      address: string;
+      coordinates: { lat: number; lng: number };
+      category?: string;
+      flatFee?: number;
+    }>
+  - `flatFee`?: number
+  - `surchargeMultiplier`?: number
+  - `isActive`: boolean
+  - `createdAt`?: string, `updatedAt`?: string
+
+### 8.2 Rule Inheritance & Visual IF/THEN Pricing Rules
+- Expanded `/pricingRules` schema:
+  - `parentRuleId`?: string (references parent rule ID for base fare, distance/time rates, and default surcharges)
+  - `stopProcessingOnMatch`?: boolean (halts subsequent lower-priority rule evaluations)
+  - `triggers`:
+    - `zoneIds`?: string[], `zoneGroupIds`?: string[], `locationCollectionIds`?: string[]
+    - `minDistanceMiles`?: number, `maxDistanceMiles`?: number
+    - `minDurationMinutes`?: number, `maxDurationMinutes`?: number
+    - `daysOfWeek`?: number[], `timeWindows`?: Array<{ start: string; end: string }>, `holidayDates`?: string[]
+    - `accountTypes`?: Array<'retail' | 'corporate' | 'vip'>, `accountTags`?: string[]
+    - `vehicleTiers`?: string[]
+    - `equipment`?: { minCarSeats?: number; minLuggage?: number }
+    - `passengers`?: { min?: number; max?: number }
+  - `modifier`:
+    - `type`: `'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent' | 'base_override'`
+    - `value`: number
+    - `baseFareOverride`?: number, `perMileRateOverride`?: number, `perMinuteRateOverride`?: number
+    - `surchargeAdders`?: Array<{ name: string; amount: number; type: 'flat' | 'percent' }>
+  - `allowDriverSelection`: boolean
+  - `priority`: number
+  - `isActive`: boolean
+
+### 8.3 Granular Step-Increment Fare Calculation Engine
+- Decaying distance bracket calculation:
+  - Pure incremental step accumulator computing steps = ceil(miles_in_tier / step_size).
+  - Step rates scale per bracket (e.g., $0.35/0.1mi initial -> $0.25/0.1mi intermediate -> $0.20/0.1mi long range -> $0.15/0.1mi extended regional).
+- Delay wait-time step calculator:
+  - Excess delay minutes beyond grace period converted to seconds and evaluated as steps = ceil(excess_seconds / step_seconds).
+- Pure Inheritance Resolution:
+  - Resolves `parentRuleId` recursively with cycle guard, merging parent base fares, mileage rates, minute rates, and default surcharges, before applying child delta overrides.

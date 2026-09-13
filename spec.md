@@ -248,3 +248,46 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Universal CSS Variable Injection**:
     - Published tokens are injected into root HTML styles in `root.tsx`, `layout.tsx`, and `admin.tsx`, guaranteeing uniform styling across all public customer views and internal operator consoles.
 
+### 16. Phase 20: Advanced Condition Rules Engine, Rule Inheritance & Geographic Entity Manager
+- **Geographic Entity Engine (`/admin` -> Zones):**
+  - **Zone Groups (`/zoneGroups`)**:
+    - Group multiple individual geofences (radii and polygons) into named operational clusters (e.g. "Metro West Corridor", "Regional Aviation Hubs", "Out-of-County Zones").
+    - Unified spatial evaluation: A trip matches a Zone Group if its pickup or dropoff coordinates lie within any child zone of the group.
+    - Configurable cluster-level flat surcharges and percentage multipliers.
+  - **Named Location Collections (`/locationCollections`)**:
+    - Manage curated registries of Point-of-Interest (POI) markers and address lists (e.g. "Regional Aviation Hubs", "Sports Arenas & Venues", "Metro Transit Stations").
+    - Each collection contains structured `LocationPoint` records (`id`, `name`, `address`, `coordinates: { lat, lng }`, `category`, `flatFee`).
+    - Proximity-based geofencing matching pickup or destination against collection landmarks with configurable distance thresholds.
+  - **Dedicated Firestore Schemas**:
+    - `/zones`: Individual radius and polygon geofences (`ZoneGeofence`).
+    - `/zoneGroups`: Clustered zone collections (`ZoneGroup`).
+    - `/locationCollections`: Point-of-interest sets (`LocationCollection`).
+- **Rule Inheritance & Visual Condition Rule Builder (`/admin` -> Rates):**
+  - **Rule Inheritance Cascades (Parent/Child Rules)**:
+    - Child rules define a `parentRuleId` referencing a parent rule to inherit base fares, distance/time rate tiers, and default surcharges.
+    - Child rules dynamically apply delta overrides (e.g. custom flat discount, added surcharge, or rate multiplier) while reflecting updates made to parent rules.
+    - Pure functional cascade resolution with cycle detection to prevent circular references.
+  - **Visual IF/THEN Condition Rule Builder**:
+    - Interactive drawer interface structured around declarative IF [Triggers] THEN [Actions] logic.
+    - **IF Triggers**:
+      - Geofence: Match specific Zone, Zone Group, or Location Collection.
+      - Temporal: Time-of-day windows, days of week, and calendar holiday dates.
+      - Trip Bounds: Min/max distance (miles) and min/max duration (minutes).
+      - Fleet & Passenger: Vehicle tier classes, equipment (car seats, luggage minimums), and passenger counts.
+      - Customer Classification: Account types (`retail`, `corporate`, `vip`) and account tags (e.g. `VIP_TIER`, `AIRPORT_PREFERRED`).
+    - **THEN Actions**:
+      - Inherit Base Rule: Inherits parent rule rates and overrides.
+      - Base / Mileage Rate Overrides: Set custom base fare, per-mile rate, or per-minute rate.
+      - Surcharge Adders: Flat or percentage fees (e.g. child seats, excess luggage, zone fees).
+      - Rate Multipliers: Peak or promotional scaling factor.
+      - Flat Fare Override: Enforce fixed corridor rate.
+    - **Execution Control**:
+      - Priority ranking with drag-and-drop / up-down reordering.
+      - Active/inactive toggle.
+      - "Stop Processing on Match" short-circuit execution control.
+      - "Allow Driver App Manual Select" permission toggle.
+- **Granular Step-Increment Fare Calculation Engine:**
+  - Decaying distance step brackets with granular step sizes (e.g. $0.35 per 0.1 mile for miles 0-5, decaying to $0.25 for 5-15, $0.20 for 15-30, and $0.15 for 30+).
+  - Delay wait-time step calculation (e.g. $0.60 per 60s/90s under threshold after grace period).
+  - Live Fare Matrix Simulator integration with interactive audit trail logging displaying parent rule cascades and step calculation breakdowns.
+

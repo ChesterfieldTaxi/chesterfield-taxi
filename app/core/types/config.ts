@@ -64,28 +64,59 @@ export interface ConditionSurchargeConfig {
   zoneSurcharges?: Record<string, { flat: number; percent: number }>;
 }
 
+export interface RuleEquipmentFilter {
+  minCarSeats?: number;
+  minLuggage?: number;
+}
+
+export interface RulePassengerFilter {
+  min?: number;
+  max?: number;
+}
+
 export interface PricingRuleTrigger {
   zoneIds?: string[];
+  zoneGroupIds?: string[];
+  locationCollectionIds?: string[];
   minDistanceMiles?: number;
   maxDistanceMiles?: number;
+  minDurationMinutes?: number;
+  maxDurationMinutes?: number;
   daysOfWeek?: number[]; // 0 = Sun, 1 = Mon ... 6 = Sat
   timeWindows?: Array<{ start: string; end: string }>; // "HH:MM" 24h
   holidayDates?: string[]; // "YYYY-MM-DD"
   accountTypes?: Array<'retail' | 'corporate' | 'vip'>;
+  accountTags?: string[];
   vehicleTiers?: string[]; // e.g. 'standard', 'premium', 'xl', 'wheelchair'
+  equipment?: RuleEquipmentFilter;
+  passengers?: RulePassengerFilter;
+}
+
+export interface RuleSurchargeAdder {
+  id?: string;
+  name: string;
+  amount: number;
+  type: 'flat' | 'percent';
 }
 
 export interface PricingRuleModifier {
-  type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent';
+  type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent' | 'base_override';
   value: number;
+  // Phase 20 Delta & Base Overrides
+  baseFareOverride?: number;
+  perMileRateOverride?: number;
+  perMinuteRateOverride?: number;
+  surchargeAdders?: RuleSurchargeAdder[];
 }
 
 export interface NamedPricingRule {
   id: string;
   name: string;
   description?: string;
+  parentRuleId?: string; // Rule Inheritance: Inherits base parameters from parent rule
   priority: number; // 1 to 100, higher number = evaluated first
   isActive: boolean;
+  stopProcessingOnMatch?: boolean; // When true, halts subsequent rule evaluations upon match
   allowDriverSelection: boolean;
   triggers: PricingRuleTrigger;
   modifier: PricingRuleModifier;

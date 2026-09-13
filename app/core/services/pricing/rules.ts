@@ -579,12 +579,18 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
   const evaluationResult = evaluateApplicablePricingRules(
     {
       distanceMiles: context.input.distanceMiles,
+      durationMinutes: context.input.durationMinutes,
       pickupDate: pickupDateStr,
       pickupTime: pickupTimeStr,
       zoneIds: context.input.zoneIds,
+      zoneGroupIds: context.input.zoneGroupIds,
+      locationCollectionIds: context.input.locationCollectionIds,
       accountType: context.input.accountType,
+      accountTags: context.input.accountTags,
       vehicleTier: context.input.vehicleTier,
       selectedRuleId: context.input.selectedRuleId,
+      equipment: context.input.equipment,
+      passengers: context.input.passengers,
     },
     rules
   );
@@ -644,6 +650,17 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
       description: evaluationResult.auditTrail.join('; '),
     });
     additiveSurcharges += pctFee;
+  }
+
+  if (evaluationResult.surchargeAdders && evaluationResult.surchargeAdders.length > 0) {
+    for (const adder of evaluationResult.surchargeAdders) {
+      newSurcharges.push({
+        name: adder.name,
+        amount: roundCurrency(adder.amount),
+        description: 'Inherited rule surcharge adder',
+      });
+      additiveSurcharges += adder.amount;
+    }
   }
 
   const totalDelta = roundCurrency(multiplierDelta + additiveSurcharges);

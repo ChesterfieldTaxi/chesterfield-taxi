@@ -107,6 +107,17 @@ export interface PricingInput {
   accountType?: 'retail' | 'corporate' | 'vip';
   /** Zone IDs matched by pickup/dropoff coordinates */
   zoneIds?: string[];
+  /** Zone Group IDs matched by pickup/dropoff coordinates */
+  zoneGroupIds?: string[];
+  /** Location Collection IDs matched by proximity */
+  locationCollectionIds?: string[];
+  /** Specific account tags for corporate partner overrides */
+  accountTags?: string[];
+  /** Equipment counts (car seats, luggage) */
+  equipment?: {
+    carSeats?: number;
+    luggageCount?: number;
+  };
   /** Wait time or delay in minutes */
   delayMinutes?: number;
   /** Dispatcher or driver selected Named Pricing Rule ID */

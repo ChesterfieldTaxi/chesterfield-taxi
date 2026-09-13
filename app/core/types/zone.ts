@@ -30,3 +30,63 @@ export interface ZoneGeofence {
   createdAt?: string;
   updatedAt?: string;
 }
+
+/**
+ * Zone Group Schema
+ * 
+ * Groups multiple individual geofences (radii and polygons) into named
+ * operational clusters (e.g. "Metro West Corridor", "Regional Aviation Hubs").
+ * Stored in Firestore collection `/zoneGroups`.
+ */
+export interface ZoneGroup {
+  id: string; // e.g. "group-metro-west"
+  name: string; // e.g. "Metro West Corridor"
+  description?: string;
+  zoneIds: string[]; // references ZoneGeofence.id
+  color: string; // Hex color string, e.g. "#6366f1"
+  surchargeMultiplier?: number; // e.g. 1.05 (+5%)
+  flatFee?: number; // e.g. 2.50 ($2.50 cluster surcharge)
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Named Location Collection Schema
+ * 
+ * Represents curated Point-of-Interest (POI) markers and address lists
+ * (e.g. Airports, Venues, Train Stations).
+ * Stored in Firestore collection `/locationCollections`.
+ */
+export type LocationCategory =
+  | 'airport'
+  | 'venue'
+  | 'train_station'
+  | 'hotel'
+  | 'hospital'
+  | 'corporate'
+  | 'other';
+
+export interface LocationPoint {
+  id: string; // e.g. "poi-stl-t1"
+  name: string; // e.g. "Lambert International Terminal 1"
+  address: string;
+  coordinates: ZoneCoordinate;
+  category?: LocationCategory;
+  flatFee?: number; // e.g. gate fee or pickup surcharge
+  notes?: string;
+}
+
+export interface LocationCollection {
+  id: string; // e.g. "collection-regional-airports"
+  name: string; // e.g. "Regional Aviation Hubs"
+  description?: string;
+  category?: string;
+  locations: LocationPoint[];
+  flatFee?: number; // Surcharge applied if pickup/dropoff matches this collection
+  surchargeMultiplier?: number;
+  proximityRadiusMiles?: number; // Detection tolerance in miles, default 0.5 mi
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
