@@ -46,10 +46,26 @@ import {
   HistoryIcon,
 } from '../ui/Icons';
 
+export interface BookingEngineV2InitialValues {
+  pickupAddress?: string;
+  pickupCoordinates?: GeoPoint;
+  dropoffAddress?: string;
+  dropoffCoordinates?: GeoPoint;
+  driverNotes?: string;
+  vehicleChoice?: CustomerVehicleChoice;
+  passengers?: number;
+  timingType?: 'asap' | 'later';
+  passengerName?: string;
+  passengerPhone?: string;
+  passengerEmail?: string;
+}
+
 export interface BookingEngineV2Props {
   className?: string;
   onBookingSuccess?: (trip: Trip) => void;
   onConfirmedChange?: (isConfirmed: boolean) => void;
+  initialValues?: BookingEngineV2InitialValues;
+  hideDispatchBanner?: boolean;
 }
 
 export type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
@@ -183,6 +199,8 @@ export function BookingEngineV2({
   className = '',
   onBookingSuccess,
   onConfirmedChange,
+  initialValues,
+  hideDispatchBanner = false,
 }: BookingEngineV2Props) {
   const location = useLocation();
 
@@ -322,6 +340,69 @@ export function BookingEngineV2({
     window.addEventListener('reset-booking-form', handleReset);
     return () => window.removeEventListener('reset-booking-form', handleReset);
   }, []);
+
+  // Pre-fill from URL Search Parameters (e.g. from Passenger App 1-tap rebook or quick destination chips)
+  useEffect(() => {
+    if (!location.search) return;
+    try {
+      const params = new URLSearchParams(location.search);
+      const pickupParam = params.get('pickup');
+      const dropoffParam = params.get('dropoff');
+      const notesParam = params.get('notes');
+      const vehicleParam = params.get('vehicle') as CustomerVehicleChoice | null;
+      const passengersParam = params.get('passengers');
+      const pickupLat = params.get('pickupLat');
+      const pickupLng = params.get('pickupLng');
+      const dropoffLat = params.get('dropoffLat');
+      const dropoffLng = params.get('dropoffLng');
+
+      if (pickupParam || dropoffParam || notesParam || vehicleParam || passengersParam) {
+        setForm((prev) => ({
+          ...prev,
+          pickupAddress: pickupParam !== null ? pickupParam : prev.pickupAddress,
+          pickupCoordinates: pickupLat && pickupLng ? { lat: parseFloat(pickupLat), lng: parseFloat(pickupLng) } : prev.pickupCoordinates,
+          dropoffAddress: dropoffParam !== null ? dropoffParam : prev.dropoffAddress,
+          dropoffCoordinates: dropoffLat && dropoffLng ? { lat: parseFloat(dropoffLat), lng: parseFloat(dropoffLng) } : prev.dropoffCoordinates,
+          driverNotes: notesParam !== null ? notesParam : prev.driverNotes,
+          vehicleChoice: vehicleParam && ['sedan', 'suv', 'van'].includes(vehicleParam) ? vehicleParam : prev.vehicleChoice,
+          selectedVehicles: vehicleParam && ['sedan', 'suv', 'van'].includes(vehicleParam) ? [vehicleParam] : prev.selectedVehicles,
+          passengers: passengersParam ? Math.max(1, parseInt(passengersParam, 10) || 1) : prev.passengers,
+        }));
+      }
+    } catch (err) {
+      console.warn('[BookingEngineV2] Error parsing search params:', err);
+    }
+  }, [location.search]);
+
+  // Pre-fill from initialValues prop (e.g. from Passenger App embedded booking)
+  useEffect(() => {
+    if (!initialValues) return;
+    setForm((prev) => ({
+      ...prev,
+      ...(initialValues.pickupAddress !== undefined && initialValues.pickupAddress !== ''
+        ? { pickupAddress: initialValues.pickupAddress }
+        : {}),
+      ...(initialValues.pickupCoordinates ? { pickupCoordinates: initialValues.pickupCoordinates } : {}),
+      ...(initialValues.dropoffAddress !== undefined && initialValues.dropoffAddress !== ''
+        ? { dropoffAddress: initialValues.dropoffAddress }
+        : {}),
+      ...(initialValues.dropoffCoordinates ? { dropoffCoordinates: initialValues.dropoffCoordinates } : {}),
+      ...(initialValues.driverNotes !== undefined && initialValues.driverNotes !== ''
+        ? { driverNotes: initialValues.driverNotes }
+        : {}),
+      ...(initialValues.vehicleChoice && ['sedan', 'suv', 'van'].includes(initialValues.vehicleChoice)
+        ? {
+            vehicleChoice: initialValues.vehicleChoice,
+            selectedVehicles: [initialValues.vehicleChoice],
+          }
+        : {}),
+      ...(initialValues.passengers ? { passengers: initialValues.passengers } : {}),
+      ...(initialValues.timingType ? { timingType: initialValues.timingType } : {}),
+      ...(initialValues.passengerName ? { passengerName: initialValues.passengerName } : {}),
+      ...(initialValues.passengerPhone ? { passengerPhone: initialValues.passengerPhone } : {}),
+      ...(initialValues.passengerEmail ? { passengerEmail: initialValues.passengerEmail } : {}),
+    }));
+  }, [initialValues]);
 
   // Customer Booking Form Config from Admin Settings
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
@@ -1286,32 +1367,34 @@ export function BookingEngineV2({
   return (
     <div className={`relative max-w-6xl mx-auto ${className}`}>
       {/* ─── 24/7 Dispatch Review & Reassurance Notice Banner ─── */}
-      <div className="mb-5 p-3.5 bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-xl shadow-md border border-blue-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600/40 border border-blue-400/50 flex items-center justify-center shrink-0 text-blue-300 text-lg">
-            <ShieldCheckIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-200">
-                Direct Dispatch Confirmation
-              </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                24/7 Service
-              </span>
+      {!hideDispatchBanner && (
+        <div className="mb-5 p-3.5 bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-xl shadow-md border border-blue-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-600/40 border border-blue-400/50 flex items-center justify-center shrink-0 text-blue-300 text-lg">
+              <ShieldCheckIcon className="w-5 h-5" />
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Every trip is reviewed by our local dispatch team and confirmed via text &amp; email.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-blue-200">
+                  Direct Dispatch Confirmation
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  24/7 Service
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Every trip is reviewed by our local dispatch team and confirmed via text &amp; email.
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-2 text-xs font-semibold text-slate-300 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 self-stretch sm:self-auto justify-center">
+            <PhoneIcon className="w-3.5 h-3.5 text-blue-300" />
+            <span>Dispatch: (314) 738-0100</span>
           </div>
         </div>
-
-        <div className="shrink-0 flex items-center gap-2 text-xs font-semibold text-slate-300 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 self-stretch sm:self-auto justify-center">
-          <PhoneIcon className="w-3.5 h-3.5 text-blue-300" />
-          <span>Dispatch: (314) 738-0100</span>
-        </div>
-      </div>
+      )}
 
       <form onSubmit={handleBookRide} className="select-none">
         {/* Grid: Left Main Stack (Col 8), Right Sticky Summary (Col 4) */}

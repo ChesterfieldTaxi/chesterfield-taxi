@@ -9,7 +9,16 @@
 /**
  * State machine literal types for Trip lifecycle.
  */
-export type CoreTripStatus = 'pending' | 'offered' | 'assigned' | 'completed';
+export type CoreTripStatus =
+  | 'pending'
+  | 'offered'
+  | 'assigned'
+  | 'accepted'
+  | 'en_route'
+  | 'arrived'
+  | 'in_progress'
+  | 'completed';
+
 export type TripConfirmationStatus =
   | 'UNCONFIRMED'
   | 'CONFIRMED'
@@ -17,6 +26,7 @@ export type TripConfirmationStatus =
   | 'unconfirmed'
   | 'confirmed'
   | 'declined';
+
 export type TripStatus = CoreTripStatus | TripConfirmationStatus | 'cancelled';
 
 export const TRIP_STATUSES: readonly TripStatus[] = [
@@ -29,6 +39,10 @@ export const TRIP_STATUSES: readonly TripStatus[] = [
   'pending',
   'offered',
   'assigned',
+  'accepted',
+  'en_route',
+  'arrived',
+  'in_progress',
   'completed',
   'cancelled',
 ] as const;
@@ -37,15 +51,20 @@ export const TRIP_STATUSES: readonly TripStatus[] = [
  * Valid state transitions mapping adhering strictly to the dispatch state machine.
  */
 export const TRIP_STATE_TRANSITIONS = {
-  UNCONFIRMED: ['CONFIRMED', 'DECLINED', 'cancelled', 'pending'],
-  CONFIRMED: ['pending', 'offered', 'assigned', 'cancelled'],
+  UNCONFIRMED: ['CONFIRMED', 'DECLINED', 'cancelled', 'pending', 'assigned', 'accepted', 'en_route'],
+  CONFIRMED: ['pending', 'offered', 'assigned', 'accepted', 'en_route', 'cancelled'],
   DECLINED: ['cancelled'],
-  unconfirmed: ['CONFIRMED', 'confirmed', 'DECLINED', 'declined', 'cancelled', 'pending'],
-  confirmed: ['pending', 'offered', 'assigned', 'cancelled'],
+  unconfirmed: ['CONFIRMED', 'confirmed', 'DECLINED', 'declined', 'cancelled', 'pending', 'assigned', 'accepted', 'en_route'],
+  confirmed: ['pending', 'offered', 'assigned', 'accepted', 'en_route', 'cancelled'],
   declined: ['cancelled'],
-  pending: ['CONFIRMED', 'confirmed', 'offered', 'assigned', 'cancelled'],
-  offered: ['assigned', 'pending', 'cancelled'],
-  assigned: ['completed', 'cancelled'],
+
+  pending: ['CONFIRMED', 'confirmed', 'offered', 'assigned', 'accepted', 'en_route', 'cancelled'],
+  offered: ['assigned', 'accepted', 'pending', 'cancelled'],
+  assigned: ['accepted', 'en_route', 'arrived', 'in_progress', 'completed', 'cancelled', 'pending'],
+  accepted: ['en_route', 'arrived', 'in_progress', 'cancelled', 'pending'],
+  en_route: ['arrived', 'in_progress', 'cancelled'],
+  arrived: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
   completed: [],
   cancelled: [],
 } as const satisfies Record<TripStatus, readonly TripStatus[]>;
@@ -118,6 +137,17 @@ export interface TripPricing {
   tariffProfileName?: string;
   matchedCorridorId?: string;
   matchedCorridorName?: string;
+  // Phase 24: In-Vehicle Taximeter & Extra Fees
+  meterDistanceMiles?: number;
+  meterDurationMinutes?: number;
+  meterCalculatedFare?: number;
+  driverExtras?: Array<{
+    id: string;
+    name: string;
+    amount: number;
+    category: 'toll' | 'parking' | 'luggage' | 'cleaning' | 'custom';
+  }>;
+  driverExtrasTotal?: number;
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'corporate';

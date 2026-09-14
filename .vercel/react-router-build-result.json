@@ -13,9 +13,13 @@
       "root": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/_index": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/book": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/booking.status": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/track": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/services": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/about": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/contact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/app": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/driver": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -52,6 +56,20 @@
         "path": "book",
         "config": {}
       },
+      "routes/booking.status": {
+        "id": "routes/booking.status",
+        "parentId": "routes/layout",
+        "file": "app/routes/booking.status.tsx",
+        "path": "booking/status/:tripId",
+        "config": {}
+      },
+      "routes/track": {
+        "id": "routes/track",
+        "parentId": "routes/layout",
+        "file": "app/routes/track.tsx",
+        "path": "track/:tripToken",
+        "config": {}
+      },
       "routes/services": {
         "id": "routes/services",
         "parentId": "routes/layout",
@@ -71,6 +89,20 @@
         "parentId": "routes/layout",
         "file": "app/routes/contact.tsx",
         "path": "contact",
+        "config": {}
+      },
+      "routes/app": {
+        "id": "routes/app",
+        "parentId": "root",
+        "file": "app/routes/app.tsx",
+        "path": "app",
+        "config": {}
+      },
+      "routes/driver": {
+        "id": "routes/driver",
+        "parentId": "root",
+        "file": "app/routes/driver.tsx",
+        "path": "driver",
         "config": {}
       },
       "routes/admin.login": {
@@ -153,6 +185,18 @@
         "file": "routes/book.tsx",
         "path": "book"
       },
+      "routes/booking.status": {
+        "id": "routes/booking.status",
+        "parentId": "routes/layout",
+        "file": "routes/booking.status.tsx",
+        "path": "booking/status/:tripId"
+      },
+      "routes/track": {
+        "id": "routes/track",
+        "parentId": "routes/layout",
+        "file": "routes/track.tsx",
+        "path": "track/:tripToken"
+      },
       "routes/services": {
         "id": "routes/services",
         "parentId": "routes/layout",
@@ -170,6 +214,18 @@
         "parentId": "routes/layout",
         "file": "routes/contact.tsx",
         "path": "contact"
+      },
+      "routes/app": {
+        "id": "routes/app",
+        "parentId": "root",
+        "file": "routes/app.tsx",
+        "path": "app"
+      },
+      "routes/driver": {
+        "id": "routes/driver",
+        "parentId": "root",
+        "file": "routes/driver.tsx",
+        "path": "driver"
       },
       "routes/admin.login": {
         "id": "routes/admin.login",
@@ -235,6 +291,14 @@
                 "path": "book"
               },
               {
+                "file": "routes/booking.status.tsx",
+                "path": "booking/status/:tripId"
+              },
+              {
+                "file": "routes/track.tsx",
+                "path": "track/:tripToken"
+              },
+              {
                 "file": "routes/services.tsx",
                 "path": "services"
               },
@@ -247,6 +311,14 @@
                 "path": "contact"
               }
             ]
+          },
+          {
+            "file": "routes/app.tsx",
+            "path": "app"
+          },
+          {
+            "file": "routes/driver.tsx",
+            "path": "driver"
           },
           {
             "file": "routes/admin.login.tsx",

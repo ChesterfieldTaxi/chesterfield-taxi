@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router';
-import { CarIcon, PhoneIcon, MenuIcon, XIcon, ShieldCheckIcon } from '../ui/Icons';
+import { CarIcon, PhoneIcon, MenuIcon, XIcon, ShieldCheckIcon, UserIcon } from '../ui/Icons';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 
@@ -13,6 +13,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home', path: '/', end: true },
   { label: 'Services', path: '/services' },
+  { label: 'Fleet & Rates', path: '/services#rates' },
   { label: 'About', path: '/about' },
   { label: 'Contact', path: '/contact' },
 ];
@@ -117,7 +118,7 @@ export function Navbar() {
           </nav>
 
           {/* Desktop Right CTAs */}
-          <div className="hidden md:flex items-center gap-3.5">
+          <div className="hidden md:flex items-center gap-3">
             {/* Quick Phone Link */}
             <a
               href={`tel:${companySettings.phone ? companySettings.phone.replace(/[^0-9+]/g, '') : COMPANY_CONFIG.phone.primaryRaw}`}
@@ -126,6 +127,16 @@ export function Navbar() {
               <PhoneIcon className="w-4 h-4 text-blue-600" />
               <span>{companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
+
+            {/* Sleek Sign In CTA */}
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all shadow-2xs"
+              title="Sign in to Passenger Portal"
+            >
+              <UserIcon className="w-4 h-4 text-slate-500" />
+              <span>Sign In</span>
+            </Link>
 
             {/* Prominent Book Now CTA */}
             <Link
@@ -147,8 +158,16 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Mobile Menu Toggle Button */}
+          {/* Mobile Actions */}
           <div className="flex items-center gap-2 md:hidden">
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
+            >
+              <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+              <span>Sign In</span>
+            </Link>
+
             <Link
               to="/book"
               style={{
@@ -217,6 +236,15 @@ export function Navbar() {
 
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
             <Link
+              to="/app"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+            >
+              <UserIcon className="w-4 h-4" />
+              <span>Passenger Portal / Sign In</span>
+            </Link>
+
+            <Link
               to="/book"
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -245,6 +273,7 @@ export function Navbar() {
           </div>
         </div>
       )}
+
     </header>
   );
 }

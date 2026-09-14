@@ -319,12 +319,102 @@ export interface TariffProfile {
    - Enforce `minimumPrice` floor.
 5. Append `profile.extras` and universal surcharges.
 6. Record complete audit trail.
- 
- # #   1 1 .   P h a s e   2 3   A r c h i t e c t u r e :   S y s t e m   A u d i t   &   H a r d e n i n g  
- # # #   1 1 . 1   S e c u r i t y   &   I n d e x e s  
- -   S t r i c t   R B A C   r u l e s   i n   f i r e s t o r e . r u l e s   f o r   t r i p s ,   t a r i f f s ,   p r i c i n g R u l e s ,   f l e e t ,   z o n e s ,   c o n f i g .  
- -   E x p l i c i t   c o m p o u n d   i n d e x e s   d e f i n e d   i n   f i r e s t o r e . i n d e x e s . j s o n .  
- # # #   1 1 . 2   P e r f o r m a n c e   &   M a i n t a i n a b i l i t y  
- -   V i r t u a l i z e d   l i s t   r e n d e r i n g   i n   d i s p a t c h   q u e u e   f o r   1 0 0 +   c o n c u r r e n t   t r i p s .  
- -   D e c o u p l e d ,   p u r e   f u n c t i o n a l   p r i c i n g   e v a l u a t i o n .  
- 
+
+## 11. Phase 23 Architecture: System Audit & Hardening
+### 11.1 Security & Indexes
+- Strict RBAC rules in firestore.rules for trips, tariffs, pricingRules, fleet, zones, config.
+- Explicit compound indexes defined in firestore.indexes.json.
+### 11.2 Performance & Maintainability
+- Virtualized list rendering in dispatch queue for 100+ concurrent trips.
+- Decoupled, pure functional pricing evaluation.
+
+## 12. Phase 24 Architecture: Driver Mobile PWA & Multi-Party Real-Time Sync
+### 12.1 Driver Console & Shift State Machine
+- **Driver Shift State**: `on_duty` | `off_duty` | `on_break` stored in driver profile/roster with live vehicle binding.
+- **Trip Lifecycle State Machine**:
+  `offered` / `assigned` ➔ `accepted` ➔ `en_route` ➔ `arrived` ➔ `in_progress` ➔ `completed` (with `declined` / `cancelled` fallbacks).
+### 12.2 In-Vehicle Live Meter Engine
+- Pure Functional Taximeter evaluation executing at runtime using matched `TariffProfile`.
+- Real-time elapsed duration and distance increment tracking.
+- Interactive extras adder allowing addition of tolls, parking, luggage, and cleaning fees.
+### 12.3 Multi-Party Snapshot Sync
+- Firestore `onSnapshot` subscriptions bridging the Driver Console, Dispatch Console (`/dispatch`), Admin Dashboard (`/admin`), and Customer Booking Tracker (`/booking/status/:tripId`).
+
+## 13. Phase 25 Architecture: Passenger Mobile Web App (`/app`)
+
+### 13.1 Passenger Domain Models & Local-First Storage (`app/core/types/passenger.ts`)
+```typescript
+export type SavedPlaceCategory = 'home' | 'work' | 'airport' | 'medical' | 'favorite' | 'other';
+
+export interface SavedPlace {
+  id: string;
+  label: string;
+  category: SavedPlaceCategory;
+  address: string;
+  notes?: string;
+  coordinates?: { lat: number; lng: number };
+}
+
+export interface PassengerAccount {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  passengerNotes?: string;
+  preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair';
+  communicationPreferences: {
+    smsUpdates: boolean;
+    emailReceipts: boolean;
+    phoneCalls: boolean;
+  };
+  savedPlaces: SavedPlace[];
+  recentSearches?: string[];
+}
+```
+
+### 13.2 Passenger Service & Reactive State Management
+- `PassengerService` singleton (`app/core/services/passenger.service.ts`):
+  - Local-first persistence via `localStorage` with sensible Chesterfield default profiles and saved locations.
+  - CRUD operations for saved places with validation and category tagging.
+  - Active reservation detection querying live Firestore status (`UNCONFIRMED`, `CONFIRMED`, `ASSIGNED`, `EN ROUTE`, `IN_PROGRESS`).
+  - Ride history resolution joining Firestore trips with localized cache.
+
+### 13.4 Self-Contained In-App Booking Flow & Reactive Hydration
+- Handoff directly inside `/app` without navigating to `/book`:
+  - `BookingEngineV2` is directly embedded within the `book` tab of `/app`.
+  - `initialValues?: BookingEngineV2InitialValues` prop reactively hydrates origin, destination, vehicle class, passenger count, and custom notes whenever selected from 1-tap chips, Saved Places actions, or past trip rebooking.
+  - Keeps the entire booking, pricing, and confirmation flow fully self-contained inside the passenger portal.
+
+### 13.5 Dedicated App Shell Layout & Floating Assistance FAB
+- Decoupled Route Architecture:
+  - Elevate `/app` to top-level route in `app/routes.ts` outside `routes/layout.tsx`.
+  - Public marketing header/footer completely suppressed within `/app`.
+- Public Site Navigation:
+  - Clean menu: `Home`, `Services`, `Fleet & Rates`, `About`, `Contact`.
+  - Sleek "Sign In" button adjacent to the "Book Now" CTA on desktop and mobile.
+- Dedicated Passenger App Shell:
+  - Minimalist top status bar with compact brand logo, "Passenger Portal" indicator badge, greeting, and live ride beacon.
+  - Sticky bottom navigation bar on mobile and dock navigation on desktop with 4 tabs (`[ 🚖 Book ]`, `[ 📜 Trips ]`, `[ 📍 Places ]`, `[ 👤 Profile ]`).
+  - Floating Action Button (`?`) anchored above the bottom nav opening a quick popover with:
+    - 24/7 Dispatch Desk direct dial (`(314) 738-0100`).
+    - Direct Office line (`(314) 738-9921`).
+    - Interactive Help Center & FAQ Modal (Airport pickups STL, child car seats, luggage guidelines, and cancellation policy).
+    - Email Dispatch link (`dispatch@chesterfieldtaxi.com`).
+    - "Back to Main Website" escape link (`to="/"`) and "Sign Out".
+
+## 14. Phase 26 Architecture: Modular Website Builder & White-Label CMS Studio
+### 14.1 Modular Component Registry
+- Pure UI components (Hero Banner, Quick Booking Card, Flat Tariff Matrix, Fleet Showcase, Service Area List, Testimonial Carousel, Contact / Dispatch Bar, Custom HTML Block).
+- Mapped in `app/components/cms/SectionRegistry.tsx` using a `SECTION_REGISTRY` pattern.
+- A dynamic page renderer interprets JSON-based layout orders and passes configuration props down to these registered components.
+
+### 14.2 Admin Visual CMS Studio (`/admin?tab=website`)
+- **Layout Reordering Canvas**: Drag-and-drop interface for adding, removing, enabling/disabling, and reordering homepage layout sections.
+- **Live Section Property Inspector**: Dynamic form bindings mapping to the active section's parameters (e.g. heading texts, subheadings, background images, CTAs).
+- **Visual Theme & Asset Switcher**: Extends the branding studio to support Google Fonts selection, icon sets, and extended logo/favicon uploads.
+
+### 14.3 Advanced CMS & SEO Tools
+- **Monaco CSS Editor**: Browser-based code editor integrated into the CMS panel, securely injecting custom stylesheet overrides into the application `<head>`.
+- **Script Injector**: Specialized admin fields for managing tracking pixels, analytics tags, and chat widgets.
+- **SEO & Social Graph**: Route-specific Meta Title, Description, and OpenGraph tags to control social sharing cards.

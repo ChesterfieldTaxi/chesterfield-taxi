@@ -58,7 +58,8 @@ export type AdminTabKey =
   | 'fleet'
   | 'staff'
   | 'bookings'
-  | 'layout';
+  | 'layout'
+  | 'website';
 
 interface TabItem {
   key: AdminTabKey;
@@ -165,6 +166,7 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'security', label: '🛡️ Security & 2FA' },
     { key: 'audit', label: '📜 Config Audit Trail' },
     { key: 'system', label: '⚙️ System Ops & Backups' },
+    { key: 'website', label: '🌐 Website Studio' },
   ],
 };
 
@@ -205,6 +207,9 @@ export default function AdminLayout() {
   } else if (rawTab === 'form' || rawTab === 'layout') {
     normalizedTab = 'advanced';
     activeSubParam = 'form';
+  } else if (rawTab === 'website') {
+    normalizedTab = 'advanced';
+    activeSubParam = 'website';
   }
 
   // Current subpages for the active tab
@@ -491,6 +496,7 @@ export default function AdminLayout() {
               initialSubTab={effectiveSub}
             />
           )}
+
 
           {/* Legacy Backward Compatibility Fallbacks */}
           {normalizedTab === 'general' && (

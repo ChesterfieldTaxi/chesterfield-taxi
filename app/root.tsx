@@ -59,6 +59,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {COMPANY_CONFIG.cms?.customCss && (
+          <style dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.customCss }} />
+        )}
+        {COMPANY_CONFIG.cms?.scripts?.head && (
+          <script dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.scripts.head }} />
+        )}
       </head>
       <body>
         <script
@@ -71,6 +77,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
+        {COMPANY_CONFIG.cms?.scripts?.footer && (
+          <script dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.scripts.footer }} />
+        )}
       </body>
     </html>
   );

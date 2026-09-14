@@ -247,3 +247,49 @@
 - [x] 23.5 Live Dispatch & Queue Stress Testing: Create developer seeding utility for 100+ concurrent mock trips, test `/dispatch` virtualized rendering under load.
 - [x] 23.6 Firestore Security Rules & Composite Index Hardening: Audit `firestore.rules` for strict RBAC and `firestore.indexes.json` for compound query support.
 - [x] 23.7 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` and mark Phase 23 complete.
+
+## Phase 24: Driver Mobile App & Real-Time Sync
+- [x] 24.1 Documentation Updates: Update spec.md, plan.md, and tasks.md with Phase 24 scope.
+- [x] 24.2 Core Data Models & State Machine: Expand TripStatus with `accepted`, `en_route`, `arrived`, `in_progress`, configure transitions, and define DriverProfile / Shift types.
+- [x] 24.3 Driver Service: Implement `driver.service.ts` for shift management (On-Duty / Off-Duty / On-Break), active trip subscription, step actions, and meter updates.
+- [x] 24.4 Driver Mobile PWA Console (`/driver`): Build mobile-first, responsive driver interface with shift controls, assigned trip card, and sequential action flow.
+- [x] 24.5 In-Vehicle Live Meter & Fare Extras: Build live meter interface for `in_progress` trips with distance/time calculation and manual extras adder (tolls, parking, luggage, cleaning fees).
+- [x] 24.6 Multi-Party Real-Time Firestore Sync: Update Dispatch Console (`/dispatch`), Admin Dashboard (`/admin`), and Customer Booking Tracker (`/booking/status/:tripId`) to listen and render new statuses in real-time.
+- [x] 24.7 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.
+
+## Phase 25: Passenger Mobile Web App (`/app`)
+- [x] 25.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md with Phase 25 Passenger Web App scope.
+- [x] 25.2 Data Models & Passenger Service: Create `passenger.ts` and `passenger.service.ts` for Saved Places CRUD, Customer Profile management, active trip tracking, and ride history resolution.
+- [x] 25.3 Rebooking Handoff & Deep Linking: Update `BookingEngineV2.tsx` to parse URL query params (`pickup`, `dropoff`, `notes`, `vehicle`) and support 1-tap rebook prefill.
+- [x] 25.4 Real-Time Tracking Deep Link: Register `/track/:tripToken` route alias and update `booking.status.tsx` to support both `tripId` and `tripToken`.
+- [x] 25.5 Mobile-First Passenger PWA (`/app`): Build responsive portal with Quick Book Drawer, saved place chips ("Home", "Work", "Airport"), Active Trip floating banner, Profile manager, and Saved Places manager.
+- [x] 25.6 Trip History & Itemized Digital Receipts: Implement past trips view, 1-tap rebook buttons, and printable/downloadable itemized receipt modal with complete fare breakdown.
+- [x] 25.7 Navigation Integration: Add Passenger App link to main Navbar.
+- [x] 25.8 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` and mark Phase 25 complete.
+- [x] 25.9 Navigation Refinement (Pattern 2: Dedicated App Shell):
+  - [x] 25.9.1 Decouple public header: Remove "Passenger App" from public menu, set menu strictly to Home, Services, Fleet & Rates, About, Contact, and add sleek "Sign In" button adjacent to "Book Now".
+  - [x] 25.9.2 Route Decoupling: Move `/app` outside public layout in `routes.ts` to suppress public marketing headers and footers.
+  - [x] 25.9.3 Dedicated App Shell Layout: Implement desktop header with brand logo, "Passenger Portal" badge, dynamic avatar dropdown `[ 👤 Sarah J. ▾ ]`, mobile sticky bottom bar `[ 🚖 Book ] [ 📜 Trips ] [ 📍 Places ] [ 👤 Profile ]`, and "Back to Main Website" escape link.
+  - [x] 25.9.4 Verification: Verify `npm run typecheck` and `npm run build` with 0 errors.
+- [x] 25.10 Passenger App Streamlining & Self-Contained Booking Flow:
+  - [x] 25.10.1 Remove top sticky header and redundant top profile card with duplicate tabs from `/app`.
+  - [x] 25.10.2 Add minimalist top status bar with compact logo, company name, passenger greeting, and live ride beacon.
+  - [x] 25.10.3 Add `?` Floating Action Button (FAB) floating above sticky bottom navigation.
+  - [x] 25.10.4 Add floating assistance popover with 24/7 Dispatch call buttons, direct desk line, FAQ trigger, email dispatch, website escape link, and sign out.
+  - [x] 25.10.5 Add interactive Help Center & FAQ Modal covering airport pickup grace periods, child car seats, luggage guidelines, and cancellation terms.
+  - [x] 25.10.6 Directly embed `BookingEngineV2` inside `/app` with reactive `initialValues` prefill, eliminating external redirects to `/book` for 1-tap chips, Saved Places actions, and trip rebooking.
+  - [x] 25.10.7 Verify `npm run typecheck` and `npm run build` pass with 0 errors.
+- [x] 25.11 Passenger App Direct Dispatch Banner & Action Streamlining:
+  - [x] 25.11.1 Remove dark blue "Direct Dispatch Confirmation" banner in passenger app (`hideDispatchBanner={true}`).
+  - [x] 25.11.2 Remove duplicate "Direct Desk Line" from `?` assistance popover menu.
+  - [x] 25.11.3 Remove "Back to Main Website" buttons from both the assistance popover and Profile tab.
+  - [x] 25.11.4 Add "Book Return" button for trips in Past Trips tab (automatically swaps pickup & dropoff in the embedded booking flow) and highlight the latest trip with a "Most Recent" badge.
+  - [x] 25.11.5 Verify `npm run typecheck` and `npm run build` pass with 0 errors.
+
+
+## Phase 26: Modular Website Builder & White-Label CMS Studio
+- [x] 26.1 Documentation Updates: Update spec.md, plan.md, and tasks.md to reflect Phase 26 scope.
+- [x] 26.2 Modular Section Registry & Dynamic Renderer: Create `SECTION_REGISTRY` in `app/components/cms/SectionRegistry.tsx` and pure UI components for sections.
+- [x] 26.3 Admin Visual CMS Studio (`/admin?tab=website`): Layout Reordering Canvas, Live Section Property Inspector, Visual Theme & Asset Switcher.
+- [x] 26.4 Advanced CMS & SEO Tools: Monaco / CodeMirror CSS Editor, Head / Footer Script Injector, SEO & Social Graph Manager.
+- [x] 26.5 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.

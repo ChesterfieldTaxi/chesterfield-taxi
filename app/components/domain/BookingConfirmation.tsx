@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import type { Trip } from '../../core/types';
 import {
   CheckIcon,
@@ -267,9 +268,19 @@ export function BookingConfirmation({
         <span className="text-xs text-slate-500 text-center sm:text-left">
           Questions about your ride? Call 24/7 Dispatch at {COMPANY_CONFIG.phone.dispatch}.
         </span>
-        <Button onClick={onBookAnother} variant="primary" size="md">
-          Book Another Ride
-        </Button>
+        <div className="flex items-center gap-2">
+          {trip.id && (
+            <Link
+              to={`/track/${trip.id}`}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+            >
+              Track Live Ride
+            </Link>
+          )}
+          <Button onClick={onBookAnother} variant="primary" size="md">
+            Book Another Ride
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );

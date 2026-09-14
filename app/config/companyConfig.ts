@@ -77,6 +77,25 @@ export interface CompanyBrandConfig {
   maxDispatchDrafts?: number;
   carSeatLimits: CarSeatLimitsConfig;
   vehicleCapacities: Record<'sedan' | 'suv' | 'van' | 'any', VehicleCapacityConfig>;
+  // Phase 26: CMS Config
+  cms?: {
+    homepageLayout: Array<{
+      id: string;
+      type: string;
+      isEnabled: boolean;
+      props: Record<string, any>;
+    }>;
+    seo: {
+      defaultMetaTitle: string;
+      defaultMetaDescription: string;
+      defaultOpenGraphImage: string;
+    };
+    scripts: {
+      head: string;
+      footer: string;
+    };
+    customCss: string;
+  };
 }
 
 export const COMPANY_CONFIG: CompanyBrandConfig = {
@@ -143,6 +162,22 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
     'Spirit of St. Louis Airport (SUS)',
     'Downtown St. Louis Metro',
   ],
+  cms: {
+    homepageLayout: [
+      { id: 'hero-1', type: 'hero', isEnabled: true, props: { heading: 'Premium Ride Service', subHeading: 'Book your ride now.', ctaText: 'Book Now', ctaLink: '/book' } },
+      { id: 'contact-bar-1', type: 'contact-bar', isEnabled: true, props: {} }
+    ],
+    seo: {
+      defaultMetaTitle: 'Chesterfield Taxi',
+      defaultMetaDescription: 'Professional Car Service in Chesterfield, MO',
+      defaultOpenGraphImage: ''
+    },
+    scripts: {
+      head: '',
+      footer: ''
+    },
+    customCss: ''
+  }
 };
 
 /**

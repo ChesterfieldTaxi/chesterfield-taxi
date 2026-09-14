@@ -369,10 +369,67 @@ The booking portal will guide the user through a sequential, config-driven flow:
   4. Otherwise, run the trip through the profile's Taximeter Step Bracket calculator (Flag drop + Primary Steps + Intermediate Increments + "Then" Open-Ended Steps + Delay Waiting Steps + Minimum Floor).
   5. Append applicable extras and universal surcharges.
   6. Log complete itemized profile audit trace step-by-step in the Live Simulator.
-# # #   1 9 .   P h a s e   2 3 :   A d v a n c e d   S y s t e m   A u d i t ,   C o d e   M a i n t a i n a b i l i t y   &   S t r e s s   T e s t i n g  
- -   * * U I   P o l i s h : * *   F i x   L i v e   F a r e   S i m u l a t o r   s i d e b a r   s t i c k y   p o s i t i o n .  
- -   * * M a i n t a i n a b i l i t y : * *   M o d u l a r   d e c o u p l i n g ,   d y n a m i c   t h e m e   a b s t r a c t i o n ,   s t r i c t   s c h e m a   t y p i n g .  
- -   * * P r i c i n g   E n g i n e : * *   D e t e r m i n i s m   a n d   c o l l i s i o n   r e s o l u t i o n .  
- -   * * S t r e s s   T e s t i n g : * *   D a t a   s e e d i n g   u t i l i t y   f o r   1 0 0 +   c o n c u r r e n t   t r i p s   a n d   v i r t u a l i z e d   l i s t   r e n d e r i n g .  
- -   * * S e c u r i t y : * *   A u d i t   f i r e s t o r e . r u l e s   a n d   c o m p o s i t e   i n d e x e s .  
- 
+### 19. Phase 23: Advanced System Audit, Code Maintainability & Stress Testing
+- **UI Polish:** Fix Live Fare Simulator sidebar sticky position.
+- **Maintainability:** Modular decoupling, dynamic theme abstraction, strict schema typing.
+- **Pricing Engine:** Determinism and collision resolution.
+- **Stress Testing:** Data seeding utility for 100+ concurrent trips and virtualized list rendering.
+- **Security:** Audit firestore.rules and composite indexes.
+
+### 20. Phase 24: Driver Mobile App & Real-Time Sync
+- **Mobile-Optimized Driver Console (`/driver`)**:
+  - Touch-friendly, high-contrast PWA interface optimized for smartphones, tablets, and in-vehicle dash mounts.
+  - Driver authentication and shift toggle: On-Duty, Off-Duty, and On-Break status controls updating driver availability and current active vehicle.
+  - Active Trip Card: High-visibility passenger details (name, one-tap calling, pickup/dropoff addresses, intermediate waypoints, passenger count, child safety seat equipment, flight details, and estimated fare).
+  - Step-by-Step Trip Lifecycle Transitions: Prominent single-tap status actions:
+    * `ACCEPT TRIP` (transitions trip to `assigned` or `accepted`)
+    * `EN ROUTE` (transitions trip to `en_route`)
+    * `ARRIVED AT PICKUP` (transitions trip to `arrived`)
+    * `START TRIP / IN_PROGRESS` (transitions trip to `in_progress`)
+    * `COMPLETE TRIP` (transitions trip to `completed`)
+    * `DECLINE` / `CANCEL` (returns trip to dispatch queue or cancels with reason).
+- **In-Vehicle Live Taximeter & Meter Adjustments**:
+  - Active during `in_progress` status.
+  - Real-time GPS distance and elapsed duration calculation based on the active Tariff Profile.
+  - Manual Extras Adder: Interface allowing drivers to append on-the-fly fees (tolls, airport surcharges, parking, luggage surcharge, cleaning fees) before completing the trip.
+  - Immediate fare recalculation reflecting dynamically in total trip cost and audit breakdown.
+- **Multi-Party Real-Time Firestore Synchronization**:
+  - Live `onSnapshot` listeners connecting driver actions to:
+    * Dispatcher Console (`/dispatch` queue tables, status badges, active vehicle tracking).
+    * Admin Dashboard (`/admin` active trip monitoring).
+    * Public Customer Booking Status Page (`/booking/status/:tripId`).
+
+### 21. Phase 25: Passenger Mobile Web App (`/app`)
+- **Mobile-First Passenger Portal (`/app`)**:
+  - Dedicated, responsive web application for Chesterfield Taxi passengers, optimized for smartphones and mobile browsers.
+  - Streamlined App Chrome: Clean, uncluttered layout with top nav and duplicate profile tabs removed in favor of a minimalist status bar with compact brand logo, customer greeting, and live ride beacon.
+  - Self-Contained Booking Flow: Fully embeds the `BookingEngineV2` upfront pricing, vehicle selection, child safety seats, airport flight tracking, and instant confirmation wizard directly in `/app` with zero redirects to `/book`.
+  - 1-Tap Saved Places Chips & Rebooking: Single-tap origin/destination chips ("Home", "Work", "Airport") and "Rebook" / "Ride To Here" actions automatically prefill the embedded engine and activate the booking tab in-place.
+- **Customer Account & Saved Places Manager**:
+  - Profile Management: Contact name, telephone number, email, default vehicle tier, and driver pickup notes (e.g. gate codes, preferred door, building entrance instructions).
+  - Communication Preferences: Interactive toggles for SMS dispatch updates, email digital receipts, and driver arrival phone calls.
+  - Saved Places CRUD: Add, edit, label, and categorize frequent origins and destinations with icons (`home`, `work`, `airport`, `medical`, `favorite`, `other`).
+- **Past Trip Receipts & Ride History**:
+  - Itemized Trip History: Filter and view past completed and cancelled reservations with date/time, vehicle tier, driver name, route details, and fare totals.
+  - Digital Receipts View & Download: Itemized printable receipt modal (`window.print()` print-ready layout) displaying company credentials, trip token, breakdown of base fare, mileage, waiting time, extras, and payment method.
+- **Navigation Decoupling & Dedicated App Shell Layout**:
+  - Public Main Navigation Header: Menu links strictly limited to `Home`, `Services`, `Fleet & Rates`, `About`, `Contact`. Includes a sleek "Sign In" button adjacent to the "Book Now" CTA linking into `/app`.
+  - Dedicated Passenger App Shell (`/app`): Decoupled from public marketing header and footer with isolated layout.
+  - Sticky Bottom & Dock Navigation: Ergonomic bottom navigation bar on mobile and floating bottom dock on desktop with tabs: `[ 🚖 Book ]`, `[ 📜 Trips ]`, `[ 📍 Places ]`, `[ 👤 Profile ]`.
+  - Floating Action Button (`?`) & Assistance Popover: Floating button anchored above the bottom nav opening a quick popover with 24/7 Dispatch Desk call button `(314) 738-0100`, direct office line `(314) 738-9921`, interactive Help Center & FAQ modal trigger, email dispatch, and website escape link.
+  - Help Center & FAQ Modal: Interactive guide covering airport pickup grace periods at Lambert STL, child car seat accommodations, luggage capacities, and 2-hour free cancellation policy.
+
+### 22. Phase 26: Modular Website Builder & White-Label CMS Studio
+- **Modular Component Registry & Dynamic Renderer**:
+  - `SECTION_REGISTRY` mapping configurable section types (`hero`, `booking-card`, `tariff-matrix`, `fleet-showcase`, `service-areas`, `testimonials`, `contact-bar`, `custom-html`) to pure UI React components.
+  - Page builder engine recursively interpreting JSON schema from the Firestore config to render components dynamically in order.
+- **Visual CMS Studio (`/admin?tab=website`)**:
+  - Live preview canvas alongside a drag-and-drop layout sorter.
+  - Property inspectors bound to each section schema (e.g. Hero headings, background images, and CTA routing).
+  - Expanded Theme Switcher with Google Fonts pairings, asset uploads, and accent colors.
+- **Advanced Marketing Tools**:
+  - SEO / Social Graph Manager allowing Meta Title, Meta Description, and OpenGraph Image configuration per logical route.
+  - CodeMirror / Monaco-based custom CSS editor for advanced site restyling.
+  - Header & Footer script injection boundaries for installing external marketing analytics and chatbots safely.
+
+

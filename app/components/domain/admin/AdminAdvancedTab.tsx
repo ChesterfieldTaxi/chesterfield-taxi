@@ -31,8 +31,9 @@ import {
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { getBookingService } from '../../../core/services/booking';
+import { AdminWebsiteTab } from './website/AdminWebsiteTab';
 
-export type AdvancedSubTab = 'form' | 'security' | 'audit' | 'system';
+export type AdvancedSubTab = 'form' | 'security' | 'audit' | 'system' | 'website';
 
 export interface AdminAdvancedTabProps {
   settings: AppSettings;
@@ -58,7 +59,12 @@ export function AdminAdvancedTab({
   useEffect(() => {
     if (initialSubTab === 'customer-form' || initialSubTab === 'form') {
       setActiveSub('form');
-    } else if (initialSubTab === 'security' || initialSubTab === 'audit' || initialSubTab === 'system') {
+    } else if (
+      initialSubTab === 'security' ||
+      initialSubTab === 'audit' ||
+      initialSubTab === 'system' ||
+      initialSubTab === 'website'
+    ) {
       setActiveSub(initialSubTab as AdvancedSubTab);
     }
   }, [initialSubTab]);
@@ -267,6 +273,19 @@ export function AdminAdvancedTab({
           >
             <SettingsIcon className="w-4 h-4 shrink-0" />
             <span>System Ops &amp; Backups</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSub('website')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+              activeSub === 'website'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <CarIcon className="w-4 h-4 shrink-0" />
+            <span>Website Studio</span>
           </button>
         </div>
 
@@ -1256,6 +1275,17 @@ export function AdminAdvancedTab({
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SUBPAGE 5: WEBSITE BUILDER & CMS STUDIO
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeSub === 'website' && (
+        <AdminWebsiteTab
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading || isSaving}
+        />
       )}
     </div>
   );

@@ -1259,6 +1259,31 @@ export default function DispatchRoute() {
         return <Badge variant="info">Offered</Badge>;
       case 'assigned':
         return <Badge variant="primary">Assigned</Badge>;
+      case 'accepted':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
+            Accepted
+          </span>
+        );
+      case 'en_route':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+            🚗 En Route
+          </span>
+        );
+      case 'arrived':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+            📍 Arrived
+          </span>
+        );
+      case 'in_progress':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            ⏱️ In Progress
+          </span>
+        );
       case 'completed':
         return <Badge variant="success">Completed</Badge>;
       case 'cancelled':
@@ -1266,6 +1291,7 @@ export default function DispatchRoute() {
       default:
         return <Badge variant="neutral">{status}</Badge>;
     }
+
   };
 
   // Active Draft object for map route display
