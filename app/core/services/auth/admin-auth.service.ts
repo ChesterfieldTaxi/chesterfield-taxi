@@ -50,8 +50,29 @@ export class AdminAuthService {
 
       if (userSnap.exists()) {
         const data = userSnap.data();
-        if (data && data.role) {
-          return data.role as UserRole;
+        let role = data?.role as UserRole | undefined;
+
+        // Self-healing: if a test driver account got stuck as 'customer', force upgrade it
+        if (role === 'customer' && user.email && user.email.toLowerCase().includes('driver')) {
+          role = 'driver';
+          await setDoc(userRef, { role }, { merge: true });
+          // Ensure a driver profile exists too
+          try {
+            const driverRef = doc(db, 'drivers', user.uid);
+            await setDoc(driverRef, {
+              id: user.uid,
+              name: user.displayName || user.email.split('@')[0],
+              phone: '(314) 738-0100',
+              dutyStatus: 'off_duty',
+              vehicleUnit: 'Unassigned',
+              vehicleTier: 'standard',
+              zone: 'Chesterfield'
+            }, { merge: true });
+          } catch (e) {}
+        }
+
+        if (role) {
+          return role;
         }
       }
 
