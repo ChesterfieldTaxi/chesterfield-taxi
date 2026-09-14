@@ -22,8 +22,21 @@ import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, Co
 
 type AdminZonesSubTab = 'zones' | 'groups' | 'collections';
 
-export function AdminZonesTab() {
-  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>('zones');
+export interface AdminZonesTabProps {
+  initialSubTab?: AdminZonesSubTab;
+}
+
+export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>(initialSubTab || 'zones');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+      setIsEditingZone(false);
+      setIsEditingGroup(false);
+      setIsEditingCollection(false);
+    }
+  }, [initialSubTab]);
 
   // Zones State
   const [zones, setZones] = useState<ZoneGeofence[]>([]);
@@ -441,60 +454,27 @@ export function AdminZonesTab() {
 
   return (
     <div className="space-y-6">
-      {/* ─── Top Sub-Navigation Bar ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveSubTab('zones');
-              setIsEditingZone(false);
-              setIsEditingGroup(false);
-              setIsEditingCollection(false);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'zones'
-                ? 'bg-white text-blue-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <MapPinIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Operational Zones ({zones.length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveSubTab('groups');
-              setIsEditingZone(false);
-              setIsEditingGroup(false);
-              setIsEditingCollection(false);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'groups'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <LayersIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span>Zone Groups ({zoneGroups.length})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveSubTab('collections');
-              setIsEditingZone(false);
-              setIsEditingGroup(false);
-              setIsEditingCollection(false);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'collections'
-                ? 'bg-white text-emerald-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CompassIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Location Collections ({locationCollections.length})</span>
-          </button>
+      {/* ─── Zones Top Action Bar ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSubTab === 'zones' && (
+            <>
+              <MapPinIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Operational Zones &amp; Geofences ({zones.length} active)</span>
+            </>
+          )}
+          {activeSubTab === 'groups' && (
+            <>
+              <LayersIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Zone Groups &amp; Pricing Corridors ({zoneGroups.length} groups)</span>
+            </>
+          )}
+          {activeSubTab === 'collections' && (
+            <>
+              <CompassIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>POI Location Collections ({locationCollections.length} collections)</span>
+            </>
+          )}
         </div>
 
         {/* Action Button for Active SubTab */}

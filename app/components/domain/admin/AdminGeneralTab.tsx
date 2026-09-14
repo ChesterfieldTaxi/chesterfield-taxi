@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AppSettings, CompanyConfig, BrandingConfig, LocalizationConfig } from '../../../core/types/config';
 import { Button } from '../../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../ui/Card';
@@ -12,6 +12,7 @@ export interface AdminGeneralTabProps {
   settings: AppSettings;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   isLoading?: boolean;
+  initialSubTab?: 'studio' | 'profile';
 }
 
 const DEFAULT_BRANDING: BrandingConfig = {
@@ -168,9 +169,20 @@ const BODY_FONTS = [
 
 const RADIUS_OPTIONS = ['0px', '4px', '8px', '12px', '16px', '9999px'];
 
-export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGeneralTabProps) {
+export function AdminGeneralTab({
+  settings,
+  onSave,
+  isLoading = false,
+  initialSubTab = 'studio',
+}: AdminGeneralTabProps) {
   // Navigation Sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<'studio' | 'profile'>('studio');
+  const [activeSubTab, setActiveSubTab] = useState<'studio' | 'profile'>(initialSubTab || 'studio');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // Company and Localization State
   const [company, setCompany] = useState<CompanyConfig>({ ...settings.company });
@@ -299,40 +311,12 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
 
   return (
     <div className="space-y-6">
-      {/* Sub-tab Navigation */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('studio')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeSubTab === 'studio'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <SparklesIcon className="w-4 h-4 shrink-0" />
-            <span>Dynamic Branding Studio</span>
-            {hasUnpublishedChanges && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Unpublished changes" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('profile')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeSubTab === 'profile'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <BuildingIcon className="w-4 h-4 shrink-0" />
-            <span>Business Profile &amp; Localization</span>
-          </button>
-        </div>
-
-        {activeSubTab === 'studio' && (
-          <div className="flex items-center gap-2">
+      {/* Contextual Action Bar */}
+      {activeSubTab === 'studio' && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2 px-2">
+            <SparklesIcon className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700">Dynamic Branding Studio</span>
             {hasUnpublishedChanges ? (
               <Badge variant="warning" size="sm">
                 ⚠️ Live Canvas (Draft Isolating)
@@ -342,6 +326,9 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
                 ✓ Published &amp; Synced Site-Wide
               </Badge>
             )}
+          </div>
+
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="primary"
@@ -354,8 +341,17 @@ export function AdminGeneralTab({ settings, onSave, isLoading = false }: AdminGe
               Publish Changes to Site-Wide
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {activeSubTab === 'profile' && (
+        <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2 px-2">
+            <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700">Business Profile &amp; Localization Settings</span>
+          </div>
+        </div>
+      )}
 
       {saveSuccess && (
         <Alert variant="success" title="Success">

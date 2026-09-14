@@ -293,7 +293,26 @@ export class MockBookingService implements IBookingService {
   }
 
   public async getBookingStatus(bookingId: string): Promise<BookingStatusResponse | null> {
-    const trip = this.trips.get(bookingId);
+    const rawId = (bookingId || '').trim();
+    const cleanId = rawId.replace(/^#/, '').trim();
+    const cleanLower = cleanId.toLowerCase();
+
+    let trip = this.trips.get(bookingId) || this.trips.get(cleanId);
+    if (!trip) {
+      for (const t of this.trips.values()) {
+        if (
+          t.id.toLowerCase() === cleanLower ||
+          t.id.toLowerCase().endsWith(cleanLower) ||
+          cleanLower.endsWith(t.id.toLowerCase()) ||
+          t.id.toLowerCase().includes(cleanLower) ||
+          (t.passenger?.phone?.replace(/\D/g, '').includes(cleanId.replace(/\D/g, '')) && cleanId.replace(/\D/g, '').length >= 7)
+        ) {
+          trip = t;
+          break;
+        }
+      }
+    }
+
     if (!trip) {
       return null;
     }

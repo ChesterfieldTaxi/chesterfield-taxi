@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import { getBookingService } from '../core/services/booking';
 import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import { PhoneIcon, SpinnerIcon } from '../components/ui/Icons';
+import { PhoneIcon, SpinnerIcon, SearchIcon } from '../components/ui/Icons';
 
 export function meta() {
   return [
@@ -24,11 +24,21 @@ const LIFECYCLE_STEPS: Array<{ key: TripStatus; label: string; desc: string }> =
 
 export default function BookingStatusRoute() {
   const params = useParams();
+  const navigate = useNavigate();
   const tripId = params.tripId || params.tripToken;
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchRef, setSearchRef] = useState('');
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = searchRef.trim().replace(/^#/, '');
+    if (clean) {
+      navigate(`/booking/status/${encodeURIComponent(clean)}`);
+    }
+  };
 
   useEffect(() => {
     if (!tripId) {
@@ -44,8 +54,9 @@ export default function BookingStatusRoute() {
       .then((res) => {
         if (res?.trip) {
           setTrip(res.trip);
+          setError(null);
         } else {
-          setError('Booking #' + tripId + ' not found.');
+          setError('Booking reference "' + tripId + '" not found in live system.');
         }
       })
       .catch((err) => {
@@ -61,6 +72,7 @@ export default function BookingStatusRoute() {
         tripId,
         (updatedTrip) => {
           setTrip(updatedTrip);
+          setError(null);
         },
         (err) => {
           console.warn('[BookingStatus] Realtime sync error:', err);
@@ -90,15 +102,42 @@ export default function BookingStatusRoute() {
           !
         </div>
         <h3 className="text-lg font-bold text-slate-900">Trip Not Found</h3>
-        <p className="text-xs text-slate-600 mt-2 mb-6">
-          {error || 'Unable to locate this reservation. Please verify your trip reference.'}
+        <p className="text-xs text-slate-600 mt-2 mb-5">
+          {error || 'Unable to locate this reservation. Please verify your trip reference or phone number.'}
         </p>
-        <Link
-          to="/book"
-          className="px-4 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
-        >
-          Book a Ride
-        </Link>
+
+        <form onSubmit={handleSearchSubmit} className="mb-6">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchRef}
+              onChange={(e) => setSearchRef(e.target.value)}
+              placeholder="Enter Trip ID or Phone #"
+              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-slate-900 text-white font-semibold text-sm rounded-xl hover:bg-slate-800 transition-colors"
+            >
+              Search
+            </button>
+          </div>
+        </form>
+
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            to="/book"
+            className="px-4 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            Book a Ride
+          </Link>
+          <a
+            href={`tel:${COMPANY_CONFIG.phone}`}
+            className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-colors"
+          >
+            Call Dispatch
+          </a>
+        </div>
       </div>
     );
   }

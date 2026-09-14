@@ -166,11 +166,15 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'types', label: 'Service Classes' },
     { key: 'fleet', label: 'Fleet Inventory' },
   ],
-  zones: [],
+  zones: [
+    { key: 'zones', label: 'Geofences' },
+    { key: 'groups', label: 'Zone Groups' },
+    { key: 'collections', label: 'POI Collections' },
+  ],
   operators: [],
   general: [
-    { key: 'branding', label: 'Branding Studio' },
-    { key: 'company', label: 'Business Profile' },
+    { key: 'studio', label: 'Branding Studio' },
+    { key: 'profile', label: 'Business Profile' },
   ],
   advanced: [
     { key: 'website', label: 'Website Studio' },
@@ -225,9 +229,10 @@ export default function AdminLayout() {
     activeSubParam = 'website';
   }
 
-  // Current subpages for the active tab
+  // Current subpages for the active tab (safely handle empty arrays)
   const currentSubList = SUB_PAGES[normalizedTab];
-  const effectiveSub = activeSubParam || (currentSubList ? currentSubList[0].key : undefined);
+  const effectiveSub =
+    activeSubParam || (currentSubList && currentSubList.length > 0 ? currentSubList[0].key : undefined);
 
   const handleTabChange = (key: AdminTabKey, sub?: string) => {
     const params: Record<string, string> = { tab: key };
@@ -507,7 +512,7 @@ export default function AdminLayout() {
               />
             )}
 
-            {normalizedTab === 'zones' && <AdminZonesTab />}
+            {normalizedTab === 'zones' && <AdminZonesTab initialSubTab={effectiveSub as any} />}
 
             {normalizedTab === 'operators' && <AdminOperatorsTab />}
 
@@ -520,12 +525,13 @@ export default function AdminLayout() {
               />
             )}
 
-            {/* Legacy Backward Compatibility Fallbacks */}
+            {/* General Settings */}
             {normalizedTab === 'general' && (
               <AdminGeneralTab
                 settings={settings}
                 onSave={handleSaveSettings}
                 isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
               />
             )}
 

@@ -315,19 +315,37 @@ export class FirebaseBookingService implements IBookingService {
   }
 
   public async getBookingStatus(bookingId: string): Promise<BookingStatusResponse | null> {
-    const tripDocRef = doc(this.db, this.collectionName, bookingId);
+    const rawId = (bookingId || '').trim();
+    const cleanId = rawId.replace(/^#/, '').trim();
+    const cleanLower = cleanId.toLowerCase();
+
     let trip: Trip | null = null;
-    try {
-      const snapshot = await getDoc(tripDocRef);
-      if (snapshot.exists()) {
-        trip = snapshot.data() as Trip;
+
+    // 1. Try direct doc lookup with raw and cleaned ID
+    for (const lookupKey of [cleanId, rawId]) {
+      if (!lookupKey) continue;
+      try {
+        const tripDocRef = doc(this.db, this.collectionName, lookupKey);
+        const snapshot = await getDoc(tripDocRef);
+        if (snapshot.exists()) {
+          trip = snapshot.data() as Trip;
+          break;
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-      // ignore
     }
 
+    // 2. Fallback to local trips with case-insensitive and suffix/phone matching
     if (!trip) {
-      trip = this.getLocalTrips().find((t) => t.id === bookingId) || null;
+      const locals = this.getLocalTrips();
+      trip =
+        locals.find((t) => t.id === cleanId || t.id === rawId) ||
+        locals.find((t) => t.id.toLowerCase() === cleanLower) ||
+        locals.find((t) => t.id.toLowerCase().endsWith(cleanLower) || cleanLower.endsWith(t.id.toLowerCase())) ||
+        locals.find((t) => t.id.toLowerCase().includes(cleanLower)) ||
+        locals.find((t) => t.passenger?.phone?.replace(/\D/g, '').includes(cleanId.replace(/\D/g, '')) && cleanId.replace(/\D/g, '').length >= 7) ||
+        null;
     }
 
     if (!trip) {
@@ -425,17 +443,37 @@ export class FirebaseBookingService implements IBookingService {
     onUpdate: (trip: Trip) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const local = this.getLocalTrips().find((t) => t.id === bookingId);
+    const rawId = (bookingId || '').trim();
+    const cleanId = rawId.replace(/^#/, '').trim();
+    const cleanLower = cleanId.toLowerCase();
+
+    const findMatch = () => {
+      const locals = this.getLocalTrips();
+      return (
+        locals.find((t) => t.id === cleanId || t.id === rawId) ||
+        locals.find((t) => t.id.toLowerCase() === cleanLower) ||
+        locals.find((t) => t.id.toLowerCase().endsWith(cleanLower) || cleanLower.endsWith(t.id.toLowerCase())) ||
+        locals.find((t) => t.id.toLowerCase().includes(cleanLower)) ||
+        null
+      );
+    };
+
+    const local = findMatch();
     if (local) {
       Promise.resolve().then(() => onUpdate(local)).catch(onError);
     }
 
     const handleLocalTripEvent = (e: any) => {
       const detail = e?.detail as Trip | undefined;
-      if (detail && detail.id === bookingId) {
+      if (
+        detail &&
+        (detail.id === cleanId ||
+          detail.id.toLowerCase() === cleanLower ||
+          detail.id.toLowerCase().includes(cleanLower))
+      ) {
         onUpdate(detail);
       } else {
-        const fresh = this.getLocalTrips().find((t) => t.id === bookingId);
+        const fresh = findMatch();
         if (fresh) onUpdate(fresh);
       }
     };
@@ -445,7 +483,7 @@ export class FirebaseBookingService implements IBookingService {
       window.addEventListener('storage', handleLocalTripEvent);
     }
 
-    const tripDocRef = doc(this.db, this.collectionName, bookingId);
+    const tripDocRef = doc(this.db, this.collectionName, cleanId || rawId);
 
     const unsubscribe = onSnapshot(
       tripDocRef,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AppSettings, VehicleTierConfig } from '../../../core/types/config';
 import { Button } from '../../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
@@ -31,7 +31,14 @@ export function AdminVehiclesTab({
   isLoading = false,
   initialSubTab = 'types',
 }: AdminVehiclesTabProps) {
-  const [subTab, setSubTab] = useState<'types' | 'fleet'>(initialSubTab);
+  const [subTab, setSubTab] = useState<'types' | 'fleet'>(initialSubTab || 'types');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const [vehicles, setVehicles] = useState<VehicleTierConfig[]>([...settings.vehicles]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -125,43 +132,23 @@ export function AdminVehiclesTab({
 
   return (
     <div className="space-y-6">
-      {/* ─── Vehicles Sub-Navigation ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        {/* Sub-navigation Pills */}
-        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setSubTab('types')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              subTab === 'types'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <TagIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Vehicle Classes</span>
-            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
-              {vehicles.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('fleet')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              subTab === 'fleet'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CarIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Physical Fleet</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">
-              {settings.fleet?.length || 4} Cars
-            </span>
-          </button>
+      {/* ─── Contextual Asset Summary ─── */}
+      <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {subTab === 'types' ? (
+            <>
+              <TagIcon className="w-4 h-4 text-blue-600" />
+              <span>Service Classes &amp; Multipliers ({vehicles.length} categories)</span>
+            </>
+          ) : (
+            <>
+              <CarIcon className="w-4 h-4 text-emerald-600" />
+              <span>Physical Fleet Inventory ({settings.fleet?.length || 4} vehicles active)</span>
+            </>
+          )}
         </div>
 
-        <div className="text-xs text-slate-500 font-medium">
+        <div className="text-xs text-slate-500 font-medium px-2">
           Fleet Asset Management
         </div>
       </div>

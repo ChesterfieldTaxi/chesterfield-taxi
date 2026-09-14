@@ -141,48 +141,20 @@ export function AdminCustomersSubpage({
 
   return (
     <div className="space-y-6">
-      {/* ─── Sub-Navigation Pills ─── */}
+      {/* ─── Customers Contextual Action Bar ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveSub('directory')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'directory'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <UsersIcon className="w-4 h-4 shrink-0" />
-            <span>Passenger Directory</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'directory' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {allCustomers.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('corporate')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'corporate'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <BuildingIcon className="w-4 h-4 shrink-0" />
-            <span>Corporate Client Accounts</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'corporate' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {corporateClients.length}
-            </span>
-          </button>
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSub === 'directory' ? (
+            <>
+              <UsersIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Passenger Directory ({allCustomers.length} profiles)</span>
+            </>
+          ) : (
+            <>
+              <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Corporate Client Accounts ({corporateClients.length} accounts)</span>
+            </>
+          )}
         </div>
 
         <div className="w-full sm:w-72">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type {
   AppSettings,
   CorporateAccountConfig,
@@ -31,7 +31,13 @@ export function AdminInvoicingSubpage({
   isLoading = false,
   initialSubTab = 'ledger',
 }: AdminInvoicingSubpageProps) {
-  const [activeSub, setActiveSub] = useState<InvoicingSubTab>(initialSubTab);
+  const [activeSub, setActiveSub] = useState<InvoicingSubTab>(initialSubTab || 'ledger');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSub(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // Invoices & Corporate state from settings
   const invoices = settings.invoices || [];
@@ -178,61 +184,27 @@ export function AdminInvoicingSubpage({
 
   return (
     <div className="space-y-6">
-      {/* ─── Sub-Navigation Pills ─── */}
+      {/* ─── Invoicing Contextual Action Bar ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveSub('ledger')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'ledger'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <FileTextIcon className="w-4 h-4 shrink-0" />
-            <span>Invoices &amp; Billing Ledger</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'ledger' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {invoices.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('accounts')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'accounts'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <BuildingIcon className="w-4 h-4 shrink-0" />
-            <span>Corporate Direct Accounts</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'accounts' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {corporateAccounts.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('gateways')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'gateways'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <CreditCardIcon className="w-4 h-4 shrink-0" />
-            <span>Payment Gateway &amp; Processing</span>
-          </button>
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSub === 'ledger' && (
+            <>
+              <FileTextIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Invoices &amp; Billing Ledger ({invoices.length} invoices)</span>
+            </>
+          )}
+          {activeSub === 'accounts' && (
+            <>
+              <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Corporate Direct Billing ({corporateAccounts.length} clients)</span>
+            </>
+          )}
+          {activeSub === 'gateways' && (
+            <>
+              <CreditCardIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Payment Gateway Terminals &amp; Processors</span>
+            </>
+          )}
         </div>
 
         {activeSub === 'ledger' && (

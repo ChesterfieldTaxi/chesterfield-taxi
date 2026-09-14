@@ -476,77 +476,39 @@ export function AdminRatesTab({
 
   return (
     <div className="space-y-6">
-      {/* Rates Top Sub-Navigation Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('tariffs')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'tariffs'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ZapIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-            <span>Unified Tariffs</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('base')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'base'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <SlidersIcon className="w-3.5 h-3.5 shrink-0 text-slate-500" />
-            <span>Base &amp; Legacy Simulator</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('named_rules')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'named_rules'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FileTextIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-            <span>Condition Rules</span>
-            <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
-              {namedRules.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('step_increments')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'step_increments'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <LayersIcon className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
-            <span>Step Increments</span>
-            {pricing.useStepIncrements && (
-              <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full">
-                ON
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('condition_surcharges')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'condition_surcharges'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <BabyIcon className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-            <span>Universal Surcharges</span>
-          </button>
+      {/* Rates Top Action Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSubTab === 'tariffs' && (
+            <>
+              <ZapIcon className="w-4 h-4 text-amber-500" />
+              <span>Unified Tariffs &amp; Regional Corridors</span>
+            </>
+          )}
+          {activeSubTab === 'base' && (
+            <>
+              <SlidersIcon className="w-4 h-4 text-slate-600" />
+              <span>Base Metered Rates &amp; Legacy Simulator</span>
+            </>
+          )}
+          {activeSubTab === 'named_rules' && (
+            <>
+              <FileTextIcon className="w-4 h-4 text-blue-600" />
+              <span>Named Pricing Rules &amp; Surcharges ({namedRules.length} rules)</span>
+            </>
+          )}
+          {activeSubTab === 'step_increments' && (
+            <>
+              <LayersIcon className="w-4 h-4 text-indigo-600" />
+              <span>Distance Step Increments &amp; Brackets</span>
+            </>
+          )}
+          {activeSubTab === 'condition_surcharges' && (
+            <>
+              <BabyIcon className="w-4 h-4 text-rose-600" />
+              <span>Universal Surcharges &amp; Equipment Adders</span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

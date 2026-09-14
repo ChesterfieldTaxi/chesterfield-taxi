@@ -130,48 +130,28 @@ export function AdminDashboardTab({
 
   return (
     <div className="space-y-6">
-      {/* ─── Sub-Navigation Pills ─── */}
+      {/* ─── Dashboard Contextual Action Bar ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveSub('overview')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'overview'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <BarChartIcon className="w-4 h-4 shrink-0" />
-            <span>Operational Overview</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('telemetry')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'telemetry'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <ActivityIcon className="w-4 h-4 shrink-0" />
-            <span>System Telemetry &amp; APIs</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('analytics')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'analytics'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <LayersIcon className="w-4 h-4 shrink-0" />
-            <span>Route &amp; Fleet Analytics</span>
-          </button>
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSub === 'overview' && (
+            <>
+              <BarChartIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Operational Fleet Overview &amp; Live Status</span>
+            </>
+          )}
+          {activeSub === 'telemetry' && (
+            <>
+              <ActivityIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>System Infrastructure &amp; API Connectivity</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-1" />
+            </>
+          )}
+          {activeSub === 'analytics' && (
+            <>
+              <LayersIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Route &amp; Fleet Analytics</span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

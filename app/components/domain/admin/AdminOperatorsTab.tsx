@@ -347,13 +347,14 @@ export function AdminOperatorsTab() {
   return (
     <div className="space-y-6">
       {/* ─── Operators Top Action Bar ─── */}
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Operational Staff &amp; Drivers ({operators.length})
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-2 px-2">
+          <ShieldIcon className="w-4 h-4 text-blue-600 shrink-0" />
+          <span className="text-xs font-bold text-slate-700">
+            Operational Staff &amp; Drivers ({operators.length} accounts)
           </span>
           <span className="hidden sm:inline-block text-xs text-slate-400">
-            RBAC Access Controls &amp; Fleet Assignments
+            • RBAC Access &amp; Fleet Assignments
           </span>
         </div>
 
