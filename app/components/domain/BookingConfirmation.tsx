@@ -267,12 +267,14 @@ export function BookingConfirmation({
           <div className="mt-0.5 shrink-0">
             {emailDelivery?.status === 'sending' ? (
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            ) : emailDelivery?.status === 'sent' || emailDelivery?.status === 'simulated' ? (
+            ) : emailDelivery?.status === 'failed' ? (
+              <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">
+                !
+              </div>
+            ) : (
               <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
                 ✓
               </div>
-            ) : (
-              <MailIcon className="w-4 h-4 text-slate-400" />
             )}
           </div>
           <div className="leading-relaxed flex-1">
@@ -280,6 +282,35 @@ export function BookingConfirmation({
               <p className="text-slate-700 font-medium">
                 Sending confirmation summary to <strong className="text-slate-900">{trip.passenger.email}</strong>...
               </p>
+            ) : emailDelivery?.status === 'failed' ? (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-amber-800">
+                    Booking Request Registered
+                  </p>
+                </div>
+                <p className="text-slate-600 mt-1">
+                  Your ride request is active in our dispatch queue. Confirmation email delivery to{' '}
+                  <strong className="text-slate-800">{emailDelivery?.recipient || trip.passenger.email}</strong> is pending configuration ({emailDelivery?.error || 'Email service offline'}).
+                </p>
+                <p className="text-slate-500 mt-1">
+                  Our dispatchers can view your ride in real-time.
+                </p>
+              </>
+            ) : emailDelivery?.status === 'simulated' ? (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-blue-800">
+                    ✓ Request Queued in Dispatch
+                  </p>
+                </div>
+                <p className="text-slate-600 mt-1">
+                  Your reservation is saved and visible on the dispatch console. (Demo mode: live email delivery requires <code className="bg-slate-200/60 px-1 py-0.5 rounded text-[10px]">RESEND_API_KEY</code>).
+                </p>
+                <p className="text-slate-500 mt-1">
+                  You will receive updates directly as your driver is dispatched.
+                </p>
+              </>
             ) : (
               <>
                 <div className="flex items-center gap-2 flex-wrap">

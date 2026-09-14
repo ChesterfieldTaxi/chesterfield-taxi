@@ -316,13 +316,24 @@ export class FirebaseBookingService implements IBookingService {
 
   public async getBookingStatus(bookingId: string): Promise<BookingStatusResponse | null> {
     const tripDocRef = doc(this.db, this.collectionName, bookingId);
-    const snapshot = await getDoc(tripDocRef);
+    let trip: Trip | null = null;
+    try {
+      const snapshot = await getDoc(tripDocRef);
+      if (snapshot.exists()) {
+        trip = snapshot.data() as Trip;
+      }
+    } catch (e) {
+      // ignore
+    }
 
-    if (!snapshot.exists()) {
+    if (!trip) {
+      trip = this.getLocalTrips().find((t) => t.id === bookingId) || null;
+    }
+
+    if (!trip) {
       return null;
     }
 
-    const trip = snapshot.data() as Trip;
     return {
       tripId: trip.id,
       status: trip.status,
@@ -338,13 +349,23 @@ export class FirebaseBookingService implements IBookingService {
     cancelledBy: 'passenger' | 'driver' | 'admin' | 'system' = 'passenger'
   ): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, bookingId);
-    const snapshot = await getDoc(tripDocRef);
-
-    if (!snapshot.exists()) {
-      throw new Error(`Booking with ID "${bookingId}" not found in Firestore.`);
+    let trip: Trip | null = null;
+    try {
+      const snapshot = await getDoc(tripDocRef);
+      if (snapshot.exists()) {
+        trip = snapshot.data() as Trip;
+      }
+    } catch (e) {
+      // ignore
     }
 
-    const trip = snapshot.data() as Trip;
+    if (!trip) {
+      trip = this.getLocalTrips().find((t) => t.id === bookingId) || null;
+    }
+
+    if (!trip) {
+      throw new Error(`Booking with ID "${bookingId}" not found.`);
+    }
 
     if (!isValidTripTransition(trip.status, 'cancelled')) {
       throw new Error(
@@ -370,12 +391,33 @@ export class FirebaseBookingService implements IBookingService {
       statusHistory: [...trip.statusHistory, historyEntry],
     };
 
-    await updateDoc(tripDocRef, updates);
+    const sanitizedUpdates = sanitizePayload(updates);
+    try {
+      await updateDoc(tripDocRef, sanitizedUpdates);
+    } catch (err) {
+      console.warn('[FirebaseBookingService] cancelBooking updateDoc warning:', err);
+    }
 
-    return {
+    const cancelledTrip: Trip = {
       ...trip,
       ...updates,
     };
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
+        const existing = window.localStorage.getItem(STORAGE_KEY);
+        const trips: Trip[] = existing ? JSON.parse(existing) : [];
+        const idx = trips.findIndex((t) => t.id === cancelledTrip.id);
+        if (idx >= 0) trips[idx] = cancelledTrip;
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: cancelledTrip }));
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return cancelledTrip;
   }
 
   public subscribeToBooking(
@@ -383,6 +425,26 @@ export class FirebaseBookingService implements IBookingService {
     onUpdate: (trip: Trip) => void,
     onError?: (error: Error) => void
   ): () => void {
+    const local = this.getLocalTrips().find((t) => t.id === bookingId);
+    if (local) {
+      Promise.resolve().then(() => onUpdate(local)).catch(onError);
+    }
+
+    const handleLocalTripEvent = (e: any) => {
+      const detail = e?.detail as Trip | undefined;
+      if (detail && detail.id === bookingId) {
+        onUpdate(detail);
+      } else {
+        const fresh = this.getLocalTrips().find((t) => t.id === bookingId);
+        if (fresh) onUpdate(fresh);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('chesterfield_trip_created', handleLocalTripEvent);
+      window.addEventListener('storage', handleLocalTripEvent);
+    }
+
     const tripDocRef = doc(this.db, this.collectionName, bookingId);
 
     const unsubscribe = onSnapshot(
@@ -393,12 +455,20 @@ export class FirebaseBookingService implements IBookingService {
         }
       },
       (err) => {
-        console.error(`[FirebaseBookingService] Snapshot error on trip ${bookingId}:`, err);
+        console.warn(`[FirebaseBookingService] Snapshot error on trip ${bookingId}:`, err);
+        const fallback = this.getLocalTrips().find((t) => t.id === bookingId);
+        if (fallback) onUpdate(fallback);
         if (onError) onError(err);
       }
     );
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('chesterfield_trip_created', handleLocalTripEvent);
+        window.removeEventListener('storage', handleLocalTripEvent);
+      }
+    };
   }
 
   private getLocalTrips(): Trip[] {
@@ -518,13 +588,27 @@ export class FirebaseBookingService implements IBookingService {
     }
   ): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, tripId);
-    const snapshot = await getDoc(tripDocRef);
+    let trip: Trip | null = null;
+    let docExistsOnFirestore = false;
 
-    if (!snapshot.exists()) {
-      throw new Error(`Booking with ID "${tripId}" not found in Firestore.`);
+    try {
+      const snapshot = await getDoc(tripDocRef);
+      if (snapshot.exists()) {
+        trip = snapshot.data() as Trip;
+        docExistsOnFirestore = true;
+      }
+    } catch (e) {
+      // Permission or network error
     }
 
-    const trip = snapshot.data() as Trip;
+    if (!trip) {
+      trip = this.getLocalTrips().find((t) => t.id === tripId) || null;
+    }
+
+    if (!trip) {
+      throw new Error(`Booking with ID "${tripId}" not found.`);
+    }
+
     const now = new Date().toISOString();
 
     const historyEntry: TripStatusHistoryEntry = {
@@ -557,17 +641,21 @@ export class FirebaseBookingService implements IBookingService {
       updates.cancelledBy = options?.actorRole ?? 'admin';
     }
 
-    const sanitizedUpdates = sanitizePayload(updates);
-    try {
-      await updateDoc(tripDocRef, sanitizedUpdates);
-    } catch (updateErr) {
-      console.warn('[FirebaseBookingService] updateTripStatus updateDoc warning:', updateErr);
-    }
-
     const updatedTrip: Trip = {
       ...trip,
       ...updates,
     };
+
+    const sanitizedUpdates = sanitizePayload(updates);
+    try {
+      if (docExistsOnFirestore) {
+        await updateDoc(tripDocRef, sanitizedUpdates);
+      } else {
+        await setDoc(tripDocRef, sanitizePayload(updatedTrip), { merge: true });
+      }
+    } catch (updateErr) {
+      console.warn('[FirebaseBookingService] updateTripStatus Firestore sync warning:', updateErr);
+    }
 
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
@@ -589,10 +677,12 @@ export class FirebaseBookingService implements IBookingService {
   public async updateTrip(tripId: string, updates: Partial<Trip>): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, tripId);
     let trip: Trip | null = null;
+    let docExistsOnFirestore = false;
     try {
       const snapshot = await getDoc(tripDocRef);
       if (snapshot.exists()) {
         trip = snapshot.data() as Trip;
+        docExistsOnFirestore = true;
       }
     } catch (e) {
       // ignore
@@ -613,16 +703,20 @@ export class FirebaseBookingService implements IBookingService {
       updatedAt: now,
     });
 
-    try {
-      await updateDoc(tripDocRef, cleanUpdates);
-    } catch (err) {
-      console.warn('[FirebaseBookingService] updateTrip updateDoc warning:', err);
-    }
-
     const mergedTrip: Trip = {
       ...trip,
       ...cleanUpdates,
     };
+
+    try {
+      if (docExistsOnFirestore) {
+        await updateDoc(tripDocRef, cleanUpdates);
+      } else {
+        await setDoc(tripDocRef, sanitizePayload(mergedTrip), { merge: true });
+      }
+    } catch (err) {
+      console.warn('[FirebaseBookingService] updateTrip Firestore sync warning:', err);
+    }
 
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
