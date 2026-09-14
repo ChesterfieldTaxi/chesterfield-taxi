@@ -18,9 +18,23 @@ export interface UserDropdownProps {
    * 'dark': light text on dark header (Admin)
    */
   variant?: 'light' | 'dark';
+  /**
+   * Drop direction: if true, opens upwards (for bottom navigation rails)
+   */
+  dropUp?: boolean;
+  /**
+   * If true, displays only the user avatar button (for collapsed sidebar)
+   */
+  collapsed?: boolean;
 }
 
-export function UserDropdown({ email, onSignOut, variant = 'light' }: UserDropdownProps) {
+export function UserDropdown({
+  email,
+  onSignOut,
+  variant = 'light',
+  dropUp = false,
+  collapsed = false,
+}: UserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -50,24 +64,38 @@ export function UserDropdown({ email, onSignOut, variant = 'light' }: UserDropdo
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer select-none border ${
+        className={`flex items-center gap-2 transition-all cursor-pointer select-none border ${
+          collapsed ? 'p-1 rounded-full' : 'px-2.5 py-1.5 rounded-xl'
+        } ${
           variant === 'dark'
             ? 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 text-slate-100 hover:text-white'
             : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900'
         }`}
-        title="Account Menu"
+        title={`Account: ${displayEmail}`}
       >
         <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
           {initial}
         </div>
-        <span className="text-xs font-semibold tracking-tight max-w-[160px] sm:max-w-[220px] truncate">
-          {displayEmail}
-        </span>
-        <ChevronDownIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        {!collapsed && (
+          <>
+            <span className="text-xs font-semibold tracking-tight max-w-[160px] sm:max-w-[220px] truncate">
+              {displayEmail}
+            </span>
+            <ChevronDownIcon
+              className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+                dropUp && isOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </>
+        )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+        <div
+          className={`absolute ${
+            dropUp ? 'bottom-full mb-2 left-0' : 'right-0 mt-2'
+          } w-72 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100`}
+        >
           {/* User Header */}
           <div className="px-4 py-2.5">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">

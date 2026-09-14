@@ -160,86 +160,108 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         } ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
         {/* Top Brand Banner */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800/80 shrink-0">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div
-              style={{
-                backgroundColor: 'var(--brand-primary, #2563eb)',
-                color: 'var(--btn-primary-text, #ffffff)',
-              }}
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-xs shrink-0"
-            >
-              <CarIcon className="w-5 h-5" />
-            </div>
-
-            {!isCollapsed && (
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-sm text-white tracking-tight truncate">
-                    {settings.company?.name || COMPANY_CONFIG.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <span className="font-semibold uppercase tracking-wider text-[10px] text-blue-400">
-                    Admin
-                  </span>
-                  <span>•</span>
-                  <span
-                    className={`inline-block w-1.5 h-1.5 rounded-full ${
-                      isLiveFirebase ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-amber-400'
-                    }`}
+        <div
+          className={`h-16 flex items-center border-b border-slate-800/80 shrink-0 ${
+            isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+          }`}
+        >
+          {isCollapsed ? (
+            <div className="relative group flex items-center justify-center">
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="w-10 h-10 rounded-xl flex items-center justify-center font-black shadow-md hover:scale-105 transition-all cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--brand-primary, #2563eb)',
+                  color: 'var(--btn-primary-text, #ffffff)',
+                }}
+                title={`Expand sidebar - ${settings.company?.name || COMPANY_CONFIG.name}`}
+              >
+                {settings.branding?.logoUrl ? (
+                  <img
+                    src={settings.branding.logoUrl}
+                    alt={settings.company?.name || COMPANY_CONFIG.name}
+                    className="w-6 h-6 object-contain"
                   />
-                  <span className="text-[10px] font-medium text-slate-400">
-                    {isLiveFirebase ? 'Cloud' : 'Local'}
-                  </span>
+                ) : (
+                  <CarIcon className="w-5 h-5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-slate-800 hover:bg-blue-600 border border-slate-700 hover:border-blue-500 rounded-full flex items-center justify-center text-slate-300 hover:text-white transition-colors shadow-xs cursor-pointer"
+                title="Expand sidebar"
+              >
+                <ChevronRightIcon className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                <div
+                  style={{
+                    backgroundColor: 'var(--brand-primary, #2563eb)',
+                    color: 'var(--btn-primary-text, #ffffff)',
+                  }}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-xs shrink-0"
+                >
+                  {settings.branding?.logoUrl ? (
+                    <img
+                      src={settings.branding.logoUrl}
+                      alt={settings.company?.name || COMPANY_CONFIG.name}
+                      className="w-6 h-6 object-contain"
+                    />
+                  ) : (
+                    <CarIcon className="w-5 h-5" />
+                  )}
+                </div>
+
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-white tracking-tight truncate">
+                      {settings.company?.name || COMPANY_CONFIG.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span className="font-semibold uppercase tracking-wider text-[10px] text-blue-400">
+                      Admin
+                    </span>
+                    <span>•</span>
+                    <span
+                      className={`inline-block w-1.5 h-1.5 rounded-full ${
+                        isLiveFirebase ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-amber-400'
+                      }`}
+                    />
+                    <span className="text-[10px] font-medium text-slate-400">
+                      {isLiveFirebase ? 'Cloud' : 'Local'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Desktop Collapse Toggle / Mobile Close Button */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={onCloseMobile}
-              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Close navigation"
-            >
-              <XIcon className="w-5 h-5" />
-            </button>
+              {/* Desktop Collapse Toggle / Mobile Close Button */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={onCloseMobile}
+                  className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Close navigation"
+                >
+                  <XIcon className="w-5 h-5" />
+                </button>
 
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isCollapsed ? (
-                <ChevronRightIcon className="w-4 h-4" />
-              ) : (
-                <ChevronLeftIcon className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Primary Dispatch Action Button */}
-        <div className="p-3 border-b border-slate-800/80 shrink-0">
-          <Link
-            to="/dispatch"
-            reloadDocument
-            style={{
-              backgroundColor: 'var(--brand-primary, #2563eb)',
-              color: 'var(--btn-primary-text, #ffffff)',
-            }}
-            className={`w-full py-2.5 rounded-xl font-bold text-xs shadow-md hover:shadow-blue-500/20 hover:opacity-95 transition-all flex items-center justify-center gap-2 group active:scale-98 ${
-              isCollapsed ? 'px-2' : 'px-3'
-            }`}
-            title="Launch Live 3-Pane Dispatch Console"
-          >
-            <RadioIcon className="w-4 h-4 shrink-0 animate-pulse text-white" />
-            {!isCollapsed && <span className="truncate">Live Dispatch</span>}
-          </Link>
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Navigation Group Items */}
@@ -299,38 +321,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </nav>
 
         {/* Bottom User & Utility Bar */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/40 shrink-0 space-y-2">
-          {/* Public Site Link */}
-          {!isCollapsed ? (
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between px-3 py-1.5 text-xs text-slate-400 hover:text-blue-400 hover:bg-slate-800/60 rounded-lg transition-colors group"
-            >
-              <span className="font-medium">Public Passenger Site</span>
-              <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400" />
-            </a>
-          ) : (
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-800/60 rounded-lg transition-colors"
-              title="Open Public Passenger Site"
-            >
-              <ExternalLinkIcon className="w-4 h-4" />
-            </a>
-          )}
-
-          {/* User Profile & Sign Out Dropdown */}
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-2'}`}>
-            <UserDropdown
-              email={user?.email}
-              onSignOut={onSignOut}
-              variant="dark"
-            />
-          </div>
+        <div className={`p-3 border-t border-slate-800/80 bg-slate-950/40 shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-2'}`}>
+          <UserDropdown
+            email={user?.email}
+            onSignOut={onSignOut}
+            variant="dark"
+            dropUp={true}
+            collapsed={isCollapsed}
+          />
         </div>
       </aside>
     </>

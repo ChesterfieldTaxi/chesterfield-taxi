@@ -226,68 +226,27 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
   return (
     <div className="space-y-6">
-      {/* ─── Sub-Navigation Pills ─── */}
+      {/* ─── Trips Contextual Action Bar ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveSub('dispatch')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'dispatch'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <ActivityIcon className="w-4 h-4 shrink-0" />
-            <span>Active Dispatch Queue</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'dispatch' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {activeDispatchTrips.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('history')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'history'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <HistoryIcon className="w-4 h-4 shrink-0" />
-            <span>Trip History & Search</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'history' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {trips.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('exceptions')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'exceptions'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <AlertTriangleIcon className="w-4 h-4 shrink-0" />
-            <span>Exceptions & Cancellations</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'exceptions' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
-              }`}
-            >
-              {exceptionTrips.length}
-            </span>
-          </button>
+        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+          {activeSub === 'dispatch' && (
+            <>
+              <ActivityIcon className="w-4 h-4 text-blue-600" />
+              <span>Active Queue ({activeDispatchTrips.length} active trips)</span>
+            </>
+          )}
+          {activeSub === 'history' && (
+            <>
+              <HistoryIcon className="w-4 h-4 text-blue-600" />
+              <span>Trip Archive ({trips.length} records)</span>
+            </>
+          )}
+          {activeSub === 'exceptions' && (
+            <>
+              <AlertTriangleIcon className="w-4 h-4 text-rose-500" />
+              <span>Exceptions & Cancellations ({exceptionTrips.length} flagged)</span>
+            </>
+          )}
         </div>
 
         {/* Global Export Tools */}

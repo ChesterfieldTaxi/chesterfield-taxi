@@ -127,48 +127,56 @@ const PRIMARY_TABS: TabItem[] = [
     icon: SettingsIcon,
     description: 'Dynamic branding studio, company profile, and regional localization',
   },
+  {
+    key: 'advanced',
+    label: 'Advanced Settings',
+    icon: SettingsIcon,
+    description: 'Visual website studio, security permissions, audit trails, and maintenance',
+  },
 ];
 
 export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = {
   dashboard: [
-    { key: 'overview', label: '📊 Overview' },
-    { key: 'telemetry', label: '🛰️ Infrastructure & Telemetry' },
-    { key: 'analytics', label: '📈 Analytics & Corridors' },
+    { key: 'overview', label: 'Overview' },
+    { key: 'telemetry', label: 'Telemetry' },
+    { key: 'analytics', label: 'Analytics' },
   ],
   trips: [
-    { key: 'dispatch', label: '🚕 Active Queue' },
-    { key: 'history', label: '📜 Trip History & Archive' },
-    { key: 'exceptions', label: '⚠️ Exceptions & Cancellations' },
+    { key: 'dispatch', label: 'Active Queue' },
+    { key: 'history', label: 'Trip History' },
+    { key: 'exceptions', label: 'Exceptions' },
   ],
   invoicing: [
-    { key: 'ledger', label: '📑 Invoices & Statements' },
-    { key: 'accounts', label: '🏢 Corporate Direct Accounts' },
-    { key: 'gateways', label: '💳 Payment Gateways & Terminals' },
+    { key: 'ledger', label: 'Invoices' },
+    { key: 'accounts', label: 'Corporate Accounts' },
+    { key: 'gateways', label: 'Payment Gateways' },
   ],
   customers: [
-    { key: 'directory', label: '👤 Passenger Directory' },
-    { key: 'corporate', label: '🏢 Corporate Client Accounts' },
+    { key: 'directory', label: 'Directory' },
+    { key: 'corporate', label: 'Corporate' },
   ],
   rates: [
-    { key: 'tariffs', label: '⚡ Unified Tariffs' },
-    { key: 'base', label: '💵 Standard Base Rates' },
-    { key: 'named_rules', label: '⚡ Named Surge Rules' },
-    { key: 'step_increments', label: '📏 Distance Tiers' },
-    { key: 'condition_surcharges', label: '➕ Condition Surcharges' },
+    { key: 'tariffs', label: 'Unified Tariffs' },
+    { key: 'base', label: 'Standard Rates' },
+    { key: 'named_rules', label: 'Surge Rules' },
+    { key: 'step_increments', label: 'Distance Tiers' },
+    { key: 'condition_surcharges', label: 'Surcharges' },
   ],
   vehicles: [
-    { key: 'types', label: '🏷️ Service Classes' },
-    { key: 'fleet', label: '🚗 Physical Motor Fleet' },
+    { key: 'types', label: 'Service Classes' },
+    { key: 'fleet', label: 'Fleet Inventory' },
   ],
+  zones: [],
+  operators: [],
   general: [
-    { key: 'branding', label: '🎨 Branding Studio' },
-    { key: 'company', label: '🏢 Business Profile' },
+    { key: 'branding', label: 'Branding Studio' },
+    { key: 'company', label: 'Business Profile' },
   ],
   advanced: [
-    { key: 'website', label: '🌐 Website Studio' },
-    { key: 'security', label: '🛡️ Security & 2FA' },
-    { key: 'audit', label: '📜 Config Audit Trail' },
-    { key: 'system', label: '⚙️ System Ops & Backups' },
+    { key: 'website', label: 'Website Studio' },
+    { key: 'security', label: 'Security & Access' },
+    { key: 'audit', label: 'Audit Trail' },
+    { key: 'system', label: 'System Ops' },
   ],
 };
 
@@ -322,6 +330,7 @@ export default function AdminLayout() {
 
   const currentTabObj =
     PRIMARY_TABS.find((t) => t.key === normalizedTab) || PRIMARY_TABS[0];
+  const activeSubList = SUB_PAGES[normalizedTab] || [];
 
   return (
     <div
@@ -363,33 +372,51 @@ export default function AdminLayout() {
 
       {/* ─── Main Admin Workspace Canvas ─── */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        {/* Top Control Header with Breadcrumbs & Actions */}
+        {/* Top Control Header with Section Title, Sub-Tab Menu & Actions */}
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
           <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-            {/* Left: Mobile Toggle & Breadcrumbs */}
-            <div className="flex items-center gap-3 min-w-0">
+            {/* Left: Mobile Toggle, Active Section Title, and Sub-Tab Navigation Bar */}
+            <div className="flex items-center gap-3.5 min-w-0 overflow-hidden">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
                 title="Open Navigation Menu"
               >
                 <MenuIcon className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500 truncate">
-                <span className="text-slate-400 font-medium">Admin</span>
-                <span className="text-slate-300">/</span>
-                <span className="text-slate-900 font-bold capitalize">{currentTabObj.label}</span>
-                {effectiveSub && (
-                  <>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-blue-600 font-bold capitalize">
-                      {effectiveSub.replace(/-/g, ' ')}
-                    </span>
-                  </>
-                )}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
+                  {currentTabObj.label}
+                </span>
               </div>
+
+              {/* Top Sub-Tab Navigation Bar */}
+              {activeSubList.length > 0 && (
+                <>
+                  <div className="h-5 w-px bg-slate-200 shrink-0 hidden sm:block" />
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                    {activeSubList.map((sub) => {
+                      const isActive = effectiveSub === sub.key;
+                      return (
+                        <button
+                          key={sub.key}
+                          type="button"
+                          onClick={() => handleTabChange(normalizedTab, sub.key)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{sub.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Right: Quick Launch Dispatch, Public Link, Status Badge */}

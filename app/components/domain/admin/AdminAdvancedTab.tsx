@@ -154,95 +154,43 @@ export function AdminAdvancedTab({
 
   return (
     <div className="space-y-6">
-      {/* ─── Sub-Navigation Pills ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveSub('website')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'website'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <CarIcon className="w-4 h-4 shrink-0" />
-            <span>Website Studio</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('security')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'security'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <ShieldIcon className="w-4 h-4 shrink-0" />
-            <span>Security &amp; Access</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('audit')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'audit'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <HistoryIcon className="w-4 h-4 shrink-0" />
-            <span>Config Audit Trail</span>
-            <span
-              className={`text-[11px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                activeSub === 'audit' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
+      {/* Contextual Action Bar for Audit / System Export */}
+      {(activeSub === 'audit' || activeSub === 'system') && (
+        <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="text-xs font-bold text-slate-700 px-2">
+            {activeSub === 'audit' ? (
+              <span>Config Audit Trail ({auditLogs.length} logged events)</span>
+            ) : (
+              <span>System Operations, Diagnostics & Backups</span>
+            )}
+          </div>
+          {activeSub === 'audit' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportAuditLogs}
+              className="text-xs font-bold inline-flex items-center gap-1.5"
             >
-              {auditLogs.length}
-            </span>
-          </button>
+              <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Export Audit Log (JSON)</span>
+            </Button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveSub('system')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'system'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <SettingsIcon className="w-4 h-4 shrink-0" />
-            <span>System Ops &amp; Backups</span>
-          </button>
+          {activeSub === 'system' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportFullConfig}
+              className="text-xs font-bold inline-flex items-center gap-1.5"
+            >
+              <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Export Full System Config</span>
+            </Button>
+          )}
         </div>
-
-        {activeSub === 'audit' && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportAuditLogs}
-            className="text-xs font-bold inline-flex items-center gap-1.5"
-          >
-            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Export Audit Log (JSON)</span>
-          </Button>
-        )}
-
-        {activeSub === 'system' && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportFullConfig}
-            className="text-xs font-bold inline-flex items-center gap-1.5"
-          >
-            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Export Full System Config</span>
-          </Button>
-        )}
-      </div>
+      )}
 
       {saveSuccessMessage && (
         <Alert variant="success" className="animate-in fade-in text-xs font-semibold">
