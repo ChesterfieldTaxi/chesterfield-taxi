@@ -26,6 +26,7 @@ import {
   LuggageIcon,
   MailIcon,
   FlagIcon,
+  LogOutIcon,
 } from '../components/ui/Icons';
 
 export function meta() {
@@ -437,8 +438,21 @@ export default function DriverAppRoute() {
           </div>
         </div>
 
-        {/* Driver Shift Duty Status Dropdown */}
+        {/* Driver Header Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              import('../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+                getAdminAuthService().signOut();
+              });
+            }}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Sign Out"
+          >
+            <LogOutIcon className="w-5 h-5" />
+          </button>
+          
           <div className="relative">
             <select
               value={driver?.dutyStatus || 'off_duty'}
