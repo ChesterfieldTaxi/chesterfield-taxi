@@ -415,28 +415,30 @@ export default function DriverAppRoute() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-24 select-none antialiased">
       {/* Top Mobile App Header */}
-      <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-sm">
+      <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-md gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
             CT
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-sm text-white leading-tight">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="font-bold text-sm text-white leading-tight truncate max-w-[170px] sm:max-w-none">
                 {driver?.name || 'Driver Console'}
               </h1>
-              <span className="text-[10px] bg-slate-800 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700">
-                {driver?.vehicleUnit}
-              </span>
+              {driver?.vehicleUnit && (
+                <span className="text-[9px] bg-slate-800 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">
+                  {driver.vehicleUnit}
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-slate-400">
-              {COMPANY_CONFIG.name} · Dispatch: {COMPANY_CONFIG.phone.dispatch}
+            <p className="text-[10px] text-slate-400 truncate">
+              {COMPANY_CONFIG.name} · {COMPANY_CONFIG.phone.dispatch}
             </p>
           </div>
         </div>
 
         {/* Driver Shift Duty Status Dropdown */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative">
             <select
               value={driver?.dutyStatus || 'off_duty'}
@@ -1198,43 +1200,52 @@ export default function DriverAppRoute() {
                   return (
                     <div
                       key={key}
-                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-2 ${
+                      className={`p-3 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                         dayConfig.enabled
                           ? 'bg-slate-950/80 border-slate-700/80'
                           : 'bg-slate-950/30 border-slate-800/40 opacity-60'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-[100px]">
-                        <input
-                          type="checkbox"
-                          checked={dayConfig.enabled}
-                          onChange={() => handleToggleDay(key)}
-                          id={`day-${key}`}
-                          className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                        />
-                        <label htmlFor={`day-${key}`} className="text-xs font-bold text-white cursor-pointer">
-                          {label}
-                        </label>
+                      <div className="flex items-center justify-between sm:justify-start gap-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={dayConfig.enabled}
+                            onChange={() => handleToggleDay(key)}
+                            id={`day-${key}`}
+                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                          />
+                          <label htmlFor={`day-${key}`} className="text-xs font-bold text-white cursor-pointer select-none">
+                            {label}
+                          </label>
+                        </div>
+                        {!dayConfig.enabled && (
+                          <span className="text-[11px] text-slate-500 font-semibold italic sm:hidden">Off-duty / Closed</span>
+                        )}
                       </div>
 
                       {dayConfig.enabled ? (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <input
-                            type="time"
-                            value={dayConfig.startHour}
-                            onChange={(e) => handleTimeChange(key, 'startHour', e.target.value)}
-                            className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 outline-none text-xs"
-                          />
-                          <span className="text-slate-400 text-[10px]">to</span>
-                          <input
-                            type="time"
-                            value={dayConfig.endHour}
-                            onChange={(e) => handleTimeChange(key, 'endHour', e.target.value)}
-                            className="bg-slate-800 border border-slate-700 text-white rounded-lg px-2 py-1 outline-none text-xs"
-                          />
+                        <div className="flex items-center gap-2 text-xs w-full sm:w-auto">
+                          <div className="flex-1 sm:flex-initial min-w-0">
+                            <input
+                              type="time"
+                              value={dayConfig.startHour}
+                              onChange={(e) => handleTimeChange(key, 'startHour', e.target.value)}
+                              className="w-full sm:w-auto bg-slate-800 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 outline-none text-xs text-center"
+                            />
+                          </div>
+                          <span className="text-slate-400 text-xs px-1 shrink-0">to</span>
+                          <div className="flex-1 sm:flex-initial min-w-0">
+                            <input
+                              type="time"
+                              value={dayConfig.endHour}
+                              onChange={(e) => handleTimeChange(key, 'endHour', e.target.value)}
+                              className="w-full sm:w-auto bg-slate-800 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 outline-none text-xs text-center"
+                            />
+                          </div>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-slate-500 font-semibold italic">Off-duty / Closed</span>
+                        <span className="text-[11px] text-slate-500 font-semibold italic hidden sm:inline">Off-duty / Closed</span>
                       )}
                     </div>
                   );
