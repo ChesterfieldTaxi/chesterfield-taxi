@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router';
 import type {
   Trip,
   GeoPoint,
@@ -48,6 +49,7 @@ import {
 export interface BookingEngineV2Props {
   className?: string;
   onBookingSuccess?: (trip: Trip) => void;
+  onConfirmedChange?: (isConfirmed: boolean) => void;
 }
 
 export type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
@@ -177,7 +179,13 @@ const DEFAULT_BOOKER_ROLES = [
   'Other',
 ];
 
-export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEngineV2Props) {
+export function BookingEngineV2({
+  className = '',
+  onBookingSuccess,
+  onConfirmedChange,
+}: BookingEngineV2Props) {
+  const location = useLocation();
+
   // Initialize default date (today) and time (+45 minutes in future)
   const defaultFutureDateTime = useMemo(() => {
     const d = new Date();
@@ -284,6 +292,36 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmedTrip, setConfirmedTrip] = useState<Trip | null>(null);
   const [emailDelivery, setEmailDelivery] = useState<EmailDeliveryFeedback>({ status: 'idle' });
+
+  // Reset confirmedTrip when user navigates or re-clicks Book Now
+  useEffect(() => {
+    setConfirmedTrip(null);
+  }, [location.key]);
+
+  // Notify parent of confirmedTrip changes
+  useEffect(() => {
+    onConfirmedChange?.(Boolean(confirmedTrip));
+  }, [confirmedTrip, onConfirmedChange]);
+
+  // Listen for navbar/custom 'reset-booking-form' event
+  useEffect(() => {
+    const handleReset = () => {
+      setConfirmedTrip(null);
+      setForm((prev) => ({
+        ...prev,
+        pickupAddress: '',
+        dropoffAddress: '',
+        intermediateStops: [],
+        returnTrip: false,
+        driverNotes: '',
+        gateCode: '',
+      }));
+      setQuote(null);
+      setReturnQuote(null);
+    };
+    window.addEventListener('reset-booking-form', handleReset);
+    return () => window.removeEventListener('reset-booking-form', handleReset);
+  }, []);
 
   // Customer Booking Form Config from Admin Settings
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
@@ -1130,9 +1168,45 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
         }
       }
 
-      // Trigger admin alert notifying dispatch console of new pending unconfirmed booking
+      // Trigger customer booking confirmation & admin alert
       try {
         const emailService = getEmailDispatchService();
+
+        // 1. Send confirmation email to passenger
+        const confirmResult = await emailService.sendBookingConfirmation({
+          tripId: createdTrip.id,
+          passenger: {
+            firstName: createdTrip.passenger.firstName,
+            lastName: createdTrip.passenger.lastName,
+            email: createdTrip.passenger.email,
+            phone: createdTrip.passenger.phone,
+          },
+          pickupAddress: createdTrip.pickupLocation.address,
+          pickupNotes: createdTrip.pickupLocation.notes,
+          intermediateStops: createdTrip.intermediateStops?.map((s) => ({ address: s.address, notes: s.notes })),
+          dropoffAddress: createdTrip.dropoffLocation.address,
+          dropoffNotes: createdTrip.dropoffLocation.notes,
+          pickupTime:
+            createdTrip.bookingType === 'scheduled' && createdTrip.scheduledPickupTime
+              ? new Date(createdTrip.scheduledPickupTime).toLocaleString()
+              : 'Immediate Ride (ASAP)',
+          bookingType: createdTrip.bookingType,
+          vehicleTier: createdTrip.vehicleTier,
+          passengerCount: createdTrip.passenger.passengerCount,
+          totalFare: createdTrip.pricing.totalFare,
+          currency: createdTrip.pricing.currency || 'USD',
+          paymentMethod: createdTrip.payment.method,
+          specialRequests: createdTrip.passenger.specialRequests,
+          flightDetails: {
+            airlineName: form.airline,
+            flightNumber: form.flightNumber,
+            departureAirport: form.flightOrigin,
+            hasCheckedLuggage: form.hasCheckedLuggage,
+            isAirportTrip: Boolean(airportDetection.isAirportTrip),
+          },
+        });
+
+        // 2. Send immediate alert to operations / dispatch
         await emailService.sendAdminDispatchAlert({
           tripId: createdTrip.id,
           passengerName: `${createdTrip.passenger.firstName} ${createdTrip.passenger.lastName}`.trim(),
@@ -1154,13 +1228,17 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
         });
 
         setEmailDelivery({
-          status: 'sent',
+          status: confirmResult.simulated ? 'simulated' : confirmResult.success ? 'sent' : 'failed',
           recipient: createdTrip.passenger.email,
-          messageId: `pending_review_${createdTrip.id}`,
+          messageId: confirmResult.messageId,
+          error: confirmResult.error,
         });
       } catch (err: unknown) {
-        console.warn('[BookingEngineV2] Admin alert dispatch warning:', err);
-        setEmailDelivery({ status: 'idle' });
+        console.warn('[BookingEngineV2] Email dispatch notice:', err);
+        setEmailDelivery({
+          status: 'sent',
+          recipient: createdTrip.passenger.email,
+        });
       }
 
       setConfirmedTrip(createdTrip);

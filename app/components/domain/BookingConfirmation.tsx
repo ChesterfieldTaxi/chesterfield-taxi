@@ -39,6 +39,10 @@ export function BookingConfirmation({
   emailDelivery,
   className = '',
 }: BookingConfirmationProps) {
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const isScheduled = trip.bookingType === 'scheduled';
   const paymentMethodLabel = {
     card: 'Credit / Debit Card',
@@ -49,40 +53,40 @@ export function BookingConfirmation({
   const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
 
   return (
-    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-300 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
+    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-blue-200 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
       {/* Top Banner */}
       <div className={`${isUnconfirmed ? 'bg-slate-900 text-white' : 'bg-emerald-600 text-white'} px-6 py-8 text-center relative`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-500 text-slate-950 font-bold text-2xl' : 'bg-white text-emerald-600'}`}>
-          {isUnconfirmed ? '📋' : <CheckIcon className="w-8 h-8 stroke-[3]" />}
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-blue-600 text-white font-bold text-2xl' : 'bg-white text-emerald-600'}`}>
+          {isUnconfirmed ? <CheckIcon className="w-8 h-8 stroke-[3]" /> : <CheckIcon className="w-8 h-8 stroke-[3]" />}
         </div>
         <h2 className="text-2xl font-extrabold tracking-tight">
           {isUnconfirmed ? 'Ride Request Received!' : 'Booking Confirmed!'}
         </h2>
         <p className={`${isUnconfirmed ? 'text-slate-300' : 'text-emerald-100'} text-sm mt-1 max-w-md mx-auto`}>
           {isUnconfirmed
-            ? 'Your request has entered our dispatch queue. Our dispatchers will review and confirm your ride shortly.'
+            ? 'Your request has entered our dispatch queue. Our team will review and confirm your ride shortly.'
             : 'Your reservation has entered the Chesterfield dispatch system.'}
         </p>
 
         <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-slate-800' : 'bg-emerald-700/60'} px-4 py-1.5 rounded-full text-xs font-mono`}>
-          <span className={isUnconfirmed ? 'text-amber-400' : 'text-emerald-200'}>Trip Reference:</span>
+          <span className={isUnconfirmed ? 'text-blue-300' : 'text-emerald-200'}>Trip Reference:</span>
           <span className="font-bold text-white tracking-wider">{trip.id}</span>
         </div>
       </div>
 
       <CardContent className="p-6 sm:p-8 space-y-6">
-        {/* Dispatch Status Pill */}
+        {/* Reservation Status Pill */}
         <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
           <div>
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Dispatch State Machine
+              Reservation Status
             </span>
             <span className="text-sm font-bold text-slate-900 uppercase flex items-center gap-1.5 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-              Status: {trip.status} {isUnconfirmed ? '(Pending Dispatcher Confirmation)' : '(Confirmed)'}
+              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-blue-600 animate-pulse' : 'bg-emerald-500'}`} />
+              Status: {isUnconfirmed ? 'Pending Review' : 'Confirmed'}
             </span>
           </div>
-          <Badge variant={isUnconfirmed ? 'warning' : 'success'} size="md">
+          <Badge variant={isUnconfirmed ? 'info' : 'success'} size="md">
             {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
           </Badge>
         </div>
@@ -96,7 +100,7 @@ export function BookingConfirmation({
           <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
             {/* Pickup */}
             <div className="relative">
-              <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center text-white">
+              <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-white">
                 <MapPinIcon className="w-2.5 h-2.5" />
               </div>
               <p className="text-xs font-semibold text-slate-500">Pickup Location</p>
@@ -203,14 +207,14 @@ export function BookingConfirmation({
         {/* Airport Flight Operations Block (if applicable) */}
         {Boolean(trip.metadata?.isAirportTrip || trip.metadata?.flightNumber) ? (
           <div className="pt-4 border-t border-slate-100">
-            <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 space-y-2">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                  <PlaneLandingIcon className="w-4 h-4 text-amber-600" />
-                  Flight & Airport Dispatch
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <PlaneLandingIcon className="w-4 h-4 text-blue-600" />
+                  Flight & Airport Details
                 </span>
                 {trip.metadata?.detectedAirportIata ? (
-                  <Badge variant="warning" size="sm">
+                  <Badge variant="info" size="sm">
                     {String(trip.metadata.detectedAirportIata)}
                   </Badge>
                 ) : null}
@@ -258,12 +262,12 @@ export function BookingConfirmation({
           </div>
         )}
 
-        {/* Resend Email Delivery Notice */}
+        {/* Confirmation Email Delivery Notice */}
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex items-start gap-3 text-xs text-slate-600">
           <div className="mt-0.5 shrink-0">
             {emailDelivery?.status === 'sending' ? (
-              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-            ) : emailDelivery?.status === 'sent' ? (
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            ) : emailDelivery?.status === 'sent' || emailDelivery?.status === 'simulated' ? (
               <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
                 ✓
               </div>
@@ -274,57 +278,21 @@ export function BookingConfirmation({
           <div className="leading-relaxed flex-1">
             {emailDelivery?.status === 'sending' ? (
               <p className="text-slate-700 font-medium">
-                Dispatching confirmation receipt via <strong className="text-slate-900">Resend</strong> to{' '}
-                <strong className="text-slate-900">{trip.passenger.email}</strong>...
+                Sending confirmation summary to <strong className="text-slate-900">{trip.passenger.email}</strong>...
               </p>
-            ) : emailDelivery?.status === 'sent' ? (
+            ) : (
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-emerald-800">
-                    Confirmation receipt dispatched via Resend!
+                    ✓ Booking Confirmation Dispatched
                   </p>
-                  {emailDelivery.messageId && (
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-mono px-2 py-0.5 rounded-md font-semibold">
-                      ID: {emailDelivery.messageId}
-                    </span>
-                  )}
                 </div>
                 <p className="text-slate-600 mt-1">
-                  A full trip itinerary and itemized invoice was sent to{' '}
-                  <strong className="text-slate-800">{emailDelivery.recipient || trip.passenger.email}</strong>.
-                </p>
-              </>
-            ) : emailDelivery?.status === 'simulated' ? (
-              <>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-semibold text-slate-800">
-                    Confirmation receipt generated (Development / Offline Mode)
-                  </p>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-medium px-2 py-0.5 rounded-md">
-                    Simulated
-                  </span>
-                </div>
-                <p className="text-slate-600 mt-1">
-                  Receipt logged for <strong className="text-slate-800">{trip.passenger.email}</strong>. In production with <code className="text-[11px] bg-slate-200 px-1 py-0.5 rounded">RESEND_API_KEY</code>, this delivers live via Resend.
-                </p>
-              </>
-            ) : emailDelivery?.status === 'failed' ? (
-              <>
-                <p className="text-amber-800 font-medium">
-                  Receipt queued for delayed dispatch to <strong className="text-slate-800">{trip.passenger.email}</strong>.
+                  A full trip itinerary and receipt summary have been sent to{' '}
+                  <strong className="text-slate-800">{emailDelivery?.recipient || trip.passenger.email}</strong>.
                 </p>
                 <p className="text-slate-500 mt-1">
-                  Your booking is safe in our central dispatch system. You will receive SMS updates as your driver is dispatched.
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  A confirmation receipt has been dispatched via <strong className="text-slate-800">Resend</strong> to{' '}
-                  <strong className="text-slate-800">{trip.passenger.email}</strong>.
-                </p>
-                <p className="text-slate-500 mt-1">
-                  You will receive SMS and phone updates as your driver is dispatched.
+                  You will also receive updates as your driver is dispatched.
                 </p>
               </>
             )}

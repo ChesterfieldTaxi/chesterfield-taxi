@@ -130,6 +130,11 @@ export function Navbar() {
             {/* Prominent Book Now CTA */}
             <Link
               to="/book"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('reset-booking-form'));
+                }
+              }}
               style={{
                 backgroundColor: 'var(--btn-primary-bg, #2563eb)',
                 color: 'var(--btn-primary-text, #ffffff)',
@@ -213,6 +218,12 @@ export function Navbar() {
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
             <Link
               to="/book"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('reset-booking-form'));
+                }
+              }}
               style={{
                 backgroundColor: 'var(--btn-primary-bg, #2563eb)',
                 color: 'var(--btn-primary-text, #ffffff)',

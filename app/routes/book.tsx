@@ -34,40 +34,44 @@ const GUARANTEES = [
 ];
 
 export default function BookRoute() {
+  const [isConfirmed, setIsConfirmed] = React.useState(false);
+
   return (
     <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-28">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Header Bar */}
-        <div className="text-center mb-6 space-y-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950 tracking-tight">
-            Book Your Ride
-          </h1>
+        {/* Header Bar - Hidden on Confirmation */}
+        {!isConfirmed && (
+          <div className="text-center mb-6 space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950 tracking-tight">
+              Book Your Ride
+            </h1>
 
-          <p className="text-sm sm:text-base text-slate-600 max-w-lg mx-auto">
-            Reliable airport transfers, executive travel, and local service with upfront pricing.
-          </p>
+            <p className="text-sm sm:text-base text-slate-600 max-w-lg mx-auto">
+              Reliable airport transfers, executive travel, and local service with upfront pricing.
+            </p>
 
-          {/* Quick reassurance pills */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs text-slate-600">
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
-              <ShieldCheckIcon className="w-4 h-4 text-blue-600" />
-              <span className="font-medium">Upfront Fixed Rates</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
-              <ClockIcon className="w-4 h-4 text-blue-600" />
-              <span className="font-medium">24/7 Live Dispatch</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
-              <CarIcon className="w-4 h-4 text-blue-600" />
-              <span className="font-medium">Sedans, SUVs & WAV</span>
+            {/* Quick reassurance pills */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs text-slate-600">
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+                <ShieldCheckIcon className="w-4 h-4 text-blue-600" />
+                <span className="font-medium">Upfront Fixed Rates</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+                <ClockIcon className="w-4 h-4 text-blue-600" />
+                <span className="font-medium">24/7 Live Dispatch</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+                <CarIcon className="w-4 h-4 text-blue-600" />
+                <span className="font-medium">Sedans, SUVs & WAV</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Customer Booking Engine */}
-        <div className="mt-6">
-          <BookingEngineV2 />
+        <div className={isConfirmed ? '' : 'mt-6'}>
+          <BookingEngineV2 onConfirmedChange={setIsConfirmed} />
         </div>
 
         {/* Live Support Footnote */}
@@ -77,7 +81,7 @@ export default function BookRoute() {
           </p>
           <p className="font-semibold text-slate-700">
             Call our 24/7 {COMPANY_CONFIG.name} Dispatch Desk at{' '}
-            <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="text-amber-600 hover:text-amber-700 underline font-bold">
+            <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="text-blue-600 hover:text-blue-700 underline font-bold">
               {COMPANY_CONFIG.phone.dispatch}
             </a>
           </p>
