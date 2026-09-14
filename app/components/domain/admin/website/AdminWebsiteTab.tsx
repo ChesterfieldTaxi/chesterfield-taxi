@@ -6,8 +6,14 @@ import { WebsitePagesTab } from './WebsitePagesTab';
 import { WebsiteFormControlsTab } from './WebsiteFormControlsTab';
 import { WebsiteNavigationTab } from './WebsiteNavigationTab';
 import {
-  SparklesIcon,
   FileTextIcon,
+  PaletteIcon,
+  SlidersIcon,
+  LayersIcon,
+  CompassIcon,
+  SearchIcon,
+  CodeIcon,
+  SparklesIcon,
   SettingsIcon,
   ShieldCheckIcon,
   HistoryIcon,
@@ -29,6 +35,20 @@ export type WebsiteSubTab =
   | 'navigation'
   | 'seo'
   | 'css';
+
+const WEBSITE_SUB_TABS: Array<{
+  id: WebsiteSubTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'pages', label: 'Pages Directory', icon: FileTextIcon },
+  { id: 'themes', label: 'Themes & Livery', icon: PaletteIcon },
+  { id: 'form', label: 'Form Controls', icon: SlidersIcon },
+  { id: 'layout', label: 'Section Canvas', icon: LayersIcon },
+  { id: 'navigation', label: 'Header & Footer', icon: CompassIcon },
+  { id: 'seo', label: 'SEO & Analytics', icon: SearchIcon },
+  { id: 'css', label: 'Monaco CSS Editor', icon: CodeIcon },
+];
 
 export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
   settings,
@@ -107,89 +127,25 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
     <div className="space-y-6">
       {/* Visual CMS Studio Navigation Tabs */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('pages')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'pages'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>📑 Pages Directory</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('themes')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'themes'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>🎨 Themes &amp; Livery</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('form')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'form'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>📋 Form Controls</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('layout')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'layout'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>🧱 Section Canvas</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('navigation')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'navigation'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>🧭 Header &amp; Footer</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('seo')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'seo'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>🔍 SEO &amp; Analytics</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('css')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-            activeSubTab === 'css'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <span>💻 Monaco CSS Editor</span>
-        </button>
+        {WEBSITE_SUB_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 1. PAGES TAB */}

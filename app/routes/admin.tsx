@@ -19,6 +19,7 @@ import {
   AdminBookingsTab,
   AdminLayoutTab,
 } from '../components/domain/admin';
+import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
   CarIcon,
@@ -32,6 +33,8 @@ import {
   UserCheckIcon,
   SettingsIcon,
   RadioIcon,
+  MenuIcon,
+  ExternalLinkIcon,
 } from '../components/ui/Icons';
 
 export function meta() {
@@ -185,6 +188,8 @@ export default function AdminLayout() {
   const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isLiveFirebase, setIsLiveFirebase] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Active tab derived reactively from location.search with legacy aliasing
   const searchParams = new URLSearchParams(location.search);
@@ -320,7 +325,7 @@ export default function AdminLayout() {
 
   return (
     <div
-      className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col"
+      className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-row antialiased"
       style={
         {
           "--color-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#f59e0b",
@@ -342,202 +347,193 @@ export default function AdminLayout() {
         } as React.CSSProperties
       }
     >
-      {/* ─── Top Navigation Bar ─── */}
-      <header className="sticky top-0 z-40 bg-slate-900 text-white border-b border-slate-800 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Brand Wordmark & Mode Badge */}
-          <div className="flex items-center gap-3">
-            <div
-              style={{
-                backgroundColor: 'var(--brand-primary, #2563eb)',
-                color: 'var(--btn-primary-text, #ffffff)',
-              }}
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-xs shrink-0"
-            >
-              <CarIcon className="w-5 h-5" />
+      {/* ─── Persistent Left Sidebar ─── */}
+      <AdminSidebar
+        currentTab={normalizedTab}
+        onSelectTab={handleTabChange}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        settings={settings}
+        user={user}
+        onSignOut={handleSignOut}
+        isLiveFirebase={isLiveFirebase}
+      />
+
+      {/* ─── Main Admin Workspace Canvas ─── */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Top Control Header with Breadcrumbs & Actions */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+          <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            {/* Left: Mobile Toggle & Breadcrumbs */}
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                title="Open Navigation Menu"
+              >
+                <MenuIcon className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-500 truncate">
+                <span className="text-slate-400 font-medium">Admin</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-900 font-bold capitalize">{currentTabObj.label}</span>
+                {effectiveSub && (
+                  <>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-blue-600 font-bold capitalize">
+                      {effectiveSub.replace(/-/g, ' ')}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base font-extrabold tracking-tight leading-none text-white">
-                {settings.company.name || 'Chesterfield Taxi'}
-              </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-blue-400 border border-slate-700 uppercase tracking-wider">
-                Admin
-              </span>
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isLiveFirebase ? 'bg-emerald-400' : 'bg-amber-400'
-                }`}
-                title={isLiveFirebase ? 'Firestore Connected' : 'Local Storage Mode'}
-              />
-            </div>
-          </div>
 
-          {/* User actions, Prominent Dispatch Button, and public site link */}
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            {/* Prominent Header CTA: The Single Primary Entry Point to /dispatch */}
-            <Link
-              to="/dispatch"
-              reloadDocument
-              style={{
-                backgroundColor: 'var(--brand-primary, #2563eb)',
-                color: 'var(--btn-primary-text, #ffffff)',
-              }}
-              className="text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg hover:opacity-95 border border-blue-400/40 transition-all flex items-center gap-2 transform active:scale-95"
-              title="Launch Live 3-Pane Dispatch Console"
-            >
-              <RadioIcon className="w-4 h-4 shrink-0" />
-              <span>Launch Dispatch Console</span>
-            </Link>
+            {/* Right: Quick Launch Dispatch, Public Link, Status Badge */}
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <Link
+                to="/dispatch"
+                reloadDocument
+                style={{
+                  backgroundColor: 'var(--brand-primary, #2563eb)',
+                  color: 'var(--btn-primary-text, #ffffff)',
+                }}
+                className="hidden sm:inline-flex text-xs font-black px-3.5 py-2 rounded-xl shadow-xs hover:opacity-95 transition-all items-center gap-2"
+                title="Launch Live 3-Pane Dispatch Console"
+              >
+                <RadioIcon className="w-3.5 h-3.5 animate-pulse" />
+                <span>Launch Dispatch</span>
+              </Link>
 
-            {/* Link to public portal */}
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden md:inline-flex text-xs text-blue-400 hover:text-blue-300 font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
-            >
-              Public Site &rarr;
-            </a>
+              <a
+                href="/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-slate-600 hover:text-slate-900 font-bold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>Live Site</span>
+                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400" />
+              </a>
 
-            {/* Unified User Dropdown across all admin pages */}
-            <UserDropdown
-              email={user?.email}
-              onSignOut={handleSignOut}
-              variant="dark"
-            />
-          </div>
-        </div>
-      </header>
-
-      {/* ─── Main Admin Workspace ─── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-        {/* Dynamic 9-Tab Navigation Selector Bar */}
-        <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5">
-            {PRIMARY_TABS.map((tab) => {
-              const isActive = normalizedTab === tab.key;
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => handleTabChange(tab.key)}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-xs font-bold transition-all text-center ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-bold text-slate-600">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isLiveFirebase ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-amber-400'
                   }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
-                  <span className="truncate">{tab.label}</span>
-                </button>
-              );
-            })}
+                />
+                <span>{isLiveFirebase ? 'Cloud Synced' : 'Local Storage'}</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </header>
 
-        {/* Dynamic Tab Body */}
-        <div className="pt-2">
-          {normalizedTab === 'dashboard' && (
-            <AdminDashboardTab
-              settings={settings}
-              onNavigateTab={(tab) => handleTabChange(tab as AdminTabKey)}
-              initialSubTab={effectiveSub as any}
-            />
-          )}
+        {/* ─── Main Admin Workspace Content ─── */}
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          {/* Dynamic Tab Body */}
+          <div className="pt-1">
+            {normalizedTab === 'dashboard' && (
+              <AdminDashboardTab
+                settings={settings}
+                onNavigateTab={(tab) => handleTabChange(tab as AdminTabKey)}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
-          {normalizedTab === 'trips' && (
-            <AdminTripsSubpage initialSubTab={effectiveSub as any} />
-          )}
+            {normalizedTab === 'trips' && (
+              <AdminTripsSubpage initialSubTab={effectiveSub as any} />
+            )}
 
-          {normalizedTab === 'invoicing' && (
-            <AdminInvoicingSubpage
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab={effectiveSub as any}
-            />
-          )}
+            {normalizedTab === 'invoicing' && (
+              <AdminInvoicingSubpage
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
-          {normalizedTab === 'customers' && (
-            <AdminCustomersSubpage
-              settings={settings}
-              initialSubTab={effectiveSub as any}
-            />
-          )}
+            {normalizedTab === 'customers' && (
+              <AdminCustomersSubpage
+                settings={settings}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
-          {normalizedTab === 'rates' && (
-            <AdminRatesTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab={effectiveSub as any}
-            />
-          )}
+            {normalizedTab === 'rates' && (
+              <AdminRatesTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
-          {normalizedTab === 'vehicles' && (
-            <AdminVehiclesTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab={effectiveSub as any}
-            />
-          )}
+            {normalizedTab === 'vehicles' && (
+              <AdminVehiclesTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
-          {normalizedTab === 'zones' && <AdminZonesTab />}
+            {normalizedTab === 'zones' && <AdminZonesTab />}
 
-          {normalizedTab === 'operators' && <AdminOperatorsTab />}
+            {normalizedTab === 'operators' && <AdminOperatorsTab />}
 
-          {normalizedTab === 'advanced' && (
-            <AdminAdvancedTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab={effectiveSub}
-            />
-          )}
+            {normalizedTab === 'advanced' && (
+              <AdminAdvancedTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
 
+            {/* Legacy Backward Compatibility Fallbacks */}
+            {normalizedTab === 'general' && (
+              <AdminGeneralTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+              />
+            )}
 
-          {/* Legacy Backward Compatibility Fallbacks */}
-          {normalizedTab === 'general' && (
-            <AdminGeneralTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-            />
-          )}
+            {(normalizedTab === 'form' || normalizedTab === 'layout') && (
+              <AdminAdvancedTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab="website"
+              />
+            )}
 
-          {(normalizedTab === 'form' || normalizedTab === 'layout') && (
-            <AdminAdvancedTab
-              settings={settings}
-              onSave={handleSaveSettings}
-              isLoading={isSavingConfig || isConfigLoading}
-              initialSubTab="form"
-            />
-          )}
-
-          {normalizedTab === 'bookings' && (
-            <AdminTripsSubpage initialSubTab="dispatch" />
-          )}
-        </div>
-
-        {/* Outlet for any nested routes */}
-        <Outlet />
-      </main>
-
-      {/* Admin Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div>
-            &copy; {new Date().getFullYear()} Chesterfield Taxi &bull; Admin &amp; Dispatch Portal
+            {normalizedTab === 'bookings' && (
+              <AdminTripsSubpage initialSubTab="dispatch" />
+            )}
           </div>
-          <div className="flex items-center gap-4">
-            <span>React Router v7 Framework Mode</span>
-            <span>&bull;</span>
-            <span>Firebase Firestore Sync</span>
+
+          {/* Outlet for any nested routes */}
+          <Outlet />
+        </main>
+
+        {/* Admin Footer */}
+        <footer className="border-t border-slate-200 bg-white py-5 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <div>
+              &copy; {new Date().getFullYear()} {settings.company?.name || COMPANY_CONFIG.name} &bull; Admin &amp; Dispatch Console
+            </div>
+            <div className="flex items-center gap-3">
+              <span>React Router v7 Framework Mode</span>
+              <span>&bull;</span>
+              <span>Firebase Firestore Sync</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }
