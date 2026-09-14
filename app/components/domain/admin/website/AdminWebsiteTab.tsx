@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import Editor from '@monaco-editor/react';
+import { WebsiteThemesTab } from './WebsiteThemesTab';
+import { WebsitePagesTab } from './WebsitePagesTab';
+import { WebsiteFormControlsTab } from './WebsiteFormControlsTab';
+import { WebsiteNavigationTab } from './WebsiteNavigationTab';
+import {
+  SparklesIcon,
+  FileTextIcon,
+  SettingsIcon,
+  ShieldCheckIcon,
+  HistoryIcon,
+  CarIcon,
+} from '../../../ui/Icons';
 
 export interface AdminWebsiteTabProps {
   settings: any;
@@ -9,27 +21,50 @@ export interface AdminWebsiteTabProps {
   initialSubTab?: string;
 }
 
+export type WebsiteSubTab =
+  | 'pages'
+  | 'themes'
+  | 'form'
+  | 'layout'
+  | 'navigation'
+  | 'seo'
+  | 'css';
+
 export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
   settings,
   onSave,
   isLoading,
-  initialSubTab = 'layout'
+  initialSubTab = 'pages',
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
+  const [activeSubTab, setActiveSubTab] = useState<WebsiteSubTab>(
+    (initialSubTab as WebsiteSubTab) || 'pages'
+  );
 
   // Layout Builder State
-  const defaultLayout = settings.cms?.homepageLayout || [];
+  const defaultLayout = settings.cms?.homepageLayout || [
+    { id: '1', type: 'HeroBanner', isEnabled: true },
+    { id: '2', type: 'QuickBookingCard', isEnabled: true },
+    { id: '3', type: 'FleetShowcase', isEnabled: true },
+    { id: '4', type: 'FlatTariffMatrix', isEnabled: true },
+    { id: '5', type: 'ServiceAreaList', isEnabled: true },
+    { id: '6', type: 'TestimonialCarousel', isEnabled: true },
+    { id: '7', type: 'ContactBar', isEnabled: true },
+  ];
   const [layout, setLayout] = useState(defaultLayout);
 
   // SEO State
-  const [seo, setSeo] = useState(settings.cms?.seo || {
-    defaultMetaTitle: '',
-    defaultMetaDescription: '',
-    defaultOpenGraphImage: ''
-  });
+  const [seo, setSeo] = useState(
+    settings.cms?.seo || {
+      defaultMetaTitle: '',
+      defaultMetaDescription: '',
+      defaultOpenGraphImage: '',
+    }
+  );
 
   // Scripts & CSS State
-  const [scripts, setScripts] = useState(settings.cms?.scripts || { head: '', footer: '' });
+  const [scripts, setScripts] = useState(
+    settings.cms?.scripts || { head: '', footer: '' }
+  );
   const [customCss, setCustomCss] = useState(settings.cms?.customCss || '');
 
   const handleDragEnd = (result: DropResult) => {
@@ -44,8 +79,8 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
     await onSave({
       cms: {
         ...settings.cms,
-        homepageLayout: layout
-      }
+        homepageLayout: layout,
+      },
     });
   };
 
@@ -55,60 +90,220 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
         ...settings.cms,
         seo,
         scripts,
-        customCss
-      }
+        customCss,
+      },
     });
+  };
+
+  const toggleSectionEnable = (id: string) => {
+    setLayout((prev: any[]) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, isEnabled: !item.isEnabled } : item
+      )
+    );
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex border-b border-slate-200 mb-6">
+      {/* Visual CMS Studio Navigation Tabs */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-1.5">
         <button
+          type="button"
+          onClick={() => setActiveSubTab('pages')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'pages'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>📑 Pages Directory</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('themes')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'themes'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>🎨 Themes &amp; Livery</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('form')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'form'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>📋 Form Controls</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('layout')}
-          className={`py-3 px-4 font-semibold ${activeSubTab === 'layout' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'layout'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
         >
-          Layout Builder
+          <span>🧱 Section Canvas</span>
         </button>
+
         <button
+          type="button"
+          onClick={() => setActiveSubTab('navigation')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'navigation'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>🧭 Header &amp; Footer</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('seo')}
-          className={`py-3 px-4 font-semibold ${activeSubTab === 'seo' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'seo'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
         >
-          SEO & Scripts
+          <span>🔍 SEO &amp; Analytics</span>
         </button>
+
         <button
+          type="button"
           onClick={() => setActiveSubTab('css')}
-          className={`py-3 px-4 font-semibold ${activeSubTab === 'css' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
+            activeSubTab === 'css'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
         >
-          Monaco CSS Editor
+          <span>💻 Monaco CSS Editor</span>
         </button>
       </div>
 
+      {/* 1. PAGES TAB */}
+      {activeSubTab === 'pages' && (
+        <WebsitePagesTab
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* 2. THEMES & BRANDING TAB */}
+      {activeSubTab === 'themes' && (
+        <WebsiteThemesTab
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* 3. FORM CONTROLS TAB */}
+      {activeSubTab === 'form' && (
+        <WebsiteFormControlsTab
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* 4. HOMEPAGE SECTION CANVAS */}
       {activeSubTab === 'layout' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Homepage Layout Builder</h2>
-          <p className="text-sm text-slate-500 mb-4">Drag and drop sections to reorder the homepage layout.</p>
-          
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
+                Visual Section Pipeline
+              </span>
+              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+                Homepage Layout Reordering Canvas
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Drag and drop section blocks to restructure the flow of the homepage.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSaveLayout}
+              disabled={isLoading}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+            >
+              {isLoading ? 'Saving...' : 'Save Section Order'}
+            </button>
+          </div>
+
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="layout-list">
               {(provided) => (
-                <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-3">
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className="space-y-3"
+                >
                   {layout.map((item: any, index: number) => (
-                    <Draggable key={item.id} draggableId={item.id} index={index}>
-                      {(provided) => (
+                    <Draggable
+                      key={item.id}
+                      draggableId={item.id}
+                      index={index}
+                    >
+                      {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg"
+                          className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                            snapshot.isDragging
+                              ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-500'
+                              : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/70'
+                          }`}
                         >
-                          <div className="flex items-center gap-4">
-                            <span className="text-slate-400">☰</span>
-                            <span className="font-semibold text-slate-800">{item.type}</span>
-                          </div>
-                          <div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${item.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
-                              {item.isEnabled ? 'Enabled' : 'Disabled'}
+                          <div className="flex items-center gap-3">
+                            <span className="cursor-grab text-slate-400 text-base">
+                              ☰
                             </span>
+                            <span className="font-mono text-xs font-bold text-slate-400">
+                              #{index + 1}
+                            </span>
+                            <div>
+                              <span className="font-bold text-slate-900 text-sm block">
+                                {item.type}
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                {item.type === 'HeroBanner' && 'High-impact value proposition & quick CTAs'}
+                                {item.type === 'QuickBookingCard' && 'Instant quote calculation & pickup inputs'}
+                                {item.type === 'FleetShowcase' && 'Vehicle service tiers, amenities & capacities'}
+                                {item.type === 'FlatTariffMatrix' && 'Fixed-rate airport & regional transfer pricing'}
+                                {item.type === 'ServiceAreaList' && 'Coverage map & neighborhood directory'}
+                                {item.type === 'TestimonialCarousel' && 'Verified customer reviews & passenger ratings'}
+                                {item.type === 'ContactBar' && '24/7 direct telephone dispatch badge'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionEnable(item.id)}
+                              className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${
+                                item.isEnabled
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {item.isEnabled ? 'Active' : 'Hidden'}
+                            </button>
                           </div>
                         </div>
                       )}
@@ -119,83 +314,146 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
               )}
             </Droppable>
           </DragDropContext>
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={handleSaveLayout}
-              disabled={isLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Saving...' : 'Save Layout'}
-            </button>
-          </div>
         </div>
       )}
 
+      {/* 5. NAVIGATION TAB */}
+      {activeSubTab === 'navigation' && (
+        <WebsiteNavigationTab
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* 6. SEO & SCRIPTS TAB */}
       {activeSubTab === 'seo' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">SEO & Scripts Manager</h2>
-          <div className="space-y-4">
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Meta Title</label>
-              <input 
-                type="text" 
-                value={seo.defaultMetaTitle}
-                onChange={e => setSeo({ ...seo, defaultMetaTitle: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded-lg"
-              />
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
+                Search Engine Optimization
+              </span>
+              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+                Global SEO &amp; Analytics Script Injector
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage global OpenGraph metadata, Google Tag Manager, Meta Pixel, and tracking tags.
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Meta Description</label>
-              <textarea 
-                value={seo.defaultMetaDescription}
-                onChange={e => setSeo({ ...seo, defaultMetaDescription: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded-lg h-24"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Head Scripts</label>
-              <textarea 
-                value={scripts.head}
-                onChange={e => setScripts({ ...scripts, head: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded-lg h-24 font-mono text-sm"
-                placeholder="<!-- Google Analytics, Facebook Pixel, etc. -->"
-              />
-            </div>
-          </div>
-          <div className="mt-6 flex justify-end">
+
             <button
               onClick={handleSaveSeo}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
             >
-              {isLoading ? 'Saving...' : 'Save SEO'}
+              {isLoading ? 'Saving...' : 'Save SEO & Scripts'}
             </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Default Meta Title
+              </label>
+              <input
+                type="text"
+                value={seo.defaultMetaTitle}
+                onChange={(e) => setSeo({ ...seo, defaultMetaTitle: e.target.value })}
+                className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                placeholder="Chesterfield Taxi & Car Service — 24/7 St. Louis Airport & Executive Travel"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Default Meta Description
+              </label>
+              <textarea
+                value={seo.defaultMetaDescription}
+                onChange={(e) =>
+                  setSeo({ ...seo, defaultMetaDescription: e.target.value })
+                }
+                rows={3}
+                className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                placeholder="Reliable 24-hour taxi and chauffeured car service in Chesterfield, Ballwin, and West County..."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Head Scripts (GTM, Meta Pixel, Telemetry)
+                </label>
+                <textarea
+                  value={scripts.head}
+                  onChange={(e) =>
+                    setScripts({ ...scripts, head: e.target.value })
+                  }
+                  rows={6}
+                  className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white font-mono"
+                  placeholder="<!-- <script async src='https://www.googletagmanager.com/gtag/js?id=G-XXXXX'></script> -->"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Footer Scripts (Chat Widgets, Conversion Tags)
+                </label>
+                <textarea
+                  value={scripts.footer}
+                  onChange={(e) =>
+                    setScripts({ ...scripts, footer: e.target.value })
+                  }
+                  rows={6}
+                  className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white font-mono"
+                  placeholder="<!-- Live Chat SDK or conversion trackers -->"
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
+      {/* 7. MONACO CSS EDITOR */}
       {activeSubTab === 'css' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-[600px] flex flex-col">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Monaco Custom CSS Editor</h2>
-          <p className="text-sm text-slate-500 mb-4">Inject custom styles site-wide.</p>
-          <div className="flex-1 border border-slate-300 rounded-lg overflow-hidden">
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
+                Developer Customization
+              </span>
+              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+                Monaco Custom CSS Style Editor
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Inject custom CSS rules and override styles directly into the live HTML head.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSaveSeo}
+              disabled={isLoading}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+            >
+              {isLoading ? 'Saving...' : 'Publish Custom CSS'}
+            </button>
+          </div>
+
+          <div className="border border-slate-200 rounded-xl overflow-hidden h-[540px]">
             <Editor
               height="100%"
               defaultLanguage="css"
               value={customCss}
               onChange={(val) => setCustomCss(val || '')}
               theme="vs-dark"
-              options={{ minimap: { enabled: false } }}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+              }}
             />
-          </div>
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={handleSaveSeo}
-              disabled={isLoading}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Saving...' : 'Save CSS'}
-            </button>
           </div>
         </div>
       )}
