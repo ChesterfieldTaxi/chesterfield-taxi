@@ -56,7 +56,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     >
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        <meta name="theme-color" content="#2563eb" />
+        <link rel="manifest" href="/manifest.json" />
         <Meta />
         <Links />
         {COMPANY_CONFIG.cms?.customCss && (
