@@ -48,12 +48,14 @@ export interface StepIncrementTier {
   endMiles: number;
   stepMiles: number; // e.g. 0.1
   ratePerStep: number; // e.g. 0.35
+  isOpenEnded?: boolean; // When true, tier applies to all miles >= startMiles without an upper ceiling
 }
 
 export interface DelayRateConfig {
   stepSeconds: number; // e.g. 90 sec
   ratePerStep: number; // e.g. $0.60
   gracePeriodMinutes: number; // e.g. 5 min
+  isOpenEnded?: boolean; // When true, delay step calculation applies indefinitely after grace period
 }
 
 export interface ConditionSurchargeConfig {
@@ -78,6 +80,8 @@ export interface PricingRuleTrigger {
   zoneIds?: string[];
   zoneGroupIds?: string[];
   locationCollectionIds?: string[];
+  fromZoneId?: string; // Origin Zone for Corridor rules
+  toZoneId?: string; // Destination Zone for Corridor rules
   minDistanceMiles?: number;
   maxDistanceMiles?: number;
   minDurationMinutes?: number;
@@ -107,6 +111,10 @@ export interface PricingRuleModifier {
   perMileRateOverride?: number;
   perMinuteRateOverride?: number;
   surchargeAdders?: RuleSurchargeAdder[];
+  // Explicit inheritance override toggles
+  overrideBaseFare?: boolean;
+  overrideRates?: boolean;
+  overrideSurcharges?: boolean;
 }
 
 export interface NamedPricingRule {
@@ -283,9 +291,13 @@ export interface AppSettings {
   invoices?: InvoiceRecord[];
   securityControls?: SecurityControlsConfig;
   configAuditTrail?: ConfigAuditEntry[];
+  tariffs?: import('./tariff').TariffProfile[]; // Unified Tariff Profiles
+  tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   updatedAt?: string;
   updatedBy?: string;
 }
+
+export * from './tariff';
 
 export interface IAdminConfigService {
   /**

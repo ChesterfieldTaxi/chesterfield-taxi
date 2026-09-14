@@ -176,6 +176,12 @@
 - [x] 20.10 Update Live Fare Matrix Simulator in `AdminRatesTab.tsx` with expanded inputs and audit trail trace showing rule inheritance cascades and step calculation breakdowns.
 - [x] 20.11 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
 - [x] 20.12 Run `npm run build` to confirm production build stability and mark Phase 20 complete in tasks.md.
+- [x] 20.13 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to reflect open-ended step increments ("And Above / After"), inherited parent delta overrides, conflict warnings, and inline simulator test triggers.
+- [x] 20.14 Open-Ended Step Increments ("And Above / After"): Add checkbox in embedded Step Increment editor, display open-ended bounds, and process remaining distance/time in `rules.ts`.
+- [x] 20.15 Rule Editor UI & Inheritance Overrides: Render parent values in disabled state with individual "Override" toggles for Base Drop, Step Tiers, and Surcharges.
+- [x] 20.16 Drawer Usability Enhancements: Add "Test Rule in Simulator" auto-fill action button and lightweight Priority Collision Detection warning.
+- [x] 20.17 Universal Surcharges & Zone Pair Corridors: Consolidate Universal Surcharges dedicated sub-tab and support Origin Zone -> Destination Zone corridor flat fare overrides.
+- [x] 20.18 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.
 ## Phase 20.B: API Cost Optimization Protocol for Google Maps & Directions Services
 - [x] 20.B.1 Documentation & Specification updates for API Cost Optimization Protocol.
 - [x] 20.B.2 Developer & Offline Mock Mode in `companyConfig.ts` (`enableRealtimeRouting: false`).
@@ -210,3 +216,26 @@
 - [x] 21.B.9 Implement Payment Method selector (Cash in Cab, Credit Card with contactless in-cab terminal vs card on file, and Corporate Account direct billing).
 - [x] 21.B.10 Build Right-Hand Sticky Summary Card with itemized price breakdown, Zero Surge Pricing Guarantee badge, 24/7 Dispatch Review notice, and direct dispatch hotline.
 - [x] 21.B.11 Run `npm run typecheck` and `npm run build` to verify 0 errors.
+
+## Phase 22: TaxiCaller-Style Unified Tariff Engine
+- [x] 22.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to replace fragmented base rate forms with self-contained Tariff Profiles.
+- [x] 22.2 Data Models & Tariff Service: Define `TariffProfile`, `TariffCorridor`, `TariffTaximeterRate`, `TariffExtras`, and create `TariffService` with default presets.
+- [x] 22.3 Pure Pricing Pipeline Update: Implement unified tariff evaluation (Profile Match ➔ Flat Corridor Check ➔ Taximeter Step Brackets ➔ Extras & Surcharges).
+- [x] 22.4 TaxiCaller-Style UI in `/admin` Rates: Build tabbed tariff profile switcher, meta & triggers, flat corridor table, iconic taximeter block, and extras manager.
+- [x] 22.5 Live Simulator & Audit Trace: Connect the Estimates & Live Simulator to display matched tariff profile badges, corridor/taximeter route, and full audit logs.
+- [x] 22.6 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.
+
+## Phase 22.B: Tariff Engine Refinements (Intermediate Increments, Inheritance, Groups & UI Cleanliness)
+- [x] 22.B.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to define Phase 22.B scope.
+- [x] 22.B.2 Data Models & Engine: Add `TariffDistanceIncrement`, `TariffGroup`, and `TariffInheritanceConfig` to `tariff.ts` and `tariff.service.ts`.
+- [x] 22.B.3 Intermediate Increments & Inheritance Pipeline: Update `evaluateTaximeterFare` and `applyUnifiedTariffEngine` to resolve parent inheritance and calculate multi-tier distance step brackets between primary and then.
+- [x] 22.B.4 UI Refinements: Remove external labels/references, remove `×` button on tabs, add big red delete button at bottom of each tariff page.
+- [x] 22.B.5 Tariff Groups & Dynamic Admin Configuration: Implement Tariff Groups manager, inheritance picker with override toggles, and dynamically bind conditions/extras to admin-created vehicles (`settings.vehicles`), zones, and collections.
+- [x] 22.B.6 Verification: Run `npm run typecheck` and `npm run build` to verify 0 errors.
+
+## Phase 22.C: Tariff Layout & Subpage Refinements
+- [x] 22.C.1 Move `+ Add Increment Tier` button from card header to be placed directly between the Primary tier (+ intermediate tiers) and the "Then" open-ended tier.
+- [x] 22.C.2 Reorder cards in `UnifiedTariffManager.tsx` so the entire `Taximeter Step Brackets` section appears immediately after `Profile Configuration`, followed by `Flat Tariff Matrix` (Corridors), `Tariff Extras & Surcharges`, and the bottom delete button.
+- [x] 22.C.3 Configure `Unified Tariffs` as the default subpage for `/admin?tab=rates` across `SUB_PAGES` in `app/routes/admin.tsx` and `AdminRatesTab.tsx`.
+- [x] 22.C.4 Verify `npm run typecheck` and `npm run build` pass with 0 errors.
+

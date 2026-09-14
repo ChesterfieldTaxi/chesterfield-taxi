@@ -23,6 +23,12 @@ import type {
   CalculationAuditStep,
 } from './types';
 import { evaluateApplicablePricingRules, DEFAULT_NAMED_PRICING_RULES } from './pricing-rules.service';
+import {
+  DEFAULT_TARIFF_PROFILES,
+  matchTariffProfile,
+  matchTariffCorridor,
+  evaluateTaximeterFare,
+} from './tariff.service';
 
 /**
  * Default production pricing configuration.
@@ -68,6 +74,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
     zoneSurcharges: {},
   },
   namedPricingRules: DEFAULT_NAMED_PRICING_RULES,
+  tariffs: DEFAULT_TARIFF_PROFILES,
 };
 
 /**
@@ -178,9 +185,186 @@ function appendAudit(
 }
 
 // ----------------------------------------------------------------------------
+// STEP 0: TaxiCaller-Style Unified Tariff Profile Evaluation
+// ----------------------------------------------------------------------------
+export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
+  const tariffs = context.config.tariffs;
+  if (!tariffs || tariffs.length === 0) {
+    return context;
+  }
+
+  // 1. Match highest priority active TariffProfile (honoring activeTariffId or vehicle/schedule)
+  const candidateTariffs = context.config.activeTariffId
+    ? tariffs.filter((t) => t.id === context.config.activeTariffId)
+    : tariffs;
+  const matchedProfile = matchTariffProfile(context.input, candidateTariffs.length > 0 ? candidateTariffs : tariffs);
+  if (!matchedProfile) {
+    return context;
+  }
+
+  // 2. Check if trip matches an explicit From/To Flat Corridor inside that profile
+  const matchedCorridor = matchTariffCorridor(context.input, matchedProfile);
+  if (matchedCorridor) {
+    const flatFare = roundCurrency(matchedCorridor.flatPrice);
+    let currentSubtotal = flatFare;
+    const newSurcharges: SurchargeEntry[] = [...context.surcharges];
+
+    // Evaluate child safety car seats
+    let carSeatFee = 0;
+    const carSeatRate = matchedProfile.extras?.carSeatFeePerUnit ?? context.config.conditionSurcharges?.carSeatFeePerUnit ?? 0;
+    if (carSeatRate > 0) {
+      const breakdown = context.input.carSeatsBreakdown;
+      const totalCarSeats = breakdown
+        ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
+        : (context.input.equipment?.carSeats ?? 0);
+      if (totalCarSeats > 0) {
+        carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
+        newSurcharges.push({
+          name: `Child Safety Seats (${totalCarSeats})`,
+          amount: carSeatFee,
+          description: `$${carSeatRate.toFixed(2)} x ${totalCarSeats} seat(s)`,
+        });
+        currentSubtotal = roundCurrency(currentSubtotal + carSeatFee);
+      }
+    }
+
+    // Evaluate custom surcharges from profile
+    if (matchedProfile.extras?.customSurcharges) {
+      for (const adder of matchedProfile.extras.customSurcharges) {
+        const adderFee = adder.type === 'percent'
+          ? roundCurrency(flatFare * (adder.amount / 100))
+          : roundCurrency(adder.amount);
+        newSurcharges.push({
+          name: adder.name,
+          amount: adderFee,
+          description: `Tariff surcharge: ${adder.name}`,
+        });
+        currentSubtotal = roundCurrency(currentSubtotal + adderFee);
+      }
+    }
+
+    const auditTrail = appendAudit(
+      context.auditTrail,
+      1,
+      `Tariff Profile: ${matchedProfile.name}`,
+      `Flat Corridor: ${matchedCorridor.name} ($${flatFare.toFixed(2)})${matchedCorridor.allowReturn ? ' [Bidirectional]' : ''}`,
+      flatFare,
+      currentSubtotal
+    );
+
+    return {
+      ...context,
+      tariffProfileId: matchedProfile.id,
+      tariffProfileName: matchedProfile.name,
+      matchedCorridorId: matchedCorridor.id,
+      matchedCorridorName: matchedCorridor.name,
+      baseFare: 0,
+      distanceFare: 0,
+      timeFare: 0,
+      carSeatFee,
+      surcharges: newSurcharges,
+      subtotal: currentSubtotal,
+      totalFare: currentSubtotal,
+      auditTrail,
+    };
+  }
+
+  // 3. Taximeter Step Bracket Calculation
+  const totalDuration = context.input.durationMinutes + (context.input.delayMinutes ?? 0);
+  const meterResult = evaluateTaximeterFare(
+    matchedProfile.taximeter,
+    context.input.distanceMiles,
+    totalDuration
+  );
+
+  let currentSubtotal = meterResult.subtotal;
+  const newSurcharges: SurchargeEntry[] = [...context.surcharges];
+
+  // Evaluate extras: car seats
+  let carSeatFee = 0;
+  const carSeatRate = matchedProfile.extras?.carSeatFeePerUnit ?? context.config.conditionSurcharges?.carSeatFeePerUnit ?? 0;
+  if (carSeatRate > 0) {
+    const breakdown = context.input.carSeatsBreakdown;
+    const totalCarSeats = breakdown
+      ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
+      : (context.input.equipment?.carSeats ?? 0);
+    if (totalCarSeats > 0) {
+      carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
+      newSurcharges.push({
+        name: `Child Safety Seats (${totalCarSeats})`,
+        amount: carSeatFee,
+        description: `$${carSeatRate.toFixed(2)} x ${totalCarSeats} seat(s)`,
+      });
+      currentSubtotal = roundCurrency(currentSubtotal + carSeatFee);
+    }
+  }
+
+  // Evaluate extras: extra passengers over base allowance
+  let passengerSurcharge = 0;
+  const allowance = matchedProfile.extras?.passengerBaseAllowance ?? context.config.conditionSurcharges?.passengerBaseAllowance;
+  const perHeadFee = matchedProfile.extras?.extraPassengerFeePerHead ?? context.config.conditionSurcharges?.extraPassengerFeePerHead;
+  if (allowance !== undefined && perHeadFee && perHeadFee > 0) {
+    const paxCount = typeof context.input.passengers === 'number' ? context.input.passengers : 1;
+    if (paxCount > allowance) {
+      const extraPax = paxCount - allowance;
+      passengerSurcharge = roundCurrency(extraPax * perHeadFee);
+      newSurcharges.push({
+        name: `Additional Passengers (${extraPax})`,
+        amount: passengerSurcharge,
+        description: `$${perHeadFee.toFixed(2)}/head over ${allowance} base allowance`,
+      });
+      currentSubtotal = roundCurrency(currentSubtotal + passengerSurcharge);
+    }
+  }
+
+  // Evaluate custom surcharges from profile
+  if (matchedProfile.extras?.customSurcharges) {
+    for (const adder of matchedProfile.extras.customSurcharges) {
+      const adderFee = adder.type === 'percent'
+        ? roundCurrency(meterResult.subtotal * (adder.amount / 100))
+        : roundCurrency(adder.amount);
+      newSurcharges.push({
+        name: adder.name,
+        amount: adderFee,
+        description: `Tariff surcharge: ${adder.name}`,
+      });
+      currentSubtotal = roundCurrency(currentSubtotal + adderFee);
+    }
+  }
+
+  const auditTrail = appendAudit(
+    context.auditTrail,
+    1,
+    `Tariff Profile: ${matchedProfile.name}`,
+    `Taximeter: ${meterResult.auditDetails.join(' | ')}`,
+    meterResult.subtotal,
+    currentSubtotal
+  );
+
+  return {
+    ...context,
+    tariffProfileId: matchedProfile.id,
+    tariffProfileName: matchedProfile.name,
+    baseFare: meterResult.baseFare,
+    distanceFare: meterResult.distanceFare,
+    timeFare: meterResult.delayFare,
+    delayFee: meterResult.delayFare,
+    carSeatFee,
+    passengerSurcharge,
+    surcharges: newSurcharges,
+    subtotal: currentSubtotal,
+    totalFare: currentSubtotal,
+    auditTrail,
+  };
+};
+
+// ----------------------------------------------------------------------------
 // STEP 1: Base Fare Calculation (with Flag Drop Distance Allowance)
 // ----------------------------------------------------------------------------
 export const applyBaseFare: PricingPipelineStep = (context) => {
+  if (context.tariffProfileId) {
+    return context;
+  }
   const tier = context.input.vehicleTier;
   const configuredBaseFare =
     context.config.vehicleBaseFares?.[tier] ?? context.config.baseFare;
@@ -212,6 +396,9 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
 // STEP 2: Distance & Time Rate Application (Decaying Step Increments & Delays)
 // ----------------------------------------------------------------------------
 export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
+  if (context.tariffProfileId) {
+    return context;
+  }
   const { distanceMiles, durationMinutes, vehicleTier, delayMinutes } = context.input;
   const {
     perMileRate,
@@ -239,7 +426,9 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
 
     for (const tier of sortedTiers) {
       if (remainingMiles <= 0) break;
-      const tierCapacity = Math.max(0, tier.endMiles - tier.startMiles);
+      const tierCapacity = (tier.isOpenEnded || tier.endMiles === Infinity)
+        ? Infinity
+        : Math.max(0, tier.endMiles - tier.startMiles);
       const milesInTier = Math.min(remainingMiles, tierCapacity);
 
       if (milesInTier > 0) {
@@ -318,6 +507,9 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
 // STEP 3: Vehicle Multiplier Application
 // ----------------------------------------------------------------------------
 export const applyVehicleMultiplier: PricingPipelineStep = (context) => {
+  if (context.tariffProfileId) {
+    return context;
+  }
   const tier = context.input.vehicleTier;
   const multiplier = context.config.vehicleMultipliers[tier] ?? 1.0;
 
@@ -436,6 +628,9 @@ export const applySurgeMultiplier: PricingPipelineStep = createSurgeStep(DEFAULT
 // STEP 5: Condition-Based Surcharges (Car Seats, Extra Passengers, Zones)
 // ----------------------------------------------------------------------------
 export const applyConditionSurcharges: PricingPipelineStep = (context) => {
+  if (context.tariffProfileId) {
+    return context;
+  }
   const newSurcharges: SurchargeEntry[] = [];
   const cfg = context.config.conditionSurcharges;
   let runningAdditions = 0;
@@ -583,6 +778,8 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
       pickupDate: pickupDateStr,
       pickupTime: pickupTimeStr,
       zoneIds: context.input.zoneIds,
+      originZoneId: context.input.originZoneId,
+      destinationZoneId: context.input.destinationZoneId,
       zoneGroupIds: context.input.zoneGroupIds,
       locationCollectionIds: context.input.locationCollectionIds,
       accountType: context.input.accountType,

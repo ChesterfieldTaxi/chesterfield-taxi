@@ -161,6 +161,7 @@ Trips stored in Firestore will strictly adhere to the following state transition
   - `stopProcessingOnMatch`?: boolean (halts subsequent lower-priority rule evaluations)
   - `triggers`:
     - `zoneIds`?: string[], `zoneGroupIds`?: string[], `locationCollectionIds`?: string[]
+    - `fromZoneId`?: string, `toZoneId`?: string (explicit Origin -> Destination corridor pair)
     - `minDistanceMiles`?: number, `maxDistanceMiles`?: number
     - `minDurationMinutes`?: number, `maxDurationMinutes`?: number
     - `daysOfWeek`?: number[], `timeWindows`?: Array<{ start: string; end: string }>, `holidayDates`?: string[]
@@ -173,18 +174,28 @@ Trips stored in Firestore will strictly adhere to the following state transition
     - `value`: number
     - `baseFareOverride`?: number, `perMileRateOverride`?: number, `perMinuteRateOverride`?: number
     - `surchargeAdders`?: Array<{ name: string; amount: number; type: 'flat' | 'percent' }>
+    - `overrideBaseFare`?: boolean, `overrideRates`?: boolean, `overrideSurcharges`?: boolean
   - `allowDriverSelection`: boolean
   - `priority`: number
   - `isActive`: boolean
+- UI Drawer Usability:
+  - Inherited rule editor renders parent values disabled with explicit override toggles.
+  - Non-blocking Priority Collision Detection warning when saving rules with identical priority or overlapping triggers.
+  - "Test Rule in Simulator" auto-fills simulator state and routes to the live calculation tab.
 
 ### 8.3 Granular Step-Increment Fare Calculation Engine
 - Decaying distance bracket calculation:
   - Pure incremental step accumulator computing steps = ceil(miles_in_tier / step_size).
   - Step rates scale per bracket (e.g., $0.35/0.1mi initial -> $0.25/0.1mi intermediate -> $0.20/0.1mi long range -> $0.15/0.1mi extended regional).
+  - Open-Ended Step Increments (`isOpenEnded: true`):
+    - The final bracket tier can be marked as "Open-Ended / After", removing upper distance ceiling (`endMiles: Infinity`).
+    - The pure pricing pipeline computes `tierCapacity = Infinity`, processing all remaining mileage at that final bracket rate.
 - Delay wait-time step calculator:
   - Excess delay minutes beyond grace period converted to seconds and evaluated as steps = ceil(excess_seconds / step_seconds).
 - Pure Inheritance Resolution:
-  - Resolves `parentRuleId` recursively with cycle guard, merging parent base fares, mileage rates, minute rates, and default surcharges, before applying child delta overrides.
+  - Resolves `parentRuleId` recursively with cycle guard, merging parent base fares, mileage rates, minute rates, corridor parameters, and default surcharges, before applying child delta overrides.
+- Consolidated Universal Surcharges:
+  - Dedicated Sub-Tab 4 housing child safety car seats, extra headcount allowance, vehicle tier surcharges, and highway toll pass-throughs.
 
 ## 9. Phase 21 Architecture: Public Booking Engine & Confirmation Workflow
 
@@ -224,3 +235,87 @@ Trips stored in Firestore will strictly adhere to the following state transition
   - **Accept Action**: calls `updateTripStatus(tripId, 'CONFIRMED')` and dispatches `sendBookingConfirmation(payload)` via Resend API.
   - **Decline Action**: calls `updateTripStatus(tripId, 'DECLINED')` and dispatches `sendBookingDeclined(payload)` with preset or custom reason via Resend API.
 
+## 10. Phase 22 Architecture: TaxiCaller-Style Unified Tariff Engine
+
+### 10.1 Tariff Profile Schema (`app/core/types/tariff.ts`)
+```typescript
+export interface TariffProfile {
+  id: string;
+  name: string; // e.g. "Standard Flat Rate", "METER", "MiniVan Flat Rate"
+  currency: string; // "USD"
+  units: 'imperial' | 'metric';
+  fareIncrement?: number; // e.g. 2.50
+  priority: number; // 1 to 100
+  isActive: boolean;
+  isDefault?: boolean;
+  parentTariffId?: string; // Optional inheritance from parent profile
+  groupId?: string; // Optional group assignment (e.g. Airport Corridors)
+  inheritance?: {
+    overrideTaximeter?: boolean;
+    overrideCorridors?: boolean;
+    overrideExtras?: boolean;
+    overrideTriggers?: boolean;
+  };
+  triggers: {
+    vehicleTiers?: string[];
+    zoneIds?: string[];
+    zoneGroupIds?: string[];
+    locationCollectionIds?: string[];
+    daysOfWeek?: number[];
+    timeWindows?: Array<{ start: string; end: string }>;
+  };
+  taximeter: {
+    startPrice: number;
+    initialDistanceIncluded: number;
+    initialTimeIncluded: number;
+    primaryDistanceStep: number;
+    primaryDistanceRate: number;
+    primaryDistanceLimit: number;
+    intermediateIncrements?: Array<{
+      id: string;
+      name?: string;
+      upToDistance: number;
+      stepDistance: number;
+      ratePerStep: number;
+    }>;
+    thenDistanceStep: number;
+    thenDistanceRate: number;
+    freeTrafficMinutes: number;
+    waitingRatePerStep: number;
+    waitingStepSeconds: number;
+    minimumPrice: number;
+  };
+  corridors: Array<{
+    id: string;
+    name: string;
+    fromZoneId?: string;
+    fromLocationCollectionId?: string;
+    toZoneId?: string;
+    toLocationCollectionId?: string;
+    flatPrice: number;
+    allowReturn?: boolean;
+    priorityRank?: number;
+  }>;
+  extras: {
+    carSeatFeePerUnit: number;
+    passengerBaseAllowance: number;
+    extraPassengerFeePerHead: number;
+    vehicleTierMultipliers?: Record<string, number>;
+    customSurcharges?: Array<{ id: string; name: string; amount: number; type: 'flat' | 'percent' }>;
+  };
+}
+```
+
+### 10.2 Pure Pipeline Execution Sequence
+1. Match active `TariffProfile` with highest `priority` rank matching vehicle tier, schedule, and pickup/dropoff.
+2. Resolve any inheritance from `parentTariffId` for non-overridden attributes.
+3. Check `profile.corridors` for Origin ➔ Destination match (or reverse match if `allowReturn: true`). If matched, assign flat price.
+4. If no corridor matched, execute `profile.taximeter`:
+   - `startPrice`
+   - Primary distance step calculation up to `primaryDistanceLimit`
+   - Intermediate increment brackets (up to each successive limit)
+   - Open-ended `thenDistanceRate` step calculation for remaining distance to infinity
+   - Delay waiting steps beyond `freeTrafficMinutes`
+   - Enforce `minimumPrice` floor.
+5. Append `profile.extras` and universal surcharges.
+6. Record complete audit trail.

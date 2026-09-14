@@ -22,6 +22,7 @@ import type {
 } from './types';
 import {
   DEFAULT_PRICING_CONFIG,
+  applyUnifiedTariffEngine,
   applyBaseFare,
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
@@ -58,8 +59,12 @@ export function createInitialContext(
 
 /**
  * Standard prioritized pipeline steps array.
+ * Step 0: TaxiCaller Unified Tariff Profile (Corridor Flat Fare OR Taximeter Step Rate + Extras)
+ * Steps 1-2: Fallback Base Fare and Distance/Time Rates (if no tariff profile active)
+ * Steps 3-7: Overlays (Surge, Custom Condition Rules, Multi-Stop, Tolls, Discounts)
  */
 export const DEFAULT_PIPELINE_STEPS: readonly PricingPipelineStep[] = [
+  applyUnifiedTariffEngine,
   applyBaseFare,
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
@@ -112,6 +117,10 @@ export function toTripPricing(context: PricingContext): TripPricing {
     passengerSurcharge: context.passengerSurcharge || 0,
     delayFee: context.delayFee || 0,
     appliedRuleNames: context.appliedRuleNames ? [...context.appliedRuleNames] : undefined,
+    tariffProfileId: context.tariffProfileId,
+    tariffProfileName: context.tariffProfileName,
+    matchedCorridorId: context.matchedCorridorId,
+    matchedCorridorName: context.matchedCorridorName,
   };
 }
 
@@ -142,6 +151,8 @@ export function calculateTripPricing(
   return {
     pricing: toTripPricing(finalContext),
     context: finalContext,
+    tariffProfileId: finalContext.tariffProfileId,
+    matchedCorridorId: finalContext.matchedCorridorId,
   };
 }
 

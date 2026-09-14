@@ -222,6 +222,8 @@ export interface RuleEvaluationInput {
   pickupDate?: string; // "YYYY-MM-DD"
   pickupTime?: string; // "HH:MM" 24h
   zoneIds?: string[];
+  originZoneId?: string;
+  destinationZoneId?: string;
   zoneGroupIds?: string[];
   locationCollectionIds?: string[];
   accountType?: 'retail' | 'corporate' | 'vip';
@@ -488,6 +490,8 @@ export function resolveRuleInheritance(
   const mergedTriggers: PricingRuleTrigger = {
     ...resolvedParent.triggers,
     ...rule.triggers,
+    fromZoneId: rule.triggers.fromZoneId ?? resolvedParent.triggers.fromZoneId,
+    toZoneId: rule.triggers.toZoneId ?? resolvedParent.triggers.toZoneId,
     zoneIds: rule.triggers.zoneIds?.length ? rule.triggers.zoneIds : resolvedParent.triggers.zoneIds,
     zoneGroupIds: rule.triggers.zoneGroupIds?.length ? rule.triggers.zoneGroupIds : resolvedParent.triggers.zoneGroupIds,
     locationCollectionIds: rule.triggers.locationCollectionIds?.length
@@ -507,13 +511,25 @@ export function resolveRuleInheritance(
   const mergedModifier: PricingRuleModifier = {
     ...resolvedParent.modifier,
     ...rule.modifier,
-    baseFareOverride: rule.modifier.baseFareOverride ?? resolvedParent.modifier.baseFareOverride,
-    perMileRateOverride: rule.modifier.perMileRateOverride ?? resolvedParent.modifier.perMileRateOverride,
-    perMinuteRateOverride: rule.modifier.perMinuteRateOverride ?? resolvedParent.modifier.perMinuteRateOverride,
-    surchargeAdders: [
-      ...(resolvedParent.modifier.surchargeAdders || []),
-      ...(rule.modifier.surchargeAdders || []),
-    ],
+    baseFareOverride:
+      rule.modifier.overrideBaseFare === false
+        ? resolvedParent.modifier.baseFareOverride
+        : (rule.modifier.baseFareOverride ?? resolvedParent.modifier.baseFareOverride),
+    perMileRateOverride:
+      rule.modifier.overrideRates === false
+        ? resolvedParent.modifier.perMileRateOverride
+        : (rule.modifier.perMileRateOverride ?? resolvedParent.modifier.perMileRateOverride),
+    perMinuteRateOverride:
+      rule.modifier.overrideRates === false
+        ? resolvedParent.modifier.perMinuteRateOverride
+        : (rule.modifier.perMinuteRateOverride ?? resolvedParent.modifier.perMinuteRateOverride),
+    surchargeAdders:
+      rule.modifier.overrideSurcharges === false
+        ? resolvedParent.modifier.surchargeAdders
+        : [
+            ...(resolvedParent.modifier.surchargeAdders || []),
+            ...(rule.modifier.surchargeAdders || []),
+          ],
   };
 
   return {
@@ -575,8 +591,27 @@ export function evaluateApplicablePricingRules(
       const { triggers } = rule;
       let matches = true;
 
+      // 0. Origin -> Destination Corridor check
+      if (triggers.fromZoneId) {
+        const matchesOrigin =
+          input.originZoneId === triggers.fromZoneId ||
+          (input.zoneIds && input.zoneIds.length > 0 && input.zoneIds[0] === triggers.fromZoneId);
+        if (!matchesOrigin) {
+          matches = false;
+        }
+      }
+      if (matches && triggers.toZoneId) {
+        const matchesDest =
+          input.destinationZoneId === triggers.toZoneId ||
+          (input.zoneIds && input.zoneIds.length > 1 && input.zoneIds[1] === triggers.toZoneId) ||
+          (input.zoneIds && input.zoneIds.includes(triggers.toZoneId));
+        if (!matchesDest) {
+          matches = false;
+        }
+      }
+
       // 1. Zone Geofence check
-      if (triggers.zoneIds && triggers.zoneIds.length > 0) {
+      if (matches && triggers.zoneIds && triggers.zoneIds.length > 0) {
         const hasZoneMatch = input.zoneIds?.some((zid) => triggers.zoneIds!.includes(zid));
         if (!hasZoneMatch) {
           matches = false;

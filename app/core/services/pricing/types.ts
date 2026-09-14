@@ -46,6 +46,10 @@ export interface PricingConfig {
   conditionSurcharges?: import('../../types/config').ConditionSurchargeConfig;
   /** Named pricing rules to evaluate */
   namedPricingRules?: import('../../types/config').NamedPricingRule[];
+  /** Phase 22: TaxiCaller-Style Unified Tariff Profiles */
+  tariffs?: import('../../types/tariff').TariffProfile[];
+  /** Optional active/selected tariff profile override */
+  activeTariffId?: string;
 }
 
 
@@ -107,6 +111,10 @@ export interface PricingInput {
   accountType?: 'retail' | 'corporate' | 'vip';
   /** Zone IDs matched by pickup/dropoff coordinates */
   zoneIds?: string[];
+  /** Specific Origin Zone ID (for corridor matching) */
+  originZoneId?: string;
+  /** Specific Destination Zone ID (for corridor matching) */
+  destinationZoneId?: string;
   /** Zone Group IDs matched by pickup/dropoff coordinates */
   zoneGroupIds?: string[];
   /** Location Collection IDs matched by proximity */
@@ -175,6 +183,12 @@ export interface PricingContext {
   readonly delayFee?: number;
   readonly appliedRuleNames?: ReadonlyArray<string>;
 
+  // Phase 22: Unified Tariff Profile tracking
+  readonly tariffProfileId?: string;
+  readonly tariffProfileName?: string;
+  readonly matchedCorridorId?: string;
+  readonly matchedCorridorName?: string;
+
   // Step-by-step calculation trace for transparency and auditing
   readonly auditTrail: ReadonlyArray<CalculationAuditStep>;
 }
@@ -187,4 +201,6 @@ export type PricingPipelineStep = (context: PricingContext) => PricingContext;
 export interface PricingCalculationResult {
   pricing: TripPricing;
   context: PricingContext;
+  tariffProfileId?: string;
+  matchedCorridorId?: string;
 }

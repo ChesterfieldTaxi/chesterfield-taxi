@@ -265,31 +265,41 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Rule Inheritance & Visual Condition Rule Builder (`/admin` -> Rates):**
   - **Rule Inheritance Cascades (Parent/Child Rules)**:
     - Child rules define a `parentRuleId` referencing a parent rule to inherit base fares, distance/time rate tiers, and default surcharges.
-    - Child rules dynamically apply delta overrides (e.g. custom flat discount, added surcharge, or rate multiplier) while reflecting updates made to parent rules.
+    - Child rules dynamically apply delta overrides while reflecting updates made to parent rules.
+    - **Inherited Values & Override Toggles**: For inherited rules, parent values are rendered in a disabled state with individual "Override" toggles for Base Drop, Step Tiers, Rate Multipliers, and Surcharges.
     - Pure functional cascade resolution with cycle detection to prevent circular references.
   - **Visual IF/THEN Condition Rule Builder**:
     - Interactive drawer interface structured around declarative IF [Triggers] THEN [Actions] logic.
     - **IF Triggers**:
-      - Geofence: Match specific Zone, Zone Group, or Location Collection.
+      - Geofence & Corridors: Match specific Zone, Zone Group, Location Collection, or explicit Origin Zone -> Destination Zone corridors (`fromZoneId` -> `toZoneId`).
       - Temporal: Time-of-day windows, days of week, and calendar holiday dates.
       - Trip Bounds: Min/max distance (miles) and min/max duration (minutes).
       - Fleet & Passenger: Vehicle tier classes, equipment (car seats, luggage minimums), and passenger counts.
       - Customer Classification: Account types (`retail`, `corporate`, `vip`) and account tags (e.g. `VIP_TIER`, `AIRPORT_PREFERRED`).
     - **THEN Actions**:
-      - Inherit Base Rule: Inherits parent rule rates and overrides.
+      - Inherit Base Rule: Inherits parent rule rates and overrides with disabled display and toggleable overrides.
       - Base / Mileage Rate Overrides: Set custom base fare, per-mile rate, or per-minute rate.
       - Surcharge Adders: Flat or percentage fees (e.g. child seats, excess luggage, zone fees).
       - Rate Multipliers: Peak or promotional scaling factor.
-      - Flat Fare Override: Enforce fixed corridor rate.
-    - **Execution Control**:
+      - Flat Fare Override: Enforce fixed corridor rate (e.g. Origin Zone to Destination Zone flat rate).
+    - **Execution Control & Usability**:
       - Priority ranking with drag-and-drop / up-down reordering.
       - Active/inactive toggle.
       - "Stop Processing on Match" short-circuit execution control.
       - "Allow Driver App Manual Select" permission toggle.
+      - **Priority Collision Detection**: Lightweight non-blocking warning alert when saving rules with identical priority rankings or overlapping trigger criteria.
+      - **Test Rule in Simulator Action**: Drawer action button to immediately populate the Live Fare Simulator with matching rule triggers and switch to the simulator view.
 - **Granular Step-Increment Fare Calculation Engine:**
   - Decaying distance step brackets with granular step sizes (e.g. $0.35 per 0.1 mile for miles 0-5, decaying to $0.25 for 5-15, $0.20 for 15-30, and $0.15 for 30+).
+  - **Open-Ended Step Increments ("And Above / After")**:
+    - Embedded Step Increment editor supports an "Open-Ended / After" checkbox for the final distance tier and delay tier.
+    - When checked, the upper bound input is replaced with open-ended display (`${startMiles}+ mi` or `After ${startMiles} mi`).
+    - Calculation engine processes all subsequent distance or wait time using that final step rate with unbounded capacity (`Infinity`).
   - Delay wait-time step calculation (e.g. $0.60 per 60s/90s under threshold after grace period).
   - Live Fare Matrix Simulator integration with interactive audit trail logging displaying parent rule cascades and step calculation breakdowns.
+- **Universal Surcharges & Zone Pair Corridors:**
+  - Site-wide Universal Surcharges consolidated into a clean dedicated sub-tab (Child safety car seats, extra headcount allowance, vehicle tier surcharges, and highway toll pass-throughs).
+  - Origin Zone -> Destination Zone corridor flat fare overrides inside individual named rules.
 
 ### 17. Phase 21: Public Booking Engine Overhaul & Dispatcher Confirmation Workflow
 - **Public Customer Booking Engine Alignment with Phase 20 Pricing Engine (`/book`):**
@@ -323,4 +333,39 @@ The booking portal will guide the user through a sequential, config-driven flow:
       - Updates trip status to `'DECLINED'`.
       - Automatically dispatches courteous notification email to the passenger citing the rejection reason and providing 24/7 dispatch desk contact options.
 
-
+### 18. Phase 22: Unified Tariff Engine & Hierarchical Profile Architecture
+- **Self-Contained Tariff Profiles (`TariffProfile`)**:
+  - Replaces fragmented base rate forms with unified, self-contained Tariff Profile containers.
+  - Top Profile Tabs: `Standard Flat Rate`, `MiniVan Flat Rate`, `METER`, `MiniVan METER`, with `+ New Tariff` creation and quick profile switching.
+  - **Tariff Meta**: Profile Name, Currency (`USD`), Units (`Imperial` / `Metric`), Fare Increment (e.g. `$2.50` or `$0.10`), Priority Rank (1-100), Group Assignment, Parent Inheritance link, and Active status toggle.
+  - **Unbranded Native Styling**: Proprietary, clean interface without external system badges, reference watermarks, or tab delete clutter.
+  - **Safe Bottom Deletion**: Tab pills are clean navigation buttons without accidental `×` click targets. Each profile page features a dedicated, prominent red "Delete This Tariff Profile" action at the bottom of the workspace with safety confirmation.
+  - **Dynamic Entity Configuration**:
+    - **Admin-Configured Vehicle Classes**: Dynamically maps to the fleet tiers defined in `settings.vehicles` rather than fixed static arrays.
+    - **Spatial Zones & Corridors**: Corridors and trigger matchers pull from live admin geofence zones (`zones`), zone groups (`zoneGroups`), and location collections (`locationCollections`).
+    - **Configurable Extras**: Integrates live car seat allowances, extra passenger rates, and custom surcharges.
+  - **Multi-Tier Intermediate Distance Increments**:
+    - Extends beyond a simple two-bracket model by supporting arbitrary intermediate distance increments between the primary distance limit and the final open-ended "then" tier.
+    - Structure: Flag Drop Start Price ➔ Primary Step Bracket (0 to Primary Limit) ➔ N Intermediate Increments (Bracket A up to Limit A, Bracket B up to Limit B, etc.) ➔ Open-Ended "Then" Step Rate (for all remaining miles to infinity).
+  - **Tariff Profile Inheritance & Tariff Groups**:
+    - **Tariff Groups (`TariffGroup`)**: Admins can define named groups of tariffs (e.g., "Airport Fleet Tariffs", "Standard Metro", "Corporate Contracts") to organize and batch-manage tariffs.
+    - **Inheritance Engine**: Profiles can specify a `parentTariffId`. When inheriting, the child profile can inherit the parent's taximeter step rates, flat corridors, and extras, or toggle granular overrides (`overrideTaximeter`, `overrideCorridors`, `overrideExtras`, `overrideTriggers`).
+  - **Flat Tariff Matrix (From / To Corridors)**:
+    - Inline table mapping Origin (`fromZoneId` / `fromLocationCollectionId`) to Destination (`toZoneId` / `toLocationCollectionId`).
+    - Fixed flat price overrides with bidirectional Two-Way Return (`allowReturn`) toggles.
+    - Full Import/Export JSON support for corridor collections.
+  - **Taximeter Section**:
+    - Flag drop start price & included initial distance/time.
+    - Primary distance rate per step up to distance limit.
+    - N Intermediate distance step tiers.
+    - Final "Then" Step Increment rate per step applied open-ended to infinity.
+    - Free traffic delay allowance, waiting rate per step interval, and minimum fare floor.
+  - **Extras & Surcharges**:
+    - Car seat unit fee, passenger headcount allowance & extra passenger fees, vehicle tier multipliers, and custom surcharges.
+- **Pure Pricing Pipeline Evaluation Sequence**:
+  1. Match the active `TariffProfile` with the highest priority matching the trip's vehicle class, schedule, and pickup/dropoff location.
+  2. Resolve any inheritance from `parentTariffId` for non-overridden attributes.
+  3. Check if the trip matches an explicit From/To Flat Corridor inside that tariff (honoring return direction). If matched, apply flat fare.
+  4. Otherwise, run the trip through the profile's Taximeter Step Bracket calculator (Flag drop + Primary Steps + Intermediate Increments + "Then" Open-Ended Steps + Delay Waiting Steps + Minimum Floor).
+  5. Append applicable extras and universal surcharges.
+  6. Log complete itemized profile audit trace step-by-step in the Live Simulator.

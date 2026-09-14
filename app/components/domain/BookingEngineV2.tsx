@@ -1216,15 +1216,15 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-extrabold uppercase tracking-wider text-blue-200">
-                Direct Dispatch Ingestion
+                Direct Dispatch Confirmation
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                24/7 Monitoring
+                24/7 Service
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Reservations are transmitted directly to our on-duty Chesterfield dispatch desk. We verify chauffeur routing and confirm via SMS & email within minutes.
+              Every trip is reviewed by our local dispatch team and confirmed via text &amp; email.
             </p>
           </div>
         </div>
@@ -1326,9 +1326,6 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   Route & Stops
                 </label>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Live Google Maps Routing
-                </span>
               </div>
 
               <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">

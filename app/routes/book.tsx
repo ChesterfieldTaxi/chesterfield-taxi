@@ -39,28 +39,29 @@ export default function BookRoute() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Bar */}
-        <div className="text-center mb-8 space-y-2">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-blue-200">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }} />
-            {COMPANY_CONFIG.name} Reservation System
-          </div>
-
+        <div className="text-center mb-6 space-y-2">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950 tracking-tight">
-            Book Your Ride Online
+            Book Your Ride
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto">
-            Single-page booking portal with instant Google Maps live fare calculation and upfront pricing guarantee.
+          <p className="text-sm sm:text-base text-slate-600 max-w-lg mx-auto">
+            Reliable airport transfers, executive travel, and local service with upfront pricing.
           </p>
 
           {/* Quick reassurance pills */}
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs text-slate-600">
-            {GUARANTEES.map((item, index) => (
-              <div key={index} className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
-                {item.icon}
-                <span className="font-medium">{item.text}</span>
-              </div>
-            ))}
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 text-xs text-slate-600">
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+              <ShieldCheckIcon className="w-4 h-4 text-blue-600" />
+              <span className="font-medium">Upfront Fixed Rates</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+              <ClockIcon className="w-4 h-4 text-blue-600" />
+              <span className="font-medium">24/7 Live Dispatch</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
+              <CarIcon className="w-4 h-4 text-blue-600" />
+              <span className="font-medium">Sedans, SUVs & WAV</span>
+            </div>
           </div>
         </div>
 

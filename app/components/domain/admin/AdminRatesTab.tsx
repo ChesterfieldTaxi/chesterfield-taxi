@@ -26,6 +26,7 @@ import {
   LayersIcon,
   BabyIcon,
   PlusIcon,
+  SlidersIcon,
 } from '../../ui/Icons';
 import {
   getPricingRulesService,
@@ -35,12 +36,13 @@ import { calculateTripPricing } from '../../../core/services/pricing/pipeline';
 import type { VehicleTier } from '../../../core/types/trip';
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence, ZoneGroup, LocationCollection } from '../../../core/types/zone';
+import { UnifiedTariffManager } from './tariff/UnifiedTariffManager';
 
 export interface AdminRatesTabProps {
   settings: AppSettings;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   isLoading?: boolean;
-  initialSubTab?: 'base' | 'named_rules' | 'step_increments' | 'condition_surcharges';
+  initialSubTab?: 'tariffs' | 'base' | 'named_rules' | 'step_increments' | 'condition_surcharges';
 }
 
 const DEFAULT_CONDITION_SURCHARGES: ConditionSurchargeConfig = {
@@ -60,10 +62,12 @@ export function AdminRatesTab({
   settings,
   onSave,
   isLoading = false,
-  initialSubTab = 'base',
+  initialSubTab = 'tariffs',
 }: AdminRatesTabProps) {
-  // Rates Sub-section: 4 tabs
-  const [activeSubTab, setActiveSubTab] = useState<'base' | 'named_rules' | 'step_increments' | 'condition_surcharges'>(initialSubTab);
+  // Rates Sub-section: 5 tabs with Unified Tariffs as primary default
+  const [activeSubTab, setActiveSubTab] = useState<'tariffs' | 'base' | 'named_rules' | 'step_increments' | 'condition_surcharges'>(
+    initialSubTab || 'tariffs'
+  );
 
   useEffect(() => {
     if (initialSubTab) {
@@ -131,6 +135,8 @@ export function AdminRatesTab({
   const [simDelayMinutes, setSimDelayMinutes] = useState<number>(0);
   const [simSelectedRuleId, setSimSelectedRuleId] = useState<string>('');
   const [simZoneId, setSimZoneId] = useState<string>('');
+  const [simOriginZoneId, setSimOriginZoneId] = useState<string>('');
+  const [simDestinationZoneId, setSimDestinationZoneId] = useState<string>('');
   const [simZoneGroupId, setSimZoneGroupId] = useState<string>('');
   const [simLocationCollectionId, setSimLocationCollectionId] = useState<string>('');
   const [simAccountType, setSimAccountType] = useState<'retail' | 'corporate' | 'vip'>('retail');
@@ -184,7 +190,13 @@ export function AdminRatesTab({
         passengers: simPassengers,
         delayMinutes: simDelayMinutes,
         selectedRuleId: simSelectedRuleId || undefined,
-        zoneIds: simZoneId ? [simZoneId] : undefined,
+        originZoneId: simOriginZoneId || undefined,
+        destinationZoneId: simDestinationZoneId || undefined,
+        zoneIds: [
+          ...(simZoneId ? [simZoneId] : []),
+          ...(simOriginZoneId ? [simOriginZoneId] : []),
+          ...(simDestinationZoneId ? [simDestinationZoneId] : []),
+        ].filter((v, i, a) => a.indexOf(v) === i),
         zoneGroupIds: simZoneGroupId ? [simZoneGroupId] : undefined,
         locationCollectionIds: simLocationCollectionId ? [simLocationCollectionId] : undefined,
         accountType: simAccountType,
@@ -224,6 +236,8 @@ export function AdminRatesTab({
     simDelayMinutes,
     simSelectedRuleId,
     simZoneId,
+    simOriginZoneId,
+    simDestinationZoneId,
     simZoneGroupId,
     simLocationCollectionId,
     simAccountType,
@@ -375,11 +389,108 @@ export function AdminRatesTab({
     }
   };
 
+  // Collision detection warnings for editingRule
+  const collisionWarnings = useMemo(() => {
+    if (!editingRule) return [];
+    const warnings: string[] = [];
+    const otherRules = namedRules.filter((r) => r.id !== editingRule.id && r.isActive);
+
+    // Check same priority
+    const samePriority = otherRules.filter((r) => r.priority === editingRule.priority);
+    if (samePriority.length > 0) {
+      warnings.push(
+        `Priority #${editingRule.priority} is already used by "${samePriority.map((r) => r.name).join(', ')}". Simultaneous active rules with equal priority have non-deterministic evaluation order.`
+      );
+    }
+
+    // Check corridor overlap
+    if (editingRule.triggers.fromZoneId && editingRule.triggers.toZoneId) {
+      const sameCorridor = otherRules.filter(
+        (r) =>
+          r.triggers.fromZoneId === editingRule.triggers.fromZoneId &&
+          r.triggers.toZoneId === editingRule.triggers.toZoneId
+      );
+      if (sameCorridor.length > 0) {
+        const fromName = zones.find((z) => z.id === editingRule.triggers.fromZoneId)?.name || editingRule.triggers.fromZoneId;
+        const toName = zones.find((z) => z.id === editingRule.triggers.toZoneId)?.name || editingRule.triggers.toZoneId;
+        warnings.push(
+          `Corridor from "${fromName}" to "${toName}" is already targeted by "${sameCorridor.map((r) => r.name).join(', ')}". Consider adjusting priorities or enabling "Stop Cascading on Match".`
+        );
+      }
+    }
+
+    return warnings;
+  }, [editingRule, namedRules, zones]);
+
+  // Test Rule in Simulator action handler
+  const handleTestRuleInSimulator = () => {
+    if (!editingRule) return;
+    if (typeof editingRule.triggers.minDistanceMiles === 'number') {
+      setSimDistance(editingRule.triggers.minDistanceMiles);
+    } else if (typeof editingRule.triggers.maxDistanceMiles === 'number') {
+      setSimDistance(Math.min(10, editingRule.triggers.maxDistanceMiles));
+    }
+    if (typeof editingRule.triggers.minDurationMinutes === 'number') {
+      setSimDuration(editingRule.triggers.minDurationMinutes);
+    }
+    if (editingRule.triggers.vehicleTiers && editingRule.triggers.vehicleTiers.length > 0) {
+      setSimVehicleTier(editingRule.triggers.vehicleTiers[0] as VehicleTier);
+    }
+    if (editingRule.triggers.fromZoneId) {
+      setSimOriginZoneId(editingRule.triggers.fromZoneId);
+    }
+    if (editingRule.triggers.toZoneId) {
+      setSimDestinationZoneId(editingRule.triggers.toZoneId);
+    }
+    if (editingRule.triggers.zoneIds && editingRule.triggers.zoneIds.length > 0) {
+      setSimZoneId(editingRule.triggers.zoneIds[0]);
+    }
+    if (editingRule.triggers.zoneGroupIds && editingRule.triggers.zoneGroupIds.length > 0) {
+      setSimZoneGroupId(editingRule.triggers.zoneGroupIds[0]);
+    }
+    if (editingRule.triggers.locationCollectionIds && editingRule.triggers.locationCollectionIds.length > 0) {
+      setSimLocationCollectionId(editingRule.triggers.locationCollectionIds[0]);
+    }
+    if (editingRule.triggers.accountTypes && editingRule.triggers.accountTypes.length > 0) {
+      setSimAccountType(editingRule.triggers.accountTypes[0]);
+    }
+    if (editingRule.triggers.accountTags && editingRule.triggers.accountTags.length > 0) {
+      setSimAccountTags(editingRule.triggers.accountTags.join(', '));
+    }
+    if (editingRule.triggers.equipment?.minCarSeats) {
+      setSimCarSeats(editingRule.triggers.equipment.minCarSeats);
+    }
+    if (editingRule.triggers.equipment?.minLuggage) {
+      setSimLuggage(editingRule.triggers.equipment.minLuggage);
+    }
+    if (editingRule.triggers.passengers?.min) {
+      setSimPassengers(editingRule.triggers.passengers.min);
+    }
+    if (editingRule.id) {
+      setSimSelectedRuleId(editingRule.id);
+    }
+
+    setActiveSubTab('base');
+    setIsRuleModalOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Rates Top Sub-Navigation Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
         <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('tariffs')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'tariffs'
+                ? 'bg-white text-slate-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ZapIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+            <span>Unified Tariffs</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('base')}
@@ -389,8 +500,8 @@ export function AdminRatesTab({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ZapIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-            <span>Base &amp; Simulator</span>
+            <SlidersIcon className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+            <span>Base &amp; Legacy Simulator</span>
           </button>
           <button
             type="button"
@@ -402,7 +513,7 @@ export function AdminRatesTab({
             }`}
           >
             <FileTextIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-            <span>Named Rules</span>
+            <span>Condition Rules</span>
             <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
               {namedRules.length}
             </span>
@@ -434,7 +545,7 @@ export function AdminRatesTab({
             }`}
           >
             <BabyIcon className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-            <span>Extras &amp; Equipment</span>
+            <span>Universal Surcharges</span>
           </button>
         </div>
 
@@ -462,6 +573,22 @@ export function AdminRatesTab({
         <Alert variant="error" title="Save Failed">
           {saveError}
         </Alert>
+      )}
+
+      {/* ─── SUB-TAB 0: TAXICALLER UNIFIED TARIFF PROFILE ENGINE ─── */}
+      {activeSubTab === 'tariffs' && (
+        <UnifiedTariffManager
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading || isSaving}
+          zones={zones}
+          zoneGroups={zoneGroups}
+          locationCollections={locationCollections}
+          onOpenRulesDrawer={() => setActiveSubTab('named_rules')}
+          onOpenZonesTab={() => {
+            window.location.href = '/admin?tab=zones';
+          }}
+        />
       )}
 
       {/* ─── SUB-TAB 1: BASE RATES & FARE SIMULATOR ─── */}
@@ -729,12 +856,52 @@ export function AdminRatesTab({
 
                 {/* Geographic Entity Simulation */}
                 <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    Geographic Spatial Simulator
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                      Geographic Spatial Simulator
+                    </span>
+                    {(simOriginZoneId || simDestinationZoneId) && (
+                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        Corridor Active
+                      </span>
+                    )}
+                  </div>
+                  {/* Origin -> Destination Corridor Simulation */}
+                  <div className="grid grid-cols-2 gap-2 pb-1 border-b border-slate-200/60">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Origin Zone (Pickup)</label>
+                      <select
+                        value={simOriginZoneId}
+                        onChange={(e) => setSimOriginZoneId(e.target.value)}
+                        className="w-full text-[11px] rounded border border-slate-200 bg-white p-1"
+                      >
+                        <option value="">No Origin Zone</option>
+                        {zones.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            From: {z.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Destination Zone (Dropoff)</label>
+                      <select
+                        value={simDestinationZoneId}
+                        onChange={(e) => setSimDestinationZoneId(e.target.value)}
+                        className="w-full text-[11px] rounded border border-slate-200 bg-white p-1"
+                      >
+                        <option value="">No Destination Zone</option>
+                        {zones.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            To: {z.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Zone</label>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Active Zone</label>
                       <select
                         value={simZoneId}
                         onChange={(e) => setSimZoneId(e.target.value)}
@@ -1249,7 +1416,7 @@ export function AdminRatesTab({
                   <tr>
                     <th className="px-4 py-3">Tier Name</th>
                     <th className="px-4 py-3">Start (mi)</th>
-                    <th className="px-4 py-3">End (mi)</th>
+                    <th className="px-4 py-3">End (mi) / Open-Ended</th>
                     <th className="px-4 py-3">Step Increment</th>
                     <th className="px-4 py-3">Rate / Step ($)</th>
                     <th className="px-4 py-3">Equivalent Rate / Mile</th>
@@ -1259,6 +1426,7 @@ export function AdminRatesTab({
                 <tbody className="divide-y divide-slate-100">
                   {pricing.stepIncrementTiers?.map((tier, idx) => {
                     const equivPerMile = tier.stepMiles > 0 ? (tier.ratePerStep / tier.stepMiles) : 0;
+                    const isLastTier = idx === (pricing.stepIncrementTiers?.length ?? 0) - 1;
                     return (
                       <tr key={tier.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-4 py-3 font-bold text-slate-900">
@@ -1286,16 +1454,44 @@ export function AdminRatesTab({
                           />
                         </td>
                         <td className="px-4 py-3 text-slate-700">
-                          <input
-                            type="number"
-                            value={tier.endMiles}
-                            onChange={(e) => {
-                              const updated = [...(pricing.stepIncrementTiers || [])];
-                              updated[idx] = { ...updated[idx], endMiles: parseFloat(e.target.value) || 0 };
-                              setPricing({ ...pricing, stepIncrementTiers: updated });
-                            }}
-                            className="border border-slate-200 rounded px-2 py-1 text-xs font-mono w-20"
-                          />
+                          {tier.isOpenEnded ? (
+                            <div className="flex flex-col">
+                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-200 inline-block text-xs">
+                                {tier.startMiles}+ mi (After {tier.startMiles} mi)
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-medium mt-0.5">Unbounded tier</span>
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              value={tier.endMiles}
+                              onChange={(e) => {
+                                const updated = [...(pricing.stepIncrementTiers || [])];
+                                updated[idx] = { ...updated[idx], endMiles: parseFloat(e.target.value) || 0 };
+                                setPricing({ ...pricing, stepIncrementTiers: updated });
+                              }}
+                              className="border border-slate-200 rounded px-2 py-1 text-xs font-mono w-20"
+                            />
+                          )}
+                          {isLastTier && (
+                            <label className="flex items-center gap-1.5 mt-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={tier.isOpenEnded ?? false}
+                                onChange={(e) => {
+                                  const updated = [...(pricing.stepIncrementTiers || [])];
+                                  updated[idx] = {
+                                    ...updated[idx],
+                                    isOpenEnded: e.target.checked,
+                                    endMiles: e.target.checked ? 999999 : tier.startMiles + 15,
+                                  };
+                                  setPricing({ ...pricing, stepIncrementTiers: updated });
+                                }}
+                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                              />
+                              <span className="text-[11px] font-bold text-indigo-900">Open-Ended / After</span>
+                            </label>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           <input
@@ -1437,6 +1633,31 @@ export function AdminRatesTab({
                   />
                   <p className="text-[11px] text-slate-400 mt-1">e.g. $0.60 per 90 sec ($24.00/hour).</p>
                 </div>
+
+                <div className="sm:col-span-3 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={pricing.delayRate?.isOpenEnded ?? true}
+                      onChange={(e) =>
+                        setPricing({
+                          ...pricing,
+                          delayRate: {
+                            ...(pricing.delayRate || { stepSeconds: 90, ratePerStep: 0.60, gracePeriodMinutes: 5 }),
+                            isOpenEnded: e.target.checked,
+                          },
+                        })
+                      }
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-800 text-xs">Open-Ended Wait-Time Billing</span>
+                      <span className="text-[11px] text-slate-500 block">
+                        When enabled, wait time accumulates indefinitely at the configured step rate after grace period expires.
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </Card>
@@ -1456,7 +1677,7 @@ export function AdminRatesTab({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Child Safety Car Seat Equipment */}
               <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
                 <div className="flex items-center gap-2">
@@ -1535,6 +1756,36 @@ export function AdminRatesTab({
                       }
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Highway & Bridge Toll Allowance */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🛣️</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Highway &amp; Bridge Tolls</h4>
+                    <p className="text-xs text-slate-500">Universal toll pass-through baseline.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Default Tolls Allowance ($)</label>
+                  <Input
+                    type="number"
+                    step="0.50"
+                    min="0"
+                    value={pricing.defaultTolls ?? 0}
+                    onChange={(e) =>
+                      setPricing({
+                        ...pricing,
+                        defaultTolls: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Pass-through allowance added to trip fare when routes cross toll plazas or river bridges.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1622,16 +1873,49 @@ export function AdminRatesTab({
                   Configure condition triggers, hierarchical inheritance, execution flow barriers, and pricing modifiers.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsRuleModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestRuleInSimulator}
+                  leftIcon={<ZapIcon className="w-3.5 h-3.5 text-amber-500" />}
+                  className="border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-amber-900 font-bold"
+                >
+                  Test in Simulator
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setIsRuleModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveRuleModal} className="p-6 space-y-6 text-xs">
+            {(() => {
+              const parentRule = editingRule.parentRuleId
+                ? namedRules.find((r) => r.id === editingRule.parentRuleId)
+                : undefined;
+
+              return (
+                <form onSubmit={handleSaveRuleModal} className="p-6 space-y-6 text-xs">
+                  {/* Collision Detection Warnings */}
+                  {collisionWarnings.length > 0 && (
+                    <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl space-y-1.5">
+                      <div className="flex items-center gap-2 font-bold text-amber-900 text-xs">
+                        <span>⚠️ Priority &amp; Trigger Conflict Warning</span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800">
+                        {collisionWarnings.map((warn, wIdx) => (
+                          <li key={wIdx} className="leading-relaxed">
+                            {warn}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
               {/* Top Row: Basic Metadata & Inheritance */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
                 <div className="md:col-span-2 space-y-3">
@@ -1784,6 +2068,68 @@ export function AdminRatesTab({
                   <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide block">
                     Geographic Spatial Entities
                   </span>
+
+                  {/* Origin -> Destination Corridor Pair */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                        <span>🛣️ Origin ➔ Destination Corridor Pair</span>
+                      </div>
+                      {editingRule.triggers.fromZoneId && editingRule.triggers.toZoneId && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          Corridor Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-1">Origin Zone (Pickup)</label>
+                        <select
+                          value={editingRule.triggers.fromZoneId || ''}
+                          onChange={(e) =>
+                            setEditingRule({
+                              ...editingRule,
+                              triggers: {
+                                ...editingRule.triggers,
+                                fromZoneId: e.target.value || undefined,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-200 rounded p-1.5 bg-white text-xs font-medium"
+                        >
+                          <option value="">Any Origin (Unrestricted)</option>
+                          {zones.map((z) => (
+                            <option key={z.id} value={z.id}>
+                              From: {z.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-1">Destination Zone (Dropoff)</label>
+                        <select
+                          value={editingRule.triggers.toZoneId || ''}
+                          onChange={(e) =>
+                            setEditingRule({
+                              ...editingRule,
+                              triggers: {
+                                ...editingRule.triggers,
+                                toZoneId: e.target.value || undefined,
+                              },
+                            })
+                          }
+                          className="w-full border border-slate-200 rounded p-1.5 bg-white text-xs font-medium"
+                        >
+                          <option value="">Any Destination (Unrestricted)</option>
+                          {zones.map((z) => (
+                            <option key={z.id} value={z.id}>
+                              To: {z.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Individual Zones */}
                   {zones.length > 0 && (
@@ -2295,84 +2641,257 @@ export function AdminRatesTab({
                   </div>
                 </div>
 
-                {/* Granular Rate Overrides */}
-                <div className="space-y-1.5 pt-2 border-t border-emerald-100">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide block">
-                    Granular Step Overrides (Optional)
-                  </span>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Base Fare ($)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        value={editingRule.modifier.baseFareOverride ?? ''}
-                        onChange={(e) =>
-                          setEditingRule({
-                            ...editingRule,
-                            modifier: {
-                              ...editingRule.modifier,
-                              baseFareOverride: e.target.value ? parseFloat(e.target.value) : undefined,
-                            },
-                          })
-                        }
-                        className="w-full border border-slate-200 rounded-lg p-1.5 bg-white text-xs"
-                        placeholder="Default Base"
-                      />
+                {/* Granular Rate & Step Overrides */}
+                <div className="space-y-3 pt-2 border-t border-emerald-100">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide block">
+                      Granular Step &amp; Base Overrides (Optional)
+                    </span>
+                    {parentRule && (
+                      <span className="text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 font-semibold">
+                        Parent: {parentRule.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Base Fare Override */}
+                    <div className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700">Base Fare ($)</label>
+                        {parentRule && (
+                          <label className="flex items-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={editingRule.modifier.overrideBaseFare ?? (editingRule.modifier.baseFareOverride !== undefined)}
+                              onChange={(e) =>
+                                setEditingRule({
+                                  ...editingRule,
+                                  modifier: {
+                                    ...editingRule.modifier,
+                                    overrideBaseFare: e.target.checked,
+                                    baseFareOverride: e.target.checked
+                                      ? (editingRule.modifier.baseFareOverride ?? parentRule.modifier.baseFareOverride ?? pricing.baseFare)
+                                      : undefined,
+                                  },
+                                })
+                              }
+                              className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-[10px] font-bold text-indigo-700">Override</span>
+                          </label>
+                        )}
+                      </div>
+
+                      {parentRule && !(editingRule.modifier.overrideBaseFare ?? (editingRule.modifier.baseFareOverride !== undefined)) ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            disabled
+                            value={`$${(parentRule.modifier.baseFareOverride ?? pricing.baseFare).toFixed(2)}`}
+                            className="w-full border border-slate-200 rounded p-1.5 bg-slate-100 text-slate-500 font-mono text-xs cursor-not-allowed"
+                          />
+                          <span className="text-[10px] text-purple-700 font-medium block">
+                            ↳ Inherited from Parent
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={editingRule.modifier.baseFareOverride ?? ''}
+                            onChange={(e) =>
+                              setEditingRule({
+                                ...editingRule,
+                                modifier: {
+                                  ...editingRule.modifier,
+                                  baseFareOverride: e.target.value ? parseFloat(e.target.value) : undefined,
+                                },
+                              })
+                            }
+                            className="w-full border border-slate-200 rounded p-1.5 bg-white text-xs font-mono font-bold text-slate-900"
+                            placeholder="Default Base"
+                          />
+                          {parentRule && (
+                            <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                              ✓ Child Override Active
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Per-Mile ($/mi)</label>
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="0"
-                        value={editingRule.modifier.perMileRateOverride ?? ''}
-                        onChange={(e) =>
-                          setEditingRule({
-                            ...editingRule,
-                            modifier: {
-                              ...editingRule.modifier,
-                              perMileRateOverride: e.target.value ? parseFloat(e.target.value) : undefined,
-                            },
-                          })
-                        }
-                        className="w-full border border-slate-200 rounded-lg p-1.5 bg-white text-xs"
-                        placeholder="Default $/mi"
-                      />
+                    {/* Per-Mile Override */}
+                    <div className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700">Per-Mile ($/mi)</label>
+                        {parentRule && (
+                          <label className="flex items-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={editingRule.modifier.overrideRates ?? (editingRule.modifier.perMileRateOverride !== undefined || editingRule.modifier.perMinuteRateOverride !== undefined)}
+                              onChange={(e) =>
+                                setEditingRule({
+                                  ...editingRule,
+                                  modifier: {
+                                    ...editingRule.modifier,
+                                    overrideRates: e.target.checked,
+                                    perMileRateOverride: e.target.checked
+                                      ? (editingRule.modifier.perMileRateOverride ?? parentRule.modifier.perMileRateOverride ?? pricing.perMileRate ?? 0)
+                                      : undefined,
+                                    perMinuteRateOverride: e.target.checked
+                                      ? (editingRule.modifier.perMinuteRateOverride ?? parentRule.modifier.perMinuteRateOverride ?? pricing.perMinuteRate ?? 0)
+                                      : undefined,
+                                  },
+                                })
+                              }
+                              className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-[10px] font-bold text-indigo-700">Override</span>
+                          </label>
+                        )}
+                      </div>
+
+                      {parentRule && !(editingRule.modifier.overrideRates ?? (editingRule.modifier.perMileRateOverride !== undefined || editingRule.modifier.perMinuteRateOverride !== undefined)) ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            disabled
+                            value={`$${(parentRule.modifier.perMileRateOverride ?? pricing.perMileRate ?? 0).toFixed(2)} / mi`}
+                            className="w-full border border-slate-200 rounded p-1.5 bg-slate-100 text-slate-500 font-mono text-xs cursor-not-allowed"
+                          />
+                          <span className="text-[10px] text-purple-700 font-medium block">
+                            ↳ Inherited from Parent
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            value={editingRule.modifier.perMileRateOverride ?? ''}
+                            onChange={(e) =>
+                              setEditingRule({
+                                ...editingRule,
+                                modifier: {
+                                  ...editingRule.modifier,
+                                  perMileRateOverride: e.target.value ? parseFloat(e.target.value) : undefined,
+                                },
+                              })
+                            }
+                            className="w-full border border-slate-200 rounded p-1.5 bg-white text-xs font-mono font-bold text-slate-900"
+                            placeholder="Default $/mi"
+                          />
+                          {parentRule && (
+                            <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                              ✓ Child Override Active
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Per-Min ($/min)</label>
-                      <input
-                        type="number"
-                        step="0.05"
-                        min="0"
-                        value={editingRule.modifier.perMinuteRateOverride ?? ''}
-                        onChange={(e) =>
-                          setEditingRule({
-                            ...editingRule,
-                            modifier: {
-                              ...editingRule.modifier,
-                              perMinuteRateOverride: e.target.value ? parseFloat(e.target.value) : undefined,
-                            },
-                          })
-                        }
-                        className="w-full border border-slate-200 rounded-lg p-1.5 bg-white text-xs"
-                        placeholder="Default $/min"
-                      />
+                    {/* Per-Minute Override */}
+                    <div className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-700">Per-Min ($/min)</label>
+                        {parentRule && (
+                          <span className="text-[10px] text-slate-400 font-medium">Linked Rate</span>
+                        )}
+                      </div>
+
+                      {parentRule && !(editingRule.modifier.overrideRates ?? (editingRule.modifier.perMileRateOverride !== undefined || editingRule.modifier.perMinuteRateOverride !== undefined)) ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            disabled
+                            value={`$${(parentRule.modifier.perMinuteRateOverride ?? pricing.perMinuteRate ?? 0).toFixed(2)} / min`}
+                            className="w-full border border-slate-200 rounded p-1.5 bg-slate-100 text-slate-500 font-mono text-xs cursor-not-allowed"
+                          />
+                          <span className="text-[10px] text-purple-700 font-medium block">
+                            ↳ Inherited from Parent
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            value={editingRule.modifier.perMinuteRateOverride ?? ''}
+                            onChange={(e) =>
+                              setEditingRule({
+                                ...editingRule,
+                                modifier: {
+                                  ...editingRule.modifier,
+                                  perMinuteRateOverride: e.target.value ? parseFloat(e.target.value) : undefined,
+                                },
+                              })
+                            }
+                            className="w-full border border-slate-200 rounded p-1.5 bg-white text-xs font-mono font-bold text-slate-900"
+                            placeholder="Default $/min"
+                          />
+                          {parentRule && (
+                            <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">
+                              ✓ Child Override Active
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Itemized Surcharge Adders */}
                 <div className="space-y-2 pt-2 border-t border-emerald-100">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide block">
-                    Itemized Surcharge Adders (Additive Fees)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wide block">
+                      Itemized Surcharge Adders (Additive Fees)
+                    </span>
+                    {parentRule && (
+                      <label className="flex items-center gap-1 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editingRule.modifier.overrideSurcharges ?? false}
+                          onChange={(e) =>
+                            setEditingRule({
+                              ...editingRule,
+                              modifier: {
+                                ...editingRule.modifier,
+                                overrideSurcharges: e.target.checked,
+                              },
+                            })
+                          }
+                          className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-[10px] font-bold text-indigo-700">Override Parent Surcharges</span>
+                      </label>
+                    )}
+                  </div>
 
-                  {/* List current adders */}
+                  {/* If Inheriting Parent Adders and not overridden */}
+                  {parentRule && !editingRule.modifier.overrideSurcharges && parentRule.modifier.surchargeAdders && parentRule.modifier.surchargeAdders.length > 0 && (
+                    <div className="p-2.5 bg-purple-50/70 rounded-lg border border-purple-200 space-y-1.5">
+                      <span className="text-[10px] font-bold text-purple-900 block">
+                        ↳ Inheriting {parentRule.modifier.surchargeAdders.length} Surcharge(s) from &quot;{parentRule.name}&quot;:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {parentRule.modifier.surchargeAdders.map((adder, aIdx) => (
+                          <span
+                            key={adder.id || aIdx}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-white text-purple-800 border border-purple-200"
+                          >
+                            {adder.name} ({adder.type === 'flat' ? `$${adder.amount.toFixed(2)}` : `${adder.amount}%`})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List current rule adders */}
                   {editingRule.modifier.surchargeAdders && editingRule.modifier.surchargeAdders.length > 0 && (
                     <div className="space-y-1.5">
                       {editingRule.modifier.surchargeAdders.map((adder, adderIdx) => (
@@ -2431,26 +2950,40 @@ export function AdminRatesTab({
               </div>
 
               {/* Drawer Footer Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
-                  size="md"
-                  onClick={() => setIsRuleModalOpen(false)}
+                  size="sm"
+                  onClick={handleTestRuleInSimulator}
+                  leftIcon={<ZapIcon className="w-4 h-4 text-amber-500" />}
+                  className="border-amber-300 bg-amber-50/70 hover:bg-amber-100 text-amber-900 font-bold"
                 >
-                  Cancel
+                  Test Rule in Simulator
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  isLoading={isSaving}
-                  className="px-6"
-                >
-                  Save Rule to Firestore
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="md"
+                    onClick={() => setIsRuleModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    isLoading={isSaving}
+                    className="px-6"
+                  >
+                    Save Rule to Firestore
+                  </Button>
+                </div>
               </div>
             </form>
+          );
+        })()}
           </div>
         </div>
       )}

@@ -114,6 +114,10 @@ export interface TripPricing {
   passengerSurcharge?: number;
   delayFee?: number;
   appliedRuleNames?: string[];
+  tariffProfileId?: string;
+  tariffProfileName?: string;
+  matchedCorridorId?: string;
+  matchedCorridorName?: string;
 }
 
 export type PaymentMethod = 'card' | 'cash' | 'corporate';

@@ -146,6 +146,7 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'corporate', label: '🏢 Corporate Client Accounts' },
   ],
   rates: [
+    { key: 'tariffs', label: '⚡ Unified Tariffs' },
     { key: 'base', label: '💵 Standard Base Rates' },
     { key: 'named_rules', label: '⚡ Named Surge Rules' },
     { key: 'step_increments', label: '📏 Distance Tiers' },

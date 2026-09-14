@@ -29,6 +29,7 @@ import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { DEFAULT_TARIFF_PROFILES } from '../pricing/tariff.service';
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,
@@ -384,6 +385,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   invoices: [...DEFAULT_INVOICES],
   securityControls: { ...DEFAULT_SECURITY_CONTROLS },
   configAuditTrail: [...DEFAULT_CONFIG_AUDIT_TRAIL],
+  tariffs: [...DEFAULT_TARIFF_PROFILES],
+  tariffGroups: [],
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -471,6 +474,12 @@ export class AdminConfigService implements IAdminConfigService {
       configAuditTrail: incoming.configAuditTrail && incoming.configAuditTrail.length > 0
         ? incoming.configAuditTrail
         : DEFAULT_APP_SETTINGS.configAuditTrail,
+      tariffs: incoming.tariffs && incoming.tariffs.length > 0
+        ? incoming.tariffs
+        : DEFAULT_APP_SETTINGS.tariffs,
+      tariffGroups: incoming.tariffGroups && incoming.tariffGroups.length > 0
+        ? incoming.tariffGroups
+        : DEFAULT_APP_SETTINGS.tariffGroups,
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };
@@ -641,6 +650,7 @@ export class AdminConfigService implements IAdminConfigService {
       stepIncrementTiers: settings.pricing.stepIncrementTiers,
       delayRate: settings.pricing.delayRate,
       conditionSurcharges: settings.pricing.conditionSurcharges,
+      tariffs: settings.tariffs ?? DEFAULT_TARIFF_PROFILES,
     };
   }
 }
