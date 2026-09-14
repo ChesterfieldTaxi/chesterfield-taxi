@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
@@ -58,7 +59,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <meta name="theme-color" content="#2563eb" />
-        <link rel="manifest" href="/manifest.json" />
+        {/* Safely get location inside ErrorBoundary as well if needed, but since we are in head we just use a safe try-catch wrapper for useLocation if it fails, or simpler: just use generic manifest and let specific routes override with 'links' export. Actually we can just use useLocation here. */}
+        {(() => {
+          try {
+            const loc = useLocation();
+            if (loc.pathname.startsWith('/driver')) {
+              return <link rel="manifest" href="/manifest-driver.json" />;
+            }
+          } catch (e) {
+            // fallback if useLocation throws
+          }
+          return <link rel="manifest" href="/manifest.json" />;
+        })()}
         <Meta />
         <Links />
         {COMPANY_CONFIG.cms?.customCss && (
