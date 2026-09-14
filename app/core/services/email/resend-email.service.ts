@@ -50,6 +50,17 @@ const DEFAULT_ADMIN_EMAIL = getEnv('DISPATCH_ALERT_EMAIL') || COMPANY_CONFIG.ema
  * - In browser environments: Delegates securely to `/api/send-email` resource route.
  * - In local dev (no API key): Gracefully logs simulated dispatch without throwing.
  */
+function getResolvedFromAddress(configuredFrom?: string): string {
+  if (configuredFrom) return configuredFrom;
+  const envFrom = getEnv('RESEND_FROM_EMAIL');
+  if (envFrom) {
+    return envFrom.includes('<') ? envFrom : `${COMPANY_CONFIG.name} <${envFrom}>`;
+  }
+  // If no custom domain is verified in Resend yet, Resend's API will reject non-verified domains like chesterfieldtaxi.com with a 403.
+  // Using onboarding@resend.dev allows immediate delivery to test/registered recipient accounts.
+  return `${COMPANY_CONFIG.name} <onboarding@resend.dev>`;
+}
+
 export class ResendEmailService implements IEmailDispatchService {
   private resendClient: Resend | null = null;
   private apiKey?: string;
@@ -58,8 +69,8 @@ export class ResendEmailService implements IEmailDispatchService {
 
   constructor(config?: EmailServiceConfig) {
     this.apiKey = config?.apiKey || getEnv('RESEND_API_KEY');
-    this.fromAddress = config?.fromAddress || getEnv('RESEND_FROM_EMAIL') || DEFAULT_FROM_ADDRESS;
-    this.adminAlertRecipient = config?.adminAlertRecipient || getEnv('DISPATCH_ALERT_EMAIL') || DEFAULT_ADMIN_EMAIL;
+    this.fromAddress = getResolvedFromAddress(config?.fromAddress);
+    this.adminAlertRecipient = config?.adminAlertRecipient || getEnv('DISPATCH_ALERT_EMAIL') || COMPANY_CONFIG.email.dispatch;
 
     if (this.apiKey) {
       try {

@@ -1336,7 +1336,7 @@ export function BookingEngineV2({
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 {bookingConfig.allowImmediateAsap ? (
                   <label className="flex items-center gap-2 cursor-pointer shrink-0 select-none font-semibold text-slate-800 text-xs">
                     <input
@@ -1366,7 +1366,7 @@ export function BookingEngineV2({
                 )}
 
                 {form.timingType === 'later' ? (
-                  <div className="flex items-center gap-2 flex-1 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-2 gap-2 flex-1 animate-in fade-in duration-150 min-w-0">
                     <input
                       type="date"
                       name="scheduledDate"
@@ -1374,7 +1374,7 @@ export function BookingEngineV2({
                       min={new Date().toISOString().split('T')[0]}
                       onChange={(e) => setForm((prev) => ({ ...prev, scheduledDate: e.target.value }))}
                       required
-                      className="w-1/2 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      className="w-full min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     />
                     <input
                       type="time"
@@ -1382,7 +1382,7 @@ export function BookingEngineV2({
                       value={form.scheduledTime}
                       onChange={(e) => setForm((prev) => ({ ...prev, scheduledTime: e.target.value }))}
                       required
-                      className="w-1/2 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      className="w-full min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
                 ) : (
