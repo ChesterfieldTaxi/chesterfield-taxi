@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const location = useLocation();
   const [companySettings, setCompanySettings] = useState(() => {
     try {
@@ -99,21 +100,6 @@ export function Navbar() {
               </NavLink>
             ))}
 
-            {/* Dynamic Admin Console Entry Link */}
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  isActive
-                    ? 'bg-slate-900 text-blue-400 font-bold'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                }`
-              }
-              title="Dispatcher & Operator Console"
-            >
-              <ShieldCheckIcon className="w-3.5 h-3.5" />
-              <span>Admin</span>
-            </NavLink>
           </nav>
 
           {/* Desktop Right CTAs */}
@@ -217,20 +203,6 @@ export function Navbar() {
                 {item.label}
               </NavLink>
             ))}
-
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
-                  isActive
-                    ? 'bg-slate-900 text-blue-400 font-bold'
-                    : 'text-slate-500 hover:bg-slate-50'
-                }`
-              }
-            >
-              <ShieldCheckIcon className="w-4 h-4 text-blue-500" />
-              <span>Operator &amp; Admin Console</span>
-            </NavLink>
           </nav>
 
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
@@ -242,6 +214,18 @@ export function Navbar() {
               <UserIcon className="w-4 h-4" />
               <span>Sign In</span>
             </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setIsAppModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              <span>Get App</span>
+            </button>
 
             <Link
               to="/book"
@@ -256,10 +240,10 @@ export function Navbar() {
                 color: 'var(--btn-primary-text, #ffffff)',
                 borderRadius: 'var(--btn-radius, 12px)',
               }}
-              className="w-full flex items-center justify-center gap-2 font-extrabold text-base py-3 px-4 shadow-sm hover:opacity-90 transition-all"
+              className="w-full flex items-center justify-center gap-2 font-extrabold text-sm py-2.5 px-4 shadow-sm hover:opacity-90 transition-all"
             >
-              <CarIcon className="w-5 h-5" />
-              <span>Book Online Now</span>
+              <CarIcon className="w-4 h-4" />
+              <span>Book Now</span>
             </Link>
 
             <a

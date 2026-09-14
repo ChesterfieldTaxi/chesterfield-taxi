@@ -300,3 +300,12 @@
 - [x] 27.3 Role-Based Session Router & Route Guards: Implement route guards for `/admin`, `/dispatch`, `/driver` redirecting to `/signin`. Handle role-based automatic routing post-login.
 - [x] 27.4 Guest-to-User Account Linking: Add "Save Account & Claim Trips" option on `/track/$tripToken` to attach guest trips to passenger profile.
 - [x] 27.5 Verification: Run `npm run typecheck` and `npm run build` to verify 0 errors, then mark Phase 27 complete.
+## Phase 28: Passenger Auth, App Download Flow, Public Job Application Engine & Header Navigation Cleanup
+- [ ] 28.1 Documentation Updates: Update spec.md, plan.md, and tasks.md to reflect Phase 28 scope.
+- [ ] 28.2 Security & Navigation Polish: Remove 'Admin' menu button from Navbar. Ensure /admin is accessible only via direct URL navigation with route guards.
+- [ ] 28.3 Web Passenger Sign-In & Register: Remove Driver registration option from /register. Keep forms strictly for passengers.
+- [ ] 28.4 App Download & PWA Install Callout: Add 'Get App' dropdown/modal with iOS/Android placeholders and QR code, plus PWA installation triggers.
+- [ ] 28.5 Public Job Application Engine: Create /apply route with form for drivers/dispatchers. Save to Firestore /applications.
+- [ ] 28.6 Verification: Run 
+pm run typecheck and 
+pm run build to verify 0 errors, then mark Phase 28 complete.

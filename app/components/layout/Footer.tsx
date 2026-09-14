@@ -16,7 +16,7 @@ const QUICK_LINKS = [
   { label: 'Services Overview', path: '/services' },
   { label: 'About Us', path: '/about' },
   { label: 'Contact & Support', path: '/contact' },
-  { label: 'Admin Console', path: '/admin' },
+  { label: 'Careers & Applications', path: '/apply' },
 ];
 
 export function Footer() {

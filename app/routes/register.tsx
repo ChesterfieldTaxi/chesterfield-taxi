@@ -118,29 +118,6 @@ export default function Register() {
         </div>
 
         <Card className="shadow-xl border-slate-200">
-          <CardHeader className="border-b border-slate-100 pb-4">
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  role === 'customer' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
-                }`}
-                onClick={() => setRole('customer')}
-              >
-                Passenger
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  role === 'driver' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
-                }`}
-                onClick={() => setRole('driver')}
-              >
-                Driver
-              </button>
-            </div>
-          </CardHeader>
-
           <form onSubmit={handleSubmit}>
             <CardContent className="p-6 space-y-4">
               {error && (
