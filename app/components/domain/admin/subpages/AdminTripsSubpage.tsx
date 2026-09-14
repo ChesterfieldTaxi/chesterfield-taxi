@@ -91,12 +91,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           actorRole: 'admin',
           reason: options?.reason || `Admin dispatch update to ${newStatus}`,
         });
-        setActionSuccessMessage(`Trip #${tripId.slice(-6)} transitioned to ${newStatus}.`);
-        setTimeout(() => setActionSuccessMessage(null), 3000);
-        if (selectedTrip?.id === tripId) {
-          setSelectedTrip(updated);
-        }
-
+        let mailStatus = '';
         // Trigger passenger status notification email if available
         const currentTrip = updated || trips.find((t) => t.id === tripId);
         if (currentTrip && currentTrip.passenger?.email) {
@@ -107,7 +102,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 ? new Date(currentTrip.scheduledPickupTime).toLocaleString()
                 : 'Immediate Ride (ASAP)';
 
-            await emailService.sendBookingConfirmation({
+            const sendResult = await emailService.sendBookingConfirmation({
               tripId: currentTrip.id,
               passenger: {
                 firstName: currentTrip.passenger?.firstName || 'Valued',
@@ -124,10 +119,21 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
               currency: 'USD',
               paymentMethod: currentTrip.payment?.method || 'card',
             });
-          } catch (mailErr) {
+
+            if (sendResult?.success) {
+              mailStatus = ` Confirmation email sent to ${currentTrip.passenger.email}.`;
+            } else if (sendResult?.error) {
+              mailStatus = ` (Email error: ${sendResult.error})`;
+            }
+          } catch (mailErr: any) {
             console.warn('[AdminTripsSubpage] Email trigger warning:', mailErr);
+            mailStatus = ` (Email delivery offline: ${mailErr?.message || 'Check RESEND_API_KEY'})`;
           }
         }
+
+        const friendlyStatus = newStatus === 'CONFIRMED' || newStatus === 'confirmed' ? 'Confirmed & Accepted' : newStatus;
+        setActionSuccessMessage(`✓ Trip #${tripId.slice(-6)} successfully ${friendlyStatus}.${mailStatus}`);
+        setTimeout(() => setActionSuccessMessage(null), 5000);
       }
     } catch (err: any) {
       console.error('[AdminTripsSubpage] Transition error:', err);

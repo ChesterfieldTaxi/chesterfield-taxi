@@ -107,21 +107,33 @@ export class ResendEmailService implements IEmailDispatchService {
           return result;
         }
 
-        const errorText = await response.text();
-        console.warn('[ResendEmailService] /api/send-email responded with error:', errorText);
-      } catch (clientErr) {
-        console.warn('[ResendEmailService] Browser fetch to /api/send-email failed, utilizing local fallback:', clientErr);
-      }
+        let errorMessage = 'Email server error';
+        try {
+          const errorJson = await response.json();
+          if (errorJson.error) errorMessage = errorJson.error;
+        } catch {
+          const errorText = await response.text();
+          if (errorText) errorMessage = errorText;
+        }
 
-      // If client fetch fails (e.g. offline dev), return graceful simulated result
-      return {
-        success: true,
-        simulated: true,
-        messageId: `sim_client_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        recipient,
-        subject,
-        dispatchedAt: new Date().toISOString(),
-      };
+        console.error('[ResendEmailService] /api/send-email responded with error:', errorMessage);
+        return {
+          success: false,
+          error: errorMessage,
+          recipient,
+          subject,
+          dispatchedAt: new Date().toISOString(),
+        };
+      } catch (clientErr: any) {
+        console.error('[ResendEmailService] Browser fetch to /api/send-email failed:', clientErr);
+        return {
+          success: false,
+          error: clientErr?.message || 'Network error reaching email dispatch service',
+          recipient,
+          subject,
+          dispatchedAt: new Date().toISOString(),
+        };
+      }
     }
 
     // 2. Server environment without API key -> simulated dispatch

@@ -286,29 +286,29 @@ export function BookingConfirmation({
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-amber-800">
-                    Booking Request Registered
+                    Booking Request Received
                   </p>
                 </div>
                 <p className="text-slate-600 mt-1">
-                  Your ride request is active in our dispatch queue. Confirmation email delivery to{' '}
-                  <strong className="text-slate-800">{emailDelivery?.recipient || trip.passenger.email}</strong> is pending configuration ({emailDelivery?.error || 'Email service offline'}).
+                  We have received your trip request. Our dispatch team is reviewing your route and will contact you directly at <strong className="text-slate-800">{trip.passenger.phone}</strong> or <strong className="text-slate-800">{emailDelivery?.recipient || trip.passenger.email}</strong> to confirm your vehicle.
                 </p>
                 <p className="text-slate-500 mt-1">
-                  Our dispatchers can view your ride in real-time.
+                  If you have immediate questions, please call dispatch at {COMPANY_CONFIG.phone.dispatch}.
                 </p>
               </>
             ) : emailDelivery?.status === 'simulated' ? (
               <>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-semibold text-blue-800">
-                    ✓ Request Queued in Dispatch
+                  <p className="font-semibold text-blue-900">
+                    ✓ Request Received & Assigned for Review
                   </p>
                 </div>
                 <p className="text-slate-600 mt-1">
-                  Your reservation is saved and visible on the dispatch console. (Demo mode: live email delivery requires <code className="bg-slate-200/60 px-1 py-0.5 rounded text-[10px]">RESEND_API_KEY</code>).
+                  Your trip details have been sent to our dispatch team. A confirmation summary is being prepared for{' '}
+                  <strong className="text-slate-800">{emailDelivery?.recipient || trip.passenger.email}</strong>.
                 </p>
                 <p className="text-slate-500 mt-1">
-                  You will receive updates directly as your driver is dispatched.
+                  Our dispatch team will confirm your scheduled ride shortly.
                 </p>
               </>
             ) : (
