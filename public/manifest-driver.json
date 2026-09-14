@@ -7,7 +7,7 @@
   "scope": "/driver",
   "display": "standalone",
   "background_color": "#020617",
-  "theme_color": "#f59e0b",
+  "theme_color": "#2563eb",
   "icons": [
     {
       "src": "/icon-driver-192.svg",

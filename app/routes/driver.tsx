@@ -36,7 +36,7 @@ export function meta() {
   ];
 }
 
-type DriverTab = 'active' | 'offers' | 'scheduled' | 'schedule';
+type DriverTab = 'active' | 'offers' | 'messages' | 'scheduled' | 'schedule';
 
 const PRESET_EXTRAS: Array<{ name: string; amount: number; category: DriverMeterExtra['category'] }> = [
   { name: 'Lambert STL Airport Toll / Surcharge', amount: 4.0, category: 'toll' },
@@ -64,6 +64,7 @@ export default function DriverAppRoute() {
   const [assignedTrips, setAssignedTrips] = useState<Trip[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<DriverTab>('active');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -390,7 +391,7 @@ export default function DriverAppRoute() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
-        <SpinnerIcon className="w-10 h-10 text-amber-500 animate-spin mb-4" />
+        <SpinnerIcon className="w-10 h-10 text-blue-600 animate-spin mb-4" />
         <h2 className="text-xl font-bold tracking-wide">Chesterfield Driver App</h2>
         <p className="text-slate-400 text-sm mt-1">Connecting to dispatch server...</p>
       </div>
@@ -417,65 +418,79 @@ export default function DriverAppRoute() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-24 select-none antialiased">
       {/* Top Mobile App Header */}
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-md gap-3">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
-            CT
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="font-bold text-sm text-white leading-tight truncate max-w-[170px] sm:max-w-none">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 relative w-full">
+          <button 
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center gap-3 text-left min-w-0 flex-1 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 rounded-xl"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-slate-950 font-black flex items-center justify-center text-sm shadow-sm shrink-0 uppercase">
+              {driver?.name ? driver.name.charAt(0) : 'CT'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-bold text-sm text-white leading-tight truncate">
                 {driver?.name || 'Driver Console'}
               </h1>
-              {driver?.vehicleUnit && (
-                <span className="text-[9px] bg-slate-800 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">
-                  {driver.vehicleUnit}
-                </span>
-              )}
+              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                {driver?.vehicleUnit ? `Cab #${driver.vehicleUnit}` : 'No Vehicle Assigned'}
+                {driver?.vehicleMake && driver?.vehicleModel ? ` - ${driver.vehicleColor || ''} ${driver.vehicleMake} ${driver.vehicleModel}` : ''}
+              </p>
             </div>
-            <p className="text-[10px] text-slate-400 truncate">
-              {COMPANY_CONFIG.name} · {COMPANY_CONFIG.phone.dispatch}
-            </p>
-          </div>
-        </div>
-
-        {/* Driver Header Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              import('../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
-                getAdminAuthService().signOut();
-              });
-            }}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Sign Out"
-          >
-            <LogOutIcon className="w-5 h-5" />
-          </button>
-          
-          <div className="relative">
-            <select
-              value={driver?.dutyStatus || 'off_duty'}
-              disabled={actionLoading === 'duty'}
-              onChange={(e) => handleToggleDuty(e.target.value as DriverDutyStatus)}
-              className={`text-xs font-bold rounded-xl px-3 py-1.5 border outline-none cursor-pointer appearance-none pr-7 shadow-sm transition-all ${
-                driver?.dutyStatus === 'on_duty'
-                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 ring-1 ring-emerald-500/40'
-                  : driver?.dutyStatus === 'on_break'
-                  ? 'bg-amber-950/80 text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40'
-                  : 'bg-rose-950/80 text-rose-300 border-rose-500/60 ring-1 ring-rose-500/40'
-              }`}
-            >
-              <option value="on_duty" className="bg-slate-900 text-white font-semibold">● On-Duty</option>
-              <option value="on_break" className="bg-slate-900 text-white font-semibold">● On-Break</option>
-              <option value="off_duty" className="bg-slate-900 text-white font-semibold">● Off-Duty</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-              <svg className="fill-current h-3 w-3" viewBox="0 0 20 20">
-                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+            <div className="shrink-0 text-slate-400 pl-2">
+              <svg className={`w-5 h-5 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </div>
-          </div>
+          </button>
+
+          {/* Profile Dropdown Menu */}
+          {showProfileMenu && (
+            <div className="absolute top-full left-0 right-0 mt-4 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl overflow-hidden z-50 animate-fadeIn min-w-[280px]">
+              <div className="p-3 border-b border-slate-800">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Duty Status</span>
+                <div className="flex flex-col gap-1.5">
+                  <button onClick={() => { handleToggleDuty('on_duty'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'on_duty' ? 'bg-emerald-950/80 text-emerald-400 ring-1 ring-emerald-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'on_duty' ? 'bg-emerald-500' : 'bg-slate-600'}`}></span>
+                    On-Duty
+                  </button>
+                  <button onClick={() => { handleToggleDuty('on_break'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'on_break' ? 'bg-blue-950/80 text-blue-400 ring-1 ring-blue-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'on_break' ? 'bg-blue-500' : 'bg-slate-600'}`}></span>
+                    On-Break
+                  </button>
+                  <button onClick={() => { handleToggleDuty('off_duty'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'off_duty' ? 'bg-rose-950/80 text-rose-400 ring-1 ring-rose-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'off_duty' ? 'bg-rose-500' : 'bg-slate-600'}`}></span>
+                    Off-Duty
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2 border-b border-slate-800">
+                <button onClick={() => setShowProfileMenu(false)} className="w-full flex items-center justify-between p-2 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                    Dark Mode
+                  </div>
+                  <div className="w-8 h-4 bg-blue-600 rounded-full relative">
+                    <div className="absolute right-1 top-0.5 w-3 h-3 bg-white rounded-full"></div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="p-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    import('../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+                      getAdminAuthService().signOut();
+                    });
+                  }}
+                  className="w-full flex items-center gap-2 p-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                >
+                  <LogOutIcon className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -504,13 +519,13 @@ export default function DriverAppRoute() {
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex flex-col gap-1.5 shadow-md">
                 <div className="flex items-center justify-between px-1">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
                     Trip Lineup ({scheduledTrips.length})
                   </span>
                   <button
                     type="button"
                     onClick={() => setCurrentTab('scheduled')}
-                    className="text-[11px] text-amber-400 hover:underline font-bold"
+                    className="text-[11px] text-blue-400 hover:underline font-bold"
                   >
                     View All &rarr;
                   </button>
@@ -528,7 +543,7 @@ export default function DriverAppRoute() {
                         onClick={() => setActiveTripId(trip.id)}
                         className={`px-3 py-2 rounded-xl text-left border shrink-0 transition-all cursor-pointer flex flex-col gap-0.5 min-w-[130px] ${
                           isSelected
-                            ? 'bg-amber-500/15 border-amber-500 text-amber-300 shadow-sm'
+                            ? 'bg-blue-600/15 border-blue-600 text-blue-300 shadow-sm'
                             : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:bg-slate-800'
                         }`}
                       >
@@ -556,7 +571,7 @@ export default function DriverAppRoute() {
                 {/* Trip Status Header Badge */}
                 <div className="flex items-center justify-between bg-slate-800/80 px-3.5 py-2.5 rounded-2xl border border-slate-700">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
                     <span className="text-xs text-slate-300 font-bold uppercase tracking-wider">Trip Status</span>
                   </div>
                   <span className={'px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase ' +
@@ -565,20 +580,20 @@ export default function DriverAppRoute() {
                       : activeTrip.status === 'en_route'
                       ? 'bg-blue-500 text-white'
                       : activeTrip.status === 'arrived'
-                      ? 'bg-amber-400 text-slate-950'
+                      ? 'bg-blue-400 text-slate-950'
                       : 'bg-purple-500 text-white')}>
                     {activeTrip.status.replace('_', ' ')}
                   </span>
                 </div>
 
                 {/* HIGH-VISIBILITY PROMINENT PICKUP TIME CARD */}
-                <div className="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border-2 border-amber-500/50 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                <div className="bg-gradient-to-r from-blue-600/20 via-blue-600/10 to-transparent border-2 border-blue-600/50 rounded-2xl p-4 flex items-center justify-between shadow-lg">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-2xl shadow-md shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-blue-600 text-slate-950 flex items-center justify-center font-black text-2xl shadow-md shrink-0">
                       <ClockIcon className="w-6 h-6 text-slate-950" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 block">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-400 block">
                         {activeTrip.bookingType === 'asap' ? 'Immediate Pickup' : 'Scheduled Pickup Time'}
                       </span>
                       <div className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
@@ -592,7 +607,7 @@ export default function DriverAppRoute() {
                       </div>
                       {activeTrip.scheduledPickupTime && (
                         <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5 mt-0.5">
-                          <CalendarIcon className="w-3.5 h-3.5 text-amber-400" />
+                          <CalendarIcon className="w-3.5 h-3.5 text-blue-400" />
                           {new Date(activeTrip.scheduledPickupTime).toLocaleDateString([], {
                             weekday: 'short',
                             month: 'short',
@@ -604,7 +619,7 @@ export default function DriverAppRoute() {
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-600/30">
                       {activeTrip.bookingType === 'asap' ? 'ASAP' : 'PRE-BOOKED'}
                     </span>
                   </div>
@@ -627,7 +642,7 @@ export default function DriverAppRoute() {
                         {activeTrip.passenger?.luggageCount || 0} Bags
                       </span>
                       {activeTrip.pricing?.carSeatFee && activeTrip.pricing.carSeatFee > 0 ? (
-                        <span className="text-amber-400 font-semibold text-[11px] bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/30">
+                        <span className="text-blue-400 font-semibold text-[11px] bg-blue-600/10 px-2 py-0.5 rounded-md border border-blue-600/30">
                           Car Seat Req.
                         </span>
                       ) : null}
@@ -651,7 +666,7 @@ export default function DriverAppRoute() {
                           setCustomSmsText(presetDefault);
                           setShowSmsModal(true);
                         }}
-                        className="w-11 h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 flex items-center justify-center shadow cursor-pointer transition-transform active:scale-95"
+                        className="w-11 h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 flex items-center justify-center shadow cursor-pointer transition-transform active:scale-95"
                         title="Send SMS / Text"
                       >
                         <MailIcon className="w-5 h-5" />
@@ -684,7 +699,7 @@ export default function DriverAppRoute() {
                           {activeTrip.pickupLocation?.address}
                         </p>
                         {activeTrip.pickupLocation?.driverNotes && (
-                          <p className="text-xs text-amber-300 mt-1 italic">
+                          <p className="text-xs text-blue-300 mt-1 italic">
                             Note: {activeTrip.pickupLocation.driverNotes}
                           </p>
                         )}
@@ -711,13 +726,13 @@ export default function DriverAppRoute() {
                       {activeTrip.intermediateStops.map((stop, idx) => (
                         <div key={idx} className="flex items-center justify-between gap-2">
                           <div className="text-xs text-slate-300">
-                            <span className="text-amber-400 font-bold">Stop {idx + 1}:</span> {stop.address}
+                            <span className="text-blue-400 font-bold">Stop {idx + 1}:</span> {stop.address}
                           </div>
                           {stop.address && (
                             <button
                               type="button"
                               onClick={() => openMapNavigation(stop.address)}
-                              className="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg text-[10px] font-bold shrink-0 flex items-center gap-1 cursor-pointer"
+                              className="px-2 py-1 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/30 text-blue-300 rounded-lg text-[10px] font-bold shrink-0 flex items-center gap-1 cursor-pointer"
                             >
                               <span>Nav</span>
                             </button>
@@ -774,7 +789,7 @@ export default function DriverAppRoute() {
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xl font-black text-amber-400">
+                    <span className="text-xl font-black text-blue-400">
                       ${activeTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
                     </span>
                   </div>
@@ -810,7 +825,7 @@ export default function DriverAppRoute() {
                       </div>
                       <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
                         <span className="text-[10px] text-slate-400 block font-mono">CURRENT FARE</span>
-                        <span className="text-lg font-black text-amber-400 font-mono">
+                        <span className="text-lg font-black text-blue-400 font-mono">
                           ${calculateCurrentMeterFare().toFixed(2)}
                         </span>
                       </div>
@@ -822,7 +837,7 @@ export default function DriverAppRoute() {
                       <button
                         type="button"
                         onClick={() => setShowExtrasModal(true)}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-400 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
                       >
                         + Add Toll / Extra
                       </button>
@@ -838,7 +853,7 @@ export default function DriverAppRoute() {
                           {activeTrip.pricing.driverExtras.map((ex, i) => (
                             <div key={i} className="flex justify-between text-xs text-slate-300">
                               <span>{ex.name}</span>
-                              <span className="font-bold text-amber-400">+${ex.amount.toFixed(2)}</span>
+                              <span className="font-bold text-blue-400">+${ex.amount.toFixed(2)}</span>
                             </div>
                           ))}
                         </div>
@@ -897,7 +912,7 @@ export default function DriverAppRoute() {
                       type="button"
                       disabled={Boolean(actionLoading)}
                       onClick={() => handleStepAction(activeTrip.id, 'arrived')}
-                      className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-amber-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-blue-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {actionLoading === 'arrived' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <MapPinIcon className="w-5 h-5" />}
                       <span>ARRIVED AT PICKUP</span>
@@ -928,7 +943,7 @@ export default function DriverAppRoute() {
             ) : (
               /* NO ACTIVE TRIP - STANDBY STATE */
               <section className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center justify-center min-h-[300px]">
-                <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4 text-amber-400 shadow-inner">
+                <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4 text-blue-400 shadow-inner">
                   <CarIcon className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1">Standby for Next Trip</h3>
@@ -943,7 +958,7 @@ export default function DriverAppRoute() {
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-mono text-slate-500">Tier Class</span>
-                    <span className="font-bold text-amber-400 uppercase">{driver?.vehicleTier}</span>
+                    <span className="font-bold text-blue-400 uppercase">{driver?.vehicleTier}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-mono text-slate-500">Area</span>
@@ -967,7 +982,7 @@ export default function DriverAppRoute() {
 
             {offeredTrips.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center text-slate-400 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-3 text-amber-400">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-3 text-blue-400">
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
@@ -984,12 +999,12 @@ export default function DriverAppRoute() {
                   return (
                     <div
                       key={offer.id}
-                      className="bg-slate-900 border-2 border-amber-500/60 rounded-3xl p-4 shadow-xl space-y-3"
+                      className="bg-slate-900 border-2 border-blue-600/60 rounded-3xl p-4 shadow-xl space-y-3"
                     >
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                          <span className="text-xs font-black text-amber-400 uppercase tracking-wide">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
+                          <span className="text-xs font-black text-blue-400 uppercase tracking-wide">
                             {offer.bookingType === 'asap' ? 'ASAP Dispatch Offer' : 'Scheduled Trip Offer'}
                           </span>
                         </div>
@@ -1008,7 +1023,7 @@ export default function DriverAppRoute() {
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] text-amber-400 font-mono block">EST. DISTANCE</span>
+                          <span className="text-[10px] text-blue-400 font-mono block">EST. DISTANCE</span>
                           <span className="text-xs font-bold text-white">{offer.pricing?.distanceMiles?.toFixed(1) || '—'} mi</span>
                         </div>
                       </div>
@@ -1068,7 +1083,7 @@ export default function DriverAppRoute() {
 
             {scheduledTrips.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center text-slate-400 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-3 text-amber-400">
+                <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-3 text-blue-400">
                   <ClockIcon className="w-6 h-6" />
                 </div>
                 <h3 className="text-sm font-bold text-white mb-1">No Scheduled Trips</h3>
@@ -1089,20 +1104,20 @@ export default function DriverAppRoute() {
                     <div
                       key={trip.id}
                       className={`bg-slate-900 rounded-3xl p-4 border transition-all ${
-                        isCurrentActive ? 'border-amber-500 shadow-xl' : 'border-slate-800'
+                        isCurrentActive ? 'border-blue-600 shadow-xl' : 'border-slate-800'
                       }`}
                     >
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-600/30">
                             #{idx + 1}
                           </span>
                           <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <ClockIcon className="w-3.5 h-3.5 text-amber-400" />
+                            <ClockIcon className="w-3.5 h-3.5 text-blue-400" />
                             {trip.bookingType === 'asap' ? 'ASAP' : `${pickupTimeFormatted} · ${pickupDateFormatted}`}
                           </span>
                         </div>
-                        <span className="text-xs font-black text-amber-400">
+                        <span className="text-xs font-black text-blue-400">
                           ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                         </span>
                       </div>
@@ -1118,7 +1133,7 @@ export default function DriverAppRoute() {
                               {trip.passenger?.passengerCount || 1} Pax
                             </span>
                             <span>·</span>
-                            <span>Status: <strong className="uppercase text-amber-300">{trip.status}</strong></span>
+                            <span>Status: <strong className="uppercase text-blue-300">{trip.status}</strong></span>
                           </div>
                         </div>
                         {trip.passenger?.phone && (
@@ -1174,7 +1189,7 @@ export default function DriverAppRoute() {
                           }}
                           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             isCurrentActive
-                              ? 'bg-amber-500 text-slate-950 font-black'
+                              ? 'bg-blue-600 text-slate-950 font-black'
                               : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'
                           }`}
                         >
@@ -1189,12 +1204,36 @@ export default function DriverAppRoute() {
           </section>
         )}
 
+        {/* TAB: MESSAGES (Placeholder) */}
+        {currentTab === 'messages' && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <h2 className="text-base font-bold text-white leading-tight">Messages</h2>
+            </div>
+            
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col items-center justify-center text-center space-y-3 min-h-[300px]">
+              <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-2">
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </div>
+              <h3 className="font-bold text-white text-sm">No Messages</h3>
+              <p className="text-xs text-slate-400 max-w-xs">
+                You have no active messages with dispatch or passengers.
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* TAB 4: CALENDAR & WORKING HOURS */}
         {currentTab === 'schedule' && (
           <section className="space-y-4">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-amber-400" />
+                <CalendarIcon className="w-5 h-5 text-blue-400" />
                 Driver Availability & Working Hours
               </h2>
               <p className="text-xs text-slate-400">
@@ -1204,7 +1243,7 @@ export default function DriverAppRoute() {
 
             {/* Weekly Working Hours Card */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider block">
                 Regular Weekly Shift Hours
               </span>
 
@@ -1227,7 +1266,7 @@ export default function DriverAppRoute() {
                             checked={dayConfig.enabled}
                             onChange={() => handleToggleDay(key)}
                             id={`day-${key}`}
-                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                            className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
                           />
                           <label htmlFor={`day-${key}`} className="text-xs font-bold text-white cursor-pointer select-none">
                             {label}
@@ -1269,7 +1308,7 @@ export default function DriverAppRoute() {
 
             {/* Advance Notice Days Off / Vacation Calendar */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider block">
                 Advance Notice Days Off / Time Off
               </span>
               <p className="text-xs text-slate-400">
@@ -1286,7 +1325,7 @@ export default function DriverAppRoute() {
                       type="date"
                       value={newTimeOffStart}
                       onChange={(e) => setNewTimeOffStart(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none focus:border-blue-600"
                     />
                   </div>
                   <div>
@@ -1295,7 +1334,7 @@ export default function DriverAppRoute() {
                       type="date"
                       value={newTimeOffEnd}
                       onChange={(e) => setNewTimeOffEnd(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none focus:border-blue-600"
                     />
                   </div>
                 </div>
@@ -1305,13 +1344,13 @@ export default function DriverAppRoute() {
                   placeholder="Reason / Note (e.g. Doctor appt, Vacation)"
                   value={newTimeOffReason}
                   onChange={(e) => setNewTimeOffReason(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-blue-600"
                 />
 
                 <button
                   type="button"
                   onClick={handleAddTimeOff}
-                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 font-bold text-xs rounded-xl transition-all cursor-pointer"
                 >
                   + Add Advance Notice Days Off
                 </button>
@@ -1356,7 +1395,7 @@ export default function DriverAppRoute() {
                   type="button"
                   disabled={isSavingSchedule}
                   onClick={handleSaveSchedule}
-                  className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-amber-950 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-400 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-blue-950 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isSavingSchedule ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : null}
                   <span>SAVE AVAILABILITY & CALENDAR</span>
@@ -1369,14 +1408,14 @@ export default function DriverAppRoute() {
 
       {/* STICKY BOTTOM TAB NAVIGATION BAR */}
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 border-t border-slate-800 backdrop-blur-md px-3 py-2 shadow-2xl">
-        <div className="grid grid-cols-4 gap-1.5 max-w-lg mx-auto">
+        <div className="grid grid-cols-5 gap-1.5 max-w-lg mx-auto">
           {/* Active Trip Tab */}
           <button
             type="button"
             onClick={() => setCurrentTab('active')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'active'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1384,7 +1423,7 @@ export default function DriverAppRoute() {
             <span className="truncate">Active Trip</span>
             {activeTrip && (
               <span className={`w-2 h-2 rounded-full absolute top-1.5 right-2 ${
-                currentTab === 'active' ? 'bg-slate-950' : 'bg-amber-400 animate-ping'
+                currentTab === 'active' ? 'bg-slate-950' : 'bg-blue-400 animate-ping'
               }`} />
             )}
           </button>
@@ -1395,7 +1434,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('offers')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'offers'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1405,11 +1444,27 @@ export default function DriverAppRoute() {
             <span className="truncate">Offers</span>
             {offeredTrips.length > 0 && (
               <span className={`px-1.5 py-0.2 text-[9px] rounded-full font-black absolute top-1 right-2 ${
-                currentTab === 'offers' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950 animate-bounce'
+                currentTab === 'offers' ? 'bg-slate-950 text-blue-400' : 'bg-blue-600 text-slate-950 animate-bounce'
               }`}>
                 {offeredTrips.length}
               </span>
             )}
+          </button>
+
+          {/* Messages Tab */}
+          <button
+            type="button"
+            onClick={() => setCurrentTab('messages')}
+            className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
+              currentTab === 'messages'
+                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span className="truncate">Messages</span>
           </button>
 
           {/* Scheduled Trips Tab */}
@@ -1418,7 +1473,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('scheduled')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'scheduled'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1426,7 +1481,7 @@ export default function DriverAppRoute() {
             <span className="truncate">Scheduled</span>
             {scheduledTrips.length > 0 && (
               <span className={`px-1.5 py-0.2 text-[9px] rounded-full font-black absolute top-1 right-2 ${
-                currentTab === 'scheduled' ? 'bg-slate-950 text-amber-400' : 'bg-slate-700 text-white'
+                currentTab === 'scheduled' ? 'bg-slate-950 text-blue-400' : 'bg-slate-700 text-white'
               }`}>
                 {scheduledTrips.length}
               </span>
@@ -1439,7 +1494,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('schedule')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
               currentTab === 'schedule'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1455,7 +1510,7 @@ export default function DriverAppRoute() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
                   <MailIcon className="w-4 h-4" />
                 </div>
                 <div>
@@ -1502,7 +1557,7 @@ export default function DriverAppRoute() {
                     onClick={() => setCustomSmsText(preset.text)}
                     className="p-2.5 bg-slate-800/80 hover:bg-slate-800 rounded-xl text-left border border-slate-700/80 flex flex-col gap-0.5 cursor-pointer transition-all active:scale-98"
                   >
-                    <span className="text-[11px] font-bold text-amber-400">{preset.title}</span>
+                    <span className="text-[11px] font-bold text-blue-400">{preset.title}</span>
                     <span className="text-xs text-slate-300">{preset.text}</span>
                   </button>
                 ))}
@@ -1518,7 +1573,7 @@ export default function DriverAppRoute() {
                 rows={3}
                 value={customSmsText}
                 onChange={(e) => setCustomSmsText(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-blue-600"
               />
             </div>
 
@@ -1581,7 +1636,7 @@ export default function DriverAppRoute() {
                     className="p-3 bg-slate-800 hover:bg-slate-700/80 rounded-xl text-left flex items-center justify-between text-xs font-semibold text-slate-200 cursor-pointer transition-colors"
                   >
                     <span>{preset.name}</span>
-                    <span className="font-bold text-amber-400">+${preset.amount.toFixed(2)}</span>
+                    <span className="font-bold text-blue-400">+${preset.amount.toFixed(2)}</span>
                   </button>
                 ))}
               </div>
@@ -1598,7 +1653,7 @@ export default function DriverAppRoute() {
                   placeholder="Reason / Description"
                   value={customExtraName}
                   onChange={(e) => setCustomExtraName(e.target.value)}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-600"
                 />
                 <input
                   type="number"
@@ -1606,7 +1661,7 @@ export default function DriverAppRoute() {
                   placeholder="$0.00"
                   value={customExtraAmount}
                   onChange={(e) => setCustomExtraAmount(e.target.value)}
-                  className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-400 font-bold outline-none focus:border-amber-500 text-right"
+                  className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-blue-400 font-bold outline-none focus:border-blue-600 text-right"
                 />
               </div>
 
@@ -1623,7 +1678,7 @@ export default function DriverAppRoute() {
                     category: customExtraCategory,
                   });
                 }}
-                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
               >
                 Attach Custom Extra Fee
               </button>
