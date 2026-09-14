@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation } from 'react-router';
 import { CarIcon, PhoneIcon, MenuIcon, XIcon, ShieldCheckIcon, UserIcon } from '../ui/Icons';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
+import { UserDropdown } from '../domain/common/UserDropdown';
 
 interface NavItem {
   label: string;
@@ -44,6 +45,21 @@ export function Navbar() {
     } catch {
       // Ignore if server-rendered
     }
+  }, []);
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  useEffect(() => {
+    import('../../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+      const authService = getAdminAuthService();
+      setCurrentUser(authService.getCurrentUser());
+      
+      const unsubscribe = authService.onAuthStateChanged((user) => {
+        setCurrentUser(user);
+      });
+      
+      return () => unsubscribe();
+    }).catch(console.error);
   }, []);
 
   // Close mobile menu on route change
@@ -113,15 +129,39 @@ export function Navbar() {
               <span>{companySettings.phone || COMPANY_CONFIG.phone.dispatch}</span>
             </a>
 
-            {/* Sleek Sign In CTA */}
-            <Link
-              to="/signin"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all shadow-2xs"
-              title="Sign in to your account"
+            {/* Get App CTA */}
+            <button
+              type="button"
+              onClick={() => setIsAppModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all"
             >
-              <UserIcon className="w-4 h-4 text-slate-500" />
-              <span>Sign In</span>
-            </Link>
+              <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              <span>Get App</span>
+            </button>
+
+            {/* User Dropdown / Sign In CTA */}
+            {currentUser ? (
+              <div className="w-48">
+                <UserDropdown
+                  email={currentUser.email}
+                  onSignOut={() => {
+                    import('../../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+                      getAdminAuthService().signOut();
+                    });
+                  }}
+                  variant="light"
+                />
+              </div>
+            ) : (
+              <Link
+                to="/signin"
+                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all shadow-2xs"
+                title="Sign in to your account"
+              >
+                <UserIcon className="w-4 h-4 text-slate-500" />
+                <span>Sign In</span>
+              </Link>
+            )}
 
             {/* Prominent Book Now CTA */}
             <Link
@@ -206,14 +246,28 @@ export function Navbar() {
           </nav>
 
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
-            <Link
-              to="/signin"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
-            >
-              <UserIcon className="w-4 h-4" />
-              <span>Sign In</span>
-            </Link>
+            {currentUser ? (
+              <div className="w-full">
+                <UserDropdown
+                  email={currentUser.email}
+                  onSignOut={() => {
+                    import('../../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+                      getAdminAuthService().signOut();
+                    });
+                  }}
+                  variant="light"
+                />
+              </div>
+            ) : (
+              <Link
+                to="/signin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+              >
+                <UserIcon className="w-4 h-4" />
+                <span>Sign In</span>
+              </Link>
+            )}
 
             <button
               type="button"

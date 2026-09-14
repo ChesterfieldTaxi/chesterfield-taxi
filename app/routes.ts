@@ -10,6 +10,7 @@ export default [
     route("services", "routes/services.tsx"),
     route("about", "routes/about.tsx"),
     route("contact", "routes/contact.tsx"),
+    route("apply", "routes/apply.tsx"),
   ]),
 
   // Dedicated Passenger App Shell (Suppresses public marketing header/footer)
