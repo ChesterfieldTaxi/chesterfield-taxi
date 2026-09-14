@@ -423,8 +423,15 @@ export default function DriverAppRoute() {
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-3 text-left min-w-0 flex-1 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 rounded-xl"
           >
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-slate-950 font-black flex items-center justify-center text-sm shadow-sm shrink-0 uppercase">
-              {driver?.name ? driver.name.charAt(0) : 'CT'}
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0 uppercase">
+                {driver?.name ? driver.name.charAt(0) : 'CT'}
+              </div>
+              <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${
+                driver?.dutyStatus === 'on_duty' ? 'bg-emerald-500' :
+                driver?.dutyStatus === 'on_break' ? 'bg-blue-400' :
+                'bg-rose-500'
+              }`} />
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="font-bold text-sm text-white leading-tight truncate">
@@ -448,15 +455,15 @@ export default function DriverAppRoute() {
               <div className="p-3 border-b border-slate-800">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Duty Status</span>
                 <div className="flex flex-col gap-1.5">
-                  <button onClick={() => { handleToggleDuty('on_duty'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'on_duty' ? 'bg-emerald-950/80 text-emerald-400 ring-1 ring-emerald-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                  <button onClick={() => { handleToggleDuty('on_duty'); setTimeout(() => setShowProfileMenu(false), 200); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${driver?.dutyStatus === 'on_duty' ? 'bg-emerald-950/80 text-emerald-400 ring-1 ring-emerald-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
                     <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'on_duty' ? 'bg-emerald-500' : 'bg-slate-600'}`}></span>
                     On-Duty
                   </button>
-                  <button onClick={() => { handleToggleDuty('on_break'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'on_break' ? 'bg-blue-950/80 text-blue-400 ring-1 ring-blue-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
-                    <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'on_break' ? 'bg-blue-500' : 'bg-slate-600'}`}></span>
+                  <button onClick={() => { handleToggleDuty('on_break'); setTimeout(() => setShowProfileMenu(false), 200); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${driver?.dutyStatus === 'on_break' ? 'bg-blue-950/80 text-blue-400 ring-1 ring-blue-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'on_break' ? 'bg-blue-400' : 'bg-slate-600'}`}></span>
                     On-Break
                   </button>
-                  <button onClick={() => { handleToggleDuty('off_duty'); setShowProfileMenu(false); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-colors ${driver?.dutyStatus === 'off_duty' ? 'bg-rose-950/80 text-rose-400 ring-1 ring-rose-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
+                  <button onClick={() => { handleToggleDuty('off_duty'); setTimeout(() => setShowProfileMenu(false), 200); }} disabled={actionLoading === 'duty'} className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${driver?.dutyStatus === 'off_duty' ? 'bg-rose-950/80 text-rose-400 ring-1 ring-rose-500/40' : 'text-slate-300 hover:bg-slate-800'}`}>
                     <span className={`w-2.5 h-2.5 rounded-full ${driver?.dutyStatus === 'off_duty' ? 'bg-rose-500' : 'bg-slate-600'}`}></span>
                     Off-Duty
                   </button>
@@ -479,11 +486,13 @@ export default function DriverAppRoute() {
                 <button
                   type="button"
                   onClick={() => {
-                    import('../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
-                      getAdminAuthService().signOut();
-                    });
+                    setTimeout(() => {
+                      import('../core/services/auth/admin-auth.service').then(({ getAdminAuthService }) => {
+                        getAdminAuthService().signOut();
+                      });
+                    }, 200);
                   }}
-                  className="w-full flex items-center gap-2 p-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 p-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-950/30 transition-all active:scale-[0.98] cursor-pointer"
                 >
                   <LogOutIcon className="w-4 h-4" />
                   Sign Out
@@ -589,7 +598,7 @@ export default function DriverAppRoute() {
                 {/* HIGH-VISIBILITY PROMINENT PICKUP TIME CARD */}
                 <div className="bg-gradient-to-r from-blue-600/20 via-blue-600/10 to-transparent border-2 border-blue-600/50 rounded-2xl p-4 flex items-center justify-between shadow-lg">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-xl bg-blue-600 text-slate-950 flex items-center justify-center font-black text-2xl shadow-md shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-2xl shadow-md shrink-0">
                       <ClockIcon className="w-6 h-6 text-slate-950" />
                     </div>
                     <div>
@@ -1189,7 +1198,7 @@ export default function DriverAppRoute() {
                           }}
                           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             isCurrentActive
-                              ? 'bg-blue-600 text-slate-950 font-black'
+                              ? 'bg-blue-600 text-white font-black'
                               : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'
                           }`}
                         >
@@ -1415,7 +1424,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('active')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'active'
-                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-white shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1434,7 +1443,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('offers')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'offers'
-                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-white shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1444,7 +1453,7 @@ export default function DriverAppRoute() {
             <span className="truncate">Offers</span>
             {offeredTrips.length > 0 && (
               <span className={`px-1.5 py-0.2 text-[9px] rounded-full font-black absolute top-1 right-2 ${
-                currentTab === 'offers' ? 'bg-slate-950 text-blue-400' : 'bg-blue-600 text-slate-950 animate-bounce'
+                currentTab === 'offers' ? 'bg-slate-950 text-blue-400' : 'bg-blue-600 text-white animate-bounce'
               }`}>
                 {offeredTrips.length}
               </span>
@@ -1457,7 +1466,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('messages')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'messages'
-                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-white shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1473,7 +1482,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('scheduled')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
               currentTab === 'scheduled'
-                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-white shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
@@ -1494,7 +1503,7 @@ export default function DriverAppRoute() {
             onClick={() => setCurrentTab('schedule')}
             className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
               currentTab === 'schedule'
-                ? 'bg-blue-600 text-slate-950 shadow-md font-black'
+                ? 'bg-blue-600 text-white shadow-md font-black'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
