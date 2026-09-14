@@ -62,11 +62,14 @@ export default function PassengerAppRoute() {
 
   // Auth guard
   useEffect(() => {
-    
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
         navigate('/signin?message=unauthenticated&redirect=/app', { replace: true });
+      } else if (currentUser.role === 'dispatcher') {
+        navigate('/dispatch', { replace: true });
+      } else if (currentUser.role === 'driver') {
+        navigate('/driver', { replace: true });
       }
     });
     return unsubscribe;

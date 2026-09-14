@@ -55,11 +55,17 @@ export class AdminAuthService {
         }
       }
 
-      // Auto-provision primary admin if it's the specific admin email
+      // Auto-provision primary admin or dispatcher if using operational emails
       if (user.email === 'admin@chesterfieldtaxi.com') {
         const adminRole: UserRole = 'admin';
         await setDoc(userRef, { role: adminRole, email: user.email }, { merge: true });
         return adminRole;
+      }
+
+      if (user.email === 'dispatch@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('dispatch'))) {
+        const dispatchRole: UserRole = 'dispatcher';
+        await setDoc(userRef, { role: dispatchRole, email: user.email }, { merge: true });
+        return dispatchRole;
       }
 
       // Default to customer
@@ -177,7 +183,7 @@ export class AdminAuthService {
         ? 'admin'
         : trimmedEmail.includes('driver')
         ? 'driver'
-        : trimmedEmail.includes('dispatcher')
+        : (trimmedEmail.includes('dispatch') || trimmedEmail.includes('dispatcher'))
         ? 'dispatcher'
         : 'customer';
       const demoUser: AdminUser = {

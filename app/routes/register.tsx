@@ -38,17 +38,19 @@ export default function Register() {
 
   const handleRedirect = (userRole?: string) => {
     const redirect = searchParams.get('redirect');
-    if (redirect) {
-      navigate(redirect, { replace: true });
+    if (userRole === 'admin') {
+      navigate(redirect && redirect.startsWith('/admin') ? redirect : '/admin', { replace: true });
       return;
     }
-    if (userRole === 'admin' || userRole === 'dispatcher') {
-      navigate(userRole === 'admin' ? '/admin' : '/dispatch', { replace: true });
-    } else if (userRole === 'driver') {
-      navigate('/driver', { replace: true });
-    } else {
-      navigate('/app', { replace: true });
+    if (userRole === 'dispatcher') {
+      navigate(redirect && redirect.startsWith('/dispatch') ? redirect : '/dispatch', { replace: true });
+      return;
     }
+    if (userRole === 'driver') {
+      navigate(redirect && redirect.startsWith('/driver') ? redirect : '/driver', { replace: true });
+      return;
+    }
+    navigate(redirect || '/app', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

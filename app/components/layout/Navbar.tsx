@@ -129,9 +129,9 @@ export function Navbar() {
 
             {/* Sleek Sign In CTA */}
             <Link
-              to="/app"
+              to="/signin"
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all shadow-2xs"
-              title="Sign in to Passenger Portal"
+              title="Sign in to your account"
             >
               <UserIcon className="w-4 h-4 text-slate-500" />
               <span>Sign In</span>
@@ -160,7 +160,7 @@ export function Navbar() {
           {/* Mobile Actions */}
           <div className="flex items-center gap-2 md:hidden">
             <Link
-              to="/app"
+              to="/signin"
               className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
             >
               <UserIcon className="w-3.5 h-3.5 text-slate-500" />
@@ -235,12 +235,12 @@ export function Navbar() {
 
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
             <Link
-              to="/app"
+              to="/signin"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
             >
               <UserIcon className="w-4 h-4" />
-              <span>Passenger Portal / Sign In</span>
+              <span>Sign In</span>
             </Link>
 
             <Link

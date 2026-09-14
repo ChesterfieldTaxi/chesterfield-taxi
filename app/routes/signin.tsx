@@ -44,17 +44,23 @@ export default function SignIn() {
 
   const handleRedirect = (role?: string) => {
     const redirect = searchParams.get('redirect');
-    if (redirect) {
-      navigate(redirect, { replace: true });
+    
+    // Dedicated role-based destinations
+    if (role === 'admin') {
+      navigate(redirect && redirect.startsWith('/admin') ? redirect : '/admin', { replace: true });
       return;
     }
-    if (role === 'admin' || role === 'dispatcher') {
-      navigate(role === 'admin' ? '/admin' : '/dispatch', { replace: true });
-    } else if (role === 'driver') {
-      navigate('/driver', { replace: true });
-    } else {
-      navigate('/app', { replace: true });
+    if (role === 'dispatcher') {
+      navigate(redirect && redirect.startsWith('/dispatch') ? redirect : '/dispatch', { replace: true });
+      return;
     }
+    if (role === 'driver') {
+      navigate(redirect && redirect.startsWith('/driver') ? redirect : '/driver', { replace: true });
+      return;
+    }
+
+    // Customer / Passenger default
+    navigate(redirect || '/app', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
