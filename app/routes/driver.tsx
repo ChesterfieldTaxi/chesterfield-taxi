@@ -423,20 +423,20 @@ export default function DriverAppRoute() {
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-3 text-left min-w-0 flex-1 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 rounded-xl"
           >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0 uppercase">
-                {driver?.name ? driver.name.charAt(0) : 'CT'}
-              </div>
-              <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${
-                driver?.dutyStatus === 'on_duty' ? 'bg-emerald-500' :
-                driver?.dutyStatus === 'on_break' ? 'bg-blue-400' :
-                'bg-rose-500'
-              }`} />
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0 uppercase">
+              {driver?.name ? driver.name.charAt(0) : 'CT'}
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="font-bold text-sm text-white leading-tight truncate">
-                {driver?.name || 'Driver Console'}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-sm text-white leading-tight truncate">
+                  {driver?.name || 'Driver Console'}
+                </h1>
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${
+                  driver?.dutyStatus === 'on_duty' ? 'bg-emerald-500 shadow-emerald-500/50' :
+                  driver?.dutyStatus === 'on_break' ? 'bg-blue-400 shadow-blue-400/50' :
+                  'bg-rose-500 shadow-rose-500/50'
+                }`} />
+              </div>
               <p className="text-[11px] text-slate-400 truncate mt-0.5">
                 {driver?.vehicleUnit ? `Cab #${driver.vehicleUnit}` : 'No Vehicle Assigned'}
                 {driver?.vehicleMake && driver?.vehicleModel ? ` - ${driver.vehicleColor || ''} ${driver.vehicleMake} ${driver.vehicleModel}` : ''}
@@ -846,7 +846,7 @@ export default function DriverAppRoute() {
                       <button
                         type="button"
                         onClick={() => setShowExtrasModal(true)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-400 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-400 text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
                       >
                         + Add Toll / Extra
                       </button>
@@ -921,7 +921,7 @@ export default function DriverAppRoute() {
                       type="button"
                       disabled={Boolean(actionLoading)}
                       onClick={() => handleStepAction(activeTrip.id, 'arrived')}
-                      className="w-full py-4 bg-blue-600 hover:bg-blue-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-blue-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-blue-600 hover:bg-blue-400 text-white font-black text-base rounded-2xl shadow-xl shadow-blue-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {actionLoading === 'arrived' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <MapPinIcon className="w-5 h-5" />}
                       <span>ARRIVED AT PICKUP</span>
@@ -941,7 +941,7 @@ export default function DriverAppRoute() {
                       type="button"
                       disabled={Boolean(actionLoading)}
                       onClick={() => handleStepAction(activeTrip.id, 'completed')}
-                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-emerald-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-base rounded-2xl shadow-xl shadow-emerald-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {actionLoading === 'completed' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <FlagIcon className="w-5 h-5" />}
                       <span>COMPLETE TRIP</span>
@@ -1404,7 +1404,7 @@ export default function DriverAppRoute() {
                   type="button"
                   disabled={isSavingSchedule}
                   onClick={handleSaveSchedule}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-400 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-blue-950 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-400 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-950 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isSavingSchedule ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : null}
                   <span>SAVE AVAILABILITY & CALENDAR</span>
@@ -1440,11 +1440,13 @@ export default function DriverAppRoute() {
           {/* Offers Tab */}
           <button
             type="button"
+            disabled={driver?.dutyStatus !== 'on_duty'}
             onClick={() => setCurrentTab('offers')}
-            className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
+            className={`py-2 px-1 rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 relative ${
+              driver?.dutyStatus !== 'on_duty' ? 'text-slate-600 cursor-not-allowed' :
               currentTab === 'offers'
-                ? 'bg-blue-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-blue-600 text-white shadow-md font-black cursor-pointer'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 cursor-pointer'
             }`}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1687,7 +1689,7 @@ export default function DriverAppRoute() {
                     category: customExtraCategory,
                   });
                 }}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-400 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
               >
                 Attach Custom Extra Fee
               </button>
