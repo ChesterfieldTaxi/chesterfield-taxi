@@ -1,12 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation } from 'react-router';
 import {
-  ShieldIcon,
-  ExternalLinkIcon,
-  RadioIcon,
-  BarChartIcon,
   LogOutIcon,
   ChevronDownIcon,
+  SunIcon,
+  MoonIcon,
 } from '../../ui/Icons';
 
 export interface UserDropdownProps {
@@ -36,11 +33,8 @@ export function UserDropdown({
   collapsed = false,
 }: UserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
-
-  const isDispatchRoute = location.pathname.startsWith('/dispatch');
-  const isAdminRoute = location.pathname.startsWith('/admin');
 
   const displayEmail = email || 'admin@chesterfieldtaxi.com';
   const initial = displayEmail[0]?.toUpperCase() || 'A';
@@ -59,13 +53,35 @@ export function UserDropdown({
     };
   }, [isOpen]);
 
+  // Sync dark mode state with HTML class
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      setIsDark(isDarkMode);
+    }
+  }, []);
+
+  const handleToggleTheme = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (typeof window !== 'undefined') {
+      if (nextDark) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    }
+  };
+
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <div className={`relative ${collapsed ? 'inline-block' : 'w-full'} text-left`} ref={menuRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={`flex items-center gap-2 transition-all cursor-pointer select-none border ${
-          collapsed ? 'p-1 rounded-full' : 'px-2.5 py-1.5 rounded-xl'
+          collapsed ? 'p-1 rounded-full' : 'w-full justify-between px-2.5 py-1.5 rounded-xl'
         } ${
           variant === 'dark'
             ? 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 text-slate-100 hover:text-white'
@@ -73,20 +89,22 @@ export function UserDropdown({
         }`}
         title={`Account: ${displayEmail}`}
       >
-        <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-          {initial}
-        </div>
-        {!collapsed && (
-          <>
-            <span className="text-xs font-semibold tracking-tight max-w-[160px] sm:max-w-[220px] truncate">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+            {initial}
+          </div>
+          {!collapsed && (
+            <span className="text-xs font-semibold tracking-tight truncate text-left max-w-[150px]">
               {displayEmail}
             </span>
-            <ChevronDownIcon
-              className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
-                dropUp && isOpen ? 'rotate-180' : ''
-              }`}
-            />
-          </>
+          )}
+        </div>
+        {!collapsed && (
+          <ChevronDownIcon
+            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+              dropUp && isOpen ? 'rotate-180' : ''
+            }`}
+          />
         )}
       </button>
 
@@ -94,94 +112,45 @@ export function UserDropdown({
         <div
           className={`absolute ${
             dropUp ? 'bottom-full mb-2 left-0' : 'right-0 mt-2'
-          } w-72 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100`}
+          } w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100`}
         >
           {/* User Header */}
           <div className="px-4 py-2.5">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
               Active Operator
             </span>
-            <span className="text-xs font-bold text-slate-900 truncate block mt-0.5">
+            <span className="text-xs font-bold text-slate-900 truncate block mt-0.5" title={displayEmail}>
               {displayEmail}
             </span>
           </div>
 
-          {/* Contextually Intelligent Navigation Links */}
-          <div className="py-1">
-            {/* If on dispatch, show link to admin dashboard */}
-            {isDispatchRoute && (
-              <Link
-                to="/admin?tab=dashboard"
-                reloadDocument
-                onClick={() => setIsOpen(false)}
-                className="group flex items-start gap-3 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
-              >
-                <BarChartIcon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mt-0.5 shrink-0 transition-colors" />
-                <div>
-                  <span className="font-bold block text-slate-800 group-hover:text-blue-600">
-                    Admin Dashboard
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    Analytics, fleet &amp; rates overview
-                  </span>
-                </div>
-              </Link>
-            )}
-
-            {/* Advanced Settings & Audits - accessible without cluttering primary nav */}
-            <Link
-              to="/admin?tab=advanced"
-              reloadDocument
-              onClick={() => setIsOpen(false)}
-              className="group flex items-start gap-3 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+          {/* Theme Toggle (Light / Dark) */}
+          <div className="p-1">
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
             >
-              <ShieldIcon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mt-0.5 shrink-0 transition-colors" />
-              <div>
-                <span className="font-bold block text-slate-800 group-hover:text-blue-600">
-                  Advanced Settings &amp; Audits
-                </span>
-                <span className="text-[10px] text-slate-400 font-normal">
-                  Audit logs, telemetry &amp; security
+              <div className="flex items-center gap-2.5">
+                {isDark ? (
+                  <MoonIcon className="w-4 h-4 text-indigo-500 shrink-0" />
+                ) : (
+                  <SunIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                )}
+                <span>Theme: {isDark ? 'Dark Mode' : 'Light Mode'}</span>
+              </div>
+              <div className="flex items-center">
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isDark
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {isDark ? 'Dark' : 'Light'}
                 </span>
               </div>
-            </Link>
-
-            {/* If on admin, show Dispatch Operations */}
-            {isAdminRoute && (
-              <Link
-                to="/dispatch"
-                reloadDocument
-                onClick={() => setIsOpen(false)}
-                className="group flex items-start gap-3 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
-              >
-                <RadioIcon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mt-0.5 shrink-0 transition-colors" />
-                <div>
-                  <span className="font-bold block text-slate-800 group-hover:text-blue-600">
-                    Dispatch Operations
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    Real-time radar &amp; live taxi dispatch
-                  </span>
-                </div>
-              </Link>
-            )}
-
-            {/* Public Booking Site */}
-            <Link
-              to="/book"
-              onClick={() => setIsOpen(false)}
-              className="group flex items-start gap-3 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
-            >
-              <ExternalLinkIcon className="w-4 h-4 text-slate-400 group-hover:text-blue-600 mt-0.5 shrink-0 transition-colors" />
-              <div>
-                <span className="font-bold block text-slate-800 group-hover:text-blue-600">
-                  Public Booking Engine
-                </span>
-                <span className="text-[10px] text-slate-400 font-normal">
-                  View customer reservation portal
-                </span>
-              </div>
-            </Link>
+            </button>
           </div>
 
           {/* Sign Out Action */}
@@ -203,3 +172,4 @@ export function UserDropdown({
     </div>
   );
 }
+

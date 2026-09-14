@@ -155,7 +155,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 lg:static flex flex-col bg-slate-900 border-r border-slate-800 text-slate-300 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:self-start flex flex-col bg-slate-900 border-r border-slate-800 text-slate-300 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
@@ -265,7 +265,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Navigation Group Items */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5 custom-scrollbar">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-5 custom-scrollbar">
           {ADMIN_NAV_GROUPS.map((group) => (
             <div key={group.title} className="space-y-1">
               {!isCollapsed && (
@@ -321,7 +321,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </nav>
 
         {/* Bottom User & Utility Bar */}
-        <div className={`p-3 border-t border-slate-800/80 bg-slate-950/40 shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-2'}`}>
+        <div className={`p-2.5 border-t border-slate-800/80 bg-slate-950/40 shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'w-full'}`}>
           <UserDropdown
             email={user?.email}
             onSignOut={onSignOut}
