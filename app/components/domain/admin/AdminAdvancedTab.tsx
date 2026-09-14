@@ -1166,6 +1166,34 @@ export function AdminAdvancedTab({
                   Purge Local Cache
                 </Button>
               </div>
+
+              {/* Developer Stress Testing */}
+              <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-extrabold text-amber-900">Developer Tools: Seed Stress Data</h4>
+                  <p className="text-[11px] text-amber-700">
+                    Generates 100+ concurrent mock trips to test <code>/dispatch</code> virtualized rendering and smooth scrolling.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (!confirm("Are you sure you want to seed 100+ mock trips? This will flood the database.")) return;
+                    try {
+                      const res = await fetch('/api/seed-stress-data', { method: 'POST' });
+                      if (res.ok) alert("Seeding started in background.");
+                      else alert("Failed to start seeding.");
+                    } catch (err) {
+                      alert("Error seeding data.");
+                    }
+                  }}
+                  className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shrink-0"
+                >
+                  Seed 120 Trips
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

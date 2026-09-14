@@ -20,7 +20,8 @@
       "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dispatch": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.seed-stress-data": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -105,6 +106,13 @@
         "parentId": "root",
         "file": "app/routes/api.send-email.ts",
         "path": "api/send-email",
+        "config": {}
+      },
+      "routes/api.seed-stress-data": {
+        "id": "routes/api.seed-stress-data",
+        "parentId": "root",
+        "file": "app/routes/api.seed-stress-data.tsx",
+        "path": "api/seed-stress-data",
         "config": {}
       }
     }
@@ -192,6 +200,12 @@
         "parentId": "root",
         "file": "routes/api.send-email.ts",
         "path": "api/send-email"
+      },
+      "routes/api.seed-stress-data": {
+        "id": "routes/api.seed-stress-data",
+        "parentId": "root",
+        "file": "routes/api.seed-stress-data.tsx",
+        "path": "api/seed-stress-data"
       }
     },
     "routeDiscovery": {
@@ -253,6 +267,10 @@
           {
             "file": "routes/api.send-email.ts",
             "path": "api/send-email"
+          },
+          {
+            "file": "routes/api.seed-stress-data.tsx",
+            "path": "api/seed-stress-data"
           }
         ]
       }

@@ -186,7 +186,7 @@
 - [x] 20.B.1 Documentation & Specification updates for API Cost Optimization Protocol.
 - [x] 20.B.2 Developer & Offline Mock Mode in `companyConfig.ts` (`enableRealtimeRouting: false`).
 - [x] 20.B.3 Client-Side Route Caching Module (`RouteCache` in `app/core/services/maps/route-cache.ts` using sessionStorage/memory fallback, keyed by `originPlaceId_destPlaceId_waypoints`).
-- [x] 20.B.4 Pure Local Mock Routing Engine (`mock-routing.ts`) with Haversine distance × 1.25x road curvature factor, duration estimation, and straight-line polyline encoder.
+- [x] 20.B.4 Pure Local Mock Routing Engine (`mock-routing.ts`) with Haversine distance Ã— 1.25x road curvature factor, duration estimation, and straight-line polyline encoder.
 - [x] 20.B.5 Debounce & Trigger Guarding Hook/Helpers (`useDebounceRoute.ts`) enforcing 800ms quiet period and requiring valid Google `place_id`s or explicit Lat/Lng coordinates.
 - [x] 20.B.6 Integrate cost optimization and offline mock mode into `live-routing.service.ts` and `server-route.service.ts`.
 - [x] 20.B.7 Update booking engines (`BookingEngineV2.tsx`, `BookingEngine.tsx`, `DispatchBookingEngine.tsx`) with 800ms debounce and trigger guards.
@@ -207,7 +207,7 @@
 ## Phase 21.B: Customer Booking Engine Redesign (Dispatch-Aligned UI & Restrictions)
 - [x] 21.B.1 Redesign layout of `BookingEngineV2.tsx` to match the compact, professional card language of `DispatchBookingEngine.tsx` with slate-50 backdrop and rounded-xl bordered cards.
 - [x] 21.B.2 Implement dispatch-style Timing Selector (segmented toggle between Now (ASAP) and Later (Scheduled) with side-by-side date/time pickers).
-- [x] 21.B.3 Implement Route & Stops container with Route Swap button (`↕`), `DispatchLocationInput` autocomplete, up to 5 intermediate stops with reordering, and live route stats.
+- [x] 21.B.3 Implement Route & Stops container with Route Swap button (`â†•`), `DispatchLocationInput` autocomplete, up to 5 intermediate stops with reordering, and live route stats.
 - [x] 21.B.4 Implement Airport Transfer Assistance card for STL Lambert & SUS Spirit with flight details, checked baggage tracking, and curbside pickup terminal guidance.
 - [x] 21.B.5 Implement Passenger & Booker drawer with primary passenger fields, `+ Add Passenger`, and expandable Booker/Contact Person details with role selector.
 - [x] 21.B.6 Implement Trip Details with Pax & Bags steppers, Luggage classification, and 3-tier Child Safety Seat steppers (Rear-Facing, Front-Facing, Booster) enforcing Missouri child passenger safety law and company caps.
@@ -220,7 +220,7 @@
 ## Phase 22: TaxiCaller-Style Unified Tariff Engine
 - [x] 22.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to replace fragmented base rate forms with self-contained Tariff Profiles.
 - [x] 22.2 Data Models & Tariff Service: Define `TariffProfile`, `TariffCorridor`, `TariffTaximeterRate`, `TariffExtras`, and create `TariffService` with default presets.
-- [x] 22.3 Pure Pricing Pipeline Update: Implement unified tariff evaluation (Profile Match ➔ Flat Corridor Check ➔ Taximeter Step Brackets ➔ Extras & Surcharges).
+- [x] 22.3 Pure Pricing Pipeline Update: Implement unified tariff evaluation (Profile Match âž” Flat Corridor Check âž” Taximeter Step Brackets âž” Extras & Surcharges).
 - [x] 22.4 TaxiCaller-Style UI in `/admin` Rates: Build tabbed tariff profile switcher, meta & triggers, flat corridor table, iconic taximeter block, and extras manager.
 - [x] 22.5 Live Simulator & Audit Trace: Connect the Estimates & Live Simulator to display matched tariff profile badges, corridor/taximeter route, and full audit logs.
 - [x] 22.6 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.
@@ -229,7 +229,7 @@
 - [x] 22.B.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to define Phase 22.B scope.
 - [x] 22.B.2 Data Models & Engine: Add `TariffDistanceIncrement`, `TariffGroup`, and `TariffInheritanceConfig` to `tariff.ts` and `tariff.service.ts`.
 - [x] 22.B.3 Intermediate Increments & Inheritance Pipeline: Update `evaluateTaximeterFare` and `applyUnifiedTariffEngine` to resolve parent inheritance and calculate multi-tier distance step brackets between primary and then.
-- [x] 22.B.4 UI Refinements: Remove external labels/references, remove `×` button on tabs, add big red delete button at bottom of each tariff page.
+- [x] 22.B.4 UI Refinements: Remove external labels/references, remove `Ã—` button on tabs, add big red delete button at bottom of each tariff page.
 - [x] 22.B.5 Tariff Groups & Dynamic Admin Configuration: Implement Tariff Groups manager, inheritance picker with override toggles, and dynamically bind conditions/extras to admin-created vehicles (`settings.vehicles`), zones, and collections.
 - [x] 22.B.6 Verification: Run `npm run typecheck` and `npm run build` to verify 0 errors.
 
@@ -239,3 +239,11 @@
 - [x] 22.C.3 Configure `Unified Tariffs` as the default subpage for `/admin?tab=rates` across `SUB_PAGES` in `app/routes/admin.tsx` and `AdminRatesTab.tsx`.
 - [x] 22.C.4 Verify `npm run typecheck` and `npm run build` pass with 0 errors.
 
+### Phase 23: Advanced System Audit, Code Maintainability & Stress Testing
+- [x] 23.1 Documentation Updates: Update spec.md, plan.md, and tasks.md to reflect Phase 23 scope.
+- [x] 23.2 UI Polish Fix: Fix the Live Fare Simulator sidebar sticky position in `/admin?tab=rates`.
+- [x] 23.3 Maintainability & Design Pattern Audit: Ensure modular component decoupling, dynamic theme abstraction, pure pricing pipeline integrity, and schema/type hardening.
+- [x] 23.4 Pricing Engine Determinism & Conflict Resolution Audit: Strict priority ranking, collision handling, and fallback behavior.
+- [x] 23.5 Live Dispatch & Queue Stress Testing: Create developer seeding utility for 100+ concurrent mock trips, test `/dispatch` virtualized rendering under load.
+- [x] 23.6 Firestore Security Rules & Composite Index Hardening: Audit `firestore.rules` for strict RBAC and `firestore.indexes.json` for compound query support.
+- [x] 23.7 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` and mark Phase 23 complete.

@@ -934,9 +934,9 @@ export function UnifiedTariffManager({
                   </div>
                 ))}
 
-                {/* Then Open-Ended Tier */}
+                {/* Final Open-Ended Tier */}
                 <div>
-                  <span className="text-slate-400">then: </span>
+                  <span className="text-slate-400">final: </span>
                   <span className="text-purple-300 font-bold font-mono">
                     ${activeProfile.taximeter.thenDistanceRate.toFixed(3)}
                   </span>
@@ -1092,15 +1092,19 @@ export function UnifiedTariffManager({
               {(activeProfile.taximeter.intermediateIncrements || []).length > 0 && (
                 <div className="space-y-3 pt-1">
                   <div className="text-xs font-bold text-slate-800">
-                    Intermediate Increment Brackets (Between Primary &amp; Then)
+                    Intermediate Increment Brackets
                   </div>
-                  {(activeProfile.taximeter.intermediateIncrements || []).map((inc, idx) => (
+                  {(activeProfile.taximeter.intermediateIncrements || []).map((inc, idx) => {
+                    const prevLimit = idx === 0 
+                      ? activeProfile.taximeter.primaryDistanceLimit 
+                      : (activeProfile.taximeter.intermediateIncrements || [])[idx - 1].upToDistance;
+                    return (
                     <div
                       key={inc.id}
                       className="p-3 bg-cyan-50/40 border border-cyan-200 rounded-lg space-y-2"
                     >
                       <div className="flex items-center justify-between text-xs font-bold text-cyan-950">
-                        <span>Tier {idx + 2}: {inc.name || `Up to ${inc.upToDistance} mi`}</span>
+                        <span>Tier {idx + 2}: {inc.name || `Tier ${idx + 2}`} ({prevLimit} - {inc.upToDistance} mi)</span>
                         <button
                           type="button"
                           onClick={() => handleDeleteIntermediateIncrement(inc.id)}
@@ -1161,32 +1165,32 @@ export function UnifiedTariffManager({
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
 
               {/* Add Increment Tier Button placed directly between Primary (+ any intermediate increments) and Then */}
-              <div className="pt-0.5 pb-0.5">
+              <div className="pt-2 pb-2 flex justify-center">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="primary"
                   size="sm"
                   onClick={handleAddIntermediateIncrement}
-                  leftIcon={<PlusIcon className="w-3.5 h-3.5 text-blue-600" />}
-                  className="w-full py-2.5 text-xs font-bold border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/60 text-blue-700 flex items-center justify-center gap-1.5 transition-all"
+                  leftIcon={<PlusIcon className="w-3.5 h-3.5" />}
+                  className="px-6 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all rounded-full"
                 >
-                  Add Increment Tier (Between Primary &amp; Then)
+                  Add Increment Tier
                 </Button>
               </div>
 
-              {/* "Then" Open-Ended Tier */}
+              {/* "Final" Open-Ended Tier */}
               <div className="p-3 bg-purple-50/50 border border-purple-200 rounded-lg space-y-3">
                 <div className="text-xs font-bold text-purple-900">
-                  "Then" Open-Ended Bracket (Applied after {effectiveHighestLimit.toFixed(1)} mi to infinity)
+                  "Final" Open-Ended Bracket (Applies after {effectiveHighestLimit.toFixed(1)} mi)
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">"Then" Rate ($/step)</label>
+                    <label className="text-[11px] font-semibold text-slate-700">"Final" Rate ($/step)</label>
                     <Input
                       type="number"
                       step="0.005"
@@ -1206,7 +1210,7 @@ export function UnifiedTariffManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">"Then" Step Size (mi)</label>
+                    <label className="text-[11px] font-semibold text-slate-700">"Final" Step Size (mi)</label>
                     <Input
                       type="number"
                       step="0.05"
@@ -1665,7 +1669,7 @@ export function UnifiedTariffManager({
         {/* ─── ESTIMATES & LIVE SIMULATOR COLUMN ─── */}
         {showSimulator && (
           <div className="lg:col-span-5 space-y-6">
-            <Card variant="elevated" className="border-slate-200 shadow-md sticky top-6">
+            <Card variant="elevated" className="border-slate-200 shadow-md sticky top-20">
               <CardHeader className="bg-slate-900 text-white rounded-t-xl pb-3 border-b border-slate-800">
                 <div className="flex items-center justify-between">
                   <div>
