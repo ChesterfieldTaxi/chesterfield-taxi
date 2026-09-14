@@ -23,6 +23,10 @@ export interface UserDropdownProps {
    * If true, displays only the user avatar button (for collapsed sidebar)
    */
   collapsed?: boolean;
+  /**
+   * Optional custom class for the wrapper div
+   */
+  className?: string;
 }
 
 export function UserDropdown({
@@ -31,6 +35,7 @@ export function UserDropdown({
   variant = 'light',
   dropUp = false,
   collapsed = false,
+  className,
 }: UserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
@@ -76,7 +81,7 @@ export function UserDropdown({
   };
 
   return (
-    <div className={`relative ${collapsed ? 'inline-block' : 'w-full'} text-left`} ref={menuRef}>
+    <div className={`relative ${className || (collapsed ? 'inline-block' : 'w-full')} text-left`} ref={menuRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}

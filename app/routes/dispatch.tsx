@@ -1396,6 +1396,7 @@ export default function DispatchRoute() {
           email={user?.email}
           onSignOut={handleSignOut}
           variant="light"
+          className="w-auto min-w-[160px]"
         />
       </header>
 
