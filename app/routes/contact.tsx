@@ -27,16 +27,6 @@ export function meta() {
   ];
 }
 
-const SERVICE_ZONES = [
-  { city: 'Chesterfield', zip: '63005, 63017', note: 'Primary Hub & Instant Dispatch' },
-  { city: 'Wildwood', zip: '63038, 63040', note: 'Full Coverage Residential & Commercial' },
-  { city: 'Ballwin & Ellisville', zip: '63011, 63021', note: 'Manchester Corridor Service' },
-  { city: 'Town & Country', zip: '63131', note: 'Mason & Clayton Rd Area' },
-  { city: 'Creve Coeur & Maryland Hts', zip: '63141, 63043', note: 'Corporate Business Parks' },
-  { city: 'Lambert STL Airport', zip: '63145', note: 'Terminals 1 & 2 Scheduled Service' },
-  { city: 'Spirit of St. Louis (SUS)', zip: '63005', note: 'Private FBO Ramp Access' },
-  { city: 'Downtown St. Louis', zip: '63101 - 63103', note: 'Sports & Convention Shuttles' },
-];
 
 export default function ContactRoute() {
   const [formData, setFormData] = useState({
@@ -308,56 +298,41 @@ export default function ContactRoute() {
             </Card>
           </div>
 
-          {/* Service Area Coverage Directory */}
+          {/* Careers & Applications */}
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                  Service Area Directory
+                  Careers at Chesterfield Taxi
                 </span>
                 <h3 className="text-xl font-extrabold text-slate-950 tracking-tight mt-1">
-                  West County &amp; Regional Hubs
+                  Join Our Professional Team
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  We provide continuous, round-the-clock service across the following primary zones:
+                  We are always looking for reliable drivers, dispatchers, and support staff to join our growing company.
                 </p>
               </div>
 
-              <div className="space-y-3">
-                {SERVICE_ZONES.map((zone) => (
-                  <div
-                    key={zone.city}
-                    className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-900 block">{zone.city}</span>
-                      <span className="text-slate-500">{zone.note}</span>
-                    </div>
-                    <span className="font-mono text-[11px] text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md font-semibold shrink-0">
-                      {zone.zip}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-3">
-                <AlertCircleIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-blue-900 space-y-1">
-                  <span className="font-bold block">Need an immediate ride right now?</span>
-                  <p>
-                    Online inquiries are reviewed throughout the day. For urgent immediate dispatch,
-                    use our{' '}
-                    <Link to="/book" className="underline font-bold">
-                      online booking portal
-                    </Link>{' '}
-                    or call{' '}
-                    <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="underline font-bold">
-                      {COMPANY_CONFIG.phone.dispatch}
-                    </a>
-                    .
-                  </p>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
+                <CarIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-700 space-y-2">
+                  <span className="font-bold block">Current Openings</span>
+                  <ul className="space-y-1 ml-4 list-disc text-slate-600">
+                    <li>Professional Drivers (Company Unit)</li>
+                    <li>Owner-Operator Affiliates</li>
+                    <li>24/7 Operations Dispatchers</li>
+                    <li>Field Supervisors</li>
+                  </ul>
                 </div>
               </div>
+
+              <Link
+                to="/apply"
+                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3 px-4 rounded-xl transition-colors shadow-sm"
+              >
+                <span>View Job Openings & Apply</span>
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
             </div>
           </div>
 

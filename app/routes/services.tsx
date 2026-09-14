@@ -128,6 +128,16 @@ const FLEET_TIERS = [
     icon: <AccessibilityIcon className="w-6 h-6 text-blue-600" />,
   },
 ];
+const SERVICE_ZONES = [
+  { city: 'Chesterfield', zip: '63005, 63017', note: 'Primary Hub & Instant Dispatch' },
+  { city: 'Wildwood', zip: '63038, 63040', note: 'Full Coverage Residential & Commercial' },
+  { city: 'Ballwin & Ellisville', zip: '63011, 63021', note: 'Manchester Corridor Service' },
+  { city: 'Town & Country', zip: '63131', note: 'Mason & Clayton Rd Area' },
+  { city: 'Creve Coeur & Maryland Hts', zip: '63141, 63043', note: 'Corporate Business Parks' },
+  { city: 'Lambert STL Airport', zip: '63145', note: 'Terminals 1 & 2 Scheduled Service' },
+  { city: 'Spirit of St. Louis (SUS)', zip: '63005', note: 'Private FBO Ramp Access' },
+  { city: 'Downtown St. Louis', zip: '63101 - 63103', note: 'Sports & Convention Shuttles' },
+];
 
 export default function ServicesRoute() {
   return (
@@ -256,6 +266,38 @@ export default function ServicesRoute() {
                   <span>Select in Booking Wizard</span>
                   <ChevronRightIcon className="w-3 h-3 stroke-[3]" />
                 </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Service Area Coverage Directory */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-10 shadow-xs space-y-6">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+              Service Area Directory
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+              West County &amp; Regional Hubs
+            </h2>
+            <p className="text-sm text-slate-600">
+              We provide continuous, round-the-clock service across the following primary zones:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+            {SERVICE_ZONES.map((zone) => (
+              <div
+                key={zone.city}
+                className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 text-sm"
+              >
+                <div>
+                  <span className="font-bold text-slate-900 block">{zone.city}</span>
+                  <span className="text-slate-500 text-xs mt-0.5 block">{zone.note}</span>
+                </div>
+                <span className="font-mono text-xs text-blue-700 bg-blue-100/70 px-2 py-1 rounded-md font-semibold shrink-0">
+                  {zone.zip}
+                </span>
               </div>
             ))}
           </div>
