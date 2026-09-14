@@ -18,6 +18,7 @@
       "routes/services": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/about": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/contact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/apply": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/driver": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/signin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -91,6 +92,13 @@
         "parentId": "routes/layout",
         "file": "app/routes/contact.tsx",
         "path": "contact",
+        "config": {}
+      },
+      "routes/apply": {
+        "id": "routes/apply",
+        "parentId": "routes/layout",
+        "file": "app/routes/apply.tsx",
+        "path": "apply",
         "config": {}
       },
       "routes/app": {
@@ -231,6 +239,12 @@
         "file": "routes/contact.tsx",
         "path": "contact"
       },
+      "routes/apply": {
+        "id": "routes/apply",
+        "parentId": "routes/layout",
+        "file": "routes/apply.tsx",
+        "path": "apply"
+      },
       "routes/app": {
         "id": "routes/app",
         "parentId": "root",
@@ -337,6 +351,10 @@
               {
                 "file": "routes/contact.tsx",
                 "path": "contact"
+              },
+              {
+                "file": "routes/apply.tsx",
+                "path": "apply"
               }
             ]
           },

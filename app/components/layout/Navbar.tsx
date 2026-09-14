@@ -185,13 +185,6 @@ export function Navbar() {
 
           {/* Mobile Actions */}
           <div className="flex items-center gap-2 md:hidden">
-            <Link
-              to="/signin"
-              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
-            >
-              <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-              <span>Sign In</span>
-            </Link>
 
             <Link
               to="/book"
