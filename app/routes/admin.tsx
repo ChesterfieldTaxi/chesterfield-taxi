@@ -162,11 +162,10 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'company', label: '🏢 Business Profile' },
   ],
   advanced: [
-    { key: 'form', label: '📋 Customer Booking Form' },
+    { key: 'website', label: '🌐 Website Studio' },
     { key: 'security', label: '🛡️ Security & 2FA' },
     { key: 'audit', label: '📜 Config Audit Trail' },
     { key: 'system', label: '⚙️ System Ops & Backups' },
-    { key: 'website', label: '🌐 Website Studio' },
   ],
 };
 
@@ -204,11 +203,12 @@ export default function AdminLayout() {
     normalizedTab = 'operators';
   } else if (rawTab === 'bookings') {
     normalizedTab = 'trips';
-  } else if (rawTab === 'form' || rawTab === 'layout') {
+  } else if (rawTab === 'form' || rawTab === 'layout' || rawTab === 'website') {
     normalizedTab = 'advanced';
-    activeSubParam = 'form';
-  } else if (rawTab === 'website') {
-    normalizedTab = 'advanced';
+    activeSubParam = 'website';
+  }
+
+  if (normalizedTab === 'advanced' && (activeSubParam === 'form' || activeSubParam === 'customer-form')) {
     activeSubParam = 'website';
   }
 

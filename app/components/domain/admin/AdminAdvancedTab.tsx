@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type {
   AppSettings,
-  CustomerBookingConfig,
   SecurityControlsConfig,
   ConfigAuditEntry,
 } from '../../../core/types/config';
 import {
-  DEFAULT_CUSTOMER_BOOKING_CONFIG,
   DEFAULT_SECURITY_CONTROLS,
 } from '../../../core/services/config/admin-config.service';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../ui/Card';
@@ -22,7 +20,6 @@ import {
   ClockIcon,
   CarIcon,
   InfoIcon,
-  FileTextIcon,
   ShieldIcon,
   HistoryIcon,
   SettingsIcon,
@@ -32,9 +29,8 @@ import { isFirebaseConfigured } from '../../../core/services/firebase';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { getBookingService } from '../../../core/services/booking';
 import { AdminWebsiteTab } from './website/AdminWebsiteTab';
-import { WebsiteFormControlsTab } from './website/WebsiteFormControlsTab';
 
-export type AdvancedSubTab = 'form' | 'security' | 'audit' | 'system' | 'website';
+export type AdvancedSubTab = 'website' | 'security' | 'audit' | 'system';
 
 export interface AdminAdvancedTabProps {
   settings: AppSettings;
@@ -47,42 +43,32 @@ export function AdminAdvancedTab({
   settings,
   onSave,
   isLoading = false,
-  initialSubTab = 'form',
+  initialSubTab = 'website',
 }: AdminAdvancedTabProps) {
-  // Normalize initialSubTab: 'customer-form' or 'form' opens 'form'
-  const normalizedInitial =
-    initialSubTab === 'customer-form' || initialSubTab === 'form'
-      ? 'form'
-      : (initialSubTab as AdvancedSubTab) || 'form';
+  const normalizedInitial: AdvancedSubTab =
+    initialSubTab === 'security' ||
+    initialSubTab === 'audit' ||
+    initialSubTab === 'system'
+      ? initialSubTab
+      : 'website';
 
   const [activeSub, setActiveSub] = useState<AdvancedSubTab>(normalizedInitial);
 
   useEffect(() => {
-    if (initialSubTab === 'customer-form' || initialSubTab === 'form') {
-      setActiveSub('form');
-    } else if (
-      initialSubTab === 'security' ||
-      initialSubTab === 'audit' ||
-      initialSubTab === 'system' ||
-      initialSubTab === 'website'
-    ) {
-      setActiveSub(initialSubTab as AdvancedSubTab);
+    if (initialSubTab === 'security' || initialSubTab === 'audit' || initialSubTab === 'system') {
+      setActiveSub(initialSubTab);
+    } else {
+      setActiveSub('website');
     }
   }, [initialSubTab]);
 
-  // ─── 1. Customer Form Feature Config State ───
-  const [formConfig, setFormConfig] = useState<CustomerBookingConfig>({
-    ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
-    ...(settings.customerBookingConfig || {}),
-  });
-
-  // ─── 2. Security Controls State ───
+  // ─── 1. Security Controls State ───
   const [securityConfig, setSecurityConfig] = useState<SecurityControlsConfig>({
     ...DEFAULT_SECURITY_CONTROLS,
     ...(settings.securityControls || {}),
   });
 
-  // ─── 3. System & Maintenance State ───
+  // ─── 2. System & Maintenance State ───
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceBanner, setMaintenanceBanner] = useState(
     'Scheduled system maintenance in progress. Please call dispatch directly at (314) 738-0100.'
@@ -98,28 +84,6 @@ export function AdminAdvancedTab({
   const auditLogs: ConfigAuditEntry[] = settings.configAuditTrail || [];
 
   const firebaseStatus = isFirebaseConfigured();
-
-  // Save Customer Booking Form Settings
-  const handleSaveCustomerForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setIsSaving(true);
-      setSaveSuccessMessage(null);
-      setSaveError(null);
-
-      await onSave({
-        customerBookingConfig: formConfig,
-        updatedAt: new Date().toISOString(),
-      });
-
-      setSaveSuccessMessage('Customer booking form configurations successfully synchronized.');
-      setTimeout(() => setSaveSuccessMessage(null), 4000);
-    } catch (err: any) {
-      setSaveError(err.message || 'Failed to save customer form settings.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   // Save Security Controls
   const handleSaveSecurity = async (e: React.FormEvent) => {
@@ -143,20 +107,6 @@ export function AdminAdvancedTab({
     }
   };
 
-  // Toggle Payment Methods
-  const togglePaymentMethod = (method: 'card' | 'cash' | 'account') => {
-    setFormConfig((prev) => {
-      const exists = prev.acceptedPaymentMethods.includes(method);
-      let updated: Array<'card' | 'cash' | 'account'>;
-      if (exists) {
-        if (prev.acceptedPaymentMethods.length <= 1) return prev;
-        updated = prev.acceptedPaymentMethods.filter((m) => m !== method);
-      } else {
-        updated = [...prev.acceptedPaymentMethods, method];
-      }
-      return { ...prev, acceptedPaymentMethods: updated };
-    });
-  };
 
   // Export Audit Logs
   const handleExportAuditLogs = () => {
@@ -189,9 +139,6 @@ export function AdminAdvancedTab({
     }
   };
 
-  // Computed phone / email fallbacks
-  const displayPhone = formConfig.multiVehicleCallPhone || COMPANY_CONFIG.phone.dispatch;
-  const displayEmail = formConfig.multiVehicleCallEmail || COMPANY_CONFIG.email.dispatch;
 
   // Filtered audit logs
   const filteredAuditLogs = auditLogs.filter((log) => {
@@ -212,22 +159,15 @@ export function AdminAdvancedTab({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setActiveSub('form')}
+            onClick={() => setActiveSub('website')}
             className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'form'
+              activeSub === 'website'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <FileTextIcon className="w-4 h-4 shrink-0" />
-            <span>Customer Form Controls</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                formConfig.allowMultiVehicle ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {formConfig.allowMultiVehicle ? 'Multi-Cab Active' : 'Single-Cab'}
-            </span>
+            <CarIcon className="w-4 h-4 shrink-0" />
+            <span>Website Studio</span>
           </button>
 
           <button
@@ -275,19 +215,6 @@ export function AdminAdvancedTab({
             <SettingsIcon className="w-4 h-4 shrink-0" />
             <span>System Ops &amp; Backups</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSub('website')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-              activeSub === 'website'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <CarIcon className="w-4 h-4 shrink-0" />
-            <span>Website Studio</span>
-          </button>
         </div>
 
         {activeSub === 'audit' && (
@@ -329,16 +256,7 @@ export function AdminAdvancedTab({
         </Alert>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          SUBPAGE 1: CUSTOMER FORM CARD (TURBOCHARGED EXTENSIVE CONTROLS)
-      ═══════════════════════════════════════════════════════════════════════ */}
-      {activeSub === 'form' && (
-        <WebsiteFormControlsTab
-          settings={settings}
-          onSave={onSave}
-          isLoading={isSaving || isLoading}
-        />
-      )}
+
 
       {/* ═══════════════════════════════════════════════════════════════════════
           SUBPAGE 2: SECURITY & ACCESS CONTROLS
@@ -736,6 +654,7 @@ export function AdminAdvancedTab({
           settings={settings}
           onSave={onSave}
           isLoading={isLoading || isSaving}
+          initialSubTab={initialSubTab === 'form' || initialSubTab === 'customer-form' ? 'form' : undefined}
         />
       )}
     </div>
