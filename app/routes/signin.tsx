@@ -60,7 +60,7 @@ export default function SignIn() {
     }
 
     // Customer / Passenger default
-    navigate(redirect || '/app', { replace: true });
+    navigate(redirect || '/book', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
