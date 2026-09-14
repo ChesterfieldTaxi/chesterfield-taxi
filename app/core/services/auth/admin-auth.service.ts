@@ -239,13 +239,38 @@ export class AdminAuthService {
         // Write role to Firestore
         const db = getFirestore(getFirebaseApp());
         const userRef = doc(db, 'users', cred.user.uid);
-        await setDoc(userRef, { email: trimmedEmail, role, displayName: displayName || null, status: 'active' }, { merge: true });
+        let actualRole = role;
+        
+        // Auto-provision driver role based on email on creation as well
+        if (trimmedEmail === 'driver1@chesterfieldtaxi.com' || trimmedEmail.includes('driver')) {
+          actualRole = 'driver';
+          try {
+            const driverRef = doc(db, 'drivers', cred.user.uid);
+            await setDoc(driverRef, {
+              id: cred.user.uid,
+              name: displayName || trimmedEmail.split('@')[0],
+              phone: '(314) 738-0100',
+              dutyStatus: 'off_duty',
+              vehicleUnit: 'Unassigned',
+              vehicleTier: 'standard',
+              zone: 'Chesterfield'
+            }, { merge: true });
+          } catch (e) {
+            console.warn('[AdminAuthService] Error provisioning driver profile:', e);
+          }
+        } else if (trimmedEmail === 'admin@chesterfieldtaxi.com' || trimmedEmail.includes('admin')) {
+          actualRole = 'admin';
+        } else if (trimmedEmail === 'dispatch@chesterfieldtaxi.com' || trimmedEmail.includes('dispatch')) {
+          actualRole = 'dispatcher';
+        }
+
+        await setDoc(userRef, { email: trimmedEmail, role: actualRole, displayName: displayName || null, status: 'active' }, { merge: true });
         
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: displayName || cred.user.displayName,
-          role,
+          role: actualRole,
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth registration error:', err);
