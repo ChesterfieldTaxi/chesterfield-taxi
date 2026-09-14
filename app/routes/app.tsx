@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import {
   getPassengerService,
   DEFAULT_PASSENGER_ACCOUNT,
@@ -61,7 +62,7 @@ export default function PassengerAppRoute() {
 
   // Auth guard
   useEffect(() => {
-    const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+    
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
@@ -1053,7 +1054,7 @@ export default function PassengerAppRoute() {
                   type="button"
                     onClick={async () => {
                       try {
-                        const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+                        
                         await getAdminAuthService().signOut();
                       } catch {}
                       showToast('Signed out of Passenger Portal.');
@@ -1517,7 +1518,7 @@ export default function PassengerAppRoute() {
                     onClick={async () => {
                       setIsHelpMenuOpen(false);
                       try {
-                        const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+                        
                         await getAdminAuthService().signOut();
                       } catch {}
                       showToast('Signed out of Passenger Portal.');

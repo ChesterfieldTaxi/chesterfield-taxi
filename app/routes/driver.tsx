@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
+import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { getDriverService, DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '../core/services/driver.service';
 import type { DriverProfile, DriverDutyStatus, DriverMeterExtra, DriverScheduleConfig, DayOfWeek, DriverTimeOff } from '../core/types/driver';
 import type { Trip, TripStatus } from '../core/types/trip';
@@ -71,7 +72,7 @@ export default function DriverAppRoute() {
   // Auth guard
   const navigate = useNavigate();
   useEffect(() => {
-    const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+    
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
