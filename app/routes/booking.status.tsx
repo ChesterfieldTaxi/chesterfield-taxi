@@ -4,6 +4,7 @@ import { getBookingService } from '../core/services/booking';
 import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { PhoneIcon, SpinnerIcon, SearchIcon } from '../components/ui/Icons';
+import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 
 export function meta() {
   return [
@@ -31,6 +32,7 @@ export default function BookingStatusRoute() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchRef, setSearchRef] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +41,14 @@ export default function BookingStatusRoute() {
       navigate(`/booking/status/${encodeURIComponent(clean)}`);
     }
   };
+
+  useEffect(() => {
+    const authService = getAdminAuthService();
+    const unsub = authService.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!tripId) {
@@ -270,6 +280,22 @@ export default function BookingStatusRoute() {
             </div>
           </div>
         </div>
+
+        {/* Guest to User Account Linking CTA */}
+        {!currentUser && (
+          <div className="bg-blue-50 border border-blue-200 rounded-3xl p-6 shadow-md mb-6 text-center">
+            <h3 className="text-sm font-black text-blue-900 mb-2">Save Account & Claim Trips</h3>
+            <p className="text-xs text-blue-700 mb-4">
+              Register now using your booking email or phone to seamlessly attach this and previous guest bookings to your passenger profile.
+            </p>
+            <Link
+              to={`/register?role=customer&claimTrip=${tripId}`}
+              className="inline-block px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl shadow hover:bg-blue-700 transition-colors"
+            >
+              Create Account
+            </Link>
+          </div>
+        )}
 
         {/* Need Help CTA */}
         <div className="text-center text-xs text-slate-500 space-y-2">

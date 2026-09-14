@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import { getDriverService, DEFAULT_DRIVERS, DEFAULT_SCHEDULE } from '../core/services/driver.service';
 import type { DriverProfile, DriverDutyStatus, DriverMeterExtra, DriverScheduleConfig, DayOfWeek, DriverTimeOff } from '../core/types/driver';
 import type { Trip, TripStatus } from '../core/types/trip';
@@ -62,9 +63,27 @@ export default function DriverAppRoute() {
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<DriverTab>('active');
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Auth guard
+  const navigate = useNavigate();
+  useEffect(() => {
+    const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+    const authService = getAdminAuthService();
+    const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
+      if (!currentUser) {
+        navigate('/signin?message=unauthenticated&redirect=/driver', { replace: true });
+      } else if (currentUser.role !== 'driver' && currentUser.role !== 'admin' && currentUser.role !== 'dispatcher') {
+        navigate('/signin?message=unauthorized', { replace: true });
+      } else {
+        setIsAuthChecking(false);
+      }
+    });
+    return unsubscribe;
+  }, [navigate]);
 
   // Meter elapsed timer & distance state for IN_PROGRESS
   const [meterSeconds, setMeterSeconds] = useState(0);

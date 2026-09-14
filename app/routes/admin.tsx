@@ -257,9 +257,9 @@ export default function AdminLayout() {
     // Check auth status
     const unsubscribe = authService.onAuthStateChanged((currentUser) => {
       if (!currentUser) {
-        navigate('/admin/login?message=unauthenticated', { replace: true });
+        navigate('/signin?message=unauthenticated&redirect=/admin', { replace: true });
       } else if (currentUser.role !== 'admin') {
-        navigate('/admin/login?message=unauthorized', { replace: true });
+        navigate('/signin?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
         setIsAuthChecking(false);
@@ -309,7 +309,7 @@ export default function AdminLayout() {
     try {
       getAdminAuthService().signOut().catch(() => {});
     } catch {}
-    window.location.href = '/admin/login?message=logged_out';
+    window.location.href = '/signin?message=logged_out';
   };
 
   // Render auth loading screen while validating credentials

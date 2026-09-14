@@ -301,9 +301,9 @@ export default function DispatchRoute() {
   useEffect(() => {
     const unsubscribe = getAdminAuthService().onAuthStateChanged((currentUser) => {
       if (!currentUser) {
-        navigate('/admin/login?message=unauthenticated', { replace: true });
+        navigate('/signin?message=unauthenticated&redirect=/dispatch', { replace: true });
       } else if (currentUser.role !== 'admin' && currentUser.role !== 'dispatcher') {
-        navigate('/admin/login?message=unauthorized', { replace: true });
+        navigate('/signin?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
         setIsAuthChecking(false);
@@ -617,7 +617,7 @@ export default function DispatchRoute() {
     try {
       getAdminAuthService().signOut().catch(() => {});
     } catch {}
-    window.location.href = '/admin/login?message=logged_out';
+    window.location.href = '/signin?message=logged_out';
   };
 
   // Create new draft

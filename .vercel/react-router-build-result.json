@@ -20,6 +20,8 @@
       "routes/contact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/driver": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/signin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/register": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/admin.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -103,6 +105,20 @@
         "parentId": "root",
         "file": "app/routes/driver.tsx",
         "path": "driver",
+        "config": {}
+      },
+      "routes/signin": {
+        "id": "routes/signin",
+        "parentId": "root",
+        "file": "app/routes/signin.tsx",
+        "path": "signin",
+        "config": {}
+      },
+      "routes/register": {
+        "id": "routes/register",
+        "parentId": "root",
+        "file": "app/routes/register.tsx",
+        "path": "register",
         "config": {}
       },
       "routes/admin.login": {
@@ -227,6 +243,18 @@
         "file": "routes/driver.tsx",
         "path": "driver"
       },
+      "routes/signin": {
+        "id": "routes/signin",
+        "parentId": "root",
+        "file": "routes/signin.tsx",
+        "path": "signin"
+      },
+      "routes/register": {
+        "id": "routes/register",
+        "parentId": "root",
+        "file": "routes/register.tsx",
+        "path": "register"
+      },
       "routes/admin.login": {
         "id": "routes/admin.login",
         "parentId": "root",
@@ -319,6 +347,14 @@
           {
             "file": "routes/driver.tsx",
             "path": "driver"
+          },
+          {
+            "file": "routes/signin.tsx",
+            "path": "signin"
+          },
+          {
+            "file": "routes/register.tsx",
+            "path": "register"
           },
           {
             "file": "routes/admin.login.tsx",

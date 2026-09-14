@@ -18,6 +18,10 @@ export default [
   // Mobile-Optimized Driver PWA Console
   route("driver", "routes/driver.tsx"),
 
+  // Authentication Routes
+  route("signin", "routes/signin.tsx"),
+  route("register", "routes/register.tsx"),
+
   // Operator & Admin Console (Isolated Layout)
   route("admin/login", "routes/admin.login.tsx"),
   route("admin", "routes/admin.tsx"),

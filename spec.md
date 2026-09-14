@@ -432,4 +432,20 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - CodeMirror / Monaco-based custom CSS editor for advanced site restyling.
   - Header & Footer script injection boundaries for installing external marketing analytics and chatbots safely.
 
+### 23. Phase 27: Full-Stack Authentication, OAuth & Session Management
+- **Unified Sign-In & Registration Views (`/signin`, `/register`)**:
+  - Responsive, professional authentication pages with Email & Password input forms and client/server validation.
+  - Social Auth Buttons: One-tap "Continue with Google" and "Continue with Facebook" OAuth buttons.
+  - Clean tab toggle to switch between Passenger and Driver registration modes.
+- **Role-Based Session Router & Protected Route Guards**:
+  - Implementation of authentication state middleware / route guards.
+  - Unauthenticated users attempting to access `/admin`, `/dispatch`, or `/driver` are redirected to `/signin?redirect=...`.
+  - Automatic evaluation of user role claims upon successful sign-in:
+    - Passenger -> `/app`
+    - Driver -> `/driver`
+    - Dispatcher / Admin -> `/admin` or `/dispatch`
+  - Session persistence across page refreshes via secure tokens/cookies using Firebase Auth.
+- **Guest-to-User Account Linking**:
+  - Adding an option on the Guest Tracking page (`/track/$tripToken`) for guests to "Save Account & Claim Trips" using their booking email/phone, attaching previous guest bookings to their new registered passenger profile in `/app`.
+
 

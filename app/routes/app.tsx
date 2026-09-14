@@ -59,6 +59,18 @@ export default function PassengerAppRoute() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoadingTrips, setIsLoadingTrips] = useState(true);
 
+  // Auth guard
+  useEffect(() => {
+    const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+    const authService = getAdminAuthService();
+    const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
+      if (!currentUser) {
+        navigate('/signin?message=unauthenticated&redirect=/app', { replace: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigate]);
+
   // Quick Book Drawer state
   const [quickOrigin, setQuickOrigin] = useState<string>('');
   const [quickDestination, setQuickDestination] = useState<string>('');
@@ -1039,10 +1051,14 @@ export default function PassengerAppRoute() {
               <div>
                 <button
                   type="button"
-                  onClick={() => {
-                    showToast('Signed out of Passenger Portal.');
-                    setTimeout(() => navigate('/'), 600);
-                  }}
+                    onClick={async () => {
+                      try {
+                        const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+                        await getAdminAuthService().signOut();
+                      } catch {}
+                      showToast('Signed out of Passenger Portal.');
+                      setTimeout(() => navigate('/signin'), 600);
+                    }}
                   className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-50 hover:border-rose-300 text-rose-800 transition-all group text-left"
                 >
                   <div className="flex items-center gap-2.5">
@@ -1494,16 +1510,19 @@ export default function PassengerAppRoute() {
                   </div>
                 </a>
               </div>
-
               <div className="pt-2 border-t border-slate-100">
                 {/* Sign Out */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsHelpMenuOpen(false);
-                    showToast('Signed out of Passenger Portal.');
-                    setTimeout(() => navigate('/'), 800);
-                  }}
+                    onClick={async () => {
+                      setIsHelpMenuOpen(false);
+                      try {
+                        const { getAdminAuthService } = require('../core/services/auth/admin-auth.service');
+                        await getAdminAuthService().signOut();
+                      } catch {}
+                      showToast('Signed out of Passenger Portal.');
+                      setTimeout(() => navigate('/signin'), 800);
+                    }}
                   className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors"
                 >
                   <XIcon className="w-3.5 h-3.5 text-rose-500" />

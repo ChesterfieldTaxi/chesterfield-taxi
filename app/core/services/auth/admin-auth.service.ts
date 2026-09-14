@@ -7,6 +7,10 @@
 
 import {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
   type User,
@@ -166,19 +170,21 @@ export class AdminAuthService {
       trimmedEmail === 'admin@chesterfieldtaxi.com' ||
       trimmedEmail.includes('admin') ||
       trimmedEmail.includes('dispatch') ||
-      trimmedEmail.includes('driver')
+      trimmedEmail.includes('driver') ||
+      trimmedEmail.includes('customer')
     ) {
       const role: UserRole = trimmedEmail.includes('admin')
         ? 'admin'
         : trimmedEmail.includes('driver')
         ? 'driver'
-        : 'dispatcher';
+        : trimmedEmail.includes('dispatcher')
+        ? 'dispatcher'
+        : 'customer';
       const demoUser: AdminUser = {
-        uid: 'demo_admin_uid_001',
+        uid: 'demo_user_uid_001',
         email: trimmedEmail,
         displayName:
-          'Chesterfield ' +
-          (role === 'admin' ? 'Admin' : role === 'driver' ? 'Driver' : 'Dispatcher'),
+          'Chesterfield ' + role,
         isDemo: true,
         role,
       };
@@ -189,8 +195,110 @@ export class AdminAuthService {
     }
 
     throw new Error(
-      'Authentication failed. In offline development mode, use admin@... or dispatch@...'
+      'Authentication failed. In offline development mode, use admin@... or dispatch@... or customer@...'
     );
+  }
+
+  public async registerWithEmail(email: string, password: string, role: UserRole = 'customer', displayName?: string): Promise<AdminUser> {
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    if (this.isConfigured) {
+      try {
+        const auth = getFirebaseAuth();
+        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        
+        // Write role to Firestore
+        const db = getFirestore(getFirebaseApp());
+        const userRef = doc(db, 'users', cred.user.uid);
+        await setDoc(userRef, { email: trimmedEmail, role, displayName: displayName || null, status: 'active' }, { merge: true });
+        
+        return {
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: displayName || cred.user.displayName,
+          role,
+        };
+      } catch (err) {
+        console.warn('[AdminAuthService] Firebase Auth registration error:', err);
+        throw err;
+      }
+    }
+    
+    return this.signIn(email, password);
+  }
+
+  public async signInWithGoogle(role: UserRole = 'customer'): Promise<AdminUser> {
+    if (this.isConfigured) {
+      try {
+        const auth = getFirebaseAuth();
+        const provider = new GoogleAuthProvider();
+        const cred = await signInWithPopup(auth, provider);
+        
+        // Fetch or create user role
+        const db = getFirestore(getFirebaseApp());
+        const userRef = doc(db, 'users', cred.user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        let userRole = role;
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          if (data && data.role) {
+            userRole = data.role as UserRole;
+          }
+        } else {
+          // First time sign-in via Google, set role
+          await setDoc(userRef, { email: cred.user.email, role, displayName: cred.user.displayName, status: 'active' }, { merge: true });
+        }
+        
+        return {
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: cred.user.displayName,
+          role: userRole,
+        };
+      } catch (err) {
+        console.warn('[AdminAuthService] Firebase Auth Google sign-in error:', err);
+        throw err;
+      }
+    }
+    throw new Error('Google Sign-In requires Firebase to be configured.');
+  }
+
+  public async signInWithFacebook(role: UserRole = 'customer'): Promise<AdminUser> {
+    if (this.isConfigured) {
+      try {
+        const auth = getFirebaseAuth();
+        const provider = new FacebookAuthProvider();
+        const cred = await signInWithPopup(auth, provider);
+        
+        // Fetch or create user role
+        const db = getFirestore(getFirebaseApp());
+        const userRef = doc(db, 'users', cred.user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        let userRole = role;
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          if (data && data.role) {
+            userRole = data.role as UserRole;
+          }
+        } else {
+          // First time sign-in via Facebook, set role
+          await setDoc(userRef, { email: cred.user.email, role, displayName: cred.user.displayName, status: 'active' }, { merge: true });
+        }
+        
+        return {
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: cred.user.displayName,
+          role: userRole,
+        };
+      } catch (err) {
+        console.warn('[AdminAuthService] Firebase Auth Facebook sign-in error:', err);
+        throw err;
+      }
+    }
+    throw new Error('Facebook Sign-In requires Firebase to be configured.');
   }
 
   public async signOut(): Promise<void> {

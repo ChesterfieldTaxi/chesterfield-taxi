@@ -293,3 +293,10 @@
 - [x] 26.3 Admin Visual CMS Studio (`/admin?tab=website`): Layout Reordering Canvas, Live Section Property Inspector, Visual Theme & Asset Switcher.
 - [x] 26.4 Advanced CMS & SEO Tools: Monaco / CodeMirror CSS Editor, Head / Footer Script Injector, SEO & Social Graph Manager.
 - [x] 26.5 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 compilation errors.
+
+## Phase 27: Full-Stack Authentication, OAuth & Session Management
+- [x] 27.1 Documentation Updates: Update spec.md, plan.md, and tasks.md to reflect Phase 27 scope.
+- [x] 27.2 Unified Sign-In & Registration Views: Build `/signin` and `/register` with Email/Password and Social Auth (Google/Facebook) buttons, and Passenger/Driver registration toggle.
+- [x] 27.3 Role-Based Session Router & Route Guards: Implement route guards for `/admin`, `/dispatch`, `/driver` redirecting to `/signin`. Handle role-based automatic routing post-login.
+- [x] 27.4 Guest-to-User Account Linking: Add "Save Account & Claim Trips" option on `/track/$tripToken` to attach guest trips to passenger profile.
+- [x] 27.5 Verification: Run `npm run typecheck` and `npm run build` to verify 0 errors, then mark Phase 27 complete.

@@ -418,3 +418,22 @@ export interface PassengerAccount {
 - **Monaco CSS Editor**: Browser-based code editor integrated into the CMS panel, securely injecting custom stylesheet overrides into the application `<head>`.
 - **Script Injector**: Specialized admin fields for managing tracking pixels, analytics tags, and chat widgets.
 - **SEO & Social Graph**: Route-specific Meta Title, Description, and OpenGraph tags to control social sharing cards.
+
+## 15. Phase 27 Architecture: Full-Stack Authentication, OAuth & Session Management
+### 15.1 Unified Auth Interfaces
+- `/signin` and `/register` routes acting as central gateways.
+- Support for email/password and federated identities (Google/Facebook OAuth via Firebase Auth).
+- Support for both Passenger and Driver registration workflows with specific claim setup in Firestore users collection.
+
+### 15.2 Protected Route Guards
+- Higher-Order Components or loaders in React Router v7 leveraging Firebase Auth tokens to evaluate claims.
+- Graceful redirects for unauthenticated access with `?redirect=` return URLs.
+- Post-authentication routing based on Role:
+  - Passengers are routed to their personal `/app` dashboard.
+  - Drivers to `/driver` console.
+  - Dispatch/Admin to `/admin`.
+
+### 15.3 Guest Trip Claiming
+- On the `/track/$tripToken` route, detect if the current session is an unauthenticated guest.
+- Present a CTA to "Save Account & Claim Trips".
+- On account creation, link previous `email` or `phone` matching trips to the new Firebase UID.
