@@ -30,6 +30,7 @@ import {
 } from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { getBookingService } from '../../../core/services/booking';
 
 export type AdvancedSubTab = 'form' | 'security' | 'audit' | 'system';
 
@@ -1180,13 +1181,71 @@ export function AdminAdvancedTab({
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    if (!confirm("Are you sure you want to seed 100+ mock trips? This will flood the database.")) return;
+                    if (!confirm("Are you sure you want to seed 120 mock trips? This will execute client-side booking creations and push to Firestore.")) return;
+                    
+                    // Show some basic UI feedback or console log for progress
+                    console.log('Starting client-side stress seed...');
+                    
                     try {
-                      const res = await fetch('/api/seed-stress-data', { method: 'POST' });
-                      if (res.ok) alert("Seeding started in background.");
-                      else alert("Failed to start seeding.");
+                      const service = getBookingService();
+                      const statuses = ['UNCONFIRMED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'DECLINED'] as const;
+                      
+                      const baseTrip = {
+                        pickupLocation: { address: '123 Test St', coordinates: { lat: 38.6, lng: -90.5 } },
+                        dropoffLocation: { address: '456 Dest Ave', coordinates: { lat: 38.7, lng: -90.4 } },
+                        bookingType: 'asap' as const,
+                        vehicleTier: 'standard' as const,
+                        passenger: {
+                          firstName: 'Test',
+                          lastName: 'User',
+                          email: 'test@example.com',
+                          phone: '555-0100',
+                          passengerCount: 1,
+                          luggageCount: 0,
+                        },
+                        pricing: {
+                          baseFare: 5.0,
+                          distanceMiles: 1,
+                          durationMinutes: 5,
+                          distanceRate: 15.0,
+                          timeRate: 0,
+                          totalFare: 20.0,
+                          vehicleMultiplier: 1,
+                          surgeMultiplier: 1,
+                          discountAmount: 0,
+                          subtotal: 20.0,
+                          currency: 'USD'
+                        },
+                        payment: {
+                          method: 'card' as const,
+                          status: 'pending' as const,
+                          amount: 20.0
+                        }
+                      };
+
+                      let successCount = 0;
+                      for (let i = 0; i < 120; i++) {
+                        const status = statuses[i % statuses.length];
+                        const trip = await service.createBooking({
+                          ...baseTrip,
+                          passenger: {
+                            ...baseTrip.passenger,
+                            firstName: `Test${i}`,
+                          }
+                        });
+                        
+                        if (trip && status !== 'UNCONFIRMED') {
+                          if (service.updateTripStatus) {
+                            await service.updateTripStatus(trip.id, status as any, { actorRole: 'system' });
+                          }
+                        }
+                        successCount++;
+                        if (successCount % 20 === 0) console.log(`Seeded ${successCount}/120 trips...`);
+                      }
+                      alert(`Successfully seeded ${successCount} trips directly via Booking Service!`);
                     } catch (err) {
-                      alert("Error seeding data.");
+                      console.error("Seeding error", err);
+                      alert("Error seeding data. Check console for details.");
                     }
                   }}
                   className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shrink-0"
