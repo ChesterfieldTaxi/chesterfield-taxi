@@ -16,6 +16,34 @@ service cloud.firestore {
       );
     }
     
+    // Public Trips: Customers can submit new UNCONFIRMED web bookings
+    match /trips/{tripId} {
+      allow create: if request.resource.data.status in ['UNCONFIRMED', 'pending'] || request.auth != null;
+      allow read, update, delete: if request.auth != null;
+    }
+
+    // Public Operational Configuration: Read-only for public quote calculations and tariffs
+    match /zones/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /zoneGroups/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /locationCollections/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /pricing_rules/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

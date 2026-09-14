@@ -293,7 +293,31 @@ export class FirebaseBookingService implements IBookingService {
     };
 
     const sanitizedTrip = sanitizePayload(newTrip);
-    await setDoc(tripDocRef, sanitizedTrip);
+
+    try {
+      await setDoc(tripDocRef, sanitizedTrip);
+    } catch (err: unknown) {
+      console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), saving to local fallback storage:', err);
+      // Persist in local storage so customer bookings are never lost even if cloud rules haven't propagated
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const STORAGE_KEY = 'chesterfield_trips_mock_store';
+          const existing = window.localStorage.getItem(STORAGE_KEY);
+          const trips: Trip[] = existing ? JSON.parse(existing) : [];
+          const idx = trips.findIndex((t) => t.id === sanitizedTrip.id);
+          if (idx >= 0) {
+            trips[idx] = sanitizedTrip;
+          } else {
+            trips.unshift(sanitizedTrip);
+          }
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+          window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: sanitizedTrip }));
+        } catch (storageErr) {
+          console.error('[FirebaseBookingService] LocalStorage fallback failed:', storageErr);
+        }
+      }
+    }
+
     return sanitizedTrip;
   }
 

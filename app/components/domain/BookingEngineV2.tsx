@@ -865,10 +865,10 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
       }
     }
 
-    // Airport flight number guard
-    if (bookingConfig.requireFlightNumberForAirport && airportDetection.isAirportTrip) {
+    // Airport flight number guard (only when pickup is an airport)
+    if (bookingConfig.requireFlightNumberForAirport && airportDetection.isPickupAirport) {
       if (!form.flightNumber.trim()) {
-        newErrors.flightNumber = 'Flight number is required for airport pickups/dropoffs.';
+        newErrors.flightNumber = 'Flight number is required for airport pickups.';
       }
     }
 
@@ -1456,8 +1456,8 @@ export function BookingEngineV2({ className = '', onBookingSuccess }: BookingEng
                 </div>
               </div>
 
-              {/* Airport Assistance Box (Auto-detected) */}
-              {airportDetection.isAirportTrip && (
+              {/* Airport Assistance Box (Auto-detected for airport pickups only) */}
+              {airportDetection.isPickupAirport && (
                 <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
