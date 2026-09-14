@@ -68,6 +68,29 @@ export class AdminAuthService {
         return dispatchRole;
       }
 
+      if (user.email === 'driver1@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('driver'))) {
+        const driverRole: UserRole = 'driver';
+        await setDoc(userRef, { role: driverRole, email: user.email }, { merge: true });
+        
+        // Ensure a driver profile exists in the drivers collection
+        try {
+          const driverRef = doc(db, 'drivers', user.uid);
+          await setDoc(driverRef, {
+            id: user.uid,
+            name: user.displayName || user.email.split('@')[0],
+            phone: '(314) 738-0100',
+            dutyStatus: 'off_duty',
+            vehicleUnit: 'Unassigned',
+            vehicleTier: 'standard',
+            zone: 'Chesterfield'
+          }, { merge: true });
+        } catch (e) {
+          console.warn('[AdminAuthService] Error provisioning driver profile:', e);
+        }
+        
+        return driverRole;
+      }
+
       // Default to customer
       return 'customer';
     } catch (err) {
