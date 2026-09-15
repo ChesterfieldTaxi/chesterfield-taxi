@@ -114,6 +114,13 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   const [newLicense, setNewLicense] = useState('');
   const [newUnit, setNewUnit] = useState('');
 
+  // Edit Operator Modal State
+  const [editingOperator, setEditingOperator] = useState<OperatorUser | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editLicense, setEditLicense] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
@@ -258,6 +265,51 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       setTimeout(() => setSuccess(null), 3500);
     } catch (err: any) {
       setError(err.message || 'Failed to delete operator.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOperator) return;
+
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const updates = {
+      displayName: editName.trim(),
+      phone: editPhone.trim(),
+      driverLicense: editLicense.trim(),
+      assignedUnit: editUnit.trim(),
+    };
+
+    try {
+      if (isFirebaseConfigured()) {
+        const db = getFirestore(getFirebaseApp());
+        const userRef = doc(db, 'users', editingOperator.uid);
+        await setDoc(userRef, updates, { merge: true });
+        
+        // Also sync fleet if driver
+        if ((editingOperator.roles || [editingOperator.role]).includes('driver')) {
+           const fleetRef = doc(db, 'fleet', `driver-${editingOperator.uid}`);
+           await setDoc(fleetRef, { 
+             name: updates.displayName,
+             license: updates.driverLicense
+           }, { merge: true });
+        }
+      }
+
+      setOperators((prev) =>
+        prev.map((op) => (op.uid === editingOperator.uid ? { ...op, ...updates } : op))
+      );
+      
+      setSuccess(`Operator ${editingOperator.email} updated successfully.`);
+      setEditingOperator(null);
+      setTimeout(() => setSuccess(null), 3500);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update operator details.');
     } finally {
       setIsSaving(false);
     }
@@ -616,6 +668,21 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     <td className="px-5 py-3.5 text-right space-x-2">
                       <button
                         type="button"
+                        onClick={() => {
+                          setEditingOperator(op);
+                          setEditName(op.displayName || '');
+                          setEditPhone(op.phone || '');
+                          setEditLicense(op.driverLicense || '');
+                          setEditUnit(op.assignedUnit || '');
+                        }}
+                        className="text-slate-500 hover:text-blue-600 text-[11px] font-semibold underline transition-colors"
+                        title="Edit Operator Profile"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => handleSendPasswordReset(op.email)}
                         className="text-slate-500 hover:text-blue-600 text-[11px] font-semibold underline transition-colors"
                         title="Send Password Reset"
@@ -765,6 +832,90 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                   className="bg-blue-600 hover:bg-blue-700 font-bold"
                 >
                   Provision Account
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+      {/* ─── Edit Operator Modal ─── */}
+      {editingOperator && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <Card className="w-full max-w-lg bg-white shadow-2xl border-slate-200 overflow-hidden">
+            <CardHeader className="bg-slate-900 text-white p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base text-white flex items-center gap-2">
+                    <span>✏️</span>
+                    <span>Edit Profile: {editingOperator.email}</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-300 mt-0.5">
+                    Update contact details and vehicle assignment. Roles are managed in the main roster table.
+                  </CardDescription>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingOperator(null)}
+                  className="text-slate-400 hover:text-white text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            </CardHeader>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Full Name"
+                  placeholder="e.g. Marcus Vance"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Phone Number"
+                  placeholder="(314) 555-0199"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
+              </div>
+
+              {((editingOperator.roles || [editingOperator.role]).includes('driver')) && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Driver's License #"
+                      placeholder="MO-DL-1234567"
+                      value={editLicense}
+                      onChange={(e) => setEditLicense(e.target.value)}
+                    />
+                    <Input
+                      label="Assigned Vehicle Unit #"
+                      placeholder="e.g. Unit #101"
+                      value={editUnit}
+                      onChange={(e) => setEditUnit(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  onClick={() => setEditingOperator(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={isSaving}
+                  className="bg-blue-600 hover:bg-blue-700 font-bold"
+                >
+                  Save Profile
                 </Button>
               </div>
             </form>
