@@ -40,6 +40,22 @@ export function AdminVehiclesTab({
   }, [initialSubTab]);
 
   const [vehicles, setVehicles] = useState<VehicleTierConfig[]>([...settings.vehicles]);
+  const [vehicleFilter, setVehicleFilter] = useState<'active' | 'archived' | 'all'>('active');
+
+  const handleToggleArchive = (index: number) => {
+    setVehicles((prev) => {
+      const next = [...prev];
+      const cur = next[index];
+      const isArchiving = !cur.isArchived;
+      next[index] = {
+        ...cur,
+        isArchived: isArchiving,
+        archivedAt: isArchiving ? new Date().toISOString() : undefined,
+        archiveReason: isArchiving ? 'Archived by administrator' : undefined,
+      };
+      return next;
+    });
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -357,9 +373,59 @@ export function AdminVehiclesTab({
             </Card>
           )}
 
+          {/* Vehicle Types Filter Bar */}
+          <div className="flex items-center justify-between gap-4 flex-wrap pb-2 border-b border-slate-200">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setVehicleFilter('active')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  vehicleFilter === 'active'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Active Classes ({vehicles.filter((v) => !v.isArchived).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVehicleFilter('archived')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  vehicleFilter === 'archived'
+                    ? 'bg-amber-100 text-amber-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Archived ({vehicles.filter((v) => !!v.isArchived).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVehicleFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  vehicleFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All ({vehicles.length})
+              </button>
+            </div>
+            <div className="text-xs text-slate-500 font-medium">
+              Archived vehicle classes are hidden from the passenger booking wizard.
+            </div>
+          </div>
+
           {/* Vehicle Tiers Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {vehicles.map((v, index) => (
+            {vehicles
+              .filter((v) => {
+                if (vehicleFilter === 'active') return !v.isArchived;
+                if (vehicleFilter === 'archived') return !!v.isArchived;
+                return true;
+              })
+              .map((v) => {
+                const index = vehicles.findIndex((item) => item.id === v.id);
+                return (
               <Card
                 key={v.id}
                 variant="elevated"
@@ -380,17 +446,36 @@ export function AdminVehiclesTab({
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-slate-400">ID: {v.id}</span>
+                      {v.isArchived && (
+                        <span className="ml-1.5 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                          ARCHIVED
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteVehicle(index)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remove Vehicle Type"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleArchive(index)}
+                      className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition-colors ${
+                        v.isArchived
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                      }`}
+                      title={v.isArchived ? 'Restore Vehicle Type' : 'Archive Vehicle Type'}
+                    >
+                      {v.isArchived ? 'Restore' : 'Archive'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteVehicle(index)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove Vehicle Type"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 </CardHeader>
 
                 <CardContent className="p-4 space-y-4 flex-1">
@@ -460,7 +545,8 @@ export function AdminVehiclesTab({
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
 
           {/* Floating Save Actions Bar */}

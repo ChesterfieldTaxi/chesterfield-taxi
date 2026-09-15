@@ -111,15 +111,17 @@ export function VehicleTierSelector({
     const unsub = getAdminConfigService().subscribeToSettings((settings) => {
       if (settings.vehicles && settings.vehicles.length > 0) {
         setTiers(
-          settings.vehicles.map((v) => ({
-            value: v.id as VehicleTier,
-            label: v.name,
-            description: v.description || `${v.name} tier`,
-            badge: v.badge,
-            maxPassengers: v.maxPassengers,
-            maxLuggage: v.maxLuggage,
-            iconType: (v.iconType as any) || (v.id as any) || 'standard',
-          }))
+          settings.vehicles
+            .filter((v) => !v.isArchived)
+            .map((v) => ({
+              value: v.id as VehicleTier,
+              label: v.name,
+              description: v.description || `${v.name} tier`,
+              badge: v.badge,
+              maxPassengers: v.maxPassengers,
+              maxLuggage: v.maxLuggage,
+              iconType: (v.iconType as any) || (v.id as any) || 'standard',
+            }))
         );
       }
     });

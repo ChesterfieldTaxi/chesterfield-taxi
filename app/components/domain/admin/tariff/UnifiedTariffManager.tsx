@@ -60,6 +60,25 @@ export function UnifiedTariffManager({
   });
 
   // Tariff Groups state
+  const [tariffArchiveFilter, setTariffArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+
+  const handleToggleArchiveTariff = (tariffId: string) => {
+    setTariffs((prev) =>
+      prev.map((t) => {
+        if (t.id === tariffId) {
+          const isArchiving = !t.isArchived;
+          return {
+            ...t,
+            isArchived: isArchiving,
+            archivedAt: isArchiving ? new Date().toISOString() : undefined,
+            archiveReason: isArchiving ? 'Archived by administrator' : undefined,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
   const [tariffGroups, setTariffGroups] = useState<TariffGroup[]>(() => {
     return settings.tariffGroups && settings.tariffGroups.length > 0
       ? settings.tariffGroups
@@ -581,9 +600,57 @@ export function UnifiedTariffManager({
         </Alert>
       )}
 
+      {/* ─── TARIFF ARCHIVE FILTER PILLS ─── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap pb-1">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setTariffArchiveFilter('active')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              tariffArchiveFilter === 'active'
+                ? 'bg-white text-blue-600 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Active Tariffs ({tariffs.filter((t) => !t.isArchived).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTariffArchiveFilter('archived')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              tariffArchiveFilter === 'archived'
+                ? 'bg-amber-100 text-amber-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Archived ({tariffs.filter((t) => !!t.isArchived).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTariffArchiveFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              tariffArchiveFilter === 'all'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All ({tariffs.length})
+          </button>
+        </div>
+        <div className="text-xs text-slate-500 font-medium">
+          Archived tariffs are preserved for trip audit history and bypassed during rate calculations.
+        </div>
+      </div>
+
       {/* ─── PROFILE TABS ROW (Clean pills without accidental delete button) ─── */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200">
-        {tariffs.map((tariff) => {
+        {tariffs
+          .filter((t) => {
+            if (tariffArchiveFilter === 'active') return !t.isArchived;
+            if (tariffArchiveFilter === 'archived') return !!t.isArchived;
+            return true;
+          })
+          .map((tariff) => {
           const isSelected = tariff.id === selectedTariffId;
           const groupName = tariffGroups.find((g) => g.id === tariff.groupId)?.name;
           return (
@@ -598,6 +665,11 @@ export function UnifiedTariffManager({
               }`}
             >
               <span>{tariff.name}</span>
+              {tariff.isArchived && (
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                  ARCHIVED
+                </span>
+              )}
               {groupName && (
                 <span className="text-[9px] bg-slate-200/80 text-slate-700 px-1 py-0.2 rounded">
                   {groupName}
@@ -1652,17 +1724,32 @@ export function UnifiedTariffManager({
                 Permanently delete "{activeProfile.name}" from your active pricing calculation and database.
               </div>
             </div>
-            <Button
-              type="button"
-              variant="danger"
-              size="lg"
-              disabled={tariffs.length <= 1}
-              onClick={() => handleDeleteTariff(activeProfile.id)}
-              leftIcon={<TrashIcon className="w-4 h-4" />}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-6 py-3 shadow-sm shrink-0"
-            >
-              Delete This Tariff Profile
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => handleToggleArchiveTariff(activeProfile.id)}
+                className={`font-bold text-xs px-5 py-3 shadow-2xs ${
+                  activeProfile.isArchived
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                    : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                {activeProfile.isArchived ? 'Restore Tariff' : 'Archive Tariff'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="lg"
+                disabled={tariffs.length <= 1}
+                onClick={() => handleDeleteTariff(activeProfile.id)}
+                leftIcon={<TrashIcon className="w-4 h-4" />}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-6 py-3 shadow-sm shrink-0"
+              >
+                Delete This Tariff Profile
+              </Button>
+            </div>
           </div>
         </div>
 

@@ -30,6 +30,9 @@ export interface AdminUser {
   phone?: string;
   status?: 'active' | 'inactive' | 'suspended';
   assignedVehicleUnit?: string;
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
 }
 
 const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
@@ -41,8 +44,15 @@ export class AdminAuthService {
     this.isConfigured = isFirebaseConfigured();
   }
 
-  private async fetchUserRoles(user: User): Promise<UserRole[]> {
-    if (!this.isConfigured) return ['customer'];
+  private async fetchUserProfileData(user: User): Promise<{
+    roles: UserRole[];
+    status?: 'active' | 'inactive' | 'suspended';
+    isArchived?: boolean;
+    isBlacklisted?: boolean;
+    blacklistReason?: string;
+    assignedVehicleUnit?: string;
+  }> {
+    if (!this.isConfigured) return { roles: ['customer'] };
 
     try {
       const db = getFirestore(getFirebaseApp());
@@ -85,20 +95,27 @@ export class AdminAuthService {
           } catch (e) {}
         }
 
-        return roles;
+        return {
+          roles,
+          status: data?.status,
+          isArchived: data?.isArchived,
+          isBlacklisted: data?.isBlacklisted,
+          blacklistReason: data?.blacklistReason,
+          assignedVehicleUnit: data?.assignedVehicleUnit || data?.assignedUnit,
+        };
       }
 
       // Auto-provision primary admin or dispatcher if using operational emails
       if (user.email === 'admin@chesterfieldtaxi.com') {
         const adminRoles: UserRole[] = ['admin'];
         await setDoc(userRef, { roles: adminRoles, role: 'admin', email: user.email }, { merge: true });
-        return adminRoles;
+        return { roles: adminRoles, status: 'active' };
       }
 
       if (user.email === 'dispatch@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('dispatch'))) {
         const dispatchRoles: UserRole[] = ['dispatcher'];
         await setDoc(userRef, { roles: dispatchRoles, role: 'dispatcher', email: user.email }, { merge: true });
-        return dispatchRoles;
+        return { roles: dispatchRoles, status: 'active' };
       }
 
       if (user.email === 'driver1@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('driver'))) {
@@ -121,15 +138,20 @@ export class AdminAuthService {
           console.warn('[AdminAuthService] Error provisioning driver profile:', e);
         }
         
-        return driverRoles;
+        return { roles: driverRoles, status: 'active' };
       }
 
       // Default to customer
-      return ['customer'];
+      return { roles: ['customer'] };
     } catch (err) {
       console.warn('[AdminAuthService] Error fetching user roles from Firestore:', err);
-      return ['customer'];
+      return { roles: ['customer'] };
     }
+  }
+
+  private async fetchUserRoles(user: User): Promise<UserRole[]> {
+    const profile = await this.fetchUserProfileData(user);
+    return profile.roles;
   }
 
 
@@ -173,6 +195,14 @@ export class AdminAuthService {
     return null;
   }
 
+  public clearCurrentUser(): void {
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+      } catch {}
+    }
+  }
+
   public onAuthStateChanged(callback: (user: AdminUser | null) => void): () => void {
     if (typeof window === 'undefined') {
       callback(null);
@@ -184,17 +214,35 @@ export class AdminAuthService {
         const auth = getFirebaseAuth();
         return firebaseOnAuthStateChanged(auth, async (user: User | null) => {
           if (user) {
-            const roles = await this.fetchUserRoles(user);
+            const profile = await this.fetchUserProfileData(user);
+            if (profile.isBlacklisted || profile.status === 'suspended') {
+              console.warn(`[AdminAuthService] Access revoked: user ${user.uid} is blacklisted or suspended.`);
+              try {
+                await firebaseSignOut(auth);
+              } catch (_) {}
+              callback(null);
+              return;
+            }
             callback({
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
-              role: roles[0] || 'customer',
-              roles,
+              role: profile.roles[0] || 'customer',
+              roles: profile.roles,
+              status: profile.status,
+              isArchived: profile.isArchived,
+              isBlacklisted: profile.isBlacklisted,
+              blacklistReason: profile.blacklistReason,
+              assignedVehicleUnit: profile.assignedVehicleUnit,
             });
           } else {
             // Check if demo user is in storage
             const demoUser = this.getCurrentUser();
+            if (demoUser?.isBlacklisted || demoUser?.status === 'suspended') {
+              this.clearCurrentUser();
+              callback(null);
+              return;
+            }
             callback(demoUser);
           }
         });
@@ -205,6 +253,11 @@ export class AdminAuthService {
 
     // Fallback: check session storage immediately
     const user = this.getCurrentUser();
+    if (user?.isBlacklisted || user?.status === 'suspended') {
+      this.clearCurrentUser();
+      callback(null);
+      return () => {};
+    }
     callback(user);
     return () => {};
   }
@@ -216,13 +269,28 @@ export class AdminAuthService {
       try {
         const auth = getFirebaseAuth();
         const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-        const roles = await this.fetchUserRoles(cred.user);
+        const profile = await this.fetchUserProfileData(cred.user);
+
+        if (profile.isBlacklisted || profile.status === 'suspended') {
+          await firebaseSignOut(auth);
+          throw new Error(
+            `Access Denied: Account is ${profile.status === 'suspended' ? 'suspended' : 'blacklisted'}${
+              profile.blacklistReason ? ' (' + profile.blacklistReason + ')' : ''
+            }`
+          );
+        }
+
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
-          role: roles[0] || 'customer',
-          roles,
+          role: profile.roles[0] || 'customer',
+          roles: profile.roles,
+          status: profile.status,
+          isArchived: profile.isArchived,
+          isBlacklisted: profile.isBlacklisted,
+          blacklistReason: profile.blacklistReason,
+          assignedVehicleUnit: profile.assignedVehicleUnit,
         };
       } catch (err: unknown) {
         console.warn('[AdminAuthService] Firebase Auth sign-in error:', err);
@@ -231,6 +299,10 @@ export class AdminAuthService {
     }
 
     // Local / Offline demo mode authentication
+    if (trimmedEmail.includes('blacklisted')) {
+      throw new Error('Access Denied: Account is blacklisted.');
+    }
+
     if (
       trimmedEmail === 'admin@chesterfieldtaxi.com' ||
       trimmedEmail.includes('admin') ||

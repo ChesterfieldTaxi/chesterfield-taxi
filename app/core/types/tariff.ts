@@ -81,6 +81,9 @@ export interface TariffProfile {
   fareIncrement?: number; // e.g. 0.10 or 2.50
   priority: number; // 1 to 100 (higher evaluated first)
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
   isDefault?: boolean;
   groupId?: string; // Group this tariff belongs to
   parentTariffId?: string; // Parent tariff to inherit from

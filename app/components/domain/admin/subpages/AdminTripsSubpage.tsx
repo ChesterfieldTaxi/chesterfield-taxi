@@ -14,9 +14,13 @@ import {
   AlertTriangleIcon,
   DownloadIcon,
   CarIcon,
+  CheckIcon,
 } from '../../../ui/Icons';
+import { TripAuditModal } from '../TripAuditModal';
+import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
+import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 
-export type TripsSubTab = 'dispatch' | 'history' | 'exceptions';
+export type TripsSubTab = 'dispatch' | 'history' | 'archive' | 'exceptions';
 
 interface AdminTripsSubpageProps {
   initialSubTab?: TripsSubTab;
@@ -30,8 +34,12 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [auditModalTrip, setAuditModalTrip] = useState<Trip | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
+  const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
+  const [archiveRefreshKey, setArchiveRefreshKey] = useState(0);
 
   // Sync initialSubTab when parent tab query changes
   useEffect(() => {
@@ -143,24 +151,62 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
     }
   };
 
+
+  const govService = getUniversalGovernanceService();
+  const isArchivedTrip = (t: Trip) => !!t.isArchived || govService.isTripArchived(t.id);
+
+  const handleToggleArchiveTrip = async (tripId: string, currentArchiveState: boolean) => {
+    try {
+      setActionLoadingId(tripId);
+      const gov = getUniversalGovernanceService();
+      await gov.setArchiveStatus('trip', tripId, !currentArchiveState);
+
+      setTrips((prev) =>
+        prev.map((t) => (t.id === tripId ? { ...t, isArchived: !currentArchiveState } : t))
+      );
+      if (selectedTrip?.id === tripId) {
+        setSelectedTrip((prev) => (prev ? { ...prev, isArchived: !currentArchiveState } : null));
+      }
+      setArchiveRefreshKey((k) => k + 1);
+      setActionSuccessMessage(
+        !currentArchiveState
+          ? `✓ Trip #${tripId.slice(-6)} moved to archive.`
+          : `✓ Trip #${tripId.slice(-6)} restored from archive.`
+      );
+      setTimeout(() => setActionSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setError(`Failed to update archive status: ${err.message || String(err)}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   // Filtered lists adhering to TripStatus
   const activeDispatchTrips = trips.filter(
     (t) =>
-      t.status === 'unconfirmed' ||
-      t.status === 'UNCONFIRMED' ||
-      t.status === 'pending' ||
-      t.status === 'confirmed' ||
-      t.status === 'CONFIRMED' ||
-      t.status === 'assigned' ||
-      t.status === 'offered'
+      !isArchivedTrip(t) &&
+      (t.status === 'unconfirmed' ||
+        t.status === 'UNCONFIRMED' ||
+        t.status === 'pending' ||
+        t.status === 'confirmed' ||
+        t.status === 'CONFIRMED' ||
+        t.status === 'assigned' ||
+        t.status === 'offered')
+  );
+
+  const archivedTrips = trips.filter((t) => isArchivedTrip(t));
+
+  const historyTrips = trips.filter((t) =>
+    includeArchivedInHistory ? true : !isArchivedTrip(t)
   );
 
   const exceptionTrips = trips.filter(
     (t) =>
-      t.status === 'cancelled' ||
-      t.status === 'declined' ||
-      t.status === 'DECLINED' ||
-      (t.driverNotes && t.driverNotes.toLowerCase().includes('no-show'))
+      !isArchivedTrip(t) &&
+      (t.status === 'cancelled' ||
+        t.status === 'declined' ||
+        t.status === 'DECLINED' ||
+        (t.driverNotes && t.driverNotes.toLowerCase().includes('no-show')))
   );
 
   const filterBySearch = (list: Trip[]) => {
@@ -182,11 +228,13 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
   const currentDisplayTrips =
     activeSub === 'dispatch'
       ? filterBySearch(activeDispatchTrips)
+      : activeSub === 'archive'
+      ? filterBySearch(archivedTrips)
       : activeSub === 'history'
       ? filterBySearch(
           statusFilter === 'all'
-            ? trips
-            : trips.filter((t) => t.status === statusFilter)
+            ? historyTrips
+            : historyTrips.filter((t) => t.status === statusFilter)
         )
       : filterBySearch(exceptionTrips);
 
@@ -241,6 +289,12 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
               <span>Trip Archive ({trips.length} records)</span>
             </>
           )}
+          {activeSub === 'archive' && (
+            <>
+              <ArchiveBoxIcon className="w-4 h-4 text-slate-700" />
+              <span>Archived Trips ({archivedTrips.length} soft-deleted trips)</span>
+            </>
+          )}
           {activeSub === 'exceptions' && (
             <>
               <AlertTriangleIcon className="w-4 h-4 text-rose-500" />
@@ -249,8 +303,18 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           )}
         </div>
 
-        {/* Global Export Tools */}
+        {/* Archive Drawer & Export Tools */}
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsArchiveDrawerOpen(true)}
+            className="text-xs font-bold inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300"
+          >
+            <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+            <span>Universal Archive Drawer</span>
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -439,6 +503,13 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                         >
                           {trip.status.replace('_', ' ')}
                         </Badge>
+                        {isArchivedTrip(trip) && (
+                          <span className="block mt-1">
+                            <Badge variant="neutral" size="sm" className="text-[9px] font-bold">
+                              ARCHIVED
+                            </Badge>
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3 align-top whitespace-nowrap">
@@ -485,6 +556,47 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                             </Button>
                           ) : null}
 
+                          {/* Archive / Restore Button */}
+                          {isArchivedTrip(trip) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoadingId === trip.id}
+                              onClick={() => handleToggleArchiveTrip(trip.id, true)}
+                              className="text-[11px] px-2 py-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-bold flex items-center gap-1"
+                              title="Restore Trip from Archive"
+                            >
+                              <CheckIcon className="w-3 h-3" /> Restore
+                            </Button>
+                          ) : (
+                            (trip.status === 'completed' ||
+                              trip.status === 'cancelled' ||
+                              trip.status === 'declined' ||
+                              trip.status === 'DECLINED' ||
+                              activeSub === 'history') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionLoadingId === trip.id}
+                                onClick={() => handleToggleArchiveTrip(trip.id, false)}
+                                className="text-[11px] px-2 py-1 text-slate-600 border-slate-200 hover:bg-slate-100 font-bold flex items-center gap-1"
+                                title="Soft-delete and move to Archive"
+                              >
+                                <ArchiveBoxIcon className="w-3 h-3" /> Archive
+                              </Button>
+                            )
+                          )}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAuditModalTrip(trip)}
+                            className="text-[11px] px-2 py-1 text-purple-700 border-purple-200 hover:bg-purple-50 font-bold flex items-center gap-1"
+                            title="Inspect Immutable Audit Trail"
+                          >
+                            <HistoryIcon className="w-3 h-3" /> Audit
+                          </Button>
+
                           <Button
                             size="sm"
                             variant="ghost"
@@ -528,14 +640,25 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 Full dispatch itinerary and audit overview
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setSelectedTrip(null)}
-              className="text-xs font-bold"
-            >
-              ✕ Close
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setAuditModalTrip(selectedTrip)}
+                className="text-xs font-bold text-purple-700 border-purple-300 hover:bg-purple-50 flex items-center gap-1.5"
+              >
+                <HistoryIcon className="w-3.5 h-3.5" />
+                <span>Inspect Audit Trail</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedTrip(null)}
+                className="text-xs font-bold"
+              >
+                ✕ Close
+              </Button>
+            </div>
           </CardHeader>
 
           <CardContent className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -627,6 +750,22 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Trip Audit Trail Inspector Modal */}
+      {auditModalTrip && (
+        <TripAuditModal
+          trip={auditModalTrip}
+          onClose={() => setAuditModalTrip(null)}
+        />
+      )}
+
+      {isArchiveDrawerOpen && (
+        <UniversalArchiveDrawer
+          isOpen={isArchiveDrawerOpen}
+          onClose={() => setIsArchiveDrawerOpen(false)}
+          onEntityRestored={() => setArchiveRefreshKey((k) => k + 1)}
+        />
       )}
     </div>
   );

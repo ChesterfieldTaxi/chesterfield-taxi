@@ -10,6 +10,9 @@ import { Badge } from '../../ui/Badge';
 import { Input } from '../../ui/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { SpinnerIcon, ShieldCheckIcon, UserIcon, TrashIcon, LockIcon, PlusIcon, PhoneIcon, CarIcon, RadioIcon, ShieldIcon } from '../../ui/Icons';
+import { getUniversalGovernanceService } from '../../../core/services/governance/universal-governance.service';
+import { UniversalArchiveDrawer, ArchiveBoxIcon } from './UniversalArchiveDrawer';
+import { CheckIcon } from '../../ui/Icons';
 
 export interface OperatorUser {
   uid: string;
@@ -23,6 +26,10 @@ export interface OperatorUser {
   status?: 'active' | 'suspended';
   createdAt?: string;
   lastLogin?: string;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
+  isArchived?: boolean;
+  driverScore?: number;
 }
 
 const DEFAULT_OPERATORS: OperatorUser[] = [
@@ -103,6 +110,8 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   // Filters
   const [roleFilter, setRoleFilter] = useState<'all' | 'driver' | 'dispatcher' | 'admin'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
 
   // Provisioning Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -395,6 +404,9 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   // Filtered operators
   const filteredOperators = useMemo(() => {
     return operators.filter((op) => {
+      const isArchived = !!(op as any).isArchived;
+      if (archiveFilter === 'active' && isArchived) return false;
+      if (archiveFilter === 'archived' && !isArchived) return false;
       const activeRoles = op.roles || [op.role];
       if (roleFilter !== 'all' && !activeRoles.includes(roleFilter as UserRole)) return false;
       if (searchQuery.trim()) {
@@ -407,7 +419,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       }
       return true;
     });
-  }, [operators, roleFilter, searchQuery]);
+  }, [operators, archiveFilter, roleFilter, searchQuery]);
 
   const roleCounts = useMemo(() => {
     return {
@@ -436,16 +448,29 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
           </span>
         </div>
 
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          onClick={() => setShowAddModal(true)}
-          leftIcon={<PlusIcon className="w-4 h-4" />}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
-        >
-          Provision Operator
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsArchiveDrawerOpen(true)}
+            className="text-xs font-bold inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300 h-9"
+          >
+            <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+            <span>Universal Archive Drawer</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => setShowAddModal(true)}
+            leftIcon={<PlusIcon className="w-4 h-4" />}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95 h-9"
+          >
+            Provision Operator
+          </Button>
+        </div>
       </div>
 
       {success && (
@@ -462,64 +487,104 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
       {/* ─── Filter Bar ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-        {/* Role Filter Pills */}
-        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setRoleFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              roleFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            All Staff ({roleCounts.all})
-          </button>
-          <button
-            type="button"
-            onClick={() => setRoleFilter('driver')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              roleFilter === 'driver'
-                ? 'bg-white text-emerald-800 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CarIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Drivers</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full">
-              {roleCounts.driver}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRoleFilter('dispatcher')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              roleFilter === 'dispatcher'
-                ? 'bg-white text-blue-800 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <RadioIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Dispatchers</span>
-            <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.2 rounded-full">
-              {roleCounts.dispatcher}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRoleFilter('admin')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-              roleFilter === 'admin'
-                ? 'bg-white text-purple-800 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ShieldIcon className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-            <span>Admins</span>
-            <span className="text-[10px] bg-purple-100 text-purple-800 font-extrabold px-1.5 py-0.2 rounded-full">
-              {roleCounts.admin}
-            </span>
-          </button>
+        {/* Archive Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setArchiveFilter('active')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                archiveFilter === 'active'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Active ({operators.filter((o) => !(o as any).isArchived).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setArchiveFilter('archived')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                archiveFilter === 'archived'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+              <span>Archived ({operators.filter((o) => !!(o as any).isArchived).length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setArchiveFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                archiveFilter === 'all'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All ({operators.length})
+            </button>
+          </div>
+
+          {/* Role Filter Pills */}
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setRoleFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === 'all'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Staff ({roleCounts.all})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('driver')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                roleFilter === 'driver'
+                  ? 'bg-white text-emerald-800 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CarIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Drivers</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                {roleCounts.driver}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('dispatcher')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                roleFilter === 'dispatcher'
+                  ? 'bg-white text-blue-800 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <RadioIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span>Dispatchers</span>
+              <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                {roleCounts.dispatcher}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('admin')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                roleFilter === 'admin'
+                  ? 'bg-white text-purple-800 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ShieldIcon className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <span>Admins</span>
+              <span className="text-[10px] bg-purple-100 text-purple-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                {roleCounts.admin}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Search Input */}
@@ -706,6 +771,74 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                       </button>
 
                       {op.email !== 'admin@chesterfieldtaxi.com' && (
+                        <>
+{/* Archive / Restore Toggle */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const isCurrentlyArchived = !!(op as any).isArchived;
+                            const entityType = (op.roles || [op.role]).includes('driver') ? 'driver' : 'staff';
+                            const gov = getUniversalGovernanceService();
+                            await gov.setArchiveStatus(entityType, op.uid, !isCurrentlyArchived);
+                            setOperators((prev) =>
+                              prev.map((item) =>
+                                item.uid === op.uid
+                                  ? { ...item, isArchived: !isCurrentlyArchived }
+                                  : item
+                              )
+                            );
+                          }}
+                          className={`text-[11px] font-semibold underline transition-colors ${
+                            (op as any).isArchived
+                              ? 'text-emerald-600 hover:text-emerald-700'
+                              : 'text-slate-600 hover:text-slate-800'
+                          }`}
+                          title="Toggle Archive Status"
+                        >
+                          {(op as any).isArchived ? 'Restore' : 'Archive'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const isCurrentlyBl = !!(op as any).isBlacklisted;
+                            const entityType = (op.roles || [op.role]).includes('driver') ? 'driver' : 'staff';
+                            const gov = getUniversalGovernanceService();
+                            if (!isCurrentlyBl) {
+                              const reason = window.prompt(`Enter blacklist sanction reason for ${op.displayName || op.email}:`);
+                              if (reason === null) return;
+                              await gov.setBlacklistStatus(entityType, op.uid, true, reason || 'Administrative sanction');
+                              setOperators((prev) =>
+                                prev.map((item) =>
+                                  item.uid === op.uid
+                                    ? { ...item, isBlacklisted: true, blacklistReason: reason || 'Administrative sanction', status: 'suspended' }
+                                    : item
+                                )
+                              );
+                            } else {
+                              await gov.setBlacklistStatus(entityType, op.uid, false);
+                              setOperators((prev) =>
+                                prev.map((item) =>
+                                  item.uid === op.uid
+                                    ? { ...item, isBlacklisted: false, blacklistReason: undefined }
+                                    : item
+                                )
+                              );
+                            }
+                          }}
+                          className={`text-[11px] font-semibold underline transition-colors ${
+                            (op as any).isBlacklisted
+                              ? 'text-emerald-600 hover:text-emerald-700'
+                              : 'text-rose-600 hover:text-rose-700'
+                          }`}
+                          title="Toggle Blacklist Sanction"
+                        >
+                          {(op as any).isBlacklisted ? 'Unblacklist' : 'Blacklist'}
+                        </button>
+                        </>
+                      )}
+
+                      {op.email !== 'admin@chesterfieldtaxi.com' && (
                         <button
                           type="button"
                           onClick={() => handleDeleteOperator(op.uid, op.email)}
@@ -723,6 +856,14 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Universal Archive Drawer ─── */}
+      {isArchiveDrawerOpen && (
+        <UniversalArchiveDrawer
+          isOpen={isArchiveDrawerOpen}
+          onClose={() => setIsArchiveDrawerOpen(false)}
+        />
+      )}
 
       {/* ─── Provision Operator Modal ─── */}
       {showAddModal && (

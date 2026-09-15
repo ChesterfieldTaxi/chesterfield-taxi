@@ -14,3 +14,4 @@ export * from './AdminLayoutTab';
 export * from './subpages/AdminTripsSubpage';
 export * from './subpages/AdminInvoicingSubpage';
 export * from './subpages/AdminCustomersSubpage';
+export * from './AdminArchiveTab';

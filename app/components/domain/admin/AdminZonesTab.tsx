@@ -6,6 +6,7 @@ import type {
   LocationPoint,
   LocationCategory,
   ZoneCoordinate,
+  BlacklistedLocation,
 } from '../../../core/types/zone';
 import {
   getZoneService,
@@ -18,9 +19,9 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
-import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon } from '../../ui/Icons';
+import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon, AlertTriangleIcon } from '../../ui/Icons';
 
-type AdminZonesSubTab = 'zones' | 'groups' | 'collections';
+type AdminZonesSubTab = 'zones' | 'groups' | 'collections' | 'blacklists';
 
 export interface AdminZonesTabProps {
   initialSubTab?: AdminZonesSubTab;
@@ -35,6 +36,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
       setIsEditingZone(false);
       setIsEditingGroup(false);
       setIsEditingCollection(false);
+      setIsEditingBlacklist(false);
     }
   }, [initialSubTab]);
 
@@ -98,6 +100,20 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
     notes: '',
   });
 
+  // Blacklisted Locations State
+  const [blacklistedLocations, setBlacklistedLocations] = useState<BlacklistedLocation[]>([]);
+  const [selectedBlacklistId, setSelectedBlacklistId] = useState<string | null>(null);
+  const [isEditingBlacklist, setIsEditingBlacklist] = useState(false);
+  const [blacklistFormData, setBlacklistFormData] = useState<BlacklistedLocation>({
+    id: '',
+    name: '',
+    reasonCode: '',
+    action: 'BLACKLIST_BLOCK',
+    coordinates: { lat: 38.6631, lng: -90.5771 },
+    radiusMiles: 0.1,
+    isActive: true,
+  });
+
   // Shared UI & Loading State
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,37 +160,68 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
       (err) => console.warn('[AdminZonesTab] LocationCollections error:', err)
     );
 
+    const unsubBlacklists = service.subscribeToBlacklistedLocations(
+      (updatedBlacklists) => {
+        setBlacklistedLocations(updatedBlacklists);
+        if (updatedBlacklists.length > 0 && !selectedBlacklistId) {
+          setSelectedBlacklistId(updatedBlacklists[0].id);
+        }
+      },
+      (err) => console.warn('[AdminZonesTab] Blacklists error:', err)
+    );
+
     return () => {
       unsubZones();
       unsubGroups();
       unsubColls();
+      unsubBlacklists();
     };
   }, []);
 
+  // Archive Filter State
+  const [zoneArchiveFilter, setZoneArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+
   // Filtered lists
   const filteredZones = useMemo(() => {
-    if (!searchQuery.trim()) return zones;
+    let list = zones;
+    if (zoneArchiveFilter === 'active') list = list.filter((z) => !z.isArchived);
+    else if (zoneArchiveFilter === 'archived') list = list.filter((z) => !!z.isArchived);
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return zones.filter(
+    return list.filter(
       (z) => z.name.toLowerCase().includes(q) || (z.description && z.description.toLowerCase().includes(q))
     );
-  }, [zones, searchQuery]);
+  }, [zones, searchQuery, zoneArchiveFilter]);
 
   const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim()) return zoneGroups;
+    let list = zoneGroups;
+    if (zoneArchiveFilter === 'active') list = list.filter((g) => !g.isArchived);
+    else if (zoneArchiveFilter === 'archived') list = list.filter((g) => !!g.isArchived);
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return zoneGroups.filter(
+    return list.filter(
       (g) => g.name.toLowerCase().includes(q) || (g.description && g.description.toLowerCase().includes(q))
     );
-  }, [zoneGroups, searchQuery]);
+  }, [zoneGroups, searchQuery, zoneArchiveFilter]);
 
   const filteredCollections = useMemo(() => {
-    if (!searchQuery.trim()) return locationCollections;
+    let list = locationCollections;
+    if (zoneArchiveFilter === 'active') list = list.filter((c) => !c.isArchived);
+    else if (zoneArchiveFilter === 'archived') list = list.filter((c) => !!c.isArchived);
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return locationCollections.filter(
+    return list.filter(
       (c) => c.name.toLowerCase().includes(q) || (c.description && c.description.toLowerCase().includes(q))
     );
-  }, [locationCollections, searchQuery]);
+  }, [locationCollections, searchQuery, zoneArchiveFilter]);
+
+  const filteredBlacklists = useMemo(() => {
+    if (!searchQuery.trim()) return blacklistedLocations;
+    const q = searchQuery.toLowerCase();
+    return blacklistedLocations.filter(
+      (c) => c.name.toLowerCase().includes(q) || (c.reasonCode && c.reasonCode.toLowerCase().includes(q))
+    );
+  }, [blacklistedLocations, searchQuery]);
 
   // Selected entities
   const selectedZone = useMemo(() => {
@@ -188,6 +235,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
   const selectedCollection = useMemo(() => {
     return locationCollections.find((c) => c.id === selectedCollectionId) || locationCollections[0] || null;
   }, [locationCollections, selectedCollectionId]);
+
+  const selectedBlacklist = useMemo(() => {
+    return blacklistedLocations.find((c) => c.id === selectedBlacklistId) || blacklistedLocations[0] || null;
+  }, [blacklistedLocations, selectedBlacklistId]);
 
   // Map coordinate normalization
   // Chesterfield: ~38.66, -90.58; STL Metro span: lat 38.50 - 38.80, lng -90.70 - -90.15
@@ -260,6 +311,42 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
       ...zone,
       isActive: !zone.isActive,
     });
+  };
+
+  const handleToggleArchiveZone = async (zone: ZoneGeofence) => {
+    const service = getZoneService();
+    if (zone.isArchived) {
+      await service.restoreZone(zone.id);
+      setSaveSuccess(`Zone "${zone.name}" restored from archive.`);
+    } else {
+      await service.archiveZone(zone.id);
+      setSaveSuccess(`Zone "${zone.name}" archived.`);
+    }
+    setTimeout(() => setSaveSuccess(null), 3500);
+  };
+
+  const handleToggleArchiveGroup = async (group: ZoneGroup) => {
+    const service = getZoneService();
+    if (group.isArchived) {
+      await service.restoreZoneGroup(group.id);
+      setSaveSuccess(`Zone Group "${group.name}" restored from archive.`);
+    } else {
+      await service.archiveZoneGroup(group.id);
+      setSaveSuccess(`Zone Group "${group.name}" archived.`);
+    }
+    setTimeout(() => setSaveSuccess(null), 3500);
+  };
+
+  const handleToggleArchiveCollection = async (coll: LocationCollection) => {
+    const service = getZoneService();
+    if (coll.isArchived) {
+      await service.restoreLocationCollection(coll.id);
+      setSaveSuccess(`Location Collection "${coll.name}" restored from archive.`);
+    } else {
+      await service.archiveLocationCollection(coll.id);
+      setSaveSuccess(`Location Collection "${coll.name}" archived.`);
+    }
+    setTimeout(() => setSaveSuccess(null), 3500);
   };
 
   const handleResetZones = async () => {
@@ -434,6 +521,61 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Blacklisted Locations Handlers
+  // --------------------------------------------------------------------------
+  const handleStartCreateBlacklist = () => {
+    setBlacklistFormData({
+      id: '',
+      name: '',
+      reasonCode: '',
+      action: 'BLACKLIST_BLOCK',
+      coordinates: { lat: 38.6631, lng: -90.5771 },
+      radiusMiles: 0.1,
+      isActive: true,
+    });
+    setIsEditingBlacklist(true);
+  };
+
+  const handleStartEditBlacklist = (loc: BlacklistedLocation) => {
+    setBlacklistFormData({ ...loc });
+    setSelectedBlacklistId(loc.id);
+    setIsEditingBlacklist(true);
+  };
+
+  const handleSaveBlacklist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blacklistFormData.name.trim()) return;
+
+    try {
+      setSaveError(null);
+      const service = getZoneService();
+      const saved = await service.saveBlacklistedLocation(blacklistFormData);
+      setIsEditingBlacklist(false);
+      setSelectedBlacklistId(saved.id);
+      setSaveSuccess(`Blacklisted Location "${saved.name}" saved.`);
+      setTimeout(() => setSaveSuccess(null), 3500);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save blacklisted location.');
+    }
+  };
+
+  const handleDeleteBlacklist = async (locId: string) => {
+    if (confirm('Are you sure you want to delete this blacklisted location?')) {
+      const service = getZoneService();
+      await service.deleteBlacklistedLocation(locId);
+      if (selectedBlacklistId === locId) setSelectedBlacklistId(null);
+    }
+  };
+
+  const handleToggleBlacklistActive = async (loc: BlacklistedLocation) => {
+    const service = getZoneService();
+    await service.saveBlacklistedLocation({
+      ...loc,
+      isActive: !loc.isActive,
+    });
+  };
+
   // Helper for category badge icons
   const getCategoryIcon = (cat?: LocationCategory | string) => {
     switch (cat) {
@@ -473,6 +615,12 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
             <>
               <CompassIcon className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>POI Location Collections ({locationCollections.length} collections)</span>
+            </>
+          )}
+          {activeSubTab === 'blacklists' && (
+            <>
+              <AlertTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
+              <span>Exclusion Zones &amp; Blacklists ({blacklistedLocations.length} active)</span>
             </>
           )}
         </div>
@@ -550,6 +698,21 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
               </Button>
             </>
           )}
+
+          {activeSubTab === 'blacklists' && (
+            <>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleStartCreateBlacklist}
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+              >
+                Create Exclusion Zone
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -576,6 +739,43 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 {activeSubTab === 'groups' && 'Zone Groups Directory'}
                 {activeSubTab === 'collections' && 'Location Collections Directory'}
               </span>
+            </div>
+
+            {/* Archive State Filter Pills */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl mb-3">
+              <button
+                type="button"
+                onClick={() => setZoneArchiveFilter('active')}
+                className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
+                  zoneArchiveFilter === 'active'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoneArchiveFilter('archived')}
+                className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
+                  zoneArchiveFilter === 'archived'
+                    ? 'bg-amber-100 text-amber-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Archived
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoneArchiveFilter('all')}
+                className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
+                  zoneArchiveFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All
+              </button>
             </div>
 
             <Input
@@ -673,6 +873,26 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                               </div>
 
                               <div className="flex items-center gap-1">
+                                {z.isArchived && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                    ARCHIVED
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleArchiveZone(z);
+                                  }}
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
+                                    z.isArchived
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  }`}
+                                  title={z.isArchived ? 'Restore Zone' : 'Archive Zone'}
+                                >
+                                  {z.isArchived ? 'Restore' : 'Archive'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -801,6 +1021,26 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                               </div>
 
                               <div className="flex items-center gap-1">
+                                {g.isArchived && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                    ARCHIVED
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleArchiveGroup(g);
+                                  }}
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
+                                    g.isArchived
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  }`}
+                                  title={g.isArchived ? 'Restore Zone Group' : 'Archive Zone Group'}
+                                >
+                                  {g.isArchived ? 'Restore' : 'Archive'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -931,6 +1171,26 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                               </div>
 
                               <div className="flex items-center gap-1">
+                                {c.isArchived && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                    ARCHIVED
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleArchiveCollection(c);
+                                  }}
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
+                                    c.isArchived
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  }`}
+                                  title={c.isArchived ? 'Restore Collection' : 'Archive Collection'}
+                                >
+                                  {c.isArchived ? 'Restore' : 'Archive'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1505,6 +1765,211 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
               </CardContent>
             </Card>
           )}
+
+          {/* --- SubTab 4: Blacklisted Locations Directory --- */}
+          {activeSubTab === 'blacklists' && (
+            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              {filteredBlacklists.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No blacklisted locations found. Click "Create Exclusion Zone" to add one.
+                </div>
+              ) : (
+                filteredBlacklists.map((c) => {
+                  const isSelected = selectedBlacklistId === c.id;
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedBlacklistId(c.id)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
+                        isSelected
+                          ? 'border-red-500 bg-red-50/40 shadow-xs'
+                          : 'border-slate-200/90 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs bg-red-600 flex items-center justify-center text-white">
+                            <AlertTriangleIcon className="w-2.5 h-2.5" />
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                            {c.name}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge
+                            variant="error"
+                            size="sm"
+                            className="text-[9px] uppercase font-bold"
+                          >
+                            {c.action === 'BLACKLIST_BLOCK' ? 'Block' : 'Review'}
+                          </Badge>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleBlacklistActive(c);
+                            }}
+                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                              c.isActive
+                                ? 'bg-red-500 text-white'
+                                : 'bg-slate-200 text-slate-500'
+                            }`}
+                            title={c.isActive ? 'Active' : 'Disabled'}
+                          >
+                            ✓
+                          </button>
+                        </div>
+                      </div>
+                      {c.reasonCode && (
+                        <p className="text-[11px] text-slate-500 line-clamp-1">
+                          {c.reasonCode}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEditBlacklist(c);
+                            }}
+                            className="px-2 py-0.5 rounded hover:bg-slate-100 text-blue-600 font-semibold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteBlacklist(c.id);
+                            }}
+                            className="p-1 rounded hover:bg-red-50 text-red-500"
+                            title="Delete"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Blacklist Form Drawer */}
+          {activeSubTab === 'blacklists' && isEditingBlacklist && (
+            <Card variant="elevated" className="border-red-200 bg-white shadow-md animate-in slide-in-from-bottom-4">
+              <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
+                <CardTitle className="text-sm font-bold text-slate-800">
+                  {blacklistFormData.id ? 'Edit Exclusion Zone' : 'Create Exclusion Zone'}
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Define a blacklisted address or radius that blocks or flags trips.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <form onSubmit={handleSaveBlacklist} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase">Name</label>
+                    <Input
+                      required
+                      value={blacklistFormData.name}
+                      onChange={(e) => setBlacklistFormData({ ...blacklistFormData, name: e.target.value })}
+                      placeholder="e.g. Abandoned Warehouse"
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase">Reason / Context</label>
+                    <Input
+                      required
+                      value={blacklistFormData.reasonCode}
+                      onChange={(e) => setBlacklistFormData({ ...blacklistFormData, reasonCode: e.target.value })}
+                      placeholder="e.g. Safety Hazard, Out of bounds"
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase">Enforcement Action</label>
+                    <select
+                      value={blacklistFormData.action}
+                      onChange={(e) => setBlacklistFormData({ ...blacklistFormData, action: e.target.value as 'BLACKLIST_BLOCK' | 'REQUIRE_REVIEW' })}
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 h-9 text-xs focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="BLACKLIST_BLOCK">Strict Block (Reject Bookings)</option>
+                      <option value="REQUIRE_REVIEW">Flag for Review (Mode B)</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">Lat</label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        required
+                        value={blacklistFormData.coordinates.lat}
+                        onChange={(e) =>
+                          setBlacklistFormData({
+                            ...blacklistFormData,
+                            coordinates: { ...blacklistFormData.coordinates, lat: parseFloat(e.target.value) },
+                          })
+                        }
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase">Lng</label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        required
+                        value={blacklistFormData.coordinates.lng}
+                        onChange={(e) =>
+                          setBlacklistFormData({
+                            ...blacklistFormData,
+                            coordinates: { ...blacklistFormData.coordinates, lng: parseFloat(e.target.value) },
+                          })
+                        }
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase">Radius (Miles)</label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={blacklistFormData.radiusMiles}
+                      onChange={(e) => setBlacklistFormData({ ...blacklistFormData, radiusMiles: parseFloat(e.target.value) })}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingBlacklist(false)}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700 font-bold"
+                    >
+                      Save Exclusion Zone
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column (7 cols): Interactive Regional Canvas */}
@@ -1776,6 +2241,50 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                         );
                       });
                     })}
+
+                  {/* Render Blacklisted Locations */}
+                  {activeSubTab === 'blacklists' &&
+                    blacklistedLocations.map((loc) => {
+                      if (!loc.coordinates) return null;
+                      const pt = projectToMap(loc.coordinates);
+                      const isSelected = selectedBlacklistId === loc.id;
+                      const radiusPx = Math.max(12, (loc.radiusMiles || 0.1) * 22);
+                      const strokeColor = loc.action === 'BLACKLIST_BLOCK' ? '#ef4444' : '#f59e0b';
+                      const fillOpacity = isSelected ? 0.4 : 0.2;
+
+                      return (
+                        <g
+                          key={loc.id}
+                          onClick={() => setSelectedBlacklistId(loc.id)}
+                          className="cursor-pointer group"
+                        >
+                          <circle
+                            cx={`${pt.x}%`}
+                            cy={`${pt.y}%`}
+                            r={radiusPx}
+                            fill={strokeColor}
+                            fillOpacity={fillOpacity}
+                            stroke={strokeColor}
+                            strokeWidth={isSelected ? 3 : 1.5}
+                            strokeDasharray={loc.isActive ? undefined : '4 4'}
+                            className="transition-all duration-300 group-hover:fill-opacity-50"
+                          />
+                          <circle cx={`${pt.x}%`} cy={`${pt.y}%`} r={4} fill={strokeColor} stroke="#ffffff" strokeWidth={1.5} />
+                          <text
+                            x={`${pt.x}%`}
+                            y={`${pt.y}%`}
+                            dy={radiusPx + 11}
+                            textAnchor="middle"
+                            fill="#ffffff"
+                            fontSize="9"
+                            fontWeight="bold"
+                            className="select-none"
+                          >
+                            {loc.name}
+                          </text>
+                        </g>
+                      );
+                    })}
                 </svg>
               </div>
 
@@ -1786,11 +2295,13 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                     {activeSubTab === 'zones' && 'Active Zone:'}
                     {activeSubTab === 'groups' && 'Active Zone Group:'}
                     {activeSubTab === 'collections' && 'Active POI / Collection:'}
+                    {activeSubTab === 'blacklists' && 'Active Exclusion Zone:'}
                   </span>
                   <span className="text-blue-400 font-semibold">
                     {activeSubTab === 'zones' && (selectedZone?.name || 'None')}
                     {activeSubTab === 'groups' && (selectedGroup?.name || 'None')}
                     {activeSubTab === 'collections' && (selectedCollection?.name || 'None')}
+                    {activeSubTab === 'blacklists' && (selectedBlacklist?.name || 'None')}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1798,6 +2309,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                     {activeSubTab === 'zones' && 'Click a zone to view perimeter'}
                     {activeSubTab === 'groups' && `${selectedGroup?.zoneIds.length || 0} zones in cluster`}
                     {activeSubTab === 'collections' && `${selectedCollection?.locations?.length || 0} POIs in collection`}
+                    {activeSubTab === 'blacklists' && 'Click an exclusion zone to view radius'}
                   </span>
                 </div>
               </div>

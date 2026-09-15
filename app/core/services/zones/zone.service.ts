@@ -22,6 +22,7 @@ import type {
   LocationCollection,
   LocationPoint,
   ZoneCoordinate,
+  BlacklistedLocation,
 } from '../../types/zone';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
@@ -29,6 +30,7 @@ import { sanitizePayload } from '../firestore-sanitizer';
 const ZONES_STORAGE_KEY = 'chesterfield_taxi_geofence_zones';
 const ZONE_GROUPS_STORAGE_KEY = 'chesterfield_taxi_zone_groups';
 const LOCATION_COLLECTIONS_STORAGE_KEY = 'chesterfield_taxi_location_collections';
+const BLACKLISTED_LOCATIONS_STORAGE_KEY = 'chesterfield_taxi_blacklisted_locations';
 
 export const DEFAULT_ZONES: ZoneGeofence[] = [
   {
@@ -535,6 +537,10 @@ export class ZoneService {
     return () => {};
   }
 
+  public getActiveZones(): ZoneGeofence[] {
+    return this.getCachedZones().filter((z) => z.isActive && !z.isArchived);
+  }
+
   public async saveZone(zone: ZoneGeofence): Promise<ZoneGeofence> {
     const zoneId =
       zone.id ||
@@ -850,6 +856,222 @@ export class ZoneService {
     }
     return DEFAULT_LOCATION_COLLECTIONS;
   }
+
+  // ==========================================================================
+  // Blacklisted Locations API (/blacklistedLocations)
+  // ==========================================================================
+
+  private getCachedBlacklistedLocations(): BlacklistedLocation[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(BLACKLISTED_LOCATIONS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return [];
+  }
+
+  private setCachedBlacklistedLocations(locs: BlacklistedLocation[]): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(BLACKLISTED_LOCATIONS_STORAGE_KEY, JSON.stringify(locs));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  public async getBlacklistedLocations(): Promise<BlacklistedLocation[]> {
+    if (this.isConfigured && this.db) {
+      try {
+        const locsRef = collection(this.db, 'blacklistedLocations');
+        const snapshot = await getDocs(locsRef);
+        if (!snapshot.empty) {
+          const locs: BlacklistedLocation[] = [];
+          snapshot.forEach((docSnap) => {
+            locs.push({ id: docSnap.id, ...(docSnap.data() as Omit<BlacklistedLocation, 'id'>) });
+          });
+          this.setCachedBlacklistedLocations(locs);
+          return locs;
+        }
+      } catch (err) {
+        console.warn('[ZoneService] Firestore getBlacklistedLocations error, using cache:', err);
+      }
+    }
+    return this.getCachedBlacklistedLocations();
+  }
+
+  public subscribeToBlacklistedLocations(
+    onUpdate: (locs: BlacklistedLocation[]) => void,
+    onError?: (err: Error) => void
+  ): () => void {
+    if (this.isConfigured && this.db) {
+      try {
+        const locsRef = collection(this.db, 'blacklistedLocations');
+        const q = query(locsRef);
+        return onSnapshot(
+          q,
+          (snapshot) => {
+            const locs: BlacklistedLocation[] = [];
+            snapshot.forEach((docSnap) => {
+              locs.push({ id: docSnap.id, ...(docSnap.data() as Omit<BlacklistedLocation, 'id'>) });
+            });
+            this.setCachedBlacklistedLocations(locs);
+            onUpdate(locs);
+          },
+          (err) => {
+            console.warn('[ZoneService] onSnapshot blacklistedLocations error:', err);
+            onUpdate(this.getCachedBlacklistedLocations());
+            if (onError) onError(err);
+          }
+        );
+      } catch (err) {
+        console.warn('[ZoneService] subscribeToBlacklistedLocations fallback:', err);
+      }
+    }
+
+    onUpdate(this.getCachedBlacklistedLocations());
+    return () => {};
+  }
+
+  public async saveBlacklistedLocation(
+    loc: BlacklistedLocation
+  ): Promise<BlacklistedLocation> {
+    const locId =
+      loc.id ||
+      `bl-${loc.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || Date.now().toString(36)}`;
+    const sanitizedLoc: BlacklistedLocation = {
+      ...loc,
+      id: locId,
+      updatedAt: new Date().toISOString(),
+      createdAt: loc.createdAt || new Date().toISOString(),
+    };
+
+    if (this.isConfigured && this.db) {
+      try {
+        const locRef = doc(this.db, 'blacklistedLocations', locId);
+        const payload = sanitizePayload(sanitizedLoc);
+        await setDoc(locRef, payload, { merge: true });
+      } catch (err) {
+        console.warn('[ZoneService] Firestore saveBlacklistedLocation error, saving to cache:', err);
+      }
+    }
+
+    const current = this.getCachedBlacklistedLocations();
+    const existingIndex = current.findIndex((c) => c.id === locId);
+    let updated: BlacklistedLocation[];
+    if (existingIndex >= 0) {
+      updated = [...current];
+      updated[existingIndex] = sanitizedLoc;
+    } else {
+      updated = [sanitizedLoc, ...current];
+    }
+    this.setCachedBlacklistedLocations(updated);
+    return sanitizedLoc;
+  }
+
+  public async deleteBlacklistedLocation(locId: string): Promise<void> {
+    if (this.isConfigured && this.db) {
+      try {
+        const locRef = doc(this.db, 'blacklistedLocations', locId);
+        await deleteDoc(locRef);
+      } catch (err) {
+        console.warn('[ZoneService] Firestore deleteBlacklistedLocation error:', err);
+      }
+    }
+
+    const current = this.getCachedBlacklistedLocations();
+    const updated = current.filter((c) => c.id !== locId);
+    this.setCachedBlacklistedLocations(updated);
+  }
+
+  public async archiveZone(zoneId: string, reason?: string): Promise<void> {
+    const current = this.getCachedZones();
+    const zone = current.find((z) => z.id === zoneId);
+    if (!zone) return;
+    const updatedZone: ZoneGeofence = {
+      ...zone,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      archiveReason: reason || 'Archived by administrator',
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveZone(updatedZone);
+  }
+
+  public async restoreZone(zoneId: string): Promise<void> {
+    const current = this.getCachedZones();
+    const zone = current.find((z) => z.id === zoneId);
+    if (!zone) return;
+    const updatedZone: ZoneGeofence = {
+      ...zone,
+      isArchived: false,
+      archivedAt: undefined,
+      archiveReason: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveZone(updatedZone);
+  }
+
+  public async archiveZoneGroup(groupId: string, reason?: string): Promise<void> {
+    const current = this.getCachedZoneGroups();
+    const group = current.find((g) => g.id === groupId);
+    if (!group) return;
+    const updatedGroup: ZoneGroup = {
+      ...group,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      archiveReason: reason || 'Archived by administrator',
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveZoneGroup(updatedGroup);
+  }
+
+  public async restoreZoneGroup(groupId: string): Promise<void> {
+    const current = this.getCachedZoneGroups();
+    const group = current.find((g) => g.id === groupId);
+    if (!group) return;
+    const updatedGroup: ZoneGroup = {
+      ...group,
+      isArchived: false,
+      archivedAt: undefined,
+      archiveReason: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveZoneGroup(updatedGroup);
+  }
+
+  public async archiveLocationCollection(collId: string, reason?: string): Promise<void> {
+    const current = this.getCachedLocationCollections();
+    const coll = current.find((c) => c.id === collId);
+    if (!coll) return;
+    const updatedColl: LocationCollection = {
+      ...coll,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      archiveReason: reason || 'Archived by administrator',
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveLocationCollection(updatedColl);
+  }
+
+  public async restoreLocationCollection(collId: string): Promise<void> {
+    const current = this.getCachedLocationCollections();
+    const coll = current.find((c) => c.id === collId);
+    if (!coll) return;
+    const updatedColl: LocationCollection = {
+      ...coll,
+      isArchived: false,
+      archivedAt: undefined,
+      archiveReason: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveLocationCollection(updatedColl);
+  }
+
 }
 
 let zoneServiceInstance: ZoneService | null = null;

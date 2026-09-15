@@ -147,6 +147,15 @@ export class DriverService {
   public async setDutyStatus(status: DriverDutyStatus, driverId?: string): Promise<DriverProfile> {
     const id = driverId || this.activeDriverId;
     const current = await this.getDriverProfile(id);
+
+    if (status === 'on_duty' && (current.isBlacklisted || current.isArchived)) {
+      throw new Error(
+        `Shift activation rejected: Driver profile is ${current.isBlacklisted ? 'blacklisted' : 'archived'}${
+          current.blacklistReason ? ' (' + current.blacklistReason + ')' : ''
+        }`
+      );
+    }
+
     const updated: DriverProfile = {
       ...current,
       dutyStatus: status,
@@ -188,6 +197,55 @@ export class DriverService {
       }
     } catch (err) {
       console.warn('Failed to update vehicle assignment shift', err);
+    }
+
+    this.notifyDriverListeners(updated);
+    return updated;
+  }
+
+  public async setVehicleUnit(vehicleUnit: string, vehicleId?: string, driverId?: string): Promise<DriverProfile> {
+    const id = driverId || this.activeDriverId;
+    const current = await this.getDriverProfile(id);
+    if (current.isBlacklisted || current.isArchived) {
+      throw new Error(`Vehicle selection rejected: Driver profile is ${current.isBlacklisted ? 'blacklisted' : 'archived'}`);
+    }
+
+    const updated: DriverProfile = {
+      ...current,
+      vehicleUnit,
+      lastActiveAt: new Date().toISOString(),
+    };
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const ref = doc(db, 'drivers', id);
+        await setDoc(ref, sanitizePayload(updated), { merge: true });
+      } catch (e) {
+        console.warn('[DriverService] Error updating vehicle unit in Firestore:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + id, JSON.stringify(updated));
+      } catch {}
+    }
+
+    if (current.dutyStatus === 'on_duty') {
+      try {
+        const { getVehicleAssignmentService } = await import('./fleet/vehicle-assignment.service');
+        const assignmentService = getVehicleAssignmentService();
+        const activeShiftId = typeof window !== 'undefined' ? localStorage.getItem('active_shift_id_' + id) : null;
+        if (activeShiftId) {
+          await assignmentService.endShift(activeShiftId);
+        }
+        const vehId = vehicleId || ('veh-' + vehicleUnit.replace(/\D/g, ''));
+        const shift = await assignmentService.startShift(id, vehId, vehicleUnit);
+        if (typeof window !== 'undefined') localStorage.setItem('active_shift_id_' + id, shift.id);
+      } catch (e) {
+        console.warn('[DriverService] Error updating active shift for new vehicle:', e);
+      }
     }
 
     this.notifyDriverListeners(updated);

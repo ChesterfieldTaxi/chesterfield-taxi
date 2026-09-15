@@ -16,6 +16,7 @@ import {
   SettingsIcon,
   WrenchIcon,
   RadioIcon,
+  ArchiveBoxIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
@@ -98,6 +99,12 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         label: 'Operators & Staff',
         icon: UserCheckIcon,
         subHint: 'Dispatchers & Drivers',
+      },
+      {
+        key: 'archive',
+        label: 'Archive Vault',
+        icon: ArchiveBoxIcon,
+        subHint: 'Enterprise Retention',
       },
       {
         key: 'general',

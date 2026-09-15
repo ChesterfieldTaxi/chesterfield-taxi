@@ -12,9 +12,13 @@ import {
   CheckIcon,
   PlusIcon,
   TrashIcon,
+  HistoryIcon,
 } from '../../ui/Icons';
+import { ShiftHistoryModal } from './ShiftHistoryModal';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
 import { getFleetService } from '../../../core/services/fleet/fleet.service';
+import { getUniversalGovernanceService } from '../../../core/services/governance/universal-governance.service';
+import { UniversalArchiveDrawer, ArchiveBoxIcon } from './UniversalArchiveDrawer';
 
 
 export interface AdminFleetTabProps {
@@ -39,6 +43,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchCar, setSearchCar] = useState('');
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
+  const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
 
   // Add Car modal/form state
   const [showAddCarModal, setShowAddCarModal] = useState(false);
@@ -68,6 +74,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
     odometer: 0,
     performedBy: '',
   });
+
+  // Shift History Modal state
+  const [showShiftHistory, setShowShiftHistory] = useState(false);
+  const [shiftHistoryVehicleId, setShiftHistoryVehicleId] = useState<string | undefined>(undefined);
 
   // Helpers
   const getVehicleTypeName = (typeId: string) => {
@@ -303,6 +313,20 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <Button
             type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShiftHistoryVehicleId(undefined);
+              setShowShiftHistory(true);
+            }}
+            className="flex items-center gap-1.5 border-slate-300 font-bold whitespace-nowrap shrink-0 px-3.5 text-slate-700 hover:bg-slate-50"
+          >
+            <HistoryIcon className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Shift Search Tool</span>
+          </Button>
+
+          <Button
+            type="button"
             variant="primary"
             size="sm"
             onClick={() => setShowAddCarModal(true)}
@@ -507,13 +531,16 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                           {getVehicleTypeName(car.vehicleTypeId)}
                         </span>
-                        {car.status === 'active' && <Badge variant="success">Active</Badge>}
-                        {car.status === 'maintenance' && <Badge variant="warning">In Maintenance</Badge>}
-                        {car.status === 'out_of_service' && <Badge variant="neutral">Out of Service</Badge>}
-                        {car.status === 'inspecting' && <Badge variant="info">Inspecting</Badge>}
+                        {car.status === 'active' && !car.isBlacklisted && <Badge variant="success">Active</Badge>}
+                        {car.status === 'maintenance' && !car.isBlacklisted && <Badge variant="warning">In Maintenance</Badge>}
+                        {car.status === 'out_of_service' && !car.isBlacklisted && <Badge variant="neutral">Out of Service</Badge>}
+                        {car.status === 'inspecting' && !car.isBlacklisted && <Badge variant="info">Inspecting</Badge>}
+                        {car.isBlacklisted && <Badge variant="error">BLACKLISTED / GROUNDED</Badge>}
+                        {car.isArchived && <Badge variant="neutral">ARCHIVED</Badge>}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {car.year} {car.make} {car.model} • <span className="font-mono text-slate-700">{car.color}</span>
+                        {car.blacklistReason && <span className="text-rose-600 font-bold ml-2">Reason: {car.blacklistReason}</span>}
                       </p>
                     </div>
                   </div>
@@ -535,6 +562,39 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        const isCurrentlyBlacklisted = !!car.isBlacklisted;
+                        if (!isCurrentlyBlacklisted) {
+                          const reason = window.prompt(`Enter ground/blacklist reason for ${car.unitNumber}:`);
+                          if (reason === null) return;
+                          handleUpdateCar(car.id, {
+                            isBlacklisted: true,
+                            blacklistReason: reason || 'Grounded by Fleet Admin',
+                            groundedReason: reason || 'Grounded by Fleet Admin',
+                            status: 'out_of_service',
+                          });
+                        } else {
+                          handleUpdateCar(car.id, {
+                            isBlacklisted: false,
+                            blacklistReason: undefined,
+                            groundedReason: undefined,
+                            status: 'active',
+                          });
+                        }
+                      }}
+                      className={`text-xs h-8 flex items-center gap-1.5 ${
+                        car.isBlacklisted
+                          ? 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                          : 'text-rose-600 border-rose-200 hover:bg-rose-50'
+                      }`}
+                    >
+                      <span>{car.isBlacklisted ? '✅ Restore Cab' : '🚫 Ground / Blacklist'}</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
                         setSelectedCarForMaintenance(car);
                         setNewMaintenanceRecord({
                           date: new Date().toISOString().slice(0, 10),
@@ -550,6 +610,20 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
                         {historyCount}
                       </span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShiftHistoryVehicleId(car.id);
+                        setShowShiftHistory(true);
+                      }}
+                      className="text-xs h-8 flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      <HistoryIcon className="w-3.5 h-3.5" />
+                      <span>Shift History</span>
                     </Button>
 
                     <button
@@ -769,6 +843,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
           {isSaving ? 'Saving...' : 'Save Fleet Inventory'}
         </Button>
       </div>
+
+      {/* Shift History Modal */}
+      {showShiftHistory && (
+        <ShiftHistoryModal 
+          vehicleId={shiftHistoryVehicleId} 
+          onClose={() => {
+            setShowShiftHistory(false);
+            setShiftHistoryVehicleId(undefined);
+          }} 
+        />
+      )}
     </div>
   );
 }

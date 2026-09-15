@@ -158,6 +158,9 @@ export interface VehicleTierConfig {
   description?: string;
   badge?: string;
   iconType?: 'standard' | 'premium' | 'xl' | 'wheelchair';
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
 }
 
 export interface MaintenanceRecord {
@@ -186,6 +189,10 @@ export interface FleetCarConfig {
   mileage: number; // e.g. 45210
   status: 'active' | 'maintenance' | 'out_of_service' | 'inspecting';
   maintenanceHistory?: MaintenanceRecord[];
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
+  groundedReason?: string;
 }
 
 export interface CustomerBookingConfig {
@@ -293,6 +300,7 @@ export interface AppSettings {
   configAuditTrail?: ConfigAuditEntry[];
   tariffs?: import('./tariff').TariffProfile[]; // Unified Tariff Profiles
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
+  bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
   updatedAt?: string;
   updatedBy?: string;
 }

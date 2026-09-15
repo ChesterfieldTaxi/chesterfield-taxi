@@ -464,18 +464,30 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Generate secure initial temporary credentials and render a printable/copyable welcome dispatch sheet (with automated email trigger payload).
 
 ## 24. Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine + Dual Scoring & Conditional Booking Rules
-- **Temporal Shift Mapping (/vehicleAssignments)**:
-  - Record a shift session (driverId, ehicleId, ehicleNumber, startedAt, endedAt, status) when a driver toggles ON-DUTY or selects a vehicle.
-  - Temporal query helpers for looking up driver/vehicle combinations at historical timestamps.
-- **Immutable Trip Snapshots & Comprehensive Audit Trail**:
-  - Freeze vehicle metadata on assignment (ssignedVehicle) to prevent historical confusion.
-  - uditLog event array on every trip for capturing timestamped actions, actor IDs, rules matched, and context.
-- **Dual Scoring System (Customer & Driver)**:
-  - Customer Score (0-100): tracks cancellation rates, no-shows, ratings.
-  - Driver Score (0-100): tracks acceptance %, on-time rate, completion ratio, rider ratings.
-- **Conditional Booking Lifecycle Engine**:
-  - Evaluates rules against Customer Score, Driver Score threshold, etc.
-  - Mode A (AUTO_CONFIRM), Mode B (REQUIRE_REVIEW), Mode C (BLACKLIST_BLOCK).
-- **Universal Archive, Blacklist & Admin Governance UI**:
-  - Status fields (isArchived, isBlacklisted, lacklistReason) across core entities.
-  - Governance UI for Conditional Booking Policies, Geo-Fence exclusion, and Score thresholds in /admin?tab=dispatch&sub=rules.
+- **Universal Archive & Blacklist Engine (With Geo-Locations)**:
+  - Universal status properties (`isArchived: boolean`, `isBlacklisted: boolean`, `blacklistReason?: string`) across Passengers, Drivers, Staff Operators, Fleet Vehicles, Trips, and Geo-Locations.
+  - Passenger Blacklist: Instantly blocks booking submission across public /book and /app if passenger phone or email matches a blacklisted customer profile.
+  - Driver/Staff Blacklist: Revokes active session tokens immediately, rejects login attempts at /signin, and prevents shift activation.
+  - Vehicle Grounding/Blacklist: Excludes grounded and blacklisted vehicles from driver shift selection in /driver and dispatcher auto-assignment.
+  - Location Blacklist: Evaluates pickup/dropoff coordinates and addresses against /blacklistedLocations registry, rejecting creation immediately (Mode C) with security audit logs.
+- **Dual-Scoring Engine (Driver Score & Customer Score)**:
+  - Customer Score (0–100 / 5-star equivalent): Evaluates trip completion rates, cancellation frequencies, no-shows, and payment reliability. Scores below threshold trigger Mode B manual dispatcher review before confirmation.
+  - Driver Score (0–100 / 5-star equivalent): Evaluates offer acceptance rates, on-time arrivals, trip completion ratio, and customer ratings. Low scores restrict access to premium fleets and prioritize high-scoring drivers for automated dispatches.
+  - Visual Badges: Real-time score badges and metrics rendered across /admin (Customer subpage, Operators tab, Fleet tab), /dispatch (candidate cards, roster, active queue), and driver profiles.
+- **3-Tier Conditional Booking Lifecycle Engine (bookingRulesEngine.ts)**:
+  - Evaluates incoming trip requests against time of day (late-night curfew), passenger score, driver threshold, and zone restrictions:
+    - Mode A (AUTO_CONFIRM): Trips auto-confirmed directly into dispatch queues (e.g., daytime airport trips for verified high-scoring customers).
+    - Mode B (REQUIRE_REVIEW): Sets status to pending / PENDING_DISPATCHER_REVIEW with tagged rule reasons ("Late-Night Policy", "Low Customer Score", "Congested Event Area") for dispatcher acceptance.
+    - Mode C (BLACKLIST_BLOCK): Rejects booking creation outright with explanatory error messages and security audit entries.
+- **Temporal Vehicle Shifts (/vehicleAssignments) & Search Tool**:
+  - Automatically records shift documents (`driverId`, `vehicleId`, `vehicleNumber`, `startedAt`, `endedAt`, `status`) in /vehicleAssignments when drivers toggle ON-DUTY or select vehicles in /driver.
+  - Bidirectional temporal query helpers: Resolves which driver operated a given vehicle number at any specific historical timestamp, and lists all vehicle shifts operated by a given driver.
+  - Admin Shift History Search UI: Dedicated interactive modal and search tool in /admin?tab=fleet and /admin?tab=trips to input unit numbers + date windows to inspect assignments and associated trips.
+- **Immutable Trip Snapshots & Comprehensive Audit Log Inspector**:
+  - Immutable vehicle snapshot (`assignedVehicle`: `vehicleId`, `vehicleNumber`, `licensePlate`, `model`) frozen at the exact millisecond of assignment to guarantee audit accuracy.
+  - Comprehensive `auditLog` timeline array (`TripAuditEvent[]`) on every trip capturing timestamped lifecycle transitions (`TRIP_REQUESTED`, `AUTO_CONFIRMED`, `FLAGGED_FOR_HUMAN_REVIEW`, `DISPATCH_OFFERED`, `DRIVER_ACCEPTED`, `STATUS_CHANGED`, `FARE_ADJUSTED`, `TRIP_COMPLETED`, `TRIP_CANCELED`, `BLACK_LISTED`) with actor IDs and notes.
+  - Interactive Audit Log Inspector Modal in /admin?tab=trips and /dispatch displaying chronological event timelines.
+- **Admin UI Governance Modules**:
+  - Admin Rules Manager (/admin?tab=trips&sub=rules / /admin?tab=dispatch&sub=rules): Policy configurations for minimum customer score, late-night windows, auto-confirm toggles, and rule priorities.
+  - Geo-Fence & Location Rules Manager (/admin?tab=zones): Interactive registry to configure polygon/radius zones and point hotspots with policy modes (Auto-Confirm, Require Review, Blacklist Block).
+  - Universal Archive/Blacklist Drawer: Controls in /admin across all roster tables to archive, blacklist, or restore entities with mandatory reason recording.

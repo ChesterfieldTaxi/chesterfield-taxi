@@ -2,7 +2,70 @@ import { collection, doc, getDoc, setDoc, query, where, getDocs, orderBy } from 
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import type { VehicleAssignmentShift } from '../../types/driver';
 
+const DEMO_SHIFTS_KEY = 'chesterfield_demo_shifts_v1';
+
+const DEFAULT_DEMO_SHIFTS: VehicleAssignmentShift[] = [
+  {
+    id: 'shift-demo-1',
+    driverId: 'drv-101',
+    vehicleId: 'veh-204',
+    vehicleNumber: 'Cab #204',
+    startedAt: '2026-09-14T06:00:00.000Z',
+    endedAt: '2026-09-14T14:30:00.000Z',
+    status: 'completed',
+  },
+  {
+    id: 'shift-demo-2',
+    driverId: 'drv-102',
+    vehicleId: 'veh-204',
+    vehicleNumber: 'Cab #204',
+    startedAt: '2026-09-14T15:00:00.000Z',
+    status: 'active',
+  },
+  {
+    id: 'shift-demo-3',
+    driverId: 'drv-103',
+    vehicleId: 'veh-301',
+    vehicleNumber: 'Cab #301',
+    startedAt: '2026-09-14T07:00:00.000Z',
+    endedAt: '2026-09-14T17:00:00.000Z',
+    status: 'completed',
+  },
+  {
+    id: 'shift-demo-4',
+    driverId: 'drv-101',
+    vehicleId: 'veh-102',
+    vehicleNumber: 'Cab #102',
+    startedAt: '2026-09-13T08:00:00.000Z',
+    endedAt: '2026-09-13T16:00:00.000Z',
+    status: 'completed',
+  },
+];
+
 export class VehicleAssignmentService {
+  private getLocalShifts(): VehicleAssignmentShift[] {
+    if (typeof window === 'undefined') return [...DEFAULT_DEMO_SHIFTS];
+    try {
+      const raw = localStorage.getItem(DEMO_SHIFTS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [...DEFAULT_DEMO_SHIFTS];
+  }
+
+  private saveLocalShift(shift: VehicleAssignmentShift) {
+    if (typeof window === 'undefined') return;
+    try {
+      const shifts = this.getLocalShifts();
+      const idx = shifts.findIndex(s => s.id === shift.id);
+      if (idx >= 0) {
+        shifts[idx] = shift;
+      } else {
+        shifts.unshift(shift);
+      }
+      localStorage.setItem(DEMO_SHIFTS_KEY, JSON.stringify(shifts));
+    } catch {}
+  }
+
   /**
    * Start a new shift session for a driver and vehicle.
    */
@@ -26,12 +89,7 @@ export class VehicleAssignmentService {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`shift_${shift.id}`, JSON.stringify(shift));
-      } catch {}
-    }
-
+    this.saveLocalShift(shift);
     return shift;
   }
 
@@ -54,11 +112,9 @@ export class VehicleAssignmentService {
       }
     }
 
-    if (!shift && typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem(`shift_${shiftId}`);
-        if (raw) shift = JSON.parse(raw);
-      } catch {}
+    if (!shift) {
+      const localShifts = this.getLocalShifts();
+      shift = localShifts.find(s => s.id === shiftId) || null;
     }
 
     if (!shift) {
@@ -78,39 +134,132 @@ export class VehicleAssignmentService {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`shift_${shiftId}`, JSON.stringify(shift));
-      } catch {}
-    }
+    this.saveLocalShift(shift);
   }
 
   /**
-   * Lookup which driver operated a vehicle at a specific timestamp.
+   * Bidirectional Temporal Query: Lookup which driver operated a vehicle at a specific timestamp.
    */
-  async getDriverForVehicleAtTime(vehicleId: string, timestamp: string): Promise<VehicleAssignmentShift | null> {
+  async getDriverForVehicleAtTime(vehicleIdOrNumber: string, timestamp: string): Promise<VehicleAssignmentShift | null> {
+    const norm = vehicleIdOrNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestoreDb();
         const q = query(
           collection(db, 'vehicleAssignments'),
-          where('vehicleId', '==', vehicleId),
           where('startedAt', '<=', timestamp)
         );
         const snap = await getDocs(q);
         const shifts = snap.docs.map(d => d.data() as VehicleAssignmentShift);
         
-        // Find the shift that was active at the given timestamp
         for (const shift of shifts) {
-          if (!shift.endedAt || shift.endedAt >= timestamp) {
-            return shift;
+          const shiftVehIdNorm = shift.vehicleId.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const shiftVehNumNorm = shift.vehicleNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (shiftVehIdNorm === norm || shiftVehNumNorm.includes(norm) || norm.includes(shiftVehNumNorm)) {
+            if (!shift.endedAt || shift.endedAt >= timestamp) {
+              return shift;
+            }
           }
         }
       } catch (e) {
-        console.warn('[VehicleAssignmentService] Query failed:', e);
+        console.warn('[VehicleAssignmentService] Firestore query failed:', e);
       }
     }
-    return null; // Local mock query not implemented for brevity
+
+    // Local fallback
+    const local = this.getLocalShifts();
+    for (const shift of local) {
+      const shiftVehIdNorm = shift.vehicleId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const shiftVehNumNorm = shift.vehicleNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (shiftVehIdNorm === norm || shiftVehNumNorm.includes(norm) || norm.includes(shiftVehNumNorm)) {
+        if (shift.startedAt <= timestamp && (!shift.endedAt || shift.endedAt >= timestamp)) {
+          return shift;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Bidirectional Temporal Query: List all vehicles operated by a specific driver.
+   */
+  async getVehiclesOperatedByDriver(driverId: string): Promise<VehicleAssignmentShift[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const q = query(
+          collection(db, 'vehicleAssignments'),
+          where('driverId', '==', driverId)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data() as VehicleAssignmentShift);
+      } catch (e) {
+        console.warn('[VehicleAssignmentService] getVehiclesOperatedByDriver failed:', e);
+      }
+    }
+
+    const local = this.getLocalShifts();
+    return local.filter(s => s.driverId === driverId);
+  }
+
+  /**
+   * Query shifts for a specific vehicle within a date window.
+   */
+  async getShiftsForVehicle(
+    vehicleIdOrNumber: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<VehicleAssignmentShift[]> {
+    const norm = vehicleIdOrNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let allShifts: VehicleAssignmentShift[] = [];
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const snap = await getDocs(collection(db, 'vehicleAssignments'));
+        allShifts = snap.docs.map(d => d.data() as VehicleAssignmentShift);
+      } catch (e) {
+        console.warn('[VehicleAssignmentService] getShiftsForVehicle failed:', e);
+        allShifts = this.getLocalShifts();
+      }
+    } else {
+      allShifts = this.getLocalShifts();
+    }
+
+    return allShifts.filter(shift => {
+      const shiftVehIdNorm = shift.vehicleId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const shiftVehNumNorm = shift.vehicleNumber.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matchVehicle = !norm || shiftVehIdNorm === norm || shiftVehNumNorm.includes(norm) || norm.includes(shiftVehNumNorm);
+      if (!matchVehicle) return false;
+
+      if (startDate && shift.startedAt < startDate) return false;
+      if (endDate && shift.startedAt > endDate) return false;
+
+      return true;
+    }).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  }
+
+  /**
+   * Retrieve all recorded shifts with optional limit.
+   */
+  async getAllShifts(limitCount = 50): Promise<VehicleAssignmentShift[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const snap = await getDocs(collection(db, 'vehicleAssignments'));
+        const shifts = snap.docs.map(d => d.data() as VehicleAssignmentShift);
+        if (shifts.length > 0) {
+          return shifts.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, limitCount);
+        }
+      } catch (e) {
+        console.warn('[VehicleAssignmentService] getAllShifts failed:', e);
+      }
+    }
+
+    const local = this.getLocalShifts();
+    return local.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()).slice(0, limitCount);
   }
 }
 

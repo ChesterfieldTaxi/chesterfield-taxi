@@ -287,6 +287,30 @@ export class TariffService {
     }
   }
 
+  public async archiveTariff(tariffId: string, reason?: string): Promise<void> {
+    const current = this.cache || (await this.getTariffs());
+    const tariff = current.find((t) => t.id === tariffId);
+    if (!tariff) return;
+    await this.saveTariff({
+      ...tariff,
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+      archiveReason: reason || 'Archived by administrator',
+    });
+  }
+
+  public async restoreTariff(tariffId: string): Promise<void> {
+    const current = this.cache || (await this.getTariffs());
+    const tariff = current.find((t) => t.id === tariffId);
+    if (!tariff) return;
+    await this.saveTariff({
+      ...tariff,
+      isArchived: false,
+      archivedAt: undefined,
+      archiveReason: undefined,
+    });
+  }
+
   public async deleteTariff(tariffId: string): Promise<void> {
     const list = await this.getTariffs();
     const filtered = list.filter((t) => t.id !== tariffId);
@@ -388,11 +412,11 @@ export function matchTariffProfile(
 ): TariffProfile {
   // If specific tariff ID explicitly requested
   if (input.selectedRuleId) {
-    const explicit = tariffs.find((t) => t.id === input.selectedRuleId && t.isActive);
+    const explicit = tariffs.find((t) => t.id === input.selectedRuleId && t.isActive && !t.isArchived);
     if (explicit) return explicit;
   }
 
-  const activeTariffs = tariffs.filter((t) => t.isActive);
+  const activeTariffs = tariffs.filter((t) => t.isActive && !t.isArchived);
   if (activeTariffs.length === 0) {
     return DEFAULT_TARIFF_PROFILES[0];
   }

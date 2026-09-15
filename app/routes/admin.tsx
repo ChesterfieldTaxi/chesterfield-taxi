@@ -18,6 +18,7 @@ import {
   AdminCustomersSubpage,
   AdminBookingsTab,
   AdminLayoutTab,
+  AdminArchiveTab,
 } from '../components/domain/admin';
 import { AdminRulesTab } from '../components/domain/admin/AdminRulesTab';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
@@ -36,6 +37,7 @@ import {
   RadioIcon,
   MenuIcon,
   ExternalLinkIcon,
+  ArchiveBoxIcon,
 } from '../components/ui/Icons';
 
 export function meta() {
@@ -54,6 +56,7 @@ export type AdminTabKey =
   | 'vehicles'
   | 'zones'
   | 'operators'
+  | 'archive'
   | 'advanced'
   // Legacy tab aliases
   | 'general'
@@ -123,6 +126,12 @@ const PRIMARY_TABS: TabItem[] = [
     description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
   },
   {
+    key: 'archive',
+    label: 'Archive Vault',
+    icon: ArchiveBoxIcon,
+    description: 'Enterprise data retention vault and 1-click restoration engine across all platform entities',
+  },
+  {
     key: 'general',
     label: 'General',
     icon: SettingsIcon,
@@ -146,6 +155,7 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'dispatch', label: 'Active Queue' },
     { key: 'history', label: 'Trip History' },
     { key: 'rules', label: 'Booking Rules Engine' },
+    { key: 'archive', label: 'Archived Trips' },
     { key: 'exceptions', label: 'Exceptions' },
   ],
   invoicing: [
@@ -172,6 +182,7 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'zones', label: 'Geofences' },
     { key: 'groups', label: 'Zone Groups' },
     { key: 'collections', label: 'POI Collections' },
+    { key: 'blacklists', label: 'Exclusion Zones' },
   ],
   operators: [
     { key: 'roster', label: 'Roster' },
@@ -186,6 +197,15 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'security', label: 'Security & Access' },
     { key: 'audit', label: 'Audit Trail' },
     { key: 'system', label: 'System Ops' },
+  ],
+  archive: [
+    { key: 'all', label: 'All Records' },
+    { key: 'trips', label: 'Trips' },
+    { key: 'customers', label: 'Passengers' },
+    { key: 'operators', label: 'Staff & Drivers' },
+    { key: 'vehicles', label: 'Fleet & Types' },
+    { key: 'zones', label: 'Zones & Corridors' },
+    { key: 'tariffs', label: 'Unified Tariffs' },
   ],
 };
 
@@ -555,6 +575,10 @@ export default function AdminLayout() {
 
             {normalizedTab === 'bookings' && (
               <AdminTripsSubpage initialSubTab="dispatch" />
+            )}
+
+            {normalizedTab === 'archive' && (
+              <AdminArchiveTab initialSubTab={effectiveSub as any} />
             )}
           </div>
 

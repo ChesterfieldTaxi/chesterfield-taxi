@@ -27,6 +27,11 @@ export interface ZoneGeofence {
   surchargeMultiplier?: number; // e.g. 1.15 (+15%)
   flatFee?: number; // e.g. 5.00 ($5 surcharge or zone fee)
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -47,6 +52,9 @@ export interface ZoneGroup {
   surchargeMultiplier?: number; // e.g. 1.05 (+5%)
   flatFee?: number; // e.g. 2.50 ($2.50 cluster surcharge)
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -75,6 +83,7 @@ export interface LocationPoint {
   category?: LocationCategory;
   flatFee?: number; // e.g. gate fee or pickup surcharge
   notes?: string;
+  isArchived?: boolean;
 }
 
 export interface LocationCollection {
@@ -87,6 +96,34 @@ export interface LocationCollection {
   surchargeMultiplier?: number;
   proximityRadiusMiles?: number; // Detection tolerance in miles, default 0.5 mi
   isActive: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Blacklisted Location Schema
+ * 
+ * Represents an address, POI, or radius area where pickups/dropoffs are
+ * either explicitly blocked or flagged for review.
+ * Stored in Firestore collection `/blacklistedLocations`.
+ */
+export type BlacklistedLocationAction = 'BLACKLIST_BLOCK' | 'REQUIRE_REVIEW';
+
+export interface BlacklistedLocation {
+  id: string; // e.g. "bl-safety-hazard-1"
+  name: string; // e.g. "Abandoned Factory Site"
+  reasonCode: string; // e.g. "Safety Hazard", "Restricted Private Property"
+  action: BlacklistedLocationAction;
+  
+  // Spatial definitions (could be point+radius)
+  coordinates: ZoneCoordinate;
+  radiusMiles: number;
+  
+  isActive: boolean;
+  isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

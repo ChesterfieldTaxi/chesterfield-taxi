@@ -453,25 +453,29 @@ export interface PassengerAccount {
 - **Driver Profile Linkage**: If the applicant is a driver, automatically link or create their Driver Profile in the fleet system.
 - **Temporary Credentials & Welcome Sheet**: Generate secure initial temporary credentials and render a printable/copyable dispatch sheet that triggers an automated email.
 
-## 17. Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine
-### 17.1 Shift Tracking & Immutable Snapshots
-- Collection /vehicleAssignments stores Driver Shift records.
-- Trip models freeze ssignedVehicle data upon driver assignment.
-- Trips maintain an uditLog array appending actions with timestamps and actor context.
+## 17. Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine + Dual Scoring & Conditional Booking Rules
+### 17.1 Shift Tracking & Temporal Mapping
+- Collection `/vehicleAssignments` stores Driver Shift records (`driverId`, `vehicleId`, `vehicleNumber`, `startedAt`, `endedAt`, `status`).
+- Bidirectional temporal queries for resolving driver operations at historical timestamps and driver shift rosters.
+- Admin Shift History modal and search tool for cab unit number + date window exploration.
 
-### 17.2 Dual Scoring Engine
-- Passenger and Driver documents hold real-time calculated scores (0-100).
-- ookingRulesEngine.ts service checks these scores upon booking to determine execution modes (Auto-Confirm, Require-Review, Blacklist-Block).
+### 17.2 Immutable Snapshots & Audit Trail
+- Trip models freeze `assignedVehicle` snapshot metadata upon driver assignment to prevent retroactive distortions.
+- Trips maintain an immutable `auditLog` array recording all lifecycle events (`TRIP_REQUESTED`, `AUTO_CONFIRMED`, `FLAGGED_FOR_HUMAN_REVIEW`, `DISPATCH_OFFERED`, `DRIVER_ACCEPTED`, `STATUS_CHANGED`, `FARE_ADJUSTED`, `TRIP_COMPLETED`, `TRIP_CANCELED`, `BLACK_LISTED`) with actor role, actor ID, and metadata.
+- Audit Log Inspector modal in `/admin?tab=trips` and `/dispatch` for chronological event inspections.
 
-#### 6. Execution Steps (Chronological)
-1. **[x] Models & Types**: Update `trip.ts`, `driver.ts`, `passenger.ts`, and `fleet.ts` with governance fields (`isBlacklisted`, `isArchived`, `auditLog`). Add Customer Score / Driver Score schemas. Add `VehicleAssignmentShift`.
-2. **[x] Booking Rules Engine (Mode A, B, C)**: Implement a service to evaluate trip requests against rules (Scores, Time-of-day, Blacklist) to determine the execution mode.
-3. **[x] Temporal Vehicle Shifts**: Create `vehicle-assignment.service.ts` to manage shifts when drivers go on duty. Update `driver.service.ts` to integrate this.
-4. **[x] Immutable Snapshots**: Update `firebase-booking.service.ts` to capture the assigned vehicle's snapshot at the time of dispatch.
-5. **[x] Admin UI Integration**:
-   * Update Dispatch UI to flag Mode B "Requires Review" trips.
-   * Update Operators/Customers UI to display Scores and toggle Blacklist status.
-   * Build an Admin Rules Tab for configuring Booking Policies.
+### 17.3 Dual Scoring Engine
+- Customer Score (0–100 / 5-star): Evaluates cancellation frequencies, no-shows, and payment records. Low scores trigger Mode B dispatcher review.
+- Driver Score (0–100 / 5-star): Evaluates acceptance rate, on-time arrivals, trip completion ratio, and customer ratings. Restricts access to premium tiers.
+- Real-time score badges across admin and dispatch interfaces.
 
-### 17.3 Universal Governance
-- Entities support isArchived, isBlacklisted, lacklistReason for system-wide exclusion.
+### 17.4 3-Tier Conditional Booking Lifecycle Engine
+- `bookingRulesEngine.ts` evaluates booking requests against rules (Customer Score, Driver Score threshold, Time of day, Zone restrictions).
+- Mode A (AUTO_CONFIRM): Auto-confirms rides directly into dispatch pipeline.
+- Mode B (REQUIRE_REVIEW): Holds ride in `pending` / `PENDING_DISPATCHER_REVIEW` with descriptive policy tags for dispatcher approval.
+- Mode C (BLACKLIST_BLOCK): Halts booking creation and registers security audit entry.
+
+### 17.5 Universal Governance & Blacklist Engine
+- Universal `isArchived`, `isBlacklisted`, and `blacklistReason` fields across Passengers, Drivers, Staff Operators, Fleet Units, Trips, and Geo-Locations.
+- Route guards rejecting blacklisted passenger bookings, driver/staff logins, grounded vehicles in shifts, and blacklisted pickup/dropoff zones.
+- Governance UI in `/admin` for Rules Manager, Geo-Fence Manager, and Universal Archive/Blacklist actions.

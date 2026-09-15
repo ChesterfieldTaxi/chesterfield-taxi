@@ -17,6 +17,7 @@ import { resolveMockCoordinates } from '../core/services/maps/mock-routing';
 import { SpinnerIcon, RadioIcon, CarIcon, MailIcon, PhoneIcon, MapPinIcon } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
+import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
 
 export function meta() {
   return [
@@ -41,6 +42,8 @@ interface DriverRosterItem {
   phone: string;
   zone: string;
   currentTripId?: string;
+  driverScore?: number;
+  isBlacklisted?: boolean;
 }
 
 interface DispatchMessageItem {
@@ -60,6 +63,7 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     tier: 'Sedan',
     phone: '(314) 555-0101',
     zone: 'Chesterfield Valley',
+    driverScore: 98,
   },
   {
     id: 'drv-104',
@@ -70,6 +74,7 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     phone: '(314) 555-0104',
     zone: 'Lambert Airport (STL)',
     currentTripId: 'tr-8831',
+    driverScore: 95,
   },
   {
     id: 'drv-108',
@@ -79,6 +84,7 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     tier: 'Van',
     phone: '(314) 555-0108',
     zone: 'Town and Country',
+    driverScore: 91,
   },
   {
     id: 'drv-112',
@@ -88,6 +94,7 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     tier: 'Sedan',
     phone: '(314) 555-0112',
     zone: 'Ballwin / Manchester',
+    driverScore: 88,
   },
   {
     id: 'drv-115',
@@ -97,6 +104,7 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
     tier: 'Van',
     phone: '(314) 555-0115',
     zone: 'Off Duty',
+    driverScore: 74,
   },
 ];
 
@@ -120,6 +128,7 @@ export default function DispatchRoute() {
   const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
+  const [auditTrailTrip, setAuditTrailTrip] = useState<Trip | null>(null);
 
   // Dispatcher Review Modal State for UNCONFIRMED web bookings
   const [reviewTrip, setReviewTrip] = useState<Trip | null>(null);
@@ -2056,6 +2065,17 @@ export default function DispatchRoute() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setAuditTrailTrip(trip);
+                              }}
+                              className="px-2.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-bold text-amber-700 transition-colors cursor-pointer"
+                              title="Inspect Audit Trail"
+                            >
+                              Log
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 handleCloneBooking(trip);
                               }}
                               className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-600 hover:text-white border border-slate-300 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer"
@@ -2299,7 +2319,14 @@ export default function DispatchRoute() {
                                         {driver.vehicle} ({driver.tier})
                                       </span>
                                     </div>
-                                    {badge}
+                                    <div className="flex items-center gap-1.5">
+                                      {driver.driverScore !== undefined && (
+                                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Driver Score">
+                                          ★ {driver.driverScore}
+                                        </span>
+                                      )}
+                                      {badge}
+                                    </div>
                                   </div>
 
                                   <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1 border-t border-slate-100">
@@ -3333,6 +3360,14 @@ export default function DispatchRoute() {
           </div>
         );
       })()}
+
+      {/* Audit Trail Drawer Modal */}
+      {auditTrailTrip && (
+        <TripAuditModal
+          trip={auditTrailTrip}
+          onClose={() => setAuditTrailTrip(null)}
+        />
+      )}
     </div>
   );
 }

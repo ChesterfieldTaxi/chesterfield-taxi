@@ -307,11 +307,34 @@
 - [x] 28.4 One-Click Account Provisioning & Role Injection: Implement "Approve & Provision Account" action, link/create Driver Profile, and generate secure temporary credentials.
 - [x] 28.5 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 errors.
 
-## Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine + Dual Scoring & Conditional Booking Rules
-- [x] 29.1 Update spec.md, plan.md, and tasks.md with Phase 29 requirements.
-- [x] 29.2 Implement Temporal Shift Mapping (/vehicleAssignments) and query helpers.
-- [x] 29.3 Refactor Trip schema for immutable assignedVehicle snapshots and auditLog arrays.
-- [x] 29.4 Implement Dual Scoring System tracking metrics and calculation routines for Customer and Driver scores. Embed in UI.
-- [x] 29.5 Build Conditional Booking Lifecycle Engine (bookingRulesEngine.ts) with Modes A, B, and C.
-- [x] 29.6 Add isArchived, isBlacklisted, blacklistReason universally and build governance UI in /admin?tab=dispatch&sub=rules.
-- [x] 29.7 Run npm run typecheck and npm run build to confirm build stability.
+## Phase 29: Universal Governance, Shift Engine, Audit Log, Dual Scoring & Conditional Booking Rules
+- [x] 29.1 Documentation Updates: Update spec.md, plan.md, and tasks.md with Phase 29 requirements.
+- [x] 29.2 Universal Archive & Blacklist Engine (With Geo-Locations):
+  - [x] 29.2.1 Extend models (Passenger, Driver, Staff Operator, Fleet Vehicle, Trip, Geo-Location) with isArchived, isBlacklisted, blacklistReason.
+  - [x] 29.2.2 Passenger Blacklist guard on booking creation (halt and audit log).
+  - [x] 29.2.3 Driver/Staff Blacklist guard in auth service (reject sign-in and shift activation).
+  - [x] 29.2.4 Vehicle Grounding/Blacklist guard in driver shift selection and dispatch auto-assign.
+  - [x] 29.2.5 Geo-Location Blacklist guard in booking rules engine.
+- [x] 29.3 Dual-Scoring Engine (Driver Score & Customer Score):
+  - [x] 29.3.1 Customer Score (0-100) tracking cancellations, no-shows, and payment reliability.
+  - [x] 29.3.2 Driver Score (0-100) tracking acceptance rate, on-time rate, and ratings.
+  - [x] 29.3.3 Visual score badges across admin customers, operators, dispatch candidate cards, and roster.
+- [x] 29.4 3-Tier Conditional Booking Lifecycle Engine:
+  - [x] 29.4.1 Mode A (AUTO_CONFIRM) direct pipeline.
+  - [x] 29.4.2 Mode B (REQUIRE_REVIEW) with match tags ("Late-Night Policy", "Low Customer Score", "Congested Event Area").
+  - [x] 29.4.3 Mode C (BLACKLIST_BLOCK) with error notice and security audit log.
+- [x] 29.5 Temporal Vehicle Shifts (/vehicleAssignments) & Search Tool:
+  - [x] 29.5.1 Shift tracking in Firestore on duty toggles and vehicle selections.
+  - [x] 29.5.2 Bidirectional query helpers in vehicle-assignment.service.ts.
+  - [x] 29.5.3 Admin Shift History Search UI with unit number + date window exploration.
+- [x] 29.6 Immutable Trip Snapshots & Audit Log Inspector:
+  - [x] 29.6.1 Freeze assignedVehicle metadata on trip assignment.
+  - [x] 29.6.2 Complete auditLog timeline array with actor IDs and action metadata.
+  - [x] 29.6.3 Interactive Audit Log Inspector Modal in /admin?tab=trips and /dispatch.
+- [x] 29.7 Admin UI Governance Modules:
+  - [x] 29.7.1 Admin Rules Manager in /admin?tab=trips&sub=rules.
+  - [x] 29.7.2 Geo-Fence & Location Rules Manager in /admin?tab=zones.
+  - [x] 29.7.3 Universal Archive/Blacklist drawer/actions across admin roster tables.
+- [x] 29.8 Build & Typecheck Verification:
+  - [x] 29.8.1 Run npm run typecheck with 0 errors.
+  - [x] 29.8.2 Run npm run build with 0 errors.

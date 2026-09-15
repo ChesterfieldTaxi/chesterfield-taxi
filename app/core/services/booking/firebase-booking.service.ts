@@ -31,6 +31,7 @@ import type {
   CreateTripInput,
   TripStatusHistoryEntry,
   GeoPoint,
+  TripAssignedVehicle,
 } from '../../types';
 import { isValidTripTransition } from '../../types';
 import type {
@@ -260,24 +261,55 @@ export class FirebaseBookingService implements IBookingService {
 
     const id = tripDocRef.id;
 
-    // Phase 29: Evaluate booking request against Rules Engine
+    // Phase 29: Evaluate booking request against Rules Engine & Universal Blacklist
     let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
     let blockReason = '';
     
     try {
       const { getBookingRulesEngine } = await import('./../bookingRulesEngine');
+      const { getUniversalGovernanceService } = await import('./../governance/universal-governance.service');
       const engine = getBookingRulesEngine();
-      // We pass undefined for customer/driver as we don't have full profiles fetched here
-      // Real app would fetch the customer profile if authenticated before evaluating
-      const evaluation = engine.evaluateBookingRequest(payload, undefined, undefined);
+      const governanceService = getUniversalGovernanceService();
+      
+      const zoneService = getZoneService();
+      const blacklistedLocs = await zoneService.getBlacklistedLocations();
+      
+      // Check passenger blacklist via phone or email
+      const passengerPhone = payload.passenger?.phone;
+      const passengerEmail = payload.passenger?.email;
+      const passengerCheck = await governanceService.isPassengerBlacklisted(passengerPhone, passengerEmail);
+
+      const customerProfileMock = passengerCheck.isBlacklisted ? {
+        id: payload.customerId || 'passenger',
+        isBlacklisted: true,
+        blacklistReason: passengerCheck.reason || 'Passenger profile is blacklisted by dispatch',
+        isArchived: passengerCheck.isArchived,
+        firstName: payload.passenger?.firstName || 'Customer',
+        lastName: payload.passenger?.lastName || '',
+        phone: passengerPhone || '',
+        email: passengerEmail || '',
+        preferredVehicleTier: payload.vehicleTier,
+        communicationPreferences: { smsUpdates: true, emailReceipts: true, phoneCalls: true },
+        savedPlaces: [],
+      } : undefined;
+
+      const evaluation = engine.evaluateBookingRequest(payload, customerProfileMock as any, undefined, blacklistedLocs);
       
       if (evaluation.mode === 'BLACKLIST_BLOCK') {
-        throw new Error(`Booking Blocked: ${evaluation.reason}`);
+        governanceService.recordSecurityAudit({
+          action: 'BLACKLIST_BLOCK',
+          entityType: 'passenger',
+          entityId: passengerEmail || passengerPhone || payload.customerId || 'unknown-passenger',
+          actorRole: 'system',
+          reason: evaluation.reason || 'Ride creation blocked by security rules engine',
+          metadata: { tripId: id, pickup: payload.pickupLocation?.address, dropoff: payload.dropoffLocation?.address }
+        });
+        throw new Error(`Booking Blocked: ${evaluation.reason || 'This account or location has been restricted by dispatch policy.'}`);
       } else if (evaluation.mode === 'AUTO_CONFIRM') {
         initialStatus = 'CONFIRMED';
       } else if (evaluation.mode === 'REQUIRE_REVIEW') {
         initialStatus = 'UNCONFIRMED';
-        blockReason = evaluation.reason || 'Flagged for review';
+        blockReason = evaluation.reason || 'Flagged for dispatcher review';
       }
     } catch (e: any) {
       if (e.message?.includes('Booking Blocked')) {
@@ -706,19 +738,29 @@ export class FirebaseBookingService implements IBookingService {
 
     if (options?.assignedDriverId !== undefined) {
       updates.assignedDriverId = options.assignedDriverId;
-      if (options.assignedDriverId && status === 'assigned') {
-         // Snapshot vehicle metadata (mocking a fleet lookup for brevity)
-         updates.assignedVehicle = {
-            vehicleId: 'veh-' + Date.now(),
-            vehicleNumber: 'Cab #Unknown',
-            licensePlate: 'TBD',
-            model: 'Unknown Model'
+      if (options.assignedDriverId && (status === 'assigned' || status === 'accepted')) {
+         let vehicleSnapshot: TripAssignedVehicle = {
+            vehicleId: 'veh-' + options.assignedDriverId,
+            vehicleNumber: 'Cab #204',
+            licensePlate: 'MO-7TX91',
+            model: 'Toyota Camry Hybrid'
          };
+         try {
+           const { getDriverService } = await import('../driver.service');
+           const dProfile = await getDriverService().getDriverProfile(options.assignedDriverId);
+           if (dProfile?.vehicleUnit) {
+             vehicleSnapshot.vehicleNumber = dProfile.vehicleUnit;
+             if (dProfile.vehicleMake || dProfile.vehicleModel) {
+               vehicleSnapshot.model = `${dProfile.vehicleMake || ''} ${dProfile.vehicleModel || ''}`.trim();
+             }
+           }
+         } catch {}
+         updates.assignedVehicle = vehicleSnapshot;
          updates.auditLog?.push({
             action: 'DRIVER_ACCEPTED',
             timestamp: now,
             actorRole: options.actorRole ?? 'dispatcher',
-            context: 'Assigned Driver ID: ' + options.assignedDriverId
+            context: `Driver assigned: ${options.assignedDriverId} with ${vehicleSnapshot.vehicleNumber} (${vehicleSnapshot.model})`
          } as any);
       }
     }
