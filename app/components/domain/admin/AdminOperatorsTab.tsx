@@ -343,7 +343,8 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   // Filtered operators
   const filteredOperators = useMemo(() => {
     return operators.filter((op) => {
-      if (roleFilter !== 'all' && op.role !== roleFilter) return false;
+      const activeRoles = op.roles || [op.role];
+      if (roleFilter !== 'all' && !activeRoles.includes(roleFilter as UserRole)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchEmail = op.email.toLowerCase().includes(q);
@@ -359,9 +360,9 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   const roleCounts = useMemo(() => {
     return {
       all: operators.length,
-      driver: operators.filter((o) => o.role === 'driver').length,
-      dispatcher: operators.filter((o) => o.role === 'dispatcher').length,
-      admin: operators.filter((o) => o.role === 'admin').length,
+      driver: operators.filter((o) => (o.roles || [o.role]).includes('driver')).length,
+      dispatcher: operators.filter((o) => (o.roles || [o.role]).includes('dispatcher')).length,
+      admin: operators.filter((o) => (o.roles || [o.role]).includes('admin')).length,
     };
   }, [operators]);
 
@@ -512,9 +513,9 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                            op.role === 'admin'
+                            (op.roles || [op.role]).includes('admin')
                               ? 'bg-purple-100 text-purple-700'
-                              : op.role === 'dispatcher'
+                              : (op.roles || [op.role]).includes('dispatcher')
                               ? 'bg-blue-100 text-blue-700'
                               : 'bg-emerald-100 text-emerald-700'
                           }`}
@@ -574,7 +575,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
                     {/* Driver License & Unit */}
                     <td className="px-5 py-3.5">
-                      {op.role === 'driver' ? (
+                      {(op.roles || [op.role]).includes('driver') ? (
                         <div className="space-y-0.5">
                           <div className="text-[11px] font-mono font-semibold text-slate-800">
                             {op.driverLicense || 'DL on file'}
