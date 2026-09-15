@@ -170,6 +170,22 @@ export interface TripStatusHistoryEntry {
   reason?: string;
 }
 
+export interface TripAuditEvent {
+  action: 'TRIP_REQUESTED' | 'AUTO_CONFIRMED' | 'FLAGGED_FOR_HUMAN_REVIEW' | 'DISPATCH_OFFERED' | 'DRIVER_ACCEPTED' | 'STATUS_CHANGED' | 'TRIP_COMPLETED' | 'TRIP_CANCELED' | 'SCORE_UPDATED' | 'BLACK_LISTED';
+  timestamp: string; // ISO 8601
+  actorId?: string;
+  actorRole?: 'system' | 'passenger' | 'driver' | 'admin' | 'dispatcher';
+  matchedRuleId?: string;
+  context?: string;
+}
+
+export interface TripAssignedVehicle {
+  vehicleId: string;
+  vehicleNumber: string;
+  licensePlate: string;
+  model: string;
+}
+
 /**
  * Core Trip Document Model stored in Firestore.
  */
@@ -179,6 +195,11 @@ export interface Trip {
 
   /** State machine status */
   status: TripStatus;
+
+  /** Universal Governance */
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
 
   /**
    * Driver targeting broadcast array.
@@ -192,6 +213,10 @@ export interface Trip {
 
   /** Currently assigned driver, null if unassigned */
   assignedDriverId: string | null;
+  assignedVehicle?: TripAssignedVehicle;
+
+  /** Audit Log */
+  auditLog?: TripAuditEvent[];
 
   /** Location details */
   pickupLocation: TripLocation;

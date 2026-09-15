@@ -259,7 +259,32 @@ export class FirebaseBookingService implements IBookingService {
       : doc(collection(this.db, this.collectionName));
 
     const id = tripDocRef.id;
-    const initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
+
+    // Phase 29: Evaluate booking request against Rules Engine
+    let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
+    let blockReason = '';
+    
+    try {
+      const { getBookingRulesEngine } = await import('./../bookingRulesEngine');
+      const engine = getBookingRulesEngine();
+      // We pass undefined for customer/driver as we don't have full profiles fetched here
+      // Real app would fetch the customer profile if authenticated before evaluating
+      const evaluation = engine.evaluateBookingRequest(payload, undefined, undefined);
+      
+      if (evaluation.mode === 'BLACKLIST_BLOCK') {
+        throw new Error(`Booking Blocked: ${evaluation.reason}`);
+      } else if (evaluation.mode === 'AUTO_CONFIRM') {
+        initialStatus = 'CONFIRMED';
+      } else if (evaluation.mode === 'REQUIRE_REVIEW') {
+        initialStatus = 'UNCONFIRMED';
+        blockReason = evaluation.reason || 'Flagged for review';
+      }
+    } catch (e: any) {
+      if (e.message?.includes('Booking Blocked')) {
+         throw e; // Bubble up block
+      }
+      console.warn('Booking rules evaluation failed', e);
+    }
 
     const initialHistoryEntry: TripStatusHistoryEntry = {
       from: null,
@@ -267,8 +292,15 @@ export class FirebaseBookingService implements IBookingService {
       timestamp: now,
       actorRole: 'passenger',
       reason: initialStatus === 'UNCONFIRMED'
-        ? 'Web booking submitted by customer (pending dispatcher review)'
-        : 'Booking submitted via system',
+        ? blockReason || 'Web booking submitted by customer (pending dispatcher review)'
+        : 'Booking auto-confirmed by rules engine',
+    };
+
+    const auditEvent = {
+      action: initialStatus === 'CONFIRMED' ? 'AUTO_CONFIRMED' : 'TRIP_REQUESTED',
+      timestamp: now,
+      actorRole: 'passenger',
+      context: initialHistoryEntry.reason
     };
 
     const newTrip: Trip = {
@@ -279,6 +311,7 @@ export class FirebaseBookingService implements IBookingService {
       rejectedByIds: [],
       assignedDriverId: null,
       statusHistory: [initialHistoryEntry],
+      auditLog: [auditEvent as any],
       createdAt: now,
       updatedAt: now,
     };
@@ -656,15 +689,38 @@ export class FirebaseBookingService implements IBookingService {
       actorRole: options?.actorRole ?? 'admin',
       reason: options?.reason ?? `Status manually updated to ${status}`,
     };
+    
+    const auditEvent = {
+      action: 'STATUS_CHANGED',
+      timestamp: now,
+      actorRole: options?.actorRole ?? 'admin',
+      context: `Status changed to ${status}. ${options?.reason || ''}`
+    };
 
     const updates: Partial<Trip> = {
       status,
       updatedAt: now,
       statusHistory: [...trip.statusHistory, historyEntry],
+      auditLog: [...(trip.auditLog || []), auditEvent as any]
     };
 
     if (options?.assignedDriverId !== undefined) {
       updates.assignedDriverId = options.assignedDriverId;
+      if (options.assignedDriverId && status === 'assigned') {
+         // Snapshot vehicle metadata (mocking a fleet lookup for brevity)
+         updates.assignedVehicle = {
+            vehicleId: 'veh-' + Date.now(),
+            vehicleNumber: 'Cab #Unknown',
+            licensePlate: 'TBD',
+            model: 'Unknown Model'
+         };
+         updates.auditLog?.push({
+            action: 'DRIVER_ACCEPTED',
+            timestamp: now,
+            actorRole: options.actorRole ?? 'dispatcher',
+            context: 'Assigned Driver ID: ' + options.assignedDriverId
+         } as any);
+      }
     }
 
     if (options?.offeredToIds !== undefined) {

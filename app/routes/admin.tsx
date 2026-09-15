@@ -19,6 +19,7 @@ import {
   AdminBookingsTab,
   AdminLayoutTab,
 } from '../components/domain/admin';
+import { AdminRulesTab } from '../components/domain/admin/AdminRulesTab';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
@@ -81,9 +82,9 @@ const PRIMARY_TABS: TabItem[] = [
   },
   {
     key: 'trips',
-    label: 'Trips',
+    label: 'Trips & Rules',
     icon: HistoryIcon,
-    description: 'Active dispatch queue, searchable trip archive, CSV export, and exceptions',
+    description: 'Active dispatch queue, booking rules engine, searchable trip archive, CSV export, and exceptions',
   },
   {
     key: 'invoicing',
@@ -144,6 +145,7 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
   trips: [
     { key: 'dispatch', label: 'Active Queue' },
     { key: 'history', label: 'Trip History' },
+    { key: 'rules', label: 'Booking Rules Engine' },
     { key: 'exceptions', label: 'Exceptions' },
   ],
   invoicing: [
@@ -477,7 +479,11 @@ export default function AdminLayout() {
               />
             )}
 
-            {normalizedTab === 'trips' && (
+            {normalizedTab === 'trips' && effectiveSub === 'rules' && (
+              <AdminRulesTab />
+            )}
+
+            {normalizedTab === 'trips' && effectiveSub !== 'rules' && (
               <AdminTripsSubpage initialSubTab={effectiveSub as any} />
             )}
 

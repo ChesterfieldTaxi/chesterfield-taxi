@@ -27,4 +27,9 @@ export interface PhysicalFleetAsset {
   maintenanceHistory?: MaintenanceRecord[];
   createdAt?: string;
   updatedAt?: string;
+
+  /** Universal Governance & Scoring (Phase 29) */
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
 }

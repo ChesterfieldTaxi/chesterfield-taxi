@@ -452,3 +452,26 @@ export interface PassengerAccount {
 - **Approve & Provision Account Action**: Automate user creation in Firebase Auth & `/users` collection with the corresponding role (`driver`, `dispatcher`, `accountant`, or `admin`).
 - **Driver Profile Linkage**: If the applicant is a driver, automatically link or create their Driver Profile in the fleet system.
 - **Temporary Credentials & Welcome Sheet**: Generate secure initial temporary credentials and render a printable/copyable dispatch sheet that triggers an automated email.
+
+## 17. Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine
+### 17.1 Shift Tracking & Immutable Snapshots
+- Collection /vehicleAssignments stores Driver Shift records.
+- Trip models freeze ssignedVehicle data upon driver assignment.
+- Trips maintain an uditLog array appending actions with timestamps and actor context.
+
+### 17.2 Dual Scoring Engine
+- Passenger and Driver documents hold real-time calculated scores (0-100).
+- ookingRulesEngine.ts service checks these scores upon booking to determine execution modes (Auto-Confirm, Require-Review, Blacklist-Block).
+
+#### 6. Execution Steps (Chronological)
+1. **[x] Models & Types**: Update `trip.ts`, `driver.ts`, `passenger.ts`, and `fleet.ts` with governance fields (`isBlacklisted`, `isArchived`, `auditLog`). Add Customer Score / Driver Score schemas. Add `VehicleAssignmentShift`.
+2. **[x] Booking Rules Engine (Mode A, B, C)**: Implement a service to evaluate trip requests against rules (Scores, Time-of-day, Blacklist) to determine the execution mode.
+3. **[x] Temporal Vehicle Shifts**: Create `vehicle-assignment.service.ts` to manage shifts when drivers go on duty. Update `driver.service.ts` to integrate this.
+4. **[x] Immutable Snapshots**: Update `firebase-booking.service.ts` to capture the assigned vehicle's snapshot at the time of dispatch.
+5. **[x] Admin UI Integration**:
+   * Update Dispatch UI to flag Mode B "Requires Review" trips.
+   * Update Operators/Customers UI to display Scores and toggle Blacklist status.
+   * Build an Admin Rules Tab for configuring Booking Policies.
+
+### 17.3 Universal Governance
+- Entities support isArchived, isBlacklisted, lacklistReason for system-wide exclusion.

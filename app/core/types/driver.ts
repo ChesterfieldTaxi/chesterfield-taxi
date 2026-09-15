@@ -45,6 +45,27 @@ export interface DriverProfile {
   avatarUrl?: string;
   lastActiveAt?: string;
   schedule?: DriverScheduleConfig;
+  
+  /** Universal Governance & Scoring (Phase 29) */
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
+  
+  driverScore?: number; // 0-100 metric
+  acceptanceRate?: number; // %
+  onTimeArrivalRate?: number; // %
+  completionRatio?: number; // %
+  averageRating?: number; // 1.0 - 5.0
+}
+
+export interface VehicleAssignmentShift {
+  id: string;
+  driverId: string;
+  vehicleId: string;
+  vehicleNumber: string;
+  startedAt: string; // ISO 8601
+  endedAt?: string; // ISO 8601
+  status: 'active' | 'completed';
 }
 
 

@@ -462,3 +462,20 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Create official user account in Firebase Auth / User Database with appropriate role (`driver`, `dispatcher`, `accountant`, or `admin`).
   - Automatically link or create their Driver Profile in the fleet system if the applicant is a Driver.
   - Generate secure initial temporary credentials and render a printable/copyable welcome dispatch sheet (with automated email trigger payload).
+
+## 24. Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine + Dual Scoring & Conditional Booking Rules
+- **Temporal Shift Mapping (/vehicleAssignments)**:
+  - Record a shift session (driverId, ehicleId, ehicleNumber, startedAt, endedAt, status) when a driver toggles ON-DUTY or selects a vehicle.
+  - Temporal query helpers for looking up driver/vehicle combinations at historical timestamps.
+- **Immutable Trip Snapshots & Comprehensive Audit Trail**:
+  - Freeze vehicle metadata on assignment (ssignedVehicle) to prevent historical confusion.
+  - uditLog event array on every trip for capturing timestamped actions, actor IDs, rules matched, and context.
+- **Dual Scoring System (Customer & Driver)**:
+  - Customer Score (0-100): tracks cancellation rates, no-shows, ratings.
+  - Driver Score (0-100): tracks acceptance %, on-time rate, completion ratio, rider ratings.
+- **Conditional Booking Lifecycle Engine**:
+  - Evaluates rules against Customer Score, Driver Score threshold, etc.
+  - Mode A (AUTO_CONFIRM), Mode B (REQUIRE_REVIEW), Mode C (BLACKLIST_BLOCK).
+- **Universal Archive, Blacklist & Admin Governance UI**:
+  - Status fields (isArchived, isBlacklisted, lacklistReason) across core entities.
+  - Governance UI for Conditional Booking Policies, Geo-Fence exclusion, and Score thresholds in /admin?tab=dispatch&sub=rules.

@@ -168,6 +168,27 @@ export class DriverService {
         localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + id, JSON.stringify(updated));
       } catch {}
     }
+    
+    // Shift Tracking Logic
+    try {
+      const { getVehicleAssignmentService } = await import('./fleet/vehicle-assignment.service');
+      const assignmentService = getVehicleAssignmentService();
+      
+      // If toggling off_duty, end active shift if any is stored locally (simplified for now)
+      if (status === 'off_duty') {
+        const activeShiftId = typeof window !== 'undefined' ? localStorage.getItem('active_shift_id_' + id) : null;
+        if (activeShiftId) {
+          await assignmentService.endShift(activeShiftId);
+          if (typeof window !== 'undefined') localStorage.removeItem('active_shift_id_' + id);
+        }
+      } else if (status === 'on_duty' && updated.vehicleUnit) {
+         // Generate a mock vehicle ID for now, since we only have unit number string
+         const shift = await assignmentService.startShift(id, 'veh-' + updated.vehicleUnit.replace(/\D/g, ''), updated.vehicleUnit);
+         if (typeof window !== 'undefined') localStorage.setItem('active_shift_id_' + id, shift.id);
+      }
+    } catch (err) {
+      console.warn('Failed to update vehicle assignment shift', err);
+    }
 
     this.notifyDriverListeners(updated);
     return updated;
@@ -258,8 +279,44 @@ export class DriverService {
       assignedDriverId: driverId,
       reason: reason || ('Driver transitioned trip to ' + targetStatus),
     });
+    
+    // Update driver score if completed
+    if (targetStatus === 'completed') {
+      try {
+        const driverProfile = await this.getDriverProfile(driverId);
+        const prevRatio = driverProfile.completionRatio || 100;
+        const newRatio = Math.min(100, prevRatio + 0.1); // Mock increment
+        
+        await this.updateDriverScore(driverId, { completionRatio: newRatio });
+      } catch(err) {
+        console.warn('Failed to update driver score', err);
+      }
+    }
 
     return updated;
+  }
+  
+  public async updateDriverScore(driverId: string, scores: Partial<DriverProfile>): Promise<DriverProfile> {
+     const current = await this.getDriverProfile(driverId);
+     const updated = { ...current, ...scores };
+     
+     if (isFirebaseConfigured()) {
+       try {
+         const db = getFirestoreDb();
+         const ref = doc(db, 'drivers', driverId);
+         await setDoc(ref, sanitizePayload(updated), { merge: true });
+       } catch (e) {
+         console.warn('[DriverService] Error updating driver score:', e);
+       }
+     }
+     
+     if (typeof window !== 'undefined') {
+       try {
+         localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + driverId, JSON.stringify(updated));
+       } catch {}
+     }
+     this.notifyDriverListeners(updated);
+     return updated;
   }
 
   /**

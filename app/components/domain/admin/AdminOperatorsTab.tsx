@@ -637,6 +637,12 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                               {op.assignedUnit}
                             </Badge>
                           )}
+                          <div className="mt-1">
+                             <span className="text-[10px] font-bold text-slate-500 mr-1">Score:</span>
+                             <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 px-1 rounded">
+                                {(op as any).driverScore ?? 100} / 100
+                             </span>
+                          </div>
                         </div>
                       ) : (
                         <span className="text-slate-400 text-[11px]">N/A (Staff)</span>
@@ -645,23 +651,32 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
                     {/* Status Toggle */}
                     <td className="px-5 py-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(op)}
-                        disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all ${
-                          op.status === 'suspended'
-                            ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                            : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            op.status === 'suspended' ? 'bg-rose-600' : 'bg-emerald-600'
+                      <div className="flex flex-col gap-1 items-start">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(op)}
+                          disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all ${
+                            op.status === 'suspended'
+                              ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                              : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                           }`}
-                        />
-                        <span>{op.status === 'suspended' ? 'Suspended' : 'Active'}</span>
-                      </button>
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              op.status === 'suspended' ? 'bg-rose-600' : 'bg-emerald-600'
+                            }`}
+                          />
+                          <span>{op.status === 'suspended' ? 'Suspended' : 'Active'}</span>
+                        </button>
+
+                        {/* Universal Governance - Blacklist Indicator */}
+                        {(op as any).isBlacklisted && (
+                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white border border-slate-700">
+                             ⛔ BLACKLISTED
+                           </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Actions */}

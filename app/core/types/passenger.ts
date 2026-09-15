@@ -44,4 +44,15 @@ export interface PassengerAccount {
   communicationPreferences: CommunicationPreferences;
   savedPlaces: SavedPlace[];
   recentSearches?: string[];
+
+  /** Universal Governance & Scoring (Phase 29) */
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  blacklistReason?: string;
+  
+  customerScore?: number; // 0-100 metric
+  totalTrips?: number;
+  cancellationRate?: number; // %
+  noShows?: number;
+  averageRating?: number; // 1.0 - 5.0
 }

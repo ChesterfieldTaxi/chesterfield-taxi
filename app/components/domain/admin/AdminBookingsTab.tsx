@@ -169,6 +169,13 @@ export function AdminBookingsTab() {
 
       case 'cancelled':
         return <Badge variant="neutral">Cancelled</Badge>;
+      case 'unconfirmed':
+         // Phase 29: Flag for Requires Review
+         return (
+           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 animate-pulse">
+             ⚠️ Requires Review
+           </span>
+         );
       default:
         return <Badge variant="neutral">{status}</Badge>;
     }
