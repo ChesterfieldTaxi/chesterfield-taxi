@@ -35,31 +35,32 @@ export default function SignIn() {
     
     const unsubscribe = authService.onAuthStateChanged((currentUser) => {
       if (currentUser) {
-        handleRedirect(currentUser.role);
+        handleRedirect(currentUser.roles || [], currentUser.role);
       }
     });
 
     return unsubscribe;
   }, [navigate, searchParams]);
 
-  const handleRedirect = (role?: string) => {
+  const handleRedirect = (roles: string[] = [], role?: string) => {
     const redirect = searchParams.get('redirect');
+    const effectiveRoles = roles.length > 0 ? roles : (role ? [role] : []);
     
-    // Dedicated role-based destinations
-    if (role === 'admin') {
+    // Check highest privileges first
+    if (effectiveRoles.includes('admin')) {
       navigate(redirect && redirect.startsWith('/admin') ? redirect : '/admin', { replace: true });
       return;
     }
-    if (role === 'dispatcher') {
+    if (effectiveRoles.includes('dispatcher')) {
       navigate(redirect && redirect.startsWith('/dispatch') ? redirect : '/dispatch', { replace: true });
       return;
     }
-    if (role === 'driver') {
+    if (effectiveRoles.includes('driver')) {
       navigate(redirect && redirect.startsWith('/driver') ? redirect : '/driver', { replace: true });
       return;
     }
 
-    // Customer / Passenger default
+    // Default to app (customer portal)
     navigate(redirect || '/book', { replace: true });
   };
 
@@ -70,7 +71,7 @@ export default function SignIn() {
       setError(null);
       const authService = getAdminAuthService();
       const user = await authService.signIn(email, password);
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.message.includes('auth/invalid-credential') || err.message.includes('auth/wrong-password')) {
@@ -93,7 +94,7 @@ export default function SignIn() {
       setIsLoading(true);
       setError(null);
       const user = await getAdminAuthService().signInWithGoogle();
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign in failed');
     } finally {
@@ -106,7 +107,7 @@ export default function SignIn() {
       setIsLoading(true);
       setError(null);
       const user = await getAdminAuthService().signInWithFacebook();
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Facebook sign in failed');
     } finally {

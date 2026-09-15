@@ -437,3 +437,18 @@ export interface PassengerAccount {
 - On the `/track/$tripToken` route, detect if the current session is an unauthenticated guest.
 - Present a CTA to "Save Account & Claim Trips".
 - On account creation, link previous `email` or `phone` matching trips to the new Firebase UID.
+  
+## 16. Phase 28 Architecture: Admin Onboarding Center & Role Provisioning
+### 16.1 Admin Onboarding Queue (`/admin?tab=operators&sub=onboarding`)
+- **Table View**: Display incoming applicants from `/applications` collection.
+- **Filters**: Status filters (Pending, Under Review, Approved, Rejected).
+- **Candidate Dossier Card**: An expandable drawer displaying comprehensive application data (contact info, role, experience, address, license details, attached documents).
+
+### 16.2 Background & Compliance Verification Checklist
+- **Compliance Controls**: Interactive toggles in the Candidate Dossier for background check status, driver license verification, MVR clearance, and vehicle insurance approval.
+- **Audit Log**: Capture the admin user who reviewed and updated candidate statuses with timestamps.
+
+### 16.3 One-Click Account Provisioning & Role Injection
+- **Approve & Provision Account Action**: Automate user creation in Firebase Auth & `/users` collection with the corresponding role (`driver`, `dispatcher`, `accountant`, or `admin`).
+- **Driver Profile Linkage**: If the applicant is a driver, automatically link or create their Driver Profile in the fleet system.
+- **Temporary Credentials & Welcome Sheet**: Generate secure initial temporary credentials and render a printable/copyable dispatch sheet that triggers an automated email.

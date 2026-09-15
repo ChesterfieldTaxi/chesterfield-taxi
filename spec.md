@@ -448,4 +448,17 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Guest-to-User Account Linking**:
   - Adding an option on the Guest Tracking page (`/track/$tripToken`) for guests to "Save Account & Claim Trips" using their booking email/phone, attaching previous guest bookings to their new registered passenger profile in `/app`.
 
-
+### 24. Phase 28: Admin Onboarding Center, Candidate Processing & Role Provisioning
+- **Admin Onboarding Queue (`/admin?tab=operators&sub=onboarding`)**:
+  - Build a structured candidate processing dashboard with a table view listing incoming applicants from the `/applications` Firestore collection.
+  - Support status filters (Pending, Under Review, Approved, Rejected).
+  - **Candidate Dossier Card**: An expandable drawer displaying contact info, target role (Driver, Dispatcher, Accountant), experience, address, license details, and attached documents.
+- **Background & Compliance Verification Checklist**:
+  - Add interactive compliance controls inside the candidate drawer.
+  - Toggles for background check status, driver license verification, MVR clearance, and vehicle insurance approval.
+  - Audit log capturing which admin reviewed and updated candidate statuses.
+- **One-Click Account Provisioning & Role Injection**:
+  - Implement "Approve & Provision Account" action.
+  - Create official user account in Firebase Auth / User Database with appropriate role (`driver`, `dispatcher`, `accountant`, or `admin`).
+  - Automatically link or create their Driver Profile in the fleet system if the applicant is a Driver.
+  - Generate secure initial temporary credentials and render a printable/copyable welcome dispatch sheet (with automated email trigger payload).

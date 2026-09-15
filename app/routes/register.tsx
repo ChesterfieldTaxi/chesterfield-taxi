@@ -30,23 +30,25 @@ export default function Register() {
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser) => {
       if (currentUser) {
-        handleRedirect(currentUser.role);
+        handleRedirect(currentUser.roles || [], currentUser.role);
       }
     });
     return unsubscribe;
   }, [navigate]);
 
-  const handleRedirect = (userRole?: string) => {
+  const handleRedirect = (roles: string[] = [], role?: string) => {
     const redirect = searchParams.get('redirect');
-    if (userRole === 'admin') {
+    const effectiveRoles = roles.length > 0 ? roles : (role ? [role] : []);
+    
+    if (effectiveRoles.includes('admin')) {
       navigate(redirect && redirect.startsWith('/admin') ? redirect : '/admin', { replace: true });
       return;
     }
-    if (userRole === 'dispatcher') {
+    if (effectiveRoles.includes('dispatcher')) {
       navigate(redirect && redirect.startsWith('/dispatch') ? redirect : '/dispatch', { replace: true });
       return;
     }
-    if (userRole === 'driver') {
+    if (effectiveRoles.includes('driver')) {
       navigate(redirect && redirect.startsWith('/driver') ? redirect : '/driver', { replace: true });
       return;
     }
@@ -60,7 +62,7 @@ export default function Register() {
       setError(null);
       const authService = getAdminAuthService();
       const user = await authService.registerWithEmail(email, password, role, displayName);
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.message.includes('email-already-in-use')) {
@@ -83,7 +85,7 @@ export default function Register() {
       setIsLoading(true);
       setError(null);
       const user = await getAdminAuthService().signInWithGoogle(role);
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign up failed');
     } finally {
@@ -96,7 +98,7 @@ export default function Register() {
       setIsLoading(true);
       setError(null);
       const user = await getAdminAuthService().signInWithFacebook(role);
-      handleRedirect(user.role);
+      handleRedirect(user.roles || [], user.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Facebook sign up failed');
     } finally {

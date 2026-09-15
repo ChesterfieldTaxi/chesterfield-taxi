@@ -37,6 +37,9 @@ export interface DriverProfile {
   dutyStatus: DriverDutyStatus;
   vehicleUnit: string;
   vehicleTier: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
   currentTripId?: string | null;
   zone?: string;
   avatarUrl?: string;

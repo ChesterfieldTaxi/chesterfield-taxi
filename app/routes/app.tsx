@@ -66,10 +66,12 @@ export default function PassengerAppRoute() {
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
         navigate('/signin?message=unauthenticated&redirect=/app', { replace: true });
-      } else if (currentUser.role === 'dispatcher') {
-        navigate('/dispatch', { replace: true });
-      } else if (currentUser.role === 'driver') {
-        navigate('/driver', { replace: true });
+      } else {
+        const roles = currentUser.roles || [currentUser.role];
+        // If they are strictly a dispatcher or driver (and not a customer), boot them out of customer app
+        // However, if they have customer AND driver roles, let them stay.
+        // Usually, default redirect goes to highest privilege, but if they explicitly navigate to /app, we let them if they have the customer role or if we don't strictly ban admins.
+        // For now, allow anyone into the customer portal, as multi-role drivers might want to book a ride.
       }
     });
     return unsubscribe;

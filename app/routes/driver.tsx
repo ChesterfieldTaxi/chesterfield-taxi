@@ -79,7 +79,10 @@ export default function DriverAppRoute() {
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
         navigate('/signin?message=unauthenticated&redirect=/driver', { replace: true });
-      } else if (currentUser.role !== 'driver' && currentUser.role !== 'admin' && currentUser.role !== 'dispatcher') {
+      } else if (
+        !(currentUser.roles && (currentUser.roles.includes('driver') || currentUser.roles.includes('admin') || currentUser.roles.includes('dispatcher'))) &&
+        currentUser.role !== 'driver' && currentUser.role !== 'admin' && currentUser.role !== 'dispatcher'
+      ) {
         navigate('/signin?message=unauthorized', { replace: true });
       } else {
         setIsAuthChecking(false);

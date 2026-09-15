@@ -25,7 +25,8 @@ export interface AdminUser {
   email: string | null;
   displayName?: string | null;
   isDemo?: boolean;
-  role?: UserRole;
+  role?: UserRole; // Deprecated: Use roles array instead
+  roles?: UserRole[];
   phone?: string;
   status?: 'active' | 'inactive' | 'suspended';
   assignedVehicleUnit?: string;
@@ -40,8 +41,8 @@ export class AdminAuthService {
     this.isConfigured = isFirebaseConfigured();
   }
 
-  private async fetchUserRole(user: User): Promise<UserRole> {
-    if (!this.isConfigured) return 'customer';
+  private async fetchUserRoles(user: User): Promise<UserRole[]> {
+    if (!this.isConfigured) return ['customer'];
 
     try {
       const db = getFirestore(getFirebaseApp());
@@ -50,12 +51,25 @@ export class AdminAuthService {
 
       if (userSnap.exists()) {
         const data = userSnap.data();
-        let role = data?.role as UserRole | undefined;
+        let roles = data?.roles as UserRole[] | undefined;
+        let singleRole = data?.role as UserRole | undefined;
+
+        if (singleRole && (!roles || roles.length === 0)) {
+          // Self-heal: migrate single role to roles array
+          roles = [singleRole];
+          await setDoc(userRef, { roles }, { merge: true });
+        }
+
+        if (!roles || roles.length === 0) {
+          roles = ['customer'];
+        }
 
         // Self-healing: if a test driver account got stuck as 'customer', force upgrade it
-        if (role === 'customer' && user.email && user.email.toLowerCase().includes('driver')) {
-          role = 'driver';
-          await setDoc(userRef, { role }, { merge: true });
+        if (roles.includes('customer') && user.email && user.email.toLowerCase().includes('driver')) {
+          roles = roles.filter(r => r !== 'customer');
+          if (!roles.includes('driver')) roles.push('driver');
+          await setDoc(userRef, { roles, role: 'driver' }, { merge: true });
+          
           // Ensure a driver profile exists too
           try {
             const driverRef = doc(db, 'drivers', user.uid);
@@ -71,27 +85,25 @@ export class AdminAuthService {
           } catch (e) {}
         }
 
-        if (role) {
-          return role;
-        }
+        return roles;
       }
 
       // Auto-provision primary admin or dispatcher if using operational emails
       if (user.email === 'admin@chesterfieldtaxi.com') {
-        const adminRole: UserRole = 'admin';
-        await setDoc(userRef, { role: adminRole, email: user.email }, { merge: true });
-        return adminRole;
+        const adminRoles: UserRole[] = ['admin'];
+        await setDoc(userRef, { roles: adminRoles, role: 'admin', email: user.email }, { merge: true });
+        return adminRoles;
       }
 
       if (user.email === 'dispatch@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('dispatch'))) {
-        const dispatchRole: UserRole = 'dispatcher';
-        await setDoc(userRef, { role: dispatchRole, email: user.email }, { merge: true });
-        return dispatchRole;
+        const dispatchRoles: UserRole[] = ['dispatcher'];
+        await setDoc(userRef, { roles: dispatchRoles, role: 'dispatcher', email: user.email }, { merge: true });
+        return dispatchRoles;
       }
 
       if (user.email === 'driver1@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('driver'))) {
-        const driverRole: UserRole = 'driver';
-        await setDoc(userRef, { role: driverRole, email: user.email }, { merge: true });
+        const driverRoles: UserRole[] = ['driver'];
+        await setDoc(userRef, { roles: driverRoles, role: 'driver', email: user.email }, { merge: true });
         
         // Ensure a driver profile exists in the drivers collection
         try {
@@ -109,14 +121,14 @@ export class AdminAuthService {
           console.warn('[AdminAuthService] Error provisioning driver profile:', e);
         }
         
-        return driverRole;
+        return driverRoles;
       }
 
       // Default to customer
-      return 'customer';
+      return ['customer'];
     } catch (err) {
-      console.warn('[AdminAuthService] Error fetching user role from Firestore:', err);
-      return 'customer';
+      console.warn('[AdminAuthService] Error fetching user roles from Firestore:', err);
+      return ['customer'];
     }
   }
 
@@ -140,6 +152,7 @@ export class AdminAuthService {
             email: auth.currentUser.email,
             displayName: auth.currentUser.displayName,
             role: 'customer',
+            roles: ['customer'],
           };
         }
       } catch (err) {
@@ -171,12 +184,13 @@ export class AdminAuthService {
         const auth = getFirebaseAuth();
         return firebaseOnAuthStateChanged(auth, async (user: User | null) => {
           if (user) {
-            const role = await this.fetchUserRole(user);
+            const roles = await this.fetchUserRoles(user);
             callback({
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
-              role,
+              role: roles[0] || 'customer',
+              roles,
             });
           } else {
             // Check if demo user is in storage
@@ -202,12 +216,13 @@ export class AdminAuthService {
       try {
         const auth = getFirebaseAuth();
         const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-        const role = await this.fetchUserRole(cred.user);
+        const roles = await this.fetchUserRoles(cred.user);
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
-          role,
+          role: roles[0] || 'customer',
+          roles,
         };
       } catch (err: unknown) {
         console.warn('[AdminAuthService] Firebase Auth sign-in error:', err);
@@ -237,6 +252,7 @@ export class AdminAuthService {
           'Chesterfield ' + role,
         isDemo: true,
         role,
+        roles: [role],
       };
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
@@ -285,13 +301,20 @@ export class AdminAuthService {
           actualRole = 'dispatcher';
         }
 
-        await setDoc(userRef, { email: trimmedEmail, role: actualRole, displayName: displayName || null, status: 'active' }, { merge: true });
+        await setDoc(userRef, { 
+          role: actualRole,
+          roles: [actualRole],
+          email: trimmedEmail,
+          displayName: displayName || trimmedEmail.split('@')[0],
+          createdAt: new Date().toISOString()
+        }, { merge: true });
         
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: displayName || cred.user.displayName,
           role: actualRole,
+          roles: [actualRole],
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth registration error:', err);
@@ -310,26 +333,14 @@ export class AdminAuthService {
         const cred = await signInWithPopup(auth, provider);
         
         // Fetch or create user role
-        const db = getFirestore(getFirebaseApp());
-        const userRef = doc(db, 'users', cred.user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        let userRole = role;
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          if (data && data.role) {
-            userRole = data.role as UserRole;
-          }
-        } else {
-          // First time sign-in via Google, set role
-          await setDoc(userRef, { email: cred.user.email, role, displayName: cred.user.displayName, status: 'active' }, { merge: true });
-        }
+        const roles = await this.fetchUserRoles(cred.user);
         
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
-          role: userRole,
+          role: roles[0] || role,
+          roles,
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth Google sign-in error:', err);
@@ -347,26 +358,14 @@ export class AdminAuthService {
         const cred = await signInWithPopup(auth, provider);
         
         // Fetch or create user role
-        const db = getFirestore(getFirebaseApp());
-        const userRef = doc(db, 'users', cred.user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        let userRole = role;
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          if (data && data.role) {
-            userRole = data.role as UserRole;
-          }
-        } else {
-          // First time sign-in via Facebook, set role
-          await setDoc(userRef, { email: cred.user.email, role, displayName: cred.user.displayName, status: 'active' }, { merge: true });
-        }
+        const roles = await this.fetchUserRoles(cred.user);
         
         return {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
-          role: userRole,
+          role: roles[0] || role,
+          roles,
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth Facebook sign-in error:', err);

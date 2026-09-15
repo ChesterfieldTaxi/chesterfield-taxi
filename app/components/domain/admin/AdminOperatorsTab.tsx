@@ -16,6 +16,7 @@ export interface OperatorUser {
   email: string;
   displayName?: string;
   role: UserRole;
+  roles?: UserRole[];
   phone?: string;
   driverLicense?: string;
   assignedUnit?: string;
@@ -78,7 +79,21 @@ const DEFAULT_OPERATORS: OperatorUser[] = [
   },
 ];
 
-export function AdminOperatorsTab() {
+import { AdminOnboardingQueue } from './subpages/AdminOnboardingQueue';
+
+export interface AdminOperatorsTabProps {
+  initialSubTab?: 'roster' | 'onboarding';
+}
+
+export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTabProps) {
+  const [subTab, setSubTab] = useState<'roster' | 'onboarding'>(initialSubTab || 'roster');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const [operators, setOperators] = useState<OperatorUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,22 +133,28 @@ export function AdminOperatorsTab() {
         const fetched: OperatorUser[] = [];
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          fetched.push({
-            uid: docSnap.id,
-            email: data.email || 'unknown@chesterfieldtaxi.com',
-            displayName: data.displayName || data.name || '',
-            role: (data.role as UserRole) || 'customer',
-            phone: data.phone || data.phoneNumber || '',
-            driverLicense: data.driverLicense || '',
-            assignedUnit: data.assignedUnit || '',
-            status: data.status || 'active',
-            createdAt: data.createdAt,
-            lastLogin: data.lastLogin,
-          });
+          const roles = (data.roles as UserRole[]) || (data.role ? [data.role as UserRole] : ['customer']);
+          const primaryRole = roles[0] || 'customer';
+          
+          if (!roles.includes('customer') || roles.length > 1) {
+            fetched.push({
+              uid: docSnap.id,
+              email: data.email || 'unknown@chesterfieldtaxi.com',
+              displayName: data.displayName || data.name || '',
+              role: primaryRole,
+              roles,
+              phone: data.phone || data.phoneNumber || '',
+              driverLicense: data.driverLicense || '',
+              assignedUnit: data.assignedUnit || '',
+              status: data.status || 'active',
+              createdAt: data.createdAt,
+              lastLogin: data.lastLogin,
+            });
+          }
         });
 
         // Merge default drivers if not present in fresh Firestore
-        const hasDrivers = fetched.some((u) => u.role === 'driver');
+        const hasDrivers = fetched.some((u) => u.roles?.includes('driver') || u.role === 'driver');
         if (!hasDrivers) {
           fetched.push(...DEFAULT_OPERATORS.filter((o) => o.role === 'driver'));
         }
@@ -151,7 +172,7 @@ export function AdminOperatorsTab() {
     fetchUsers();
   }, []);
 
-  const handleUpdateRole = async (uid: string, email: string, role: UserRole) => {
+  const handleUpdateRole = async (uid: string, email: string, roles: UserRole[]) => {
     setIsSaving(true);
     setError(null);
     setSuccess(null);
@@ -159,12 +180,12 @@ export function AdminOperatorsTab() {
       if (isFirebaseConfigured()) {
         const db = getFirestore(getFirebaseApp());
         const userRef = doc(db, 'users', uid);
-        await setDoc(userRef, { role, email }, { merge: true });
+        await setDoc(userRef, { roles, role: roles[0] || 'customer', email }, { merge: true });
       }
       setOperators((prev) =>
-        prev.map((op) => (op.uid === uid ? { ...op, role } : op))
+        prev.map((op) => (op.uid === uid ? { ...op, roles, role: roles[0] || 'customer' } : op))
       );
-      setSuccess(`Role updated to ${role.toUpperCase()} for ${email}.`);
+      setSuccess(`Roles updated to ${roles.join(', ')} for ${email}.`);
       setTimeout(() => setSuccess(null), 3500);
     } catch (err: any) {
       setError(err.message || 'Failed to update role.');
@@ -344,6 +365,10 @@ export function AdminOperatorsTab() {
     };
   }, [operators]);
 
+  if (subTab === 'onboarding') {
+    return <AdminOnboardingQueue />;
+  }
+
   return (
     <div className="space-y-6">
       {/* ─── Operators Top Action Bar ─── */}
@@ -509,27 +534,31 @@ export function AdminOperatorsTab() {
 
                     {/* Role Dropdown */}
                     <td className="px-5 py-3.5">
-                      <select
-                        value={op.role}
-                        onChange={(e) =>
-                          handleUpdateRole(op.uid, op.email, e.target.value as UserRole)
-                        }
-                        disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
-                        className={`text-xs font-bold rounded-lg px-2.5 py-1 border transition-colors cursor-pointer ${
-                          op.role === 'admin'
-                            ? 'bg-purple-50 text-purple-800 border-purple-200'
-                            : op.role === 'dispatcher'
-                            ? 'bg-blue-50 text-blue-800 border-blue-200'
-                            : op.role === 'driver'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            : 'bg-slate-50 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        <option value="driver">🚕 Driver</option>
-                        <option value="dispatcher">🎧 Dispatcher</option>
-                        <option value="admin">🛡️ Administrator</option>
-                        <option value="customer">👤 Customer</option>
-                      </select>
+                      <div className="flex flex-col gap-1">
+                        {['driver', 'dispatcher', 'admin'].map(r => (
+                          <label key={r} className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
+                            <input
+                              type="checkbox"
+                              disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
+                              checked={(op.roles || [op.role]).includes(r as UserRole)}
+                              onChange={(e) => {
+                                const currentRoles = op.roles || [op.role];
+                                let newRoles = currentRoles;
+                                if (e.target.checked) {
+                                  if (!currentRoles.includes(r as UserRole)) {
+                                    newRoles = [...currentRoles, r as UserRole];
+                                  }
+                                } else {
+                                  newRoles = currentRoles.filter(cr => cr !== r);
+                                }
+                                if (newRoles.length === 0) newRoles = ['customer'];
+                                handleUpdateRole(op.uid, op.email, newRoles);
+                              }}
+                            />
+                            {r === 'driver' ? '🚕 Driver' : r === 'dispatcher' ? '🎧 Dispatcher' : '🛡️ Admin'}
+                          </label>
+                        ))}
+                      </div>
                     </td>
 
                     {/* Contact Details */}

@@ -302,7 +302,10 @@ export default function DispatchRoute() {
     const unsubscribe = getAdminAuthService().onAuthStateChanged((currentUser) => {
       if (!currentUser) {
         navigate('/signin?message=unauthenticated&redirect=/dispatch', { replace: true });
-      } else if (currentUser.role !== 'admin' && currentUser.role !== 'dispatcher') {
+      } else if (
+        !(currentUser.roles && (currentUser.roles.includes('admin') || currentUser.roles.includes('dispatcher'))) &&
+        currentUser.role !== 'admin' && currentUser.role !== 'dispatcher'
+      ) {
         navigate('/signin?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);

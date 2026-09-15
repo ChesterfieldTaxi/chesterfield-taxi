@@ -117,7 +117,7 @@ const PRIMARY_TABS: TabItem[] = [
   },
   {
     key: 'operators',
-    label: 'Operators',
+    label: 'Drivers & Staff',
     icon: UserCheckIcon,
     description: 'Integrated staff and driver roster table with role management (RBAC), contact info, and status',
   },
@@ -171,7 +171,10 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'groups', label: 'Zone Groups' },
     { key: 'collections', label: 'POI Collections' },
   ],
-  operators: [],
+  operators: [
+    { key: 'roster', label: 'Roster' },
+    { key: 'onboarding', label: 'Onboarding Queue' },
+  ],
   general: [
     { key: 'studio', label: 'Branding Studio' },
     { key: 'profile', label: 'Business Profile' },
@@ -258,7 +261,7 @@ export default function AdminLayout() {
     const unsubscribe = authService.onAuthStateChanged((currentUser) => {
       if (!currentUser) {
         navigate('/signin?message=unauthenticated&redirect=/admin', { replace: true });
-      } else if (currentUser.role !== 'admin') {
+      } else if (currentUser.roles && !currentUser.roles.includes('admin') && currentUser.role !== 'admin') {
         navigate('/signin?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
@@ -514,7 +517,7 @@ export default function AdminLayout() {
 
             {normalizedTab === 'zones' && <AdminZonesTab initialSubTab={effectiveSub as any} />}
 
-            {normalizedTab === 'operators' && <AdminOperatorsTab />}
+            {normalizedTab === 'operators' && <AdminOperatorsTab initialSubTab={effectiveSub as any} />}
 
             {normalizedTab === 'advanced' && (
               <AdminAdvancedTab
