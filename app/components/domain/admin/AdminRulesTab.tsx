@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -17,16 +16,626 @@ import {
   SparklesIcon,
   MapPinIcon,
   DollarSignIcon,
+  CompassIcon,
+  InfoIcon,
 } from '../../ui/Icons';
 import {
   BookingRulesEngine,
   type BookingRulesConfig,
   type BookingExecutionMode,
+  type ModularTierConfig,
+  type RuleLocationMode,
+  type RuleTimeMode,
+  type RulePaymentMethod,
   DEFAULT_BOOKING_RULES_CONFIG,
 } from '../../../core/services/bookingRulesEngine';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../../../core/types/zone';
+
+interface ModularTierCardProps {
+  tierKey: 'tier1' | 'tier2' | 'tier3';
+  tierNumber: 1 | 2 | 3;
+  title: string;
+  subtitle: string;
+  colorTheme: 'emerald' | 'amber' | 'rose';
+  config: ModularTierConfig;
+  zones: ZoneGeofence[];
+  onChange: (updated: ModularTierConfig) => void;
+}
+
+const PAYMENT_OPTIONS: { id: RulePaymentMethod; label: string; hint: string }[] = [
+  { id: 'prepaid', label: 'Prepaid In-App', hint: 'Card or digital wallet charged online' },
+  { id: 'corporate', label: 'Corporate Account', hint: 'Direct invoicing billing contract' },
+  { id: 'card', label: 'Credit Card (In-Car)', hint: 'Swiped/inserted with driver POS' },
+  { id: 'cash', label: 'Cash on Board', hint: 'Direct cash payment to operator' },
+  { id: 'voucher', label: 'Voucher / Invoiced', hint: 'Government or partner vouchers' },
+];
+
+const VEHICLE_TIER_OPTIONS = [
+  { id: 'standard', label: 'Standard Sedan' },
+  { id: 'premium', label: 'Executive Premium' },
+  { id: 'xl', label: 'XL 6-Passenger SUV' },
+  { id: 'wheelchair', label: 'Wheelchair WAV' },
+];
+
+function ModularTierCard({
+  tierKey,
+  tierNumber,
+  title,
+  subtitle,
+  colorTheme,
+  config,
+  zones,
+  onChange,
+}: ModularTierCardProps) {
+  const themeClasses = {
+    emerald: {
+      border: 'border-emerald-300',
+      badgeBg: 'bg-emerald-600 text-white',
+      headerBg: 'bg-emerald-50/70 border-b border-emerald-200/60',
+      activeText: 'text-emerald-800',
+      accentColor: 'emerald',
+      lightBox: 'bg-emerald-50/40 border-emerald-200/70',
+      pillActive: 'bg-emerald-600 text-white border-emerald-600',
+    },
+    amber: {
+      border: 'border-amber-300',
+      badgeBg: 'bg-amber-600 text-white',
+      headerBg: 'bg-amber-50/70 border-b border-amber-200/60',
+      activeText: 'text-amber-800',
+      accentColor: 'amber',
+      lightBox: 'bg-amber-50/40 border-amber-200/70',
+      pillActive: 'bg-amber-600 text-white border-amber-600',
+    },
+    rose: {
+      border: 'border-rose-300',
+      badgeBg: 'bg-rose-600 text-white',
+      headerBg: 'bg-rose-50/70 border-b border-rose-200/60',
+      activeText: 'text-rose-800',
+      accentColor: 'rose',
+      lightBox: 'bg-rose-50/40 border-rose-200/70',
+      pillActive: 'bg-rose-600 text-white border-rose-600',
+    },
+  }[colorTheme];
+
+  const update = (partial: Partial<ModularTierConfig>) => {
+    onChange({ ...config, ...partial });
+  };
+
+  const togglePaymentMethod = (method: RulePaymentMethod) => {
+    const current = config.paymentMethods || [];
+    if (current.includes(method)) {
+      update({ paymentMethods: current.filter((m) => m !== method) });
+    } else {
+      update({ paymentMethods: [...current, method] });
+    }
+  };
+
+  const toggleZone = (type: 'pickup' | 'dropoff', zoneId: string) => {
+    if (type === 'pickup') {
+      const current = config.pickupZoneIds || [];
+      if (current.includes(zoneId)) {
+        update({ pickupZoneIds: current.filter((id) => id !== zoneId) });
+      } else {
+        update({ pickupZoneIds: [...current, zoneId] });
+      }
+    } else {
+      const current = config.dropoffZoneIds || [];
+      if (current.includes(zoneId)) {
+        update({ dropoffZoneIds: current.filter((id) => id !== zoneId) });
+      } else {
+        update({ dropoffZoneIds: [...current, zoneId] });
+      }
+    }
+  };
+
+  const toggleVehicleTier = (tierId: string) => {
+    const current = config.allowedVehicleTiers || [];
+    if (current.includes(tierId)) {
+      update({ allowedVehicleTiers: current.filter((id) => id !== tierId) });
+    } else {
+      update({ allowedVehicleTiers: [...current, tierId] });
+    }
+  };
+
+  return (
+    <Card className={`border-2 shadow-xs transition-all ${themeClasses.border} overflow-hidden`}>
+      {/* ─── Card Header ─── */}
+      <div className={`p-4 sm:p-5 ${themeClasses.headerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+        <div className="flex items-start sm:items-center gap-3">
+          <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md ${themeClasses.badgeBg}`}>
+            Tier {tierNumber} Controls
+          </span>
+          <div>
+            <h3 className="text-base font-black text-slate-900">{title}</h3>
+            <p className="text-xs text-slate-500 font-medium">{subtitle}</p>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto shrink-0 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs">
+          <input
+            type="checkbox"
+            checked={config.enabled}
+            onChange={(e) => update({ enabled: e.target.checked })}
+            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+          <span className="text-xs font-bold text-slate-800">
+            Enable Tier {tierNumber}
+          </span>
+        </label>
+      </div>
+
+      <CardContent className="p-4 sm:p-6 space-y-6 bg-white">
+        {/* ─── 1. Customer Score & Rider Verification ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <UserIcon className="w-4 h-4 text-slate-500" />
+            <span>1. Customer Score &amp; Rider Profile</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-700">Customer Score Floor (Min)</span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800">
+                  ★ {config.customerScoreMin}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={config.customerScoreMin}
+                onChange={(e) => update({ customerScoreMin: parseInt(e.target.value) || 0 })}
+                className="w-full accent-blue-600 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-medium mt-1">
+                <span>0 (Any)</span>
+                <span>50</span>
+                <span>100 (VIP only)</span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-700">Customer Score Ceiling (Max)</span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800">
+                  ★ {config.customerScoreMax}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={config.customerScoreMax}
+                onChange={(e) => update({ customerScoreMax: parseInt(e.target.value) || 100 })}
+                className="w-full accent-blue-600 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 font-medium mt-1">
+                <span>0</span>
+                <span>Target Band: [{config.customerScoreMin} – {config.customerScoreMax}]</span>
+                <span>100</span>
+              </div>
+            </div>
+
+            <div className="md:col-span-2 pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.allowUnratedGuests}
+                  onChange={(e) => update({ allowUnratedGuests: e.target.checked })}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  Apply rule to first-time unrated guest riders (accounts with no score history)
+                </span>
+              </label>
+              <span className="text-[11px] text-slate-400 italic">
+                Active band: {config.customerScoreMin} to {config.customerScoreMax} points
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── 2. Granular Separated Spatial Routing ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <MapPinIcon className="w-4 h-4 text-slate-500" />
+            <span>2. Granular Spatial Routing (Separated Pickup &amp; Dropoff)</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Pickup Location Control */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Pickup Location Scope
+                </span>
+                <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
+                  {config.pickupLocationMode.toUpperCase()}
+                </Badge>
+              </div>
+
+              <select
+                value={config.pickupLocationMode}
+                onChange={(e) => update({ pickupLocationMode: e.target.value as RuleLocationMode })}
+                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all">Any Location (All Operational Zones)</option>
+                <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
+                <option value="airports">Airport Terminals &amp; Perimeters Only</option>
+                <option value="prohibited_only">Prohibited Safety Exclusion Geofences</option>
+                <option value="outside_service_area">Outside Service Perimeter / County</option>
+              </select>
+
+              {config.pickupLocationMode === 'specific_zones' && (
+                <div className="space-y-2 pt-2 border-t border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-600 block">Select Target Pickup Zones:</span>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
+                    {zones.length === 0 ? (
+                      <span className="text-xs text-slate-400 p-2">No active zones configured</span>
+                    ) : (
+                      zones.map((z) => {
+                        const isSelected = (config.pickupZoneIds || []).includes(z.id);
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => toggleZone('pickup', z.id)}
+                            className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isSelected && '✓ '}
+                            {z.name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Dropoff Location Control */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  Dropoff Location Scope
+                </span>
+                <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
+                  {config.dropoffLocationMode.toUpperCase()}
+                </Badge>
+              </div>
+
+              <select
+                value={config.dropoffLocationMode}
+                onChange={(e) => update({ dropoffLocationMode: e.target.value as RuleLocationMode })}
+                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all">Any Location (All Operational Zones)</option>
+                <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
+                <option value="airports">Airport Terminals &amp; Perimeters Only</option>
+                <option value="prohibited_only">Prohibited Safety Exclusion Geofences</option>
+                <option value="outside_service_area">Outside Service Perimeter / County</option>
+              </select>
+
+              {config.dropoffLocationMode === 'specific_zones' && (
+                <div className="space-y-2 pt-2 border-t border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-600 block">Select Target Dropoff Zones:</span>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
+                    {zones.length === 0 ? (
+                      <span className="text-xs text-slate-400 p-2">No active zones configured</span>
+                    ) : (
+                      zones.map((z) => {
+                        const isSelected = (config.dropoffZoneIds || []).includes(z.id);
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => toggleZone('dropoff', z.id)}
+                            className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isSelected && '✓ '}
+                            {z.name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── 3. Time Schedule & Fare Bounds ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <ClockIcon className="w-4 h-4 text-slate-500" />
+            <span>3. Operating Schedule &amp; Fare Bounds</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            {/* Time Schedule */}
+            <div className="space-y-3">
+              <span className="text-xs font-semibold text-slate-700 block">Operating Time Schedule</span>
+              <select
+                value={config.timeMode}
+                onChange={(e) => update({ timeMode: e.target.value as RuleTimeMode })}
+                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="all_hours">24/7 Continuous (All Hours)</option>
+                <option value="custom_window">Custom Operating Hours Window</option>
+                <option value="late_night">Late Night Enforcement Window</option>
+              </select>
+
+              {config.timeMode !== 'all_hours' && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Start Hour (24h)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={config.startHour}
+                      onChange={(e) => update({ startHour: parseInt(e.target.value) || 0 })}
+                      className="text-xs h-8 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">End Hour (24h)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={config.endHour}
+                      onChange={(e) => update({ endHour: parseInt(e.target.value) || 0 })}
+                      className="text-xs h-8 bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Fare Bounds */}
+            <div className="space-y-3">
+              <span className="text-xs font-semibold text-slate-700 block">Trip Price &amp; Fare Boundaries</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Min Price ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={config.minPrice}
+                      onChange={(e) => update({ minPrice: parseFloat(e.target.value) || 0 })}
+                      className="text-xs h-8 pl-6 bg-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Max Price ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={config.maxPrice}
+                      onChange={(e) => update({ maxPrice: parseFloat(e.target.value) || 0 })}
+                      className="text-xs h-8 pl-6 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                Trips outside this fare window trigger rule escalation.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── 4. Payment Types Matrix ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <DollarSignIcon className="w-4 h-4 text-slate-500" />
+            <span>4. Payment Types Matrix (Select applicable payment methods)</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {PAYMENT_OPTIONS.map((opt) => {
+                const isSelected = (config.paymentMethods || []).includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => togglePaymentMethod(opt.id)}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-2xs font-semibold'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      readOnly
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 pointer-events-none"
+                    />
+                    <div>
+                      <div className="text-xs font-bold">{opt.label}</div>
+                      <div className="text-[10px] text-slate-500 leading-tight">{opt.hint}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] text-slate-400 italic pt-1">
+              Selected: {(config.paymentMethods || []).map((p) => p.toUpperCase()).join(', ') || 'None selected'}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── 5. Advanced Booking Conditions & Operational Flags ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <SparklesIcon className="w-4 h-4 text-slate-500" />
+            <span>5. Advanced Booking Complexity &amp; Operational Flags</span>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.matchReturnBooked}
+                  onChange={(e) => update({ matchReturnBooked: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">🔄 Return Trip Booked</span>
+                  <span className="text-[11px] text-slate-500">Apply rule when round-trip reservation is detected</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.matchSeparateContactPerson}
+                  onChange={(e) => update({ matchSeparateContactPerson: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">👤 Separate Contact Person</span>
+                  <span className="text-[11px] text-slate-500">Apply rule when booker is different from passenger</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.matchIntermediateStops}
+                  onChange={(e) => update({ matchIntermediateStops: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">🛑 Multiple / Intermediate Stops</span>
+                  <span className="text-[11px] text-slate-500">Apply rule when trip includes 1+ intermediate waypoints</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.matchMultipleVehicles}
+                  onChange={(e) => update({ matchMultipleVehicles: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">🚗 Multiple Vehicles Requested</span>
+                  <span className="text-[11px] text-slate-500">Apply rule when reservation requests 2 or more cars</span>
+                </div>
+              </label>
+            </div>
+
+            {/* Vehicle Classes & Driver Standards */}
+            <div className="pt-3 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-[11px] font-bold text-slate-700 block mb-1.5">Allowed Vehicle Service Classes:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {VEHICLE_TIER_OPTIONS.map((vt) => {
+                    const isSelected = (config.allowedVehicleTiers || []).includes(vt.id);
+                    return (
+                      <button
+                        key={vt.id}
+                        type="button"
+                        onClick={() => toggleVehicleTier(vt.id)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 font-bold'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isSelected && '✓ '}
+                        {vt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  Min Driver Score for Premium Tiers
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={config.minDriverScoreForPremium ?? 85}
+                    onChange={(e) => update({ minDriverScoreForPremium: parseInt(e.target.value) || 0 })}
+                    className="text-xs h-8 w-24 bg-white"
+                  />
+                  <span className="text-xs text-slate-500">/ 100 points minimum</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tier 3 Security Safeguards (Only on Tier 3) */}
+            {tierKey === 'tier3' && (
+              <div className="pt-3 border-t border-rose-200 bg-rose-50/50 p-3 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                  <LockIcon className="w-3.5 h-3.5 text-rose-600" />
+                  Enterprise Security &amp; Audit Safeguards
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.enforcePassengerBlacklist ?? true}
+                      onChange={(e) => update({ enforcePassengerBlacklist: e.target.checked })}
+                      className="w-3.5 h-3.5 rounded text-rose-600"
+                    />
+                    <span className="font-medium text-slate-800">Block blacklisted passenger accounts</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.enforceVehicleGrounding ?? true}
+                      onChange={(e) => update({ enforceVehicleGrounding: e.target.checked })}
+                      className="w-3.5 h-3.5 rounded text-rose-600"
+                    />
+                    <span className="font-medium text-slate-800">Block grounded fleet vehicles</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.securityAuditLogging ?? true}
+                      onChange={(e) => update({ securityAuditLogging: e.target.checked })}
+                      className="w-3.5 h-3.5 rounded text-rose-600"
+                    />
+                    <span className="font-medium text-slate-800">Log immutable security audit events</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function AdminRulesTab() {
   const [config, setConfig] = useState<BookingRulesConfig>(() => {
@@ -54,38 +663,28 @@ export function AdminRulesTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  // ─── Live Simulator State ───
+  // ─── Real-Time Interactive Simulator State ───
   const [simCustomerScore, setSimCustomerScore] = useState<number>(85);
-  const [simIsBlacklisted, setSimIsBlacklisted] = useState<boolean>(false);
-  const [simIsNewCustomer, setSimIsNewCustomer] = useState<boolean>(false);
-  const [simHour, setSimHour] = useState<number>(14);
+  const [simIsUnratedGuest, setSimIsUnratedGuest] = useState<boolean>(false);
+  const [simPickupZoneId, setSimPickupZoneId] = useState<string>('any');
+  const [simDropoffZoneId, setSimDropoffZoneId] = useState<string>('any');
+  const [simPickupHour, setSimPickupHour] = useState<number>(14);
   const [simFare, setSimFare] = useState<number>(45);
-  const [simTier, setSimTier] = useState<'standard' | 'premium'>('standard');
-  const [simDriverScore, setSimDriverScore] = useState<number>(90);
-  const [simLocationRisk, setSimLocationRisk] = useState<'normal' | 'sensitive' | 'prohibited'>('normal');
+  const [simPaymentMethod, setSimPaymentMethod] = useState<RulePaymentMethod>('prepaid');
+  const [simReturnBooked, setSimReturnBooked] = useState<boolean>(false);
+  const [simSeparateContact, setSimSeparateContact] = useState<boolean>(false);
+  const [simHasStops, setSimHasStops] = useState<boolean>(false);
+  const [simMultipleVehicles, setSimMultipleVehicles] = useState<boolean>(false);
+  const [simVehicleTier, setSimVehicleTier] = useState<string>('standard');
 
   useEffect(() => {
-    const unsubscribe = getAdminConfigService().subscribeToSettings((settings) => {
-      if (settings.bookingRulesConfig) {
-        const raw = settings.bookingRulesConfig;
-        setConfig({
-          ...DEFAULT_BOOKING_RULES_CONFIG,
-          ...raw,
-          tier1: { ...DEFAULT_BOOKING_RULES_CONFIG.tier1, ...(raw.tier1 || {}) },
-          tier2: { ...DEFAULT_BOOKING_RULES_CONFIG.tier2, ...(raw.tier2 || {}) },
-          tier3: { ...DEFAULT_BOOKING_RULES_CONFIG.tier3, ...(raw.tier3 || {}) },
-        });
-      }
-    });
-
-    try {
-      const zService = getZoneService();
-      setZones(zService.getActiveZones());
-    } catch {
-      // zones fallback
-    }
-
-    return () => unsubscribe();
+    const zService = getZoneService();
+    zService
+      .getZones()
+      .then((res) => {
+        setZones(res.filter((z) => z.isActive && !z.isArchived));
+      })
+      .catch(() => {});
   }, []);
 
   const handleSave = async () => {
@@ -95,11 +694,11 @@ export function AdminRulesTab() {
       // Sync backward compatibility fields
       const syncConfig: BookingRulesConfig = {
         ...config,
-        minimumCustomerScoreForAutoConfirm: config.tier1.minCustomerScore ?? 70,
-        minimumDriverScoreForPremium: config.tier2.minimumDriverScoreForPremium ?? config.tier2.minDriverScoreForPremium ?? 85,
-        lateNightReviewRequired: config.tier2.lateNightReviewRequired ?? config.tier2.lateNightEnabled ?? true,
-        lateNightStartHour: config.tier2.lateNightStartHour ?? 23,
-        lateNightEndHour: config.tier2.lateNightEndHour ?? 4,
+        minimumCustomerScoreForAutoConfirm: config.tier1.customerScoreMin ?? 70,
+        minimumDriverScoreForPremium: config.tier2.minDriverScoreForPremium ?? 85,
+        lateNightReviewRequired: config.tier2.timeMode === 'late_night',
+        lateNightStartHour: config.tier2.startHour ?? 23,
+        lateNightEndHour: config.tier2.endHour ?? 4,
         blacklistEnabled: config.tier3.enabled ?? true,
       };
 
@@ -109,78 +708,69 @@ export function AdminRulesTab() {
       setSaveStatus('Booking rules successfully saved and active.');
       setTimeout(() => setSaveStatus(null), 4000);
     } catch (err: any) {
-      setSaveStatus('Failed to save rules: ' + (err?.message || String(err)));
+      console.error('Failed to save booking rules:', err);
+      setSaveStatus('Error saving booking rules: ' + err.message);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Evaluate the simulation against current config
-  const simEngine = useMemo(() => new BookingRulesEngine(config), [config]);
-
+  // ─── Real-Time Simulation Calculation ───
   const simResult = useMemo(() => {
-    const pickupDate = new Date();
-    pickupDate.setHours(simHour, 0, 0, 0);
+    const engine = new BookingRulesEngine(config);
 
-    const isProhibited = simLocationRisk === 'prohibited';
-    const isSensitive = simLocationRisk === 'sensitive';
+    const scheduledDate = new Date();
+    scheduledDate.setHours(simPickupHour, 0, 0, 0);
 
-    return simEngine.evaluateBookingRequest(
+    const isPickupAirport = simPickupZoneId === 'airport';
+    const isDropoffAirport = simDropoffZoneId === 'airport';
+    const isPickupProhibited = simPickupZoneId === 'prohibited';
+    const isDropoffProhibited = simDropoffZoneId === 'prohibited';
+
+    return engine.evaluateBookingRequest(
       {
-        vehicleTier: simTier,
-        scheduledPickupTime: pickupDate.toISOString(),
+        fare: simFare,
         fareEstimate: simFare,
-        pickupLocation: isProhibited
-          ? { address: 'Simulated High-Risk Zone', coordinates: { lat: 38.6631, lng: -90.5771 } }
-          : { address: '123 Main St, Chesterfield, MO', coordinates: { lat: 38.65, lng: -90.55 } },
+        scheduledPickupTime: scheduledDate.toISOString(),
+        paymentMethod: simPaymentMethod,
+        hasReturnTrip: simReturnBooked,
+        hasSeparateContactPerson: simSeparateContact,
+        hasIntermediateStops: simHasStops,
+        multipleVehiclesRequested: simMultipleVehicles,
+        vehicleTier: simVehicleTier as any,
+        pickupZoneId: simPickupZoneId !== 'any' ? simPickupZoneId : undefined,
+        dropoffZoneId: simDropoffZoneId !== 'any' ? simDropoffZoneId : undefined,
+        isPickupAirport,
+        isDropoffAirport,
+        isPickupProhibited,
+        isDropoffProhibited,
+        pickupAirportCode: isPickupAirport ? 'STL' : undefined,
       },
-      {
-        id: 'sim-passenger',
-        customerScore: simCustomerScore,
-        isBlacklisted: simIsBlacklisted,
-        blacklistReason: simIsBlacklisted ? 'Flagged for payment fraud / administrative blacklist' : undefined,
-        totalTrips: simIsNewCustomer ? 0 : 12,
-      } as any,
-      {
-        driverId: 'sim-driver',
-        driverScore: simDriverScore,
-      } as any,
-      isProhibited
-        ? [
-            {
-              id: 'sim-zone',
-              name: 'Prohibited Incident Zone',
-              coordinates: { lat: 38.6631, lng: -90.5771 },
-              radiusMiles: 2,
-              action: 'BLACKLIST_BLOCK',
-              isActive: true,
-              reasonCode: 'Prohibited spatial safety zone',
-            } as any,
-          ]
-        : isSensitive
-        ? [
-            {
-              id: 'sensitive-zone',
-              name: 'High Demand Entertainment Strip',
-              coordinates: { lat: 38.65, lng: -90.55 },
-              radiusMiles: 1,
-              action: 'REQUIRE_REVIEW',
-              isActive: true,
-              reasonCode: 'Sensitive congestion zone',
-            } as any,
-          ]
-        : []
+      simIsUnratedGuest
+        ? undefined
+        : ({
+            id: 'sim-customer-1',
+            email: 'sim@example.com',
+            phone: '314-555-0199',
+            fullName: 'Simulated Passenger',
+            customerScore: simCustomerScore,
+            isBlacklisted: false,
+          } as any)
     );
   }, [
-    simEngine,
+    config,
     simCustomerScore,
-    simIsBlacklisted,
-    simIsNewCustomer,
-    simHour,
+    simIsUnratedGuest,
+    simPickupZoneId,
+    simDropoffZoneId,
+    simPickupHour,
     simFare,
-    simTier,
-    simDriverScore,
-    simLocationRisk,
+    simPaymentMethod,
+    simReturnBooked,
+    simSeparateContact,
+    simHasStops,
+    simMultipleVehicles,
+    simVehicleTier,
   ]);
 
   return (
@@ -189,930 +779,352 @@ export function AdminRulesTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700">
-              <ShieldCheckIcon className="w-5 h-5" />
-            </div>
+            <span className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
+              <SlidersIcon className="w-5 h-5" />
+            </span>
             <div>
               <h2 className="text-xl font-black text-slate-900">3-Tier Conditional Booking Rules Engine</h2>
               <p className="text-xs text-slate-500 font-medium">
-                Tripartite decision matrix with isolated, dedicated controls for Customer Score, Locations, Operating Time, and Safety Thresholds.
+                Unified, identical modular controls across Auto-Confirm, Review Holds, and Security Blocks.
               </p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {saveStatus && (
-            <span
-              className={`text-xs font-bold ${
-                saveStatus.startsWith('Failed') ? 'text-rose-600' : 'text-emerald-600'
-              }`}
-            >
-              {saveStatus}
-            </span>
-          )}
           <Button
             variant="primary"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm"
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
           >
-            {isSaving && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
-            <span>{isSaving ? 'Saving...' : 'Save All Tier Rules'}</span>
+            {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+            Save All Rule Tiers
           </Button>
         </div>
       </div>
 
-      {/* ─── The 3-Tier Lifecycle Overview ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Tier 1 Overview */}
-        <div className="bg-emerald-50/70 border-2 border-emerald-300/80 rounded-2xl p-4 space-y-2 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-black tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-              Tier 1
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-200"></span>
-          </div>
-          <h4 className="text-sm font-black text-emerald-950 flex items-center gap-1.5">
-            <CheckIcon className="w-4 h-4 text-emerald-600" />
-            <span>Auto-Confirm (Mode A)</span>
-          </h4>
-          <p className="text-xs text-emerald-800/90">
-            Pass-through automation for trusted riders in allowed zones and daytime windows. Status becomes <strong>CONFIRMED</strong> immediately.
-          </p>
+      {saveStatus && (
+        <div
+          className={`p-4 rounded-xl border text-xs font-bold ${
+            saveStatus.includes('Error')
+              ? 'bg-rose-50 text-rose-800 border-rose-300'
+              : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+          }`}
+        >
+          {saveStatus}
         </div>
+      )}
 
-        {/* Tier 2 Overview */}
-        <div className="bg-amber-50/70 border-2 border-amber-300/80 rounded-2xl p-4 space-y-2 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-black tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
-              Tier 2
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-amber-200"></span>
-          </div>
-          <h4 className="text-sm font-black text-amber-950 flex items-center gap-1.5">
-            <AlertTriangleIcon className="w-4 h-4 text-amber-600" />
-            <span>Require Review (Mode B)</span>
-          </h4>
-          <p className="text-xs text-amber-800/90">
-            Held in dispatcher review queue. Triggered by low scores, late night hours, high fares, or sensitive zones. Status is <strong>UNCONFIRMED</strong>.
-          </p>
-        </div>
+      {/* ─── THE 3 IDENTICAL MODULAR TIER CARDS ─── */}
+      <div className="space-y-6">
+        {/* TIER 1: AUTO-CONFIRM */}
+        <ModularTierCard
+          tierKey="tier1"
+          tierNumber={1}
+          title="Tier 1: Auto-Confirm Direct Pass-Through"
+          subtitle="Trips satisfying all Tier 1 criteria bypass dispatcher review and dispatch automatically."
+          colorTheme="emerald"
+          config={config.tier1}
+          zones={zones}
+          onChange={(t1) => setConfig({ ...config, tier1: t1 })}
+        />
 
-        {/* Tier 3 Overview */}
-        <div className="bg-rose-50/70 border-2 border-rose-300/80 rounded-2xl p-4 space-y-2 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase font-black tracking-wider text-rose-800 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
-              Tier 3
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-4 ring-rose-200"></span>
-          </div>
-          <h4 className="text-sm font-black text-rose-950 flex items-center gap-1.5">
-            <LockIcon className="w-4 h-4 text-rose-600" />
-            <span>Blacklist Block (Mode C)</span>
-          </h4>
-          <p className="text-xs text-rose-800/90">
-            Hard security block (403 Forbidden). Triggered by suspended accounts, grounded vehicles, severe score floors, or prohibited spatial geofences.
-          </p>
-        </div>
+        {/* TIER 2: REQUIRE REVIEW */}
+        <ModularTierCard
+          tierKey="tier2"
+          tierNumber={2}
+          title="Tier 2: Require Human Review &amp; Dispatch Queue"
+          subtitle="Trips triggering any Tier 2 criteria are placed in the review queue for dispatcher manual clearance."
+          colorTheme="amber"
+          config={config.tier2}
+          zones={zones}
+          onChange={(t2) => setConfig({ ...config, tier2: t2 })}
+        />
+
+        {/* TIER 3: BLACKLIST & SECURITY BLOCK */}
+        <ModularTierCard
+          tierKey="tier3"
+          tierNumber={3}
+          title="Tier 3: Universal Hard Blacklist &amp; Security Block"
+          subtitle="Zero-tolerance safety controls. Immediate 403 rejection with immutable audit logging."
+          colorTheme="rose"
+          config={config.tier3}
+          zones={zones}
+          onChange={(t3) => setConfig({ ...config, tier3: t3 })}
+        />
       </div>
 
-      {/* ─── ISOLATED CONTROLS: TIER 1 (AUTO-CONFIRM) ─── */}
-      <Card variant="elevated" className="border-2 border-emerald-300 bg-emerald-50/20 shadow-xs">
-        <CardHeader className="bg-emerald-100/60 border-b border-emerald-200 pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-emerald-700 text-white">
-                Tier 1 Controls
-              </span>
-              <CardTitle className="text-base font-black text-emerald-950">
-                Auto-Confirm Policy &amp; Direct Pass-Through
-              </CardTitle>
+      {/* ─── LIVE EVALUATION SANDBOX & SIMULATOR ─── */}
+      <Card className="border-2 border-indigo-200 shadow-md overflow-hidden bg-slate-50/60">
+        <div className="p-4 sm:p-5 bg-indigo-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="p-2 bg-indigo-800 rounded-xl text-indigo-200">
+              <SparklesIcon className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="text-base font-black">Live 3-Tier Evaluation Sandbox &amp; Simulator</h3>
+              <p className="text-xs text-indigo-200">
+                Test ride parameters instantly against all configured tiers in real time.
+              </p>
             </div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-950 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.tier1.enabled}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    tier1: { ...config.tier1, enabled: e.target.checked },
-                  })
-                }
-                className="rounded accent-emerald-600 w-4 h-4"
-              />
-              <span>Enable Tier 1 Auto-Confirm</span>
-            </label>
           </div>
-          <p className="text-xs text-emerald-800/80 mt-1">
-            Specify isolated score requirements, allowable operating locations, operating schedule hours, and ticket size caps for automatic approval.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Control 1: Customer Score */}
-            <div className="p-4 bg-white rounded-xl border border-emerald-200 space-y-3 shadow-2xs">
+          <Badge variant="primary" size="sm" className="bg-indigo-700 text-indigo-100 border-indigo-500 font-mono">
+            REAL-TIME EXECUTION
+          </Badge>
+        </div>
+
+        <CardContent className="p-4 sm:p-6 space-y-6">
+          {/* Simulator Controls Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
+            {/* Customer Score */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <UserIcon className="w-4 h-4 text-emerald-600" />
-                  <span>Customer Score Control</span>
-                </span>
-                <span className="text-xs font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  ≥ {config.tier1.minCustomerScore}
+                <span className="text-xs font-bold text-slate-700">Customer Score</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  {simIsUnratedGuest ? 'Unrated' : `★ ${simCustomerScore}`}
                 </span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="100"
-                value={config.tier1.minCustomerScore}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    tier1: { ...config.tier1, minCustomerScore: parseInt(e.target.value) || 0 },
-                  })
-                }
-                className="w-full accent-emerald-600"
+                disabled={simIsUnratedGuest}
+                value={simCustomerScore}
+                onChange={(e) => setSimCustomerScore(parseInt(e.target.value) || 0)}
+                className="w-full accent-blue-600 cursor-pointer disabled:opacity-40"
               />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>0 (All Riders)</span>
-                <span>Cutoff: {config.tier1.minCustomerScore}</span>
-                <span>100 (VIP only)</span>
-              </div>
-              <label className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 pt-1">
                 <input
                   type="checkbox"
-                  checked={config.tier1.excludeNewCustomers}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier1: { ...config.tier1, excludeNewCustomers: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-emerald-600"
+                  checked={simIsUnratedGuest}
+                  onChange={(e) => setSimIsUnratedGuest(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
-                <span>Hold 1st-time riders for Tier 2 Review</span>
+                <span>Simulate 1st-Time Guest Rider</span>
               </label>
             </div>
 
-            {/* Control 2: Pickup / Dropoff Locations */}
-            <div className="p-4 bg-white rounded-xl border border-emerald-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <MapPinIcon className="w-4 h-4 text-emerald-600" />
-                  <span>Location Scope Control</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-slate-500">
-                  {config.tier1.locationScope === 'anywhere' ? 'Anywhere' : 'Whitelisted Only'}
-                </span>
-              </div>
+            {/* Separated Pickup Location */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Pickup Location</span>
               <select
-                value={config.tier1.locationScope}
-                onChange={(e: any) =>
-                  setConfig({
-                    ...config,
-                    tier1: { ...config.tier1, locationScope: e.target.value },
-                  })
-                }
-                className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold"
+                value={simPickupZoneId}
+                onChange={(e) => setSimPickupZoneId(e.target.value)}
+                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
               >
-                <option value="anywhere">Anywhere (All Operational Zones)</option>
-                <option value="whitelisted_zones_only">Restricted to Whitelisted Zones Only</option>
+                <option value="any">Standard Service Area</option>
+                <option value="airport">✈️ STL Airport Terminal</option>
+                <option value="prohibited">⛔ Prohibited Geofence Zone</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    📍 {z.name}
+                  </option>
+                ))}
               </select>
-              <p className="text-[11px] text-slate-500">
-                {config.tier1.locationScope === 'anywhere'
-                  ? 'All standard zones allow instant auto-confirmation.'
-                  : 'Trips with origins outside selected zones drop to Tier 2 review.'}
-              </p>
             </div>
 
-            {/* Control 3: Time Windows & Fare Caps */}
-            <div className="p-4 bg-white rounded-xl border border-emerald-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <ClockIcon className="w-4 h-4 text-emerald-600" />
-                  <span>Time &amp; Fare Thresholds</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-slate-500">
-                  {config.tier1.operatingHours === '24_7' ? '24/7 All Hours' : 'Custom Hours'}
-                </span>
-              </div>
+            {/* Separated Dropoff Location */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Dropoff Location</span>
               <select
-                value={config.tier1.operatingHours}
-                onChange={(e: any) =>
-                  setConfig({
-                    ...config,
-                    tier1: { ...config.tier1, operatingHours: e.target.value },
-                  })
-                }
-                className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold"
+                value={simDropoffZoneId}
+                onChange={(e) => setSimDropoffZoneId(e.target.value)}
+                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
               >
-                <option value="24_7">24/7 Continuous (Day &amp; Night)</option>
-                <option value="custom_window">Custom Daytime Hours Window</option>
+                <option value="any">Standard Service Area</option>
+                <option value="airport">✈️ STL Airport Terminal</option>
+                <option value="prohibited">⛔ Prohibited Geofence Zone</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    📍 {z.name}
+                  </option>
+                ))}
               </select>
-
-              {config.tier1.operatingHours === 'custom_window' && (
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Start Hour</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={config.tier1.customWindowStartHour ?? 5}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          tier1: {
-                            ...config.tier1,
-                            customWindowStartHour: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                      className="text-xs h-7 font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold block mb-0.5">End Hour</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={config.tier1.customWindowEndHour ?? 23}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          tier1: {
-                            ...config.tier1,
-                            customWindowEndHour: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                      className="text-xs h-7 font-mono font-bold"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Max Instant Fare Cap:</span>
-                <div className="flex items-center gap-1 font-mono font-bold text-slate-800">
-                  <span>$</span>
-                  <Input
-                    type="number"
-                    min="10"
-                    max="1000"
-                    value={config.tier1.maxTripFare ?? 250}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier1: { ...config.tier1, maxTripFare: parseFloat(e.target.value) || 0 },
-                      })
-                    }
-                    className="w-16 h-7 text-xs font-mono font-bold"
-                  />
-                </div>
-              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* ─── ISOLATED CONTROLS: TIER 2 (REQUIRE REVIEW) ─── */}
-      <Card variant="elevated" className="border-2 border-amber-300 bg-amber-50/20 shadow-xs">
-        <CardHeader className="bg-amber-100/60 border-b border-amber-200 pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-amber-700 text-white">
-                Tier 2 Controls
-              </span>
-              <CardTitle className="text-base font-black text-amber-950">
-                Require Review &amp; Dispatcher Queue Policy
-              </CardTitle>
-            </div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-amber-950 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.tier2.enabled}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    tier2: { ...config.tier2, enabled: e.target.checked },
-                  })
-                }
-                className="rounded accent-amber-600 w-4 h-4"
-              />
-              <span>Enable Tier 2 Review Holds</span>
-            </label>
-          </div>
-          <p className="text-xs text-amber-800/80 mt-1">
-            Configure risk factors that place bookings into the active dispatcher review holding queue for manual inspection.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Control 1: Score & Rider Triggers */}
-            <div className="p-4 bg-white rounded-xl border border-amber-200 space-y-3 shadow-2xs">
+            {/* Pickup Hour */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <UserIcon className="w-4 h-4 text-amber-600" />
-                  <span>Rider Score Review Threshold</span>
-                </span>
-                <span className="text-xs font-mono font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  &lt; {config.tier1.minCustomerScore}
+                <span className="text-xs font-bold text-slate-700">Pickup Hour</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-100 text-slate-800">
+                  {simPickupHour.toString().padStart(2, '0')}:00
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500">
-                Any passenger with customer rating between {config.tier3.hardScoreFloor} and{' '}
-                {config.tier1.minCustomerScore} is held for dispatch review.
-              </p>
-              <label className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.tier2.triggerOnNewCustomers}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier2: { ...config.tier2, triggerOnNewCustomers: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-amber-600"
-                />
-                <span>Hold unverified phone / new accounts</span>
-              </label>
-              <div className="pt-2 border-t border-slate-100 space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-600 font-medium">Min Driver Score for Premium:</span>
-                  <span className="font-mono font-bold text-blue-600">
-                    {config.tier2.minimumDriverScoreForPremium} / 100
-                  </span>
-                </div>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={config.tier2.minimumDriverScoreForPremium}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier2: {
-                        ...config.tier2,
-                        minimumDriverScoreForPremium: parseInt(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className="text-xs h-7 font-mono font-bold"
-                />
-              </div>
-            </div>
-
-            {/* Control 2: Sensitive Locations */}
-            <div className="p-4 bg-white rounded-xl border border-amber-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <MapPinIcon className="w-4 h-4 text-amber-600" />
-                  <span>Sensitive Location Flagging</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-amber-700">
-                  {config.tier2.flagSensitiveLocations ? 'Active' : 'Disabled'}
-                </span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.tier2.flagSensitiveLocations}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier2: { ...config.tier2, flagSensitiveLocations: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-amber-600"
-                />
-                <span>Flag pickups/dropoffs in sensitive zones</span>
-              </label>
-              <p className="text-[11px] text-slate-500">
-                Rides touching high-volume entertainment corridors or crowded venues are flagged with{' '}
-                <code className="text-amber-700 font-mono font-bold">#SENSITIVE_ZONE</code> for dispatcher coordination.
-              </p>
-            </div>
-
-            {/* Control 3: Late Night Windows & High Value */}
-            <div className="p-4 bg-white rounded-xl border border-amber-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <ClockIcon className="w-4 h-4 text-amber-600" />
-                  <span>Late Night Review Window</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-amber-700">
-                  {config.tier2.lateNightReviewRequired ? 'Enforced' : 'Off'}
-                </span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.tier2.lateNightReviewRequired}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier2: { ...config.tier2, lateNightReviewRequired: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-amber-600"
-                />
-                <span>Require review for late-night rides</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Start Hour (24h)</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="23"
-                    value={config.tier2.lateNightStartHour}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier2: {
-                          ...config.tier2,
-                          lateNightStartHour: parseInt(e.target.value) || 0,
-                        },
-                      })
-                    }
-                    className="text-xs h-7 font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 font-bold block mb-0.5">End Hour (24h)</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="23"
-                    value={config.tier2.lateNightEndHour}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier2: {
-                          ...config.tier2,
-                          lateNightEndHour: parseInt(e.target.value) || 0,
-                        },
-                      })
-                    }
-                    className="text-xs h-7 font-mono font-bold"
-                  />
-                </div>
-              </div>
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">Flag High Fare (&gt;$):</span>
-                <Input
-                  type="number"
-                  min="20"
-                  max="2000"
-                  value={config.tier2.highValueFareThreshold ?? 150}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier2: {
-                        ...config.tier2,
-                        highValueFareThreshold: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className="w-16 h-7 text-xs font-mono font-bold"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ─── ISOLATED CONTROLS: TIER 3 (BLACKLIST BLOCK) ─── */}
-      <Card variant="elevated" className="border-2 border-rose-300 bg-rose-50/20 shadow-xs">
-        <CardHeader className="bg-rose-100/60 border-b border-rose-200 pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-rose-700 text-white">
-                Tier 3 Controls
-              </span>
-              <CardTitle className="text-base font-black text-rose-950">
-                Universal Blacklist &amp; Security Rejection Policy
-              </CardTitle>
-            </div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-rose-950 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.tier3.enabled}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    tier3: { ...config.tier3, enabled: e.target.checked },
-                  })
-                }
-                className="rounded accent-rose-600 w-4 h-4"
-              />
-              <span>Enable Tier 3 Hard Block</span>
-            </label>
-          </div>
-          <p className="text-xs text-rose-800/80 mt-1">
-            Zero-tolerance security controls. Immediate 403 Forbidden with immutable audit logging on security violations.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Control 1: Hard Score Floor */}
-            <div className="p-4 bg-white rounded-xl border border-rose-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <UserIcon className="w-4 h-4 text-rose-600" />
-                  <span>Hard Customer Score Floor</span>
-                </span>
-                <span className="text-xs font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                  &lt; {config.tier3.hardScoreFloor}
-                </span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.tier3.hardScoreFloorEnabled}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier3: { ...config.tier3, hardScoreFloorEnabled: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-rose-600"
-                />
-                <span>Auto-block severely low scores</span>
-              </label>
               <input
                 type="range"
                 min="0"
-                max="50"
-                value={config.tier3.hardScoreFloor}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    tier3: { ...config.tier3, hardScoreFloor: parseInt(e.target.value) || 0 },
-                  })
-                }
-                className="w-full accent-rose-600"
+                max="23"
+                value={simPickupHour}
+                onChange={(e) => setSimPickupHour(parseInt(e.target.value) || 0)}
+                className="w-full accent-blue-600 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>0 (Absolute minimum)</span>
-                <span>Cutoff: {config.tier3.hardScoreFloor}</span>
-                <span>50</span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Any booking from a user below this rating is automatically rejected with a 403 response.
-              </p>
+              <span className="text-[10px] text-slate-400 block">
+                {simPickupHour >= 23 || simPickupHour < 4 ? '🌙 Late Night Window' : '☀️ Standard Operating Hours'}
+              </span>
             </div>
 
-            {/* Control 2: Prohibited Exclusion Zones */}
-            <div className="p-4 bg-white rounded-xl border border-rose-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <MapPinIcon className="w-4 h-4 text-rose-600" />
-                  <span>Prohibited Geofence Zones</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-rose-700">
-                  {config.tier3.blockProhibitedZones ? 'Active' : 'Off'}
-                </span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.tier3.blockProhibitedZones}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tier3: { ...config.tier3, blockProhibitedZones: e.target.checked },
-                    })
-                  }
-                  className="rounded accent-rose-600"
+            {/* Estimated Fare */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Estimated Fare ($)</span>
+              <div className="relative">
+                <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
+                <Input
+                  type="number"
+                  min="0"
+                  value={simFare}
+                  onChange={(e) => setSimFare(parseFloat(e.target.value) || 0)}
+                  className="text-xs h-9 pl-6 bg-slate-50"
                 />
-                <span>Block prohibited spatial exclusion zones</span>
-              </label>
-              <p className="text-[11px] text-slate-500">
-                Trips starting or ending inside zones marked as <em>Blacklisted / Prohibited</em> are instantly blocked.
-              </p>
-            </div>
-
-            {/* Control 3: Governance Entities & Audit Logging */}
-            <div className="p-4 bg-white rounded-xl border border-rose-200 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <ShieldCheckIcon className="w-4 h-4 text-rose-600" />
-                  <span>Governance &amp; Audit Trail</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold text-rose-700">Audit Active</span>
-              </div>
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.tier3.blockBlacklistedCustomers}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier3: { ...config.tier3, blockBlacklistedCustomers: e.target.checked },
-                      })
-                    }
-                    className="rounded accent-rose-600"
-                  />
-                  <span>Block suspended passenger accounts</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.tier3.blockGroundedVehicles}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier3: { ...config.tier3, blockGroundedVehicles: e.target.checked },
-                      })
-                    }
-                    className="rounded accent-rose-600"
-                  />
-                  <span>Block grounded fleet vehicles</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.tier3.logSecurityAudit}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        tier3: { ...config.tier3, logSecurityAudit: e.target.checked },
-                      })
-                    }
-                    className="rounded accent-rose-600"
-                  />
-                  <span>Log immutable security audit trail</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ─── Interactive 3-Tier Sandbox / Simulator ─── */}
-      <Card className="border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/30 shadow-md">
-        <CardHeader className="pb-3 border-b border-indigo-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <SparklesIcon className="w-5 h-5 text-indigo-600" />
-              <CardTitle className="text-base font-black text-slate-900">
-                Interactive 3-Tier Rule Evaluation Simulator
-              </CardTitle>
-            </div>
-            <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
-              Live Real-Time Engine
-            </span>
-          </div>
-          <p className="text-xs text-slate-500">
-            Simulate any booking scenario below to verify which Tier the Booking Rules Engine assigns in real-time.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Simulation Controls */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Customer Score */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <UserIcon className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Customer Score</span>
-                    </label>
-                    <span
-                      className={`text-xs font-black px-2 py-0.5 rounded ${
-                        simCustomerScore >= config.tier1.minCustomerScore
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : simCustomerScore >= (config.tier3.hardScoreFloor ?? 40)
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      ★ {simCustomerScore} / 100
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={simCustomerScore}
-                    onChange={(e) => setSimCustomerScore(parseInt(e.target.value))}
-                    className="w-full accent-blue-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span>0 (Blocked &lt; {config.tier3.hardScoreFloor ?? 40})</span>
-                    <span className="text-amber-600 font-bold">Review</span>
-                    <span className="text-emerald-600 font-bold">Pass ≥ {config.tier1.minCustomerScore}</span>
-                  </div>
-                </div>
-
-                {/* Pickup Time of Day */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <ClockIcon className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Pickup Time (Hour)</span>
-                    </label>
-                    <span className="text-xs font-black font-mono px-2 py-0.5 bg-slate-100 rounded text-slate-800">
-                      {String(simHour).padStart(2, '0')}:00
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="23"
-                    value={simHour}
-                    onChange={(e) => setSimHour(parseInt(e.target.value))}
-                    className="w-full accent-amber-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span>00:00 (Late Night)</span>
-                    <span>12:00 (Standard)</span>
-                    <span>23:00</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Fare and Zone selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Simulated Fare */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <DollarSignIcon className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Trip Fare Estimate</span>
-                    </label>
-                    <span className="text-xs font-mono font-bold text-slate-800">${simFare}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="400"
-                    step="5"
-                    value={simFare}
-                    onChange={(e) => setSimFare(parseInt(e.target.value))}
-                    className="w-full accent-emerald-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span>$10</span>
-                    <span>Tier 2 Cap: ${config.tier2.highValueFareThreshold}</span>
-                    <span>$400</span>
-                  </div>
-                </div>
-
-                {/* Spatial Zone Type */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1 shadow-2xs">
-                  <label className="text-xs font-bold text-slate-700 block">Pickup / Dropoff Spatial Zone</label>
-                  <select
-                    value={simLocationRisk}
-                    onChange={(e: any) => setSimLocationRisk(e.target.value)}
-                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 font-semibold"
-                  >
-                    <option value="normal">Normal Operational Zone</option>
-                    <option value="sensitive">Sensitive Congestion Zone (Flagged)</option>
-                    <option value="prohibited">Prohibited Incident Exclusion Zone (Blocked)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Toggles Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Blacklisted Passenger */}
-                <label
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    simIsBlacklisted
-                      ? 'bg-rose-50 border-rose-300 text-rose-900'
-                      : 'bg-white border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black">Blacklisted User</span>
-                    <input
-                      type="checkbox"
-                      checked={simIsBlacklisted}
-                      onChange={(e) => setSimIsBlacklisted(e.target.checked)}
-                      className="rounded accent-rose-600"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-1">Simulate suspended phone/email</span>
-                </label>
-
-                {/* First-time Passenger */}
-                <label
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    simIsNewCustomer
-                      ? 'bg-amber-50 border-amber-300 text-amber-900'
-                      : 'bg-white border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black">1st-Time Customer</span>
-                    <input
-                      type="checkbox"
-                      checked={simIsNewCustomer}
-                      onChange={(e) => setSimIsNewCustomer(e.target.checked)}
-                      className="rounded accent-amber-600"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-1">Unverified new rider</span>
-                </label>
-
-                {/* Service Class */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                  <label className="text-xs font-bold text-slate-700 block">Service Class</label>
-                  <select
-                    value={simTier}
-                    onChange={(e: any) => setSimTier(e.target.value)}
-                    className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-slate-50 font-semibold"
-                  >
-                    <option value="standard">Standard Sedan</option>
-                    <option value="premium">Premium Chauffeur</option>
-                  </select>
-                </div>
               </div>
             </div>
 
-            {/* Simulation Results Display Panel */}
-            <div className="lg:col-span-5">
-              <div
-                className={`p-5 rounded-2xl border-2 transition-all space-y-4 shadow-sm ${
-                  simResult.mode === 'AUTO_CONFIRM'
-                    ? 'bg-emerald-50/80 border-emerald-400 text-emerald-950'
-                    : simResult.mode === 'REQUIRE_REVIEW'
-                    ? 'bg-amber-50/80 border-amber-400 text-amber-950'
-                    : 'bg-rose-50/80 border-rose-400 text-rose-950'
-                }`}
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Payment Method</span>
+              <select
+                value={simPaymentMethod}
+                onChange={(e) => setSimPaymentMethod(e.target.value as RulePaymentMethod)}
+                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
               >
-                <div className="flex items-center justify-between border-b pb-3 border-slate-200/60">
-                  <span className="text-[10px] font-black uppercase tracking-wider opacity-80">
-                    Engine Evaluation Result
-                  </span>
-                  <Badge
-                    variant={
-                      simResult.mode === 'AUTO_CONFIRM'
-                        ? 'success'
-                        : simResult.mode === 'REQUIRE_REVIEW'
-                        ? 'warning'
-                        : 'danger'
-                    }
-                    size="sm"
-                    className="font-black text-xs"
-                  >
-                    {simResult.mode}
-                  </Badge>
-                </div>
+                <option value="prepaid">Prepaid In-App</option>
+                <option value="corporate">Corporate Account</option>
+                <option value="card">Credit Card (In-Car)</option>
+                <option value="cash">Cash on Board</option>
+                <option value="voucher">Voucher / Invoiced</option>
+              </select>
+            </div>
 
-                <div className="space-y-1">
-                  <div className="text-lg font-black flex items-center gap-2">
-                    {simResult.mode === 'AUTO_CONFIRM' && <CheckIcon className="w-5 h-5 text-emerald-600" />}
-                    {simResult.mode === 'REQUIRE_REVIEW' && (
-                      <AlertTriangleIcon className="w-5 h-5 text-amber-600" />
-                    )}
-                    {simResult.mode === 'BLACKLIST_BLOCK' && <LockIcon className="w-5 h-5 text-rose-600" />}
-                    <span>
-                      {simResult.mode === 'AUTO_CONFIRM' && 'Tier 1: Approved'}
-                      {simResult.mode === 'REQUIRE_REVIEW' && 'Tier 2: Hold For Review'}
-                      {simResult.mode === 'BLACKLIST_BLOCK' && 'Tier 3: Hard Block'}
+            {/* Vehicle Tier */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Vehicle Class Tier</span>
+              <select
+                value={simVehicleTier}
+                onChange={(e) => setSimVehicleTier(e.target.value)}
+                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
+              >
+                <option value="standard">Standard Sedan</option>
+                <option value="premium">Executive Premium</option>
+                <option value="xl">XL SUV (6-Passenger)</option>
+                <option value="wheelchair">Wheelchair WAV</option>
+              </select>
+            </div>
+
+            {/* Operational Flags Toggles */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-xs font-bold text-slate-700 block">Trip Complexity Flags:</span>
+              <div className="grid grid-cols-2 gap-1 text-[11px]">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={simReturnBooked}
+                    onChange={(e) => setSimReturnBooked(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Return Booked</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={simSeparateContact}
+                    onChange={(e) => setSimSeparateContact(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>3rd Party Booker</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={simHasStops}
+                    onChange={(e) => setSimHasStops(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Multi-Stops</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={simMultipleVehicles}
+                    onChange={(e) => setSimMultipleVehicles(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>2+ Cars</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Real-Time Evaluation Result Card */}
+          <div className="p-5 rounded-2xl border-2 border-indigo-200 bg-gradient-to-r from-indigo-50/70 to-slate-50 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
+                  Simulated Evaluation Verdict
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  {simResult.mode === 'AUTO_CONFIRM' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-black bg-emerald-600 text-white shadow-xs">
+                      <CheckIcon className="w-4 h-4" />
+                      AUTO-CONFIRM (PASS-THROUGH)
                     </span>
-                  </div>
-                  <div className="text-xs font-medium leading-relaxed opacity-90">
-                    {simResult.reason}
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-3 border-t border-slate-300/50 text-xs">
-                  {simResult.matchedRuleTags && simResult.matchedRuleTags.length > 0 && (
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-wider block opacity-75 mb-1">
-                        Matched Rule Tags:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {simResult.matchedRuleTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-white/80 border border-slate-300 shadow-2xs"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
                   )}
-
-                  <div className="text-[11px] font-semibold opacity-80 pt-1">
-                    {simResult.mode === 'AUTO_CONFIRM' &&
-                      'Trip status set to CONFIRMED. Drivers notified immediately.'}
-                    {simResult.mode === 'REQUIRE_REVIEW' &&
-                      'Trip status set to UNCONFIRMED. Placed in Dispatch Active Queue for human review.'}
-                    {simResult.mode === 'BLACKLIST_BLOCK' &&
-                      'Throws 403 Forbidden. Immutable security audit log recorded under ct_security_audit_v1.'}
-                  </div>
+                  {simResult.mode === 'REQUIRE_REVIEW' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-black bg-amber-500 text-white shadow-xs">
+                      <AlertTriangleIcon className="w-4 h-4" />
+                      FLAGGED FOR DISPATCH REVIEW
+                    </span>
+                  )}
+                  {simResult.mode === 'BLACKLIST_BLOCK' && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-black bg-rose-600 text-white shadow-xs">
+                      <LockIcon className="w-4 h-4" />
+                      BLACKLIST BLOCK (403 REJECTED)
+                    </span>
+                  )}
                 </div>
+              </div>
+
+              {/* Matched Rule Tags */}
+              <div className="flex flex-wrap gap-1.5">
+                {(simResult.matchedRuleTags || []).map((tag) => (
+                  <Badge key={tag} variant="neutral" size="sm" className="font-mono text-[10px] bg-white border-slate-300">
+                    #{tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Detailed Reason */}
+            <div className="p-3 bg-white rounded-xl border border-indigo-100 text-xs text-slate-700 font-medium">
+              <span className="font-bold text-slate-900 block mb-0.5">Decision Rationale:</span>
+              {simResult.reason || 'All parameters satisfy automatic confirmation criteria.'}
+            </div>
+
+            {/* Quick 3-Tier Summary Status Badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-indigo-100/80 text-xs">
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Tier 3 (Security Block):</span>
+                {simResult.mode === 'BLACKLIST_BLOCK' ? (
+                  <span className="font-black text-rose-600">⛔ TRIGGERED</span>
+                ) : (
+                  <span className="font-bold text-emerald-600">✓ CLEAR</span>
+                )}
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Tier 2 (Review Queue):</span>
+                {simResult.mode === 'REQUIRE_REVIEW' ? (
+                  <span className="font-black text-amber-600">⚠️ HELD FOR REVIEW</span>
+                ) : (
+                  <span className="font-bold text-emerald-600">✓ BYPASSED</span>
+                )}
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
+                <span className="font-bold text-slate-600">Tier 1 (Auto-Confirm):</span>
+                {simResult.mode === 'AUTO_CONFIRM' ? (
+                  <span className="font-black text-emerald-600">✓ CONFIRMED</span>
+                ) : (
+                  <span className="font-bold text-slate-400">— NOT ELIGIBLE</span>
+                )}
               </div>
             </div>
           </div>

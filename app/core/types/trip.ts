@@ -234,6 +234,13 @@ export interface Trip {
   cancellationReason?: string;
   cancelledBy?: 'passenger' | 'driver' | 'admin' | 'system';
 
+  /** Operational Trip Complexity Flags */
+  hasReturnTrip?: boolean;
+  hasSeparateContactPerson?: boolean;
+  contactPerson?: { name: string; phone: string; email?: string };
+  multipleVehiclesRequested?: boolean;
+  vehicleCount?: number;
+
   /** Passenger & Vehicle */
   passenger: TripPassenger;
   vehicleTier: VehicleTier;
