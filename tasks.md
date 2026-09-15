@@ -308,12 +308,10 @@
 - [x] 28.5 Build & Typecheck Verification: Run `npm run typecheck` and `npm run build` to confirm 0 errors.
 
 ## Phase 29: Vehicle Shift History, Audit Trail & Universal Blacklist/Archive Engine + Dual Scoring & Conditional Booking Rules
-- [ ] 29.1 Update spec.md, plan.md, and tasks.md with Phase 29 requirements.
-- [ ] 29.2 Implement Temporal Shift Mapping (/vehicleAssignments) and query helpers.
-- [ ] 29.3 Refactor Trip schema for immutable ssignedVehicle snapshots and uditLog arrays.
-- [ ] 29.4 Implement Dual Scoring System tracking metrics and calculation routines for Customer and Driver scores. Embed in UI.
-- [ ] 29.5 Build Conditional Booking Lifecycle Engine (ookingRulesEngine.ts) with Modes A, B, and C.
-- [ ] 29.6 Add isArchived, isBlacklisted, lacklistReason universally and build governance UI in /admin?tab=dispatch&sub=rules.
-- [ ] 29.7 Run 
-pm run typecheck and 
-pm run build to confirm build stability.
+- [x] 29.1 Update spec.md, plan.md, and tasks.md with Phase 29 requirements.
+- [x] 29.2 Implement Temporal Shift Mapping (/vehicleAssignments) and query helpers.
+- [x] 29.3 Refactor Trip schema for immutable assignedVehicle snapshots and auditLog arrays.
+- [x] 29.4 Implement Dual Scoring System tracking metrics and calculation routines for Customer and Driver scores. Embed in UI.
+- [x] 29.5 Build Conditional Booking Lifecycle Engine (bookingRulesEngine.ts) with Modes A, B, and C.
+- [x] 29.6 Add isArchived, isBlacklisted, blacklistReason universally and build governance UI in /admin?tab=dispatch&sub=rules.
+- [x] 29.7 Run npm run typecheck and npm run build to confirm build stability.
