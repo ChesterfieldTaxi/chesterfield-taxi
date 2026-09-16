@@ -159,6 +159,15 @@ export interface TripPayment {
   amount: number;
   transactionId?: string;
   paidAt?: string;
+  // Phase 31: External Payment & Card Vaulting Integrations
+  paymentIntentId?: string;
+  vaultedCardId?: string;
+  preAuthHoldAmount?: number;
+  tipAmount?: number;
+  driverPayoutId?: string;
+  payoutStatus?: 'pending' | 'settled' | 'withheld';
+  cardBrand?: string;
+  cardLast4?: string;
 }
 
 export interface TripStatusHistoryEntry {
@@ -248,6 +257,11 @@ export interface Trip {
   /** Pricing & Payment */
   pricing: TripPricing;
   payment: TripPayment;
+
+  // Phase 31: Masked Telephony Relay
+  telephonySessionId?: string;
+  proxyNumber?: string;
+  meterExtras?: Array<{ id: string; name: string; amount: number; category: string }>;
 
   /** State Machine Audit Trail */
   statusHistory: TripStatusHistoryEntry[];

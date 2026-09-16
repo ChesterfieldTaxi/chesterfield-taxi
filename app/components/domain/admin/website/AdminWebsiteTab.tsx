@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import Editor from '@monaco-editor/react';
+
+const MonacoEditor = React.lazy(() => import('@monaco-editor/react'));
 import { WebsiteThemesTab } from './WebsiteThemesTab';
 import { WebsitePagesTab } from './WebsitePagesTab';
 import { WebsiteFormControlsTab } from './WebsiteFormControlsTab';
@@ -397,19 +398,28 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden h-[540px]">
-            <Editor
-              height="100%"
-              defaultLanguage="css"
-              value={customCss}
-              onChange={(val) => setCustomCss(val || '')}
-              theme="vs-dark"
-              options={{
-                minimap: { enabled: false },
-                fontSize: 13,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-              }}
-            />
+            <Suspense
+              fallback={
+                <div className="h-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-mono">
+                  <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></span>
+                  Loading Monaco CSS Editor...
+                </div>
+              }
+            >
+              <MonacoEditor
+                height="100%"
+                defaultLanguage="css"
+                value={customCss}
+                onChange={(val) => setCustomCss(val || '')}
+                theme="vs-dark"
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                }}
+              />
+            </Suspense>
           </div>
         </div>
       )}

@@ -15,10 +15,193 @@ import {
   DownloadIcon,
   CarIcon,
   CheckIcon,
+  ChevronDownIcon,
 } from '../../../ui/Icons';
 import { TripAuditModal } from '../TripAuditModal';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
+import { LayoutToggle } from '../../../ui/LayoutToggle';
+import { useDisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+
+interface TripRowActionDropdownProps {
+  trip: Trip;
+  isSelected: boolean;
+  isActionLoading: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  onAssignDriver: () => void;
+  onComplete: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onAudit: () => void;
+  onToggleDetails: () => void;
+  isArchived: boolean;
+  canArchive: boolean;
+}
+
+function TripRowActionDropdown({
+  trip,
+  isSelected,
+  isActionLoading,
+  isOpen,
+  onToggle,
+  onClose,
+  onConfirm,
+  onAssignDriver,
+  onComplete,
+  onArchive,
+  onRestore,
+  onAudit,
+  onToggleDetails,
+  isArchived,
+  canArchive,
+}: TripRowActionDropdownProps) {
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  const canConfirm = trip.status === 'unconfirmed' || trip.status === 'UNCONFIRMED' || trip.status === 'pending';
+  const canAssign = trip.status === 'CONFIRMED' || trip.status === 'confirmed';
+  const canComplete = trip.status === 'assigned';
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className="px-2.5 py-1 rounded-lg border border-slate-300 hover:border-blue-400 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+        title="Trip Actions"
+      >
+        <span>Actions</span>
+        <ChevronDownIcon className="w-3 h-3 text-slate-400" />
+      </button>
+
+      {isOpen && (
+        <div
+          className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+            Trip #{trip.id.slice(-6).toUpperCase()}
+          </div>
+
+          {canConfirm && (
+            <button
+              type="button"
+              disabled={isActionLoading}
+              onClick={() => {
+                onClose();
+                onConfirm();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <span>✓</span>
+              <span>Confirm Trip</span>
+            </button>
+          )}
+
+          {canAssign && (
+            <button
+              type="button"
+              disabled={isActionLoading}
+              onClick={() => {
+                onClose();
+                onAssignDriver();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-blue-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <span>👤</span>
+              <span>Assign Driver</span>
+            </button>
+          )}
+
+          {canComplete && (
+            <button
+              type="button"
+              disabled={isActionLoading}
+              onClick={() => {
+                onClose();
+                onComplete();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <span>✓</span>
+              <span>Complete Trip</span>
+            </button>
+          )}
+
+          {isArchived ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onRestore();
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Restore from Archive</span>
+            </button>
+          ) : (
+            canArchive && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onArchive();
+                }}
+                className="w-full text-left px-3 py-1.5 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+                <span>Move to Archive</span>
+              </button>
+            )
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onAudit();
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-purple-50 text-purple-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <HistoryIcon className="w-3.5 h-3.5 text-purple-600" />
+            <span>Audit Trail Log</span>
+          </button>
+
+          <div className="border-t border-slate-100 my-1" />
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onToggleDetails();
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <span>{isSelected ? '✕' : 'ℹ️'}</span>
+            <span>{isSelected ? 'Close Details' : 'View Full Details'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export type TripsSubTab = 'dispatch' | 'history' | 'archive' | 'exceptions';
 
@@ -27,6 +210,7 @@ interface AdminTripsSubpageProps {
 }
 
 export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubpageProps) {
+  const [displayLayout, setDisplayLayout] = useDisplayLayout('admin-trips-layout');
   const [activeSub, setActiveSub] = useState<TripsSubTab>(initialSubTab);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +224,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
   const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
   const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
   const [archiveRefreshKey, setArchiveRefreshKey] = useState(0);
+  const [openActionTripId, setOpenActionTripId] = useState<string | null>(null);
 
   // Sync initialSubTab when parent tab query changes
   useEffect(() => {
@@ -363,42 +548,259 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
         </div>
 
-        {activeSub === 'history' && (
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-slate-600">Filter Status:</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-800"
-            >
-              <option value="all">All Lifecycles</option>
-              <option value="completed">Completed Only</option>
-              <option value="cancelled">Cancelled Only</option>
-              <option value="assigned">Assigned / In Progress</option>
-              <option value="pending">Pending</option>
-            </select>
-          </div>
-        )}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          {activeSub === 'history' && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-slate-600">Filter:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-800"
+              >
+                <option value="all">All Lifecycles</option>
+                <option value="completed">Completed Only</option>
+                <option value="cancelled">Cancelled Only</option>
+                <option value="assigned">Assigned / In Progress</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+          )}
+
+          <LayoutToggle
+            layout={displayLayout}
+            onChange={setDisplayLayout}
+            size="sm"
+          />
+        </div>
       </div>
 
-      {/* ─── Trips Table ─── */}
+      {/* ─── Trips Content (Cards vs Compact vs Table) ─── */}
       <Card variant="elevated" className="border-slate-200/80 bg-white shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
-              <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
-              <p className="text-xs font-medium">Streaming dispatch operations...</p>
-            </div>
-          ) : currentDisplayTrips.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              <p className="text-3xl mb-2">🚕</p>
-              <p className="text-sm font-bold text-slate-700">No trips matching this view</p>
-              <p className="text-xs text-slate-500 mt-1">
-                {searchTerm ? 'Try adjusting your search query' : 'Dispatch queue is currently clear.'}
-              </p>
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse text-xs">
+        {isLoading ? (
+          <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+            <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
+            <p className="text-xs font-medium">Streaming dispatch operations...</p>
+          </div>
+        ) : currentDisplayTrips.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <p className="text-3xl mb-2">🚕</p>
+            <p className="text-sm font-bold text-slate-700">No trips matching this view</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {searchTerm ? 'Try adjusting your search query' : 'Dispatch queue is currently clear.'}
+            </p>
+          </div>
+        ) : displayLayout === 'cards' ? (
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50/50">
+            {currentDisplayTrips.map((trip) => {
+              const isSelected = selectedTrip?.id === trip.id;
+              const isActionLoading = actionLoadingId === trip.id;
+              const passengerFullName =
+                [trip.passenger?.firstName, trip.passenger?.lastName].filter(Boolean).join(' ') ||
+                'Anonymous Guest';
+              const pickupTimeStr =
+                trip.bookingType === 'scheduled' && trip.scheduledPickupTime
+                  ? new Date(trip.scheduledPickupTime).toLocaleDateString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'ASAP Now';
+
+              return (
+                <div
+                  key={trip.id}
+                  onClick={() => setSelectedTrip(isSelected ? null : trip)}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs ${
+                    isSelected ? 'border-blue-500 ring-2 ring-blue-400' : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-slate-900">
+                          #{trip.id.slice(-6).toUpperCase()}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {pickupTimeStr}
+                        </span>
+                      </div>
+                      <Badge
+                        variant={
+                          trip.status === 'completed'
+                            ? 'success'
+                            : trip.status === 'cancelled' || trip.status === 'declined' || trip.status === 'DECLINED'
+                            ? 'error'
+                            : trip.status === 'assigned' || trip.status === 'offered'
+                            ? 'primary'
+                            : trip.status === 'confirmed' || trip.status === 'CONFIRMED'
+                            ? 'info'
+                            : 'warning'
+                        }
+                        size="sm"
+                        className="font-bold uppercase tracking-wider text-[10px]"
+                      >
+                        {trip.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="font-bold text-xs text-slate-900">{passengerFullName}</div>
+                      <div className="text-[11px] text-slate-500 font-mono">{trip.passenger?.phone || 'No phone'}</div>
+                      {trip.passenger?.email && (
+                        <div className="text-[10px] text-blue-600 truncate">{trip.passenger.email}</div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-emerald-500 font-bold text-xs">🟢</span>
+                        <span className="truncate font-medium" title={trip.pickupLocation?.address}>
+                          {trip.pickupLocation?.address || 'Pickup address'}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-rose-500 font-bold text-xs">🔴</span>
+                        <span className="truncate font-medium" title={trip.dropoffLocation?.address}>
+                          {trip.dropoffLocation?.address || 'Dropoff address'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-3 px-1">
+                      <span className="capitalize font-bold text-slate-700">
+                        {trip.vehicleTier || 'standard'} ({trip.passenger?.passengerCount || 1} Pax)
+                      </span>
+                      {trip.assignedDriverId ? (
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
+                          Driver: {trip.assignedDriverId}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-amber-600 font-semibold">Unassigned</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-black text-slate-900 text-sm">
+                        ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 capitalize block">
+                        {trip.payment?.method || 'Card'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                      {(trip.status === 'unconfirmed' || trip.status === 'UNCONFIRMED' || trip.status === 'pending') && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          disabled={isActionLoading}
+                          onClick={() => handleStatusTransition(trip.id, 'CONFIRMED')}
+                          className="text-[11px] px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                        >
+                          Confirm
+                        </Button>
+                      )}
+
+                      <TripRowActionDropdown
+                        trip={trip}
+                        isSelected={isSelected}
+                        isActionLoading={isActionLoading}
+                        isOpen={openActionTripId === trip.id}
+                        onToggle={() => setOpenActionTripId(openActionTripId === trip.id ? null : trip.id)}
+                        onClose={() => setOpenActionTripId(null)}
+                        onConfirm={() => handleStatusTransition(trip.id, 'CONFIRMED')}
+                        onAssignDriver={() => handleStatusTransition(trip.id, 'assigned', { assignedDriverId: 'driver-101' })}
+                        onComplete={() => handleStatusTransition(trip.id, 'completed')}
+                        onArchive={() => handleToggleArchiveTrip(trip.id, false)}
+                        onRestore={() => handleToggleArchiveTrip(trip.id, true)}
+                        onAudit={() => setAuditModalTrip(trip)}
+                        onToggleDetails={() => setSelectedTrip(isSelected ? null : trip)}
+                        isArchived={isArchivedTrip(trip)}
+                        canArchive={
+                          trip.status === 'completed' ||
+                          trip.status === 'cancelled' ||
+                          trip.status === 'declined' ||
+                          trip.status === 'DECLINED' ||
+                          activeSub === 'history'
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : displayLayout === 'compact' ? (
+          <div className="divide-y divide-slate-100 text-xs">
+            {currentDisplayTrips.map((trip) => {
+              const isSelected = selectedTrip?.id === trip.id;
+              const passengerFullName =
+                [trip.passenger?.firstName, trip.passenger?.lastName].filter(Boolean).join(' ') ||
+                'Anonymous Guest';
+              const pickupTimeStr =
+                trip.bookingType === 'scheduled' && trip.scheduledPickupTime
+                  ? new Date(trip.scheduledPickupTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'ASAP';
+
+              return (
+                <div
+                  key={trip.id}
+                  onClick={() => setSelectedTrip(isSelected ? null : trip)}
+                  className={`h-10 px-4 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50 font-medium' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="font-mono font-bold text-slate-800 text-[11px] w-14 shrink-0">
+                      #{trip.id.slice(-6).toUpperCase()}
+                    </span>
+                    <span className="text-slate-500 font-semibold text-[11px] w-16 shrink-0">
+                      {pickupTimeStr}
+                    </span>
+                    <span className="font-bold text-slate-900 truncate max-w-[140px]">
+                      {passengerFullName}
+                    </span>
+                    <span className="text-slate-500 truncate max-w-[220px]" title={`${trip.pickupLocation?.address} → ${trip.dropoffLocation?.address}`}>
+                      {trip.pickupLocation?.address || 'Pickup'} → {trip.dropoffLocation?.address || 'Dropoff'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <span className="font-bold text-slate-900">
+                      ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
+                    </span>
+                    <Badge
+                      variant={
+                        trip.status === 'completed'
+                          ? 'success'
+                          : trip.status === 'cancelled' || trip.status === 'declined'
+                          ? 'error'
+                          : 'primary'
+                      }
+                      size="sm"
+                      className="font-bold text-[10px]"
+                    >
+                      {trip.status}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSelectedTrip(isSelected ? null : trip)}
+                      className="text-[10px] px-2 py-0.5 text-slate-600 font-bold"
+                    >
+                      {isSelected ? 'Close' : 'Details'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="overflow-x-auto custom-scrollbar min-w-full">
+            <table className="w-full text-left border-collapse text-xs min-w-[850px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                   <th className="px-4 py-3">Trip ID &amp; Time</th>
@@ -523,8 +925,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
                       <td className="px-4 py-3 align-top text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Quick Dispatch Actions based on state machine */}
-                          {trip.status === 'unconfirmed' || trip.status === 'UNCONFIRMED' || trip.status === 'pending' ? (
+                          {(trip.status === 'unconfirmed' || trip.status === 'UNCONFIRMED' || trip.status === 'pending') && (
                             <Button
                               size="sm"
                               variant="primary"
@@ -534,77 +935,31 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                             >
                               Confirm
                             </Button>
-                          ) : trip.status === 'CONFIRMED' || trip.status === 'confirmed' ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={isActionLoading}
-                              onClick={() => handleStatusTransition(trip.id, 'assigned', { assignedDriverId: 'driver-101' })}
-                              className="text-[11px] px-2.5 py-1 text-blue-700 border-blue-300 font-bold"
-                            >
-                              Assign Driver
-                            </Button>
-                          ) : trip.status === 'assigned' ? (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              disabled={isActionLoading}
-                              onClick={() => handleStatusTransition(trip.id, 'completed')}
-                              className="text-[11px] px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                            >
-                              Complete
-                            </Button>
-                          ) : null}
+                          )}
 
-                          {/* Archive / Restore Button */}
-                          {isArchivedTrip(trip) ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={actionLoadingId === trip.id}
-                              onClick={() => handleToggleArchiveTrip(trip.id, true)}
-                              className="text-[11px] px-2 py-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-bold flex items-center gap-1"
-                              title="Restore Trip from Archive"
-                            >
-                              <CheckIcon className="w-3 h-3" /> Restore
-                            </Button>
-                          ) : (
-                            (trip.status === 'completed' ||
+                          <TripRowActionDropdown
+                            trip={trip}
+                            isSelected={isSelected}
+                            isActionLoading={isActionLoading}
+                            isOpen={openActionTripId === trip.id}
+                            onToggle={() => setOpenActionTripId(openActionTripId === trip.id ? null : trip.id)}
+                            onClose={() => setOpenActionTripId(null)}
+                            onConfirm={() => handleStatusTransition(trip.id, 'CONFIRMED')}
+                            onAssignDriver={() => handleStatusTransition(trip.id, 'assigned', { assignedDriverId: 'driver-101' })}
+                            onComplete={() => handleStatusTransition(trip.id, 'completed')}
+                            onArchive={() => handleToggleArchiveTrip(trip.id, false)}
+                            onRestore={() => handleToggleArchiveTrip(trip.id, true)}
+                            onAudit={() => setAuditModalTrip(trip)}
+                            onToggleDetails={() => setSelectedTrip(isSelected ? null : trip)}
+                            isArchived={isArchivedTrip(trip)}
+                            canArchive={
+                              trip.status === 'completed' ||
                               trip.status === 'cancelled' ||
                               trip.status === 'declined' ||
                               trip.status === 'DECLINED' ||
-                              activeSub === 'history') && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={actionLoadingId === trip.id}
-                                onClick={() => handleToggleArchiveTrip(trip.id, false)}
-                                className="text-[11px] px-2 py-1 text-slate-600 border-slate-200 hover:bg-slate-100 font-bold flex items-center gap-1"
-                                title="Soft-delete and move to Archive"
-                              >
-                                <ArchiveBoxIcon className="w-3 h-3" /> Archive
-                              </Button>
-                            )
-                          )}
-
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setAuditModalTrip(trip)}
-                            className="text-[11px] px-2 py-1 text-purple-700 border-purple-200 hover:bg-purple-50 font-bold flex items-center gap-1"
-                            title="Inspect Immutable Audit Trail"
-                          >
-                            <HistoryIcon className="w-3 h-3" /> Audit
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSelectedTrip(isSelected ? null : trip)}
-                            className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold"
-                          >
-                            {isSelected ? 'Close' : 'Details'}
-                          </Button>
+                              activeSub === 'history'
+                            }
+                          />
                         </div>
                       </td>
                     </tr>
@@ -612,8 +967,8 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 })}
               </tbody>
             </table>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
 
       {/* ─── Selected Trip Drawer / Modal Details ─── */}

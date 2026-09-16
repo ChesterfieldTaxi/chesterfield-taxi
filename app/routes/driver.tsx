@@ -13,6 +13,10 @@ import {
 } from '../core/services/pricing/tariff.service';
 import type { TariffProfile } from '../core/types/tariff';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { getPaymentService } from '../core/services/payment.service';
+import { getTelephonyService } from '../core/services/telephony.service';
+import { getInvoicingService } from '../core/services/invoicing.service';
+import type { DriverPayoutRecord } from '../core/types/payment';
 import {
   PhoneIcon,
   CheckIcon,
@@ -27,7 +31,10 @@ import {
   MailIcon,
   FlagIcon,
   LogOutIcon,
+  RadioIcon,
+  ShieldCheckIcon,
 } from '../components/ui/Icons';
+import { StripePaymentInput } from '../components/domain/payments/StripePaymentInput';
 
 export function meta() {
   return [
@@ -105,6 +112,8 @@ export default function DriverAppRoute() {
   // Passenger SMS presets modal state
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [customSmsText, setCustomSmsText] = useState('');
+  const [isSendingTwilioSms, setIsSendingTwilioSms] = useState(false);
+  const [twilioSmsFeedback, setTwilioSmsFeedback] = useState<string | null>(null);
 
   // Calendar / Availability editing state
   const [scheduleConfig, setScheduleConfig] = useState<DriverScheduleConfig>(DEFAULT_SCHEDULE);
@@ -112,6 +121,15 @@ export default function DriverAppRoute() {
   const [newTimeOffEnd, setNewTimeOffEnd] = useState('');
   const [newTimeOffReason, setNewTimeOffReason] = useState('');
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+
+  // Terminal Payment & Tip Selection Modal
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
+  const [tipSelection, setTipSelection] = useState<number | 'custom'>(20);
+  const [customTipValue, setCustomTipValue] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [completedPayoutReceipt, setCompletedPayoutReceipt] = useState<DriverPayoutRecord | null>(null);
+  const [terminalPayMethod, setTerminalPayMethod] = useState<'contactless' | 'manual_card'>('contactless');
+  const [manualCardToken, setManualCardToken] = useState<string | null>(null);
 
   const driverService = getDriverService();
   const bookingService = getBookingService();
@@ -286,9 +304,46 @@ export default function DriverAppRoute() {
   // Step-by-Step Status Transitions
   const handleStepAction = async (targetTripId: string, targetStatus: TripStatus, reason?: string) => {
     if (!driver) return;
+
+    // Intercept completed status to launch In-Cab Payment & Tip Selection Terminal
+    if (targetStatus === 'completed') {
+      setShowTerminalModal(true);
+      return;
+    }
+
     try {
       setActionLoading(targetStatus);
       await driverService.transitionTrip(targetTripId, targetStatus, driver.id, reason);
+
+      // Trigger Telephony Service Lifecycle SMS and Masked Proxy Sessions
+      const telephonyService = getTelephonyService();
+      if (activeTrip && activeTrip.passenger?.phone) {
+        if (targetStatus === 'en_route') {
+          await telephonyService.createMaskedSession(
+            targetTripId,
+            driver.phone || COMPANY_CONFIG.phone.dispatch,
+            activeTrip.passenger.phone
+          );
+          await telephonyService.sendLifecycleSms(targetTripId, 'driver_en_route', {
+            passengerPhone: activeTrip.passenger.phone,
+            driverName: driver.name,
+            vehicleUnit: driver.vehicleUnit || '204',
+            etaMinutes: 8,
+          });
+        } else if (targetStatus === 'arrived') {
+          await telephonyService.sendLifecycleSms(targetTripId, 'driver_arrived', {
+            passengerPhone: activeTrip.passenger.phone,
+            driverName: driver.name,
+            vehicleUnit: driver.vehicleUnit || '204',
+            vehicleModel: driver.vehicleModel || 'Standard Sedan',
+          });
+        } else if (targetStatus === 'in_progress') {
+          await telephonyService.sendLifecycleSms(targetTripId, 'trip_started', {
+            passengerPhone: activeTrip.passenger.phone,
+          });
+        }
+      }
+
       setSuccessNotice('Status updated to ' + targetStatus.toUpperCase().replace('_', ' '));
       setTimeout(() => setSuccessNotice(null), 3000);
     } catch (e: unknown) {
@@ -297,6 +352,107 @@ export default function DriverAppRoute() {
       setTimeout(() => setErrorNotice(null), 4000);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // In-Cab Payment Terminal & Tip Selection Process
+  const handleProcessTerminalPayment = async () => {
+    if (!activeTrip || !driver) return;
+    try {
+      setIsProcessingPayment(true);
+      const paymentService = getPaymentService();
+      const invoicingService = getInvoicingService();
+      const telephonyService = getTelephonyService();
+
+      // Compute base fare from meter or trip pricing
+      const meterFare = calculateCurrentMeterFare();
+      const baseTripFare = meterFare > 0 ? meterFare : (activeTrip.pricing?.totalFare || 45.0);
+
+      // Extras total
+      const extrasTotal = ((activeTrip.meterExtras || activeTrip.pricing?.driverExtras || []) as Array<{ amount: number }>).reduce((acc: number, curr: { amount: number }) => acc + curr.amount, 0);
+      const subtotalFare = Number((baseTripFare + extrasTotal).toFixed(2));
+
+      // Calculate tip amount
+      let tipAmount = 0;
+      if (tipSelection === 'custom') {
+        tipAmount = Math.max(0, parseFloat(customTipValue) || 0);
+      } else if (typeof tipSelection === 'number' && tipSelection > 0) {
+        tipAmount = Number(((subtotalFare * tipSelection) / 100).toFixed(2));
+      }
+
+      const totalCharge = Number((subtotalFare + tipAmount).toFixed(2));
+
+      // 1. Capture payment (either pre-auth hold capture or in-cab terminal chip tap or Stripe token)
+      const paymentIntentId = activeTrip.payment?.paymentIntentId || manualCardToken || `pi_term_${Date.now().toString(36)}`;
+      await paymentService.capturePayment(paymentIntentId, totalCharge);
+
+      // 2. Automated Driver Payout Calculation (75% base fare + 100% tip pass-through)
+      const payout = await paymentService.calculateDriverPayout(
+        activeTrip.id,
+        driver.id,
+        baseTripFare,
+        tipAmount,
+        extrasTotal,
+        0,
+        0.75
+      );
+
+      // 3. Balanced Ledger Bookkeeping Entries
+      const todayDate = new Date().toISOString().slice(0, 10);
+      await invoicingService.recordLedgerEntry({
+        date: todayDate,
+        type: 'fare_revenue',
+        tripId: activeTrip.id,
+        driverId: driver.id,
+        amount: subtotalFare,
+        description: `Completed Fare Trip #${activeTrip.id.slice(-6).toUpperCase()}`,
+        accountCode: '4010-FareRevenue',
+      });
+
+      if (tipAmount > 0) {
+        await invoicingService.recordLedgerEntry({
+          date: todayDate,
+          type: 'tip_collected',
+          tripId: activeTrip.id,
+          driverId: driver.id,
+          amount: tipAmount,
+          description: `Passenger Gratuity for Trip #${activeTrip.id.slice(-6).toUpperCase()}`,
+          accountCode: '2010-DriverTipsPayable',
+        });
+      }
+
+      await invoicingService.recordLedgerEntry({
+        date: todayDate,
+        type: 'driver_payout',
+        tripId: activeTrip.id,
+        driverId: driver.id,
+        amount: payout.netPayout,
+        description: `Driver Earnings Disbursed (${driver.name}) - Trip #${activeTrip.id.slice(-6).toUpperCase()}`,
+        accountCode: '5010-DriverPayout',
+      });
+
+      // 4. Send Completion SMS Telemetry to passenger
+      if (activeTrip.passenger?.phone) {
+        await telephonyService.sendLifecycleSms(activeTrip.id, 'trip_completed', {
+          passengerPhone: activeTrip.passenger.phone,
+          finalFare: totalCharge,
+        });
+      }
+
+      // 5. Close Masked Telephony Session to release virtual proxy
+      await telephonyService.closeMaskedSession(activeTrip.id);
+
+      // 6. Transition trip to completed in booking/driver service
+      await driverService.transitionTrip(activeTrip.id, 'completed', driver.id);
+
+      setCompletedPayoutReceipt(payout);
+      setSuccessNotice(`Trip completed! Passenger charged $${totalCharge.toFixed(2)}. Net payout: $${payout.netPayout.toFixed(2)}`);
+    } catch (err: unknown) {
+      console.error('Payment processing failed:', err);
+      const msg = err instanceof Error ? err.message : 'Terminal transaction failed';
+      setErrorNotice(msg);
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -417,6 +573,47 @@ export default function DriverAppRoute() {
     { key: 'sun', label: 'Sunday' },
   ];
 
+  const handleSendTwilioSms = async () => {
+    if (!activeTrip?.passenger?.phone || !customSmsText.trim()) return;
+    setIsSendingTwilioSms(true);
+    setTwilioSmsFeedback('Sending via Twilio SMS gateway...');
+    try {
+      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
+      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
+      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '' : '';
+
+      const resp = await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_sms',
+          to: activeTrip.passenger.phone,
+          body: customSmsText.trim(),
+          credentials: {
+            accountSid: twilioSid,
+            authToken: twilioToken,
+            phoneNumber: twilioPhone,
+          },
+        }),
+      });
+
+      const data = (await resp.json()) as any;
+      if (data.success) {
+        setTwilioSmsFeedback(data.message || 'SMS sent to passenger!');
+        setTimeout(() => {
+          setShowSmsModal(false);
+          setTwilioSmsFeedback(null);
+        }, 1500);
+      } else {
+        setTwilioSmsFeedback(data.message || data.error || 'Failed to dispatch Twilio SMS.');
+      }
+    } catch (err: any) {
+      setTwilioSmsFeedback(err.message || 'Error communicating with telephony API.');
+    } finally {
+      setIsSendingTwilioSms(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-24 select-none antialiased">
       {/* Top Mobile App Header */}
@@ -483,6 +680,64 @@ export default function DriverAppRoute() {
                     <div className="absolute right-1 top-0.5 w-3 h-3 bg-white rounded-full"></div>
                   </div>
                 </button>
+              </div>
+
+              <div className="p-2 border-b border-slate-800">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-2 py-1">
+                  Switch Workspace
+                </span>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/dispatch');
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-blue-900/60 flex items-center justify-center shrink-0">
+                        <RadioIcon className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <span>Dispatch Console</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">/dispatch</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/app');
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-emerald-900/60 flex items-center justify-center shrink-0">
+                        <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <span>Passenger Portal</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">/app</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/admin');
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-purple-900/60 flex items-center justify-center shrink-0">
+                        <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
+                      </div>
+                      <span>Admin Console</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">/admin</span>
+                  </button>
+                </div>
               </div>
 
               <div className="p-2">
@@ -644,6 +899,11 @@ export default function DriverAppRoute() {
                     <h4 className="text-base font-bold text-white truncate">
                       {activeTrip.passenger?.firstName} {activeTrip.passenger?.lastName}
                     </h4>
+                    {activeTrip.proxyNumber && (
+                      <span className="inline-block mt-0.5 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800">
+                        🔒 Masked Proxy Relay Active
+                      </span>
+                    )}
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 flex-wrap">
                       <span className="flex items-center gap-1">
                         <UserIcon className="w-3.5 h-3.5 text-slate-400" />
@@ -685,9 +945,9 @@ export default function DriverAppRoute() {
                       </button>
 
                       <a
-                        href={'tel:' + activeTrip.passenger.phone}
+                        href={'tel:' + (activeTrip.proxyNumber || COMPANY_CONFIG.phone.primaryRaw || activeTrip.passenger.phone)}
                         className="w-11 h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg cursor-pointer transition-transform active:scale-95"
-                        title="Call Passenger"
+                        title={activeTrip.proxyNumber ? `Call Passenger via Masked Proxy Relay (${COMPANY_CONFIG.phone.dispatch})` : "Call Passenger"}
                       >
                         <PhoneIcon className="w-5 h-5" />
                       </a>
@@ -1591,23 +1851,40 @@ export default function DriverAppRoute() {
               />
             </div>
 
+            {twilioSmsFeedback && (
+              <div className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-blue-300 flex items-center gap-2">
+                {isSendingTwilioSms && <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-blue-400" />}
+                <span>{twilioSmsFeedback}</span>
+              </div>
+            )}
+
             {/* Action Buttons */}
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setShowSmsModal(false)}
-                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <a
-                href={`sms:${activeTrip.passenger.phone}?body=${encodeURIComponent(customSmsText)}`}
-                onClick={() => setShowSmsModal(false)}
-                className="flex-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                disabled={isSendingTwilioSms}
+                onClick={handleSendTwilioSms}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <MailIcon className="w-4 h-4" />
-                <span>Open in SMS App</span>
-              </a>
+                <span>{isSendingTwilioSms ? 'Sending via Twilio...' : 'Send via Twilio Gateway'}</span>
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSmsModal(false)}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <a
+                  href={`sms:${activeTrip.passenger.phone}?body=${encodeURIComponent(customSmsText)}`}
+                  onClick={() => setShowSmsModal(false)}
+                  className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                >
+                  <span>Native SMS App</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1697,6 +1974,266 @@ export default function DriverAppRoute() {
                 Attach Custom Extra Fee
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* IN-CAB PAYMENT TERMINAL & TIP SELECTION MODAL */}
+      {showTerminalModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-5 text-white animate-in zoom-in-95 my-6">
+            {completedPayoutReceipt ? (
+              /* RECEIPT & FARE BREAKDOWN */
+              <div className="space-y-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-500/40 shadow-lg shadow-emerald-950">
+                  <CheckIcon className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white">Payment Finalized!</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Card pre-auth captured &amp; trip marked completed</p>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-left space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Base Fare (Meter):</span>
+                    <span className="font-mono text-slate-200">${completedPayoutReceipt.totalFare.toFixed(2)}</span>
+                  </div>
+                  {completedPayoutReceipt.tipAmount > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Driver Tip (100% Pass-Through):</span>
+                      <span className="font-mono font-bold">+${completedPayoutReceipt.tipAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {completedPayoutReceipt.tollsReimbursed > 0 && (
+                    <div className="flex justify-between text-blue-400">
+                      <span>Tolls &amp; Extras:</span>
+                      <span className="font-mono font-bold">+${completedPayoutReceipt.tollsReimbursed.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-800 pt-2 flex justify-between font-black text-sm text-white">
+                    <span>Passenger Total:</span>
+                    <span className="font-mono">
+                      ${(completedPayoutReceipt.totalFare + completedPayoutReceipt.tipAmount + completedPayoutReceipt.tollsReimbursed).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-950/50 border border-emerald-800/80 rounded-2xl p-4 text-left space-y-1.5 text-xs">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                    Driver Net Earnings Disbursed
+                  </span>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                      ${completedPayoutReceipt.netPayout.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-emerald-300 font-semibold">
+                      (75% Fare + 100% Tip)
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-mono text-emerald-500/80">
+                    Payout Ref: {completedPayoutReceipt.id} • {completedPayoutReceipt.status.toUpperCase()}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTerminalModal(false);
+                    setCompletedPayoutReceipt(null);
+                    setMeterSeconds(0);
+                    setMeterDistance(0);
+                    setActiveTripId(null);
+                  }}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-sm rounded-2xl shadow-lg transition-transform active:scale-95 cursor-pointer"
+                >
+                  Return to Shift / Duty Roster
+                </button>
+              </div>
+            ) : (
+              /* TERMINAL PROMPT & TIP SELECTION */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="font-black text-base text-white">In-Cab Terminal Checkout</h4>
+                    <p className="text-[11px] text-slate-400">Passenger Tip Selection &amp; Capture</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isProcessingPayment}
+                    onClick={() => setShowTerminalModal(false)}
+                    className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Subtotal Display */}
+                {(() => {
+                  const meterFare = calculateCurrentMeterFare();
+                  const baseFare = meterFare > 0 ? meterFare : (activeTrip?.pricing?.totalFare || 45.0);
+                  const extrasTotal = ((activeTrip?.meterExtras || activeTrip?.pricing?.driverExtras || []) as Array<{ amount: number }>).reduce(
+                    (acc: number, curr: { amount: number }) => acc + curr.amount,
+                    0
+                  );
+                  const subtotal = Number((baseFare + extrasTotal).toFixed(2));
+                  let calculatedTip = 0;
+                  if (tipSelection === 'custom') {
+                    calculatedTip = Math.max(0, parseFloat(customTipValue) || 0);
+                  } else if (typeof tipSelection === 'number' && tipSelection > 0) {
+                    calculatedTip = Number(((subtotal * tipSelection) / 100).toFixed(2));
+                  }
+                  const grandTotal = Number((subtotal + calculatedTip).toFixed(2));
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Trip Subtotal (Meter + Extras)
+                        </span>
+                        <div className="text-2xl font-black font-mono text-white">${subtotal.toFixed(2)}</div>
+                      </div>
+
+                      {/* Tip Selection Grid */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Select Gratuity / Tip:
+                        </span>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { label: 'No Tip', value: 0 },
+                            { label: '15%', value: 15 },
+                            { label: '20%', value: 20 },
+                            { label: '25%', value: 25 },
+                          ].map((opt) => {
+                            const isSelected = tipSelection === opt.value;
+                            const tipValue = opt.value > 0 ? (subtotal * opt.value) / 100 : 0;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setTipSelection(opt.value)}
+                                className={`py-2.5 px-1 rounded-xl text-center border font-bold text-xs transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 border-blue-500 text-white shadow-md'
+                                    : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                                }`}
+                              >
+                                <div>{opt.label}</div>
+                                {opt.value > 0 && (
+                                  <div className="text-[10px] font-normal opacity-80 mt-0.5 font-mono">
+                                    +${tipValue.toFixed(2)}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Custom Tip Option */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setTipSelection('custom')}
+                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                              tipSelection === 'custom'
+                                ? 'bg-blue-600 border-blue-500 text-white'
+                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            Custom Tip ($)
+                          </button>
+                          {tipSelection === 'custom' && (
+                            <input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              placeholder="e.g. 5.00"
+                              value={customTipValue}
+                              onChange={(e) => setCustomTipValue(e.target.value)}
+                              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500 font-mono"
+                              autoFocus
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Processing Mode Selector */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Payment Processing Mode:
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTerminalPayMethod('contactless')}
+                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              terminalPayMethod === 'contactless'
+                                ? 'bg-blue-600 border-blue-500 text-white'
+                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span>📶 In-Cab Tap / Pre-auth</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTerminalPayMethod('manual_card')}
+                            className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              terminalPayMethod === 'manual_card'
+                                ? 'bg-blue-600 border-blue-500 text-white'
+                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span>💳 Stripe Card Element</span>
+                          </button>
+                        </div>
+
+                        {terminalPayMethod === 'manual_card' && (
+                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl">
+                            <StripePaymentInput
+                              amount={grandTotal}
+                              currency="usd"
+                              onCardChange={(info) => {
+                                setManualCardToken(info.token || null);
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Total to Charge */}
+                      <div className="bg-blue-950/40 border border-blue-800/80 rounded-2xl p-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">
+                            Final Amount to Charge
+                          </span>
+                          <span className="text-xs text-slate-400">Pre-auth capture or EMV contactless tap</span>
+                        </div>
+                        <span className="text-2xl font-black font-mono text-emerald-400">${grandTotal.toFixed(2)}</span>
+                      </div>
+
+                      {/* Process Button */}
+                      <button
+                        type="button"
+                        disabled={isProcessingPayment}
+                        onClick={handleProcessTerminalPayment}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-950 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isProcessingPayment ? (
+                          <>
+                            <SpinnerIcon className="w-5 h-5 animate-spin" />
+                            <span>Processing Card &amp; Splitting Fare...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheckIcon className="w-5 h-5" />
+                            <span>Process Payment &amp; Complete Ride</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -24,6 +24,15 @@ export default defineConfig({
           ) {
             return 'react-router';
           }
+          if (id.includes('node_modules/@monaco-editor') || id.includes('node_modules/monaco-editor')) {
+            return 'vendor-monaco';
+          }
+          if (id.includes('node_modules/@hello-pangea/dnd')) {
+            return 'vendor-dnd';
+          }
+          if (id.includes('node_modules/@googlemaps')) {
+            return 'vendor-maps';
+          }
           if (id.includes('/components/ui/') || id.includes('\\components\\ui\\')) {
             return 'core-ui';
           }

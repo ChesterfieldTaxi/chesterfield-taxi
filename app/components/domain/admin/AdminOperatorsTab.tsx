@@ -600,7 +600,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
       {/* ─── Operators Roster Table ─── */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs overflow-hidden">
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
           {isLoading ? (
             <div className="p-12 text-center text-slate-400 flex items-center justify-center gap-2">
               <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
@@ -611,7 +611,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
               No operators found matching the selected filter.
             </div>
           ) : (
-            <table className="w-full text-left text-xs divide-y divide-slate-100">
+            <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[800px]">
               <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-5 py-3">Operator</th>

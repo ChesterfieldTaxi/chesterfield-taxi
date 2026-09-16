@@ -224,8 +224,8 @@ export function AdminOnboardingQueue() {
         {success && <Alert variant="success" title="Success">{success}</Alert>}
 
         <Card variant="elevated">
-          <CardContent className="p-0">
-            <table className="w-full text-left text-xs">
+          <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
+            <table className="w-full text-left text-xs min-w-[650px]">
               <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3">Applicant</th>

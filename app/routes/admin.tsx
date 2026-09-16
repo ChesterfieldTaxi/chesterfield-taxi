@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation, Outlet, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -20,9 +20,10 @@ import {
   AdminLayoutTab,
   AdminArchiveTab,
 } from '../components/domain/admin';
+import { AdminIntegrationsSubpage } from '../components/domain/admin/subpages/AdminIntegrationsSubpage';
 import { AdminRulesTab } from '../components/domain/admin/AdminRulesTab';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
-import { UserDropdown } from '../components/domain/common/UserDropdown';
+import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import {
   CarIcon,
   SpinnerIcon,
@@ -51,6 +52,8 @@ export type AdminTabKey =
   | 'dashboard'
   | 'trips'
   | 'invoicing'
+  | 'financials'
+  | 'integrations'
   | 'customers'
   | 'rates'
   | 'vehicles'
@@ -91,9 +94,21 @@ const PRIMARY_TABS: TabItem[] = [
   },
   {
     key: 'invoicing',
-    label: 'Invoicing',
+    label: 'Financials & Invoicing',
     icon: CreditCardIcon,
-    description: 'Billing ledger, corporate accounts, and payment gateway options',
+    description: 'Double-entry general ledger, B2B corporate billing, statements, and QuickBooks/GL sync',
+  },
+  {
+    key: 'financials',
+    label: 'Financials & Invoicing',
+    icon: CreditCardIcon,
+    description: 'Double-entry general ledger, B2B corporate billing, statements, and QuickBooks/GL sync',
+  },
+  {
+    key: 'integrations',
+    label: 'Integrations & APIs',
+    icon: SettingsIcon,
+    description: 'Payment processors (Stripe & Square), Twilio voice & SMS gateway, and system webhooks',
   },
   {
     key: 'customers',
@@ -159,9 +174,19 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'exceptions', label: 'Exceptions' },
   ],
   invoicing: [
-    { key: 'ledger', label: 'Invoices' },
+    { key: 'ledger', label: 'Invoices & Ledger' },
     { key: 'accounts', label: 'Corporate Accounts' },
+    { key: 'accounting-sync', label: 'QuickBooks & GL Sync' },
+  ],
+  financials: [
+    { key: 'ledger', label: 'Invoices & Ledger' },
+    { key: 'accounts', label: 'Corporate Accounts' },
+    { key: 'accounting-sync', label: 'QuickBooks & GL Sync' },
+  ],
+  integrations: [
     { key: 'gateways', label: 'Payment Gateways' },
+    { key: 'telephony', label: 'Twilio & Telephony' },
+    { key: 'webhooks', label: 'Webhooks & APIs' },
   ],
   customers: [
     { key: 'directory', label: 'Directory' },
@@ -228,6 +253,7 @@ export default function AdminLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+
   // Active tab derived reactively from location.search with legacy aliasing
   const searchParams = new URLSearchParams(location.search);
   const rawTab = (searchParams.get('tab') as AdminTabKey) || 'dashboard';
@@ -236,7 +262,9 @@ export default function AdminLayout() {
   let normalizedTab: AdminTabKey = rawTab;
   let activeSubParam = searchParams.get('sub') || undefined;
 
-  if (rawTab === 'pricing') {
+  if (rawTab === 'financials') {
+    normalizedTab = 'invoicing';
+  } else if (rawTab === 'pricing') {
     normalizedTab = 'rates';
   } else if (rawTab === 'fleet') {
     normalizedTab = 'vehicles';
@@ -402,55 +430,32 @@ export default function AdminLayout() {
 
       {/* ─── Main Admin Workspace Canvas ─── */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        {/* Top Control Header with Section Title, Sub-Tab Menu & Actions */}
+        {/* Top Control Header with Section Title & Actions */}
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
-          <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-            {/* Left: Mobile Toggle, Active Section Title, and Sub-Tab Navigation Bar */}
-            <div className="flex items-center gap-3.5 min-w-0 overflow-hidden">
+          <div className="px-4 sm:px-6 lg:px-8 h-15 sm:h-16 flex items-center justify-between gap-4">
+            {/* Left: Mobile Toggle & Active Section Title */}
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
                 title="Open Navigation Menu"
               >
                 <MenuIcon className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight whitespace-nowrap">
                   {currentTabObj.label}
                 </span>
+                <span className="hidden sm:inline-flex text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
+                  Admin
+                </span>
               </div>
-
-              {/* Top Sub-Tab Navigation Bar */}
-              {activeSubList.length > 0 && (
-                <>
-                  <div className="h-5 w-px bg-slate-200 shrink-0 hidden sm:block" />
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                    {activeSubList.map((sub) => {
-                      const isActive = effectiveSub === sub.key;
-                      return (
-                        <button
-                          key={sub.key}
-                          type="button"
-                          onClick={() => handleTabChange(normalizedTab, sub.key)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none ${
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>{sub.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
             </div>
 
-            {/* Right: Quick Launch Dispatch, Public Link, Status Badge */}
-            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            {/* Right: Quick Launch Dispatch, Public Link, Status Badge (User profile is docked in the side drawer/sidebar) */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <Link
                 to="/dispatch"
                 reloadDocument
@@ -458,24 +463,25 @@ export default function AdminLayout() {
                   backgroundColor: 'var(--brand-primary, #2563eb)',
                   color: 'var(--btn-primary-text, #ffffff)',
                 }}
-                className="hidden sm:inline-flex text-xs font-black px-3.5 py-2 rounded-xl shadow-xs hover:opacity-95 transition-all items-center gap-2"
+                className="text-xs font-black p-1.5 sm:px-3 sm:py-2 rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
                 title="Launch Live 3-Pane Dispatch Console"
               >
-                <RadioIcon className="w-3.5 h-3.5 animate-pulse" />
-                <span>Launch Dispatch</span>
+                <RadioIcon className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                <span className="hidden sm:inline">Launch Dispatch</span>
               </Link>
 
               <a
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-slate-600 hover:text-slate-900 font-bold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5"
+                className="text-xs text-slate-600 hover:text-slate-900 font-bold p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1"
+                title="View live passenger web app"
               >
-                <span>Live Site</span>
-                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400" />
+                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="hidden md:inline">Live Site</span>
               </a>
 
-              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-bold text-slate-600">
+              <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-bold text-slate-600">
                 <span
                   className={`w-2 h-2 rounded-full ${
                     isLiveFirebase ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-amber-400'
@@ -485,6 +491,29 @@ export default function AdminLayout() {
               </div>
             </div>
           </div>
+
+          {/* Subpage Navigation Strip: Unabbreviated, Smooth-Scrolling Pill Tabs */}
+          {activeSubList.length > 0 && (
+            <div className="bg-slate-50/80 border-t border-slate-200/80 px-4 sm:px-6 lg:px-8 py-2 overflow-x-auto no-scrollbar flex items-center gap-1.5 shrink-0">
+              {activeSubList.map((sub) => {
+                const isActive = effectiveSub === sub.key;
+                return (
+                  <button
+                    key={sub.key}
+                    type="button"
+                    onClick={() => handleTabChange(normalizedTab, sub.key)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-extrabold'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </header>
 
         {/* ─── Main Admin Workspace Content ─── */}
@@ -509,6 +538,15 @@ export default function AdminLayout() {
 
             {normalizedTab === 'invoicing' && (
               <AdminInvoicingSubpage
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub as any}
+              />
+            )}
+
+            {normalizedTab === 'integrations' && (
+              <AdminIntegrationsSubpage
                 settings={settings}
                 onSave={handleSaveSettings}
                 isLoading={isSavingConfig || isConfigLoading}

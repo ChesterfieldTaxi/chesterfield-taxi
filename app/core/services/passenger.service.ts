@@ -21,6 +21,14 @@ export const DEFAULT_PASSENGER_ACCOUNT: PassengerAccount = {
   firstName: 'Sarah',
   lastName: 'Jenkins',
   phone: '(314) 738-9921',
+  homePhone: '(314) 532-1200',
+  workPhone: '(314) 694-1000',
+  primaryMobilePhone: '(314) 738-9921',
+  alternatePhones: [
+    { type: 'mobile', number: '(314) 738-9921', label: 'Personal Cell (SMS)', isPrimarySms: true },
+    { type: 'home', number: '(314) 532-1200', label: 'Chesterfield Residence Landline', isPrimarySms: false },
+    { type: 'work', number: '(314) 694-1000', label: 'Bayer Campus Desk Direct', isPrimarySms: false },
+  ],
   email: 'sjenkins@bayer.com',
   passengerNotes: 'Side porch door pickup. Gate code #4421. Please call or text on arrival.',
   preferredVehicleTier: 'standard',
@@ -522,4 +530,62 @@ export function getPassengerService(): PassengerService {
     instance = new PassengerService();
   }
   return instance;
+}
+
+/**
+ * Normalizes phone numbers to 10 standard digits for cross-system comparisons.
+ */
+export function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.substring(1);
+  }
+  return digits;
+}
+
+/**
+ * Resolves the preferred mobile number for sending SMS dispatch confirmations and tracking links.
+ */
+export function resolvePrimarySmsPhone(passenger: PassengerAccount): string {
+  if (passenger.primaryMobilePhone) return passenger.primaryMobilePhone;
+  const primaryAlt = passenger.alternatePhones?.find((p) => p.isPrimarySms || p.type === 'mobile');
+  if (primaryAlt) return primaryAlt.number;
+  return passenger.phone;
+}
+
+/**
+ * Matches an incoming caller phone number against all known customer phone numbers (mobile, home, work).
+ */
+export function matchPassengerByPhone(
+  searchPhone: string,
+  passengerDirectory: PassengerAccount[] = []
+): { passenger: PassengerAccount; matchedType: 'mobile' | 'home' | 'work' | 'primary' } | null {
+  const searchNorm = normalizePhone(searchPhone);
+  if (!searchNorm) return null;
+
+  // Search directory or default passenger
+  const directory = passengerDirectory.length > 0 ? passengerDirectory : [DEFAULT_PASSENGER_ACCOUNT];
+
+  for (const account of directory) {
+    if (normalizePhone(account.phone) === searchNorm) {
+      return { passenger: account, matchedType: 'primary' };
+    }
+    if (account.homePhone && normalizePhone(account.homePhone) === searchNorm) {
+      return { passenger: account, matchedType: 'home' };
+    }
+    if (account.workPhone && normalizePhone(account.workPhone) === searchNorm) {
+      return { passenger: account, matchedType: 'work' };
+    }
+    if (account.primaryMobilePhone && normalizePhone(account.primaryMobilePhone) === searchNorm) {
+      return { passenger: account, matchedType: 'mobile' };
+    }
+    if (account.alternatePhones) {
+      const match = account.alternatePhones.find((p) => normalizePhone(p.number) === searchNorm);
+      if (match) {
+        return { passenger: account, matchedType: match.type as any };
+      }
+    }
+  }
+
+  return null;
 }

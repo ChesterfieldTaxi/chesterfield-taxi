@@ -14,10 +14,40 @@ import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../core/services/maps/google-maps-loader';
 import { hasValidRoutePair } from '../core/hooks/useDebounceRoute';
 import { resolveMockCoordinates } from '../core/services/maps/mock-routing';
-import { SpinnerIcon, RadioIcon, CarIcon, MailIcon, PhoneIcon, MapPinIcon } from '../components/ui/Icons';
+import {
+  SpinnerIcon,
+  RadioIcon,
+  CarIcon,
+  MailIcon,
+  PhoneIcon,
+  MapPinIcon,
+  MenuIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  TableCellsIcon,
+  Squares2X2Icon,
+  ListBulletIcon,
+  DocumentTextIcon,
+  MapIcon,
+  ChatBubbleLeftRightIcon,
+  BoltIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  XIcon,
+  UsersIcon,
+  BellIcon,
+  ExternalLinkIcon,
+} from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
+import { getTelephonyService } from '../core/services/telephony.service';
 import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
+import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
+import { LayoutToggle } from '../components/ui/LayoutToggle';
+import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
+import { CommsHub } from '../components/domain/dispatch/CommsHub';
+import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
+import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 
 export function meta() {
   return [
@@ -108,6 +138,154 @@ const INITIAL_DRIVERS: DriverRosterItem[] = [
   },
 ];
 
+interface TripActionDropdownProps {
+  trip: Trip;
+  isUnconfirmed: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onReview: () => void;
+  onEdit: () => void;
+  onFare: () => void;
+  onAudit: () => void;
+  onClone: () => void;
+  onFocusMap: () => void;
+}
+
+function TripActionDropdown({
+  trip,
+  isUnconfirmed,
+  isOpen,
+  onToggle,
+  onClose,
+  onReview,
+  onEdit,
+  onFare,
+  onAudit,
+  onClone,
+  onFocusMap,
+}: TripActionDropdownProps) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+        title="Trip Actions"
+      >
+        <span>Actions</span>
+        <ChevronDownIcon className="w-3 h-3 text-slate-500 shrink-0" />
+      </button>
+
+      {isOpen && (
+        <div
+          className="absolute right-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 text-left"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 flex items-center justify-between">
+            <span>Trip #{trip.id.slice(0, 8)}</span>
+            <span className="capitalize text-slate-500">{trip.status}</span>
+          </div>
+
+          {isUnconfirmed && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onReview();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              <span>📋</span>
+              <span>Review Booking</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onEdit();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <span>✎</span>
+            <span>Edit Trip</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onFare();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <span>⚡</span>
+            <span>Fare &amp; Rules</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onFocusMap();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <span>🗺️</span>
+            <span>Focus on Map</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onClone();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 transition-colors cursor-pointer"
+          >
+            <span>📋</span>
+            <span>Clone to Draft</span>
+          </button>
+
+          <div className="border-t border-slate-100 my-1" />
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onAudit();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-purple-600 transition-colors cursor-pointer"
+          >
+            <span>📜</span>
+            <span>Audit Trail Log</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export type DesktopDockTab = 'none' | 'comms' | 'drivers' | 'alerts';
+
 export default function DispatchRoute() {
   const navigate = useNavigate();
 
@@ -125,6 +303,10 @@ export default function DispatchRoute() {
   const [pillFilter, setPillFilter] = useState<'all' | 'unconfirmed' | 'pending' | 'assigned' | 'completed' | 'cancelled' | 'unassigned'>('all');
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
+  const layoutDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
@@ -152,6 +334,7 @@ export default function DispatchRoute() {
   // Filter Pills & Dropdown System (Driver, Vehicle, Company, Payment Type, Tariff, Has Car Seat)
   type FilterType = 'driver' | 'vehicle' | 'company' | 'payment_type' | 'tariff' | 'has_car_seat';
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const addFilterRef = useRef<HTMLDivElement>(null);
   const [activeFilterKeys, setActiveFilterKeys] = useState<FilterType[]>([]);
   const [selectedDriverFilter, setSelectedDriverFilter] = useState<string>('all');
@@ -159,6 +342,16 @@ export default function DispatchRoute() {
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>('all');
   const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<string>('all');
   const [selectedTariffFilter, setSelectedTariffFilter] = useState<string>('all');
+
+  // Memoized draft values updater to prevent infinite re-render loops
+  const handleDraftValuesChange = useCallback((draftId: string, vals: DispatchFormValues) => {
+    setDrafts((prev) => {
+      const target = prev.find((item) => item.id === draftId);
+      if (!target) return prev;
+      if (target.formValues === vals) return prev;
+      return prev.map((item) => (item.id === draftId ? { ...item, formValues: vals } : item));
+    });
+  }, []);
 
   // Draft Tabs state
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
@@ -170,16 +363,21 @@ export default function DispatchRoute() {
   const [isTabOverflowOpen, setIsTabOverflowOpen] = useState(false);
   const tabOverflowRef = useRef<HTMLDivElement>(null);
 
-  // Operational Right Dock Tools (Multi-tasking, non-blocking)
-  const [isDriversOpen, setIsDriversOpen] = useState(false);
-  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
-  const [isPhoneOpen, setIsPhoneOpen] = useState(false);
+  // Operational Right Dock Tools (Unified Dock: Main / Comms / Drivers / Alerts)
+  const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
+  const isDriversOpen = activeDockTab === 'drivers';
+  const isMessagesOpen = activeDockTab === 'alerts';
+  const isPhoneOpen = activeDockTab === 'comms';
+  const setIsDriversOpen = (open: boolean) => setActiveDockTab(open ? 'drivers' : 'none');
+  const setIsMessagesOpen = (open: boolean) => setActiveDockTab(open ? 'alerts' : 'none');
+  const setIsPhoneOpen = (open: boolean) => setActiveDockTab(open ? 'comms' : 'none');
   const [minimizedPanels, setMinimizedPanels] = useState<Record<string, boolean>>({});
   const operationsContainerRef = useRef<HTMLDivElement>(null);
 
   // Drivers Data State
   const [drivers, setDrivers] = useState<DriverRosterItem[]>(INITIAL_DRIVERS);
   const [driverFilter, setDriverFilter] = useState<'all' | 'available' | 'on_trip' | 'offline'>('all');
+  const [driverSearch, setDriverSearch] = useState('');
 
   // Messages Data State
   const [messages, setMessages] = useState<DispatchMessageItem[]>([
@@ -225,6 +423,7 @@ export default function DispatchRoute() {
   const [activeCallStatus, setActiveCallStatus] = useState<'idle' | 'calling' | 'connected'>('idle');
   const [callDuration, setCallDuration] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
+  const [softphoneNotice, setSoftphoneNotice] = useState<string | null>(null);
 
   // Driver Fare Console Modal State
   const [driverModalTrip, setDriverModalTrip] = useState<Trip | null>(null);
@@ -238,7 +437,16 @@ export default function DispatchRoute() {
   // Resizable layout dimensions - Default to balanced heights so Softphone never overflows
   const [sidebarWidth, setSidebarWidth] = useState(430); // 340px - 620px
   const [queueHeight, setQueueHeight] = useState(240); // 160px - 50%
-  const [operationsWidth, setOperationsWidth] = useState(400); // 320px - 750px
+  const [operationsWidth, setOperationsWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ct_dispatch_dock_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 320 && parsed <= 750) return parsed;
+      }
+    }
+    return 420;
+  });
   const [panelHeights, setPanelHeights] = useState<Record<string, number>>({
     drivers: 180,
     messages: 180,
@@ -247,13 +455,22 @@ export default function DispatchRoute() {
   const [isViewsDropdownOpen, setIsViewsDropdownOpen] = useState(false);
   const viewsDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Phase 29B/29D: Display Layout & Mobile View State
+  const [displayLayout, setDisplayLayout] = useDisplayLayout('ct_dispatch_layout', 'table');
+  const [workspaceLayout, setWorkspaceLayout] = useState<'compact' | 'split' | 'popout'>('compact');
+  const [activeMobileTab, setActiveMobileTab] = useState<
+    'booking' | 'queue' | 'map' | 'messages' | 'phone' | 'drivers' | 'comms'
+  >('queue');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [openTripActionId, setOpenTripActionId] = useState<string | null>(null);
+
   // Dynamic height balance when panels change or keyboard toggles to guarantee NO sidebar container overflow
-  const activePanels = [
-    isDriversOpen && 'drivers',
-    isMessagesOpen && 'messages',
-    isPhoneOpen && 'phone',
-  ].filter(Boolean) as ('drivers' | 'messages' | 'phone')[];
-  const activeOperationalCount = activePanels.length;
+  const activeOperationalCount = activeDockTab === 'none' ? 0 : 1;
+  const activePanels = (
+    activeDockTab === 'none'
+      ? []
+      : [activeDockTab === 'alerts' ? 'messages' : activeDockTab]
+  ) as ('drivers' | 'messages' | 'phone')[];
 
   useEffect(() => {
     if (!operationsContainerRef.current) return;
@@ -297,14 +514,17 @@ export default function DispatchRoute() {
       if (addFilterRef.current && !addFilterRef.current.contains(target)) {
         setIsAddFilterOpen(false);
       }
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(target)) {
+        setIsLayoutDropdownOpen(false);
+      }
     };
-    if (isViewsDropdownOpen || isTabOverflowOpen || isAddFilterOpen) {
+    if (isViewsDropdownOpen || isTabOverflowOpen || isAddFilterOpen || isLayoutDropdownOpen) {
       document.addEventListener('mousedown', handleOutsideClick);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
-  }, [isViewsDropdownOpen, isTabOverflowOpen, isAddFilterOpen]);
+  }, [isViewsDropdownOpen, isTabOverflowOpen, isAddFilterOpen, isLayoutDropdownOpen]);
 
   // Auth Guard
   useEffect(() => {
@@ -330,6 +550,47 @@ export default function DispatchRoute() {
     return unsub;
   }, []);
 
+  // Persist right dock operations width in localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ct_dispatch_dock_width', String(operationsWidth));
+    }
+  }, [operationsWidth]);
+
+  // Dispatcher Hotkeys: M (Main), C (Comms), D (Drivers), A (Alerts), Escape (Close dock/drawers)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.getAttribute('role') === 'textbox')
+      ) {
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === 'Escape') {
+        setActiveDockTab('none');
+        setIsMobileDrawerOpen(false);
+      } else if (e.key === 'm' || e.key === 'M') {
+        setActiveDockTab('none');
+      } else if (e.key === 'c' || e.key === 'C') {
+        setActiveDockTab((prev) => (prev === 'comms' ? 'none' : 'comms'));
+      } else if (e.key === 'd' || e.key === 'D') {
+        setActiveDockTab((prev) => (prev === 'drivers' ? 'none' : 'drivers'));
+      } else if (e.key === 'a' || e.key === 'A') {
+        setActiveDockTab((prev) => (prev === 'alerts' ? 'none' : 'alerts'));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Pricing Rules (Driver Permitted)
   useEffect(() => {
     const unsub = getPricingRulesService().subscribeToRules((rules) => {
@@ -337,6 +598,41 @@ export default function DispatchRoute() {
     });
     return () => unsub();
   }, []);
+
+  // Cross-Window Workspace Bus Sync (Multi-monitor pop-out synchronization)
+  useEffect(() => {
+    const bus = getWorkspaceBus();
+    const unsub = bus.subscribe((msg) => {
+      if (msg.type === 'POPULATE_BOOKING') {
+        const payload = msg.payload;
+        setActiveMobileTab('booking');
+        setDrafts((prev) => {
+          const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+          if (!target) return prev;
+          const currentForm = target.formValues || ({} as any);
+          const updatedForm: DispatchFormValues = {
+            ...currentForm,
+            passengerName: payload.passengerName || currentForm.passengerName || '',
+            passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+            pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+            dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+            internalNotes: payload.notes
+              ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+              : currentForm.internalNotes,
+          };
+          return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+        });
+      } else if (msg.type === 'FOCUS_TRIP_ON_MAP') {
+        const found = trips.find((t) => t.id === msg.payload.tripId);
+        if (found) {
+          setSelectedMapTrip(found);
+          setSelectedQueueTripId(found.id);
+          setActiveMobileTab('map');
+        }
+      }
+    });
+    return unsub;
+  }, [activeDraftId, trips]);
 
   const handleOpenReviewModal = (trip: Trip) => {
     setReviewTrip(trip);
@@ -834,19 +1130,65 @@ export default function DispatchRoute() {
     setDialedNumber((prev) => prev + digit);
   };
 
-  const handleStartCall = (targetNum?: string) => {
+  const handleStartCall = async (targetNum?: string, peerName?: string) => {
     const numToCall = targetNum || dialedNumber;
     if (!numToCall) return;
     setDialedNumber(numToCall);
     setActiveCallStatus('calling');
-    setTimeout(() => {
-      setActiveCallStatus('connected');
-    }, 1200);
+    setSoftphoneNotice(`Initiating call to ${numToCall}...`);
+
+    try {
+      const telephonyService = getTelephonyService();
+      telephonyService.startSoftphoneCall(numToCall, peerName);
+    } catch (e) {
+      console.warn('Softphone call initiation warning:', e);
+    }
+
+    try {
+      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
+      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
+      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '' : '';
+
+      const resp = await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'make_call',
+          to: numToCall,
+          credentials: {
+            accountSid: twilioSid,
+            authToken: twilioToken,
+            phoneNumber: twilioPhone,
+          },
+        }),
+      });
+
+      const data = (await resp.json()) as any;
+      if (data.success && data.callSid) {
+        setSoftphoneNotice(`Twilio Call Live (SID: ${data.callSid.slice(0, 10)}...). Ringing target phone!`);
+      } else if (data.status === 'simulated' || !twilioSid) {
+        setSoftphoneNotice('Simulated WebRTC Call. Add Twilio keys in Admin > Financials to ring your physical cell phone.');
+      } else {
+        setSoftphoneNotice(data.message || data.error || 'Simulated call connected.');
+      }
+    } catch (err: any) {
+      console.warn('Telephony endpoint error:', err);
+      setSoftphoneNotice('Softphone connected (simulated line).');
+    }
+
+    setActiveCallStatus('connected');
   };
 
   const handleEndCall = () => {
+    try {
+      const telephonyService = getTelephonyService();
+      telephonyService.endSoftphoneCall('call_active');
+    } catch (e) {
+      console.warn('Softphone call termination warning:', e);
+    }
     setActiveCallStatus('idle');
     setCallDuration(0);
+    setSoftphoneNotice(null);
   };
 
   // Resizable sidebar handlers
@@ -1131,13 +1473,17 @@ export default function DispatchRoute() {
       }
       return `${dateTimeRange.startDate} - ${dateTimeRange.endDate}`;
     }
-    return 'Select date range';
+    return 'All Dates';
   };
 
   // Comprehensive filtered trips in queue
   const filteredTrips = trips.filter((trip) => {
-    // Status filter from dropdown
-    if (statusFilter !== 'all' && trip.status !== statusFilter) return false;
+    // Status filter from dropdown (including unconfirmed)
+    if (statusFilter !== 'all') {
+      const tripStatusLower = (trip.status || '').toLowerCase();
+      const filterLower = statusFilter.toLowerCase();
+      if (tripStatusLower !== filterLower) return false;
+    }
 
     // Filter pills
     if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') return false;
@@ -1322,104 +1668,389 @@ export default function DispatchRoute() {
       {/* ─────────────────────────────────────────────────────────────
           1. TOP NAVIGATION BAR (Functional & Rerouted)
       ───────────────────────────────────────────────────────────── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30 shadow-sm">
-        {/* Left: View Rerouting & Action Tools */}
-        <div className="flex items-center gap-1.5">
-          {/* Active View: Dispatch */}
+      <header className="h-12 bg-white border-b border-slate-200 px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
+        {/* Left: Mobile Drawer Trigger + View Switcher & Dock Triggers */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Mobile & Desktop Drawer Hamburger Button */}
           <button
             type="button"
-            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
+            onClick={() => setIsMobileDrawerOpen(true)}
+            className="p-1.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+            title="Open Operations & Profile Drawer"
           >
-            <RadioIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Dispatch</span>
+            <MenuIcon className="w-5 h-5" />
           </button>
 
-          <div className="w-[1px] h-5 bg-slate-200 mx-1" />
-
-          {/* Drivers Dock Trigger (Toggles non-blocking side panel) */}
-          <button
-            type="button"
-            onClick={() => setIsDriversOpen(!isDriversOpen)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              isDriversOpen
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <CarIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Drivers</span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isDriversOpen ? 'bg-white' : 'bg-emerald-500 animate-pulse'
+          {/* Desktop Operational Panel Triggers: Main, Communications, Drivers, Alerts */}
+          <div className="hidden lg:flex items-center gap-1.5">
+            {/* Main Console Tab (Booking on left, Map on top right, Trips table on bottom right) */}
+            <button
+              type="button"
+              onClick={() => setActiveDockTab('none')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeDockTab === 'none'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100'
               }`}
-            />
-          </button>
+              title="Main Console: Booking form, Map, and Trips queue"
+            >
+              <Squares2X2Icon className="w-3.5 h-3.5 shrink-0" />
+              <span>Main</span>
+            </button>
 
-          {/* Messages Dock Trigger (Toggles non-blocking side panel) */}
-          <button
-            type="button"
-            onClick={() => setIsMessagesOpen(!isMessagesOpen)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              isMessagesOpen
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <MailIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Messages</span>
-            {messages.length > 0 && (
+            {/* Communications Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveDockTab(activeDockTab === 'comms' ? 'none' : 'comms')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeDockTab === 'comms'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Communications: Omnichannel Calls, Messages, and Voicemail"
+            >
+              <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Communications</span>
+              {activeCallStatus !== 'idle' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+              )}
+            </button>
+
+            {/* Drivers Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveDockTab(activeDockTab === 'drivers' ? 'none' : 'drivers')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeDockTab === 'drivers'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Drivers Roster & Status"
+            >
+              <CarIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Drivers</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                  isMessagesOpen ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                  activeDockTab === 'drivers' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {messages.length}
+                {drivers.filter((d) => d.status === 'available').length}
               </span>
-            )}
-          </button>
+            </button>
 
-          {/* Phone Softphone Dock Trigger (Toggles non-blocking side panel) */}
-          <button
-            type="button"
-            onClick={() => setIsPhoneOpen(!isPhoneOpen)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              isPhoneOpen
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Phone</span>
-          </button>
+            {/* Alerts Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveDockTab(activeDockTab === 'alerts' ? 'none' : 'alerts')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeDockTab === 'alerts'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Fleet Broadcasts & Tactical Alerts"
+            >
+              <BellIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Alerts</span>
+              {messages.length > 0 && (
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                    activeDockTab === 'alerts' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {messages.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Center: Brand Badge */}
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs tracking-tighter">
+          <div className="w-6 h-6 rounded-lg bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs tracking-tighter shadow-xs">
             CT
           </div>
-          <span className="font-extrabold text-sm tracking-tight text-slate-900">
+          <span className="font-extrabold text-sm tracking-tight text-slate-900 hidden sm:inline">
             {settings.company.name}
           </span>
         </div>
 
-        {/* Right: Unified Admin User Dropdown */}
-        <UserDropdown
-          email={user?.email}
-          onSignOut={handleSignOut}
-          variant="light"
-          className="w-auto min-w-[160px]"
-        />
+        {/* Right: Operational Status / Dispatch Indicator + Screen Pop Call HUD */}
+        <div className="flex items-center gap-2">
+          <DispatchHeaderCallHud
+            trips={trips}
+            onOpenBooking={() => setActiveMobileTab('booking')}
+            onOpenComms={() => {
+              setActiveDockTab('comms');
+              setActiveMobileTab('comms');
+            }}
+          />
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-600">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+            <span>Operational</span>
+          </div>
+        </div>
       </header>
+
+      {/* ─────────────────────────────────────────────────────────────
+          1C. SLIDE-OUT OPERATIONS & PROFILE DRAWER
+      ───────────────────────────────────────────────────────────── */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileDrawerOpen(false)}
+          />
+          <div className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs">
+                  CT
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm text-slate-900">
+                    Dispatch Hub
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Mobile Control Console
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Operations Triggers */}
+            <div className="py-3 border-b border-slate-100 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Docked Operations
+                </span>
+                <span className="text-[10px] text-blue-600 font-bold">Detachable</span>
+              </div>
+
+              {/* Main Console */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDockTab('none');
+                  setActiveMobileTab('queue');
+                  setIsMobileDrawerOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeDockTab === 'none'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Squares2X2Icon className="w-4 h-4" />
+                  <span>Main Console</span>
+                </div>
+                <span className="text-[10px] opacity-80 font-bold">Booking • Map • Trips</span>
+              </button>
+
+              {/* Unified Communications Hub with Pop-Out */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDockTab('comms');
+                    setActiveMobileTab('comms');
+                    setIsMobileDrawerOpen(false);
+                  }}
+                  className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeDockTab === 'comms' || activeMobileTab === 'comms'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="w-4 h-4" />
+                    <span>Communications</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 font-bold">
+                    Calls &amp; SMS
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => getWorkspaceBus().popOutModule('comms')}
+                  title="Pop out Comms Hub to detached window"
+                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  ↗
+                </button>
+              </div>
+
+              {/* Drivers Roster with Pop-Out */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDockTab('drivers');
+                    setActiveMobileTab('drivers');
+                    setIsMobileDrawerOpen(false);
+                  }}
+                  className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeDockTab === 'drivers' || activeMobileTab === 'drivers'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CarIcon className="w-4 h-4" />
+                    <span>Drivers Roster</span>
+                  </div>
+                  <span className="text-[11px] font-bold">
+                    {drivers.filter((d) => d.status === 'available').length} Avail
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => getWorkspaceBus().popOutModule('drivers')}
+                  title="Pop out Drivers to detached window"
+                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                >
+                  ↗
+                </button>
+              </div>
+
+              {/* Fleet Alerts & Broadcasts */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDockTab('alerts');
+                  setIsMobileDrawerOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeDockTab === 'alerts'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <BellIcon className="w-4 h-4" />
+                  <span>Alerts &amp; Broadcasts</span>
+                </div>
+                {messages.length > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                    {messages.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Workspace Layout Preferences */}
+            <div className="py-3 border-b border-slate-100 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                Workspace Workflow Layout
+              </span>
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-center text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceLayout('compact');
+                    setActiveDockTab('none');
+                  }}
+                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                    workspaceLayout === 'compact' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Compact HUD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceLayout('split');
+                    setActiveDockTab('comms');
+                  }}
+                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                    workspaceLayout === 'split' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Split Dock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceLayout('popout');
+                    getWorkspaceBus().popOutModule('comms');
+                  }}
+                  className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+                    workspaceLayout === 'popout' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Pop-Out ↗
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 px-1 leading-tight">
+                {workspaceLayout === 'compact' && 'Minimal desktop: floating caller HUD + full queue space.'}
+                {workspaceLayout === 'split' && 'Multi-tasking: side-by-side dock with dialer & roster.'}
+                {workspaceLayout === 'popout' && 'Multi-monitor: detached windows with cross-window sync.'}
+              </p>
+            </div>
+
+            {/* Quick Links */}
+            <div className="py-3 border-b border-slate-100 space-y-1">
+              <Link
+                to="/admin"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => setIsMobileDrawerOpen(false)}
+              >
+                <span className="flex items-center gap-2">
+                  <span>👑</span>
+                  <span>Admin Console</span>
+                </span>
+                <span className="text-slate-400">→</span>
+              </Link>
+              <a
+                href="/"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => setIsMobileDrawerOpen(false)}
+              >
+                <span className="flex items-center gap-2">
+                  <span>🌐</span>
+                  <span>Public Live Site</span>
+                </span>
+                <span className="text-slate-400">↗</span>
+              </a>
+            </div>
+
+            {/* Account and Profile Menu (Consistently in Side Drawer) */}
+            <div className="mt-auto pt-3 border-t border-slate-200 shrink-0">
+              <UserDropdown
+                email={user?.email}
+                onSignOut={handleSignOut}
+                variant="light"
+                currentView="dispatch"
+                dropUp={true}
+                triggerVariant="full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           2. WORKSPACE: LEFT PERSISTENT SIDEBAR + CENTER MAP & QUEUE + RIGHT DOCKED PANEL
       ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative pb-14 lg:pb-0">
         {/* ─── A. LEFT SIDEBAR: TABBED DRAFT / EDIT ENGINE ─── */}
         <aside
-          style={{ width: `${sidebarWidth}px` }}
-          className="h-full bg-white border-r border-slate-200 flex flex-col shrink-0 relative z-20 shadow-xs"
+          style={{
+            width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${sidebarWidth}px` : undefined,
+          }}
+          className={`h-full bg-white border-r border-slate-200 flex flex-col shrink-0 relative z-20 shadow-xs ${
+            activeMobileTab === 'booking' ? 'flex w-full' : 'hidden lg:flex'
+          }`}
         >
           {/* Browser-style Tab Bar */}
           <div className="h-9 bg-slate-100 border-b border-slate-200 flex items-center px-1 shrink-0 select-none relative">
@@ -1442,7 +2073,8 @@ export default function DispatchRoute() {
                     <button
                       type="button"
                       onClick={(e) => closeDraft(d.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 text-slate-400 hover:text-red-500 transition-opacity"
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 hover:bg-slate-300 cursor-pointer"
+                      title="Close Tab"
                     >
                       ✕
                     </button>
@@ -1455,7 +2087,7 @@ export default function DispatchRoute() {
                 <button
                   type="button"
                   onClick={createDraft}
-                  className="h-7 px-2 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 font-bold text-sm flex items-center justify-center transition-colors shrink-0"
+                  className="h-7 px-2 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 font-bold text-sm flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   title="Open new draft booking tab"
                 >
                   +
@@ -1555,11 +2187,7 @@ export default function DispatchRoute() {
                 <DispatchBookingEngine
                   draftId={d.id}
                   initialTrip={d.trip}
-                  onValuesChange={(vals) => {
-                    setDrafts((prev) =>
-                      prev.map((item) => (item.id === d.id ? { ...item, formValues: vals } : item))
-                    );
-                  }}
+                  onValuesChange={(vals) => handleDraftValuesChange(d.id, vals)}
                   onBookingSuccess={(savedTrip, isEdit) => {
                     if (isEdit) {
                       closeDraft(d.id, { stopPropagation: () => {} } as any);
@@ -1584,9 +2212,13 @@ export default function DispatchRoute() {
         />
 
         {/* ─── B. CENTER COLUMN: MAP VIEW STAGE + BOTTOM DOCKED QUEUE ─── */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
+        <div className={`flex-1 flex-col h-full overflow-hidden relative min-w-0 ${
+          activeMobileTab === 'queue' || activeMobileTab === 'map' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Live Google Map Stage */}
-          <div className="flex-1 w-full h-full relative z-0">
+          <div className={`w-full relative z-0 ${
+            activeMobileTab === 'map' ? 'flex-1 h-full' : activeMobileTab === 'queue' ? 'hidden lg:flex lg:flex-1' : 'flex-1'
+          }`}>
             <LiveDispatchMap
               activeFormValues={activeDraft?.formValues}
               activeTrip={activeDraft?.trip}
@@ -1598,104 +2230,473 @@ export default function DispatchRoute() {
           {/* Resizer Handle (Bottom Queue) */}
           <div
             onMouseDown={handleQueueMouseDown}
-            className="h-1.5 w-full cursor-row-resize hover:bg-blue-500/50 transition-colors z-10 shrink-0"
+            className="hidden lg:block h-1.5 w-full cursor-row-resize hover:bg-blue-500/50 transition-colors z-10 shrink-0"
           />
 
           {/* Bottom Docked Queue */}
           <div
-            style={{ height: `${queueHeight}px` }}
-            className="w-full bg-white border-t border-slate-200 flex flex-col shrink-0 z-10 shadow-md"
+            style={{
+              height: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${queueHeight}px` : undefined,
+            }}
+            className={`w-full bg-white border-t border-slate-200 flex flex-col shrink-0 z-10 shadow-md ${
+              activeMobileTab === 'queue' ? 'flex-1 h-full' : 'hidden lg:flex'
+            }`}
           >
-            {/* ─── Modern Filter & Trips Control Bar (Non-wrapping, compact, pop over map) ─── */}
-            <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 min-w-0 h-11">
-              {/* Left Side: Date Range button, Unconfirmed Badge, Status Dropdown, + Add Filter, Filter Pills, Display Count */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                {/* 1. Select Date Range Popover Button (Intelligently pops UP over the map) */}
-                <div className="relative shrink-0" ref={datePickerTriggerRef}>
+            {/* ─── Modern Filter & Trips Control Bar ─── */}
+            <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 min-w-0 h-11 relative z-30 overflow-visible">
+              {isSearchExpanded ? (
+                /* ── Expandable Search Bar (Takes full width, hides other controls) ── */
+                <div className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 min-w-0">
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                    </span>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search trips by ID, passenger, phone, pickup, dropoff, driver..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-8 py-1 bg-white border border-blue-500 rounded-lg text-slate-800 text-xs shadow-2xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                        title="Clear search text"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer h-7"
-                  >
-                    <span>📅</span>
-                    <span className="truncate max-w-[150px]">{getDateRangeButtonLabel()}</span>
-                    <span className="text-[10px] text-slate-400">▾</span>
-                  </button>
-
-                  <CustomDateTimePicker
-                    isOpen={isDatePickerOpen}
-                    onClose={() => setIsDatePickerOpen(false)}
-                    value={dateTimeRange}
-                    placement="top"
-                    onChange={(newRange) => {
-                      setDateTimeRange(newRange);
-                      setFilterStartDate(newRange.startDate);
-                      setFilterEndDate(newRange.endDate);
+                    onClick={() => {
+                      setIsSearchExpanded(false);
+                      setSearchTerm('');
                     }}
-                  />
-                </div>
-
-                {/* 2. Unconfirmed Filter Pill / Badge */}
-                <button
-                  type="button"
-                  onClick={() => setPillFilter((prev) => (prev === 'unconfirmed' ? 'all' : 'unconfirmed'))}
-                  className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold shadow-2xs shrink-0 h-7 cursor-pointer transition-all ${
-                    pillFilter === 'unconfirmed'
-                      ? 'bg-amber-600 text-white ring-2 ring-amber-400 ring-offset-1 shadow-sm'
-                      : unconfirmedCount > 0
-                      ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 animate-pulse'
-                      : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                  }`}
-                  title="Filter pending unconfirmed bookings"
-                >
-                  <span className="flex items-center gap-1">
-                    {unconfirmedCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />}
-                    <span>Unconfirmed</span>
-                  </span>
-                  <span
-                    className={`min-w-4 h-4 px-1 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                      pillFilter === 'unconfirmed'
-                        ? 'bg-white text-amber-700'
-                        : unconfirmedCount > 0
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-300 text-slate-700'
-                    }`}
+                    className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-200/80 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer shrink-0 h-7 flex items-center gap-1"
+                    title="Close search and show filters"
                   >
-                    {unconfirmedCount}
-                  </span>
-                </button>
-
-                {/* 3. Status Dropdown */}
-                <div className="relative shrink-0">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-7 px-2 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer"
-                  >
-                    <option value="all">Status: None ▾</option>
-                    <option value="UNCONFIRMED">Status: Unconfirmed ▾</option>
-                    <option value="CONFIRMED">Status: Confirmed ▾</option>
-                    <option value="pending">Status: Pending ▾</option>
-                    <option value="assigned">Status: Assigned ▾</option>
-                    <option value="completed">Status: Completed ▾</option>
-                    <option value="cancelled">Status: Cancelled ▾</option>
-                    <option value="DECLINED">Status: Declined ▾</option>
-                  </select>
+                    <span>✕</span>
+                    <span className="hidden sm:inline">Close</span>
+                  </button>
                 </div>
+              ) : (
+                /* ── Standard Control Bar ── */
+                <>
+                  {/* Left Controls: Date Range, Status Dropdown, and (on Desktop) Filter Add & Pills */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-visible">
+                    {/* 1. Select Date Range Popover Button */}
+                    <div className="relative shrink-0" ref={datePickerTriggerRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                        className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-white border rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer h-7 shrink-0 ${
+                          dateTimeRange.presetKey && dateTimeRange.presetKey !== 'all_time'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                        title="Filter trips by date range"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate max-w-[90px] sm:max-w-[130px] md:max-w-[160px]">{getDateRangeButtonLabel()}</span>
+                        <ChevronDownIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                      </button>
 
-                {/* 4. + Add Filter Dropdown */}
+                      <CustomDateTimePicker
+                        isOpen={isDatePickerOpen}
+                        onClose={() => setIsDatePickerOpen(false)}
+                        value={dateTimeRange}
+                        placement="top"
+                        onChange={(newRange) => {
+                          setDateTimeRange(newRange);
+                          setFilterStartDate(newRange.startDate);
+                          setFilterEndDate(newRange.endDate);
+                        }}
+                      />
+                    </div>
+
+                    {/* 2. Unified Status Dropdown */}
+                    <div className="relative shrink-0">
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className={`h-7 pl-2 pr-6 bg-white border rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer max-w-[110px] sm:max-w-[140px] md:max-w-[170px] truncate ${
+                          statusFilter.toLowerCase() === 'unconfirmed'
+                            ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold ring-1 ring-amber-300'
+                            : unconfirmedCount > 0 && statusFilter === 'all'
+                            ? 'border-amber-300 text-slate-800'
+                            : 'border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <option value="all">
+                          {unconfirmedCount > 0 ? `Status: All (${unconfirmedCount} unconfirmed)` : 'Status: All ▾'}
+                        </option>
+                        <option value="unconfirmed">
+                          ⚡ Unconfirmed ({unconfirmedCount})
+                        </option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="pending">Pending</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="declined">Declined</option>
+                      </select>
+                      {unconfirmedCount > 0 && statusFilter.toLowerCase() !== 'unconfirmed' && (
+                        <span
+                          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse pointer-events-none"
+                          title={`${unconfirmedCount} unconfirmed booking(s)`}
+                        />
+                      )}
+                    </div>
+
+                    {/* Desktop Only: Add Filter & Active Filter Pills */}
+                    <div className="hidden md:flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      {/* 3. + Add Filter Dropdown */}
+                      <div className="relative shrink-0" ref={addFilterRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddFilterOpen(!isAddFilterOpen)}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-7"
+                        >
+                          <FunnelIcon className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Filter</span>
+                          <span className="text-[10px] text-slate-400">▾</span>
+                        </button>
+
+                        {isAddFilterOpen && (
+                          <div className="absolute bottom-full left-0 mb-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                            {[
+                              { key: 'driver', label: 'Driver' },
+                              { key: 'vehicle', label: 'Vehicle' },
+                              { key: 'company', label: 'Company' },
+                              { key: 'payment_type', label: 'Payment Type' },
+                              { key: 'tariff', label: 'Tariff' },
+                              { key: 'has_car_seat', label: 'Has Car Seat' },
+                            ].map((item) => (
+                              <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => {
+                                  if (!activeFilterKeys.includes(item.key as FilterType)) {
+                                    setActiveFilterKeys([...activeFilterKeys, item.key as FilterType]);
+                                  }
+                                  setIsAddFilterOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-1.5 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition-colors cursor-pointer ${
+                                  activeFilterKeys.includes(item.key as FilterType) ? 'text-blue-600 font-bold bg-blue-50/50' : ''
+                                }`}
+                              >
+                                <span>{item.label}</span>
+                                {activeFilterKeys.includes(item.key as FilterType) && <span>✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Active Filter Pills on Desktop */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 py-0.5">
+                        {/* Pill: Driver */}
+                        {activeFilterKeys.includes('driver') && (
+                          <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                            <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
+                            <select
+                              value={selectedDriverFilter}
+                              onChange={(e) => setSelectedDriverFilter(e.target.value)}
+                              className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="all">All Drivers ▾</option>
+                              {drivers.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'driver'))}
+                              className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Driver filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pill: Has Car Seat */}
+                        {activeFilterKeys.includes('has_car_seat') && (
+                          <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
+                            <span className="text-[11px]">Has Car Seat</span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
+                              className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Car Seat filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pill: Vehicle */}
+                        {activeFilterKeys.includes('vehicle') && (
+                          <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                            <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
+                            <select
+                              value={selectedVehicleFilter}
+                              onChange={(e) => setSelectedVehicleFilter(e.target.value)}
+                              className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="all">All Vehicles ▾</option>
+                              {settings.vehicles.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'vehicle'))}
+                              className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Vehicle filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pill: Company */}
+                        {activeFilterKeys.includes('company') && (
+                          <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                            <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
+                            <select
+                              value={selectedCompanyFilter}
+                              onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                              className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="all">All Companies ▾</option>
+                              <option value="Chesterfield">Chesterfield Corporate</option>
+                              <option value="Medical">Medical Express</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'company'))}
+                              className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Company filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pill: Payment Type */}
+                        {activeFilterKeys.includes('payment_type') && (
+                          <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                            <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
+                            <select
+                              value={selectedPaymentFilter}
+                              onChange={(e) => setSelectedPaymentFilter(e.target.value)}
+                              className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="all">All Methods ▾</option>
+                              <option value="card">Credit Card</option>
+                              <option value="cash">Cash in Cab</option>
+                              <option value="account">Corporate Account</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'payment_type'))}
+                              className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Payment filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pill: Tariff */}
+                        {activeFilterKeys.includes('tariff') && (
+                          <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                            <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
+                            <select
+                              value={selectedTariffFilter}
+                              onChange={(e) => setSelectedTariffFilter(e.target.value)}
+                              className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                            >
+                              <option value="all">Standard Tariff ▾</option>
+                              <option value="surge">Surge Rate</option>
+                              <option value="airport">Flat Airport Rate</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'tariff'))}
+                              className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                              title="Remove Tariff filter"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Displaying X trips text */}
+                      <span className="text-[11px] text-slate-500 font-medium shrink-0 whitespace-nowrap ml-1 hidden xl:inline">
+                        Displaying {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Selection Badge, Mobile Filter Toggle, Queue Layout Dropdown, Search Magnifier */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    {selectedTripIds.length > 0 && (
+                      <div className="flex items-center gap-1.5 bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold shadow-2xs shrink-0 h-7">
+                        <span>✓ {selectedTripIds.length} Selected</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTripIds([])}
+                          className="text-[10px] text-blue-200 hover:text-white underline cursor-pointer ml-0.5"
+                        >
+                          Deselect
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Mobile Filters Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+                      className={`md:hidden flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-bold transition-all cursor-pointer h-7 shadow-2xs ${
+                        activeFilterKeys.length > 0 || isMobileFiltersOpen
+                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
+                      }`}
+                      title="Filter Trips"
+                    >
+                      <FunnelIcon className="w-3.5 h-3.5" />
+                      {activeFilterKeys.length > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+                          {activeFilterKeys.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Queue Display Layout Dropdown */}
+                    <div className="relative shrink-0" ref={layoutDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+                        className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-7"
+                        title={`Queue Layout: ${displayLayout}. Click to change.`}
+                      >
+                        {displayLayout === 'cards' ? (
+                          <Squares2X2Icon className="w-3.5 h-3.5 text-slate-600" />
+                        ) : displayLayout === 'table' ? (
+                          <TableCellsIcon className="w-3.5 h-3.5 text-slate-600" />
+                        ) : (
+                          <ListBulletIcon className="w-3.5 h-3.5 text-slate-600" />
+                        )}
+                        <span className="hidden sm:inline capitalize">
+                          {displayLayout === 'cards' ? 'Cards' : displayLayout === 'table' ? 'Table' : 'Compact'}
+                        </span>
+                        <ChevronDownIcon className="w-3 h-3 text-slate-400" />
+                      </button>
+
+                      {isLayoutDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDisplayLayout('cards');
+                              setIsLayoutDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
+                              displayLayout === 'cards' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Squares2X2Icon className="w-4 h-4 text-slate-500" />
+                              <span>Cards</span>
+                            </div>
+                            {displayLayout === 'cards' && <span>✓</span>}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDisplayLayout('table');
+                              setIsLayoutDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
+                              displayLayout === 'table' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <TableCellsIcon className="w-4 h-4 text-slate-500" />
+                              <span>Table</span>
+                            </div>
+                            {displayLayout === 'table' && <span>✓</span>}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDisplayLayout('compact');
+                              setIsLayoutDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
+                              displayLayout === 'compact' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <ListBulletIcon className="w-4 h-4 text-slate-500" />
+                              <span>Compact</span>
+                            </div>
+                            {displayLayout === 'compact' && <span>✓</span>}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Expandable Search Magnifier Icon Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSearchExpanded(true);
+                        setTimeout(() => searchInputRef.current?.focus(), 50);
+                      }}
+                      className={`p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 shadow-2xs ${
+                        searchTerm
+                          ? 'bg-blue-50 border-blue-400 text-blue-700 ring-1 ring-blue-300'
+                          : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
+                      }`}
+                      title={searchTerm ? `Searching "${searchTerm}" - Click to edit` : 'Search trips (Click to expand)'}
+                    >
+                      <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Sub-Toolbar: Filter Controls & Active Pills (visible if filters active or expanded on mobile) */}
+            {!isSearchExpanded && (activeFilterKeys.length > 0 || isMobileFiltersOpen) && (
+              <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 animate-in fade-in duration-100">
+                {/* Mobile Add Filter Button */}
                 <div className="relative shrink-0" ref={addFilterRef}>
                   <button
                     type="button"
                     onClick={() => setIsAddFilterOpen(!isAddFilterOpen)}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-7"
+                    className="flex items-center gap-1 px-2.5 py-0.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-6 shrink-0"
                   >
-                    <span>+ Add Filter</span>
-                    <span className="text-[10px] text-slate-400">▾</span>
+                    <FunnelIcon className="w-3 h-3 text-slate-500" />
+                    <span>+ Filter</span>
                   </button>
 
                   {isAddFilterOpen && (
-                    <div className="absolute bottom-full left-0 mb-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
                       {[
                         { key: 'driver', label: 'Driver' },
                         { key: 'vehicle', label: 'Vehicle' },
@@ -1725,386 +2726,866 @@ export default function DispatchRoute() {
                   )}
                 </div>
 
-                {/* 5. Active Filter Pills (Horizontally scrollable without breaking toolbar layout) */}
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 py-0.5">
-                  {/* Pill: Driver */}
-                  {activeFilterKeys.includes('driver') && (
-                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                      <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
-                      <select
-                        value={selectedDriverFilter}
-                        onChange={(e) => setSelectedDriverFilter(e.target.value)}
-                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                      >
-                        <option value="all">All Drivers ▾</option>
-                        {drivers.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'driver'))}
-                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Driver filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pill: Has Car Seat */}
-                  {activeFilterKeys.includes('has_car_seat') && (
-                    <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
-                      <span className="text-[11px]">Has Car Seat</span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
-                        className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Car Seat filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pill: Vehicle */}
-                  {activeFilterKeys.includes('vehicle') && (
-                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                      <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
-                      <select
-                        value={selectedVehicleFilter}
-                        onChange={(e) => setSelectedVehicleFilter(e.target.value)}
-                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                      >
-                        <option value="all">All Vehicles ▾</option>
-                        {settings.vehicles.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'vehicle'))}
-                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Vehicle filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pill: Company */}
-                  {activeFilterKeys.includes('company') && (
-                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                      <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
-                      <select
-                        value={selectedCompanyFilter}
-                        onChange={(e) => setSelectedCompanyFilter(e.target.value)}
-                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                      >
-                        <option value="all">All Companies ▾</option>
-                        <option value="Chesterfield">Chesterfield Corporate</option>
-                        <option value="Medical">Medical Express</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'company'))}
-                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Company filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pill: Payment Type */}
-                  {activeFilterKeys.includes('payment_type') && (
-                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                      <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
-                      <select
-                        value={selectedPaymentFilter}
-                        onChange={(e) => setSelectedPaymentFilter(e.target.value)}
-                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                      >
-                        <option value="all">All Methods ▾</option>
-                        <option value="card">Credit Card</option>
-                        <option value="cash">Cash in Cab</option>
-                        <option value="account">Corporate Account</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'payment_type'))}
-                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Payment filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Pill: Tariff */}
-                  {activeFilterKeys.includes('tariff') && (
-                    <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                      <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
-                      <select
-                        value={selectedTariffFilter}
-                        onChange={(e) => setSelectedTariffFilter(e.target.value)}
-                        className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
-                      >
-                        <option value="all">Standard Tariff ▾</option>
-                        <option value="surge">Surge Rate</option>
-                        <option value="airport">Flat Airport Rate</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'tariff'))}
-                        className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                        title="Remove Tariff filter"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* 6. Displaying X trips text */}
-                <span className="text-[11px] text-slate-500 font-medium shrink-0 whitespace-nowrap ml-1 hidden sm:inline">
-                  Displaying {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'}
-                </span>
-              </div>
-
-              {/* Right Side: Search Bar & Selection Badge */}
-              <div className="flex items-center gap-2 shrink-0">
-                {selectedTripIds.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-blue-600 text-white px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-2xs shrink-0 h-7">
-                    <span>✓ {selectedTripIds.length} Selected</span>
+                {/* Active Filter Pills on Mobile */}
+                {activeFilterKeys.includes('driver') && (
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                    <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
+                    <select
+                      value={selectedDriverFilter}
+                      onChange={(e) => setSelectedDriverFilter(e.target.value)}
+                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All</option>
+                      {drivers.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
-                      onClick={() => setSelectedTripIds([])}
-                      className="text-[10px] text-blue-200 hover:text-white underline cursor-pointer ml-1"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'driver'))}
+                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
                     >
-                      Deselect
+                      ✕
                     </button>
                   </div>
                 )}
 
-                <div className="relative shrink-0">
-                  <input
-                    type="text"
-                    placeholder="🔍 Search trips..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-slate-700 text-xs w-36 sm:w-44 focus:w-52 transition-all focus:ring-1 focus:ring-blue-500 shadow-2xs focus:outline-hidden h-7"
-                  />
-                  {searchTerm && (
+                {activeFilterKeys.includes('has_car_seat') && (
+                  <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
+                    <span className="text-[11px]">Car Seat</span>
                     <button
                       type="button"
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
+                      className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
                     >
                       ✕
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {activeFilterKeys.includes('vehicle') && (
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                    <span className="font-semibold text-slate-500 text-[11px]">Veh:</span>
+                    <select
+                      value={selectedVehicleFilter}
+                      onChange={(e) => setSelectedVehicleFilter(e.target.value)}
+                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All</option>
+                      {settings.vehicles.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'vehicle'))}
+                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {activeFilterKeys.includes('company') && (
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                    <span className="font-semibold text-slate-500 text-[11px]">Co:</span>
+                    <select
+                      value={selectedCompanyFilter}
+                      onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All</option>
+                      <option value="Chesterfield">Chesterfield</option>
+                      <option value="Medical">Medical</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'company'))}
+                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {activeFilterKeys.includes('payment_type') && (
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                    <span className="font-semibold text-slate-500 text-[11px]">Pay:</span>
+                    <select
+                      value={selectedPaymentFilter}
+                      onChange={(e) => setSelectedPaymentFilter(e.target.value)}
+                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All</option>
+                      <option value="card">Card</option>
+                      <option value="cash">Cash</option>
+                      <option value="account">Account</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'payment_type'))}
+                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {activeFilterKeys.includes('tariff') && (
+                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
+                    <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
+                    <select
+                      value={selectedTariffFilter}
+                      onChange={(e) => setSelectedTariffFilter(e.target.value)}
+                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="all">All</option>
+                      <option value="surge">Surge</option>
+                      <option value="airport">Airport</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setActiveFilterKeys(activeFilterKeys.filter((k) => k !== 'tariff'))}
+                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {activeFilterKeys.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilterKeys([])}
+                    className="text-[10px] text-red-600 hover:underline font-bold shrink-0 ml-1 cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Queue Table */}
-            <div className="flex-1 overflow-auto text-xs">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-100/90 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px] z-10">
-                  <tr>
-                    <th className="py-2 px-3 w-8 text-center">
-                      <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someFilteredSelected;
-                        }}
-                        onChange={handleToggleSelectAll}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        title="Select/Deselect All Filtered Trips"
-                      />
-                    </th>
-                    <th className="py-2 px-3">DATE/TIME ▲</th>
-                    <th className="py-2 px-3">PASSENGER</th>
-                    <th className="py-2 px-3">PICKUP</th>
-                    <th className="py-2 px-3">DROPOFF</th>
-                    <th className="py-2 px-3">DRIVER</th>
-                    <th className="py-2 px-3">VEHICLE</th>
-                    <th className="py-2 px-3">PRICE</th>
-                    <th className="py-2 px-3">STATUS</th>
-                    <th className="py-2 px-3 text-center">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-800">
-                  {filteredTrips.map((trip) => {
-                    const isSelected = selectedQueueTripId === trip.id;
-                    const isChecked = selectedTripIds.includes(trip.id);
-                    const pickupTimeStr = trip.scheduledPickupTime
-                      ? `${new Date(trip.scheduledPickupTime).toLocaleDateString([], {
-                          month: 'short',
-                          day: 'numeric',
-                        })}, ${new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}`
-                      : 'ASAP';
+            {/* ─── Queue Content (Cards vs Compact vs Table) ─── */}
+            {displayLayout === 'cards' ? (
+              <div className="flex-1 overflow-auto p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 bg-slate-50/50">
+                {filteredTrips.map((trip) => {
+                  const isSelected = selectedQueueTripId === trip.id;
+                  const isChecked = selectedTripIds.includes(trip.id);
+                  const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+                  const pickupTimeStr = trip.scheduledPickupTime
+                    ? `${new Date(trip.scheduledPickupTime).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                      })}, ${new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`
+                    : 'ASAP';
 
-                    const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+                  return (
+                    <div
+                      key={trip.id}
+                      onClick={() => {
+                        setSelectedQueueTripId(trip.id);
+                        setSelectedMapTrip(trip);
+                        setShouldZoomMap(false);
+                      }}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs ${
+                        isUnconfirmedTrip
+                          ? 'border-amber-400 bg-amber-50/50 hover:bg-amber-50 ring-1 ring-amber-300'
+                          : isSelected
+                          ? 'border-blue-500 bg-blue-50/40 ring-2 ring-blue-400'
+                          : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleToggleSelectTrip(trip.id);
+                              }}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="font-mono font-bold text-xs text-slate-800">
+                              #{trip.id.slice(-6).toUpperCase()}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              {pickupTimeStr}
+                            </span>
+                          </div>
+                          <div>{getStatusBadge(trip.status)}</div>
+                        </div>
 
-                    return (
-                      <tr
-                        key={trip.id}
-                        onClick={() => {
-                          // Single click: show route without zooming in
-                          setSelectedQueueTripId(trip.id);
-                          setSelectedMapTrip(trip);
-                          setShouldZoomMap(false);
-                        }}
-                        onDoubleClick={() => {
-                          // Double click: open edit tab and zoom in on map route
-                          setSelectedQueueTripId(trip.id);
-                          setSelectedMapTrip(trip);
-                          setShouldZoomMap(true);
-                          handleOpenEditTrip(trip);
-                        }}
-                        className={`cursor-pointer transition-colors ${
-                          isUnconfirmedTrip
-                            ? 'bg-amber-50/70 border-l-4 border-l-amber-500 hover:bg-amber-100/70'
-                            : isSelected
-                            ? 'bg-blue-50 font-medium hover:bg-blue-50/70'
-                            : isChecked
-                            ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                            : 'hover:bg-blue-50/70'
-                        }`}
-                        title="Click to view route on map. Double-click to edit trip & zoom in."
-                      >
-                        <td className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleToggleSelectTrip(trip.id)}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2 px-3 font-semibold text-slate-700">
-                          {pickupTimeStr}
-                        </td>
-                        <td className="py-2 px-3 font-medium">
-                          {trip.passenger.firstName} {trip.passenger.lastName}
-                          <div className="text-[10px] text-slate-400 font-mono">{trip.passenger.phone}</div>
-                        </td>
-                        <td className="py-2 px-3 truncate max-w-[160px]" title={trip.pickupLocation.address}>
-                          {trip.pickupLocation.address}
-                        </td>
-                        <td className="py-2 px-3 truncate max-w-[160px]" title={trip.dropoffLocation.address}>
-                          {trip.dropoffLocation.address}
-                        </td>
-                        <td className="py-2 px-3">
-                          {trip.assignedDriverId ? (
-                            <span className="font-semibold text-blue-600">{trip.assignedDriverId}</span>
-                          ) : (
-                            <span className="text-amber-600 font-bold">Unassigned</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3">
-                          <span className="capitalize px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                            {trip.vehicleTier || 'Standard'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 font-bold text-slate-900">
-                          ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
-                        </td>
-                        <td className="py-2 px-3">{getStatusBadge(trip.status)}</td>
-                        <td className="py-2 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {isUnconfirmedTrip && (
+                        <div className="mb-2.5">
+                          <div className="font-bold text-xs text-slate-900">
+                            {trip.passenger.firstName} {trip.passenger.lastName}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+                            <span>{trip.passenger.phone}</span>
+                            {trip.passenger.phone && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenReviewModal(trip);
+                                  handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
+                                  setIsPhoneOpen(true);
+                                  setActiveDockTab('comms');
                                 }}
-                                className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1 animate-pulse"
-                                title="Review and Accept or Decline customer web booking"
+                                className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                                title="Click-to-Call Passenger via WebRTC Softphone"
                               >
-                                <span>Review</span>
-                                <span>📋</span>
+                                <PhoneIcon className="w-3 h-3" />
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenDriverModal(trip);
-                              }}
-                              className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-[11px] font-bold text-blue-700 transition-colors cursor-pointer"
-                              title="Driver fare adjustment & permitted pricing rules"
-                            >
-                              Fare ⚡
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedQueueTripId(trip.id);
-                                setSelectedMapTrip(trip);
-                                setShouldZoomMap(true);
-                                handleOpenEditTrip(trip);
-                              }}
-                              className="px-2.5 py-0.5 rounded bg-slate-100 hover:bg-blue-600 hover:text-white border border-slate-300 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer"
-                              title="Edit trip"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAuditTrailTrip(trip);
-                              }}
-                              className="px-2.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-bold text-amber-700 transition-colors cursor-pointer"
-                              title="Inspect Audit Trail"
-                            >
-                              Log
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCloneBooking(trip);
-                              }}
-                              className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-600 hover:text-white border border-slate-300 text-[11px] font-bold text-slate-700 transition-colors cursor-pointer"
-                              title="Clone trip details into a new booking draft"
-                            >
-                              Clone
-                            </button>
                           </div>
-                        </td>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-emerald-600 text-xs shrink-0">🟢</span>
+                            <span className="truncate font-medium" title={trip.pickupLocation.address}>
+                              {trip.pickupLocation.address}
+                            </span>
+                          </div>
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-red-500 text-xs shrink-0">📍</span>
+                            <span className="truncate font-medium" title={trip.dropoffLocation.address}>
+                              {trip.dropoffLocation.address}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-slate-900 text-sm">
+                            ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                          </span>
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                            {trip.vehicleTier || 'Standard'}
+                          </span>
+                          {trip.assignedDriverId ? (
+                            <span className="text-[10px] font-bold text-blue-600 truncate max-w-[80px]">
+                              {trip.assignedDriverId}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-600">
+                              Unassigned
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {isUnconfirmedTrip && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenReviewModal(trip);
+                              }}
+                              className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse"
+                              title="Review customer web booking"
+                            >
+                              Review
+                            </button>
+                          )}
+                          <TripActionDropdown
+                            trip={trip}
+                            isUnconfirmed={isUnconfirmedTrip}
+                            isOpen={openTripActionId === trip.id}
+                            onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                            onClose={() => setOpenTripActionId(null)}
+                            onReview={() => handleOpenReviewModal(trip)}
+                            onEdit={() => {
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
+                              handleOpenEditTrip(trip);
+                              setActiveMobileTab('booking');
+                            }}
+                            onFare={() => handleOpenDriverModal(trip)}
+                            onAudit={() => setAuditTrailTrip(trip)}
+                            onClone={() => {
+                              handleCloneBooking(trip);
+                              setActiveMobileTab('booking');
+                            }}
+                            onFocusMap={() => {
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
+                              setActiveMobileTab('map');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredTrips.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-500 font-semibold text-xs">
+                    No trips found.
+                  </div>
+                )}
+              </div>
+            ) : displayLayout === 'compact' ? (
+              <div className="flex-1 overflow-auto divide-y divide-slate-100 text-xs">
+                {filteredTrips.map((trip) => {
+                  const isSelected = selectedQueueTripId === trip.id;
+                  const isChecked = selectedTripIds.includes(trip.id);
+                  const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+                  const pickupTimeStr = trip.scheduledPickupTime
+                    ? new Date(trip.scheduledPickupTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : 'ASAP';
+
+                  return (
+                    <div
+                      key={trip.id}
+                      onClick={() => {
+                        setSelectedQueueTripId(trip.id);
+                        setSelectedMapTrip(trip);
+                        setShouldZoomMap(false);
+                      }}
+                      onDoubleClick={() => {
+                        setSelectedQueueTripId(trip.id);
+                        setSelectedMapTrip(trip);
+                        setShouldZoomMap(true);
+                        handleOpenEditTrip(trip);
+                        setActiveMobileTab('booking');
+                      }}
+                      className={`h-9 px-3 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                        isUnconfirmedTrip
+                          ? 'bg-amber-50/80 border-l-4 border-l-amber-500'
+                          : isSelected
+                          ? 'bg-blue-50 font-medium'
+                          : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleToggleSelectTrip(trip.id);
+                          }}
+                          className="rounded border-slate-300 text-blue-600 cursor-pointer"
+                        />
+                        <span className="font-semibold text-slate-700 shrink-0 w-16">
+                          {pickupTimeStr}
+                        </span>
+                        <span className="font-bold text-slate-900 shrink-0 max-w-[120px] truncate">
+                          {trip.passenger.firstName} {trip.passenger.lastName}
+                        </span>
+                        <span className="text-slate-500 truncate max-w-[200px]" title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}>
+                          {trip.pickupLocation.address} → {trip.dropoffLocation.address}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {trip.assignedDriverId ? (
+                          <span className="text-blue-600 font-semibold text-[11px] truncate max-w-[70px]">
+                            {trip.assignedDriverId}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 font-bold text-[11px]">Unassigned</span>
+                        )}
+                        <span className="font-bold text-slate-900">
+                          ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                        </span>
+                        <div>{getStatusBadge(trip.status)}</div>
+                        <div className="flex items-center gap-1.5">
+                          {isUnconfirmedTrip && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenReviewModal(trip);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-bold text-[10px] cursor-pointer"
+                              title="Review customer web booking"
+                            >
+                              Review
+                            </button>
+                          )}
+                          <TripActionDropdown
+                            trip={trip}
+                            isUnconfirmed={isUnconfirmedTrip}
+                            isOpen={openTripActionId === trip.id}
+                            onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                            onClose={() => setOpenTripActionId(null)}
+                            onReview={() => handleOpenReviewModal(trip)}
+                            onEdit={() => {
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
+                              handleOpenEditTrip(trip);
+                              setActiveMobileTab('booking');
+                            }}
+                            onFare={() => handleOpenDriverModal(trip)}
+                            onAudit={() => setAuditTrailTrip(trip)}
+                            onClone={() => {
+                              handleCloneBooking(trip);
+                              setActiveMobileTab('booking');
+                            }}
+                            onFocusMap={() => {
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
+                              setActiveMobileTab('map');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredTrips.length === 0 && (
+                  <div className="py-12 text-center text-slate-500 font-semibold text-xs">
+                    No trips found.
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Dense Table View wrapped in overflow-x-auto custom-scrollbar */
+              <div className="flex-1 overflow-auto text-xs">
+                <div className="overflow-x-auto custom-scrollbar min-w-full">
+                  <table className="w-full text-left border-collapse min-w-[850px]">
+                    <thead className="bg-slate-100/90 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px] z-10">
+                      <tr>
+                        <th className="py-2 px-3 w-8 text-center">
+                          <input
+                            type="checkbox"
+                            checked={allFilteredSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someFilteredSelected;
+                            }}
+                            onChange={handleToggleSelectAll}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            title="Select/Deselect All Filtered Trips"
+                          />
+                        </th>
+                        <th className="py-2 px-3">DATE/TIME ▲</th>
+                        <th className="py-2 px-3">PASSENGER</th>
+                        <th className="py-2 px-3">PICKUP</th>
+                        <th className="py-2 px-3">DROPOFF</th>
+                        <th className="py-2 px-3">DRIVER</th>
+                        <th className="py-2 px-3">VEHICLE</th>
+                        <th className="py-2 px-3">PRICE</th>
+                        <th className="py-2 px-3">STATUS</th>
+                        <th className="py-2 px-3 text-center">ACTION</th>
                       </tr>
-                    );
-                  })}
-                  {filteredTrips.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="py-12 text-center text-slate-500 font-semibold text-xs">
-                        No trips found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-800">
+                      {filteredTrips.map((trip) => {
+                        const isSelected = selectedQueueTripId === trip.id;
+                        const isChecked = selectedTripIds.includes(trip.id);
+                        const pickupTimeStr = trip.scheduledPickupTime
+                          ? `${new Date(trip.scheduledPickupTime).toLocaleDateString([], {
+                              month: 'short',
+                              day: 'numeric',
+                            })}, ${new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}`
+                          : 'ASAP';
+
+                        const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+
+                        return (
+                          <tr
+                            key={trip.id}
+                            onClick={() => {
+                              // Single click: show route without zooming in
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(false);
+                            }}
+                            onDoubleClick={() => {
+                              // Double click: open edit tab and zoom in on map route
+                              setSelectedQueueTripId(trip.id);
+                              setSelectedMapTrip(trip);
+                              setShouldZoomMap(true);
+                              handleOpenEditTrip(trip);
+                              setActiveMobileTab('booking');
+                            }}
+                            className={`cursor-pointer transition-colors ${
+                              isUnconfirmedTrip
+                                ? 'bg-amber-50/70 border-l-4 border-l-amber-500 hover:bg-amber-100/70'
+                                : isSelected
+                                ? 'bg-blue-50 font-medium hover:bg-blue-50/70'
+                                : isChecked
+                                ? 'bg-blue-50/40 hover:bg-blue-50/70'
+                                : 'hover:bg-blue-50/70'
+                            }`}
+                            title="Click to view route on map. Double-click to edit trip & zoom in."
+                          >
+                            <td className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleSelectTrip(trip.id)}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-slate-700">
+                              {pickupTimeStr}
+                            </td>
+                            <td className="py-2 px-3 font-medium">
+                              {trip.passenger.firstName} {trip.passenger.lastName}
+                              <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                                <span>{trip.passenger.phone}</span>
+                                {trip.passenger.phone && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
+                                      setIsPhoneOpen(true);
+                                      setActiveDockTab('comms');
+                                    }}
+                                    className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                                    title="Click-to-Call Passenger via WebRTC Softphone"
+                                  >
+                                    <PhoneIcon className="w-2.5 h-2.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 truncate max-w-[160px]" title={trip.pickupLocation.address}>
+                              {trip.pickupLocation.address}
+                            </td>
+                            <td className="py-2 px-3 truncate max-w-[160px]" title={trip.dropoffLocation.address}>
+                              {trip.dropoffLocation.address}
+                            </td>
+                            <td className="py-2 px-3">
+                              {trip.assignedDriverId ? (
+                                <span className="font-semibold text-blue-600">{trip.assignedDriverId}</span>
+                              ) : (
+                                <span className="text-amber-600 font-bold">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3">
+                              <span className="capitalize px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                                {trip.vehicleTier || 'Standard'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 font-bold text-slate-900">
+                              ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                            </td>
+                            <td className="py-2 px-3">{getStatusBadge(trip.status)}</td>
+                            <td className="py-2 px-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {isUnconfirmedTrip && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenReviewModal(trip);
+                                    }}
+                                    className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1 animate-pulse"
+                                    title="Review and Accept or Decline customer web booking"
+                                  >
+                                    <span>Review</span>
+                                    <span>📋</span>
+                                  </button>
+                                )}
+                                <TripActionDropdown
+                                  trip={trip}
+                                  isUnconfirmed={isUnconfirmedTrip}
+                                  isOpen={openTripActionId === trip.id}
+                                  onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                                  onClose={() => setOpenTripActionId(null)}
+                                  onReview={() => handleOpenReviewModal(trip)}
+                                  onEdit={() => {
+                                    setSelectedQueueTripId(trip.id);
+                                    setSelectedMapTrip(trip);
+                                    setShouldZoomMap(true);
+                                    handleOpenEditTrip(trip);
+                                    setActiveMobileTab('booking');
+                                  }}
+                                  onFare={() => handleOpenDriverModal(trip)}
+                                  onAudit={() => setAuditTrailTrip(trip)}
+                                  onClone={() => {
+                                    handleCloneBooking(trip);
+                                    setActiveMobileTab('booking');
+                                  }}
+                                  onFocusMap={() => {
+                                    setSelectedQueueTripId(trip.id);
+                                    setSelectedMapTrip(trip);
+                                    setShouldZoomMap(true);
+                                    setActiveMobileTab('map');
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredTrips.length === 0 && (
+                        <tr>
+                          <td colSpan={10} className="py-12 text-center text-slate-500 font-semibold text-xs">
+                            No trips found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (MULTI-TASKING STACK) ─── */}
-        {activeOperationalCount > 0 && (
+        {/* ─── FULL-SCREEN MOBILE OPERATIONS TABS (lg:hidden) ─── */}
+        {/* 1. Mobile Drivers Roster Page */}
+        {activeMobileTab === 'drivers' && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden">
+            {/* Header */}
+            <div className="py-3 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-2xs">
+                  <UsersIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 tracking-tight">Drivers Roster</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {drivers.filter((d) => d.status === 'available').length} Avail
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">Fleet availability &amp; live assignment</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Search & Filter Toolbar */}
+            <div className="p-3 bg-white border-b border-slate-200 space-y-2.5 shrink-0 shadow-2xs">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <MagnifyingGlassIcon className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search drivers by name, vehicle, zone, phone..."
+                  value={driverSearch}
+                  onChange={(e) => setDriverSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
+                />
+                {driverSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setDriverSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Status Segmented Tabs */}
+              <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar">
+                {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => {
+                  const count =
+                    filterKey === 'all'
+                      ? drivers.length
+                      : drivers.filter((d) => d.status === filterKey).length;
+                  const isActive = driverFilter === filterKey;
+                  return (
+                    <button
+                      key={filterKey}
+                      type="button"
+                      onClick={() => setDriverFilter(filterKey)}
+                      className={`flex-1 min-w-[70px] shrink-0 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                        isActive
+                          ? 'bg-white text-blue-700 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="capitalize">{filterKey.replace('_', ' ')}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                          isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-200/70 text-slate-600'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Drivers List */}
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-3 text-xs pb-24">
+              {drivers
+                .filter((d) => {
+                  if (driverFilter !== 'all' && d.status !== driverFilter) return false;
+                  if (driverSearch.trim()) {
+                    const q = driverSearch.toLowerCase();
+                    return (
+                      d.name.toLowerCase().includes(q) ||
+                      d.vehicle.toLowerCase().includes(q) ||
+                      d.zone.toLowerCase().includes(q) ||
+                      d.phone.toLowerCase().includes(q)
+                    );
+                  }
+                  return true;
+                })
+                .map((driver) => {
+                  return (
+                    <div
+                      key={driver.id}
+                      className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-3 shadow-2xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center border border-slate-200 shrink-0">
+                            {driver.name
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
+                              {driver.driverScore !== undefined && (
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                                  ★ {driver.driverScore}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 font-medium">
+                              {driver.vehicle} • <span className="font-semibold text-slate-700">{driver.tier}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          {driver.status === 'available' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              Available
+                            </span>
+                          ) : driver.status === 'on_trip' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              On Trip
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                              Offline
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-slate-600 py-1.5 px-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400">📍 Zone:</span>
+                          <span className="font-bold text-slate-800">{driver.zone}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMobileTab('phone');
+                            handleStartCall(driver.phone);
+                          }}
+                          className="font-mono text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <PhoneIcon className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{driver.phone}</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAssignDriverToDraft(driver);
+                            setActiveMobileTab('booking');
+                          }}
+                          className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span>Assign to Draft</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDrivers((prev) =>
+                              prev.map((d) =>
+                                d.id === driver.id
+                                  ? {
+                                      ...d,
+                                      status:
+                                        d.status === 'available'
+                                          ? 'offline'
+                                          : d.status === 'offline'
+                                          ? 'available'
+                                          : 'available',
+                                    }
+                                  : d
+                              )
+                            );
+                          }}
+                          className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span>Toggle Status</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Phone / Messages / Voicemail) */}
+        {(activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone') && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16">
+            <CommsHub
+              user={user}
+              drivers={drivers}
+              trips={trips}
+              initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
+              onPopulateBooking={(payload) => {
+                setActiveMobileTab('booking');
+                setDrafts((prev) => {
+                  const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                  if (!target) return prev;
+                  const currentForm = target.formValues || ({} as any);
+                  const updatedForm: DispatchFormValues = {
+                    ...currentForm,
+                    passengerName: payload.passengerName || currentForm.passengerName || '',
+                    passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                    pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                    dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                    internalNotes: payload.notes
+                      ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                      : currentForm.internalNotes,
+                  };
+                  return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                });
+              }}
+              onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+            />
+          </div>
+        )}
+
+        {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (DESKTOP SINGLE ACTIVE VIEW) ─── */}
+        {activeDockTab !== 'none' && (
           <aside
-            className="relative bg-slate-100 border-l border-slate-200 flex flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg"
+            className="hidden lg:flex relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg"
             style={{ width: `${operationsWidth}px` }}
           >
             {/* Horizontal Resize Drag Handle on Left Edge */}
@@ -2116,698 +3597,395 @@ export default function DispatchRoute() {
               <div className="w-[1px] h-full bg-slate-300 group-hover:bg-blue-500 mx-auto" />
             </div>
 
-            {/* Master Header with Views Dropdown */}
-            <div className="h-9 px-3 bg-slate-900 text-white flex items-center justify-between shrink-0 text-xs pl-4">
-              <div className="flex items-center gap-2">
-                <span className="font-bold tracking-tight">Tactical Operations</span>
-                <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 font-bold text-[10px]">
-                  {activeOperationalCount} Active
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Views Dropdown */}
-                <div className="relative" ref={viewsDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsViewsDropdownOpen(!isViewsDropdownOpen)}
-                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors border border-slate-700"
-                    title="Select/deselect operational views"
-                  >
-                    <span>👁️ Views</span>
-                    <span className="text-[9px]">▾</span>
-                  </button>
-
-                  {isViewsDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white text-slate-800 rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                        Operational Views
-                      </div>
-
-                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isDriversOpen}
-                          onChange={(e) => setIsDriversOpen(e.target.checked)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="font-medium text-slate-700">🚗 Drivers Roster</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isMessagesOpen}
-                          onChange={(e) => setIsMessagesOpen(e.target.checked)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="font-medium text-slate-700">💬 Messages</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isPhoneOpen}
-                          onChange={(e) => setIsPhoneOpen(e.target.checked)}
-                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="font-medium text-slate-700">📞 Softphone</span>
-                      </label>
-
-                      <div className="border-t border-slate-100 mt-1 pt-1 px-2 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsDriversOpen(true);
-                            setIsMessagesOpen(true);
-                            setIsPhoneOpen(true);
-                          }}
-                          className="text-[10px] text-blue-600 hover:underline font-semibold"
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsDriversOpen(false);
-                            setIsMessagesOpen(false);
-                            setIsPhoneOpen(false);
-                            setIsViewsDropdownOpen(false);
-                          }}
-                          className="text-[10px] text-red-500 hover:underline font-semibold"
-                        >
-                          Close All
-                        </button>
-                      </div>
-                    </div>
+            {/* Master Header with Tab Switchers & Actions */}
+            <div className="h-10 px-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 text-xs shadow-2xs pl-4 gap-2">
+              {/* Tab Switcher Pills: Communications | Drivers | Alerts */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setActiveDockTab('comms')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeDockTab === 'comms'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Communications Console"
+                >
+                  <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Comms</span>
+                  {activeCallStatus !== 'idle' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
                   )}
-                </div>
+                </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsDriversOpen(false);
-                    setIsMessagesOpen(false);
-                    setIsPhoneOpen(false);
-                  }}
-                  className="text-[11px] text-slate-400 hover:text-white transition-colors"
-                  title="Close all operational panels"
+                  onClick={() => setActiveDockTab('drivers')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeDockTab === 'drivers'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Drivers Roster"
                 >
-                  ✕ Close All
+                  <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Drivers</span>
+                  <span
+                    className={`text-[10px] font-bold px-1 py-0.1 rounded-full ${
+                      activeDockTab === 'drivers' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {drivers.filter((d) => d.status === 'available').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveDockTab('alerts')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeDockTab === 'alerts'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Alerts & Broadcasts"
+                >
+                  <BellIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Alerts</span>
+                  {messages.length > 0 && (
+                    <span
+                      className={`text-[10px] font-bold px-1 py-0.1 rounded-full ${
+                        activeDockTab === 'alerts' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {messages.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Action Buttons: Pop-out and Close Dock */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeDockTab === 'comms') getWorkspaceBus().popOutModule('comms');
+                    else if (activeDockTab === 'drivers') getWorkspaceBus().popOutModule('drivers');
+                    else getWorkspaceBus().popOutModule('trips');
+                  }}
+                  title="Pop out this view into separate desktop window"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  <ExternalLinkIcon className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveDockTab('none')}
+                  className="px-2 py-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-rose-600 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1"
+                  title="Close dock (Return to Main)"
+                >
+                  <span>✕ Close</span>
                 </button>
               </div>
             </div>
 
-            {/* Stacked Panels (Vertically Shared without Container Scrollbar) */}
-            <div ref={operationsContainerRef} className="flex-1 overflow-hidden flex flex-col min-h-0">
-              {/* 1. DRIVERS ROSTER CARD */}
-              {isDriversOpen && (
-                <>
-                  <div
-                    className={`flex flex-col bg-white overflow-hidden transition-all ${
-                      minimizedPanels.drivers
-                        ? 'h-8 shrink-0'
-                        : activePanels.length === 1
-                        ? 'flex-1 h-full min-h-0'
-                        : activePanels[activePanels.length - 1] === 'drivers'
-                        ? 'flex-1 min-h-[160px]'
-                        : 'shrink-0'
-                    }`}
-                    style={
-                      !minimizedPanels.drivers &&
-                      activePanels.length > 1 &&
-                      activePanels[activePanels.length - 1] !== 'drivers'
-                        ? { height: `${panelHeights.drivers}px` }
-                        : undefined
-                    }
-                  >
-                    {/* Header: Clickable to minimize/expand */}
-                    <div
-                      onClick={() => toggleMinimizePanel('drivers')}
-                      className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0 cursor-pointer select-none hover:bg-slate-750 transition-colors"
-                      title={minimizedPanels.drivers ? 'Click to expand' : 'Click to minimize'}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <CarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span>Drivers Roster</span>
-                        <span className="text-[10px] text-emerald-400">
-                          ({drivers.filter((d) => d.status === 'available').length} Avail)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMinimizePanel('drivers');
-                          }}
-                          className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title={minimizedPanels.drivers ? 'Expand Drivers Roster' : 'Minimize Drivers Roster'}
-                        >
-                          {minimizedPanels.drivers ? '▾' : '—'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsDriversOpen(false);
-                          }}
-                          className="text-slate-400 hover:text-red-400 text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title="Close panel"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {!minimizedPanels.drivers && (
-                      <>
-                        {/* Filter tabs */}
-                        <div className="p-1.5 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-[11px] shrink-0">
-                          {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => (
-                            <button
-                              key={filterKey}
-                              type="button"
-                              onClick={() => setDriverFilter(filterKey)}
-                              className={`flex-1 py-0.5 text-center rounded font-semibold capitalize transition-all ${
-                                driverFilter === filterKey ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600'
-                              }`}
-                            >
-                              {filterKey.replace('_', ' ')}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Drivers List */}
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
-                          {drivers
-                            .filter((d) => (driverFilter === 'all' ? true : d.status === driverFilter))
-                            .map((driver) => {
-                              let badge = <Badge variant="success">Available</Badge>;
-                              if (driver.status === 'on_trip') badge = <Badge variant="info">On Trip</Badge>;
-                              if (driver.status === 'offline') badge = <Badge variant="neutral">Offline</Badge>;
-
-                              return (
-                                <div
-                                  key={driver.id}
-                                  className="p-2 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-1.5 shadow-2xs"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <span className="font-bold text-slate-900 text-xs">{driver.name}</span>
-                                      <span className="text-[10px] text-slate-500 ml-1.5">
-                                        {driver.vehicle} ({driver.tier})
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      {driver.driverScore !== undefined && (
-                                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Driver Score">
-                                          ★ {driver.driverScore}
-                                        </span>
-                                      )}
-                                      {badge}
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-[10px] text-slate-600 pt-1 border-t border-slate-100">
-                                    <div>📍 {driver.zone}</div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setIsPhoneOpen(true);
-                                        handleStartCall(driver.phone);
-                                      }}
-                                      className="font-mono text-blue-600 hover:underline font-bold"
-                                    >
-                                      📞 {driver.phone}
-                                    </button>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 pt-0.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAssignDriverToDraft(driver)}
-                                      className="flex-1 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] rounded border border-blue-200 transition-colors"
-                                    >
-                                      Assign to Active Draft
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setDrivers((prev) =>
-                                          prev.map((d) =>
-                                            d.id === driver.id
-                                              ? {
-                                                  ...d,
-                                                  status:
-                                                    d.status === 'available'
-                                                      ? 'offline'
-                                                      : d.status === 'offline'
-                                                      ? 'available'
-                                                      : 'available',
-                                                }
-                                              : d
-                                          )
-                                        );
-                                      }}
-                                      className="px-1.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-[10px] rounded border border-slate-300"
-                                    >
-                                      Toggle
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {!minimizedPanels.drivers &&
-                    activePanels.length > 1 &&
-                    activePanels[activePanels.length - 1] !== 'drivers' && (
-                      <div
-                        onMouseDown={(e) => handleVerticalResizeStart(e, 'drivers')}
-                        className="h-2 w-full cursor-row-resize bg-slate-200 hover:bg-blue-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
-                        title="Drag to resize Drivers Roster height"
-                      >
-                        <div className="w-8 h-1 bg-slate-400 group-hover:bg-white rounded-full" />
-                      </div>
-                    )}
-                </>
+            {/* Active Panel Viewport: Occupies Full Height */}
+            <div ref={operationsContainerRef} className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
+              {/* 1. COMMUNICATIONS HUB (Omnichannel Console) */}
+              {activeDockTab === 'comms' && (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  <CommsHub
+                    user={user}
+                    drivers={drivers}
+                    trips={trips}
+                    initialTab="all"
+                    isPopout={false}
+                    onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+                    onClose={() => setActiveDockTab('none')}
+                    onPopulateBooking={(payload) => {
+                      setDrafts((prev) => {
+                        const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                        if (!target) return prev;
+                        const currentForm = target.formValues || ({} as any);
+                        const updatedForm: DispatchFormValues = {
+                          ...currentForm,
+                          passengerName: payload.passengerName || currentForm.passengerName || '',
+                          passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                          pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                          dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                          internalNotes: payload.notes
+                            ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                            : currentForm.internalNotes,
+                        };
+                        return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                      });
+                    }}
+                  />
+                </div>
               )}
 
-              {/* 2. MESSAGES CARD */}
-              {isMessagesOpen && (
-                <>
-                  <div
-                    className={`flex flex-col bg-white overflow-hidden transition-all ${
-                      minimizedPanels.messages
-                        ? 'h-8 shrink-0'
-                        : activePanels.length === 1
-                        ? 'flex-1 h-full min-h-0'
-                        : activePanels[activePanels.length - 1] === 'messages'
-                        ? 'flex-1 min-h-[160px]'
-                        : 'shrink-0'
-                    }`}
-                    style={
-                      !minimizedPanels.messages &&
-                      activePanels.length > 1 &&
-                      activePanels[activePanels.length - 1] !== 'messages'
-                        ? { height: `${panelHeights.messages}px` }
-                        : undefined
-                    }
-                  >
-                    {/* Header: Clickable to minimize/expand */}
-                    <div
-                      onClick={() => toggleMinimizePanel('messages')}
-                      className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0 cursor-pointer select-none hover:bg-slate-750 transition-colors"
-                      title={minimizedPanels.messages ? 'Click to expand' : 'Click to minimize'}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <span>💬 Driver Messaging &amp; SMS</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMinimizePanel('messages');
-                          }}
-                          className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title={minimizedPanels.messages ? 'Expand Messages' : 'Minimize Messages'}
-                        >
-                          {minimizedPanels.messages ? '▾' : '—'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsMessagesOpen(false);
-                          }}
-                          className="text-slate-400 hover:text-red-400 text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title="Close panel"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
+              {/* 2. DRIVERS ROSTER */}
+              {activeDockTab === 'drivers' && (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  {/* Filter tabs */}
+                  <div className="p-2 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-xs shrink-0">
+                    {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => (
+                      <button
+                        key={filterKey}
+                        type="button"
+                        onClick={() => setDriverFilter(filterKey)}
+                        className={`flex-1 py-1 text-center rounded-lg font-bold capitalize transition-all cursor-pointer ${
+                          driverFilter === filterKey ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        {filterKey.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
 
-                    {!minimizedPanels.messages && (
-                      <>
-                        {/* Space-Saving Tactical Presets Dropdown */}
-                        <div className="p-1.5 bg-slate-50 border-b border-slate-200 space-y-1 shrink-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
-                              ⚡ Tactical Presets
-                            </span>
-                            {user?.role === 'admin' && !isAddingPreset && (
-                              <button
-                                type="button"
-                                onClick={() => setIsAddingPreset(true)}
-                                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
-                              >
-                                + Add Preset
-                              </button>
-                            )}
-                          </div>
+                  {/* Drivers List */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
+                    {drivers
+                      .filter((d) => (driverFilter === 'all' ? true : d.status === driverFilter))
+                      .map((driver) => {
+                        let badge = <Badge variant="success">Available</Badge>;
+                        if (driver.status === 'on_trip') badge = <Badge variant="info">On Trip</Badge>;
+                        if (driver.status === 'offline') badge = <Badge variant="neutral">Offline</Badge>;
 
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (!val) return;
-                              if (val === '__add_custom__') {
-                                setIsAddingPreset(true);
-                              } else {
-                                setMsgText(val);
-                              }
-                            }}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-700 font-medium focus:ring-1 focus:ring-blue-500"
+                        return (
+                          <div
+                            key={driver.id}
+                            className="p-3 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-2 shadow-2xs"
                           >
-                            <option value="">Select a preset to insert...</option>
-                            {tacticalPresets.map((preset, i) => (
-                              <option key={i} value={preset}>
-                                {preset}
-                              </option>
-                            ))}
-                            {user?.role === 'admin' && (
-                              <option value="__add_custom__">➕ Create New Preset (Admin)...</option>
-                            )}
-                          </select>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
+                                <span className="text-xs text-slate-500 ml-2">
+                                  {driver.vehicle} ({driver.tier})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {driver.driverScore !== undefined && (
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Driver Score">
+                                    ★ {driver.driverScore}
+                                  </span>
+                                )}
+                                {badge}
+                              </div>
+                            </div>
 
-                          {isAddingPreset && (
-                            <div className="flex items-center gap-1 mt-1 p-1 bg-blue-50 border border-blue-200 rounded">
-                              <input
-                                type="text"
-                                placeholder="Enter new preset message..."
-                                value={newPresetText}
-                                onChange={(e) => setNewPresetText(e.target.value)}
-                                className="flex-1 px-2 py-0.5 bg-white border border-blue-300 rounded text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveNewPreset();
-                                  }
-                                }}
-                              />
+                            <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-100">
+                              <div>📍 {driver.zone}</div>
                               <button
                                 type="button"
-                                onClick={handleSaveNewPreset}
-                                className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] rounded cursor-pointer"
+                                onClick={() => {
+                                  setActiveDockTab('comms');
+                                  handleStartCall(driver.phone, driver.name);
+                                }}
+                                className="font-mono text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                               >
-                                Save
+                                <PhoneIcon className="w-3 h-3 text-blue-600" />
+                                <span>{driver.phone}</span>
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleAssignDriverToDraft(driver)}
+                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                              >
+                                Assign to Active Draft
                               </button>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setIsAddingPreset(false);
-                                  setNewPresetText('');
+                                  setDrivers((prev) =>
+                                    prev.map((d) =>
+                                      d.id === driver.id
+                                        ? {
+                                            ...d,
+                                            status:
+                                              d.status === 'available'
+                                                ? 'offline'
+                                                : d.status === 'offline'
+                                                ? 'available'
+                                                : 'available',
+                                          }
+                                        : d
+                                    )
+                                  );
                                 }}
-                                className="px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-[10px] rounded cursor-pointer"
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
                               >
-                                Cancel
+                                Toggle
                               </button>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Compose Alert Form */}
-                        <form onSubmit={handleSendMessage} className="p-2 bg-white border-b border-slate-200 space-y-1.5 shrink-0">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <div>
-                              <span className="block text-[9px] font-bold text-slate-500 uppercase">Send To</span>
-                              <select
-                                value={msgRecipient}
-                                onChange={(e) => setMsgRecipient(e.target.value)}
-                                className="w-full px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800"
-                              >
-                                <option value="All Drivers">📢 All Drivers</option>
-                                {drivers.map((d) => (
-                                  <option key={d.id} value={d.name}>
-                                    {d.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <span className="block text-[9px] font-bold text-slate-500 uppercase">Priority</span>
-                              <select
-                                value={msgPriority}
-                                onChange={(e) => setMsgPriority(e.target.value as any)}
-                                className="w-full px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800"
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="urgent">🚨 Urgent</option>
-                              </select>
-                            </div>
                           </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
-                          <div className="flex gap-1.5">
-                            <input
-                              type="text"
-                              placeholder="Type dispatch message or note..."
-                              value={msgText}
-                              onChange={(e) => setMsgText(e.target.value)}
-                              className="flex-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                            />
-                            <button
-                              type="submit"
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded transition-colors shrink-0 cursor-pointer"
-                            >
-                              Send
-                            </button>
-                          </div>
-                        </form>
+              {/* 3. FLEET ALERTS & BROADCASTS */}
+              {activeDockTab === 'alerts' && (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  {/* Space-Saving Tactical Presets Dropdown */}
+                  <div className="p-2.5 bg-slate-50 border-b border-slate-200 space-y-1.5 shrink-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
+                        ⚡ Tactical Broadcast Presets
+                      </span>
+                      {user?.role === 'admin' && !isAddingPreset && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingPreset(true)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                        >
+                          + Add Preset
+                        </button>
+                      )}
+                    </div>
 
-                        {/* Message History */}
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
-                          {messages.map((m) => (
-                            <div
-                              key={m.id}
-                              className={`p-2 rounded-lg border text-xs space-y-0.5 ${
-                                m.priority === 'urgent'
-                                  ? 'bg-red-50 border-red-300 text-red-900'
-                                  : 'bg-slate-50 border-slate-200 text-slate-800'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between font-bold text-[10px]">
-                                <span>To: {m.to}</span>
-                                <span className="text-slate-400">{m.timestamp}</span>
-                              </div>
-                              <p className="text-[11px] leading-snug">{m.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        if (val === '__add_custom__') {
+                          setIsAddingPreset(true);
+                        } else {
+                          setMsgText(val);
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-700 font-medium focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="">Select a tactical preset to insert...</option>
+                      {tacticalPresets.map((preset, i) => (
+                        <option key={i} value={preset}>
+                          {preset}
+                        </option>
+                      ))}
+                      {user?.role === 'admin' && (
+                        <option value="__add_custom__">➕ Create New Preset (Admin)...</option>
+                      )}
+                    </select>
+
+                    {isAddingPreset && (
+                      <div className="flex items-center gap-1.5 mt-1.5 p-1.5 bg-blue-50 border border-blue-200 rounded-xl">
+                        <input
+                          type="text"
+                          placeholder="Enter new preset message..."
+                          value={newPresetText}
+                          onChange={(e) => setNewPresetText(e.target.value)}
+                          className="flex-1 px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveNewPreset();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveNewPreset}
+                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg cursor-pointer"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingPreset(false);
+                            setNewPresetText('');
+                          }}
+                          className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-xs rounded-lg cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  {!minimizedPanels.messages &&
-                    activePanels.length > 1 &&
-                    activePanels[activePanels.length - 1] !== 'messages' && (
-                      <div
-                        onMouseDown={(e) => handleVerticalResizeStart(e, 'messages')}
-                        className="h-2 w-full cursor-row-resize bg-slate-200 hover:bg-blue-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
-                        title="Drag to resize Messages height"
-                      >
-                        <div className="w-8 h-1 bg-slate-400 group-hover:bg-white rounded-full" />
-                      </div>
-                    )}
-                </>
-              )}
-
-              {/* 3. SOFTPHONE CARD */}
-              {isPhoneOpen && (
-                <>
-                  <div
-                    className={`flex flex-col bg-slate-900 text-white overflow-hidden transition-all ${
-                      minimizedPanels.phone
-                        ? 'h-8 shrink-0'
-                        : activePanels.length === 1
-                        ? 'flex-1 h-full min-h-0'
-                        : activePanels[activePanels.length - 1] === 'phone'
-                        ? 'flex-1 min-h-0'
-                        : 'shrink-0'
-                    }`}
-                    style={
-                      !minimizedPanels.phone &&
-                      activePanels.length > 1 &&
-                      activePanels[activePanels.length - 1] !== 'phone'
-                        ? { height: `${panelHeights.phone}px` }
-                        : undefined
-                    }
-                  >
-                    {/* Header: Clickable to minimize/expand */}
-                    <div
-                      onClick={() => toggleMinimizePanel('phone')}
-                      className="h-8 px-3 bg-slate-800 text-white flex items-center justify-between shrink-0 cursor-pointer select-none hover:bg-slate-750 transition-colors"
-                      title={minimizedPanels.phone ? 'Click to expand' : 'Click to minimize'}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <span>📞 Tactical Softphone</span>
-                        <span className="text-[10px] text-emerald-400 uppercase">({activeCallStatus})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMinimizePanel('phone');
-                          }}
-                          className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title={minimizedPanels.phone ? 'Expand Softphone' : 'Minimize Softphone'}
+                  {/* Compose Alert Form */}
+                  <form onSubmit={handleSendMessage} className="p-3 bg-white border-b border-slate-200 space-y-2 shrink-0">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Send To</span>
+                        <select
+                          value={msgRecipient}
+                          onChange={(e) => setMsgRecipient(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                         >
-                          {minimizedPanels.phone ? '▾' : '—'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsPhoneOpen(false);
-                          }}
-                          className="text-slate-400 hover:text-red-400 text-xs px-1.5 py-0.5 rounded hover:bg-slate-700/60 transition-colors"
-                          title="Close panel"
+                          <option value="All Drivers">📢 All Drivers</option>
+                          {drivers.map((d) => (
+                            <option key={d.id} value={d.name}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase">Priority</span>
+                        <select
+                          value={msgPriority}
+                          onChange={(e) => setMsgPriority(e.target.value as any)}
+                          className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                         >
-                          ✕
-                        </button>
+                          <option value="normal">Normal</option>
+                          <option value="urgent">🚨 Urgent</option>
+                        </select>
                       </div>
                     </div>
 
-                    {!minimizedPanels.phone && (
-                      <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
-                        {/* Softphone Display */}
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center">
-                          <div className="text-[10px] text-slate-500 font-mono">
-                            {activeCallStatus === 'connected' ? (
-                              <span className="text-emerald-400 animate-pulse">
-                                ● IN CALL ({Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')})
-                              </span>
-                            ) : activeCallStatus === 'calling' ? (
-                              <span className="text-amber-400 animate-pulse">CONNECTING...</span>
-                            ) : (
-                              'READY TO DIAL'
-                            )}
-                          </div>
-                          <div className="text-base font-mono font-bold tracking-wider text-slate-100 min-h-[22px] truncate">
-                            {dialedNumber || '(Ready)'}
-                          </div>
-                        </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Type dispatch broadcast or alert..."
+                        value={msgText}
+                        onChange={(e) => setMsgText(e.target.value)}
+                        className="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors shrink-0 cursor-pointer"
+                      >
+                        Broadcast
+                      </button>
+                    </div>
+                  </form>
 
-                        {/* Speed Dial Presets */}
-                        <div className="space-y-1">
-                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Speed Dial</div>
-                          <div className="grid grid-cols-2 gap-1">
-                            {[
-                              { name: 'Dispatch Desk', num: '(314) 738-0100' },
-                              { name: 'Lambert STL', num: '(314) 890-1333' },
-                              { name: 'Mike T.', num: '(314) 555-0101' },
-                              { name: 'Sarah K.', num: '(314) 555-0104' },
-                            ].map((preset, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => handleStartCall(preset.num)}
-                                className="p-1 bg-slate-800/80 hover:bg-slate-800 rounded text-left border border-slate-700 transition-colors cursor-pointer"
-                              >
-                                <div className="text-[10px] font-bold text-slate-200 truncate">{preset.name}</div>
-                                <div className="text-[9px] font-mono text-emerald-400">{preset.num}</div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Call Actions & Keypad Toggle */}
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          {activeCallStatus === 'idle' ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleStartCall()}
-                                className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                              >
-                                <span>📞</span>
-                                <span>Call</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDialedNumber('')}
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
-                                title="Clear number"
-                              >
-                                Clear
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleEndCall}
-                              className="flex-1 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 font-bold text-xs text-white flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                            >
-                              <span>📵</span>
-                              <span>End Call</span>
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={toggleKeypad}
-                            className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 border transition-colors cursor-pointer ${
-                              showKeypad
-                                ? 'bg-blue-600 border-blue-400 text-white shadow-xs'
-                                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-                            }`}
-                            title={showKeypad ? 'Hide Dialpad' : 'Show Dialpad'}
-                          >
-                            <span>🔢</span>
-                            <span>{showKeypad ? 'Hide' : 'Keypad'}</span>
-                          </button>
-                        </div>
-
-                        {/* 12-Key Numeric Dialpad (collapsible) */}
-                        {showKeypad && (
-                          <div className="grid grid-cols-3 gap-1 pt-1 border-t border-slate-800">
-                            {[
-                              { digit: '1', sub: '' },
-                              { digit: '2', sub: 'ABC' },
-                              { digit: '3', sub: 'DEF' },
-                              { digit: '4', sub: 'GHI' },
-                              { digit: '5', sub: 'JKL' },
-                              { digit: '6', sub: 'MNO' },
-                              { digit: '7', sub: 'PQRS' },
-                              { digit: '8', sub: 'TUV' },
-                              { digit: '9', sub: 'WXYZ' },
-                              { digit: '*', sub: '' },
-                              { digit: '0', sub: '+' },
-                              { digit: '#', sub: '' },
-                            ].map((btn) => (
-                              <button
-                                key={btn.digit}
-                                type="button"
-                                onClick={() => handleDialDigit(btn.digit)}
-                                className="h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer"
-                              >
-                                <span>{btn.digit}</span>
-                                {btn.sub && <span className="text-[7px] text-slate-400 -mt-1">{btn.sub}</span>}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                  {/* Message History */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+                    {messages.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="text-xs font-semibold">No alerts sent yet</p>
                       </div>
+                    ) : (
+                      messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`p-3 rounded-xl border text-xs space-y-1 ${
+                            m.priority === 'urgent'
+                              ? 'bg-rose-50 border-rose-300 text-rose-900'
+                              : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between font-bold text-[10px]">
+                            <span className="flex items-center gap-1">
+                              <span>To: {m.to}</span>
+                              {m.priority === 'urgent' && <span className="text-rose-600 font-extrabold">(URGENT)</span>}
+                            </span>
+                            <span className="text-slate-400">{m.timestamp}</span>
+                          </div>
+                          <p className="text-xs leading-snug">{m.text}</p>
+                        </div>
+                      ))
                     )}
                   </div>
-
-                  {!minimizedPanels.phone &&
-                    activePanels.length > 1 &&
-                    activePanels[activePanels.length - 1] !== 'phone' && (
-                      <div
-                        onMouseDown={(e) => handleVerticalResizeStart(e, 'phone')}
-                        className="h-2 w-full cursor-row-resize bg-slate-800 hover:bg-emerald-500 transition-colors flex items-center justify-center shrink-0 z-10 group select-none"
-                        title="Drag to resize Softphone height"
-                      >
-                        <div className="w-8 h-1 bg-slate-500 group-hover:bg-white rounded-full" />
-                      </div>
-                    )}
-                </>
+                </div>
               )}
             </div>
           </aside>
@@ -3368,6 +4546,124 @@ export default function DispatchRoute() {
           onClose={() => setAuditTrailTrip(null)}
         />
       )}
+
+
+      {/* ─────────────────────────────────────────────────────────────
+          MOBILE BOTTOM DOCK NAVIGATION (lg:hidden) - 5 CONSOLIDATED TABS
+          Tabs: Trips, Booking, Comms (Omnichannel Hub), Drivers, Map
+      ───────────────────────────────────────────────────────────── */}
+      <nav
+        aria-label="Mobile Dispatch Navigation"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-1 py-1 flex items-center justify-around select-none print:hidden"
+      >
+        {/* Tab 1: Trips */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('queue')}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'queue'
+              ? 'text-blue-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'queue' ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <CarIcon className="w-5 h-5" />
+            {unconfirmedCount > 0 ? (
+              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center animate-pulse">
+                {unconfirmedCount}
+              </span>
+            ) : filteredTrips.length > 0 ? (
+              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-slate-200 text-slate-800 text-[9px] font-bold flex items-center justify-center">
+                {filteredTrips.length}
+              </span>
+            ) : null}
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Trips</span>
+        </button>
+
+        {/* Tab 2: Booking */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('booking')}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'booking'
+              ? 'text-blue-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'booking' ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <DocumentTextIcon className="w-5 h-5" />
+            {drafts.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+                {drafts.length}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Booking</span>
+        </button>
+
+        {/* Tab 3: Comms (Omnichannel All / Phone / Messages / Voicemail) */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('comms')}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone'
+              ? 'text-emerald-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className={`p-1 rounded-xl transition-colors relative ${
+            activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone'
+              ? 'bg-emerald-50 text-emerald-600'
+              : ''
+          }`}>
+            <PhoneIcon className="w-5 h-5" />
+            {activeCallStatus !== 'idle' ? (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            ) : messages.length > 0 ? (
+              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+                {messages.length}
+              </span>
+            ) : null}
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Comms</span>
+        </button>
+
+        {/* Tab 4: Drivers */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('drivers')}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'drivers'
+              ? 'text-blue-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'drivers' ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <UsersIcon className="w-5 h-5" />
+            <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
+              {drivers.filter((d) => d.status === 'available').length}
+            </span>
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Drivers</span>
+        </button>
+
+        {/* Tab 5: Map */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab('map')}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'map'
+              ? 'text-blue-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div className={`p-1 rounded-xl transition-colors ${activeMobileTab === 'map' ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <MapIcon className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Map</span>
+        </button>
+      </nav>
     </div>
   );
 }

@@ -427,8 +427,8 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
           </div>
 
           {/* ─── Unified Archive Table ─── */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto custom-scrollbar rounded-xl border border-slate-200 min-w-full">
+            <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Entity Type</th>

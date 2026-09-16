@@ -417,7 +417,7 @@ export function AdminDashboardTab({
             Real-time reservations and operational trip status across Chesterfield and St. Louis.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
           {isLoading ? (
             <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
               <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
@@ -428,7 +428,7 @@ export function AdminDashboardTab({
               No bookings registered yet.
             </div>
           ) : (
-            <table className="w-full text-left text-xs divide-y divide-slate-100">
+            <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[600px]">
               <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-2.5">Trip ID</th>

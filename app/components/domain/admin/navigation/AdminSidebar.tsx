@@ -23,6 +23,7 @@ import {
   XIcon,
 } from '../../../ui/Icons';
 import { UserDropdown } from '../../common/UserDropdown';
+import { RoleViewSwitcher } from '../../common/RoleViewSwitcher';
 
 export interface NavItemConfig {
   key: AdminTabKey;
@@ -56,9 +57,9 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
       },
       {
         key: 'invoicing',
-        label: 'Invoicing & Ledger',
+        label: 'Financials & Invoicing',
         icon: CreditCardIcon,
-        subHint: 'Billing & Accounts',
+        subHint: 'Ledger, Invoices & Sync',
       },
     ],
   },
@@ -111,6 +112,14 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         label: 'General & Profile',
         icon: SettingsIcon,
         subHint: 'Company & Branding',
+      },
+      {
+        key: 'integrations',
+        label: 'Integrations & APIs',
+        icon: SettingsIcon,
+        badge: 'APIs',
+        badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30',
+        subHint: 'Stripe, Square, Twilio',
       },
       {
         key: 'advanced',
@@ -271,6 +280,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           )}
         </div>
 
+        {/* Mobile Drawer Role View Switcher */}
+        <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-950/40 lg:hidden">
+          <RoleViewSwitcher variant="drawer" currentView="admin" user={user} onNavigate={onCloseMobile} />
+        </div>
+
         {/* Navigation Group Items */}
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-5 custom-scrollbar">
           {ADMIN_NAV_GROUPS.map((group) => (
@@ -283,7 +297,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentTab === item.key;
+                const isActive = currentTab === item.key || (item.key === 'invoicing' && (currentTab as string) === 'financials');
 
                 return (
                   <button
@@ -335,6 +349,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             variant="dark"
             dropUp={true}
             collapsed={isCollapsed}
+            triggerVariant="full"
           />
         </div>
       </aside>

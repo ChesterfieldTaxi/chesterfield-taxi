@@ -6,6 +6,7 @@
  */
 
 import type { VehicleTier } from './trip';
+import type { VaultedCard } from './payment';
 
 export type SavedPlaceCategory =
   | 'home'
@@ -33,17 +34,29 @@ export interface CommunicationPreferences {
   phoneCalls: boolean;
 }
 
+export interface AlternatePhone {
+  type: 'mobile' | 'home' | 'work' | 'other';
+  number: string;
+  label?: string;
+  isPrimarySms?: boolean;
+}
+
 export interface PassengerAccount {
   id: string;
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
+  alternatePhones?: AlternatePhone[];
+  homePhone?: string;
+  workPhone?: string;
+  primaryMobilePhone?: string;
   passengerNotes?: string; // e.g. "Prefer side door, wheelchair ramp access needed"
   preferredVehicleTier?: VehicleTier;
   communicationPreferences: CommunicationPreferences;
   savedPlaces: SavedPlace[];
   recentSearches?: string[];
+  vaultedPaymentMethods?: VaultedCard[];
 
   /** Universal Governance & Scoring (Phase 29) */
   isArchived?: boolean;

@@ -1372,8 +1372,8 @@ export function AdminRatesTab({
             </div>
 
             {/* Bracket Tiers Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs divide-y divide-slate-200">
+            <div className="overflow-x-auto custom-scrollbar min-w-full">
+              <table className="w-full text-left text-xs divide-y divide-slate-200 min-w-[700px]">
                 <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="px-4 py-3">Tier Name</th>

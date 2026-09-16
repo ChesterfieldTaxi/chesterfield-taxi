@@ -61,7 +61,7 @@ export default function SignIn() {
     }
 
     // Default to app (customer portal)
-    navigate(redirect || '/book', { replace: true });
+    navigate(redirect || '/app', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

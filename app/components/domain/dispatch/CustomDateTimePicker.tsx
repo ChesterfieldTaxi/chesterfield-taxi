@@ -54,6 +54,7 @@ export function CustomDateTimePicker({
   placement = 'auto',
 }: CustomDateTimePickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
 
   // Intelligent placement calculation: determines if it pops upwards (over the map) or downwards
   const [computedPlacement, setComputedPlacement] = useState<'top' | 'bottom'>('top');
@@ -69,7 +70,7 @@ export function CustomDateTimePicker({
       return;
     }
     // Auto placement: measure viewport space above trigger
-    const parentEl = containerRef.current?.parentElement;
+    const parentEl = desktopContainerRef.current?.parentElement || containerRef.current?.parentElement;
     if (parentEl) {
       const rect = parentEl.getBoundingClientRect();
       const spaceAbove = rect.top;
@@ -115,12 +116,17 @@ export function CustomDateTimePicker({
     }
   }, [isOpen, value]);
 
-  // Click outside to close
+  // Click outside to close (checks both desktop and mobile containers)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        onClose();
+      const target = event.target as Node;
+      if (desktopContainerRef.current && desktopContainerRef.current.contains(target)) {
+        return;
       }
+      if (containerRef.current && containerRef.current.contains(target)) {
+        return;
+      }
+      onClose();
     }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
@@ -388,13 +394,111 @@ export function CustomDateTimePicker({
   const minutesList = ['00', '15', '30', '45', '59'];
 
   return (
-    <div
-      ref={containerRef}
-      className={`absolute left-0 ${
-        computedPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-      } bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col md:flex-row text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150 overflow-hidden max-w-[calc(100vw-32px)]`}
-      style={{ minWidth: '640px' }}
-    >
+    <>
+      {/* ─── Mobile Modal Overlay (< md) ─── */}
+      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 md:hidden animate-in fade-in">
+        <div
+          ref={containerRef}
+          className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm max-h-[88vh] flex flex-col text-xs text-slate-800 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Mobile Modal Header */}
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
+            <span className="font-extrabold text-sm text-slate-800">Date Range Filter</span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500 font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* Horizontal Presets */}
+            <div className="p-2 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-slate-50/50">
+              {PRESETS.map((preset) => {
+                const isSelected = activePreset === preset.key;
+                return (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset.key)}
+                    className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                        : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Calendar */}
+            <div className="p-3">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold"
+                >
+                  ‹
+                </button>
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Select Dates
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold"
+                >
+                  ›
+                </button>
+              </div>
+
+              {renderCalendarMonth(baseDate.getFullYear(), baseDate.getMonth())}
+            </div>
+          </div>
+
+          {/* Mobile Footer */}
+          <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100"
+            >
+              Clear
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-200 font-semibold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApply}
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Desktop Popover (>= md) ─── */}
+      <div
+        ref={desktopContainerRef}
+        className={`hidden md:flex absolute left-0 ${
+          computedPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+        } bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex-col md:flex-row text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150 overflow-hidden max-w-[calc(100vw-32px)]`}
+        style={{ minWidth: '640px' }}
+      >
       {/* ─── 1. Left Sidebar of Presets ─── */}
       <div className="w-38 border-r border-slate-100 bg-slate-50/70 p-2 space-y-0.5 max-h-[380px] overflow-y-auto shrink-0 select-none">
         {PRESETS.map((preset) => {
@@ -535,5 +639,6 @@ export function CustomDateTimePicker({
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -491,3 +491,96 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Admin Rules Manager (/admin?tab=trips&sub=rules / /admin?tab=dispatch&sub=rules): Policy configurations for minimum customer score, late-night windows, auto-confirm toggles, and rule priorities.
   - Geo-Fence & Location Rules Manager (/admin?tab=zones): Interactive registry to configure polygon/radius zones and point hotspots with policy modes (Auto-Confirm, Require Review, Blacklist Block).
   - Universal Archive/Blacklist Drawer: Controls in /admin across all roster tables to archive, blacklist, or restore entities with mandatory reason recording.
+
+### 25. Phase 29B: Responsive Mobile Overhaul, Mobile Dispatch Console, Multi-Role View Switcher & Custom Layout Options
+- **Multi-Role View Switcher & App Shell Integration**:
+  - Role-based landing: Authenticated users land automatically on their designated default console view upon sign-in (Admin -> `/admin`, Dispatcher -> `/dispatch`, Driver -> `/driver`, Passenger/Customer -> `/app`).
+  - Unified View Launcher: For users possessing multi-role credentials or administrative privileges, a visual "Switch View" selector in the top app header, profile menus, and navigation bars permits instant 1-tap switching between Customer (`/app`), Driver (`/driver`), Dispatcher (`/dispatch`), and Admin (`/admin`).
+  - Active workspace visual indicators, role privilege badges, and automatic session synchronization across all portals.
+- **Dispatch Console Mobile Overhaul (`/dispatch`)**:
+  - Slide-out mobile navigation drawer giving immediate thumb-friendly access to driver rosters, incoming and outgoing dispatch messages, quick softphone dialer, layout toggles, and workspace switching.
+  - Ergonomic 3-Tab Mobile View Switcher (bottom/top tabs):
+    1. `[ 📝 New Booking ]`: Full-width mobile reservation draft form and booking engine with real-time validation, multi-draft tabs, and instantaneous fare preview.
+    2. `[ 🗺️ Live Map ]`: Full-screen responsive Google Map canvas with active driver telemetry markers, route overlays, and layer controls.
+    3. `[ 🚕 Trip Queue ]`: Mobile-optimized active trip feed with search, quick filters, driver assignment actions, and review/override drawers.
+  - Desktop multi-pane split layout seamlessly preserved on larger screens (>= 1024px).
+- **Configurable Display Layout Engine (Cards vs. List/Table vs. Compact)**:
+  - Persistent UI display toggles accessible in `/admin` and `/dispatch` header toolbars:
+    - 🎴 Card Grid View: High-visual-density cards optimized for mobile viewports, touch targets, and field operations.
+    - 📊 Dense Table View: Standard analytical data grid with responsive overflow protection for multi-column inspections.
+    - 📑 Compact List View: Minimalist single-line rows designed for maximum record throughput and rapid vertical scanning.
+  - Persistent client-side preference engine saving layout choices in `localStorage` per device.
+  - Intelligent viewport detection: Automatically defaults to Card View on narrow screens (< 768px) while granting operators instant manual layout overrides.
+- **Admin Console & Table Responsive Overhaul (`/admin`)**:
+  - Restored header actions: Prominent, non-clipping action buttons for "Launch Dispatch", "Live Site", and workspace switching across both desktop and mobile viewports.
+  - High-density table remediation: All data tables (Trips, Operators & Roster, Fleet Assets, Audit Logs, Geo-Zones, Invoicing, Onboarding Queue) wrapped in responsive `overflow-x-auto` containers with styled scrollbars to eliminate page-level horizontal blowout on mobile.
+
+### 26. Phase 30: End-to-End Live Simulation & Production Infrastructure Hardening
+- **Full Lifecycle E2E Simulation Walkthrough**:
+  - **Passenger Flow**: Submitting ride requests on `/app` evaluated dynamically against the `BookingRulesEngine`:
+    - Mode A (AUTO_CONFIRM): Verified high-reputation passengers automatically advance to `CONFIRMED`.
+    - Mode B (REQUIRE_REVIEW): Low scores, unrated guests, or late-night trips held in `UNCONFIRMED` with tagged rule reasons.
+    - Mode C (BLACKLIST_BLOCK): Restricts blacklisted passengers, prohibited geofences, and grounded assets with security audit logging.
+  - **Dispatcher Flow**: Real-time triage in `/dispatch`:
+    - Trip visualization and queue review across Card, Table, and Compact layouts.
+    - Manual assignment to active driver shift unit with instant real-time broadcast to all subscribers.
+  - **Driver Flow**: Lifecycle progression on `/driver` mobile PWA:
+    - Step-by-step state cycling (`assigned` -> `en_route` -> `arrived` -> `in_progress` -> `completed`).
+    - Immutable vehicle snapshot (`assignedVehicle`) freezing at assignment to prevent retroactive drift.
+    - Comprehensive `auditLog` array timeline tracking actor role, timestamp, and transition context.
+  - **Tracking Flow**: Real-time live customer telemetry map on `/track/$tripToken`:
+    - Visual route path and real-time vehicle telemetry beacon with live status updates via Firestore snapshot listeners.
+- **Role-Based Access Control (RBAC) & Firestore Security Rule Verification**:
+  - Strict tenant boundary governance in `firestore.rules`:
+    - Passengers view and mutate strictly their own profiles (`/users/{uid}`) and booked trips (`/trips/{tripId}`).
+    - Drivers update strictly their assigned trips and active shift records (`/vehicleAssignments`).
+    - Candidates submit applications (`/applications`) without permissions to read the candidate queue.
+    - Dispatchers and Admins retain operational read/write access.
+    - Closes wildcard security hole by requiring dispatcher authorization for unmapped collections.
+- **Production Asset & Bundle Optimization**:
+  - Code splitting and lazy loading for heavy dependencies (Monaco Editor via `React.lazy`, `@hello-pangea/dnd`, Maps loader).
+  - Production chunk optimization in `vite.config.ts` manualChunks.
+  - Clean up unused imports, dead CSS modules, and redundant console logs.
+
+### 27. Phase 31: Enterprise External API Integrations (Payments, Invoicing, and Telephony)
+- **Payments & Card Vaulting Engine (Stripe / Square)**:
+  - **Tokenized Card Vaulting**:
+    - Passengers on `/app` and web booking flows can securely vault credit/debit cards on file with PCI-compliant tokenization (`VaultedCard` model with brand, last 4 digits, expiry, token, and default designation).
+    - Booking checkout allows 1-click payment using vaulted payment methods or manual card entry with instant tokenization.
+  - **Pre-Authorization Holds & Automated Capture**:
+    - Automatic pre-authorization hold initiated upon booking confirmation (`CONFIRMED` or driver `accepted`).
+    - Automated payment capture triggered when the trip is marked `completed`, reconciling base fare, distance/meter calculations, itemized extras, tolls, and customer tips.
+  - **Driver In-Cab Terminal & Tip Prompt**:
+    - Driver PWA terminal integration on `/driver`: Upon completing a trip, driver triggers terminal screen with tip preset buttons (`15%`, `20%`, `25%`, `Custom`, `No Tip`) and contactless card settlement.
+  - **Automated Driver Payouts Engine**:
+    - Automated fare-splitting algorithm computing platform commission, driver net earnings, 100% tip pass-through, and 100% toll reimbursement.
+    - Generates immutable `DriverPayout` records and ledger entries.
+- **B2B Corporate Invoicing & Accounting Sync**:
+  - **Automated Corporate Billing & Scheduled Invoicing**:
+    - Corporate accounts billing terms supported: Net 15, Net 30, Net 60, and Immediate Charge.
+    - Automated batch invoicing generator grouping unbilled completed corporate rides into consolidated periodic billing statements.
+  - **Printable & Downloadable PDF Invoice Engine**:
+    - High-fidelity PDF invoice template generation with official Chesterfield Taxi branding, contact details, tax ID, itemized ride breakdown (trip ID, date, passenger, route, PO #, amount), payment terms, and bank remittance slip.
+  - **Accounting Sync (QuickBooks / Xero / General Ledger)**:
+    - Daily financial ledger recording transaction lines across accounts: fare revenue, driver payouts, tips, tolls, and gateway processing fees.
+    - One-click export to standard QuickBooks CSV and General Ledger JSON formats for external bookkeeping and tax reconciliation.
+  - **Admin Financials Console (`/admin?tab=financials`)**:
+    - Normalized tab navigation at `/admin?tab=financials` (aliased to `/admin?tab=invoicing`).
+    - Dedicated tabs for Invoicing Ledger, Corporate Accounts, Payment Gateways, and Accounting Sync.
+- **Telephony & Communication Suite (Twilio / WebRTC)**:
+  - **Masked Virtual Phone Relay**:
+    - Virtual proxy phone numbers (Twilio relay session) bridging communications between driver personal cell and passenger phone.
+    - Preserves mutual privacy; direct mobile phone numbers are never exposed to counterparties.
+    - Automated session lifecycle: created on driver dispatch assignment, expired on trip completion or cancellation.
+  - **Automated SMS Telemetry Alerts**:
+    - Automated dispatch milestone text messages triggered during state machine transitions:
+      - `en_route`: "Cab #[unit] is en route. Driver: [name]. Estimated arrival: [ETA]."
+      - `arrived`: "Your Chesterfield Taxi driver has arrived outside in [vehicle model] (Cab #[unit])."
+      - `in_progress`: "Trip started. Safe travels with Chesterfield Taxi!"
+      - `completed`: "Trip completed. Total fare: $[amount]. Thank you for riding with Chesterfield Taxi."
+    - Complete SMS notification delivery history and logging.
+  - **Embedded WebRTC Click-to-Call Softphone (`/dispatch`)**:
+    - Fully operational browser softphone inside the tactical dispatch desk with numeric dial pad, DTMF tones, live call timer, mute toggle, and audio indicators.
+    - Click-to-call integration directly from Driver Roster and Active Trip Queue items.
+
+

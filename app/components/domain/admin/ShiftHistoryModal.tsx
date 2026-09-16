@@ -132,8 +132,9 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
                  <p className="text-sm mt-1">Try adjusting your search criteria.</p>
               </div>
            ) : (
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                 <thead className="bg-white sticky top-0 border-b border-slate-200 shadow-sm z-10">
+              <div className="overflow-x-auto custom-scrollbar min-w-full">
+                  <table className="w-full text-left text-sm whitespace-nowrap min-w-[650px]">
+                     <thead className="bg-white sticky top-0 border-b border-slate-200 shadow-sm z-10">
                     <tr className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                        <th className="px-6 py-3">Shift ID</th>
                        <th className="px-6 py-3">Vehicle</th>
@@ -188,8 +189,9 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
                           </td>
                        </tr>
                     ))}
-                 </tbody>
-              </table>
+                  </tbody>
+               </table>
+            </div>
            )}
         </div>
       </Card>

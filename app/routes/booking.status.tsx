@@ -5,6 +5,7 @@ import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { PhoneIcon, SpinnerIcon, SearchIcon } from '../components/ui/Icons';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
 
 export function meta() {
   return [
@@ -253,6 +254,9 @@ export default function BookingStatusRoute() {
             </div>
           )}
         </div>
+
+        {/* Live Customer Telemetry Map & HUD */}
+        <CustomerTelemetryMap trip={trip} className="mb-6" />
 
         {/* Route Details Card */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-lg mb-6 space-y-4">

@@ -1,51 +1,190 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // ─────────────────────────────────────────────────────────────
+    // Helper Functions & Role Definitions
+    // ─────────────────────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (
-        isAdmin() ||
-        (request.auth.uid == userId && (
-          (request.auth.token.email == 'admin@chesterfieldtaxi.com') ||
-          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || request.resource.data.role == 'customer')
-        ))
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'admin@chesterfieldtaxi.com' ||
+        (getUserData().role == 'admin') ||
+        (getUserData().roles != null && 'admin' in getUserData().roles)
       );
     }
-    
-    // Public Trips: Customers can submit new UNCONFIRMED web bookings
-    match /trips/{tripId} {
-      allow create: if request.resource.data.status in ['UNCONFIRMED', 'pending'] || request.auth != null;
-      allow read, update, delete: if request.auth != null;
+
+    function isDispatcher() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (getUserData().role == 'dispatcher') ||
+        (getUserData().roles != null && 'dispatcher' in getUserData().roles)
+      );
     }
 
-    // Public Operational Configuration: Read-only for public quote calculations and tariffs
+    function isDriver() {
+      return isAuthenticated() && (
+        (getUserData().role == 'driver') ||
+        (getUserData().roles != null && 'driver' in getUserData().roles)
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. User Profiles & Accounts (/users/{userId})
+    // ─────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Passengers and drivers can only view their own user profile; Dispatchers/Admins can view all
+      allow read: if isOwner(userId) || isDispatcher();
+
+      // Users can update their own profile without elevating role; Dispatchers/Admins have full write
+      allow write: if isDispatcher() || (
+        isOwner(userId) && (
+          // Initial creation on registration
+          resource == null ||
+          // Modification without tampering with role
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'roles']) ||
+           request.resource.data.role == 'customer')
+        )
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. Trips & Bookings (/trips/{tripId})
+    // ─────────────────────────────────────────────────────────────
+    match /trips/{tripId} {
+      // Public / Guest creation of new UNCONFIRMED web bookings, or authenticated passenger bookings
+      allow create: if request.resource.data.status in ['UNCONFIRMED', 'pending'] || isAuthenticated();
+
+      // Read single trip:
+      // - Dispatchers / Admins can read all trips
+      // - Passengers can view their own trips
+      // - Assigned or offered drivers can view trip details
+      // - Direct lookup by unique tripId or tripToken (for public tracking)
+      allow get: if isDispatcher() ||
+        (isAuthenticated() && (
+          resource.data.customerId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          (resource.data.passenger != null && resource.data.passenger.email == request.auth.token.email) ||
+          resource.data.assignedDriverId == request.auth.uid ||
+          (resource.data.offeredToIds != null && request.auth.uid in resource.data.offeredToIds)
+        )) ||
+        // Guests tracking via direct doc reference
+        resource.data.status != null;
+
+      // List query: Passengers can only list trips matching their customerId; Drivers their assigned trips; Dispatchers all
+      allow list: if isDispatcher() ||
+        (isAuthenticated() && (
+          resource.data.customerId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          resource.data.assignedDriverId == request.auth.uid
+        ));
+
+      // Updates:
+      // - Dispatchers / Admins: full operational updates
+      // - Drivers: update assigned trips (status transitions, meter extras, coordinates)
+      // - Passengers: cancel own trip or update notes
+      allow update: if isDispatcher() ||
+        (isDriver() && (
+          resource.data.assignedDriverId == request.auth.uid ||
+          (resource.data.offeredToIds != null && request.auth.uid in resource.data.offeredToIds)
+        )) ||
+        (isAuthenticated() && (
+          resource.data.customerId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
+          (resource.data.passenger != null && resource.data.passenger.email == request.auth.token.email)
+        ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'cancellationReason', 'cancelledAt', 'cancelledBy', 'passengerNotes', 'specialInstructions'
+        ]));
+
+      // Deletes: Admins and Dispatchers only
+      allow delete: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 3. Driver Shift Tracking & Vehicle Assignments (/vehicleAssignments)
+    // ─────────────────────────────────────────────────────────────
+    match /vehicleAssignments/{assignmentId} {
+      // Drivers can view, create, and update their own shift records; Dispatchers manage all
+      allow read: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
+      allow create: if isDispatcher() || (isDriver() && request.resource.data.driverId == request.auth.uid);
+      allow update: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
+      allow delete: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 4. Job Applications & Driver Onboarding (/applications)
+    // ─────────────────────────────────────────────────────────────
+    match /applications/{applicationId} {
+      // Public candidates can submit applications, but CANNOT read or list the queue
+      allow create: if true;
+      // Only Dispatchers and Admins can view, review, or mutate applicant submissions
+      allow read, update, delete: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 5. Driver Profiles & Roster (/drivers/{driverId})
+    // ─────────────────────────────────────────────────────────────
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated();
+      allow update: if isDispatcher() || (isDriver() && request.auth.uid == driverId);
+      allow create, delete: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 6. Public Operational Configurations (Zones, Tariffs, Pricing)
+    // ─────────────────────────────────────────────────────────────
     match /zones/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isDispatcher();
     }
     match /zoneGroups/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isDispatcher();
     }
     match /locationCollections/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isDispatcher();
     }
     match /pricing_rules/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isDispatcher();
+    }
+    match /pricingRules/{document=**} {
+      allow read: if true;
+      allow write: if isDispatcher();
+    }
+    match /tariffs/{document=**} {
+      allow read: if true;
+      allow write: if isDispatcher();
     }
     match /config/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isDispatcher();
+    }
+    match /fleet/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isDispatcher();
+    }
+    match /securityAudits/{document=**} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isDispatcher();
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // 7. General Wildcard Security Lockdown
+    // ─────────────────────────────────────────────────────────────
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isDispatcher();
     }
   }
 }

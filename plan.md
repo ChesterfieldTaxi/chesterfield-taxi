@@ -479,3 +479,133 @@ export interface PassengerAccount {
 - Universal `isArchived`, `isBlacklisted`, and `blacklistReason` fields across Passengers, Drivers, Staff Operators, Fleet Units, Trips, and Geo-Locations.
 - Route guards rejecting blacklisted passenger bookings, driver/staff logins, grounded vehicles in shifts, and blacklisted pickup/dropoff zones.
 - Governance UI in `/admin` for Rules Manager, Geo-Fence Manager, and Universal Archive/Blacklist actions.
+
+## 18. Phase 29B Architecture: Responsive Mobile Overhaul, Mobile Dispatch Console, Multi-Role View Switcher & Custom Layout Options
+
+### 18.1 Multi-Role View Launcher & Unified App Shell
+- **Role Hierarchy & Permitted Workspaces**:
+  - `admin`: Full unrestricted access to Admin (`/admin`), Dispatch (`/dispatch`), Driver (`/driver`), and Customer (`/app`).
+  - `dispatcher`: Access to Dispatch (`/dispatch`), Driver (`/driver`), and Customer (`/app`).
+  - `driver`: Access to Driver (`/driver`) and Customer (`/app`).
+  - `customer`: Access to Customer (`/app`) and public booking.
+- **Component Architecture**:
+  - `RoleViewSwitcher.tsx`: Self-contained interactive popover/dropdown rendering accessible workspace targets with visual active indicators and icons.
+  - Integration across headers: Mounted in Admin Header (`/admin`), Dispatch Header (`/dispatch`), and within `UserDropdown.tsx` for consistent global accessibility.
+  - Sign-in destination engine: Post-login redirection accurately parses user's `roles` array and defaults to highest appropriate workspace.
+
+### 18.2 Dispatch Console Mobile View State Machine (`/dispatch`)
+- **Responsive Viewport Toggles**:
+  - Viewport detection isolates desktop multi-column view from mobile single-pane focus.
+  - Mobile mode (`lg:hidden`) exposes a 3-tab segmented controller:
+    1. `activeMobileTab === 'booking'`: Renders draft tabs and `DispatchBookingEngine` full-screen.
+    2. `activeMobileTab === 'map'`: Renders Google Maps canvas full-screen with driver overlays.
+    3. `activeMobileTab === 'queue'`: Renders active trips table/cards full-screen with filter pills and search.
+  - Slide-out mobile navigation drawer provides touch access to Drivers roster, Messages, Softphone, and Switcher without interfering with map or booking states.
+
+### 18.3 Configurable Display Layout Engine
+- **Layout Modes**:
+  - `'cards'`: High-density responsive card grid, ideal for touchscreens and mobile viewports.
+  - `'table'`: Analytical tabular view wrapped in scrollable containers.
+  - `'compact'`: Minimalist single-line rows for maximum vertical data throughput.
+- **Hook & Storage Schema**:
+  - `useDisplayLayout(key, defaultLayout)` hook with automatic mobile detection (`window.innerWidth < 768px ? 'cards' : 'table'`).
+  - Syncs changes to `localStorage` under keys `ct_display_layout_admin` and `ct_display_layout_dispatch`.
+- `LayoutToggle.tsx`: Clean 3-way toggle button group embedded in Admin and Dispatch toolbars.
+
+### 18.4 Admin Console Responsive & Table Overflow Remediation
+- **Header Actions**: Responsive layout with preserved action buttons ("Launch Dispatch", "Live Site", "Switch View") across all breakpoints.
+- **Horizontal Table Protection**: All administrative grid tables wrapped in `overflow-x-auto` with styled scrollbars (`custom-scrollbar`) and min-width constraints, preventing body-level horizontal overflow.
+
+## 19. Phase 30 Architecture: End-to-End Live Simulation & Production Infrastructure Hardening
+
+### 19.1 Multi-Role E2E Simulation Architecture
+- **Automated Integration Test Pipeline (`test-e2e-simulation.ts`)**:
+  - Exercises full multi-role booking lifecycles across domain services without requiring live manual browser interaction.
+  - **Passenger Flow**:
+    - Creates trip reservation under multiple customer scenarios.
+    - Tests `BookingRulesEngine` evaluation for Mode A (auto-confirmed `CONFIRMED`), Mode B (review required `UNCONFIRMED` with rule reason tags), and Mode C (blacklist block rejection with security audit event).
+  - **Dispatcher Flow**:
+    - Queries active trips queue across Card, Table, and Compact display layout formats.
+    - Transitions unconfirmed trips to confirmed, and assigns active driver shift unit (`Cab #204` / `drv-101`).
+    - Verifies real-time event broadcasting to active subscribers.
+  - **Driver Flow**:
+    - Accepts trip offer on driver shift interface.
+    - Cycles status sequentially through `assigned` -> `en_route` -> `arrived` -> `in_progress` -> `completed`.
+    - Validates immutable vehicle snapshot (`assignedVehicle`) freezing upon driver assignment.
+    - Validates automated sequential appending of `TripAuditEvent` entries to `auditLog` array.
+  - **Tracking Flow**:
+    - Subscribes to live trip updates simulating `/track/$tripToken`.
+    - Verifies real-time reception of status changes, telemetry coordinates, and status beacon indicators.
+
+### 19.2 Multi-Tenant Firestore Security Rules RBAC Matrix
+| Collection | Role / Subject | Permitted Operations | Conditions / Safeguards |
+| :--- | :--- | :--- | :--- |
+| `/users/{uid}` | Customer / Passenger | `read`, `create`, `update` | Own profile only (`request.auth.uid == uid`), cannot elevate role |
+| `/users/{uid}` | Dispatcher / Admin | `read`, `create`, `update`, `delete` | Full elevated operational management |
+| `/trips/{id}` | Public / Guest | `create`, `get` | Create `UNCONFIRMED`/`pending`; read by unique tripId/token for tracking |
+| `/trips/{id}` | Customer / Passenger | `list`, `update` | Query own trips (`customerId == uid`); update notes or cancel |
+| `/trips/{id}` | Driver | `get`, `update` | Only assigned trips (`assignedDriverId == uid`) or offered trips |
+| `/trips/{id}` | Dispatcher / Admin | `read`, `write` | Full access for dispatch, override, assignment, and status cycling |
+| `/vehicleAssignments` | Driver | `create`, `read`, `update` | Active shift records where `driverId == uid` |
+| `/vehicleAssignments` | Dispatcher / Admin | `read`, `write` | Operational fleet shift management and audit history |
+| `/applications` | Candidate / Applicant | `create` | Public candidate submission; zero read permissions for queue privacy |
+| `/applications` | Dispatcher / Admin | `read`, `write` | Onboarding queue processing and compliance verification |
+| Operational Config | Public / All | `read` | Read tariffs, pricing rules, zones, and branding config |
+| Operational Config | Dispatcher / Admin | `write` | Restricted configuration mutation |
+| Wildcard `/{doc=**}` | Dispatcher / Admin | `read`, `write` | Default denies general unauthorized access |
+
+### 19.3 Production Bundle Optimization & Asset Code-Splitting
+- **Dynamic Lazy Loading**:
+  - Dynamically load heavy components (such as `@monaco-editor/react` in `AdminWebsiteTab.tsx`) using `React.lazy()` and `Suspense` with elegant loading skeletons.
+- **Rollup Chunking Strategy (`vite.config.ts`)**:
+  - `vendor-monaco`: `@monaco-editor/react`
+  - `vendor-dnd`: `@hello-pangea/dnd`
+  - `vendor-maps`: `@googlemaps/js-api-loader`
+  - `firebase`: Firebase SDK modular bundle
+  - `react-router`: Core routing runtime
+  - `core-ui`: Universal UI component library
+
+## 20. Phase 31 Architecture: Enterprise External API Integrations (Payments, Invoicing, and Telephony)
+
+### 20.1 Payments & Card Vaulting Architecture (`payment.service.ts`)
+- **Vendor Abstraction (`IPaymentService`)**:
+  - Unified interface supporting Stripe / Square API contracts with zero-downtime test/mock simulation fallback.
+  - Card vaulting engine creates tokenized `VaultedCard` records (`last4`, `brand`, `expMonth`, `expYear`, `token`, `isDefault`) stored against the passenger profile (`PassengerAccount.vaultedPaymentMethods`).
+- **Two-Stage Authorization Lifecycle**:
+  - `createPreAuthorization(tripId, amount, customerId, cardId)`: Triggered automatically upon trip confirmation (`CONFIRMED` or driver `accepted`), placing a temporary pre-auth hold on the vaulted card.
+  - `capturePayment(tripId, finalFare, tip, extras)`: Triggered upon trip completion (`completed`), capturing the pre-authorized amount adjusted with actual taximeter fare, extra fees, tolls, and customer gratuity.
+- **Driver PWA In-Cab Terminal**:
+  - Terminal flow embedded in `/driver` triggering upon completion with tip calculation buttons (`15%`, `20%`, `25%`, `Custom`, `No Tip`) and immediate card receipt confirmation.
+- **Automated Driver Payouts Engine**:
+  - Calculates net split per trip: Driver base share (e.g. 75%), Platform commission (25%), 100% tip pass-through to driver, and 100% toll reimbursement to driver.
+  - Generates immutable `DriverPayout` entities linked to accounting ledger.
+
+### 20.2 B2B Corporate Invoicing & Accounting Sync Architecture (`invoicing.service.ts`)
+- **B2B Billing Contract (`IInvoicingService`)**:
+  - Periodic automated invoice generation for corporate accounts based on billing cycles (`net15`, `net30`, `net60`, `immediate`).
+  - Batch invoicing engine queries unbilled completed trips matching corporate IDs and consolidates into formal `InvoiceRecord` entities.
+- **PDF Generation Pipeline**:
+  - High-fidelity PDF rendering engine producing professional printable invoice documents formatted with Chesterfield Taxi logo, corporate billing details, trip log with PO numbers, itemized line items, payment terms, and bank remittance instructions.
+- **Accounting Ledger Sync**:
+  - Financial ledger recording balanced entries across platform accounts (`fare_revenue`, `platform_commission`, `driver_payout`, `tip_collected`, `toll_reimbursement`, `refund`).
+  - Standardized export modules for QuickBooks CSV (`quickbooks_csv`), QuickBooks IIF (`quickbooks_iif`), and General Ledger JSON (`general_ledger_json`).
+- **Admin Financials Console Integration**:
+  - Tab routing `/admin?tab=financials` (aliased to `invoicing`) with sub-tabs: Ledger, Corporate Accounts, Payment Gateways, and Accounting Sync.
+
+### 20.3 Telephony & Communications Architecture (`telephony.service.ts`)
+- **Masked Virtual Phone Relay (`ITelephonyService`)**:
+  - Virtual proxy number session provisioning (Twilio Proxy emulation).
+  - Routes inbound and outbound calls/SMS between passenger and driver through Chesterfield Taxi proxy numbers to ensure phone privacy.
+  - Session lifecycle hooks tie to trip state machine (starts on `assigned`, terminates on `completed` or `cancelled`).
+- **Automated Lifecycle SMS Telemetry**:
+  - Event listener triggers automated SMS notifications upon trip state changes:
+    - `en_route`: Informs passenger driver is heading to pickup with vehicle info and ETA.
+    - `arrived`: Alerts passenger driver has arrived outside with vehicle make/model/cab unit.
+    - `in_progress`: Confirms trip initiation.
+    - `completed`: Delivers completion confirmation with final charged fare.
+  - In-memory/Firestore message audit trail tracking delivery status and timestamp.
+- **Dispatcher WebRTC Softphone (`/dispatch`)**:
+  - Full-featured browser softphone interface integrated into tactical dispatch workspace.
+  - Connects to WebRTC audio session state machine (`idle` -> `connecting` -> `in_call` -> `ended`) with live duration timer, mute toggle, DTMF keypad tone generation, and click-to-call hooks on driver roster and active trip rows.
+
+

@@ -159,6 +159,12 @@ export function DispatchBookingEngine({
   const isEditMode = Boolean(initialTrip?.id);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
 
+  // Keep latest onValuesChange in a ref to avoid infinite dependency re-triggers
+  const onValuesChangeRef = useRef(onValuesChange);
+  useEffect(() => {
+    onValuesChangeRef.current = onValuesChange;
+  }, [onValuesChange]);
+
   // Form State: Timing
   const [timingType, setTimingType] = useState<'asap' | 'later'>('asap');
   const [scheduledDate, setScheduledDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -564,7 +570,7 @@ export function DispatchBookingEngine({
       localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
     } catch {}
 
-    onValuesChange?.({
+    onValuesChangeRef.current?.({
       timingType,
       scheduledDate,
       scheduledTime,
@@ -731,7 +737,6 @@ export function DispatchBookingEngine({
     isFareOverridden,
     estimatedDurationMinutes,
     estimatedDistanceMiles,
-    onValuesChange,
   ]);
 
   // Live route calculation & pricing (Outbound, wrapped in 800ms debounce & trigger guard)

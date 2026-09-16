@@ -338,3 +338,72 @@
 - [x] 29.8 Build & Typecheck Verification:
   - [x] 29.8.1 Run npm run typecheck with 0 errors.
   - [x] 29.8.2 Run npm run build with 0 errors.
+
+## Phase 29B: Responsive Mobile Overhaul, Mobile Dispatch Console, Multi-Role View Switcher & Custom Layout Options
+- [x] 29B.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md with Phase 29B scope.
+- [x] 29B.2 Multi-Role View Switcher & App Shell Integration:
+  - [x] 29B.2.1 Create `RoleViewSwitcher.tsx` with role resolution and 1-tap workspace switching (`/admin`, `/dispatch`, `/driver`, `/app`).
+  - [x] 29B.2.2 Integrate View Switcher into `UserDropdown.tsx` and Admin/Dispatch headers.
+  - [x] 29B.2.3 Update `/signin` and `/register` post-auth redirection logic for role-based landing.
+- [x] 29B.3 Configurable Display Layout Engine (Cards vs. List/Table vs. Compact):
+  - [x] 29B.3.1 Create `useDisplayLayout.ts` hook with `localStorage` persistence and automatic < 768px fallback.
+  - [x] 29B.3.2 Create `LayoutToggle.tsx` 3-way segmented button group.
+  - [x] 29B.3.3 Integrate layout toggles in `/admin` and `/dispatch` header toolbars.
+- [x] 29B.4 Dispatch Console Mobile Overhaul (`/dispatch`):
+  - [x] 29B.4.1 Build responsive slide-out navigation drawer for mobile screens (Drivers, Messages, Softphone, Settings).
+  - [x] 29B.4.2 Implement 3-tab mobile view switcher (`[ 📝 New Booking ]`, `[ 🗺️ Live Map ]`, `[ 🚕 Trip Queue ]`).
+  - [x] 29B.4.3 Support Card Grid, Dense Table, and Compact List views in the active Trip Queue.
+  - [x] 29B.4.4 Preserve desktop 3-pane split layout with resizable splitters for >= 1024px.
+- [x] 29B.5 Admin Console & Table Responsive Overhaul (`/admin`):
+  - [x] 29B.5.1 Restore missing header actions ("Launch Dispatch", "Live Site", quick navigation) on desktop and mobile viewports.
+  - [x] 29B.5.2 Wrap all high-density tables (Trips, Roster, Fleet, Audit Logs, Geo-Zones, Invoicing, Onboarding) in responsive `overflow-x-auto custom-scrollbar` containers.
+  - [x] 29B.5.3 Integrate Card View and Compact View in Admin Trips and Operators/Roster.
+- [x] 29B.7 Header, Sidenav, and Dispatch Queue Refinements (User Directives):
+  - [x] 29B.7.1 Minimized User Button across the board (`triggerVariant="minimized"`, avatar initial + down arrow).
+  - [x] 29B.7.2 Consolidated workspace switching into `UserDropdown` and removed redundant standalone header dropdowns to eliminate tab title truncation on mobile.
+  - [x] 29B.7.3 Transformed mobile sidenav/drawer workspace selector into a space-saving compact dropdown.
+  - [x] 29B.7.4 Redesigned Dispatch Queue toolbar with full-width expandable search via 🔍 magnifier button, hiding filters during typing.
+  - [x] 29B.7.5 Merged unconfirmed bookings filter into the primary status dropdown with pending notification dot.
+  - [x] 29B.7.6 Moved Queue Display Layout selector off main header directly into queue page toolbar as a compact dropdown.
+
+## Phase 30: End-to-End Live Simulation & Production Infrastructure Hardening
+- [x] 30.1 Documentation Updates (FIRST STEP): Update spec.md, plan.md, and tasks.md to reflect Phase 30 scope: Complete E2E multi-role simulation testing, Firestore security rule verification, bundle optimization, and production readiness checks.
+- [x] 30.2 Full Lifecycle End-to-End Simulation Walkthrough:
+  - [x] 30.2.1 Passenger Flow: Create ride request on /app; verify evaluation against the BookingRulesEngine (Mode A Auto-Confirm vs Mode B Review Required vs Mode C Blacklist Block).
+  - [x] 30.2.2 Dispatcher Flow: Accept/review trip on /dispatch (testing Card, Table, and Compact list views), assign to active driver shift unit, and verify instant state broadcast.
+  - [x] 30.2.3 Driver Flow: Accept trip offer on /driver PWA, cycle status transitions (EN_ROUTE -> ARRIVED -> IN_PROGRESS -> COMPLETED), verify vehicle snapshot freezing and automated auditLog array updates.
+  - [x] 30.2.4 Tracking Flow: Verify live customer telemetry map (/track/$tripToken) updates in real time via Firestore snapshot listeners.
+- [x] 30.3 Role-Based Access Control (RBAC) & Security Hardening:
+  - [x] 30.3.1 Audit `firestore.rules` to enforce strict multi-tenant governance (Passengers profile & trips, Drivers assigned trips & shifts, Applicants queue lockdown, Admins/Dispatchers elevated read/write).
+- [x] 30.4 Production Asset & Bundle Optimization:
+  - [x] 30.4.1 Implement code splitting and dynamic lazy loading for heavy dependencies (Leaflet Maps, Monaco Editor, charting libraries).
+  - [x] 30.4.2 Clean up unused imports, dead CSS modules, and redundant console logs.
+- [x] 30.5 Build, Typecheck & Verification:
+  - [x] 30.5.1 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
+  - [x] 30.5.2 Run `npm run build` to confirm production client and SSR build stability.
+  - [x] 30.5.3 Update tasks.md to mark Phase 30 complete upon verification.
+
+## Phase 31: Enterprise External API Integrations (Payments, Invoicing, and Telephony)
+- [x] 31.1 Documentation Updates (FIRST STEP):
+  - [x] 31.1.1 Update `spec.md`, `plan.md`, and `tasks.md` to reflect Phase 31 scope: Payment processor integration (Stripe / Square), B2B Invoicing & Ledger Sync (QuickBooks / PDF generator), and Telephony Suite (Twilio masked SMS, call relay, and Dispatcher softphone).
+- [x] 31.2 Payments & Card Vaulting Engine (Stripe / Square):
+  - [x] 31.2.1 Create payment data contracts (`app/core/types/payment.ts`) for vaulted cards, payment intents, and driver payouts.
+  - [x] 31.2.2 Implement payment service (`app/core/services/payment.service.ts`) with card vaulting, pre-authorization holds, and payment capture.
+  - [x] 31.2.3 Implement tokenized card checkout and card-on-file vaulting on `/app` profile and `BookingEngineV2.tsx`.
+  - [x] 31.2.4 Implement Driver PWA terminal integration (`/driver`) with tip selection presets (`15%`, `20%`, `25%`, `Custom`, `No Tip`) and card processing upon trip completion.
+  - [x] 31.2.5 Implement driver payouts engine structure for automated fare splitting and ledger entries.
+- [x] 31.3 B2B Corporate Invoicing & Accounting Sync:
+  - [x] 31.3.1 Create invoicing data contracts (`app/core/types/invoicing.ts`) for financial ledger entries and accounting export formats.
+  - [x] 31.3.2 Implement invoicing service (`app/core/services/invoicing.service.ts`) with automated corporate batch billing and printable PDF invoice generation.
+  - [x] 31.3.3 Implement accounting sync interface for QuickBooks CSV, QuickBooks IIF, and General Ledger JSON export.
+  - [x] 31.3.4 Update `/admin?tab=financials` (and `/admin?tab=invoicing`) with Invoicing & Financials console, PDF viewer/print modal, and accounting sync sub-tab.
+- [x] 31.4 Telephony & Communication Suite (Twilio / WebRTC):
+  - [x] 31.4.1 Create telephony data contracts (`app/core/types/telephony.ts`) for masked proxy sessions, SMS notifications, and WebRTC calls.
+  - [x] 31.4.2 Implement communications service (`app/core/services/telephony.service.ts`) with masked phone relay and automated SMS telemetry alerts.
+  - [x] 31.4.3 Wire automated SMS telemetry alerts to trip state lifecycle transitions (`en_route`, `arrived`, `in_progress`, `completed`).
+  - [x] 31.4.4 Connect WebRTC Click-to-Call softphone widget inside `/dispatch` with driver roster and queue direct dialer.
+- [x] 31.5 Build & Typecheck Verification:
+  - [x] 31.5.1 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
+  - [x] 31.5.2 Run `npm run build` to confirm production client and SSR build stability.
+  - [x] 31.5.3 Update tasks.md to mark Phase 31 complete upon verification.
+

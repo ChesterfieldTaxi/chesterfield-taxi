@@ -32,8 +32,10 @@ import {
   XIcon,
   InfoIcon,
   ArrowLeftRightIcon,
+  RadioIcon,
 } from '../components/ui/Icons';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
+import { UserDropdown } from '../components/domain/common/UserDropdown';
 
 export function meta() {
   return [
@@ -224,6 +226,14 @@ export default function PassengerAppRoute() {
     const returnFrom = trip.dropoffLocation?.address?.split(',')[0] || 'destination';
     const returnTo = trip.pickupLocation?.address?.split(',')[0] || 'pickup';
     showToast(`Loaded return ride: ${returnFrom} → ${returnTo}`);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await getAdminAuthService().signOut();
+    } catch {}
+    showToast('Signed out of Passenger Portal.');
+    setTimeout(() => navigate('/signin'), 600);
   };
 
   // Quick 1-tap chip destination select
@@ -488,6 +498,15 @@ export default function PassengerAppRoute() {
                 <span>Ride #{activeTrip.id} Live</span>
               </button>
             )}
+
+            <UserDropdown
+              email={account.email}
+              onSignOut={handleSignOut}
+              variant="light"
+              currentView="app"
+              className="w-auto"
+              triggerVariant="minimized"
+            />
           </div>
         </div>
 
@@ -1048,6 +1067,74 @@ export default function PassengerAppRoute() {
                 </button>
               </div>
             </form>
+
+            {/* Workspace Switcher */}
+            <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+              <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
+                Switch Workspace
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Link
+                  to="/dispatch"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                      <RadioIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">
+                        Dispatch Console
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        Operations & Booking
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                <Link
+                  to="/driver"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <CarIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 block">
+                        Driver Portal
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        Shifts & Navigation
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                <Link
+                  to="/admin"
+                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                      <ShieldCheckIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-purple-700 block">
+                        Admin Console
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        System Configuration
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
 
             {/* Portal Account Actions */}
             <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">

@@ -52,7 +52,7 @@ export default function Register() {
       navigate(redirect && redirect.startsWith('/driver') ? redirect : '/driver', { replace: true });
       return;
     }
-    navigate(redirect || '/book', { replace: true });
+    navigate(redirect || '/app', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
