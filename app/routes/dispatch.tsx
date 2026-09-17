@@ -5,7 +5,7 @@ import { getAdminConfigService } from '../core/services/config/admin-config.serv
 import { getBookingService } from '../core/services/booking';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings, NamedPricingRule } from '../core/types/config';
-import type { Trip, TripStatus } from '../core/types/trip';
+import type { Trip, TripStatus, TripAuditEvent } from '../core/types/trip';
 import { getPricingRulesService } from '../core/services/pricing';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
@@ -37,6 +37,9 @@ import {
   UsersIcon,
   BellIcon,
   ExternalLinkIcon,
+  PencilIcon,
+  ShieldCheckIcon,
+  PlusIcon,
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
@@ -161,9 +164,15 @@ function TripActionDropdown({
   onFocusMap,
 }: TripActionDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [openUpward, setOpenUpward] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    if (dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 280);
+    }
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         onClose();
@@ -181,98 +190,104 @@ function TripActionDropdown({
           e.stopPropagation();
           onToggle();
         }}
-        className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
         title="Trip Actions"
       >
         <span>Actions</span>
-        <ChevronDownIcon className="w-3 h-3 text-slate-500 shrink-0" />
+        <ChevronDownIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
       </button>
 
       {isOpen && (
         <div
-          className="absolute right-0 bottom-full mb-1 sm:bottom-auto sm:top-full sm:mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 text-left"
+          className={`absolute right-0 ${
+            openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 flex items-center justify-between">
-            <span>Trip #{trip.id.slice(0, 8)}</span>
-            <span className="capitalize text-slate-500">{trip.status}</span>
+          <div className="px-3.5 py-2 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="font-mono text-slate-600">Trip #{trip.id.slice(0, 8)}</span>
+            <span className="capitalize px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 font-bold">
+              {trip.status}
+            </span>
           </div>
 
-          {isUnconfirmed && (
+          <div className="py-1">
+            {isUnconfirmed && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onReview();
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80 transition-colors cursor-pointer"
+              >
+                <DocumentTextIcon className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Review Booking</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
                 onClose();
-                onReview();
+                onEdit();
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-colors cursor-pointer"
             >
-              <span>📋</span>
-              <span>Review Booking</span>
+              <PencilIcon className="w-4 h-4 text-blue-500 shrink-0" />
+              <span>Edit Trip</span>
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onEdit();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
-          >
-            <span>✎</span>
-            <span>Edit Trip</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onFare();
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50/80 hover:text-amber-700 transition-colors cursor-pointer"
+            >
+              <BoltIcon className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Fare &amp; Rules</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onFare();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
-          >
-            <span>⚡</span>
-            <span>Fare &amp; Rules</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onFocusMap();
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50/80 hover:text-emerald-700 transition-colors cursor-pointer"
+            >
+              <MapPinIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Focus on Map</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onFocusMap();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
-          >
-            <span>🗺️</span>
-            <span>Focus on Map</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onClone();
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50/80 hover:text-cyan-700 transition-colors cursor-pointer"
+            >
+              <PlusIcon className="w-4 h-4 text-cyan-600 shrink-0" />
+              <span>Clone to Draft</span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onClone();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 transition-colors cursor-pointer"
-          >
-            <span>📋</span>
-            <span>Clone to Draft</span>
-          </button>
-
-          <div className="border-t border-slate-100 my-1" />
-
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onAudit();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-purple-600 transition-colors cursor-pointer"
-          >
-            <span>📜</span>
-            <span>Audit Trail Log</span>
-          </button>
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onAudit();
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-purple-50/80 hover:text-purple-700 transition-colors cursor-pointer"
+            >
+              <ShieldCheckIcon className="w-4 h-4 text-purple-500 shrink-0" />
+              <span>Audit Trail Log</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -306,6 +321,8 @@ export default function DispatchRoute() {
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
   const [auditTrailTrip, setAuditTrailTrip] = useState<Trip | null>(null);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(2);
+  const [missedCallsCount, setMissedCallsCount] = useState<number>(1);
 
   // Dispatcher Review Modal State for UNCONFIRMED web bookings
   const [reviewTrip, setReviewTrip] = useState<Trip | null>(null);
@@ -829,9 +846,39 @@ export default function DispatchRoute() {
         specialRequests: reviewTrip.passenger.specialRequests,
       });
 
+      const nowIso = new Date().toISOString();
+      const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '2001';
+      const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
+      const confRef = `CNF-${numPart}`;
+
+      const newAuditEvents: TripAuditEvent[] = [
+        ...(reviewTrip.auditLog || []),
+        {
+          action: 'AUTO_CONFIRMED',
+          timestamp: nowIso,
+          actorRole: 'dispatcher',
+          referenceNumber: confRef,
+          context: 'Dispatcher reviewed and confirmed reservation',
+        },
+        {
+          action: 'EMAIL_LOGGED',
+          timestamp: nowIso,
+          actorRole: 'system',
+          referenceNumber: emailRef,
+          context: `Dispatched confirmation receipt & live tracking link to ${reviewTrip.passenger.email}`,
+        },
+      ];
+
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          status: 'CONFIRMED',
+          auditLog: newAuditEvents,
+        });
+      }
+
       // Update local state
       setTrips((prev) =>
-        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'CONFIRMED' as TripStatus }) : t))
+        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'CONFIRMED' as TripStatus, auditLog: newAuditEvents }) : t))
       );
 
       setReviewAlert({
@@ -893,9 +940,39 @@ export default function DispatchRoute() {
         customNotes: reviewCustomNotes.trim() || undefined,
       });
 
+      const nowIso = new Date().toISOString();
+      const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '3001';
+      const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
+      const decRef = `DEC-${numPart}`;
+
+      const newAuditEvents: TripAuditEvent[] = [
+        ...(reviewTrip.auditLog || []),
+        {
+          action: 'DRIVER_DECLINED',
+          timestamp: nowIso,
+          actorRole: 'dispatcher',
+          referenceNumber: decRef,
+          context: `Dispatcher declined booking: ${reasonToSave}`,
+        },
+        {
+          action: 'EMAIL_LOGGED',
+          timestamp: nowIso,
+          actorRole: 'system',
+          referenceNumber: emailRef,
+          context: `Sent cancellation notice email to ${reviewTrip.passenger.email}`,
+        },
+      ];
+
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          status: 'DECLINED',
+          auditLog: newAuditEvents,
+        });
+      }
+
       // Update local state
       setTrips((prev) =>
-        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'DECLINED' as TripStatus }) : t))
+        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'DECLINED' as TripStatus, auditLog: newAuditEvents }) : t))
       );
 
       setReviewAlert({
@@ -1025,6 +1102,119 @@ export default function DispatchRoute() {
       console.error('Failed to apply driver flat override:', err);
     } finally {
       setIsApplyingDriverFare(false);
+    }
+  };
+
+  // Batch Actions for Trips Table
+  const handleBatchConfirmTrips = async () => {
+    if (selectedTripIds.length === 0) return;
+    const bookingService = getBookingService();
+    const tripsToConfirm = trips.filter(
+      (t) => selectedTripIds.includes(t.id) && t.status !== 'CONFIRMED' && t.status !== 'confirmed' && t.status !== 'completed'
+    );
+    if (tripsToConfirm.length === 0) {
+      alert('All selected trip(s) are already confirmed or completed.');
+      return;
+    }
+
+    try {
+      for (const t of tripsToConfirm) {
+        if (bookingService.updateTripStatus) {
+          await bookingService.updateTripStatus(t.id, 'CONFIRMED', {
+            actorRole: 'admin',
+            reason: 'Batch confirmed by dispatcher',
+          });
+        } else if (bookingService.updateTrip) {
+          await bookingService.updateTrip(t.id, { status: 'CONFIRMED' });
+        }
+      }
+      setTrips((prev) =>
+        prev.map((t) => (selectedTripIds.includes(t.id) ? { ...t, status: 'CONFIRMED' as TripStatus } : t))
+      );
+      setSelectedTripIds([]);
+    } catch (err) {
+      console.error('Failed to batch confirm trips:', err);
+    }
+  };
+
+  const handleBatchAssignDriver = () => {
+    if (selectedTripIds.length === 0) return;
+    const firstTrip = trips.find((t) => t.id === selectedTripIds[0]);
+    if (firstTrip) {
+      handleOpenDriverModal(firstTrip);
+    }
+  };
+
+  const handleBatchExportCsv = () => {
+    if (selectedTripIds.length === 0) return;
+    const selectedTrips = trips.filter((t) => selectedTripIds.includes(t.id));
+    if (selectedTrips.length === 0) return;
+
+    const headers = [
+      'Trip ID',
+      'Status',
+      'Booking Type',
+      'Pickup Time',
+      'Passenger Name',
+      'Passenger Phone',
+      'Pickup Address',
+      'Dropoff Address',
+      'Vehicle Tier',
+      'Total Fare',
+      'Assigned Driver',
+    ];
+
+    const rows = selectedTrips.map((t) => [
+      `"${t.id}"`,
+      `"${t.status}"`,
+      `"${t.bookingType || 'scheduled'}"`,
+      `"${t.scheduledPickupTime || 'ASAP'}"`,
+      `"${[t.passenger?.firstName, t.passenger?.lastName].filter(Boolean).join(' ') || 'Guest'}"`,
+      `"${t.passenger?.phone || ''}"`,
+      `"${(t.pickupLocation?.address || '').replace(/"/g, '""')}"`,
+      `"${(t.dropoffLocation?.address || '').replace(/"/g, '""')}"`,
+      `"${t.vehicleTier || 'standard'}"`,
+      `"$${(t.pricing?.totalFare || 0).toFixed(2)}"`,
+      `"${t.assignedDriverId || 'Unassigned'}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `trips_export_${new Date().toISOString().slice(0, 10)}_${selectedTrips.length}_trips.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBatchCancelTrips = async () => {
+    if (selectedTripIds.length === 0) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel the ${selectedTripIds.length} selected trip(s)?`
+    );
+    if (!confirmed) return;
+
+    const bookingService = getBookingService();
+    try {
+      for (const id of selectedTripIds) {
+        if (bookingService.updateTripStatus) {
+          await bookingService.updateTripStatus(id, 'cancelled', {
+            actorRole: 'admin',
+            reason: 'Batch cancellation by dispatcher',
+          });
+        } else if (bookingService.updateTrip) {
+          await bookingService.updateTrip(id, { status: 'cancelled' });
+        }
+      }
+      setTrips((prev) =>
+        prev.map((t) => (selectedTripIds.includes(t.id) ? { ...t, status: 'cancelled' as TripStatus } : t))
+      );
+      setSelectedTripIds([]);
+    } catch (err) {
+      console.error('Failed to batch cancel trips:', err);
     }
   };
 
@@ -1928,16 +2118,76 @@ export default function DispatchRoute() {
           </span>
         </div>
 
-        {/* Right: Screen Pop Call HUD + Alerts Bell + App Suite Launcher */}
+        {/* Right: Screen Pop Call HUD + Omnichannel Messages + Alerts Bell + App Suite Launcher */}
         <div className="flex items-center gap-2">
           <DispatchHeaderCallHud
             trips={trips}
+            missedCallsCount={missedCallsCount}
             onOpenBooking={() => setActiveMobileTab('booking')}
-            onOpenComms={() => {
-              setActiveDockTab('phone');
+            onOpenEditTrip={(tripId) => {
+              const found = trips.find((t) => t.id === tripId) || {
+                id: tripId,
+                bookingType: 'scheduled',
+                status: 'CONFIRMED',
+                pickupLocation: { address: '14848 Conway Rd, Chesterfield, MO' },
+                dropoffLocation: { address: 'Lambert Airport Terminal 1 (STL)' },
+                passenger: { firstName: 'Sarah', lastName: 'Jenkins', phone: '(314) 532-1200' },
+                pricing: { totalFare: 68.5 },
+              } as Trip;
+              setSelectedQueueTripId(found.id);
+              setSelectedMapTrip(found);
+              setShouldZoomMap(true);
+              handleOpenEditTrip(found);
+              setActiveMobileTab('booking');
+            }}
+            onOpenComms={(tab, phone) => {
+              setActiveDockTab('comms');
               setActiveMobileTab('comms');
             }}
+            onPopulateBooking={(payload) => {
+              setActiveMobileTab('booking');
+              setDrafts((prev) => {
+                const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                if (!target) return prev;
+                const currentForm = target.formValues || ({} as any);
+                const updatedForm: DispatchFormValues = {
+                  ...currentForm,
+                  passengerName: payload.passengerName || currentForm.passengerName || '',
+                  passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                  pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                  dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                  internalNotes: payload.notes
+                    ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                    : currentForm.internalNotes,
+                };
+                return prev.map((d) => (d.id === target.id ? { ...d, formValues: updatedForm } : d));
+              });
+            }}
           />
+
+          {/* Omnichannel Messages Hub Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveDockTab((prev) => (prev === 'comms' ? 'none' : 'comms'));
+              setActiveMobileTab('comms');
+              setUnreadMessagesCount(0);
+            }}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+              activeDockTab === 'comms' || activeMobileTab === 'comms'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+            }`}
+            title="Communications & Messages Hub"
+            aria-label="Messages"
+          >
+            <ChatBubbleLeftRightIcon className="w-4 h-4" />
+            {unreadMessagesCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                {unreadMessagesCount}
+              </span>
+            )}
+          </button>
 
           {/* Tactical Alerts Bell Notification Center */}
           <div className="relative" ref={alertsDropdownRef}>
@@ -1981,13 +2231,11 @@ export default function DispatchRoute() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAlertsDropdown(false);
-                      setActiveDockTab('alerts');
-                    }}
-                    className="text-xs font-bold text-blue-400 hover:text-blue-300 cursor-pointer"
+                    onClick={() => setShowAlertsDropdown(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Close alerts"
                   >
-                    Open Console ↗
+                    <XIcon className="w-4 h-4" />
                   </button>
                 </div>
 
@@ -2943,14 +3191,53 @@ export default function DispatchRoute() {
                   {/* Right Side: Selection Badge, Mobile Filter Toggle, Queue Layout Dropdown, Search Magnifier */}
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {selectedTripIds.length > 0 && (
-                      <div className="flex items-center gap-1.5 bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold shadow-2xs shrink-0 h-7">
-                        <span>✓ {selectedTripIds.length} Selected</span>
+                      <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-900 text-white px-2 py-1 rounded-xl text-xs font-semibold shadow-md shrink-0 animate-in fade-in zoom-in-95 duration-100">
+                        <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 shrink-0">
+                          ✓ {selectedTripIds.length} <span className="hidden sm:inline">Selected</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleBatchConfirmTrips}
+                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Confirm all selected trips"
+                        >
+                          <BoltIcon className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Confirm</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBatchAssignDriver}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Assign driver to selected trip"
+                        >
+                          <UsersIcon className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Assign</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBatchExportCsv}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Export selected trips as CSV"
+                        >
+                          <DocumentTextIcon className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Export</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleBatchCancelTrips}
+                          className="px-2 py-0.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                          title="Cancel selected trips"
+                        >
+                          <span>🚫</span>
+                          <span className="hidden sm:inline">Cancel</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setSelectedTripIds([])}
-                          className="text-[10px] text-blue-200 hover:text-white underline cursor-pointer ml-0.5"
+                          className="p-1 text-slate-400 hover:text-white rounded-md cursor-pointer ml-0.5 shrink-0"
+                          title="Clear selection"
                         >
-                          Deselect
+                          <XIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}

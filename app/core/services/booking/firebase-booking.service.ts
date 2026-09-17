@@ -32,6 +32,8 @@ import type {
   TripStatusHistoryEntry,
   GeoPoint,
   TripAssignedVehicle,
+  TripAuditEvent,
+  TripFieldDiff,
 } from '../../types';
 import { isValidTripTransition } from '../../types';
 import type {
@@ -834,8 +836,74 @@ export class FirebaseBookingService implements IBookingService {
     }
 
     const now = new Date().toISOString();
+
+    const fieldChanges: TripFieldDiff[] = [];
+    if (updates.pickupLocation?.address && updates.pickupLocation.address !== trip.pickupLocation?.address) {
+      fieldChanges.push({
+        field: 'pickupLocation',
+        label: 'Pickup Address',
+        oldValue: trip.pickupLocation?.address,
+        newValue: updates.pickupLocation.address,
+      });
+    }
+    if (updates.dropoffLocation?.address && updates.dropoffLocation.address !== trip.dropoffLocation?.address) {
+      fieldChanges.push({
+        field: 'dropoffLocation',
+        label: 'Dropoff Address',
+        oldValue: trip.dropoffLocation?.address,
+        newValue: updates.dropoffLocation.address,
+      });
+    }
+    if (updates.scheduledPickupTime && updates.scheduledPickupTime !== trip.scheduledPickupTime) {
+      fieldChanges.push({
+        field: 'scheduledPickupTime',
+        label: 'Pickup Time',
+        oldValue: trip.scheduledPickupTime,
+        newValue: updates.scheduledPickupTime,
+      });
+    }
+    if (updates.vehicleTier && updates.vehicleTier !== trip.vehicleTier) {
+      fieldChanges.push({
+        field: 'vehicleTier',
+        label: 'Vehicle Tier',
+        oldValue: trip.vehicleTier,
+        newValue: updates.vehicleTier,
+      });
+    }
+    if (updates.pricing?.totalFare !== undefined && updates.pricing?.totalFare !== trip.pricing?.totalFare) {
+      fieldChanges.push({
+        field: 'totalFare',
+        label: 'Total Fare',
+        oldValue: trip.pricing?.totalFare ? `$${trip.pricing.totalFare.toFixed(2)}` : '$0.00',
+        newValue: `$${updates.pricing.totalFare.toFixed(2)}`,
+      });
+    }
+    if (updates.passenger?.phone && updates.passenger.phone !== trip.passenger?.phone) {
+      fieldChanges.push({
+        field: 'passengerPhone',
+        label: 'Passenger Phone',
+        oldValue: trip.passenger?.phone,
+        newValue: updates.passenger.phone,
+      });
+    }
+
+    let updatedAuditLog: TripAuditEvent[] = trip.auditLog ? [...trip.auditLog] : [];
+    if (fieldChanges.length > 0) {
+      const refSuffix = Math.floor(1000 + Math.random() * 9000);
+      updatedAuditLog.push({
+        action: 'TRIP_MODIFIED',
+        timestamp: now,
+        actorRole: 'dispatcher',
+        referenceNumber: `EDT-${refSuffix}`,
+        referenceType: 'edit',
+        fieldChanges,
+        context: `Dispatcher modified trip fields: ${fieldChanges.map((f) => f.label).join(', ')}`,
+      });
+    }
+
     const cleanUpdates = sanitizePayload({
       ...updates,
+      auditLog: updatedAuditLog,
       updatedAt: now,
     });
 

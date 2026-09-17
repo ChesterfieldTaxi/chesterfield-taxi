@@ -171,6 +171,71 @@ interface CommsHubProps {
   trips?: Trip[];
 }
 
+interface CommsBatchActionBarProps {
+  selectedCount: number;
+  onMarkRead: () => void;
+  onMarkUnread: () => void;
+  onArchive: () => void;
+  onClear: () => void;
+}
+
+function CommsBatchActionBar({
+  selectedCount,
+  onMarkRead,
+  onMarkUnread,
+  onArchive,
+  onClear,
+}: CommsBatchActionBarProps) {
+  if (selectedCount === 0) return null;
+  return (
+    <div className="p-2.5 px-3 bg-slate-900 text-white flex items-center justify-between gap-2 shadow-xs shrink-0 animate-in fade-in duration-150">
+      <div className="flex items-center gap-2.5">
+        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+        <span className="text-xs font-bold text-slate-200">
+          {selectedCount} selected
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onMarkRead}
+          className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+          title="Mark selected as Read"
+        >
+          <CheckIcon className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Mark Read</span>
+        </button>
+        <button
+          type="button"
+          onClick={onMarkUnread}
+          className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+          title="Mark selected as Unread"
+        >
+          <MailIcon className="w-3.5 h-3.5 text-blue-400" />
+          <span>Mark Unread</span>
+        </button>
+        <button
+          type="button"
+          onClick={onArchive}
+          className="px-2 py-1 rounded-md bg-rose-950/70 hover:bg-rose-900 text-xs font-semibold text-rose-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 border border-rose-800/40"
+          title="Archive / Remove selected"
+        >
+          <TrashIcon className="w-3.5 h-3.5" />
+          <span>Archive</span>
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          className="p-1 rounded-md text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+          title="Clear selection"
+        >
+          <XIcon className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CommsHub({
   user,
   initialTab = 'all',
@@ -656,60 +721,14 @@ export function CommsHub({
         {activeTab === 'all' && !selectedContactPhone && (
           <div className="flex-1 flex flex-col min-w-0 bg-white">
             {/* Batch Actions Bar OR Filter Toolbar */}
-            {selectedItemIds.size > 0 ? (
-              <div className="p-2.5 px-3 bg-slate-900 text-white flex items-center justify-between gap-2 shadow-xs shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="checkbox"
-                    ref={masterCheckboxRef}
-                    checked={isAllSelected}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-400 cursor-pointer"
-                    title={isAllSelected ? 'Deselect all' : 'Select all'}
-                  />
-                  <span className="text-xs font-bold text-slate-200">
-                    {selectedItemIds.size} selected
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleBatchMarkRead}
-                    className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-                    title="Mark selected as Read"
-                  >
-                    <CheckIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Mark Read</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBatchMarkUnread}
-                    className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
-                    title="Mark selected as Unread"
-                  >
-                    <MailIcon className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Mark Unread</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBatchArchive}
-                    className="px-2 py-1 rounded-md bg-rose-950/70 hover:bg-rose-900 text-xs font-semibold text-rose-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 border border-rose-800/40"
-                    title="Archive / Remove selected"
-                  >
-                    <TrashIcon className="w-3.5 h-3.5" />
-                    <span>Archive</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedItemIds(new Set())}
-                    className="p-1 rounded-md text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ml-1"
-                    title="Clear selection"
-                  >
-                    <XIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
+            <CommsBatchActionBar
+              selectedCount={selectedItemIds.size}
+              onMarkRead={handleBatchMarkRead}
+              onMarkUnread={handleBatchMarkUnread}
+              onArchive={handleBatchArchive}
+              onClear={() => setSelectedItemIds(new Set())}
+            />
+            {selectedItemIds.size === 0 && (
               <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 shrink-0">
                 <div className="flex items-center gap-2">
                   <input
@@ -1626,31 +1645,69 @@ export function CommsHub({
 
             {/* SUB-VIEW 2: CALL HISTORY */}
             {callsSubTab === 'history' && (
-              <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 p-3 overflow-y-auto space-y-2.5">
-                {interactions.filter((item) => item.type.startsWith('call_')).map((call) => {
-                  const isCallPlaying = playingCallId === call.id;
-                  const isMissed = call.type === 'call_missed';
-                  const isOutbound = call.type === 'call_outbound';
+              <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-y-auto">
+                <CommsBatchActionBar
+                  selectedCount={selectedItemIds.size}
+                  onMarkRead={handleBatchMarkRead}
+                  onMarkUnread={handleBatchMarkUnread}
+                  onArchive={handleBatchArchive}
+                  onClear={() => setSelectedItemIds(new Set())}
+                />
+                <div className="p-3 space-y-2.5">
+                  {interactions.filter((item) => item.type.startsWith('call_')).map((call) => {
+                    const isCallPlaying = playingCallId === call.id;
+                    const isMissed = call.type === 'call_missed';
+                    const isOutbound = call.type === 'call_outbound';
+                    const isRowSelected = selectedItemIds.has(call.id);
 
-                  return (
-                    <div
-                      key={call.id}
-                      className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-all space-y-2"
-                    >
-                      {/* Caller Header */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                              isMissed
-                                ? 'bg-rose-100 text-rose-600'
-                                : isOutbound
-                                ? 'bg-blue-100 text-blue-600'
-                                : 'bg-emerald-100 text-emerald-600'
-                            }`}
-                          >
-                            <PhoneIcon className="w-3.5 h-3.5" />
-                          </div>
+                    return (
+                      <div
+                        key={call.id}
+                        onClick={() => handleToggleSelectRow(call.id)}
+                        className={`p-3 rounded-2xl border transition-all space-y-2 border-l-4 cursor-pointer ${
+                          isRowSelected
+                            ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                            : call.isUnread
+                            ? 'bg-blue-50/70 hover:bg-blue-100/60 border-blue-200 border-l-blue-600 font-semibold'
+                            : 'bg-white hover:bg-slate-50 border-slate-200 border-l-transparent text-slate-700'
+                        }`}
+                      >
+                        {/* Caller Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleSelectRow(call.id);
+                              }}
+                              className="flex items-center gap-1.5 shrink-0"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isRowSelected}
+                                onChange={() => {}}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              {call.isUnread ? (
+                                <span
+                                  className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                                  title="Unread call"
+                                />
+                              ) : (
+                                <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
+                              )}
+                            </div>
+                            <div
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                                isMissed
+                                  ? 'bg-rose-100 text-rose-600'
+                                  : isOutbound
+                                  ? 'bg-blue-100 text-blue-600'
+                                  : 'bg-emerald-100 text-emerald-600'
+                              }`}
+                            >
+                              <PhoneIcon className="w-3.5 h-3.5" />
+                            </div>
                           <div className="min-w-0">
                             <h4 className="font-bold text-xs text-slate-900 truncate">
                               {call.contactName}
@@ -1751,53 +1808,93 @@ export function CommsHub({
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
 
             {/* SUB-VIEW 3: MISSED CALLS INBOX */}
             {callsSubTab === 'missed' && (
-              <div className="flex-1 flex flex-col p-4 bg-white overflow-y-auto space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div>
-                    <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
-                      <span>Missed Inbound Calls</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
-                  </div>
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                    {interactions.filter((item) => item.type === 'call_missed').length} Missed
-                  </span>
-                </div>
-
-                {interactions.filter((item) => item.type === 'call_missed').length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 space-y-2">
-                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg">
-                      ✓
+              <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+                <CommsBatchActionBar
+                  selectedCount={selectedItemIds.size}
+                  onMarkRead={handleBatchMarkRead}
+                  onMarkUnread={handleBatchMarkUnread}
+                  onArchive={handleBatchArchive}
+                  onClear={() => setSelectedItemIds(new Set())}
+                />
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div>
+                      <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                        <span>Missed Inbound Calls</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
                     </div>
-                    <p className="text-xs font-bold text-slate-600">No Missed Calls</p>
-                    <p className="text-[11px]">All incoming call attempts have been answered or resolved.</p>
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      {interactions.filter((item) => item.type === 'call_missed').length} Missed
+                    </span>
                   </div>
-                ) : (
-                  interactions.filter((item) => item.type === 'call_missed').map((call) => (
-                    <div
-                      key={call.id}
-                      className="p-3 bg-white border border-rose-200/90 rounded-2xl shadow-2xs hover:shadow-sm transition-all space-y-2.5 bg-gradient-to-r from-rose-50/30 to-white"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
-                            <PhoneIcon className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-bold text-xs text-slate-900 truncate">
-                              {call.contactName}
-                            </h4>
-                            <p className="text-[11px] text-slate-600 font-mono font-medium">
-                              {call.contactPhone}
-                            </p>
-                          </div>
-                        </div>
+
+                  {interactions.filter((item) => item.type === 'call_missed').length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 space-y-2">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg">
+                        ✓
+                      </div>
+                      <p className="text-xs font-bold text-slate-600">No Missed Calls</p>
+                      <p className="text-[11px]">All incoming call attempts have been answered or resolved.</p>
+                    </div>
+                  ) : (
+                    interactions.filter((item) => item.type === 'call_missed').map((call) => {
+                      const isRowSelected = selectedItemIds.has(call.id);
+                      return (
+                        <div
+                          key={call.id}
+                          onClick={() => handleToggleSelectRow(call.id)}
+                          className={`p-3 rounded-2xl border transition-all space-y-2.5 border-l-4 cursor-pointer ${
+                            isRowSelected
+                              ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                              : call.isUnread
+                              ? 'bg-blue-50/70 hover:bg-blue-100/60 border-rose-200 border-l-blue-600 font-semibold'
+                              : 'bg-white hover:bg-slate-50 border-rose-100 border-l-transparent text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSelectRow(call.id);
+                                }}
+                                className="flex items-center gap-1.5 shrink-0"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isRowSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                {call.isUnread ? (
+                                  <span
+                                    className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                                    title="Unread missed call"
+                                  />
+                                ) : (
+                                  <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
+                                )}
+                              </div>
+                              <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
+                                <PhoneIcon className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-slate-900 truncate">
+                                  {call.contactName}
+                                </h4>
+                                <p className="text-[11px] text-slate-600 font-mono font-medium">
+                                  {call.contactPhone}
+                                </p>
+                              </div>
+                            </div>
                         <div className="text-right shrink-0">
                           <span className="text-[10px] text-slate-500 font-medium block">
                             {call.timestamp}
@@ -1833,37 +1930,83 @@ export function CommsHub({
                         </button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
           </div>
         )}
 
         {/* VIEW 4: VOICEMAIL INBOX */}
         {activeTab === 'voicemail' && (
-          <div className="flex-1 flex flex-col min-w-0 bg-white p-4 overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900">Voicemail Inbox</h3>
-                <p className="text-xs text-slate-500">Audio playback and automated booking transcripts</p>
+          <div className="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto">
+            <CommsBatchActionBar
+              selectedCount={selectedItemIds.size}
+              onMarkRead={handleBatchMarkRead}
+              onMarkUnread={handleBatchMarkUnread}
+              onArchive={handleBatchArchive}
+              onClear={() => setSelectedItemIds(new Set())}
+            />
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">Voicemail Inbox</h3>
+                  <p className="text-xs text-slate-500">Audio playback and automated booking transcripts</p>
+                </div>
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                  {filteredInteractions.filter((i) => i.type === 'voicemail' && i.isUnread).length} New Voicemail
+                </span>
               </div>
-              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                1 New Voicemail
-              </span>
-            </div>
 
-            {filteredInteractions
-              .filter((i) => i.type === 'voicemail')
-              .map((vm) => (
-                <div key={vm.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-black text-xs text-slate-900 block">{vm.contactName}</span>
-                      <span className="text-[11px] font-mono text-slate-600">{vm.contactPhone}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium">{vm.timestamp}</span>
-                  </div>
+              {filteredInteractions
+                .filter((i) => i.type === 'voicemail')
+                .map((vm) => {
+                  const isRowSelected = selectedItemIds.has(vm.id);
+                  return (
+                    <div
+                      key={vm.id}
+                      onClick={() => handleToggleSelectRow(vm.id)}
+                      className={`p-4 rounded-2xl border space-y-3 border-l-4 cursor-pointer transition-all ${
+                        isRowSelected
+                          ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                          : vm.isUnread
+                          ? 'bg-amber-50/60 border-amber-200 border-l-blue-600 font-semibold'
+                          : 'bg-white border-amber-200/80 border-l-transparent text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSelectRow(vm.id);
+                            }}
+                            className="flex items-center gap-1.5 shrink-0"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isRowSelected}
+                              onChange={() => {}}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            {vm.isUnread ? (
+                              <span
+                                className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                                title="Unread voicemail"
+                              />
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-black text-xs text-slate-900 block">{vm.contactName}</span>
+                            <span className="text-[11px] font-mono text-slate-600">{vm.contactPhone}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-medium">{vm.timestamp}</span>
+                      </div>
 
                   {/* Audio Controls */}
                   <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-amber-200">
@@ -1925,13 +2068,23 @@ export function CommsHub({
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
+            </div>
           </div>
         )}
 
         {/* VIEW 5: MESSAGING LIST */}
         {activeTab === 'messages' && !selectedContactPhone && (
-          <div className="flex-1 flex flex-col min-w-0 bg-white divide-y divide-slate-100 overflow-y-auto">
+          <div className="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto">
+            <CommsBatchActionBar
+              selectedCount={selectedItemIds.size}
+              onMarkRead={handleBatchMarkRead}
+              onMarkUnread={handleBatchMarkUnread}
+              onArchive={handleBatchArchive}
+              onClear={() => setSelectedItemIds(new Set())}
+            />
+            <div className="divide-y divide-slate-100">
             {filteredInteractions
               .filter((i) => i.type.startsWith('sms_'))
               .map((sms) => {
@@ -2049,6 +2202,7 @@ export function CommsHub({
                   </div>
                 );
               })}
+            </div>
           </div>
         )}
       </div>

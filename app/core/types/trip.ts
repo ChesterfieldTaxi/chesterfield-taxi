@@ -179,13 +179,39 @@ export interface TripStatusHistoryEntry {
   reason?: string;
 }
 
+export interface TripFieldDiff {
+  field: string;
+  label: string;
+  oldValue: any;
+  newValue: any;
+}
+
 export interface TripAuditEvent {
-  action: 'TRIP_REQUESTED' | 'AUTO_CONFIRMED' | 'FLAGGED_FOR_HUMAN_REVIEW' | 'DISPATCH_OFFERED' | 'DRIVER_ACCEPTED' | 'STATUS_CHANGED' | 'TRIP_COMPLETED' | 'TRIP_CANCELED' | 'SCORE_UPDATED' | 'BLACK_LISTED';
+  action:
+    | 'TRIP_REQUESTED'
+    | 'AUTO_CONFIRMED'
+    | 'FLAGGED_FOR_HUMAN_REVIEW'
+    | 'DISPATCH_OFFERED'
+    | 'DRIVER_ACCEPTED'
+    | 'DRIVER_DECLINED'
+    | 'STATUS_CHANGED'
+    | 'TRIP_MODIFIED'
+    | 'TRIP_COMPLETED'
+    | 'TRIP_CANCELED'
+    | 'SCORE_UPDATED'
+    | 'BLACK_LISTED'
+    | 'CALL_LOGGED'
+    | 'SMS_LOGGED'
+    | 'EMAIL_LOGGED';
   timestamp: string; // ISO 8601
   actorId?: string;
   actorRole?: 'system' | 'passenger' | 'driver' | 'admin' | 'dispatcher';
   matchedRuleId?: string;
   context?: string;
+  referenceNumber?: string; // e.g. TEL-9481, SMS-3810, EML-1092, OFR-4019, DEC-2918
+  referenceType?: 'call' | 'sms' | 'email' | 'offer' | 'decline' | 'lifecycle' | 'edit';
+  fieldChanges?: TripFieldDiff[];
+  notes?: string;
 }
 
 export interface TripAssignedVehicle {

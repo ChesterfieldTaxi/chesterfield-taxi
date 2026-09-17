@@ -1123,6 +1123,12 @@ export function DispatchBookingEngine({
     onClearDraft?.();
   };
 
+  const handleConfirmClear = () => {
+    if (window.confirm('Are you sure you want to clear this booking form? All unsaved inputs will be reset.')) {
+      handleClear();
+    }
+  };
+
   // Clone current booking data into a new draft tab
   const handleCloneBooking = () => {
     const clonedValues: DispatchFormValues = {
@@ -2868,7 +2874,7 @@ export function DispatchBookingEngine({
             <button
               type="button"
               onClick={handleCloneBooking}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Create a new draft tab pre-populated with these trip details"
             >
               <span>📋</span>
@@ -2877,8 +2883,9 @@ export function DispatchBookingEngine({
           ) : (
             <button
               type="button"
-              onClick={handleClear}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors"
+              onClick={handleConfirmClear}
+              className="px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
+              title="Clear all booking inputs"
             >
               Clear
             </button>
@@ -2887,15 +2894,19 @@ export function DispatchBookingEngine({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+            className={`rounded-xl font-black text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer ${
+              isEditMode
+                ? 'px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-xs'
+                : 'px-6 py-2 bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 text-sm active:scale-95'
+            }`}
           >
             {isSubmitting ? (
               <>
-                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                <SpinnerIcon className="w-4 h-4 animate-spin" />
                 <span>Saving...</span>
               </>
             ) : (
-              <span>{isEditMode ? 'Update Booking' : 'Book Trip'}</span>
+              <span>{isEditMode ? 'Update Booking' : 'Book'}</span>
             )}
           </button>
         </div>

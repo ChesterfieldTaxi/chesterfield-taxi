@@ -45,6 +45,11 @@ import {
   DollarSignIcon,
   BuildingIcon,
   HistoryIcon,
+  PawPrintIcon,
+  WheelchairIcon,
+  VolumeXIcon,
+  MusicNoteIcon,
+  DevicePhoneMobileIcon,
 } from '../ui/Icons';
 import { StripePaymentInput } from './payments/StripePaymentInput';
 
@@ -2479,10 +2484,10 @@ export function BookingEngineV2({
               {/* Special Requests Chips */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { key: 'petFriendly', label: 'Pet-Friendly', icon: '🐾' },
-                  { key: 'wheelchair', label: 'WAV Ramp', icon: '♿' },
-                  { key: 'quietRide', label: 'Quiet Ride', icon: '🤫' },
-                  { key: 'musicOk', label: 'Music OK', icon: '🎵' },
+                  { key: 'petFriendly', label: 'Pet-Friendly', Icon: PawPrintIcon },
+                  { key: 'wheelchair', label: 'WAV Ramp', Icon: WheelchairIcon },
+                  { key: 'quietRide', label: 'Quiet Ride', Icon: VolumeXIcon },
+                  { key: 'musicOk', label: 'Music OK', Icon: MusicNoteIcon },
                 ].map((item) => (
                   <button
                     key={item.key}
@@ -2494,7 +2499,7 @@ export function BookingEngineV2({
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    <span>{item.icon}</span>
+                    <item.Icon className="w-3.5 h-3.5 shrink-0" />
                     <span>{item.label}</span>
                   </button>
                 ))}
@@ -2593,26 +2598,28 @@ export function BookingEngineV2({
                     <button
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, cardPaymentType: 'terminal' }))}
-                      className={`flex-1 py-1 text-center rounded-md text-xs font-bold transition-all ${
-                        form.cardPaymentType === 'terminal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                      className={`flex-1 py-1.5 px-2 text-center rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        form.cardPaymentType === 'terminal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      💳 Pay in Vehicle (Contactless / Chip Terminal)
+                      <CreditCardIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Pay in Vehicle (Contactless / Chip Terminal)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, cardPaymentType: 'manual' }))}
-                      className={`flex-1 py-1 text-center rounded-md text-xs font-bold transition-all ${
-                        form.cardPaymentType === 'manual' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                      className={`flex-1 py-1.5 px-2 text-center rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        form.cardPaymentType === 'manual' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      📝 Pre-authorize Card
+                      <ShieldCheckIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                      <span>Pre-authorize Card</span>
                     </button>
                   </div>
 
                   {form.cardPaymentType === 'terminal' ? (
                     <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded border border-slate-200 flex items-center gap-2">
-                      <span className="text-base text-blue-600">🛡</span>
+                      <ShieldCheckIcon className="w-4 h-4 text-blue-600 shrink-0" />
                       <span>Pay securely inside the vehicle upon arrival using Apple Pay, Google Pay, or any major credit/debit card. No payment is charged upfront.</span>
                     </div>
                   ) : (
