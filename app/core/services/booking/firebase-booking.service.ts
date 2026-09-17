@@ -330,11 +330,25 @@ export class FirebaseBookingService implements IBookingService {
         : 'Booking auto-confirmed by rules engine',
     };
 
-    const auditEvent = {
+    const meta = (payload.metadata || {}) as Record<string, any>;
+    const channel = (meta.channel || (meta.createdByRole === 'dispatcher' ? 'dispatch' : 'web')) as 'web' | 'app' | 'dispatch' | 'email' | 'phone';
+    const bookedByName = meta.bookedByName || (meta.createdByRole === 'dispatcher' ? 'Dispatcher Console' : payload.passenger?.firstName ? `${payload.passenger.firstName} ${payload.passenger.lastName || ''}`.trim() : 'Online Passenger');
+    const bookedByRole = (meta.createdByRole || 'passenger') as 'passenger' | 'dispatcher' | 'admin' | 'system';
+    const bkgRef = (meta.referenceNumber as string) || `BKG-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const auditEvent: TripAuditEvent = {
       action: initialStatus === 'CONFIRMED' ? 'AUTO_CONFIRMED' : 'TRIP_REQUESTED',
       timestamp: now,
-      actorRole: 'passenger',
-      context: initialHistoryEntry.reason
+      actorRole: bookedByRole,
+      referenceNumber: bkgRef,
+      referenceType: 'booking',
+      bookingChannel: channel,
+      bookedBy: {
+        name: bookedByName,
+        role: bookedByRole,
+        email: payload.passenger?.email,
+      },
+      context: `Initial reservation received via ${channel.toUpperCase()} intake by ${bookedByName} (${payload.passenger?.email || 'no email'}). ${initialHistoryEntry.reason}`,
     };
 
     const newTrip: Trip = {
@@ -345,7 +359,7 @@ export class FirebaseBookingService implements IBookingService {
       rejectedByIds: [],
       assignedDriverId: null,
       statusHistory: [initialHistoryEntry],
-      auditLog: [auditEvent as any],
+      auditLog: [auditEvent],
       createdAt: now,
       updatedAt: now,
     };
@@ -773,10 +787,45 @@ export class FirebaseBookingService implements IBookingService {
 
     if (status === 'completed') {
       updates.completedAt = now;
+      if (trip.payment?.method === 'account' || trip.payment?.method === 'corporate') {
+        try {
+          const { getInvoicingService } = await import('../invoicing.service');
+          await getInvoicingService().handleCorporateTripCompleted({
+            ...trip,
+            ...updates,
+          } as Trip);
+          updates.payment = {
+            ...(trip.payment || { method: 'account', amount: trip.pricing?.totalFare || 0 }),
+            status: 'pending_invoice',
+          };
+          updates.auditLog?.push({
+            action: 'INVOICE_GENERATED',
+            timestamp: now,
+            actorRole: 'system',
+            referenceNumber: `AR-${Math.floor(1000 + Math.random() * 9000)}`,
+            referenceType: 'invoice',
+            context: 'Trip marked completed. Corporate account credit confirmed; unbilled itemized transaction logged in AR ledger (status: pending_invoice).',
+          });
+        } catch (invErr) {
+          console.warn('[FirebaseBookingService] Corporate invoicing hook error:', invErr);
+        }
+      }
     } else if (status === 'cancelled') {
       updates.cancelledAt = now;
       updates.cancellationReason = options?.reason ?? '';
       updates.cancelledBy = options?.actorRole ?? 'admin';
+    } else if (trip.status === 'cancelled') {
+      updates.cancelledAt = undefined;
+      updates.cancellationReason = undefined;
+      updates.cancelledBy = undefined;
+      updates.auditLog?.push({
+        action: 'TRIP_REACTIVATED',
+        timestamp: now,
+        actorRole: options?.actorRole ?? 'dispatcher',
+        referenceNumber: `RCT-${Math.floor(1000 + Math.random() * 9000)}`,
+        referenceType: 'lifecycle',
+        context: `Trip reactivated from cancelled state back to active status (${status}). ${options?.reason || ''}`,
+      });
     }
 
     const updatedTrip: Trip = {

@@ -30,8 +30,11 @@ export default [
   route("dispatch", "routes/dispatch.tsx"),
   route("dispatch/popout", "routes/dispatch.popout.tsx"),
 
-  // Transactional Email Gateway Route (Server Action)
+  // Serverless API Routes
   route("api/send-email", "routes/api.send-email.ts"),
   route("api/seed-stress-data", "routes/api.seed-stress-data.tsx"),
+  route("api/payments", "routes/api.payments.ts"),
+  route("api/telephony", "routes/api.telephony.ts"),
+  route("api/telephony/verify", "routes/api.telephony.verify.ts"),
 ] satisfies RouteConfig;
 

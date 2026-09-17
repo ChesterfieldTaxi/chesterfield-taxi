@@ -87,6 +87,28 @@ export interface CorporateBatchBillingResult {
   invoiceIds: string[];
 }
 
+export interface CorporateUnbilledTransaction {
+  id: string;
+  tripId: string;
+  corporateAccountId: string;
+  corporateAccountName: string;
+  accountNumber?: string;
+  passengerName: string;
+  passengerPhone?: string;
+  pickupDate: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  baseFare: number;
+  gratuity: number;
+  tolls: number;
+  waitTimeFee: number;
+  discountAmount: number;
+  totalAmount: number;
+  status: 'unbilled' | 'pending_invoice' | 'invoiced' | 'paid' | 'settled';
+  invoiceId?: string;
+  createdAt: string;
+}
+
 export interface IInvoicingService {
   /**
    * Generates a printable PDF data structure and print layout for an invoice.
@@ -101,6 +123,33 @@ export interface IInvoicingService {
     corporateAccountId: string,
     unbilledTrips: Trip[]
   ): Promise<InvoiceRecord | null>;
+
+  /**
+   * Generates a consolidated invoice from specific selected unbilled corporate transactions.
+   */
+  generateInvoiceFromUnbilled(
+    corporateAccountId: string,
+    unbilledTransactions: CorporateUnbilledTransaction[]
+  ): Promise<InvoiceRecord | null>;
+
+  /**
+   * Records a completed corporate account trip into the unbilled AR queue
+   * and verifies credit availability.
+   */
+  handleCorporateTripCompleted(
+    trip: Trip,
+    corporateAccount?: CorporateAccountConfig
+  ): Promise<CorporateUnbilledTransaction | null>;
+
+  /**
+   * Retrieves all corporate unbilled transactions, optionally filtered by corporateAccountId.
+   */
+  getUnbilledTransactions(corporateAccountId?: string): Promise<CorporateUnbilledTransaction[]>;
+
+  /**
+   * Marks an issued invoice as paid / settled and records corresponding ledger entries.
+   */
+  markInvoicePaid(invoiceId: string): Promise<InvoiceRecord | null>;
 
   /**
    * Records a balanced transaction entry into the financial ledger.

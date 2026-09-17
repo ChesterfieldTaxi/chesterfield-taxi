@@ -150,8 +150,8 @@ export interface TripPricing {
   driverExtrasTotal?: number;
 }
 
-export type PaymentMethod = 'card' | 'cash' | 'corporate';
-export type PaymentStatus = 'pending' | 'authorized' | 'captured' | 'failed' | 'refunded';
+export type PaymentMethod = 'card' | 'cash' | 'corporate' | 'account';
+export type PaymentStatus = 'pending' | 'authorized' | 'captured' | 'failed' | 'refunded' | 'pending_invoice' | 'invoiced' | 'settled';
 
 export interface TripPayment {
   method: PaymentMethod;
@@ -163,7 +163,11 @@ export interface TripPayment {
   paymentIntentId?: string;
   vaultedCardId?: string;
   preAuthHoldAmount?: number;
+  // Gratuity, Tolls, Wait Time for corporate itemization
   tipAmount?: number;
+  tollsAmount?: number;
+  waitTimeAmount?: number;
+  corporateAccountId?: string;
   driverPayoutId?: string;
   payoutStatus?: 'pending' | 'settled' | 'withheld';
   cardBrand?: string;
@@ -198,6 +202,10 @@ export interface TripAuditEvent {
     | 'TRIP_MODIFIED'
     | 'TRIP_COMPLETED'
     | 'TRIP_CANCELED'
+    | 'TRIP_REACTIVATED'
+    | 'TRIP_COPIED'
+    | 'INVOICE_GENERATED'
+    | 'PAYMENT_SETTLED'
     | 'SCORE_UPDATED'
     | 'BLACK_LISTED'
     | 'CALL_LOGGED'
@@ -208,8 +216,15 @@ export interface TripAuditEvent {
   actorRole?: 'system' | 'passenger' | 'driver' | 'admin' | 'dispatcher';
   matchedRuleId?: string;
   context?: string;
-  referenceNumber?: string; // e.g. TEL-9481, SMS-3810, EML-1092, OFR-4019, DEC-2918
-  referenceType?: 'call' | 'sms' | 'email' | 'offer' | 'decline' | 'lifecycle' | 'edit';
+  referenceNumber?: string; // e.g. TEL-9481, SMS-3810, EML-1092, OFR-4019, DEC-2918, BKG-1920, INV-4019
+  referenceType?: 'call' | 'sms' | 'email' | 'offer' | 'decline' | 'lifecycle' | 'edit' | 'booking' | 'invoice' | 'payment';
+  bookingChannel?: 'web' | 'app' | 'dispatch' | 'email' | 'phone';
+  bookedBy?: {
+    name?: string;
+    email?: string;
+    role?: string;
+    ip?: string;
+  };
   fieldChanges?: TripFieldDiff[];
   notes?: string;
 }
@@ -271,6 +286,10 @@ export interface Trip {
 
   /** Operational Trip Complexity Flags */
   hasReturnTrip?: boolean;
+  linkedTripId?: string;
+  linkedReturnTripId?: string;
+  isReturnRide?: boolean;
+  returnScheduledPickupTime?: string;
   hasSeparateContactPerson?: boolean;
   contactPerson?: { name: string; phone: string; email?: string };
   multipleVehiclesRequested?: boolean;

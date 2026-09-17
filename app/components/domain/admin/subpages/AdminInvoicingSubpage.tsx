@@ -9,6 +9,7 @@ import type {
   FinancialLedgerEntry,
   AccountingExportFormat,
   PrintableInvoiceData,
+  CorporateUnbilledTransaction,
 } from '../../../../core/types/invoicing';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
@@ -159,6 +160,26 @@ export function AdminInvoicingSubpage({
   const [isExporting, setIsExporting] = useState(false);
   const [printableData, setPrintableData] = useState<PrintableInvoiceData | null>(null);
 
+  // Accounts Receivable (AR) & Corporate Invoicing State
+  const [unbilledTransactions, setUnbilledTransactions] = useState<CorporateUnbilledTransaction[]>([]);
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+  const [arFilter, setArFilter] = useState<'all' | 'unbilled' | 'invoiced' | 'settled'>('all');
+  const [ledgerViewMode, setLedgerViewMode] = useState<'ar_ledger' | 'invoices'>('ar_ledger');
+
+  const fetchUnbilled = async () => {
+    try {
+      const invoicingService = getInvoicingService();
+      const txs = await invoicingService.getUnbilledTransactions();
+      setUnbilledTransactions(txs);
+    } catch (err) {
+      console.error('Failed to load corporate AR transactions:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnbilled();
+  }, [activeSub]);
+
   useEffect(() => {
     const fetchLedger = async () => {
       const invoicingService = getInvoicingService();
@@ -237,12 +258,162 @@ export function AdminInvoicingSubpage({
     }
   };
 
-  // Summary Metrics
+  // Summary Metrics: AR & Aging Analytics
+  const totalUnbilledAR = unbilledTransactions
+    .filter((tx) => tx.status === 'unbilled' || tx.status === 'pending_invoice')
+    .reduce((sum, tx) => sum + tx.totalAmount, 0);
+  const unbilledCount = unbilledTransactions.filter(
+    (tx) => tx.status === 'unbilled' || tx.status === 'pending_invoice'
+  ).length;
+
+  const nowMs = Date.now();
+  const overdue30DaysInvoices = invoices.filter((inv) => {
+    if (inv.status === 'paid') return false;
+    const issuedMs = new Date(inv.issuedDate).getTime();
+    const daysSinceIssue = (nowMs - issuedMs) / (1000 * 60 * 60 * 24);
+    return daysSinceIssue > 30 || inv.status === 'overdue';
+  });
+  const totalOverdue30Days = overdue30DaysInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const settledThisMonthInvoices = invoices.filter(
+    (inv) =>
+      inv.status === 'paid' &&
+      (inv.paidDate ? inv.paidDate.startsWith(currentMonthStr) : inv.issuedDate.startsWith(currentMonthStr))
+  );
+  const settledRevenueThisMonth = settledThisMonthInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
   const totalPaid = invoices
     .filter((inv) => inv.status === 'paid')
     .reduce((sum, inv) => sum + inv.totalAmount, 0);
   const totalOutstanding = totalInvoiced - totalPaid;
+
+  const handleGenerateInvoiceFromAR = async (targetTxs?: CorporateUnbilledTransaction[]) => {
+    try {
+      setIsSaving(true);
+      const pool = targetTxs || (selectedTxIds.length > 0
+        ? unbilledTransactions.filter((tx) => selectedTxIds.includes(tx.id))
+        : unbilledTransactions.filter((tx) => tx.status === 'unbilled' || tx.status === 'pending_invoice'));
+
+      if (pool.length === 0) {
+        setSaveSuccessMessage('No unbilled corporate transactions selected.');
+        setTimeout(() => setSaveSuccessMessage(null), 3000);
+        return;
+      }
+
+      const invoicingService = getInvoicingService();
+      const corpId = pool[0].corporateAccountId;
+      const newInv = await invoicingService.generateInvoiceFromUnbilled(corpId, pool);
+      if (newInv) {
+        const updatedInvoices = [newInv, ...invoices];
+        await onSave({ invoices: updatedInvoices });
+        await fetchUnbilled();
+        setSelectedTxIds([]);
+        setSelectedInvoice(newInv);
+        setSaveSuccessMessage(`Successfully generated ${newInv.invoiceNumber} covering ${pool.length} corporate trips.`);
+        setTimeout(() => setSaveSuccessMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Failed to generate invoice from AR:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMarkARPaidSettled = async (targetTxIds?: string[]) => {
+    try {
+      setIsSaving(true);
+      const idsToSettle = targetTxIds || selectedTxIds;
+      if (idsToSettle.length === 0) {
+        setSaveSuccessMessage('Please select one or more transactions to settle.');
+        setTimeout(() => setSaveSuccessMessage(null), 3000);
+        return;
+      }
+      const invoicingService = getInvoicingService();
+      setUnbilledTransactions((prev) =>
+        prev.map((t) => (idsToSettle.includes(t.id) ? { ...t, status: 'settled' as const } : t))
+      );
+      const linkedInvoiceIds = unbilledTransactions
+        .filter((t) => idsToSettle.includes(t.id) && t.invoiceId)
+        .map((t) => t.invoiceId as string);
+
+      for (const invId of linkedInvoiceIds) {
+        await invoicingService.markInvoicePaid(invId);
+      }
+      if (linkedInvoiceIds.length > 0) {
+        const updated = invoices.map((inv) =>
+          linkedInvoiceIds.includes(inv.id)
+            ? { ...inv, status: 'paid' as const, paidDate: new Date().toISOString().slice(0, 10) }
+            : inv
+        );
+        await onSave({ invoices: updated });
+      }
+      setSelectedTxIds([]);
+      setSaveSuccessMessage(`Marked ${idsToSettle.length} transaction(s) as Settled / Paid.`);
+      setTimeout(() => setSaveSuccessMessage(null), 3500);
+    } catch (err) {
+      console.error('Failed to settle transactions:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExportARForQuickBooks = () => {
+    try {
+      const txsToExport = unbilledTransactions.filter((tx) =>
+        arFilter === 'all' ? true : tx.status === arFilter
+      );
+      const headers = [
+        'Transaction Date',
+        'Account Number',
+        'Corporate Client',
+        'Passenger Name',
+        'Pickup Address',
+        'Dropoff Address',
+        'Base Fare',
+        'Gratuity',
+        'Tolls',
+        'Wait Time',
+        'Discount',
+        'Net Total',
+        'Status',
+        'Invoice Number',
+        'QuickBooks Account Code',
+      ];
+      const rows = txsToExport.map((t) => [
+        t.pickupDate,
+        `"${t.accountNumber || ''}"`,
+        `"${t.corporateAccountName || ''}"`,
+        `"${t.passengerName || ''}"`,
+        `"${(t.pickupAddress || '').replace(/"/g, '""')}"`,
+        `"${(t.dropoffAddress || '').replace(/"/g, '""')}"`,
+        t.baseFare.toFixed(2),
+        t.gratuity.toFixed(2),
+        t.tolls.toFixed(2),
+        t.waitTimeFee.toFixed(2),
+        t.discountAmount.toFixed(2),
+        t.totalAmount.toFixed(2),
+        t.status,
+        t.invoiceId || 'Unbilled',
+        '1200-AccountsReceivable',
+      ]);
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `QuickBooks_AR_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setSaveSuccessMessage(`Exported ${txsToExport.length} transactions for QuickBooks AR.`);
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Export QuickBooks CSV error:', err);
+    }
+  };
 
   const handleAddCorporateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -657,111 +828,454 @@ export function AdminInvoicingSubpage({
       )}
 
       {/* ─── Metric KPI Badges ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Total Invoiced (All-Time)
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Unbilled AR */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
+              Total Unbilled AR
+            </span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
+              Pending Statement
+            </span>
+          </div>
+          <span className="text-2xl font-black text-slate-900 mt-1 block">
+            ${totalUnbilledAR.toFixed(2)}
           </span>
-          <span className="text-xl font-black text-slate-900 mt-1 block">
+          <span className="text-xs text-slate-500 font-medium">
+            {unbilledCount} unbilled corporate ride{unbilledCount === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        {/* Card 2: Outstanding Invoices (>30 Days) */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">
+              Outstanding Invoices (&gt;30 Days)
+            </span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+              Aging AR
+            </span>
+          </div>
+          <span className="text-2xl font-black text-rose-600 mt-1 block">
+            ${totalOverdue30Days.toFixed(2)}
+          </span>
+          <span className="text-xs text-slate-500 font-medium">
+            {overdue30DaysInvoices.length} invoice{overdue30DaysInvoices.length === 1 ? '' : 's'} past 30 days
+          </span>
+        </div>
+
+        {/* Card 3: Settled Revenue This Month */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
+              Settled Revenue This Month
+            </span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Reconciled
+            </span>
+          </div>
+          <span className="text-2xl font-black text-emerald-600 mt-1 block">
+            ${settledRevenueThisMonth.toFixed(2)}
+          </span>
+          <span className="text-xs text-slate-500 font-medium">
+            {settledThisMonthInvoices.length} corporate statement{settledThisMonthInvoices.length === 1 ? '' : 's'} collected
+          </span>
+        </div>
+
+        {/* Card 4: Total Invoiced (All-Time) */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+              Total Invoiced (All-Time)
+            </span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+              Gross Invoiced
+            </span>
+          </div>
+          <span className="text-2xl font-black text-slate-900 mt-1 block">
             ${totalInvoiced.toFixed(2)}
           </span>
-          <span className="text-xs text-slate-500">{invoices.length} total generated statements</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-            Collected Revenue
+          <span className="text-xs text-slate-500 font-medium">
+            {invoices.length} statements (${totalPaid.toFixed(2)} paid)
           </span>
-          <span className="text-xl font-black text-emerald-600 mt-1 block">
-            ${totalPaid.toFixed(2)}
-          </span>
-          <span className="text-xs text-slate-500">Paid and reconciled</span>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
-            Outstanding / Net Accounts
-          </span>
-          <span className="text-xl font-black text-amber-600 mt-1 block">
-            ${totalOutstanding.toFixed(2)}
-          </span>
-          <span className="text-xs text-slate-500">Awaiting payment reconciliation</span>
         </div>
       </div>
 
-      {/* ─── Sub-View: Invoicing Ledger ─── */}
+      {/* ─── Sub-View: Invoicing & Accounts Receivable Ledger ─── */}
       {activeSub === 'ledger' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar min-w-full">
-            <table className="w-full text-left text-xs min-w-[750px]">
-              <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Invoice #</th>
-                  <th className="px-4 py-3">Client / Organization</th>
-                  <th className="px-4 py-3">Issued Date</th>
-                  <th className="px-4 py-3">Due Date</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-900">
-                      {inv.invoiceNumber}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-bold text-slate-800 block">{inv.customerName}</span>
-                      <span className="text-[11px] text-slate-500">{inv.customerEmail}</span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{inv.issuedDate}</td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{inv.dueDate}</td>
-                    <td className="px-4 py-3 font-black text-slate-900 whitespace-nowrap">
-                      ${inv.totalAmount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <Badge
-                        variant={
-                          inv.status === 'paid'
-                            ? 'success'
-                            : inv.status === 'overdue'
-                            ? 'error'
-                            : 'warning'
-                        }
-                        size="sm"
-                        className="font-bold uppercase text-[10px]"
-                      >
-                        {inv.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {inv.status !== 'paid' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
-                            className="text-[10px] px-2 py-1 text-emerald-700 bg-emerald-50 border-emerald-300 font-bold"
-                          >
-                            Mark Paid
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold"
-                        >
-                          View
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="space-y-4">
+          {/* Sub-view toggle & Batch Action Toolbar */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            {/* View Mode Pill Switcher */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setLedgerViewMode('ar_ledger')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  ledgerViewMode === 'ar_ledger'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                AR Ledger &amp; Unbilled Trips ({unbilledTransactions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLedgerViewMode('invoices')}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  ledgerViewMode === 'invoices'
+                    ? 'bg-white text-blue-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Generated Statements &amp; Invoices ({invoices.length})
+              </button>
+            </div>
+
+            {/* AR Actions (when in ar_ledger mode) */}
+            {ledgerViewMode === 'ar_ledger' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportARForQuickBooks}
+                  leftIcon={<DownloadIcon className="w-3.5 h-3.5 text-slate-600" />}
+                  className="text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300 hover:bg-slate-50 shadow-xs cursor-pointer"
+                >
+                  Export CSV for QuickBooks
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSaving || (selectedTxIds.length === 0 && unbilledCount === 0)}
+                  onClick={() => handleMarkARPaidSettled()}
+                  leftIcon={<CheckIcon className="w-3.5 h-3.5 text-emerald-600" />}
+                  className="text-xs font-bold text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 shadow-xs cursor-pointer"
+                >
+                  Mark as Paid / Settled {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSaving || (selectedTxIds.length === 0 && unbilledCount === 0)}
+                  onClick={() => handleGenerateInvoiceFromAR()}
+                  leftIcon={<FileTextIcon className="w-3.5 h-3.5 text-white" />}
+                  className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm cursor-pointer"
+                >
+                  Generate PDF Invoice {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}
+                </Button>
+              </div>
+            )}
+
+            {/* Invoices Actions (when in invoices mode) */}
+            {ledgerViewMode === 'invoices' && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setIsNewInvoiceModalOpen(true)}
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+              >
+                Create Direct Invoice
+              </Button>
+            )}
           </div>
+
+          {/* ──── VIEW 1: Accounts Receivable Transactions Ledger ──── */}
+          {ledgerViewMode === 'ar_ledger' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              {/* Filter Sub-Tabs */}
+              <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+                <div className="flex items-center gap-1">
+                  {(['all', 'unbilled', 'invoiced', 'settled'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setArFilter(mode)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        arFilter === mode
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {mode === 'all' && `All Runs (${unbilledTransactions.length})`}
+                      {mode === 'unbilled' && `Unbilled AR (${unbilledCount})`}
+                      {mode === 'invoiced' &&
+                        `Invoiced (${unbilledTransactions.filter((t) => t.status === 'invoiced').length})`}
+                      {mode === 'settled' &&
+                        `Settled (${unbilledTransactions.filter((t) => t.status === 'settled').length})`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-xs font-medium text-slate-500">
+                  {selectedTxIds.length > 0 ? (
+                    <span className="font-bold text-blue-600">{selectedTxIds.length} trip(s) selected</span>
+                  ) : (
+                    <span>Select rides to batch invoice or settle</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Transactions Table */}
+              <div className="overflow-x-auto custom-scrollbar min-w-full">
+                <table className="w-full text-left text-xs min-w-[900px]">
+                  <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label="Select all unbilled corporate transactions"
+                          checked={
+                            unbilledTransactions.length > 0 &&
+                            selectedTxIds.length ===
+                              unbilledTransactions.filter((t) => (arFilter === 'all' ? true : t.status === arFilter))
+                                .length
+                          }
+                          onChange={(e) => {
+                            const filtered = unbilledTransactions.filter((t) =>
+                              arFilter === 'all' ? true : t.status === arFilter
+                            );
+                            if (e.target.checked) {
+                              setSelectedTxIds(filtered.map((t) => t.id));
+                            } else {
+                              setSelectedTxIds([]);
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Corporate Account</th>
+                      <th className="px-4 py-3">Passenger &amp; Route</th>
+                      <th className="px-4 py-3">Fare Breakdown</th>
+                      <th className="px-4 py-3 text-right">Net Total</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                      <th className="px-4 py-3">Invoice Ref</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {unbilledTransactions
+                      .filter((tx) => (arFilter === 'all' ? true : tx.status === arFilter))
+                      .map((tx) => {
+                        const isSelected = selectedTxIds.includes(tx.id);
+                        return (
+                          <tr
+                            key={tx.id}
+                            className={`transition-colors ${
+                              isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/70'
+                            }`}
+                          >
+                            <td className="px-4 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select transaction ${tx.id}`}
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedTxIds([...selectedTxIds, tx.id]);
+                                  } else {
+                                    setSelectedTxIds(selectedTxIds.filter((id) => id !== tx.id));
+                                  }
+                                }}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
+                              {tx.pickupDate}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-slate-900 block">
+                                {tx.corporateAccountName}
+                              </span>
+                              <span className="font-mono text-[10px] text-slate-500">
+                                Acct: {tx.accountNumber || 'CORP-GEN'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 max-w-[260px]">
+                              <span className="font-bold text-slate-800 block truncate">
+                                {tx.passengerName}
+                              </span>
+                              <span className="text-[11px] text-slate-500 block truncate" title={`${tx.pickupAddress} ➔ ${tx.dropoffAddress}`}>
+                                {tx.pickupAddress.split(',')[0]} ➔ {tx.dropoffAddress.split(',')[0]}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-slate-600">
+                              <div className="font-mono text-[11px] space-y-0.5">
+                                <div>Base: ${tx.baseFare.toFixed(2)} | Tip: ${tx.gratuity.toFixed(2)}</div>
+                                <div className="text-[10px] text-slate-400">
+                                  Tolls: ${tx.tolls.toFixed(2)} | Wait: ${tx.waitTimeFee.toFixed(2)}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-black font-mono text-slate-900 whitespace-nowrap text-sm">
+                              ${tx.totalAmount.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <Badge
+                                variant={
+                                  tx.status === 'settled'
+                                    ? 'success'
+                                    : tx.status === 'invoiced'
+                                    ? 'default'
+                                    : 'warning'
+                                }
+                                size="sm"
+                                className="font-bold uppercase text-[10px]"
+                              >
+                                {tx.status === 'unbilled' ? 'Unbilled AR' : tx.status}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
+                              {tx.invoiceId ? (
+                                <span className="font-bold text-blue-600">{tx.invoiceId}</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Unbilled</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {tx.status !== 'settled' && tx.status !== 'invoiced' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleGenerateInvoiceFromAR([tx])}
+                                    className="text-[10px] px-2 py-1 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 font-bold cursor-pointer"
+                                  >
+                                    Invoice
+                                  </Button>
+                                )}
+                                {tx.status !== 'settled' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleMarkARPaidSettled([tx.id])}
+                                    className="text-[10px] px-2 py-1 text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-bold cursor-pointer"
+                                  >
+                                    Settle
+                                  </Button>
+                                )}
+                                {tx.invoiceId && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const foundInv = invoices.find((inv) => inv.id === tx.invoiceId);
+                                      if (foundInv) setSelectedInvoice(foundInv);
+                                    }}
+                                    className="text-[10px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                                  >
+                                    View
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {unbilledTransactions.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-slate-400 font-medium">
+                          No corporate account transactions recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ──── VIEW 2: Invoiced Statements & Reconciled Statements ──── */}
+          {ledgerViewMode === 'invoices' && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto custom-scrollbar min-w-full">
+                <table className="w-full text-left text-xs min-w-[750px]">
+                  <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3">Invoice #</th>
+                      <th className="px-4 py-3">Client / Organization</th>
+                      <th className="px-4 py-3">Issued Date</th>
+                      <th className="px-4 py-3">Due Date</th>
+                      <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoices.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold text-slate-900">
+                          {inv.invoiceNumber}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-slate-800 block">{inv.customerName}</span>
+                          <span className="text-[11px] text-slate-500">{inv.customerEmail}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{inv.issuedDate}</td>
+                        <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{inv.dueDate}</td>
+                        <td className="px-4 py-3 font-black text-slate-900 whitespace-nowrap">
+                          ${inv.totalAmount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge
+                            variant={
+                              inv.status === 'paid'
+                                ? 'success'
+                                : inv.status === 'overdue'
+                                ? 'error'
+                                : 'warning'
+                            }
+                            size="sm"
+                            className="font-bold uppercase text-[10px]"
+                          >
+                            {inv.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {inv.status !== 'paid' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
+                                className="text-[10px] px-2 py-1 text-emerald-700 bg-emerald-50 border-emerald-300 font-bold cursor-pointer"
+                              >
+                                Mark Paid
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedInvoice(inv)}
+                              className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
+                            >
+                              View &amp; Print
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {invoices.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                          No statements or invoices issued yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1659,17 +2173,30 @@ export function AdminInvoicingSubpage({
       {/* ─── Modal: Printable PDF Invoice Preview ─── */}
       {selectedInvoice && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-in zoom-in-95 my-8">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+          <div
+            id="printable-invoice-modal"
+            className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-in zoom-in-95 my-8"
+          >
+            {/* Header: Company & Invoice Metadata */}
+            <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-5 gap-4">
               <div>
-                <h3 className="font-black text-xl text-slate-900 tracking-tight">
+                <h2 className="font-black text-2xl text-slate-900 tracking-tight">
                   {COMPANY_CONFIG.name}
-                </h3>
-                <p className="text-xs text-slate-500">{COMPANY_CONFIG.address.formatted}</p>
-                <p className="text-xs text-slate-500">Phone: {COMPANY_CONFIG.phone.dispatch} | Email: {COMPANY_CONFIG.email.dispatch}</p>
+                </h2>
+                <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                  Corporate Transportation &amp; Fleet Logistics Division
+                </p>
+                <p className="text-xs text-slate-500 mt-1">{COMPANY_CONFIG.address.formatted}</p>
+                <p className="text-xs text-slate-500">
+                  Phone: {COMPANY_CONFIG.phone.dispatch} | Billing: billing@chesterfieldtaxi.com
+                </p>
+                <p className="text-[11px] font-mono text-slate-400">USDOT: 3829104 | Tax ID: 43-1892041</p>
               </div>
               <div className="text-right">
-                <span className="font-mono text-sm font-black text-blue-600 block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Invoice / Statement
+                </span>
+                <span className="font-mono text-lg font-black text-blue-600 block mt-0.5">
                   {selectedInvoice.invoiceNumber}
                 </span>
                 <Badge
@@ -1681,77 +2208,179 @@ export function AdminInvoicingSubpage({
                       : 'warning'
                   }
                   size="sm"
-                  className="font-bold uppercase text-[10px] mt-1"
+                  className="font-bold uppercase text-[10px] mt-1.5"
                 >
                   {selectedInvoice.status}
                 </Badge>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Billed To</span>
-                <p className="font-bold text-slate-900 mt-1">{selectedInvoice.customerName}</p>
+            {/* Account & Billing Cycle Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Billed Corporate Account
+                </span>
+                <p className="font-black text-slate-900 text-sm mt-0.5">{selectedInvoice.customerName}</p>
                 <p className="text-slate-600">{selectedInvoice.customerEmail}</p>
+                <div className="pt-1.5 flex items-center gap-2">
+                  <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                    Acct #: {selectedInvoice.corporateAccountId || printableData?.corporateAccount?.accountNumber || 'CORP-GEN-104'}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">Terms: Net 30 Days</span>
+                </div>
               </div>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Statement &amp; Cycle Dates
+                </span>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Issued Date:</span>
+                  <span className="text-slate-500">Invoice Date:</span>
                   <span className="font-mono font-bold text-slate-800">{selectedInvoice.issuedDate}</span>
                 </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-slate-500">Due Date:</span>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Payment Due:</span>
                   <span className="font-mono font-bold text-slate-800">{selectedInvoice.dueDate}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Billing Cycle:</span>
+                  <span className="font-mono font-bold text-slate-800">
+                    {printableData?.corporateAccount?.billingCycle || 'Monthly Net 30'}
+                  </span>
+                </div>
                 {selectedInvoice.paidDate && (
-                  <div className="flex justify-between mt-1 text-emerald-600">
-                    <span>Paid Date:</span>
-                    <span className="font-mono font-bold">{selectedInvoice.paidDate}</span>
+                  <div className="flex justify-between text-emerald-600 font-bold border-t border-slate-200 pt-1">
+                    <span>Reconciled Date:</span>
+                    <span className="font-mono">{selectedInvoice.paidDate}</span>
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Itemized Trip Logs Table */}
             <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-2.5">Description</th>
-                    <th className="px-4 py-2.5 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {selectedInvoice.lineItems.map((li, idx) => (
-                    <tr key={idx}>
-                      <td className="px-4 py-2.5 text-slate-800 font-medium">{li.description}</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">
-                        ${li.amount.toFixed(2)}
+              <div className="bg-slate-100/70 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Itemized Transportation Logs
+                </span>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {printableData?.lineItems?.length || selectedInvoice.lineItems.length} Trip Record(s)
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2.5">Date</th>
+                      <th className="px-4 py-2.5">Passenger</th>
+                      <th className="px-4 py-2.5">Route / Service Description</th>
+                      <th className="px-4 py-2.5 text-right">Fare</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {printableData?.lineItems ? (
+                      printableData.lineItems.map((li, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{li.date}</td>
+                          <td className="px-4 py-2.5 font-bold text-slate-800">{li.passengerName || selectedInvoice.customerName}</td>
+                          <td className="px-4 py-2.5 text-slate-700">
+                            <div>{li.description}</div>
+                            {li.pickupDropoff && (
+                              <div className="text-[11px] text-slate-500 font-mono mt-0.5">{li.pickupDropoff}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                            ${li.amount.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      selectedInvoice.lineItems.map((li, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{selectedInvoice.issuedDate}</td>
+                          <td className="px-4 py-2.5 font-bold text-slate-800">{selectedInvoice.customerName}</td>
+                          <td className="px-4 py-2.5 text-slate-700">{li.description}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                            ${li.amount.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot className="bg-slate-50/90 font-medium border-t border-slate-200">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-2 text-right text-slate-600">Subtotal:</td>
+                      <td className="px-4 py-2 text-right font-mono font-bold text-slate-900">
+                        ${(printableData?.subtotal || selectedInvoice.totalAmount).toFixed(2)}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-50/80 font-bold border-t border-slate-200">
-                  <tr>
-                    <td className="px-4 py-3 text-right text-slate-600">Total Balance Due:</td>
-                    <td className="px-4 py-3 text-right font-black text-sm text-slate-900 font-mono">
-                      ${selectedInvoice.totalAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                    {(printableData?.discountAmount ?? 0) > 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-1.5 text-right text-emerald-600">
+                          Corporate Contract Discount:
+                        </td>
+                        <td className="px-4 py-1.5 text-right font-mono font-bold text-emerald-600">
+                          -${printableData!.discountAmount!.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td colSpan={3} className="px-4 py-1.5 text-right text-slate-500 text-[11px]">
+                        Sales &amp; Transit Tax (MO RS 144.030 Exempt):
+                      </td>
+                      <td className="px-4 py-1.5 text-right font-mono text-slate-500 text-[11px]">
+                        $0.00
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200 bg-blue-50/50">
+                      <td colSpan={3} className="px-4 py-3 text-right font-black text-slate-900 text-sm">
+                        Total Balance Due:
+                      </td>
+                      <td className="px-4 py-3 text-right font-black text-base text-blue-700 font-mono">
+                        ${selectedInvoice.totalAmount.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
-            {/* Remittance Bank Info */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 space-y-1">
-              <p className="font-bold text-slate-800 text-xs">Remittance Information</p>
-              <p>Bank: {printableData?.remittanceInfo.bankName || 'Commerce Bank of St. Louis'}</p>
-              <p>Account Name: {printableData?.remittanceInfo.accountName || COMPANY_CONFIG.legalName}</p>
-              <p>Routing: {printableData?.remittanceInfo.routingNumber || '081000601'} | Account: {printableData?.remittanceInfo.accountNumber || '••••••••4819'}</p>
+            {/* Payment Terms & Remittance Bank Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Bank Remittance Details
+                </span>
+                <p className="font-bold text-slate-800">
+                  Bank: {printableData?.remittanceInfo?.bankName || 'Commerce Bank of St. Louis'}
+                </p>
+                <p className="text-slate-600">
+                  Account Name: {printableData?.remittanceInfo?.accountName || COMPANY_CONFIG.legalName}
+                </p>
+                <p className="font-mono text-slate-700">
+                  Routing: {printableData?.remittanceInfo?.routingNumber || '081000601'} | Acct: {printableData?.remittanceInfo?.accountNumber || '••••••••4819'}
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Payment Remittance Terms
+                </span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Net 30 Days. Please include invoice number{' '}
+                  <span className="font-mono font-bold text-slate-800">{selectedInvoice.invoiceNumber}</span> on all checks or electronic remittance advices.
+                </p>
+                <p className="text-slate-500 text-[10px]">
+                  Mail checks to: Chesterfield Taxi Inc., 177 Chesterfield Valley Dr, Chesterfield, MO 63005
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            {/* Modal Controls (Hidden in Print Mode) */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200 no-print">
               <div className="text-xs text-slate-400">
-                Chesterfield Taxi Billing Division
+                Chesterfield Taxi Billing Division • Generated via Invoicing Engine
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1759,6 +2388,7 @@ export function AdminInvoicingSubpage({
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedInvoice(null)}
+                  className="cursor-pointer"
                 >
                   Close
                 </Button>
@@ -1767,7 +2397,7 @@ export function AdminInvoicingSubpage({
                   variant="primary"
                   size="sm"
                   onClick={() => window.print()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer shadow-xs"
                 >
                   Print / Save PDF
                 </Button>

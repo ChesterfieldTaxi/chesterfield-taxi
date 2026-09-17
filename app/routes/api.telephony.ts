@@ -81,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
         return Response.json({
           success: false,
           configured: false,
-          message:
+          error:
             'Twilio credentials not configured. Please supply a valid Account SID starting with AC and Auth Token.',
         });
       }
@@ -104,7 +104,7 @@ export async function action({ request }: ActionFunctionArgs) {
             status: result.status,
             accountSid,
             fromNumber: twilioFromNumber,
-            message: `Twilio connection verified (${result.friendly_name}).`,
+            message: 'Connected',
           });
         } else {
           return Response.json({

@@ -86,8 +86,16 @@ export function AdminIntegrationsSubpage({
   const [twilioPhone, setTwilioPhone] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) || '+13145550199';
   });
-  const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
-  const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(null);
+  const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('ct_twilio_status') === 'connected'
+      ? 'connected'
+      : 'idle';
+  });
+  const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('ct_twilio_status') === 'connected'
+      ? 'Connected'
+      : null;
+  });
 
   // Live Outbound Phone Call Tester
   const [testCallPhone, setTestCallPhone] = useState('');
@@ -130,6 +138,9 @@ export function AdminIntegrationsSubpage({
         localStorage.setItem('ct_twilio_sid', twilioSid.trim());
         localStorage.setItem('ct_twilio_token', twilioToken.trim());
         localStorage.setItem('ct_twilio_phone', twilioPhone.trim());
+        if (twilioStatus === 'connected') {
+          localStorage.setItem('ct_twilio_status', 'connected');
+        }
       }
       setSaveSuccessMessage('Twilio telephony gateway credentials saved.');
       setTimeout(() => setSaveSuccessMessage(null), 3000);
@@ -153,6 +164,14 @@ export function AdminIntegrationsSubpage({
           credentials: { stripeSecretKey: stripeSk.trim() },
         }),
       });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setStripeStatus('error');
+        setStripeStatusMsg(`Server returned non-JSON response (${resp.status}). Check server route configuration.`);
+        return;
+      }
+
       const data = (await resp.json()) as any;
       if (data.success) {
         setStripeStatus('connected');
@@ -180,6 +199,14 @@ export function AdminIntegrationsSubpage({
           credentials: { squareAccessToken: squareToken.trim() },
         }),
       });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setSquareStatus('error');
+        setSquareStatusMsg(`Server returned non-JSON response (${resp.status}). Check server route configuration.`);
+        return;
+      }
+
       const data = (await resp.json()) as any;
       if (data.success) {
         setSquareStatus('connected');
@@ -198,11 +225,13 @@ export function AdminIntegrationsSubpage({
     setTwilioStatus('checking');
     setTwilioStatusMsg('Connecting to Twilio Accounts API...');
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await fetch('/api/telephony/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'verify_credentials',
+          accountSid: twilioSid.trim(),
+          authToken: twilioToken.trim(),
+          phoneNumber: twilioPhone.trim(),
           credentials: {
             accountSid: twilioSid.trim(),
             authToken: twilioToken.trim(),
@@ -210,13 +239,34 @@ export function AdminIntegrationsSubpage({
           },
         }),
       });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const rawText = await resp.text().catch(() => '');
+        console.warn('[Twilio Verification] Non-JSON response received:', resp.status, rawText.slice(0, 100));
+        setTwilioStatus('error');
+        setTwilioStatusMsg(
+          `Server returned non-JSON response (${resp.status}). Please verify the telephony endpoint is configured.`
+        );
+        return;
+      }
+
       const data = (await resp.json()) as any;
       if (data.success) {
         setTwilioStatus('connected');
-        setTwilioStatusMsg(data.message || 'Twilio account authenticated successfully!');
+        setTwilioStatusMsg(data.message || 'Connected');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ct_twilio_status', 'connected');
+          localStorage.setItem('ct_twilio_sid', twilioSid.trim());
+          localStorage.setItem('ct_twilio_token', twilioToken.trim());
+          localStorage.setItem('ct_twilio_phone', twilioPhone.trim());
+        }
       } else {
         setTwilioStatus('error');
-        setTwilioStatusMsg(data.error || data.message || 'Twilio authentication failed.');
+        setTwilioStatusMsg(data.error || data.message || 'Invalid Credentials');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('ct_twilio_status');
+        }
       }
     } catch (err: any) {
       setTwilioStatus('error');
@@ -246,6 +296,14 @@ export function AdminIntegrationsSubpage({
           },
         }),
       });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setTestCallStatus('error');
+        setTestCallMsg('Server returned non-JSON response. Please verify telephony route.');
+        return;
+      }
+
       const data = (await resp.json()) as any;
       if (data.success) {
         setTestCallStatus('success');
@@ -286,6 +344,14 @@ export function AdminIntegrationsSubpage({
           },
         }),
       });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setTestSmsStatus('error');
+        setTestSmsMsg('Server returned non-JSON response. Please verify telephony route.');
+        return;
+      }
+
       const data = (await resp.json()) as any;
       if (data.success) {
         setTestSmsStatus('success');
@@ -584,8 +650,12 @@ export function AdminIntegrationsSubpage({
                     Connect your Twilio Account to enable real outbound calling to mobile phones, two-way passenger/driver SMS, and number masking.
                   </CardDescription>
                 </div>
-                <Badge variant={twilioStatus === 'connected' ? 'success' : twilioStatus === 'error' ? 'danger' : 'neutral'}>
-                  {twilioStatus === 'connected' ? 'Twilio Connected' : twilioStatus === 'error' ? 'Connection Error' : 'Unverified'}
+                <Badge
+                  variant={twilioStatus === 'connected' ? 'success' : twilioStatus === 'error' ? 'danger' : 'neutral'}
+                  className="gap-1 font-bold"
+                >
+                  {twilioStatus === 'connected' && <CheckIcon className="w-3 h-3 inline text-emerald-700" />}
+                  {twilioStatus === 'connected' ? 'Connected' : twilioStatus === 'error' ? 'Connection Error' : 'Unverified'}
                 </Badge>
               </div>
             </CardHeader>
@@ -597,7 +667,16 @@ export function AdminIntegrationsSubpage({
                   <input
                     type="text"
                     value={twilioSid}
-                    onChange={(e) => setTwilioSid(e.target.value)}
+                    onChange={(e) => {
+                      setTwilioSid(e.target.value);
+                      if (twilioStatus === 'connected') {
+                        setTwilioStatus('idle');
+                        setTwilioStatusMsg(null);
+                        if (typeof window !== 'undefined') {
+                          localStorage.removeItem('ct_twilio_status');
+                        }
+                      }
+                    }}
                     placeholder="AC..."
                     className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
                   />
@@ -611,7 +690,16 @@ export function AdminIntegrationsSubpage({
                   <input
                     type="password"
                     value={twilioToken}
-                    onChange={(e) => setTwilioToken(e.target.value)}
+                    onChange={(e) => {
+                      setTwilioToken(e.target.value);
+                      if (twilioStatus === 'connected') {
+                        setTwilioStatus('idle');
+                        setTwilioStatusMsg(null);
+                        if (typeof window !== 'undefined') {
+                          localStorage.removeItem('ct_twilio_status');
+                        }
+                      }
+                    }}
                     placeholder="32-character secret"
                     className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
                   />

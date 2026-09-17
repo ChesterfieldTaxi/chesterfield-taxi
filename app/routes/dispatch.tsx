@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -6,6 +7,7 @@ import { getBookingService } from '../core/services/booking';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings, NamedPricingRule } from '../core/types/config';
 import type { Trip, TripStatus, TripAuditEvent } from '../core/types/trip';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { getPricingRulesService } from '../core/services/pricing';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
@@ -140,6 +142,7 @@ interface TripActionDropdownProps {
   trip: Trip;
   isUnconfirmed: boolean;
   isOpen: boolean;
+  isDesktop?: boolean;
   onToggle: () => void;
   onClose: () => void;
   onReview: () => void;
@@ -148,12 +151,15 @@ interface TripActionDropdownProps {
   onAudit: () => void;
   onClone: () => void;
   onFocusMap: () => void;
+  onCancelTrip?: () => void;
+  onReactivateTrip?: () => void;
 }
 
 function TripActionDropdown({
   trip,
   isUnconfirmed,
   isOpen,
+  isDesktop = true,
   onToggle,
   onClose,
   onReview,
@@ -162,29 +168,55 @@ function TripActionDropdown({
   onAudit,
   onClone,
   onFocusMap,
+  onCancelTrip,
+  onReactivateTrip,
 }: TripActionDropdownProps) {
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [openUpward, setOpenUpward] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const menuWidth = 220;
+    const menuHeight = 280;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < menuHeight && rect.top > menuHeight;
+    const top = openUpward ? rect.top - menuHeight - 4 : rect.bottom + 4;
+    const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+    setCoords({ top, left });
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (dropdownRef.current) {
-      const rect = dropdownRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setOpenUpward(spaceBelow < 280);
-    }
+    updatePosition();
+
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        triggerRef.current && !triggerRef.current.contains(event.target as Node) &&
+        menuRef.current && !menuRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     }
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, updatePosition]);
+
+  const isCompleted = trip.status === 'completed';
+  const isCancelled = trip.status === 'cancelled';
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block text-left">
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -197,21 +229,62 @@ function TripActionDropdown({
         <ChevronDownIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className={`absolute right-0 ${
-            openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-          } w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100`}
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            width: '220px',
+            zIndex: 99999,
+          }}
+          className="bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3.5 py-2 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
             <span className="font-mono text-slate-600">Trip #{trip.id.slice(0, 8)}</span>
-            <span className="capitalize px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 font-bold">
+            <span className={`capitalize px-1.5 py-0.2 rounded-md font-bold text-[10px] ${
+              isCompleted
+                ? 'bg-emerald-100 text-emerald-800'
+                : isCancelled
+                ? 'bg-rose-100 text-rose-800'
+                : 'bg-blue-100 text-blue-800'
+            }`}>
               {trip.status}
             </span>
           </div>
 
           <div className="py-1">
+            {/* On mobile: include Edit and Focus Map (auto-switches mobile tabs) */}
+            {!isDesktop && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onEdit();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-colors cursor-pointer"
+                >
+                  <PencilIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>Edit Trip</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onFocusMap();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50/80 hover:text-emerald-700 transition-colors cursor-pointer"
+                >
+                  <MapPinIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>View on Map</span>
+                </button>
+              </>
+            )}
+
             {isUnconfirmed && (
               <button
                 type="button"
@@ -219,9 +292,9 @@ function TripActionDropdown({
                   onClose();
                   onReview();
                 }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80 transition-colors cursor-pointer"
               >
-                <DocumentTextIcon className="w-4 h-4 text-amber-600 shrink-0" />
+                <DocumentTextIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>Review Booking</span>
               </button>
             )}
@@ -230,36 +303,12 @@ function TripActionDropdown({
               type="button"
               onClick={() => {
                 onClose();
-                onEdit();
-              }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-colors cursor-pointer"
-            >
-              <PencilIcon className="w-4 h-4 text-blue-500 shrink-0" />
-              <span>Edit Trip</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
                 onFare();
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-amber-50/80 hover:text-amber-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-amber-50/80 hover:text-amber-700 transition-colors cursor-pointer"
             >
-              <BoltIcon className="w-4 h-4 text-amber-500 shrink-0" />
+              <BoltIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>Fare &amp; Rules</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onFocusMap();
-              }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50/80 hover:text-emerald-700 transition-colors cursor-pointer"
-            >
-              <MapPinIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Focus on Map</span>
             </button>
 
             <button
@@ -268,10 +317,10 @@ function TripActionDropdown({
                 onClose();
                 onClone();
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-cyan-50/80 hover:text-cyan-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-cyan-50/80 hover:text-cyan-700 transition-colors cursor-pointer"
             >
-              <PlusIcon className="w-4 h-4 text-cyan-600 shrink-0" />
-              <span>Clone to Draft</span>
+              <PlusIcon className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+              <span>Copy Booking</span>
             </button>
           </div>
 
@@ -282,13 +331,48 @@ function TripActionDropdown({
                 onClose();
                 onAudit();
               }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-purple-50/80 hover:text-purple-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-purple-50/80 hover:text-purple-700 transition-colors cursor-pointer"
             >
-              <ShieldCheckIcon className="w-4 h-4 text-purple-500 shrink-0" />
+              <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-500 shrink-0" />
               <span>Audit Trail Log</span>
             </button>
           </div>
-        </div>
+
+          {!isCompleted && (
+            <div className="py-1">
+              {isCancelled ? (
+                onReactivateTrip && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onReactivateTrip();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                  >
+                    <span>🔄</span>
+                    <span>Reactivate Trip</span>
+                  </button>
+                )
+              ) : (
+                onCancelTrip && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onCancelTrip();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                  >
+                    <span>✕</span>
+                    <span>Cancel Trip</span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -377,6 +461,22 @@ export default function DispatchRoute() {
 
   // Operational Right Dock Tools (Unified Dock: Main / Phone / Email / Drivers)
   const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
+  const [commsInitialTab, setCommsInitialTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('all');
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    cancelText?: string;
+    confirmVariant?: 'danger' | 'primary' | 'warning';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    onConfirm: () => {},
+  });
   const isDriversOpen = activeDockTab === 'drivers';
   const isMessagesOpen = activeDockTab === 'alerts';
   const isPhoneOpen = activeDockTab === 'phone' || activeDockTab === 'comms';
@@ -1190,31 +1290,80 @@ export default function DispatchRoute() {
     URL.revokeObjectURL(url);
   };
 
-  const handleBatchCancelTrips = async () => {
+  const handleBatchCancelTrips = () => {
     if (selectedTripIds.length === 0) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to cancel the ${selectedTripIds.length} selected trip(s)?`
-    );
-    if (!confirmed) return;
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Batch Cancel Bookings',
+      message: `Are you sure you want to cancel the ${selectedTripIds.length} selected trip(s)? Any assigned drivers will be notified.`,
+      confirmText: 'Cancel Trips',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }));
+        const bookingService = getBookingService();
+        try {
+          for (const id of selectedTripIds) {
+            if (bookingService.updateTripStatus) {
+              await bookingService.updateTripStatus(id, 'cancelled', {
+                actorRole: 'admin',
+                reason: 'Batch cancellation by dispatcher',
+              });
+            } else if (bookingService.updateTrip) {
+              await bookingService.updateTrip(id, { status: 'cancelled' });
+            }
+          }
+          setTrips((prev) =>
+            prev.map((t) => (selectedTripIds.includes(t.id) ? { ...t, status: 'cancelled' as TripStatus } : t))
+          );
+          setSelectedTripIds([]);
+        } catch (err) {
+          console.error('Failed to batch cancel trips:', err);
+        }
+      },
+    });
+  };
 
+  const handlePromptCancelTrip = (trip: Trip) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Cancel Trip #${trip.id.slice(0, 8)}`,
+      message: `Are you sure you want to cancel the booking for ${trip.passenger?.firstName || 'Guest'} ${trip.passenger?.lastName || ''}? Any assigned driver will be notified.`,
+      confirmText: 'Cancel Trip',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }));
+        const bookingService = getBookingService();
+        try {
+          if (bookingService.updateTripStatus) {
+            await bookingService.updateTripStatus(trip.id, 'cancelled', {
+              actorRole: 'admin',
+              reason: 'Cancelled by dispatcher from Actions Menu',
+            });
+          } else if (bookingService.updateTrip) {
+            await bookingService.updateTrip(trip.id, { status: 'cancelled' });
+          }
+          setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, status: 'cancelled' as TripStatus } : t)));
+        } catch (err) {
+          console.error('Failed to cancel trip:', err);
+        }
+      },
+    });
+  };
+
+  const handleReactivateTrip = async (trip: Trip) => {
     const bookingService = getBookingService();
     try {
-      for (const id of selectedTripIds) {
-        if (bookingService.updateTripStatus) {
-          await bookingService.updateTripStatus(id, 'cancelled', {
-            actorRole: 'admin',
-            reason: 'Batch cancellation by dispatcher',
-          });
-        } else if (bookingService.updateTrip) {
-          await bookingService.updateTrip(id, { status: 'cancelled' });
-        }
+      if (bookingService.updateTripStatus) {
+        await bookingService.updateTripStatus(trip.id, 'pending', {
+          actorRole: 'admin',
+          reason: 'Reactivated by dispatcher from Actions Menu',
+        });
+      } else if (bookingService.updateTrip) {
+        await bookingService.updateTrip(trip.id, { status: 'pending' });
       }
-      setTrips((prev) =>
-        prev.map((t) => (selectedTripIds.includes(t.id) ? { ...t, status: 'cancelled' as TripStatus } : t))
-      );
-      setSelectedTripIds([]);
+      setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, status: 'pending' as TripStatus } : t)));
     } catch (err) {
-      console.error('Failed to batch cancel trips:', err);
+      console.error('Failed to reactivate trip:', err);
     }
   };
 
@@ -2169,8 +2318,9 @@ export default function DispatchRoute() {
           <button
             type="button"
             onClick={() => {
+              setCommsInitialTab('messages');
               setActiveDockTab((prev) => (prev === 'comms' ? 'none' : 'comms'));
-              setActiveMobileTab('comms');
+              setActiveMobileTab('messages');
               setUnreadMessagesCount(0);
             }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
@@ -2687,7 +2837,7 @@ export default function DispatchRoute() {
         >
           {/* Browser-style Tab Bar */}
           <div className="h-9 bg-slate-100 border-b border-slate-200 flex items-center px-1 shrink-0 select-none relative">
-            <div className="flex-1 flex items-center gap-1 overflow-x-auto h-full scrollbar-none py-1">
+            <div className="flex-1 flex items-center gap-1 overflow-x-auto h-full scrollbar-none py-1 min-w-0">
               {drafts.map((d) => {
                 const isActive = d.id === activeDraftId;
                 const label = getTabLabel(d);
@@ -2696,17 +2846,17 @@ export default function DispatchRoute() {
                     key={d.id}
                     onClick={() => setActiveDraftId(d.id)}
                     title={d.formValues?.passengerName || d.id}
-                    className={`group relative h-7 px-2.5 rounded-t-md text-xs font-semibold flex items-center gap-1.5 cursor-pointer border-t border-x transition-colors shrink-0 ${
+                    className={`group relative h-7 px-2 rounded-t-md text-xs font-semibold flex items-center gap-1 cursor-pointer border-t border-x transition-colors shrink-0 max-w-[85px] ${
                       isActive
                         ? 'bg-white text-blue-600 border-slate-300 shadow-xs'
                         : 'bg-slate-200/60 text-slate-600 hover:bg-slate-200 border-transparent'
                     }`}
                   >
-                    <span className="truncate max-w-[110px]">{label}</span>
+                    <span className="truncate flex-1 text-[11px]">{label}</span>
                     <button
                       type="button"
                       onClick={(e) => closeDraft(d.id, e)}
-                      className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 hover:bg-slate-300 cursor-pointer"
+                      className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] text-slate-400 hover:text-slate-700 hover:bg-slate-300 cursor-pointer shrink-0"
                       title="Close Tab"
                     >
                       ✕
@@ -2714,25 +2864,26 @@ export default function DispatchRoute() {
                   </div>
                 );
               })}
+            </div>
 
-              {/* Add New Tab Button (Inline) */}
+            {/* Pinned Add Tab & Overflow Actions (Always visible, never squeezed under dropdown) */}
+            <div className="flex items-center shrink-0 pl-1 border-l border-slate-200 gap-0.5">
               {drafts.length < maxDrafts && (
                 <button
                   type="button"
                   onClick={createDraft}
-                  className="h-7 px-2 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-800 font-bold text-sm flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  className="h-7 w-7 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-bold text-sm flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   title="Open new draft booking tab"
                 >
                   +
                 </button>
               )}
-            </div>
 
-            {/* Tab Overflow Chevron Menu (Pinned to right) */}
-            <div className="relative shrink-0 flex items-center pl-1 border-l border-slate-200" ref={tabOverflowRef}>
-              <button
-                type="button"
-                onClick={() => setIsTabOverflowOpen(!isTabOverflowOpen)}
+              {/* Tab Overflow Chevron Menu (Pinned to right) */}
+              <div className="relative shrink-0 flex items-center" ref={tabOverflowRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsTabOverflowOpen(!isTabOverflowOpen)}
                 className={`h-7 px-1.5 rounded flex items-center justify-center text-xs font-bold transition-colors ${
                   isTabOverflowOpen
                     ? 'bg-blue-100 text-blue-700'
@@ -2807,6 +2958,7 @@ export default function DispatchRoute() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
@@ -2831,7 +2983,14 @@ export default function DispatchRoute() {
                       prev.map((item) => (item.id === d.id ? { ...item, formValues: undefined } : item))
                     );
                   }}
+                  onCopyBooking={handleCloneBookingToNewDraft}
                   onCloneBooking={handleCloneBookingToNewDraft}
+                  onOpenLinkedTrip={(linkedTripId) => {
+                    const linkedTrip = trips.find((t) => t.id === linkedTripId);
+                    if (linkedTrip) {
+                      handleOpenEditTrip(linkedTrip);
+                    }
+                  }}
                 />
               </div>
             ))}
@@ -3679,6 +3838,7 @@ export default function DispatchRoute() {
                             trip={trip}
                             isUnconfirmed={isUnconfirmedTrip}
                             isOpen={openTripActionId === trip.id}
+                            isDesktop={isDesktop}
                             onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
                             onClose={() => setOpenTripActionId(null)}
                             onReview={() => handleOpenReviewModal(trip)}
@@ -3701,6 +3861,8 @@ export default function DispatchRoute() {
                               setShouldZoomMap(true);
                               setActiveMobileTab('map');
                             }}
+                            onCancelTrip={() => handlePromptCancelTrip(trip)}
+                            onReactivateTrip={() => handleReactivateTrip(trip)}
                           />
                         </div>
                       </div>
@@ -3797,6 +3959,7 @@ export default function DispatchRoute() {
                             trip={trip}
                             isUnconfirmed={isUnconfirmedTrip}
                             isOpen={openTripActionId === trip.id}
+                            isDesktop={isDesktop}
                             onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
                             onClose={() => setOpenTripActionId(null)}
                             onReview={() => handleOpenReviewModal(trip)}
@@ -3819,6 +3982,8 @@ export default function DispatchRoute() {
                               setShouldZoomMap(true);
                               setActiveMobileTab('map');
                             }}
+                            onCancelTrip={() => handlePromptCancelTrip(trip)}
+                            onReactivateTrip={() => handleReactivateTrip(trip)}
                           />
                         </div>
                       </div>
@@ -3975,33 +4140,36 @@ export default function DispatchRoute() {
                                     <span>📋</span>
                                   </button>
                                 )}
-                                <TripActionDropdown
-                                  trip={trip}
-                                  isUnconfirmed={isUnconfirmedTrip}
-                                  isOpen={openTripActionId === trip.id}
-                                  onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
-                                  onClose={() => setOpenTripActionId(null)}
-                                  onReview={() => handleOpenReviewModal(trip)}
-                                  onEdit={() => {
-                                    setSelectedQueueTripId(trip.id);
-                                    setSelectedMapTrip(trip);
-                                    setShouldZoomMap(true);
-                                    handleOpenEditTrip(trip);
-                                    setActiveMobileTab('booking');
-                                  }}
-                                  onFare={() => handleOpenDriverModal(trip)}
-                                  onAudit={() => setAuditTrailTrip(trip)}
-                                  onClone={() => {
-                                    handleCloneBooking(trip);
-                                    setActiveMobileTab('booking');
-                                  }}
-                                  onFocusMap={() => {
-                                    setSelectedQueueTripId(trip.id);
-                                    setSelectedMapTrip(trip);
-                                    setShouldZoomMap(true);
-                                    setActiveMobileTab('map');
-                                  }}
-                                />
+                                 <TripActionDropdown
+                                   trip={trip}
+                                   isUnconfirmed={isUnconfirmedTrip}
+                                   isOpen={openTripActionId === trip.id}
+                                   isDesktop={isDesktop}
+                                   onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                                   onClose={() => setOpenTripActionId(null)}
+                                   onReview={() => handleOpenReviewModal(trip)}
+                                   onEdit={() => {
+                                     setSelectedQueueTripId(trip.id);
+                                     setSelectedMapTrip(trip);
+                                     setShouldZoomMap(true);
+                                     handleOpenEditTrip(trip);
+                                     setActiveMobileTab('booking');
+                                   }}
+                                   onFare={() => handleOpenDriverModal(trip)}
+                                   onAudit={() => setAuditTrailTrip(trip)}
+                                   onClone={() => {
+                                     handleCloneBooking(trip);
+                                     setActiveMobileTab('booking');
+                                   }}
+                                   onFocusMap={() => {
+                                     setSelectedQueueTripId(trip.id);
+                                     setSelectedMapTrip(trip);
+                                     setShouldZoomMap(true);
+                                     setActiveMobileTab('map');
+                                   }}
+                                   onCancelTrip={() => handlePromptCancelTrip(trip)}
+                                   onReactivateTrip={() => handleReactivateTrip(trip)}
+                                 />
                               </div>
                             </td>
                           </tr>
@@ -4368,7 +4536,7 @@ export default function DispatchRoute() {
                     user={user}
                     drivers={drivers}
                     trips={trips}
-                    initialTab="all"
+                    initialTab={commsInitialTab}
                     isPopout={false}
                     onPopOut={() => getWorkspaceBus().popOutModule('comms')}
                     onClose={() => setActiveDockTab('none')}
@@ -5347,6 +5515,18 @@ export default function DispatchRoute() {
           onClose={() => setAuditTrailTrip(null)}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModalConfig.isOpen}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        confirmText={confirmModalConfig.confirmText}
+        cancelText={confirmModalConfig.cancelText || 'Cancel'}
+        confirmVariant={confirmModalConfig.confirmVariant || 'primary'}
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={() => setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
 
 
       {/* ─────────────────────────────────────────────────────────────

@@ -248,6 +248,13 @@ export function CommsHub({
   trips = [],
 }: CommsHubProps) {
   const [activeTab, setActiveTab] = useState<CommsTab>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all');

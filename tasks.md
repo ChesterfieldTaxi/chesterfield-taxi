@@ -406,4 +406,11 @@
   - [x] 31.5.1 Run `npm run typecheck` to confirm 0 TypeScript compilation errors.
   - [x] 31.5.2 Run `npm run build` to confirm production client and SSR build stability.
   - [x] 31.5.3 Update tasks.md to mark Phase 31 complete upon verification.
+- [x] 31.6 Twilio Telephony Verification Endpoint & Admin Interface Hardening:
+  - [x] 31.6.1 Implement dedicated verification endpoint `app/routes/api.telephony.verify.ts` validating Twilio credentials against Twilio REST Accounts API (`https://api.twilio.com/2010-04-01/Accounts/{AccountSid}.json`).
+  - [x] 31.6.2 Ensure strict JSON responses and complete try/catch wrapping to prevent Vercel/SSR HTML error pages.
+  - [x] 31.6.3 Register `api/telephony/verify`, `api/telephony`, and `api/payments` in `app/routes.ts`.
+  - [x] 31.6.4 Update `AdminIntegrationsSubpage.tsx` with Content-Type validation safeguard before `response.json()`, live "Connected" (Green Badge) rendering, and local persistence.
+  - [x] 31.6.5 Verify with `npm run typecheck` (0 errors) and `npm run build` (clean SSR build).
+
 

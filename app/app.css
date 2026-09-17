@@ -186,4 +186,35 @@ input.gm-err-autocomplete {
   display: none !important;
 }
 
-
+/* Printable PDF Invoice CSS */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #printable-invoice-modal,
+  #printable-invoice-modal * {
+    visibility: visible;
+  }
+  #printable-invoice-modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .no-print,
+  button,
+  .print-hide {
+    display: none !important;
+  }
+}

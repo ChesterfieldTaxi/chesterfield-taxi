@@ -49,6 +49,7 @@ export function BookingConfirmation({
     card: 'Credit / Debit Card',
     cash: 'Pay in Vehicle (Cash/Card)',
     corporate: 'Corporate Billing Account',
+    account: 'Corporate Billing Account',
   }[trip.payment.method];
 
   const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';

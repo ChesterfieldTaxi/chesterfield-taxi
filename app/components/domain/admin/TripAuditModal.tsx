@@ -253,6 +253,16 @@ export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
                             Ref: {event.referenceNumber}
                           </span>
                         )}
+                        {event.bookingChannel && (
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                            Intake: {event.bookingChannel}
+                          </span>
+                        )}
+                        {event.bookedBy?.name && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                            By: {event.bookedBy.name}
+                          </span>
+                        )}
                       </div>
                       <span className="text-[11px] font-mono text-slate-500">
                         {new Date(event.timestamp).toLocaleString()}

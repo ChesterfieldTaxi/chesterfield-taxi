@@ -9,6 +9,7 @@ import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
 import { SpinnerIcon, PlusIcon, UserIcon, PhoneIcon, MailIcon, LuggageIcon } from '../../ui/Icons';
+import { ConfirmationModal } from '../../ui/ConfirmationModal';
 
 export interface AdditionalPassenger {
   name: string;
@@ -126,6 +127,8 @@ export interface DispatchBookingEngineProps {
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
   onCloneBooking?: (values: DispatchFormValues) => void;
+  onCopyBooking?: (values: DispatchFormValues) => void;
+  onOpenLinkedTrip?: (linkedTripId: string) => void;
 }
 
 const DEFAULT_COMPANIES = ['Chesterfield Taxi', 'St. Louis Taxi', 'West County Express'];
@@ -155,8 +158,26 @@ export function DispatchBookingEngine({
   onValuesChange,
   onClearDraft,
   onCloneBooking,
+  onCopyBooking,
+  onOpenLinkedTrip,
 }: DispatchBookingEngineProps) {
   const isEditMode = Boolean(initialTrip?.id);
+  const isCompleted = initialTrip?.status === 'completed';
+  const isCancelled = initialTrip?.status === 'cancelled';
+  const linkedTripId =
+    initialTrip?.linkedTripId ||
+    initialTrip?.linkedReturnTripId ||
+    (initialTrip?.metadata as any)?.linkedTripId ||
+    (initialTrip?.metadata as any)?.linkedReturnTripId;
+  const isReturnRide = Boolean(
+    initialTrip?.isReturnRide ||
+    (initialTrip?.metadata as any)?.isReturnRide ||
+    initialTrip?.linkedTripId
+  );
+  const returnScheduledTime =
+    initialTrip?.returnScheduledPickupTime ||
+    (initialTrip?.metadata as any)?.returnScheduledPickupTime;
+  const hasLinkedTrip = Boolean(linkedTripId);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
 
   // Keep latest onValuesChange in a ref to avoid infinite dependency re-triggers
@@ -1123,15 +1144,15 @@ export function DispatchBookingEngine({
     onClearDraft?.();
   };
 
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+
   const handleConfirmClear = () => {
-    if (window.confirm('Are you sure you want to clear this booking form? All unsaved inputs will be reset.')) {
-      handleClear();
-    }
+    setIsClearModalOpen(true);
   };
 
-  // Clone current booking data into a new draft tab
-  const handleCloneBooking = () => {
-    const clonedValues: DispatchFormValues = {
+  // Copy current booking data into a new draft tab
+  const handleCopyBooking = () => {
+    const copiedValues: DispatchFormValues = {
       timingType,
       scheduledDate,
       scheduledTime,
@@ -1160,7 +1181,7 @@ export function DispatchBookingEngine({
         booster: boosterCount,
       },
       selectedVehicles,
-      vehicle: selectedVehicles[0] || 'any',
+      vehicle: selectedVehicles[0] || { type: 'Sedan', count: 1 },
       paymentMethod,
       cardDetails: {
         cardPaymentType,
@@ -1178,7 +1199,6 @@ export function DispatchBookingEngine({
       },
       tariff,
       pricingRuleId: selectedRuleId || undefined,
-      pricingRuleName: availableNamedRules.find((r) => r.id === selectedRuleId)?.name,
       discount,
       company,
       driverId: 'unassigned',
@@ -1209,11 +1229,12 @@ export function DispatchBookingEngine({
       },
       repeatDetails: {
         repeat,
-        repeatFrequency,
+        repeatFrequency: repeatFrequency as any,
         repeatDays,
         repeatOccurrences,
         repeatUntilDate,
-        repeatWeeksPattern,
+        repeatWeeksPattern: 'all',
+        repeatsRoundTrip: returnTrip,
       },
       estimatedFare,
       returnEstimatedFare,
@@ -1224,8 +1245,14 @@ export function DispatchBookingEngine({
       estimatedDistanceMiles,
     };
 
-    onCloneBooking?.(clonedValues);
+    if (onCopyBooking) {
+      onCopyBooking(copiedValues);
+    } else if (onCloneBooking) {
+      onCloneBooking(copiedValues);
+    }
   };
+
+  const handleCloneBooking = handleCopyBooking;
 
   // Submit Booking (Create or Update)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1264,7 +1291,10 @@ export function DispatchBookingEngine({
     if (paymentMethod === 'account') method = 'corporate';
 
     const totalCalculatedFare = returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare;
-    const finalFare = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : totalCalculatedFare;
+    // Single-leg fare for outbound trip vs return trip leg fare
+    const outboundFare = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : estimatedFare;
+    const returnLegFare = returnEstimatedFare || estimatedFare;
+    const finalFare = outboundFare;
 
     const names = passengerName.trim().split(/\s+/);
     const firstName = names[0] || 'Guest';
@@ -1563,7 +1593,19 @@ export function DispatchBookingEngine({
                 createdByRole: 'dispatcher',
               },
             };
-            await service.createBooking(returnPayload);
+            const createdReturnTrip = await service.createBooking(returnPayload);
+            // Also link outbound trip back to return trip
+            if (service.updateTrip && createdReturnTrip?.id) {
+              await service.updateTrip(createdTrip.id, {
+                linkedReturnTripId: createdReturnTrip.id,
+                returnScheduledPickupTime: returnScheduledTime,
+                metadata: {
+                  ...createdTrip.metadata,
+                  linkedReturnTripId: createdReturnTrip.id,
+                  returnScheduledPickupTime: returnScheduledTime,
+                },
+              });
+            }
           } catch (retErr) {
             console.warn('[DispatchBookingEngine] Failed to create linked return trip:', retErr);
           }
@@ -1586,6 +1628,30 @@ export function DispatchBookingEngine({
     <form onSubmit={handleSubmit} className="flex flex-col h-full bg-slate-50 select-none text-xs">
       {/* ─── Scrollable Form Body ─── */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3.5">
+        {isCompleted && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+              <span>🔒</span>
+              <span>Completed Trip (Immutable Route Record)</span>
+            </div>
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              Route and schedule are permanently locked for compliance. You may still adjust driver notes, fare overrides, tips, and payment status.
+            </p>
+          </div>
+        )}
+
+        {isCancelled && (
+          <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 text-xs space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-rose-900">
+              <span>🚫</span>
+              <span>Cancelled Trip</span>
+            </div>
+            <p className="text-[11px] text-rose-800 leading-relaxed">
+              Dispatch operations are halted. You may update internal remarks or click &quot;Copy Booking&quot; below to generate a new active booking.
+            </p>
+          </div>
+        )}
+
         {submitError && (
           <div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs font-semibold flex items-center gap-1.5">
             <span>⚠</span>
@@ -2382,17 +2448,66 @@ export function DispatchBookingEngine({
           <div className="pt-2 border-t border-slate-200 space-y-2">
             {/* Return Trip (Full Route, Details & Vehicles) */}
             <div>
-              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={returnTrip}
-                  onChange={(e) => setReturnTrip(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="font-bold text-slate-800">Return Trip (Round Trip)</span>
-              </label>
+              {hasLinkedTrip ? (
+                <div className="p-3 bg-indigo-50/90 border border-indigo-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1.5 select-none opacity-80 cursor-not-allowed">
+                      <input
+                        type="checkbox"
+                        checked={true}
+                        disabled={true}
+                        className="rounded border-slate-300 text-indigo-600 cursor-not-allowed"
+                      />
+                      <span className="font-bold text-indigo-950 text-xs">
+                        {isReturnRide ? 'Return Leg (Round Trip)' : 'Outbound Leg (Round Trip)'}
+                      </span>
+                    </label>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                      🔒 Linked Round-Trip
+                    </span>
+                  </div>
 
-              {returnTrip && (
+                  <div className="text-xs text-indigo-900 leading-relaxed">
+                    {isReturnRide ? (
+                      <p>
+                        This booking represents the <strong>return leg</strong> of a round-trip. Linked to primary outbound trip{' '}
+                        <span className="font-mono font-bold bg-indigo-100/70 px-1 py-0.5 rounded">
+                          #{linkedTripId?.slice(0, 8)}
+                        </span>.
+                      </p>
+                    ) : (
+                      <p>
+                        Linked return leg exists
+                        {returnScheduledTime ? ` scheduled for ${new Date(returnScheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                        {' '}(Trip <span className="font-mono font-bold bg-indigo-100/70 px-1 py-0.5 rounded">#{linkedTripId?.slice(0, 8)}</span>).
+                      </p>
+                    )}
+                  </div>
+
+                  {onOpenLinkedTrip && linkedTripId && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLinkedTrip(linkedTripId)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs active:scale-98"
+                    >
+                      <span>✎ Open &amp; Edit {isReturnRide ? 'Outbound Leg' : 'Return Leg'} in New Tab</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={returnTrip}
+                      disabled={isCompleted || isCancelled}
+                      onChange={(e) => setReturnTrip(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    <span className="font-bold text-slate-800">Return Trip (Round Trip)</span>
+                  </label>
+
+                  {returnTrip && (
                 <div className="mt-1.5 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2.5">
                   <div className="text-[10px] font-bold text-indigo-900 tracking-wide uppercase">
                     🔁 RETURN LEG SPECIFICATIONS
@@ -2680,6 +2795,8 @@ export function DispatchBookingEngine({
                   </label>
                 </div>
               )}
+                </>
+              )}
             </div>
 
             {/* Repeat / Recurring (Until Date & Weeks Pattern) */}
@@ -2864,7 +2981,7 @@ export function DispatchBookingEngine({
           {/* Subtitle breakdown for return trip */}
           {returnTrip && (
             <div className="text-[10px] text-slate-500 font-medium">
-              Round Trip: ${estimatedFare.toFixed(2)} out + ${returnEstimatedFare.toFixed(2)} ret
+              Leg 1: ${estimatedFare.toFixed(2)} | Return Leg: ${returnEstimatedFare.toFixed(2)}
             </div>
           )}
         </div>
@@ -2873,12 +2990,12 @@ export function DispatchBookingEngine({
           {isEditMode ? (
             <button
               type="button"
-              onClick={handleCloneBooking}
+              onClick={handleCopyBooking}
               className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Create a new draft tab pre-populated with these trip details"
             >
               <span>📋</span>
-              <span>Clone Booking</span>
+              <span>Copy Booking</span>
             </button>
           ) : (
             <button
@@ -2911,6 +3028,20 @@ export function DispatchBookingEngine({
           </button>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={isClearModalOpen}
+        title="Clear Booking Form"
+        message="Are you sure you want to clear this booking form? All unsaved inputs will be reset to default values."
+        confirmText="Clear Form"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={() => {
+          handleClear();
+          setIsClearModalOpen(false);
+        }}
+        onCancel={() => setIsClearModalOpen(false)}
+      />
     </form>
   );
 }

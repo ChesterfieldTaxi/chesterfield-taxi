@@ -29,7 +29,10 @@
       "routes/dispatch": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dispatch.popout": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/api.seed-stress-data": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
+      "routes/api.seed-stress-data": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.payments": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.telephony": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.telephony.verify": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0"
     },
     "routes": {
       "root": {
@@ -178,6 +181,27 @@
         "file": "app/routes/api.seed-stress-data.tsx",
         "path": "api/seed-stress-data",
         "config": {}
+      },
+      "routes/api.payments": {
+        "id": "routes/api.payments",
+        "parentId": "root",
+        "file": "app/routes/api.payments.ts",
+        "path": "api/payments",
+        "config": {}
+      },
+      "routes/api.telephony": {
+        "id": "routes/api.telephony",
+        "parentId": "root",
+        "file": "app/routes/api.telephony.ts",
+        "path": "api/telephony",
+        "config": {}
+      },
+      "routes/api.telephony.verify": {
+        "id": "routes/api.telephony.verify",
+        "parentId": "root",
+        "file": "app/routes/api.telephony.verify.ts",
+        "path": "api/telephony/verify",
+        "config": {}
       }
     }
   },
@@ -318,6 +342,24 @@
         "parentId": "root",
         "file": "routes/api.seed-stress-data.tsx",
         "path": "api/seed-stress-data"
+      },
+      "routes/api.payments": {
+        "id": "routes/api.payments",
+        "parentId": "root",
+        "file": "routes/api.payments.ts",
+        "path": "api/payments"
+      },
+      "routes/api.telephony": {
+        "id": "routes/api.telephony",
+        "parentId": "root",
+        "file": "routes/api.telephony.ts",
+        "path": "api/telephony"
+      },
+      "routes/api.telephony.verify": {
+        "id": "routes/api.telephony.verify",
+        "parentId": "root",
+        "file": "routes/api.telephony.verify.ts",
+        "path": "api/telephony/verify"
       }
     },
     "routeDiscovery": {
@@ -415,6 +457,18 @@
           {
             "file": "routes/api.seed-stress-data.tsx",
             "path": "api/seed-stress-data"
+          },
+          {
+            "file": "routes/api.payments.ts",
+            "path": "api/payments"
+          },
+          {
+            "file": "routes/api.telephony.ts",
+            "path": "api/telephony"
+          },
+          {
+            "file": "routes/api.telephony.verify.ts",
+            "path": "api/telephony/verify"
           }
         ]
       }

@@ -12,6 +12,7 @@ import type {
   PrintableInvoiceData,
   IInvoicingService,
   LedgerEntryType,
+  CorporateUnbilledTransaction,
 } from '../types/invoicing';
 import type { InvoiceRecord, CorporateAccountConfig } from '../types/config';
 import type { Trip } from '../types/trip';
@@ -20,6 +21,70 @@ import { isFirebaseConfigured, getFirestoreDb } from './firebase';
 import { collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 const LEDGER_STORAGE_KEY = 'ct_financial_ledger_entries';
+const UNBILLED_STORAGE_KEY = 'ct_corporate_unbilled_transactions';
+
+const INITIAL_MOCK_UNBILLED_TRANSACTIONS: CorporateUnbilledTransaction[] = [
+  {
+    id: 'unb-101',
+    tripId: 'tr-8840',
+    corporateAccountId: 'corp-1',
+    corporateAccountName: 'Boeing Defense & Space',
+    accountNumber: 'BA-77492',
+    passengerName: 'Dr. Michael Scott',
+    passengerPhone: '(314) 555-0192',
+    pickupDate: '2026-09-14',
+    pickupAddress: 'Boeing Bldg 101, St. Louis, MO',
+    dropoffAddress: 'Lambert STL Terminal 1, St. Louis, MO',
+    baseFare: 85.00,
+    gratuity: 15.00,
+    tolls: 5.00,
+    waitTimeFee: 7.50,
+    discountAmount: 11.25,
+    totalAmount: 101.25,
+    status: 'unbilled',
+    createdAt: '2026-09-14T11:20:00.000Z',
+  },
+  {
+    id: 'unb-102',
+    tripId: 'tr-8842',
+    corporateAccountId: 'corp-1',
+    corporateAccountName: 'Boeing Defense & Space',
+    accountNumber: 'BA-77492',
+    passengerName: 'Sarah Jenkins (VP Eng)',
+    passengerPhone: '(314) 555-0143',
+    pickupDate: '2026-09-15',
+    pickupAddress: 'Lambert STL Terminal 2, St. Louis, MO',
+    dropoffAddress: 'Ritz-Carlton Clayton, MO',
+    baseFare: 65.00,
+    gratuity: 12.00,
+    tolls: 0.00,
+    waitTimeFee: 0.00,
+    discountAmount: 7.70,
+    totalAmount: 69.30,
+    status: 'unbilled',
+    createdAt: '2026-09-15T15:45:00.000Z',
+  },
+  {
+    id: 'unb-103',
+    tripId: 'tr-8845',
+    corporateAccountId: 'corp-2',
+    corporateAccountName: 'Centene Healthcare HQ',
+    accountNumber: 'CNC-99120',
+    passengerName: 'David Ortiz',
+    passengerPhone: '(314) 555-0281',
+    pickupDate: '2026-09-16',
+    pickupAddress: '7700 Forsyth Blvd, Clayton, MO',
+    dropoffAddress: 'Spirit of St. Louis Airport, Chesterfield, MO',
+    baseFare: 90.00,
+    gratuity: 15.00,
+    tolls: 4.00,
+    waitTimeFee: 5.00,
+    discountAmount: 11.40,
+    totalAmount: 102.60,
+    status: 'unbilled',
+    createdAt: '2026-09-16T09:10:00.000Z',
+  },
+];
 
 const INITIAL_MOCK_LEDGER_ENTRIES: FinancialLedgerEntry[] = [
   {
@@ -80,9 +145,11 @@ const INITIAL_MOCK_LEDGER_ENTRIES: FinancialLedgerEntry[] = [
 
 class InvoicingService implements IInvoicingService {
   private ledgerEntries: FinancialLedgerEntry[] = [];
+  private unbilledTransactions: CorporateUnbilledTransaction[] = [];
 
   constructor() {
     this.hydrateLedger();
+    this.hydrateUnbilled();
   }
 
   private hydrateLedger() {
@@ -109,6 +176,33 @@ class InvoicingService implements IInvoicingService {
       localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(this.ledgerEntries));
     } catch (e) {
       console.warn('[InvoicingService] Failed to persist ledger entries:', e);
+    }
+  }
+
+  private hydrateUnbilled() {
+    if (typeof window === 'undefined') {
+      this.unbilledTransactions = [...INITIAL_MOCK_UNBILLED_TRANSACTIONS];
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(UNBILLED_STORAGE_KEY);
+      if (stored) {
+        this.unbilledTransactions = JSON.parse(stored);
+      } else {
+        this.unbilledTransactions = [...INITIAL_MOCK_UNBILLED_TRANSACTIONS];
+        localStorage.setItem(UNBILLED_STORAGE_KEY, JSON.stringify(this.unbilledTransactions));
+      }
+    } catch {
+      this.unbilledTransactions = [...INITIAL_MOCK_UNBILLED_TRANSACTIONS];
+    }
+  }
+
+  private persistUnbilled() {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(UNBILLED_STORAGE_KEY, JSON.stringify(this.unbilledTransactions));
+    } catch (e) {
+      console.warn('[InvoicingService] Failed to persist unbilled transactions:', e);
     }
   }
 
@@ -243,6 +337,198 @@ class InvoicingService implements IInvoicingService {
     });
 
     return newInvoice;
+  }
+
+  async handleCorporateTripCompleted(
+    trip: Trip,
+    corporateAccount?: CorporateAccountConfig
+  ): Promise<CorporateUnbilledTransaction | null> {
+    if (!trip || (trip.payment?.method !== 'account' && trip.payment?.method !== 'corporate')) {
+      return null;
+    }
+
+    const corpId = trip.payment?.corporateAccountId || trip.customerId || 'corp-1';
+    let corpAccount = corporateAccount;
+    if (!corpAccount && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ct_app_settings');
+        if (raw) {
+          const settings = JSON.parse(raw);
+          const corps: CorporateAccountConfig[] = settings.corporateAccounts || [];
+          corpAccount = corps.find((c) => c.id === corpId || c.accountNumber === corpId);
+        }
+      } catch {}
+    }
+
+    const baseFare = trip.pricing?.totalFare || trip.pricing?.subtotal || 50.0;
+    const gratuity = trip.payment.tipAmount || 0;
+    const tolls = trip.payment.tollsAmount || 0;
+    const waitTimeFee = trip.payment.waitTimeAmount || 0;
+    const discountPercent = corpAccount?.discountPercent || 0;
+    const grossTotal = baseFare + gratuity + tolls + waitTimeFee;
+    const discountAmount = discountPercent > 0 ? Number(((grossTotal * discountPercent) / 100).toFixed(2)) : 0;
+    const netTotal = Number((grossTotal - discountAmount).toFixed(2));
+
+    const pickupDate = trip.actualPickupTime
+      ? trip.actualPickupTime.slice(0, 10)
+      : trip.scheduledPickupTime
+      ? trip.scheduledPickupTime.slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+
+    const passengerName = trip.passenger?.firstName
+      ? `${trip.passenger.firstName} ${trip.passenger.lastName || ''}`.trim()
+      : 'Corporate Traveler';
+
+    const unbilledTx: CorporateUnbilledTransaction = {
+      id: `unb-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+      tripId: trip.id,
+      corporateAccountId: corpAccount?.id || corpId,
+      corporateAccountName: corpAccount?.companyName || 'Corporate Partner Account',
+      accountNumber: corpAccount?.accountNumber,
+      passengerName,
+      passengerPhone: trip.passenger?.phone,
+      pickupDate,
+      pickupAddress: trip.pickupLocation?.address || 'Pickup Location',
+      dropoffAddress: trip.dropoffLocation?.address || 'Dropoff Location',
+      baseFare,
+      gratuity,
+      tolls,
+      waitTimeFee,
+      discountAmount,
+      totalAmount: netTotal,
+      status: 'unbilled',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Prepend and persist
+    this.unbilledTransactions = [unbilledTx, ...this.unbilledTransactions.filter((t) => t.tripId !== trip.id)];
+    this.persistUnbilled();
+
+    return unbilledTx;
+  }
+
+  async getUnbilledTransactions(corporateAccountId?: string): Promise<CorporateUnbilledTransaction[]> {
+    if (corporateAccountId) {
+      return this.unbilledTransactions.filter((t) => t.corporateAccountId === corporateAccountId);
+    }
+    return [...this.unbilledTransactions];
+  }
+
+  async generateInvoiceFromUnbilled(
+    corporateAccountId: string,
+    unbilledTxs: CorporateUnbilledTransaction[]
+  ): Promise<InvoiceRecord | null> {
+    if (!unbilledTxs || unbilledTxs.length === 0) return null;
+
+    const firstTx = unbilledTxs[0];
+    const customerName = firstTx.corporateAccountName || 'Corporate Partner';
+    const customerEmail = 'accounts.payable@' + customerName.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+
+    const lineItems = unbilledTxs.map((tx) => ({
+      description: `Ride ${tx.pickupDate}: ${tx.passengerName} (${tx.pickupAddress.split(',')[0]} ➔ ${tx.dropoffAddress.split(',')[0]})`,
+      amount: tx.totalAmount,
+    }));
+
+    const totalAmount = Number(lineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2));
+    const now = new Date();
+    const issuedDate = now.toISOString().slice(0, 10);
+    const dueDate = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+    const invoiceId = `inv-${Date.now().toString(36)}`;
+    const invoiceNumber = `INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newInvoice: InvoiceRecord = {
+      id: invoiceId,
+      invoiceNumber,
+      corporateAccountId,
+      customerName,
+      customerEmail,
+      tripIds: unbilledTxs.map((t) => t.tripId),
+      totalAmount,
+      status: 'issued',
+      issuedDate,
+      dueDate,
+      lineItems,
+      notes: `Consolidated corporate invoice covering ${unbilledTxs.length} transport runs. Terms: Net 30.`,
+    };
+
+    // Mark transactions as invoiced
+    const billedIds = new Set(unbilledTxs.map((t) => t.id));
+    this.unbilledTransactions = this.unbilledTransactions.map((tx) =>
+      billedIds.has(tx.id) ? { ...tx, status: 'invoiced' as const, invoiceId } : tx
+    );
+    this.persistUnbilled();
+
+    // Persist into app settings invoices cache
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ct_app_settings');
+        if (raw) {
+          const settings = JSON.parse(raw);
+          const invList: InvoiceRecord[] = settings.invoices || [];
+          settings.invoices = [newInvoice, ...invList.filter((i) => i.id !== newInvoice.id)];
+          localStorage.setItem('ct_app_settings', JSON.stringify(settings));
+        }
+      } catch {}
+    }
+
+    // Record ledger entry
+    await this.recordLedgerEntry({
+      date: issuedDate,
+      type: 'fare_revenue',
+      corporateAccountId,
+      invoiceId: newInvoice.id,
+      amount: totalAmount,
+      description: `Corporate Invoice ${invoiceNumber} issued to ${customerName} (${unbilledTxs.length} rides)`,
+      accountCode: '1200-AccountsReceivable',
+    });
+
+    return newInvoice;
+  }
+
+  async markInvoicePaid(invoiceId: string): Promise<InvoiceRecord | null> {
+    const today = new Date().toISOString().slice(0, 10);
+    let updatedInvoice: InvoiceRecord | null = null;
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ct_app_settings');
+        if (raw) {
+          const settings = JSON.parse(raw);
+          const invList: InvoiceRecord[] = settings.invoices || [];
+          const idx = invList.findIndex((i) => i.id === invoiceId);
+          if (idx >= 0) {
+            invList[idx] = {
+              ...invList[idx],
+              status: 'paid',
+              paidDate: today,
+            };
+            updatedInvoice = invList[idx];
+            settings.invoices = invList;
+            localStorage.setItem('ct_app_settings', JSON.stringify(settings));
+          }
+        }
+      } catch {}
+    }
+
+    // Mark all associated unbilled transactions as paid
+    this.unbilledTransactions = this.unbilledTransactions.map((tx) =>
+      tx.invoiceId === invoiceId ? { ...tx, status: 'paid' as const } : tx
+    );
+    this.persistUnbilled();
+
+    if (updatedInvoice) {
+      await this.recordLedgerEntry({
+        date: today,
+        type: 'fare_revenue',
+        corporateAccountId: updatedInvoice.corporateAccountId,
+        invoiceId: updatedInvoice.id,
+        amount: updatedInvoice.totalAmount,
+        description: `Settlement received for Invoice ${updatedInvoice.invoiceNumber} (${updatedInvoice.customerName})`,
+        accountCode: '1010-OperatingAccount',
+      });
+    }
+
+    return updatedInvoice;
   }
 
   async recordLedgerEntry(entry: Omit<FinancialLedgerEntry, 'id' | 'createdAt'>): Promise<FinancialLedgerEntry> {
