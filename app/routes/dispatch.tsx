@@ -901,7 +901,8 @@ export default function DispatchRoute() {
       } else if (e.key === 'm' || e.key === 'M') {
         setActiveDockTab('none');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'c' || e.key === 'C') {
-        setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
+        setCommsInitialTab('phone');
+        setActiveDockTab((prev) => (prev === 'phone' || (prev === 'comms' && commsInitialTab === 'phone') ? 'none' : 'phone'));
       } else if (e.key === 'e' || e.key === 'E') {
         setActiveDockTab((prev) => (prev === 'email' ? 'none' : 'email'));
       } else if (e.key === 'd' || e.key === 'D') {
@@ -2340,9 +2341,16 @@ export default function DispatchRoute() {
             {/* Phone Tab (Calls, SMS, Voicemail) */}
             <button
               type="button"
-              onClick={() => setActiveDockTab(activeDockTab === 'phone' || activeDockTab === 'comms' ? 'none' : 'phone')}
+              onClick={() => {
+                if (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) {
+                  setActiveDockTab('none');
+                } else {
+                  setCommsInitialTab('phone');
+                  setActiveDockTab('phone');
+                }
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeDockTab === 'phone' || activeDockTab === 'comms'
+                activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100'
               }`}
@@ -2424,14 +2432,10 @@ export default function DispatchRoute() {
             trips={trips}
             missedCallsCount={missedCallsCount}
             isPhoneDockActive={
-              (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) ||
-              (activeMobileTab === 'comms' && commsInitialTab === 'phone')
+              activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')
             }
             onTogglePhoneDock={() => {
-              if (
-                (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) &&
-                activeMobileTab !== 'messages'
-              ) {
+              if (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) {
                 setActiveDockTab('none');
               } else {
                 setCommsInitialTab('phone');
@@ -2486,15 +2490,17 @@ export default function DispatchRoute() {
           <button
             type="button"
             onClick={() => {
-              setCommsInitialTab('messages');
-              setActiveDockTab((prev) =>
-                (prev === 'comms' || prev === 'phone') && commsInitialTab === 'messages' ? 'none' : 'comms'
-              );
-              setActiveMobileTab('messages');
-              setUnreadMessagesCount(0);
+              if (activeDockTab === 'comms' && commsInitialTab === 'messages') {
+                setActiveDockTab('none');
+              } else {
+                setCommsInitialTab('messages');
+                setActiveDockTab('comms');
+                setActiveMobileTab('messages');
+                setUnreadMessagesCount(0);
+              }
             }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              (activeDockTab === 'comms' && commsInitialTab === 'messages') || activeMobileTab === 'messages'
+              activeDockTab === 'comms' && commsInitialTab === 'messages'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
             }`}
@@ -2780,12 +2786,13 @@ export default function DispatchRoute() {
                 <button
                   type="button"
                   onClick={() => {
+                    setCommsInitialTab('phone');
                     setActiveDockTab('phone');
                     setActiveMobileTab('comms');
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeDockTab === 'phone' || activeDockTab === 'comms' || activeMobileTab === 'comms'
+                    (activeDockTab !== 'none' ? (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) : activeMobileTab === 'comms')
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
@@ -2796,7 +2803,7 @@ export default function DispatchRoute() {
                   </div>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      activeDockTab === 'phone' || activeDockTab === 'comms' || activeMobileTab === 'comms'
+                      (activeDockTab !== 'none' ? (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) : activeMobileTab === 'comms')
                         ? 'bg-white/20 text-white'
                         : 'bg-slate-800 text-slate-300 border border-slate-700'
                     }`}
@@ -2862,7 +2869,7 @@ export default function DispatchRoute() {
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeDockTab === 'drivers' || activeMobileTab === 'drivers'
+                    (activeDockTab !== 'none' ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
@@ -2873,7 +2880,7 @@ export default function DispatchRoute() {
                   </div>
                   <span
                     className={`text-[11px] font-bold ${
-                      activeDockTab === 'drivers' || activeMobileTab === 'drivers'
+                      (activeDockTab !== 'none' ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
                         ? 'text-white'
                         : 'text-slate-300'
                     }`}
@@ -4018,8 +4025,8 @@ export default function DispatchRoute() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
-                                  setIsPhoneOpen(true);
-                                  setActiveDockTab('comms');
+                                  setCommsInitialTab('phone');
+                                  setActiveDockTab('phone');
                                 }}
                                 className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
                                 title="Click-to-Call Passenger via WebRTC Softphone"
@@ -4362,8 +4369,8 @@ export default function DispatchRoute() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
-                                      setIsPhoneOpen(true);
-                                      setActiveDockTab('comms');
+                                      setCommsInitialTab('phone');
+                                      setActiveDockTab('phone');
                                     }}
                                     className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
                                     title="Click-to-Call Passenger via WebRTC Softphone"
@@ -4936,7 +4943,8 @@ export default function DispatchRoute() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setActiveDockTab('comms');
+                                  setCommsInitialTab('phone');
+                                  setActiveDockTab('phone');
                                   handleStartCall(driver.phone, driver.name);
                                 }}
                                 className="font-mono text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
