@@ -21,21 +21,42 @@ export interface TelephonyApiRequest {
 }
 
 /**
- * Formats a phone number to standard E.164 (+1XXXXXXXXXX) format
+ * Sanitizes and formats an input phone number to standard E.164 (+1XXXXXXXXXX) format.
+ * Replaces all non-numeric characters except leading '+'.
+ * Examples:
+ *   "314-585-7762"       => "+13145857762"
+ *   "13145857762"        => "+13145857762"
+ *   "+13145857762"       => "+13145857762"
+ *   "(314) 585-7762"     => "+13145857762"
+ *   "+1 (314) 585-7762"  => "+13145857762"
  */
-function toE164(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return `+1${digits}`;
+export function sanitizePhoneNumber(phone: string | undefined | null): string {
+  if (!phone || typeof phone !== 'string') return '';
+  const trimmed = phone.trim();
+  const hasLeadingPlus = trimmed.startsWith('+');
+  const digitsOnly = trimmed.replace(/\D/g, '');
+
+  if (!digitsOnly) return '';
+
+  if (hasLeadingPlus) {
+    return `+${digitsOnly}`;
   }
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`;
+
+  // 10 digits: US/Canada standard NANP without country code
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
   }
-  if (digits.length > 0 && !phone.startsWith('+')) {
-    return `+${digits}`;
+
+  // 11 digits starting with 1: US/Canada with country code but missing leading '+'
+  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
   }
-  return phone.trim();
+
+  return `+${digitsOnly}`;
 }
+
+export const toE164 = sanitizePhoneNumber;
+
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -138,17 +159,56 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
+    // Helper to validate E.164 phone numbers (+1XXXXXXXXXX or international)
+    const isValidE164 = (num: string) => /^\+[1-9]\d{9,14}$/.test(num);
+
     // ─── 1. Outbound Voice Call via Twilio REST API ───
     if (data.action === 'make_call') {
       if (!data.to) {
         return Response.json(
-          { success: false, error: 'Destination phone number "to" is required.' },
-          { status: 400 }
+          {
+            success: false,
+            code: 'INVALID_TO_NUMBER',
+            error: 'Destination phone number "to" is required.',
+            message: 'Number must be verified in Twilio Trial Console',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
-      const formattedTo = toE164(data.to);
-      const formattedFrom = toE164(data.from || twilioFromNumber);
+      // Sanitize input numbers to E.164 before initiating Twilio call
+      const formattedTo = sanitizePhoneNumber(data.to);
+      const formattedFrom = sanitizePhoneNumber(data.from || twilioFromNumber);
+
+      if (!isValidE164(formattedTo)) {
+        return Response.json(
+          {
+            success: false,
+            code: 'INVALID_TO_NUMBER',
+            error: `Invalid destination number "${data.to}". Number must be verified in Twilio Trial Console.`,
+            message: 'Number must be verified in Twilio Trial Console',
+            to: data.to,
+            formattedTo,
+            help: 'https://www.twilio.com/console/phone-numbers/verified',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!isValidE164(formattedFrom)) {
+        return Response.json(
+          {
+            success: false,
+            code: 'INVALID_FROM_NUMBER',
+            error: `Invalid caller ID number "${data.from || twilioFromNumber}". Number must be verified in Twilio Trial Console.`,
+            message: 'Number must be verified in Twilio Trial Console',
+            from: data.from || twilioFromNumber,
+            formattedFrom,
+            help: 'https://www.twilio.com/console/phone-numbers/verified',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
 
       const twiml =
         data.customTwiml ||
@@ -181,17 +241,40 @@ export async function action({ request }: ActionFunctionArgs) {
           to: callResult.to,
           from: callResult.from,
           message: `Outbound call placed to ${formattedTo}. Your cell phone should ring shortly!`,
-        });
+        }, { headers: { 'Content-Type': 'application/json' } });
       } else {
+        const isParamOrTrialIssue =
+          callResult.code === 21608 || // Unverified 'To' number on trial account
+          callResult.code === 21211 || // Invalid 'To' Phone Number
+          callResult.code === 21212 || // Invalid 'From' Phone Number
+          callResult.code === 21606 || // 'From' number is not a valid incoming number
+          callResult.code === 21219 || // 'To' phone number not verified
+          callResult.code === 21408 || // Geo permissions
+          callResult.code === 21614 || // Not a valid mobile number
+          (callResult.message &&
+            (callResult.message.toLowerCase().includes('unverified') ||
+             callResult.message.toLowerCase().includes('trial') ||
+             callResult.message.toLowerCase().includes('verify') ||
+             callResult.message.toLowerCase().includes('caller id') ||
+             callResult.message.toLowerCase().includes('permission')));
+
+        const errorMsg = isParamOrTrialIssue
+          ? 'Number must be verified in Twilio Trial Console'
+          : (callResult.message || 'Twilio call placement failed');
+
         return Response.json(
           {
             success: false,
-            code: 'TWILIO_CALL_FAILED',
-            error: callResult.message || 'Twilio call placement failed',
+            code: isParamOrTrialIssue ? 'TWILIO_NUMBER_UNVERIFIED' : 'TWILIO_CALL_FAILED',
+            error: errorMsg,
+            message: 'Number must be verified in Twilio Trial Console',
+            details: callResult.message,
             twilioCode: callResult.code,
-            moreInfo: callResult.more_info,
+            moreInfo: callResult.more_info || 'https://www.twilio.com/console/phone-numbers/verified',
+            to: formattedTo,
+            from: formattedFrom,
           },
-          { status: 400 }
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
     }
@@ -200,13 +283,49 @@ export async function action({ request }: ActionFunctionArgs) {
     if (data.action === 'send_sms') {
       if (!data.to || !data.body) {
         return Response.json(
-          { success: false, error: '"to" and "body" are required for SMS dispatch.' },
-          { status: 400 }
+          {
+            success: false,
+            code: 'INVALID_PARAMETERS',
+            error: '"to" and "body" are required for SMS dispatch.',
+            message: 'Number must be verified in Twilio Trial Console',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
-      const formattedTo = toE164(data.to);
-      const formattedFrom = toE164(data.from || twilioFromNumber);
+      // Sanitize input numbers to E.164 before initiating Twilio SMS
+      const formattedTo = sanitizePhoneNumber(data.to);
+      const formattedFrom = sanitizePhoneNumber(data.from || twilioFromNumber);
+
+      if (!isValidE164(formattedTo)) {
+        return Response.json(
+          {
+            success: false,
+            code: 'INVALID_TO_NUMBER',
+            error: `Invalid destination number "${data.to}". Number must be verified in Twilio Trial Console.`,
+            message: 'Number must be verified in Twilio Trial Console',
+            to: data.to,
+            formattedTo,
+            help: 'https://www.twilio.com/console/phone-numbers/verified',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!isValidE164(formattedFrom)) {
+        return Response.json(
+          {
+            success: false,
+            code: 'INVALID_FROM_NUMBER',
+            error: `Invalid sender phone number "${data.from || twilioFromNumber}". Number must be verified in Twilio Trial Console.`,
+            message: 'Number must be verified in Twilio Trial Console',
+            from: data.from || twilioFromNumber,
+            formattedFrom,
+            help: 'https://www.twilio.com/console/phone-numbers/verified',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
 
       const params = new URLSearchParams();
       params.append('To', formattedTo);
@@ -235,17 +354,40 @@ export async function action({ request }: ActionFunctionArgs) {
           to: smsResult.to,
           from: smsResult.from,
           message: `SMS message sent successfully to ${formattedTo}!`,
-        });
+        }, { headers: { 'Content-Type': 'application/json' } });
       } else {
+        const isParamOrTrialIssue =
+          smsResult.code === 21608 ||
+          smsResult.code === 21211 ||
+          smsResult.code === 21212 ||
+          smsResult.code === 21606 ||
+          smsResult.code === 21219 ||
+          smsResult.code === 21408 ||
+          smsResult.code === 21614 ||
+          (smsResult.message &&
+            (smsResult.message.toLowerCase().includes('unverified') ||
+             smsResult.message.toLowerCase().includes('trial') ||
+             smsResult.message.toLowerCase().includes('verify') ||
+             smsResult.message.toLowerCase().includes('caller id') ||
+             smsResult.message.toLowerCase().includes('permission')));
+
+        const errorMsg = isParamOrTrialIssue
+          ? 'Number must be verified in Twilio Trial Console'
+          : (smsResult.message || 'Twilio SMS dispatch failed');
+
         return Response.json(
           {
             success: false,
-            code: 'TWILIO_SMS_FAILED',
-            error: smsResult.message || 'Twilio SMS dispatch failed',
+            code: isParamOrTrialIssue ? 'TWILIO_NUMBER_UNVERIFIED' : 'TWILIO_SMS_FAILED',
+            error: errorMsg,
+            message: 'Number must be verified in Twilio Trial Console',
+            details: smsResult.message,
             twilioCode: smsResult.code,
-            moreInfo: smsResult.more_info,
+            moreInfo: smsResult.more_info || 'https://www.twilio.com/console/phone-numbers/verified',
+            to: formattedTo,
+            from: formattedFrom,
           },
-          { status: 400 }
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
     }

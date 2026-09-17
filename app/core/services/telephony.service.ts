@@ -19,6 +19,35 @@ import { doc, updateDoc } from 'firebase/firestore';
 const MASKED_SESSIONS_STORAGE_KEY = 'ct_telephony_masked_sessions';
 const SMS_HISTORY_STORAGE_KEY = 'ct_telephony_sms_history';
 
+/**
+ * Sanitizes and formats an input phone number to standard E.164 (+1XXXXXXXXXX).
+ * Replaces all non-numeric characters except leading '+'.
+ * Examples:
+ *   "314-585-7762"   => "+13145857762"
+ *   "13145857762"    => "+13145857762"
+ *   "+13145857762"   => "+13145857762"
+ */
+export function sanitizePhoneNumber(phone: string | undefined | null): string {
+  if (!phone || typeof phone !== 'string') return '';
+  const trimmed = phone.trim();
+  const hasLeadingPlus = trimmed.startsWith('+');
+  const digitsOnly = trimmed.replace(/\D/g, '');
+
+  if (!digitsOnly) return '';
+
+  if (hasLeadingPlus) {
+    return `+${digitsOnly}`;
+  }
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
+  }
+  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
+  }
+  return `+${digitsOnly}`;
+}
+
+
 class TelephonyService implements ITelephonyService {
   private sessions: Map<string, MaskedRelaySession> = new Map();
   private smsLogs: SmsNotification[] = [];

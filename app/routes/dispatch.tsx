@@ -45,7 +45,7 @@ import {
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
-import { getTelephonyService } from '../core/services/telephony.service';
+import { getTelephonyService, sanitizePhoneNumber } from '../core/services/telephony.service';
 import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../components/ui/LayoutToggle';
@@ -178,18 +178,41 @@ function TripActionDropdown({
   const updatePosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const menuWidth = 220;
-    const menuHeight = 280;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward = spaceBelow < menuHeight && rect.top > menuHeight;
-    const top = openUpward ? rect.top - menuHeight - 4 : rect.bottom + 4;
-    const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+    const menuEl = menuRef.current;
+    const menuWidth = 208; // width in px
+    // Use measured height if mounted, otherwise estimate based on items
+    const menuHeight = menuEl?.offsetHeight || (isUnconfirmed ? 200 : 165);
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    // Overlay directly below if there is enough space, otherwise overlay directly above
+    const openUpward = spaceBelow < (menuHeight + 8) && spaceAbove > spaceBelow;
+
+    const top = openUpward
+      ? Math.max(8, rect.top - menuHeight - 4)
+      : Math.min(viewportHeight - menuHeight - 8, rect.bottom + 4);
+
+    // Align dropdown right edge with the trigger button right edge
+    let left = rect.right - menuWidth;
+    if (left < 8) {
+      left = Math.max(8, rect.left);
+    }
+    if (left + menuWidth > viewportWidth - 8) {
+      left = Math.max(8, viewportWidth - menuWidth - 8);
+    }
+
     setCoords({ top, left });
-  }, []);
+  }, [isUnconfirmed]);
 
   useEffect(() => {
     if (!isOpen) return;
     updatePosition();
+
+    // Re-measure on next animation frame after portal mounts to ensure exact DOM height
+    const rafId = requestAnimationFrame(updatePosition);
 
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -200,13 +223,23 @@ function TripActionDropdown({
       }
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    }
+
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose, updatePosition]);
 
@@ -222,11 +255,21 @@ function TripActionDropdown({
           e.stopPropagation();
           onToggle();
         }}
-        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+        className={`px-2.5 py-1 rounded-lg border font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+          isOpen
+            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-300'
+        }`}
         title="Trip Actions"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
       >
         <span>Actions</span>
-        <ChevronDownIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+        <ChevronDownIcon
+          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+            isOpen ? 'rotate-180 text-blue-600' : 'text-slate-500'
+          }`}
+        />
       </button>
 
       {isOpen && typeof document !== 'undefined' && createPortal(
@@ -236,13 +279,13 @@ function TripActionDropdown({
             position: 'fixed',
             top: `${coords.top}px`,
             left: `${coords.left}px`,
-            width: '220px',
+            width: '208px',
             zIndex: 99999,
           }}
-          className="bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
+          className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl">
             <span className="font-mono text-slate-600">Trip #{trip.id.slice(0, 8)}</span>
             <span className={`capitalize px-1.5 py-0.2 rounded-md font-bold text-[10px] ${
               isCompleted
@@ -256,7 +299,7 @@ function TripActionDropdown({
           </div>
 
           <div className="py-1">
-            {/* On mobile: include Edit and Focus Map (auto-switches mobile tabs) */}
+            {/* On mobile: include Edit and Focus Map */}
             {!isDesktop && (
               <>
                 <button
@@ -1642,11 +1685,11 @@ export default function DispatchRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'make_call',
-          to: numToCall,
+          to: sanitizePhoneNumber(numToCall),
           credentials: {
             accountSid: twilioSid,
             authToken: twilioToken,
-            phoneNumber: twilioPhone,
+            phoneNumber: sanitizePhoneNumber(twilioPhone),
           },
         }),
       });

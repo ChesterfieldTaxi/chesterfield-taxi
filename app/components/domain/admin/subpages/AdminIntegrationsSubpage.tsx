@@ -13,6 +13,8 @@ import {
   CheckIcon,
   LockIcon,
 } from '../../../ui/Icons';
+import { sanitizePhoneNumber } from '../../../../core/services/telephony.service';
+
 
 export type IntegrationsSubTab = 'gateways' | 'telephony' | 'webhooks';
 
@@ -275,24 +277,25 @@ export function AdminIntegrationsSubpage({
   };
 
   const handleTriggerTestCall = async () => {
-    if (!testCallPhone.trim()) {
+    const cleanTo = sanitizePhoneNumber(testCallPhone);
+    if (!cleanTo) {
       setTestCallStatus('error');
-      setTestCallMsg('Please enter a recipient cell phone number to ring.');
+      setTestCallMsg('Please enter a valid recipient cell phone number to ring.');
       return;
     }
     setTestCallStatus('calling');
-    setTestCallMsg(`Initiating outbound call to ${testCallPhone}...`);
+    setTestCallMsg(`Initiating outbound call to ${cleanTo}...`);
     try {
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'make_call',
-          to: testCallPhone.trim(),
+          to: cleanTo,
           credentials: {
             accountSid: twilioSid.trim(),
             authToken: twilioToken.trim(),
-            phoneNumber: twilioPhone.trim(),
+            phoneNumber: sanitizePhoneNumber(twilioPhone.trim()),
           },
         }),
       });
@@ -313,7 +316,11 @@ export function AdminIntegrationsSubpage({
         );
       } else {
         setTestCallStatus('error');
-        setTestCallMsg(data.message || data.error || 'Failed to trigger outbound call via Twilio.');
+        setTestCallMsg(
+          data.message === 'Number must be verified in Twilio Trial Console'
+            ? '⚠️ Number must be verified in Twilio Trial Console. In trial mode, Twilio only connects to verified Caller IDs.'
+            : (data.error || data.message || 'Failed to trigger outbound call via Twilio.')
+        );
       }
     } catch (err: any) {
       setTestCallStatus('error');
@@ -322,25 +329,26 @@ export function AdminIntegrationsSubpage({
   };
 
   const handleTriggerTestSms = async () => {
-    if (!testSmsPhone.trim()) {
+    const cleanTo = sanitizePhoneNumber(testSmsPhone);
+    if (!cleanTo) {
       setTestSmsStatus('error');
-      setTestSmsMsg('Please enter a recipient phone number for the test SMS.');
+      setTestSmsMsg('Please enter a valid recipient phone number for the test SMS.');
       return;
     }
     setTestSmsStatus('sending');
-    setTestSmsMsg(`Dispatching SMS to ${testSmsPhone}...`);
+    setTestSmsMsg(`Dispatching SMS to ${cleanTo}...`);
     try {
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'send_sms',
-          to: testSmsPhone.trim(),
+          to: cleanTo,
           body: testSmsBody.trim(),
           credentials: {
             accountSid: twilioSid.trim(),
             authToken: twilioToken.trim(),
-            phoneNumber: twilioPhone.trim(),
+            phoneNumber: sanitizePhoneNumber(twilioPhone.trim()),
           },
         }),
       });
@@ -358,7 +366,11 @@ export function AdminIntegrationsSubpage({
         setTestSmsMsg(data.message || `SMS sent! Message SID: ${data.messageSid}. Check your phone.`);
       } else {
         setTestSmsStatus('error');
-        setTestSmsMsg(data.message || data.error || 'Failed to send SMS via Twilio.');
+        setTestSmsMsg(
+          data.message === 'Number must be verified in Twilio Trial Console'
+            ? '⚠️ Number must be verified in Twilio Trial Console. In trial mode, Twilio only sends SMS to verified Caller IDs.'
+            : (data.error || data.message || 'Failed to send SMS via Twilio.')
+        );
       }
     } catch (err: any) {
       setTestSmsStatus('error');
