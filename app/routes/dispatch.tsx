@@ -2423,6 +2423,22 @@ export default function DispatchRoute() {
           <DispatchHeaderCallHud
             trips={trips}
             missedCallsCount={missedCallsCount}
+            isPhoneDockActive={
+              (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) ||
+              (activeMobileTab === 'comms' && commsInitialTab === 'phone')
+            }
+            onTogglePhoneDock={() => {
+              if (
+                (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) &&
+                activeMobileTab !== 'messages'
+              ) {
+                setActiveDockTab('none');
+              } else {
+                setCommsInitialTab('phone');
+                setActiveDockTab('phone');
+                setActiveMobileTab('comms');
+              }
+            }}
             onOpenBooking={() => setActiveMobileTab('booking')}
             onOpenEditTrip={(tripId) => {
               const found = trips.find((t) => t.id === tripId) || {
@@ -2441,7 +2457,8 @@ export default function DispatchRoute() {
               setActiveMobileTab('booking');
             }}
             onOpenComms={(tab, phone) => {
-              setActiveDockTab('comms');
+              if (tab) setCommsInitialTab(tab);
+              setActiveDockTab(tab === 'phone' ? 'phone' : 'comms');
               setActiveMobileTab('comms');
             }}
             onPopulateBooking={(payload) => {
@@ -2470,12 +2487,14 @@ export default function DispatchRoute() {
             type="button"
             onClick={() => {
               setCommsInitialTab('messages');
-              setActiveDockTab((prev) => (prev === 'comms' ? 'none' : 'comms'));
+              setActiveDockTab((prev) =>
+                (prev === 'comms' || prev === 'phone') && commsInitialTab === 'messages' ? 'none' : 'comms'
+              );
               setActiveMobileTab('messages');
               setUnreadMessagesCount(0);
             }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              activeDockTab === 'comms' || activeMobileTab === 'comms'
+              (activeDockTab === 'comms' && commsInitialTab === 'messages') || activeMobileTab === 'messages'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
             }`}
@@ -4699,7 +4718,7 @@ export default function DispatchRoute() {
         {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (DESKTOP SINGLE ACTIVE VIEW) ─── */}
         {activeDockTab !== 'none' && (
           <aside
-            className="hidden lg:flex relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-lg"
+            className="hidden lg:flex relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-2xl animate-in slide-in-from-right duration-250 ease-out"
             style={{ width: `${operationsWidth}px` }}
           >
             {/* Horizontal Resize Drag Handle on Left Edge */}
@@ -4717,9 +4736,12 @@ export default function DispatchRoute() {
               <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setActiveDockTab('phone')}
+                  onClick={() => {
+                    setCommsInitialTab('phone');
+                    setActiveDockTab('phone');
+                  }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'phone' || activeDockTab === 'comms'
+                    activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}

@@ -28,6 +28,8 @@ interface DispatchHeaderCallHudProps {
   onOpenComms?: (tab?: 'all' | 'phone' | 'messages' | 'voicemail', phone?: string) => void;
   onPopulateBooking?: (data: any) => void;
   missedCallsCount?: number;
+  isPhoneDockActive?: boolean;
+  onTogglePhoneDock?: () => void;
 }
 
 export function DispatchHeaderCallHud({
@@ -37,6 +39,8 @@ export function DispatchHeaderCallHud({
   onOpenComms,
   onPopulateBooking,
   missedCallsCount = 0,
+  isPhoneDockActive = false,
+  onTogglePhoneDock,
 }: DispatchHeaderCallHudProps) {
   const [activeCall, setActiveCall] = useState<{
     callSid?: string;
@@ -54,12 +58,6 @@ export function DispatchHeaderCallHud({
 
   // Dropdown visibility states
   const [showInboundFlydown, setShowInboundFlydown] = useState(false);
-  const [showCallpadFlydown, setShowCallpadFlydown] = useState(false);
-
-  // Callpad state
-  const [dialedNumber, setDialedNumber] = useState('');
-  const [activeDialerStatus, setActiveDialerStatus] = useState<'idle' | 'calling' | 'connected'>('idle');
-  const [dialerDuration, setDialerDuration] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const workspaceBus = getWorkspaceBus();
@@ -81,7 +79,6 @@ export function DispatchHeaderCallHud({
         setCallState('incoming');
         setCallDuration(0);
         setShowInboundFlydown(true);
-        setShowCallpadFlydown(false);
       } else if (msg.type === 'CALL_ENDED') {
         setActiveCall(null);
         setShowInboundFlydown(false);
@@ -109,47 +106,33 @@ export function DispatchHeaderCallHud({
 
   // Connected call duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let timer: NodeJS.Timeout | null = null;
     if (activeCall && callState === 'connected') {
-      interval = setInterval(() => {
+      timer = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
     }
     return () => {
-      if (interval) clearInterval(interval);
+      if (timer) clearInterval(timer);
     };
   }, [activeCall, callState]);
 
-  // Outbound callpad duration timer
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (activeDialerStatus === 'connected') {
-      interval = setInterval(() => {
-        setDialerDuration((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeDialerStatus]);
-
-  // Close flydowns on outside click
+  // Dismiss HUD when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowInboundFlydown(false);
-        setShowCallpadFlydown(false);
       }
     }
-    if (showInboundFlydown || showCallpadFlydown) {
+    if (showInboundFlydown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showInboundFlydown, showCallpadFlydown]);
+  }, [showInboundFlydown]);
 
-  // Handle answering call inside flydown (dock stays untouched)
+  // Handle answering call: sets connected, publishes to bus, and opens phone dock
   const handleAnswer = () => {
     if (!activeCall) return;
     setCallState('connected');
@@ -157,6 +140,9 @@ export function DispatchHeaderCallHud({
       callSid: activeCall.callSid,
       callerNumber: activeCall.callerNumber,
     });
+    if (onOpenComms) {
+      onOpenComms('phone', activeCall.callerNumber);
+    }
   };
 
   // Handle ending call
@@ -242,25 +228,6 @@ export function DispatchHeaderCallHud({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const handleDialerKeyPress = (key: string) => {
-    setDialedNumber((prev) => prev + key);
-  };
-
-  const handleStartDialerCall = () => {
-    if (!dialedNumber) return;
-    setActiveDialerStatus('calling');
-    setTimeout(() => {
-      setActiveDialerStatus('connected');
-    }, 1200);
-  };
-
-  const handleEndDialerCall = () => {
-    setActiveDialerStatus('idle');
-    setDialerDuration(0);
-  };
-
-  const [showMaintenanceTools, setShowMaintenanceTools] = useState(false);
-
   return (
     <div className="relative inline-flex items-center gap-1.5" ref={containerRef}>
       {/* RESTING STATE: Phone Icon Button with Missed Counter */}
@@ -268,17 +235,14 @@ export function DispatchHeaderCallHud({
         <div className="relative">
           <button
             type="button"
-            onClick={() => {
-              setShowCallpadFlydown((prev) => !prev);
-              setShowInboundFlydown(false);
-            }}
+            onClick={onTogglePhoneDock}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              showCallpadFlydown
+              isPhoneDockActive
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
             }`}
-            title="Open Softphone Callpad"
-            aria-label="Phone Callpad"
+            title="Phone Hub & Dialpad (Alt+P)"
+            aria-label="Phone"
           >
             <PhoneIcon className="w-4 h-4" />
             {missedCallsCount > 0 && (
@@ -287,167 +251,6 @@ export function DispatchHeaderCallHud({
               </span>
             )}
           </button>
-
-          {/* CALLPAD FLYDOWN (Anchored Directly Below Call Icon) */}
-          {showCallpadFlydown && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <PhoneIcon className="w-4 h-4 text-emerald-400" />
-                  <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
-                    Callpad / Softphone
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCallpadFlydown(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Close callpad"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-
-              {activeDialerStatus === 'idle' ? (
-                <div className="p-3.5 space-y-3">
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                    <span>Caller ID:</span>
-                    <span className="font-bold text-slate-700">(314) 738-0100</span>
-                  </div>
-
-                  {/* Dialed Number Display */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={dialedNumber}
-                      onChange={(e) => setDialedNumber(e.target.value)}
-                      placeholder="Enter number..."
-                      className="w-full text-center font-mono font-black text-lg py-2 px-8 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 tracking-wider focus:outline-blue-500"
-                    />
-                    {dialedNumber && (
-                      <button
-                        type="button"
-                        onClick={() => setDialedNumber('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 12-Key DTMF Dialpad */}
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { key: '1', sub: '' },
-                      { key: '2', sub: 'ABC' },
-                      { key: '3', sub: 'DEF' },
-                      { key: '4', sub: 'GHI' },
-                      { key: '5', sub: 'JKL' },
-                      { key: '6', sub: 'MNO' },
-                      { key: '7', sub: 'PQRS' },
-                      { key: '8', sub: 'TUV' },
-                      { key: '9', sub: 'WXYZ' },
-                      { key: '*', sub: '' },
-                      { key: '0', sub: '+' },
-                      { key: '#', sub: '' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.key}
-                        type="button"
-                        onClick={() => handleDialerKeyPress(btn.key)}
-                        className="h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-blue-100 active:scale-95 text-slate-800 font-bold transition-all flex flex-col items-center justify-center cursor-pointer shadow-2xs"
-                      >
-                        <span className="text-sm font-black leading-none">{btn.key}</span>
-                        {btn.sub && (
-                          <span className="text-[8px] text-slate-400 leading-none">{btn.sub}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Call Controls */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setDialedNumber((prev) => prev.slice(0, -1))}
-                      disabled={!dialedNumber}
-                      className="p-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex-1"
-                    >
-                      ⌫ Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStartDialerCall}
-                      disabled={!dialedNumber.trim()}
-                      className="p-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer flex-2 flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
-                    >
-                      <PhoneIcon className="w-3.5 h-3.5" />
-                      <span>Call</span>
-                    </button>
-                  </div>
-
-                  {/* Maintenance & Diagnostics Section */}
-                  <div className="pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setShowMaintenanceTools((prev) => !prev)}
-                      className="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 font-semibold py-1 cursor-pointer transition-colors"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <span>🛠️</span>
-                        <span>Diagnostics & Simulation</span>
-                      </span>
-                      <span>{showMaintenanceTools ? '▲' : '▼'}</span>
-                    </button>
-                    {showMaintenanceTools && (
-                      <div className="mt-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 animate-in fade-in duration-100">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-500 font-medium">Inbound Call Screen Pop:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCallpadFlydown(false);
-                              handleSimulateInboundCall();
-                            }}
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-white cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Simulate inbound call for staff diagnostics"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            <span>Simulate Inbound</span>
-                          </button>
-                        </div>
-                        <p className="text-[9px] text-slate-400 leading-tight">
-                          Live Twilio voice is active. This simulation triggers local screen pops and caller matching without placing a phone call.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Active Outbound Call State */
-                <div className="p-4 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto animate-pulse">
-                    <PhoneIcon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 font-mono">{dialedNumber}</h4>
-                    <p className="text-xs text-slate-500 font-medium">
-                      {activeDialerStatus === 'calling'
-                        ? 'Connecting...'
-                        : `Connected • ${formatSecs(dialerDuration)}`}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleEndDialerCall}
-                    className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-                  >
-                    End Call
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       ) : (
         /* INCOMING / IN-CALL STATE: Emerald Pulsing Pill */

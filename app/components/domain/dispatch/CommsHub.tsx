@@ -1764,13 +1764,45 @@ export function CommsHub({
                       </div>
                     </div>
                   )}
+
+                  {/* Diagnostics & Simulation */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-medium">Inbound Call HUD:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        getWorkspaceBus().publish('CALL_INCOMING', {
+                          callSid: `CA_${Date.now()}`,
+                          callerNumber: '(314) 532-1200',
+                          callerName: 'Sarah Jenkins',
+                          numberType: 'home',
+                          mobileForSms: '(314) 532-1200',
+                          upcomingBookings: [
+                            {
+                              id: 'bk-994',
+                              time: 'Tomorrow 6:00 AM',
+                              pickupAddress: '14848 Conway Rd, Chesterfield, MO',
+                              dropoffAddress: 'Lambert Airport Terminal 1 (STL)',
+                              fare: 68.5,
+                            },
+                          ],
+                          vipTag: 'VIP Executive',
+                        });
+                      }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs"
+                      title="Simulate incoming call to test screen-pop HUD and ring audio"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Simulate Inbound</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* SUB-VIEW 2: CALL HISTORY */}
             {callsSubTab === 'history' && (
-              <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-y-auto">
+              <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
                 <CommsBatchActionBar
                   selectedCount={selectedItemIds.size}
                   onMarkRead={handleBatchMarkRead}
@@ -1802,7 +1834,7 @@ export function CommsHub({
                     placeholder="Filter call history..."
                   />
                 )}
-                <div className="p-3 space-y-2.5">
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
                   {filteredHistoryCalls.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 space-y-2">
                       <p className="text-xs font-bold text-slate-600">No Call History Matches</p>
@@ -1819,12 +1851,12 @@ export function CommsHub({
                       <div
                         key={call.id}
                         onClick={() => handleToggleSelectRow(call.id)}
-                        className={`p-3 rounded-2xl border transition-all space-y-2 border-l-4 cursor-pointer ${
+                        className={`group relative p-3.5 transition-all cursor-pointer space-y-2 border-l-4 ${
                           isRowSelected
-                            ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                            ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
                             : call.isUnread
-                            ? 'bg-blue-50/70 hover:bg-blue-100/60 border-blue-200 border-l-blue-600 font-semibold'
-                            : 'bg-white hover:bg-slate-50 border-slate-200 border-l-transparent text-slate-700'
+                            ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                            : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                         }`}
                       >
                         {/* Caller Header */}
@@ -1969,7 +2001,7 @@ export function CommsHub({
 
             {/* SUB-VIEW 3: MISSED CALLS INBOX */}
             {callsSubTab === 'missed' && (
-              <div className="flex-1 flex flex-col bg-white overflow-y-auto">
+              <div className="flex-1 flex flex-col bg-white overflow-hidden">
                 <CommsBatchActionBar
                   selectedCount={selectedItemIds.size}
                   onMarkRead={handleBatchMarkRead}
@@ -1993,20 +2025,20 @@ export function CommsHub({
                     placeholder="Filter missed calls..."
                   />
                 )}
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div>
-                      <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
-                        <span>Missed Inbound Calls</span>
-                      </h3>
-                      <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
-                    </div>
-                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                      {filteredMissedCalls.length} Missed
-                    </span>
+                <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+                  <div>
+                    <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                      <span>Missed Inbound Calls</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
                   </div>
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    {filteredMissedCalls.length} Missed
+                  </span>
+                </div>
 
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
                   {filteredMissedCalls.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 space-y-2">
                       <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg">
@@ -2022,12 +2054,12 @@ export function CommsHub({
                         <div
                           key={call.id}
                           onClick={() => handleToggleSelectRow(call.id)}
-                          className={`p-3 rounded-2xl border transition-all space-y-2.5 border-l-4 cursor-pointer ${
+                          className={`group relative p-3.5 transition-all cursor-pointer space-y-2.5 border-l-4 ${
                             isRowSelected
-                              ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                              ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
                               : call.isUnread
-                              ? 'bg-blue-50/70 hover:bg-blue-100/60 border-rose-200 border-l-blue-600 font-semibold'
-                              : 'bg-white hover:bg-slate-50 border-rose-100 border-l-transparent text-slate-700'
+                              ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                              : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -2112,7 +2144,7 @@ export function CommsHub({
 
         {/* VIEW 4: VOICEMAIL INBOX */}
         {activeTab === 'voicemail' && (
-          <div className="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto">
+          <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
             <CommsBatchActionBar
               selectedCount={selectedItemIds.size}
               onMarkRead={handleBatchMarkRead}
@@ -2136,17 +2168,17 @@ export function CommsHub({
                 placeholder="Filter voicemails..."
               />
             )}
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">Voicemail Inbox</h3>
-                  <p className="text-xs text-slate-500">Audio playback and automated booking transcripts</p>
-                </div>
-                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                  {unreadCountVoicemail} New Voicemail
-                </span>
+            <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-extrabold text-xs text-slate-900">Voicemail Inbox</h3>
+                <p className="text-[11px] text-slate-500">Audio playback and automated booking transcripts</p>
               </div>
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                {unreadCountVoicemail} New Voicemail
+              </span>
+            </div>
 
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
               {filteredVoicemails.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 space-y-2">
                   <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-lg">
@@ -2162,12 +2194,12 @@ export function CommsHub({
                     <div
                       key={vm.id}
                       onClick={() => handleToggleSelectRow(vm.id)}
-                      className={`p-4 rounded-2xl border space-y-3 border-l-4 cursor-pointer transition-all ${
+                      className={`group relative p-3.5 transition-all cursor-pointer space-y-3 border-l-4 ${
                         isRowSelected
-                          ? 'bg-blue-100/70 border-blue-300 border-l-blue-700 shadow-2xs'
+                          ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
                           : vm.isUnread
-                          ? 'bg-amber-50/60 border-amber-200 border-l-blue-600 font-semibold'
-                          : 'bg-white border-amber-200/80 border-l-transparent text-slate-700'
+                          ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                          : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -2203,7 +2235,7 @@ export function CommsHub({
                       </div>
 
                   {/* Audio Controls */}
-                  <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-amber-200">
+                  <div className="flex items-center justify-between bg-slate-50/70 p-3 rounded-xl border border-slate-200">
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
