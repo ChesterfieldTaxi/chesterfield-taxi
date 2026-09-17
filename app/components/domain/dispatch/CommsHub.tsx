@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getWorkspaceBus, type UpcomingBookingPreview } from '../../../core/services/workspace-bus.service';
 import {
   matchPassengerByPhone,
@@ -236,6 +236,105 @@ function CommsBatchActionBar({
   );
 }
 
+interface CommsFilterToolbarProps {
+  isAllSelected: boolean;
+  masterCheckboxRef?: React.RefObject<HTMLInputElement | null>;
+  onToggleSelectAll: () => void;
+  unreadCount: number;
+  filterUnreadOnly: boolean;
+  onToggleUnreadOnly: () => void;
+  contactFilter: ContactFilter;
+  onChangeContactFilter: (val: ContactFilter) => void;
+  searchQuery: string;
+  onChangeSearchQuery: (val: string) => void;
+  showChannelFilter?: boolean;
+  channelFilter?: string;
+  onChangeChannelFilter?: (val: string) => void;
+  channelOptions?: { value: string; label: string }[];
+  placeholder?: string;
+}
+
+function CommsFilterToolbar({
+  isAllSelected,
+  masterCheckboxRef,
+  onToggleSelectAll,
+  unreadCount,
+  filterUnreadOnly,
+  onToggleUnreadOnly,
+  contactFilter,
+  onChangeContactFilter,
+  searchQuery,
+  onChangeSearchQuery,
+  showChannelFilter = false,
+  channelFilter = 'all',
+  onChangeChannelFilter,
+  channelOptions = [],
+  placeholder = 'Filter communications...',
+}: CommsFilterToolbarProps) {
+  return (
+    <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 shrink-0">
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="checkbox"
+          ref={masterCheckboxRef}
+          checked={isAllSelected}
+          onChange={onToggleSelectAll}
+          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          title="Select/Deselect all communications in this view"
+        />
+
+        <button
+          type="button"
+          onClick={onToggleUnreadOnly}
+          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+            filterUnreadOnly
+              ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+          }`}
+        >
+          Unread ({unreadCount})
+        </button>
+
+        {showChannelFilter && channelOptions.length > 0 && (
+          <select
+            value={channelFilter}
+            onChange={(e) => onChangeChannelFilter && onChangeChannelFilter(e.target.value)}
+            className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+          >
+            {channelOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select
+          value={contactFilter}
+          onChange={(e) => onChangeContactFilter(e.target.value as ContactFilter)}
+          className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+        >
+          <option value="all">All contacts</option>
+          <option value="passengers">Passengers &amp; VIPs</option>
+          <option value="drivers">Active Drivers</option>
+        </select>
+      </div>
+
+      {/* Search input */}
+      <div className="relative">
+        <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onChangeSearchQuery(e.target.value)}
+          placeholder={placeholder}
+          className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-44 focus:outline-blue-500"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function CommsHub({
   user,
   initialTab = 'all',
@@ -257,6 +356,7 @@ export function CommsHub({
 
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  const [callTypeFilter, setCallTypeFilter] = useState<'all' | 'inbound' | 'outbound' | 'missed'>('all');
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -364,13 +464,9 @@ export function CommsHub({
     return unsub;
   }, [workspaceBus]);
 
-  // Filter interaction events
-  const filteredInteractions = interactions.filter((item) => {
+  // Filter interaction items helper
+  const filterItem = (item: InteractionEvent) => {
     if (filterUnreadOnly && !item.isUnread) return false;
-
-    if (channelFilter === 'calls' && !item.type.startsWith('call_')) return false;
-    if (channelFilter === 'voicemail' && item.type !== 'voicemail') return false;
-    if (channelFilter === 'messages' && !item.type.startsWith('sms_')) return false;
 
     if (contactFilter === 'passengers' && item.contactType !== 'passenger' && item.contactType !== 'corporate') {
       return false;
@@ -379,23 +475,72 @@ export function CommsHub({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = item.contactName.toLowerCase().includes(q);
-      const matchPhone = item.contactPhone.includes(q);
-      const matchSnippet = item.snippet.toLowerCase().includes(q);
-      if (!matchName && !matchPhone && !matchSnippet) return false;
+      const matchName = (item.contactName || '').toLowerCase().includes(q);
+      const matchPhone = (item.contactPhone || '').includes(q);
+      const matchSnippet = (item.snippet || '').toLowerCase().includes(q);
+      const matchTranscript = (item.transcription || '').toLowerCase().includes(q);
+      if (!matchName && !matchPhone && !matchSnippet && !matchTranscript) return false;
     }
-
     return true;
-  });
+  };
 
-  const unreadCount = interactions.filter((i) => i.isUnread).length;
+  const allHistoryCalls = useMemo(() => interactions.filter((item) => item.type.startsWith('call_')), [interactions]);
+  const allMissedCalls = useMemo(() => interactions.filter((item) => item.type === 'call_missed'), [interactions]);
+  const allVoicemails = useMemo(() => interactions.filter((item) => item.type === 'voicemail'), [interactions]);
+  const allMessages = useMemo(() => interactions.filter((item) => item.type.startsWith('sms_')), [interactions]);
 
-  // Master checkbox selection calculation
+  const filteredAllInteractions = useMemo(() => {
+    return interactions.filter((item) => {
+      if (channelFilter === 'calls' && !item.type.startsWith('call_')) return false;
+      if (channelFilter === 'voicemail' && item.type !== 'voicemail') return false;
+      if (channelFilter === 'messages' && !item.type.startsWith('sms_')) return false;
+      return filterItem(item);
+    });
+  }, [interactions, channelFilter, filterUnreadOnly, contactFilter, searchQuery]);
+
+  const filteredHistoryCalls = useMemo(() => {
+    return allHistoryCalls.filter((item) => {
+      if (callTypeFilter === 'inbound' && item.type !== 'call_inbound') return false;
+      if (callTypeFilter === 'outbound' && item.type !== 'call_outbound') return false;
+      if (callTypeFilter === 'missed' && item.type !== 'call_missed') return false;
+      return filterItem(item);
+    });
+  }, [allHistoryCalls, callTypeFilter, filterUnreadOnly, contactFilter, searchQuery]);
+
+  const filteredMissedCalls = useMemo(() => allMissedCalls.filter(filterItem), [allMissedCalls, filterUnreadOnly, contactFilter, searchQuery]);
+  const filteredVoicemails = useMemo(() => allVoicemails.filter(filterItem), [allVoicemails, filterUnreadOnly, contactFilter, searchQuery]);
+  const filteredMessages = useMemo(() => allMessages.filter(filterItem), [allMessages, filterUnreadOnly, contactFilter, searchQuery]);
+
+  // Backward-compatible alias
+  const filteredInteractions = filteredAllInteractions;
+
+  // Active items for current view
+  const currentTabItems = useMemo(() => {
+    if (activeTab === 'all') return filteredAllInteractions;
+    if (activeTab === 'phone') {
+      if (callsSubTab === 'history') return filteredHistoryCalls;
+      if (callsSubTab === 'missed') return filteredMissedCalls;
+      return [];
+    }
+    if (activeTab === 'voicemail') return filteredVoicemails;
+    if (activeTab === 'messages') return filteredMessages;
+    return filteredAllInteractions;
+  }, [activeTab, callsSubTab, filteredAllInteractions, filteredHistoryCalls, filteredMissedCalls, filteredVoicemails, filteredMessages]);
+
+  const unreadCountAll = useMemo(() => interactions.filter((i) => i.isUnread).length, [interactions]);
+  const unreadCountHistory = useMemo(() => allHistoryCalls.filter((i) => i.isUnread).length, [allHistoryCalls]);
+  const unreadCountMissed = useMemo(() => allMissedCalls.filter((i) => i.isUnread).length, [allMissedCalls]);
+  const unreadCountVoicemail = useMemo(() => allVoicemails.filter((i) => i.isUnread).length, [allVoicemails]);
+  const unreadCountMessages = useMemo(() => allMessages.filter((i) => i.isUnread).length, [allMessages]);
+
+  const unreadCount = unreadCountAll;
+
+  // Master checkbox selection calculation for active tab
   const isAllSelected =
-    filteredInteractions.length > 0 &&
-    filteredInteractions.every((item) => selectedItemIds.has(item.id));
+    currentTabItems.length > 0 &&
+    currentTabItems.every((item) => selectedItemIds.has(item.id));
   const isSomeSelected =
-    filteredInteractions.some((item) => selectedItemIds.has(item.id)) && !isAllSelected;
+    currentTabItems.some((item) => selectedItemIds.has(item.id)) && !isAllSelected;
 
   useEffect(() => {
     if (masterCheckboxRef.current) {
@@ -405,9 +550,17 @@ export function CommsHub({
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedItemIds(new Set());
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        currentTabItems.forEach((i) => next.delete(i.id));
+        return next;
+      });
     } else {
-      setSelectedItemIds(new Set(filteredInteractions.map((item) => item.id)));
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        currentTabItems.forEach((i) => next.add(i.id));
+        return next;
+      });
     }
   };
 
@@ -736,63 +889,28 @@ export function CommsHub({
               onClear={() => setSelectedItemIds(new Set())}
             />
             {selectedItemIds.size === 0 && (
-              <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 shrink-0">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    ref={masterCheckboxRef}
-                    checked={isAllSelected}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    title="Select all communications"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterUnreadOnly(!filterUnreadOnly)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                      filterUnreadOnly
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Unread ({unreadCount})
-                  </button>
-
-                  <select
-                    value={channelFilter}
-                    onChange={(e) => setChannelFilter(e.target.value as any)}
-                    className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
-                  >
-                    <option value="all">All channels</option>
-                    <option value="calls">Calls Only</option>
-                    <option value="voicemail">Voicemail Only</option>
-                    <option value="messages">Messaging Only</option>
-                  </select>
-
-                  <select
-                    value={contactFilter}
-                    onChange={(e) => setContactFilter(e.target.value as any)}
-                    className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
-                  >
-                    <option value="all">All contacts</option>
-                    <option value="passengers">Passengers &amp; VIPs</option>
-                    <option value="drivers">Active Drivers</option>
-                  </select>
-                </div>
-
-                {/* Search input */}
-                <div className="relative">
-                  <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filter communications..."
-                    className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-44 focus:outline-blue-500"
-                  />
-                </div>
-              </div>
+              <CommsFilterToolbar
+                isAllSelected={isAllSelected}
+                masterCheckboxRef={masterCheckboxRef}
+                onToggleSelectAll={handleToggleSelectAll}
+                unreadCount={unreadCountAll}
+                filterUnreadOnly={filterUnreadOnly}
+                onToggleUnreadOnly={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                contactFilter={contactFilter}
+                onChangeContactFilter={setContactFilter}
+                searchQuery={searchQuery}
+                onChangeSearchQuery={setSearchQuery}
+                showChannelFilter={true}
+                channelFilter={channelFilter}
+                onChangeChannelFilter={(val) => setChannelFilter(val as any)}
+                channelOptions={[
+                  { value: 'all', label: 'All channels' },
+                  { value: 'calls', label: 'Calls Only' },
+                  { value: 'voicemail', label: 'Voicemail Only' },
+                  { value: 'messages', label: 'Messaging Only' },
+                ]}
+                placeholder="Filter communications..."
+              />
             )}
 
             {/* Temporary Toast for Forward / Clipboard Copy */}
@@ -1660,8 +1778,38 @@ export function CommsHub({
                   onArchive={handleBatchArchive}
                   onClear={() => setSelectedItemIds(new Set())}
                 />
+                {selectedItemIds.size === 0 && (
+                  <CommsFilterToolbar
+                    isAllSelected={isAllSelected}
+                    masterCheckboxRef={masterCheckboxRef}
+                    onToggleSelectAll={handleToggleSelectAll}
+                    unreadCount={unreadCountHistory}
+                    filterUnreadOnly={filterUnreadOnly}
+                    onToggleUnreadOnly={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                    contactFilter={contactFilter}
+                    onChangeContactFilter={setContactFilter}
+                    searchQuery={searchQuery}
+                    onChangeSearchQuery={setSearchQuery}
+                    showChannelFilter={true}
+                    channelFilter={callTypeFilter}
+                    onChangeChannelFilter={(val) => setCallTypeFilter(val as any)}
+                    channelOptions={[
+                      { value: 'all', label: 'All Call Types' },
+                      { value: 'inbound', label: 'Inbound Only' },
+                      { value: 'outbound', label: 'Outbound Only' },
+                      { value: 'missed', label: 'Missed Only' },
+                    ]}
+                    placeholder="Filter call history..."
+                  />
+                )}
                 <div className="p-3 space-y-2.5">
-                  {interactions.filter((item) => item.type.startsWith('call_')).map((call) => {
+                  {filteredHistoryCalls.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 space-y-2">
+                      <p className="text-xs font-bold text-slate-600">No Call History Matches</p>
+                      <p className="text-[11px]">No call records match your current filter criteria.</p>
+                    </div>
+                  ) : (
+                    filteredHistoryCalls.map((call) => {
                     const isCallPlaying = playingCallId === call.id;
                     const isMissed = call.type === 'call_missed';
                     const isOutbound = call.type === 'call_outbound';
@@ -1814,7 +1962,7 @@ export function CommsHub({
                       </div>
                     </div>
                   );
-                })}
+                }))}
                 </div>
               </div>
             )}
@@ -1829,6 +1977,22 @@ export function CommsHub({
                   onArchive={handleBatchArchive}
                   onClear={() => setSelectedItemIds(new Set())}
                 />
+                {selectedItemIds.size === 0 && (
+                  <CommsFilterToolbar
+                    isAllSelected={isAllSelected}
+                    masterCheckboxRef={masterCheckboxRef}
+                    onToggleSelectAll={handleToggleSelectAll}
+                    unreadCount={unreadCountMissed}
+                    filterUnreadOnly={filterUnreadOnly}
+                    onToggleUnreadOnly={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                    contactFilter={contactFilter}
+                    onChangeContactFilter={setContactFilter}
+                    searchQuery={searchQuery}
+                    onChangeSearchQuery={setSearchQuery}
+                    showChannelFilter={false}
+                    placeholder="Filter missed calls..."
+                  />
+                )}
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div>
@@ -1839,11 +2003,11 @@ export function CommsHub({
                       <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
                     </div>
                     <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                      {interactions.filter((item) => item.type === 'call_missed').length} Missed
+                      {filteredMissedCalls.length} Missed
                     </span>
                   </div>
 
-                  {interactions.filter((item) => item.type === 'call_missed').length === 0 ? (
+                  {filteredMissedCalls.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 space-y-2">
                       <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg">
                         ✓
@@ -1852,7 +2016,7 @@ export function CommsHub({
                       <p className="text-[11px]">All incoming call attempts have been answered or resolved.</p>
                     </div>
                   ) : (
-                    interactions.filter((item) => item.type === 'call_missed').map((call) => {
+                    filteredMissedCalls.map((call) => {
                       const isRowSelected = selectedItemIds.has(call.id);
                       return (
                         <div
@@ -1956,6 +2120,22 @@ export function CommsHub({
               onArchive={handleBatchArchive}
               onClear={() => setSelectedItemIds(new Set())}
             />
+            {selectedItemIds.size === 0 && (
+              <CommsFilterToolbar
+                isAllSelected={isAllSelected}
+                masterCheckboxRef={masterCheckboxRef}
+                onToggleSelectAll={handleToggleSelectAll}
+                unreadCount={unreadCountVoicemail}
+                filterUnreadOnly={filterUnreadOnly}
+                onToggleUnreadOnly={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                contactFilter={contactFilter}
+                onChangeContactFilter={setContactFilter}
+                searchQuery={searchQuery}
+                onChangeSearchQuery={setSearchQuery}
+                showChannelFilter={false}
+                placeholder="Filter voicemails..."
+              />
+            )}
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -1963,13 +2143,20 @@ export function CommsHub({
                   <p className="text-xs text-slate-500">Audio playback and automated booking transcripts</p>
                 </div>
                 <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                  {filteredInteractions.filter((i) => i.type === 'voicemail' && i.isUnread).length} New Voicemail
+                  {unreadCountVoicemail} New Voicemail
                 </span>
               </div>
 
-              {filteredInteractions
-                .filter((i) => i.type === 'voicemail')
-                .map((vm) => {
+              {filteredVoicemails.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-lg">
+                    ✓
+                  </div>
+                  <p className="text-xs font-bold text-slate-600">No Voicemails Found</p>
+                  <p className="text-[11px]">No voicemail messages match your active filter.</p>
+                </div>
+              ) : (
+                filteredVoicemails.map((vm) => {
                   const isRowSelected = selectedItemIds.has(vm.id);
                   return (
                     <div
@@ -2076,7 +2263,7 @@ export function CommsHub({
                   )}
                 </div>
               );
-            })}
+            }))}
             </div>
           </div>
         )}
@@ -2091,10 +2278,30 @@ export function CommsHub({
               onArchive={handleBatchArchive}
               onClear={() => setSelectedItemIds(new Set())}
             />
+            {selectedItemIds.size === 0 && (
+              <CommsFilterToolbar
+                isAllSelected={isAllSelected}
+                masterCheckboxRef={masterCheckboxRef}
+                onToggleSelectAll={handleToggleSelectAll}
+                unreadCount={unreadCountMessages}
+                filterUnreadOnly={filterUnreadOnly}
+                onToggleUnreadOnly={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                contactFilter={contactFilter}
+                onChangeContactFilter={setContactFilter}
+                searchQuery={searchQuery}
+                onChangeSearchQuery={setSearchQuery}
+                showChannelFilter={false}
+                placeholder="Filter messages..."
+              />
+            )}
             <div className="divide-y divide-slate-100">
-            {filteredInteractions
-              .filter((i) => i.type.startsWith('sms_'))
-              .map((sms) => {
+            {filteredMessages.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 space-y-2">
+                <p className="text-xs font-bold text-slate-600">No Messages Found</p>
+                <p className="text-[11px]">No SMS messages match your active filter.</p>
+              </div>
+            ) : (
+              filteredMessages.map((sms) => {
                 const isRowSelected = selectedItemIds.has(sms.id);
                 return (
                   <div
@@ -2208,7 +2415,7 @@ export function CommsHub({
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
         )}

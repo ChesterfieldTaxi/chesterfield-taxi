@@ -75,6 +75,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
   const [newCalTime, setNewCalTime] = useState('');
   const [newCalCategory, setNewCalCategory] = useState<DispatchCalendarEvent['category']>('airport');
 
+  const [isEditingNote, setIsEditingNote] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
   const saveDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -88,6 +89,17 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
     });
     return () => unsubscribe();
   }, [activeNoteId]);
+
+  // Presence heartbeat for Dispatch Notes
+  useEffect(() => {
+    if (!isOpen || activeModule !== 'notes') return;
+    const sendHeartbeat = () => {
+      dispatchAppSuiteService.updatePresence(activeNoteId, isEditingNote);
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen, activeModule, activeNoteId, isEditingNote]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -107,6 +119,8 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
   const currentAuthor = dispatchAppSuiteService.getCurrentAuthor();
   const activeNote = suiteState.notes.find((n) => n.id === activeNoteId) || suiteState.notes[0];
   const completedTasksCount = suiteState.tasks.filter((t) => t.completed).length;
+  const activePresences = dispatchAppSuiteService.getActivePresences(activeNote?.id);
+  const peerPresences = activePresences.filter((p) => p.uid !== currentAuthor.uid);
 
   // ─── NOTE EDIT HANDLER WITH DEBOUNCED AUTO-SAVE ───
   const handleNoteContentChange = (content: string) => {
@@ -367,7 +381,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
 
               {activeNote && (
                 <>
-                  {/* Google Docs-Style Author Attribution Chip */}
+                  {/* Google Docs-Style Author Attribution Chip + Live Collaborator Avatars */}
                   <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-full bg-purple-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
@@ -388,7 +402,33 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Google Docs-Style Live Presence Avatar Stack */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Active Presence Avatars */}
+                      <div className="flex items-center -space-x-2 overflow-hidden" title="Live dispatchers currently active on this pad">
+                        {activePresences.map((p) => {
+                          const isSelf = p.uid === currentAuthor.uid;
+                          return (
+                            <div
+                              key={p.uid}
+                              className={`relative inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-[10px] font-black ring-2 ring-white shadow-2xs cursor-help ${
+                                p.avatarColor || (isSelf ? 'bg-purple-600' : 'bg-emerald-600')
+                              }`}
+                              title={`${p.name} (${p.role || 'dispatcher'})${isSelf ? ' (You)' : ''}${
+                                p.isEditing ? ' • ✍️ Typing now' : ' • 👁️ Viewing'
+                              }`}
+                            >
+                              <span>{getInitials(p.name)}</span>
+                              {p.isEditing ? (
+                                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
+                              ) : (
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       {noteSaveStatus === 'saving' && (
                         <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1 animate-pulse">
                           <span>●</span> Saving...
@@ -399,21 +439,31 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                           <span>✓</span> Saved
                         </span>
                       )}
-                      {activeNote.contributors && activeNote.contributors.length > 1 && (
-                        <span
-                          className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full font-bold cursor-help"
-                          title={`Collaborators: ${activeNote.contributors.map((c) => c.name).join(', ')}`}
-                        >
-                          👥 {activeNote.contributors.length}
-                        </span>
-                      )}
                     </div>
                   </div>
+
+                  {/* Teammate Live Viewing / Editing Banner */}
+                  {peerPresences.length > 0 && (
+                    <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-emerald-50/90 border border-emerald-200 text-[11px] text-emerald-800 animate-in fade-in duration-200">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                        <span className="font-semibold truncate">
+                          <strong>{peerPresences.map((p) => p.name).join(', ')}</strong>{' '}
+                          {peerPresences.some((p) => p.isEditing) ? 'is currently editing this pad...' : 'is viewing this note'}
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-200/60 px-1.5 py-0.2 rounded text-emerald-900 shrink-0">
+                        Live Sync
+                      </span>
+                    </div>
+                  )}
 
                   {/* Note Title Input */}
                   <input
                     type="text"
                     value={activeNote.title}
+                    onFocus={() => setIsEditingNote(true)}
+                    onBlur={() => setIsEditingNote(false)}
                     onChange={(e) => {
                       const newTitle = e.target.value;
                       dispatchAppSuiteService.updateNote(activeNote.id, { title: newTitle });
@@ -425,6 +475,8 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   {/* Note Content Textarea */}
                   <textarea
                     value={activeNote.content}
+                    onFocus={() => setIsEditingNote(true)}
+                    onBlur={() => setIsEditingNote(false)}
                     onChange={(e) => handleNoteContentChange(e.target.value)}
                     rows={8}
                     className="w-full text-xs font-mono p-3 rounded-xl border border-slate-300 bg-amber-50/20 text-slate-900 placeholder-slate-400 focus:outline-purple-500 resize-none leading-relaxed"

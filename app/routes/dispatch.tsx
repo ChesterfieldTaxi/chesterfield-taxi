@@ -56,6 +56,7 @@ import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher
 import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
+import { soundNotificationService } from '../core/services/sound-notification.service';
 
 export function meta() {
   return [
@@ -549,6 +550,17 @@ export default function DispatchRoute() {
   const alertsDropdownRef = useRef<HTMLDivElement>(null);
   const [minimizedPanels, setMinimizedPanels] = useState<Record<string, boolean>>({});
   const operationsContainerRef = useRef<HTMLDivElement>(null);
+  const knownTripIdsRef = useRef<Set<string> | null>(null);
+
+  // Dispatch Audio State (Inbound calls & ASAP chimes)
+  const [isSoundMuted, setIsSoundMuted] = useState<boolean>(() => soundNotificationService.isMuted());
+  const toggleSoundMuted = useCallback(() => {
+    const nextMuted = soundNotificationService.toggleMute();
+    setIsSoundMuted(nextMuted);
+    if (!nextMuted) {
+      soundNotificationService.playAsapRideChime();
+    }
+  }, []);
 
   // Drivers Data State
   const [drivers, setDrivers] = useState<DriverRosterItem[]>(INITIAL_DRIVERS);
@@ -1318,6 +1330,46 @@ export default function DispatchRoute() {
     }
   };
 
+  const handleQuickAssignDriver = async (tripId: string, driverId: string) => {
+    const isUnassigning = !driverId || driverId === 'unassigned';
+    const tripToUpdate = trips.find((t) => t.id === tripId);
+    if (!tripToUpdate) return;
+
+    const previousDriverId = tripToUpdate.assignedDriverId;
+
+    const updates: Partial<Trip> = {
+      assignedDriverId: isUnassigning ? null : driverId,
+      status: isUnassigning
+        ? (tripToUpdate.status === 'assigned' ? 'pending' : tripToUpdate.status)
+        : (['pending', 'unconfirmed', 'UNCONFIRMED', 'CONFIRMED', 'confirmed'].includes(tripToUpdate.status)
+            ? 'assigned'
+            : tripToUpdate.status),
+    };
+
+    const bookingService = getBookingService();
+    try {
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(tripId, updates);
+      }
+      setTrips((prev) => prev.map((t) => (t.id === tripId ? ({ ...t, ...updates } as Trip) : t)));
+
+      // Sync driver roster statuses
+      setDrivers((prev) =>
+        prev.map((d) => {
+          if (!isUnassigning && d.id === driverId) {
+            return { ...d, status: 'on_trip', currentTripId: tripId };
+          }
+          if (previousDriverId && d.id === previousDriverId && d.currentTripId === tripId) {
+            return { ...d, status: 'available', currentTripId: undefined };
+          }
+          return d;
+        })
+      );
+    } catch (err) {
+      console.error('Failed to quick-assign driver:', err);
+    }
+  };
+
   const handleBatchExportCsv = () => {
     if (selectedTripIds.length === 0) return;
     const selectedTrips = trips.filter((t) => selectedTripIds.includes(t.id));
@@ -1440,16 +1492,42 @@ export default function DispatchRoute() {
     }
   };
 
-  // Trips real-time subscription
+  // Trips real-time subscription with ASAP Ride Audio Chime
   useEffect(() => {
     const service = getBookingService();
+    const handleTripsUpdate = (updatedTrips: Trip[]) => {
+      if (knownTripIdsRef.current === null) {
+        knownTripIdsRef.current = new Set(updatedTrips.map((t) => t.id));
+        setTrips(updatedTrips);
+        return;
+      }
+
+      // Check for incoming new trips
+      const newTrips = updatedTrips.filter((t) => !knownTripIdsRef.current!.has(t.id));
+      if (newTrips.length > 0) {
+        const hasAsapOrPending = newTrips.some(
+          (t) =>
+            t.bookingType === 'asap' ||
+            t.status === 'unconfirmed' ||
+            t.status === 'UNCONFIRMED' ||
+            t.status === 'pending'
+        );
+        if (hasAsapOrPending) {
+          soundNotificationService.playAsapRideChime();
+        }
+        newTrips.forEach((t) => knownTripIdsRef.current!.add(t.id));
+      }
+
+      setTrips(updatedTrips);
+    };
+
     if (service.subscribeToAllTrips) {
       return service.subscribeToAllTrips(
-        (updatedTrips) => setTrips(updatedTrips),
+        handleTripsUpdate,
         (err) => console.error('[Dispatch] Trips subscription error:', err)
       );
     } else if (service.getAllTrips) {
-      service.getAllTrips().then(setTrips).catch(console.error);
+      service.getAllTrips().then(handleTripsUpdate).catch(console.error);
     }
   }, []);
 
@@ -2558,6 +2636,32 @@ export default function DispatchRoute() {
               </div>
             )}
           </div>
+
+          {/* Audio Chime & Inbound Ring Mute Toggle */}
+          <button
+            type="button"
+            onClick={toggleSoundMuted}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+              isSoundMuted
+                ? 'bg-slate-100 text-slate-400 border border-slate-200 hover:text-slate-600'
+                : 'bg-white text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 shadow-2xs'
+            }`}
+            title={
+              isSoundMuted
+                ? 'Dispatch Audio Muted (Click to Unmute Calls & ASAP Chimes)'
+                : 'Dispatch Audio Active (Inbound Ring & ASAP Chimes Enabled)'
+            }
+            aria-label="Sound Notification Toggle"
+          >
+            {isSoundMuted ? (
+              <span className="text-base select-none leading-none" role="img" aria-label="Muted">🔇</span>
+            ) : (
+              <span className="text-base select-none leading-none" role="img" aria-label="Sound Active">🔊</span>
+            )}
+            {!isSoundMuted && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+            )}
+          </button>
 
           {/* App Suite Launcher (9-Dot Grid) */}
           <AppSuiteLauncher />
@@ -3931,15 +4035,27 @@ export default function DispatchRoute() {
                           <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                             {trip.vehicleTier || 'Standard'}
                           </span>
-                          {trip.assignedDriverId ? (
-                            <span className="text-[10px] font-bold text-blue-600 truncate max-w-[80px]">
-                              {trip.assignedDriverId}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-amber-600">
-                              Unassigned
-                            </span>
-                          )}
+                          <select
+                            value={trip.assignedDriverId || 'unassigned'}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleQuickAssignDriver(trip.id, e.target.value);
+                            }}
+                            className={`text-[11px] font-semibold rounded-md border py-0.5 px-1.5 cursor-pointer transition-colors max-w-[140px] truncate ${
+                              trip.assignedDriverId
+                                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
+                            }`}
+                            title="Quick-assign driver"
+                          >
+                            <option value="unassigned">⚠️ Unassigned</option>
+                            {drivers.map((drv) => (
+                              <option key={drv.id} value={drv.id}>
+                                {drv.name} ({drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -4052,13 +4168,27 @@ export default function DispatchRoute() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {trip.assignedDriverId ? (
-                          <span className="text-blue-600 font-semibold text-[11px] truncate max-w-[70px]">
-                            {trip.assignedDriverId}
-                          </span>
-                        ) : (
-                          <span className="text-amber-600 font-bold text-[11px]">Unassigned</span>
-                        )}
+                        <select
+                          value={trip.assignedDriverId || 'unassigned'}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleQuickAssignDriver(trip.id, e.target.value);
+                          }}
+                          className={`text-[11px] font-semibold rounded-md border py-0.5 px-1.5 cursor-pointer transition-colors max-w-[130px] truncate ${
+                            trip.assignedDriverId
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                              : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
+                          }`}
+                          title="Quick-assign driver"
+                        >
+                          <option value="unassigned">⚠️ Unassigned</option>
+                          {drivers.map((drv) => (
+                            <option key={drv.id} value={drv.id}>
+                              {drv.name} ({drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                            </option>
+                          ))}
+                        </select>
                         <span className="font-bold text-slate-900">
                           ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                         </span>
@@ -4231,11 +4361,27 @@ export default function DispatchRoute() {
                               {trip.dropoffLocation.address}
                             </td>
                             <td className="py-2 px-3">
-                              {trip.assignedDriverId ? (
-                                <span className="font-semibold text-blue-600">{trip.assignedDriverId}</span>
-                              ) : (
-                                <span className="text-amber-600 font-bold">Unassigned</span>
-                              )}
+                              <select
+                                value={trip.assignedDriverId || 'unassigned'}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickAssignDriver(trip.id, e.target.value);
+                                }}
+                                className={`text-xs font-semibold rounded-lg border py-1 px-2 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[155px] truncate ${
+                                  trip.assignedDriverId
+                                    ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
+                                    : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
+                                }`}
+                                title="Quick-assign driver to this trip"
+                              >
+                                <option value="unassigned">⚠️ Unassigned</option>
+                                {drivers.map((drv) => (
+                                  <option key={drv.id} value={drv.id}>
+                                    {drv.name} ({drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                                  </option>
+                                ))}
+                              </select>
                             </td>
                             <td className="py-2 px-3">
                               <span className="capitalize px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">

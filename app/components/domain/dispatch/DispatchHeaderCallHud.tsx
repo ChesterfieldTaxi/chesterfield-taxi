@@ -19,6 +19,7 @@ import {
   HomeModernIcon,
   DevicePhoneMobileIcon,
 } from '../../ui/Icons';
+import { soundNotificationService } from '../../../core/services/sound-notification.service';
 
 interface DispatchHeaderCallHudProps {
   trips?: Trip[];
@@ -91,6 +92,20 @@ export function DispatchHeaderCallHud({
 
     return unsub;
   }, [workspaceBus]);
+
+  // Audio ring cadence for incoming calls
+  useEffect(() => {
+    let ringInterval: NodeJS.Timeout | null = null;
+    if (activeCall && callState === 'incoming') {
+      soundNotificationService.playInboundCallRing();
+      ringInterval = setInterval(() => {
+        soundNotificationService.playInboundCallRing();
+      }, 4000);
+    }
+    return () => {
+      if (ringInterval) clearInterval(ringInterval);
+    };
+  }, [activeCall, callState]);
 
   // Connected call duration timer
   useEffect(() => {
