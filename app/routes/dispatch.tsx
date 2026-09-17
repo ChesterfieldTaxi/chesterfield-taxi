@@ -173,10 +173,10 @@ function TripActionDropdown({
 }: TripActionDropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [coords, setCoords] = useState<{ top: number; left: number; openUpward: boolean } | null>(null);
 
-  const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return;
+  const calculatePosition = useCallback(() => {
+    if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const menuEl = menuRef.current;
     const menuWidth = 208; // width in px
@@ -204,12 +204,28 @@ function TripActionDropdown({
       left = Math.max(8, viewportWidth - menuWidth - 8);
     }
 
-    setCoords({ top, left });
+    return { top, left, openUpward };
   }, [isUnconfirmed]);
+
+  // Synchronously compute trigger coordinates before browser paint to prevent flying from (0,0)
+  useEffect(() => {
+    if (!isOpen) {
+      setCoords(null);
+      return;
+    }
+    const initial = calculatePosition();
+    if (initial) {
+      setCoords(initial);
+    }
+  }, [isOpen, calculatePosition]);
 
   useEffect(() => {
     if (!isOpen) return;
-    updatePosition();
+
+    const updatePosition = () => {
+      const updated = calculatePosition();
+      if (updated) setCoords(updated);
+    };
 
     // Re-measure on next animation frame after portal mounts to ensure exact DOM height
     const rafId = requestAnimationFrame(updatePosition);
@@ -241,7 +257,7 @@ function TripActionDropdown({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, updatePosition]);
+  }, [isOpen, onClose, calculatePosition]);
 
   const isCompleted = trip.status === 'completed';
   const isCancelled = trip.status === 'cancelled';
@@ -272,7 +288,7 @@ function TripActionDropdown({
         />
       </button>
 
-      {isOpen && typeof document !== 'undefined' && createPortal(
+      {isOpen && coords !== null && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
           style={{
@@ -281,6 +297,7 @@ function TripActionDropdown({
             left: `${coords.left}px`,
             width: '208px',
             zIndex: 99999,
+            transformOrigin: coords.openUpward ? 'bottom right' : 'top right',
           }}
           className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
           onClick={(e) => e.stopPropagation()}
@@ -850,12 +867,25 @@ export default function DispatchRoute() {
         return;
       }
 
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          setIsSearchExpanded(true);
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
+        return;
+      }
+      if (e.altKey) return;
 
-      if (e.key === 'Escape') {
+      if (e.key === '/') {
+        e.preventDefault();
+        setIsSearchExpanded(true);
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else if (e.key === 'Escape') {
         setActiveDockTab('none');
         setIsMobileDrawerOpen(false);
         setShowAlertsDropdown(false);
+        setIsSearchExpanded(false);
       } else if (e.key === 'm' || e.key === 'M') {
         setActiveDockTab('none');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'c' || e.key === 'C') {
@@ -3085,19 +3115,22 @@ export default function DispatchRoute() {
           >
             {/* ─── Modern Filter & Trips Control Bar ─── */}
             <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 min-w-0 h-11 relative z-30 overflow-visible">
+              {/* Mobile-Only Expanded Search (takes full width on small screens) */}
               {isSearchExpanded ? (
-                /* ── Expandable Search Bar (Takes full width, hides other controls) ── */
-                <div className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 min-w-0">
+                <div className="md:hidden flex-1 flex items-center gap-2 animate-in fade-in duration-150 min-w-0">
                   <div className="relative flex-1 min-w-0">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                       <MagnifyingGlassIcon className="w-3.5 h-3.5" />
                     </span>
                     <input
                       ref={searchInputRef}
                       type="text"
-                      placeholder="Search trips by ID, passenger, phone, pickup, dropoff, driver..."
+                      placeholder="Search trips by ID, passenger, phone..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setIsSearchExpanded(false);
+                      }}
                       className="w-full pl-8 pr-8 py-1 bg-white border border-blue-500 rounded-lg text-slate-800 text-xs shadow-2xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7"
                     />
                     {searchTerm && (
@@ -3121,14 +3154,14 @@ export default function DispatchRoute() {
                     title="Close search and show filters"
                   >
                     <span>✕</span>
-                    <span className="hidden sm:inline">Close</span>
                   </button>
                 </div>
-              ) : (
-                /* ── Standard Control Bar ── */
-                <>
-                  {/* Left Controls: Date Range, Status Dropdown, and (on Desktop) Filter Add & Pills */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-visible">
+              ) : null}
+
+              {/* Standard Control Bar: Always displayed on Desktop; visible on mobile when search is NOT expanded */}
+              <div className={`${isSearchExpanded ? 'hidden md:flex' : 'flex'} items-center justify-between gap-1.5 sm:gap-2 flex-1 min-w-0`}>
+                {/* Left Controls: Date Range, Status Dropdown, and (on Desktop) Filter Add & Pills */}
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-visible">
                     {/* 1. Select Date Range Popover Button */}
                     <div className="relative shrink-0" ref={datePickerTriggerRef}>
                       <button
@@ -3540,26 +3573,72 @@ export default function DispatchRoute() {
                       )}
                     </div>
 
-                    {/* Expandable Search Magnifier Icon Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSearchExpanded(true);
-                        setTimeout(() => searchInputRef.current?.focus(), 50);
-                      }}
-                      className={`p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 shadow-2xs ${
-                        searchTerm
-                          ? 'bg-blue-50 border-blue-400 text-blue-700 ring-1 ring-blue-300'
-                          : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
-                      }`}
-                      title={searchTerm ? `Searching "${searchTerm}" - Click to edit` : 'Search trips (Click to expand)'}
-                    >
-                      <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Search Component: Desktop inline bar with max-width or compact button */}
+                    {isSearchExpanded ? (
+                      <div className="hidden md:flex items-center gap-1.5 w-60 lg:w-72 max-w-[320px] animate-in fade-in duration-150">
+                        <div className="relative flex-1 min-w-0">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                            <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                          </span>
+                          <input
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder="Search trips (/ or Ctrl+K)..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                if (searchTerm) {
+                                  setSearchTerm('');
+                                } else {
+                                  setIsSearchExpanded(false);
+                                }
+                              }
+                            }}
+                            className="w-full pl-8 pr-7 py-1 bg-white border border-blue-500 rounded-lg text-slate-800 text-xs shadow-2xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7"
+                          />
+                          {searchTerm && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchTerm('')}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                              title="Clear search text"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSearchExpanded(false);
+                          }}
+                          className="px-2 py-1 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer shrink-0 h-7 flex items-center justify-center"
+                          title="Close search (Esc)"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSearchExpanded(true);
+                          setTimeout(() => searchInputRef.current?.focus(), 50);
+                        }}
+                        className={`p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 shadow-2xs ${
+                          searchTerm
+                            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-1 ring-blue-300'
+                            : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
+                        }`}
+                        title={searchTerm ? `Searching "${searchTerm}" - Click to edit` : 'Search trips (/ or Ctrl+K)'}
+                      >
+                        <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
 
             {/* Mobile Sub-Toolbar: Filter Controls & Active Pills (visible if filters active or expanded on mobile) */}
             {!isSearchExpanded && (activeFilterKeys.length > 0 || isMobileFiltersOpen) && (

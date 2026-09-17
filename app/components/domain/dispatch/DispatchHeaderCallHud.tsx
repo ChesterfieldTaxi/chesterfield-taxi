@@ -244,19 +244,10 @@ export function DispatchHeaderCallHud({
     setDialerDuration(0);
   };
 
+  const [showMaintenanceTools, setShowMaintenanceTools] = useState(false);
+
   return (
     <div className="relative inline-flex items-center gap-1.5" ref={containerRef}>
-      {/* Test Simulator Trigger Button */}
-      <button
-        type="button"
-        onClick={handleSimulateInboundCall}
-        className="hidden xl:inline-flex items-center gap-1.5 px-2 py-1 rounded-xl text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors cursor-pointer"
-        title="Simulate inbound phone call from Sarah Jenkins"
-      >
-        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-        <span>Simulate Inbound</span>
-      </button>
-
       {/* RESTING STATE: Phone Icon Button with Missed Counter */}
       {!activeCall ? (
         <div className="relative">
@@ -378,6 +369,43 @@ export function DispatchHeaderCallHud({
                       <PhoneIcon className="w-3.5 h-3.5" />
                       <span>Call</span>
                     </button>
+                  </div>
+
+                  {/* Maintenance & Diagnostics Section */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setShowMaintenanceTools((prev) => !prev)}
+                      className="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 font-semibold py-1 cursor-pointer transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>🛠️</span>
+                        <span>Diagnostics & Simulation</span>
+                      </span>
+                      <span>{showMaintenanceTools ? '▲' : '▼'}</span>
+                    </button>
+                    {showMaintenanceTools && (
+                      <div className="mt-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 animate-in fade-in duration-100">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 font-medium">Inbound Call Screen Pop:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCallpadFlydown(false);
+                              handleSimulateInboundCall();
+                            }}
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-white cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Simulate inbound call for staff diagnostics"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            <span>Simulate Inbound</span>
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-slate-400 leading-tight">
+                          Live Twilio voice is active. This simulation triggers local screen pops and caller matching without placing a phone call.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
