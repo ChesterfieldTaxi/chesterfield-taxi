@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useLocation } from 'react-router';
+import { useLocation, Link } from 'react-router';
 import type {
   Trip,
   GeoPoint,
@@ -62,6 +62,8 @@ export interface BookingEngineV2InitialValues {
   vehicleChoice?: CustomerVehicleChoice;
   passengers?: number;
   timingType?: 'asap' | 'later';
+  scheduledDate?: string;
+  scheduledTime?: string;
   passengerName?: string;
   passengerPhone?: string;
   passengerEmail?: string;
@@ -138,6 +140,8 @@ interface FormState {
 
   // Trip Capacity Details
   passengers: number;
+  carryOnBags: number;
+  checkedBags: number;
   bags: number;
   luggageType: 'standard' | 'carryon_only' | 'oversized';
   hasOversizedLuggage: boolean;
@@ -151,6 +155,7 @@ interface FormState {
 
   // Vehicle
   vehicleChoice: CustomerVehicleChoice;
+  isVehicleAutoAssigned: boolean;
   selectedVehicles: CustomerVehicleChoice[];
 
   // Return Trip (Round Trip)
@@ -250,6 +255,8 @@ export function BookingEngineV2({
     contactRole: DEFAULT_BOOKER_ROLES[0],
 
     passengers: 1,
+    carryOnBags: 1,
+    checkedBags: 0,
     bags: 1,
     luggageType: 'standard',
     hasOversizedLuggage: false,
@@ -261,6 +268,7 @@ export function BookingEngineV2({
     boosterCount: 0,
 
     vehicleChoice: 'sedan',
+    isVehicleAutoAssigned: true,
     selectedVehicles: ['sedan'],
 
     returnTrip: false,
@@ -411,6 +419,8 @@ export function BookingEngineV2({
         : {}),
       ...(initialValues.passengers ? { passengers: initialValues.passengers } : {}),
       ...(initialValues.timingType ? { timingType: initialValues.timingType } : {}),
+      ...(initialValues.scheduledDate ? { scheduledDate: initialValues.scheduledDate } : {}),
+      ...(initialValues.scheduledTime ? { scheduledTime: initialValues.scheduledTime } : {}),
       ...(initialValues.passengerName ? { passengerName: initialValues.passengerName } : {}),
       ...(initialValues.passengerPhone ? { passengerPhone: initialValues.passengerPhone } : {}),
       ...(initialValues.passengerEmail ? { passengerEmail: initialValues.passengerEmail } : {}),
@@ -450,26 +460,26 @@ export function BookingEngineV2({
     any: { maxPassengers: 4, maxBags: 3 },
   };
 
-  // Fleet capacity based on selected vehicles (multi-vehicle mode) or single vehicle
+  // Fleet capacity based on selected vehicles (multi-vehicle mode) or single vehicle (max based on biggest vehicle in fleet)
   const totalMaxPassengers = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 0) {
+    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1) {
       return form.selectedVehicles.reduce(
         (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
         0
       );
     }
-    return vehicleCapacities[form.vehicleChoice]?.maxPassengers || 4;
-  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, form.vehicleChoice, vehicleCapacities]);
+    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxPassengers || 4), 7);
+  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]);
 
   const totalMaxBags = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 0) {
+    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1) {
       return form.selectedVehicles.reduce(
         (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
         0
       );
     }
-    return vehicleCapacities[form.vehicleChoice]?.maxBags || 3;
-  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, form.vehicleChoice, vehicleCapacities]);
+    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxBags || 3), 6);
+  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]);
 
   const totalCarSeats = form.rearFacingCount + form.frontFacingCount + form.boosterCount;
   const returnTotalCarSeats = form.returnRearFacing + form.returnFrontFacing + form.returnBooster;
@@ -520,20 +530,46 @@ export function BookingEngineV2({
     return 'standard';
   }, []);
 
-  // Enforce customer vehicle capacity restrictions (single-vehicle mode only):
-  // If passengers > 4 or bags > 3, Sedan cannot accommodate. Auto-switch to SUV or Van.
+  // Enforce customer vehicle auto-selection and capacity restrictions (single-vehicle mode):
+  // Automatically choose cheapest vehicle capable of carrying the requested passengers & luggage
   useEffect(() => {
     if (!bookingConfig.allowMultiVehicle) {
-      if ((form.passengers > 4 || form.bags > 3) && form.vehicleChoice === 'sedan') {
-        const nextChoice = form.passengers > 6 || form.bags > 5 ? 'van' : 'suv';
+      const totalLuggage = form.carryOnBags + form.checkedBags;
+      let minVehicle: CustomerVehicleChoice = 'sedan';
+      if (form.passengers > 6 || totalLuggage > 5 || form.specialRequests.wheelchair) {
+        minVehicle = 'van';
+      } else if (form.passengers > 4 || totalLuggage > 3) {
+        minVehicle = 'suv';
+      }
+
+      const currentCap = vehicleCapacities[form.vehicleChoice] || { maxPassengers: 4, maxBags: 3 };
+      const canFitCurrent = form.passengers <= currentCap.maxPassengers && totalLuggage <= currentCap.maxBags;
+
+      if (!canFitCurrent) {
         setForm((prev) => ({
           ...prev,
-          vehicleChoice: nextChoice,
-          selectedVehicles: [nextChoice],
+          vehicleChoice: minVehicle,
+          selectedVehicles: [minVehicle],
+          isVehicleAutoAssigned: true,
+        }));
+      } else if (form.isVehicleAutoAssigned && form.vehicleChoice !== minVehicle) {
+        setForm((prev) => ({
+          ...prev,
+          vehicleChoice: minVehicle,
+          selectedVehicles: [minVehicle],
         }));
       }
     }
-  }, [bookingConfig.allowMultiVehicle, form.passengers, form.bags, form.vehicleChoice]);
+  }, [
+    bookingConfig.allowMultiVehicle,
+    form.passengers,
+    form.carryOnBags,
+    form.checkedBags,
+    form.specialRequests.wheelchair,
+    form.isVehicleAutoAssigned,
+    form.vehicleChoice,
+    vehicleCapacities,
+  ]);
 
   // If wheelchair requested, auto-select Van (WAV)
   useEffect(() => {
@@ -1935,63 +1971,104 @@ export function BookingEngineV2({
                   Trip Details
                 </label>
                 <span className="text-[11px] text-slate-400 font-medium">
-                  {form.passengers} Pax • {form.bags} Bags
+                  {form.passengers} Pax • {(form.carryOnBags + form.checkedBags)} Bags
                 </span>
               </div>
 
               <div className="space-y-3">
-                {/* Passengers & Bags Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Passengers & Bags Row - 3 equal width columns */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                   {/* Passengers Counter */}
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-slate-700 font-medium text-xs">
-                      <UserIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div>
-                        <div className="font-semibold text-slate-800">Total Passengers</div>
-                        <div className="text-[10px] text-slate-400">Max Cap: {totalMaxPassengers} Pax</div>
-                      </div>
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium text-xs">
+                      <UserIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="font-semibold text-slate-800">Passengers</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, passengers: Math.max(1, prev.passengers - 1) }))}
-                        className="w-6 h-6 rounded bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
+                        className="w-5 h-5 rounded bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none"
                       >
                         -
                       </button>
-                      <span className="w-5 text-center font-bold text-xs">{form.passengers}</span>
+                      <span className="w-4 text-center font-bold text-xs">{form.passengers}</span>
                       <button
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, passengers: Math.min(totalMaxPassengers, prev.passengers + 1) }))}
-                        className="w-6 h-6 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700"
+                        className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none"
                       >
                         +
                       </button>
                     </div>
                   </div>
 
-                  {/* Bags Counter */}
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-slate-700 font-medium text-xs">
-                      <LuggageIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div>
-                        <div className="font-semibold text-slate-800">Total Luggage</div>
-                        <div className="text-[10px] text-slate-400">Max Cap: {totalMaxBags} Bags</div>
-                      </div>
+                  {/* Carry-on Bags */}
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium text-xs">
+                      <LuggageIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="font-semibold text-slate-800">Carry-on Bags</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, bags: Math.max(0, prev.bags - 1) }))}
-                        className="w-6 h-6 rounded bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
+                        onClick={() =>
+                          setForm((prev) => {
+                            const nextCarry = Math.max(0, prev.carryOnBags - 1);
+                            return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none"
                       >
                         -
                       </button>
-                      <span className="w-5 text-center font-bold text-xs">{form.bags}</span>
+                      <span className="w-4 text-center font-bold text-xs">{form.carryOnBags}</span>
                       <button
                         type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, bags: Math.min(totalMaxBags, prev.bags + 1) }))}
-                        className="w-6 h-6 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700"
+                        disabled={(form.carryOnBags + form.checkedBags) >= totalMaxBags}
+                        onClick={() =>
+                          setForm((prev) => {
+                            const nextCarry = Math.min(totalMaxBags - prev.checkedBags, prev.carryOnBags + 1);
+                            return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-xs leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Checked Bags */}
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-medium text-xs">
+                      <LuggageIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="font-semibold text-slate-800">Checked Bags</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => {
+                            const nextChecked = Math.max(0, prev.checkedBags - 1);
+                            return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none"
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center font-bold text-xs">{form.checkedBags}</span>
+                      <button
+                        type="button"
+                        disabled={(form.carryOnBags + form.checkedBags) >= totalMaxBags}
+                        onClick={() =>
+                          setForm((prev) => {
+                            const nextChecked = Math.min(totalMaxBags - prev.carryOnBags, prev.checkedBags + 1);
+                            return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-xs leading-none"
                       >
                         +
                       </button>
@@ -1999,10 +2076,9 @@ export function BookingEngineV2({
                   </div>
                 </div>
 
-                {/* Luggage Type Classification */}
+                {/* Oversized / Special Gear */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-600">Luggage Profile</label>
                     <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
                       <input
                         type="checkbox"
@@ -2010,30 +2086,8 @@ export function BookingEngineV2({
                         onChange={(e) => setForm((prev) => ({ ...prev, hasOversizedLuggage: e.target.checked }))}
                         className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Oversized / Special Gear</span>
+                      <span className="font-semibold text-slate-800">Oversized / Special Gear (Skis, Golf Clubs, Wheelchairs)</span>
                     </label>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { key: 'carry_on', label: 'Carry-On', desc: 'Standard overhead size' },
-                      { key: 'checked', label: 'Checked Bag', desc: 'Full-size suitcases' },
-                      { key: 'mixed', label: 'Mixed Sizes', desc: 'Both carry-on & checked' },
-                    ].map((type) => (
-                      <button
-                        key={type.key}
-                        type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, luggageType: type.key as any }))}
-                        className={`p-2 rounded-lg border text-center transition-all ${
-                          form.luggageType === type.key
-                            ? 'bg-blue-50/80 border-blue-500 text-blue-900 shadow-xs ring-1 ring-blue-500'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{type.label}</div>
-                        <div className="text-[10px] text-slate-400">{type.desc}</div>
-                      </button>
-                    ))}
                   </div>
 
                   {form.hasOversizedLuggage && (
@@ -2262,7 +2316,7 @@ export function BookingEngineV2({
                         desc: 'Executive Lincoln / Camry',
                         passengers: vehicleCapacities.sedan.maxPassengers,
                         bags: vehicleCapacities.sedan.maxBags,
-                        isRestricted: form.passengers > 4 || form.bags > 3,
+                        isRestricted: form.passengers > 4 || (form.carryOnBags + form.checkedBags) > 3,
                         restrictionReason: form.passengers > 4 ? 'Requires SUV or Van (5+ pax)' : 'Requires SUV or Van (4+ bags)',
                       },
                       {
@@ -2271,7 +2325,7 @@ export function BookingEngineV2({
                         desc: 'Full-size Chevy Suburban / Tahoe',
                         passengers: vehicleCapacities.suv.maxPassengers,
                         bags: vehicleCapacities.suv.maxBags,
-                        isRestricted: form.passengers > 6 || form.bags > 5,
+                        isRestricted: form.passengers > 6 || (form.carryOnBags + form.checkedBags) > 5,
                         restrictionReason: 'Requires Passenger Van (7 pax)',
                       },
                       {
@@ -2528,17 +2582,6 @@ export function BookingEngineV2({
                   />
                 </div>
               </div>
-
-              {/* SMS Consent Checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 pt-1">
-                <input
-                  type="checkbox"
-                  checked={form.smsConsent}
-                  onChange={(e) => setForm((prev) => ({ ...prev, smsConsent: e.target.checked }))}
-                  className="rounded border-slate-300 text-blue-600"
-                />
-                <span>I agree to receive automated SMS trip dispatch notifications and chauffeur arrival alerts.</span>
-              </label>
             </div>
 
             {/* ─── Card 8: Payment Method (Segmented) ─── */}
@@ -2817,6 +2860,40 @@ export function BookingEngineV2({
                   <CarIcon className="w-3.5 h-3.5 text-blue-600" />
                   <span>Sanitized Commercial Fleet & Car Seats</span>
                 </div>
+              </div>
+
+              {/* Mandatory Agreements: SMS, Terms & Privacy */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/90 space-y-2.5 text-xs text-slate-600">
+                <label className="flex items-start gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={form.smsConsent}
+                    onChange={(e) => setForm((prev) => ({ ...prev, smsConsent: e.target.checked }))}
+                    className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  />
+                  <span className="text-[11px] text-slate-600 leading-tight group-hover:text-slate-800 transition-colors">
+                    I agree to receive automated transactional SMS trip dispatch notifications and chauffeur arrival alerts.
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    required
+                    defaultChecked
+                    className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  />
+                  <span className="text-[11px] text-slate-600 leading-tight group-hover:text-slate-800 transition-colors">
+                    I agree to the{' '}
+                    <Link to="/terms" target="_blank" className="font-semibold text-blue-600 underline hover:text-blue-800">
+                      Terms and Conditions
+                    </Link>{' '}
+                    and{' '}
+                    <Link to="/privacy" target="_blank" className="font-semibold text-blue-600 underline hover:text-blue-800">
+                      Privacy Policy
+                    </Link>.
+                  </span>
+                </label>
               </div>
 
               {/* Primary CTA Submit Button */}

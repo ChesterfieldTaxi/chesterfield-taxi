@@ -232,12 +232,24 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
       </div>
 
       {/* Telemetry Status Footer */}
-      <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+      <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
         <div className="flex items-center gap-1.5">
           <MapPinIcon className="w-3.5 h-3.5 text-slate-500" />
-          <span className="truncate max-w-[200px] sm:max-w-xs">{trip.pickupLocation?.address || 'Pickup location'}</span>
+          <span className="truncate max-w-[150px] sm:max-w-xs">{trip.pickupLocation?.address || 'Pickup location'}</span>
         </div>
-        <div className="font-mono text-[11px] text-slate-500">
+        
+        {trip.assignedDriverId && ['assigned', 'en_route', 'arrived', 'in_progress'].includes(trip.status) && (
+          <div className="flex items-center gap-2">
+            <button type="button" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700">
+              <span className="w-3 h-3 block">📞</span> Call Driver
+            </button>
+            <button type="button" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700">
+              💬 Text
+            </button>
+          </div>
+        )}
+        
+        <div className="font-mono text-[11px] text-slate-500 hidden sm:block">
           Updated: {new Date(trip.updatedAt || trip.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
       </div>

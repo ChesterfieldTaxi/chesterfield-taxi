@@ -156,6 +156,12 @@ export function Footer() {
             <Link to="/contact" className="hover:text-blue-400 transition-colors">
               Support
             </Link>
+            <Link to="/terms" className="hover:text-blue-400 transition-colors">
+              Terms &amp; Conditions
+            </Link>
+            <Link to="/privacy" className="hover:text-blue-400 transition-colors">
+              Privacy Policy
+            </Link>
             <Link to="/admin" className="hover:text-blue-400 transition-colors">
               Staff Portal
             </Link>

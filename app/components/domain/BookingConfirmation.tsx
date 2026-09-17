@@ -55,23 +55,23 @@ export function BookingConfirmation({
   const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
 
   return (
-    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-blue-200 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
+    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
       {/* Top Banner */}
-      <div className={`${isUnconfirmed ? 'bg-slate-900 text-white' : 'bg-emerald-600 text-white'} px-6 py-8 text-center relative`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-blue-600 text-white font-bold text-2xl' : 'bg-white text-emerald-600'}`}>
-          {isUnconfirmed ? <CheckIcon className="w-8 h-8 stroke-[3]" /> : <CheckIcon className="w-8 h-8 stroke-[3]" />}
+      <div className={`${isUnconfirmed ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'} px-6 py-8 text-center relative`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-100 text-amber-600' : 'bg-white text-emerald-600'}`}>
+          {isUnconfirmed ? <ClockIcon className="w-8 h-8 stroke-[3]" /> : <CheckIcon className="w-8 h-8 stroke-[3]" />}
         </div>
         <h2 className="text-2xl font-extrabold tracking-tight">
-          {isUnconfirmed ? 'Ride Request Received!' : 'Booking Confirmed!'}
+          {isUnconfirmed ? 'Ride Request Received' : 'Ride Confirmed!'}
         </h2>
-        <p className={`${isUnconfirmed ? 'text-slate-300' : 'text-emerald-100'} text-sm mt-1 max-w-md mx-auto`}>
+        <p className={`${isUnconfirmed ? 'text-amber-50' : 'text-emerald-100'} text-sm mt-1 max-w-md mx-auto`}>
           {isUnconfirmed
-            ? 'Your request has entered our dispatch queue. Our team will review and confirm your ride shortly.'
+            ? 'Your request is under review by our dispatch team. We will notify you shortly via SMS/Email.'
             : 'Your reservation has entered the Chesterfield dispatch system.'}
         </p>
 
-        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-slate-800' : 'bg-emerald-700/60'} px-4 py-1.5 rounded-full text-xs font-mono`}>
-          <span className={isUnconfirmed ? 'text-blue-300' : 'text-emerald-200'}>Trip Reference:</span>
+        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-amber-600' : 'bg-emerald-700/60'} px-4 py-1.5 rounded-full text-xs font-mono`}>
+          <span className={isUnconfirmed ? 'text-amber-100' : 'text-emerald-200'}>Trip Reference:</span>
           <span className="font-bold text-white tracking-wider">{trip.id}</span>
         </div>
       </div>
@@ -84,13 +84,30 @@ export function BookingConfirmation({
               Reservation Status
             </span>
             <span className="text-sm font-bold text-slate-900 uppercase flex items-center gap-1.5 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-blue-600 animate-pulse' : 'bg-emerald-500'}`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
               Status: {isUnconfirmed ? 'Pending Review' : 'Confirmed'}
             </span>
           </div>
-          <Badge variant={isUnconfirmed ? 'info' : 'success'} size="md">
-            {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
-          </Badge>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+            {isUnconfirmed && (
+              <button type="button" className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-300 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1">
+                Modify
+              </button>
+            )}
+            {isUnconfirmed && (
+              <button type="button" className="text-[10px] font-semibold text-red-600 hover:text-red-800 underline bg-white border border-red-200 px-2 py-1 rounded hover:bg-red-50 flex items-center gap-1">
+                Cancel Request
+              </button>
+            )}
+            {!isUnconfirmed && isScheduled && (
+              <button type="button" className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-300 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1">
+                <CalendarIcon className="w-3 h-3" /> Add to Calendar
+              </button>
+            )}
+            <Badge variant={isUnconfirmed ? 'warning' : 'success'} size="md">
+              {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
+            </Badge>
+          </div>
         </div>
 
         {/* Route Details */}
@@ -269,14 +286,24 @@ export function BookingConfirmation({
         <span className="text-xs text-slate-500 text-center sm:text-left">
           Questions about your ride? Call 24/7 Dispatch at {COMPANY_CONFIG.phone.dispatch}.
         </span>
-        <div className="flex items-center gap-2">
-          {trip.id && (
-            <Link
-              to={`/track/${trip.id}`}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
-            >
-              Track Live Ride
-            </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isUnconfirmed && trip.id && (
+             trip.status === 'en_route' ? (
+                <Link
+                  to={`/track/${trip.id}`}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors relative overflow-hidden group"
+                >
+                  <span className="absolute inset-0 w-full h-full bg-blue-400 opacity-20 animate-pulse"></span>
+                  Track Live Ride
+                </Link>
+             ) : (
+                <Link
+                  to={`/track/${trip.id}`}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+                >
+                  View Ride Details
+                </Link>
+             )
           )}
           <Button onClick={onBookAnother} variant="primary" size="md">
             Book Another Ride

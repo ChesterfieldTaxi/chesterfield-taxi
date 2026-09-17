@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { getBookingService } from '../core/services/booking';
 import {
   getPassengerService,
   DEFAULT_PASSENGER_ACCOUNT,
@@ -86,7 +87,7 @@ export default function PassengerAppRoute() {
   const [selectedVehicleTier, setSelectedVehicleTier] = useState<VehicleTier>('standard');
 
   // Trip History state
-  const [historyFilter, setHistoryFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'upcoming' | 'history'>('upcoming');
   const [selectedReceiptTrip, setSelectedReceiptTrip] = useState<Trip | null>(null);
 
   // Saved Places Modal state
@@ -171,18 +172,12 @@ export default function PassengerAppRoute() {
 
   // Filtered trips
   const filteredTrips = useMemo(() => {
-    if (historyFilter === 'completed') {
-      return trips.filter((t) => (t.status as string) === 'COMPLETED' || (t.status as string) === 'completed');
-    }
-    if (historyFilter === 'cancelled') {
-      return trips.filter(
-        (t) =>
-          (t.status as string) === 'cancelled' ||
-          (t.status as string) === 'DECLINED' ||
-          (t.status as string) === 'declined'
-      );
-    }
-    return trips;
+    return trips.filter((t) => {
+      const isHistory = t.status === 'completed' || t.status === 'cancelled' || t.status === 'DECLINED' || t.status === 'declined';
+      if (historyFilter === 'upcoming') return !isHistory;
+      if (historyFilter === 'history') return isHistory;
+      return true;
+    });
   }, [trips, historyFilter]);
 
   // Booking initial values for embedded self-contained BookingEngineV2
@@ -226,6 +221,47 @@ export default function PassengerAppRoute() {
     const returnFrom = trip.dropoffLocation?.address?.split(',')[0] || 'destination';
     const returnTo = trip.pickupLocation?.address?.split(',')[0] || 'pickup';
     showToast(`Loaded return ride: ${returnFrom} → ${returnTo}`);
+  };
+
+  // Edit upcoming trip in booking form
+  const handleEditTrip = (trip: Trip) => {
+    setBookingInitialValues({
+      pickupAddress: trip.pickupLocation?.address || '',
+      dropoffAddress: trip.dropoffLocation?.address || '',
+      driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
+      vehicleChoice: trip.vehicleTier === 'xl' ? 'suv' : trip.vehicleTier === 'wheelchair' ? 'van' : 'sedan',
+      passengers: trip.passenger?.passengerCount || 1,
+      passengerName: `${account.firstName} ${account.lastName}`.trim(),
+      passengerPhone: account.phone || '',
+      passengerEmail: account.email || '',
+      scheduledDate: trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).toISOString().split('T')[0] : '',
+      scheduledTime: trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).toTimeString().slice(0, 5) : '',
+    });
+    setActiveTab('book');
+    showToast(`Loaded Trip #${trip.id} into booking form to edit.`);
+  };
+
+  // Cancel reservation
+  const handleCancelTrip = async (trip: Trip) => {
+    if (!window.confirm(`Are you sure you want to cancel reservation #${trip.id}?`)) {
+      return;
+    }
+    try {
+      const bookingService = getBookingService();
+      if (bookingService.cancelBooking) {
+        await bookingService.cancelBooking(trip.id, 'Cancelled by passenger', 'passenger');
+      }
+      setTrips((prev) =>
+        prev.map((t) => (t.id === trip.id ? { ...t, status: 'cancelled' as TripStatus } : t))
+      );
+      if (activeTrip?.id === trip.id) {
+        setActiveTrip(null);
+      }
+      showToast(`Reservation #${trip.id} has been cancelled.`);
+    } catch (err) {
+      console.error('Error cancelling trip:', err);
+      showToast('Could not cancel trip. Please contact dispatch.');
+    }
   };
 
   const handleSignOut = async () => {
@@ -366,7 +402,7 @@ export default function PassengerAppRoute() {
     switch (status) {
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
             <CheckIcon className="w-3 h-3" /> Completed
           </span>
         );
@@ -374,52 +410,52 @@ export default function PassengerAppRoute() {
       case 'DECLINED':
       case 'declined':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
             Cancelled
           </span>
         );
       case 'UNCONFIRMED':
       case 'unconfirmed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
             Requested (Unconfirmed)
           </span>
         );
       case 'CONFIRMED':
       case 'confirmed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
             Confirmed
           </span>
         );
       case 'assigned':
       case 'accepted':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
             Driver Assigned
           </span>
         );
       case 'en_route':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
             Driver En Route
           </span>
         );
       case 'arrived':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200 animate-bounce">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200 animate-bounce">
             Driver Arrived
           </span>
         );
       case 'in_progress':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
             On Trip
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800">
             {status}
           </span>
         );
@@ -473,32 +509,16 @@ export default function PassengerAppRoute() {
               <CarIcon className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none">
-                  {COMPANY_CONFIG.name}
-                </span>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-black uppercase tracking-wider border border-blue-200">
-                  Passenger Portal
-                </span>
-              </div>
+              <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none block">
+                {COMPANY_CONFIG.name}
+              </span>
               <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                Hi, {account.firstName} • 24/7 Priority
+                Hi, {`${account.firstName} ${account.lastName}`.trim()}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {activeTrip && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('trips')}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold shadow-2xs hover:bg-emerald-100 transition-colors"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <span>Ride #{activeTrip.id} Live</span>
-              </button>
-            )}
-
             <UserDropdown
               email={account.email}
               onSignOut={handleSignOut}
@@ -510,8 +530,8 @@ export default function PassengerAppRoute() {
           </div>
         </div>
 
-        {/* Active Trip Floating Banner (Visible whenever live ride is active) */}
-        {activeTrip && (
+        {/* Active Trip Floating Banner (Visible only when driver is assigned or ride is active) */}
+        {activeTrip && ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(activeTrip.status) && (
           <section className="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-3xl p-5 text-white shadow-xl mb-4 border border-blue-500/30">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -634,17 +654,34 @@ export default function PassengerAppRoute() {
           <div className="space-y-4">
             <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80">
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-base font-extrabold text-slate-900">
-                    Past Trips &amp; Digital Receipts
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Review itemized receipts or rebook rides in two taps
-                  </p>
-                </div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Trips
+                </h2>
 
                 {/* Filter Pills */}
                 <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilter('upcoming')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
+                      historyFilter === 'upcoming'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    Upcoming
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilter('history')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
+                      historyFilter === 'history'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    History
+                  </button>
                   <button
                     type="button"
                     onClick={() => setHistoryFilter('all')}
@@ -655,28 +692,6 @@ export default function PassengerAppRoute() {
                     }`}
                   >
                     All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHistoryFilter('completed')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
-                      historyFilter === 'completed'
-                        ? 'bg-white text-emerald-700 shadow-2xs'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    Done
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHistoryFilter('cancelled')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
-                      historyFilter === 'cancelled'
-                        ? 'bg-white text-rose-700 shadow-2xs'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    Cancelled
                   </button>
                 </div>
               </div>
@@ -717,23 +732,30 @@ export default function PassengerAppRoute() {
                     return (
                       <div
                         key={trip.id}
-                        className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-2xs transition-all space-y-3"
+                        className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-2xs transition-all space-y-3 overflow-hidden"
                       >
                         {/* Top row */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-slate-500">
-                              #{trip.id}
-                            </span>
-                            {tripIndex === 0 && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
-                                Most Recent
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className="font-mono text-xs font-bold text-slate-500 truncate"
+                                title={trip.id}
+                              >
+                                #{trip.id.length > 16 ? `${trip.id.slice(0, 8)}...${trip.id.slice(-4)}` : trip.id}
                               </span>
-                            )}
-                            {getStatusBadge(trip.status)}
+                              {tripIndex === 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                                  Most Recent
+                                </span>
+                              )}
+                            </div>
+                            <div className="pt-0.5">
+                              {getStatusBadge(trip.status)}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-base font-extrabold text-slate-900">
+                          <div className="text-right shrink-0">
+                            <div className="text-base font-extrabold text-slate-900 leading-tight">
                               ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                             </div>
                             <div className="text-[10px] text-slate-400 font-semibold uppercase">
@@ -776,34 +798,60 @@ export default function PassengerAppRoute() {
                           </div>
                         )}
 
-                        {/* Action Buttons (Strictly Inline & Compact) */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedReceiptTrip(trip)}
-                            className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
-                          >
-                            View Receipt
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRebookTrip(trip)}
-                            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
-                            title="Rebook the same pickup and dropoff"
-                          >
-                            <CarIcon className="w-3.5 h-3.5 shrink-0" />
-                            <span>Rebook</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleBookReturnTrip(trip)}
-                            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
-                            title="Book return ride swapping pickup and dropoff"
-                          >
-                            <ArrowLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
-                            <span>Book Return</span>
-                          </button>
-                        </div>
+                        {/* Action Buttons */}
+                        {!(trip.status === 'completed' || trip.status === 'cancelled' || trip.status === 'DECLINED' || trip.status === 'declined') ? (
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReceiptTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReceiptTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+                            >
+                              View Receipt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRebookTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
+                              title="Rebook the same pickup and dropoff"
+                            >
+                              <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>Rebook</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleBookReturnTrip(trip)}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
+                              title="Book return ride swapping pickup and dropoff"
+                            >
+                              <ArrowLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>Book Return</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
