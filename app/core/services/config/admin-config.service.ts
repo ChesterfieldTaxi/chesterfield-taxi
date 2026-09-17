@@ -23,6 +23,7 @@ import type {
   ConfigAuditEntry,
   IAdminConfigService,
   VehicleTierConfig,
+  FleetAlertsConfig,
 } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
@@ -162,6 +163,10 @@ export const DEFAULT_SECURITY_CONTROLS: SecurityControlsConfig = {
   passwordExpiryDays: 90,
   requireSpecialChars: true,
   auditLoggingEnabled: true,
+};
+
+export const DEFAULT_FLEET_ALERTS_CONFIG: FleetAlertsConfig = {
+  autoDismissMinutes: 60, // 1 hour default
 };
 
 export const DEFAULT_CONFIG_AUDIT_TRAIL: ConfigAuditEntry[] = [
@@ -387,6 +392,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   configAuditTrail: [...DEFAULT_CONFIG_AUDIT_TRAIL],
   tariffs: [...DEFAULT_TARIFF_PROFILES],
   tariffGroups: [],
+  fleetAlertsConfig: { ...DEFAULT_FLEET_ALERTS_CONFIG },
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';

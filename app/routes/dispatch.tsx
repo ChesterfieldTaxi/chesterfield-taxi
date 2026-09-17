@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -49,6 +49,7 @@ import { CommsHub } from '../components/domain/dispatch/CommsHub';
 import { EmailDock } from '../components/domain/dispatch/EmailDock';
 import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher';
 import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
+import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 
 export function meta() {
@@ -76,14 +77,6 @@ interface DriverRosterItem {
   currentTripId?: string;
   driverScore?: number;
   isBlacklisted?: boolean;
-}
-
-interface DispatchMessageItem {
-  id: string;
-  to: string;
-  text: string;
-  timestamp: string;
-  priority: 'normal' | 'urgent';
 }
 
 const INITIAL_DRIVERS: DriverRosterItem[] = [
@@ -385,26 +378,143 @@ export default function DispatchRoute() {
   const [driverFilter, setDriverFilter] = useState<'all' | 'available' | 'on_trip' | 'offline'>('all');
   const [driverSearch, setDriverSearch] = useState('');
 
-  // Messages Data State
-  const [messages, setMessages] = useState<DispatchMessageItem[]>([
-    {
-      id: 'msg-1',
-      to: 'All Drivers',
-      text: 'Morning briefing: Lambert Airport terminal arrivals surge active until 11:30 AM.',
-      timestamp: '08:15 AM',
-      priority: 'normal',
-    },
-    {
-      id: 'msg-2',
-      to: 'Driver 104 (Sarah K.)',
-      text: 'Terminal 1 pickup confirmed for passenger Johnson.',
-      timestamp: '08:32 AM',
-      priority: 'normal',
-    },
-  ]);
+  // Admin-configurable alert auto-dismiss duration (default: 60 minutes = 1 hour)
+  const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('chesterfield_alerts_ttl_minutes');
+      if (saved) return parseInt(saved, 10);
+    } catch {}
+    return settings.fleetAlertsConfig?.autoDismissMinutes ?? 60;
+  });
+
+  // Messages Data State (Persisted)
+  const [messages, setMessages] = useState<DispatchMessageItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('chesterfield_dispatch_alerts');
+      if (saved) {
+        const parsed: DispatchMessageItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      {
+        id: 'msg-1',
+        to: 'All Drivers',
+        text: 'Morning briefing: Lambert Airport terminal arrivals surge active until 11:30 AM.',
+        timestamp: '08:15 AM',
+        createdAt: Date.now() - 15 * 60 * 1000,
+        priority: 'normal',
+        isPinned: true,
+        isRead: false,
+      },
+      {
+        id: 'msg-2',
+        to: 'Driver 104 (Sarah K.)',
+        text: 'Terminal 1 pickup confirmed for passenger Johnson.',
+        timestamp: '08:32 AM',
+        createdAt: Date.now() - 5 * 60 * 1000,
+        priority: 'normal',
+        isPinned: false,
+        isRead: false,
+      },
+    ];
+  });
   const [msgRecipient, setMsgRecipient] = useState('All Drivers');
   const [msgText, setMsgText] = useState('');
   const [msgPriority, setMsgPriority] = useState<'normal' | 'urgent'>('normal');
+  const [alertsFilter, setAlertsFilter] = useState<'all' | 'unread' | 'pinned'>('all');
+
+  // Persist alerts to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('chesterfield_dispatch_alerts', JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  // Periodic Auto-dismissal of unpinned alerts exceeding TTL
+  useEffect(() => {
+    if (alertDismissMinutes === 0) return; // 0 = Never auto-dismiss
+    const checkAndPrune = () => {
+      const now = Date.now();
+      const ttlMs = alertDismissMinutes * 60 * 1000;
+      setMessages((prev) => {
+        const unexpired = prev.filter((m) => m.isPinned || now - (m.createdAt || now) < ttlMs);
+        if (unexpired.length !== prev.length) {
+          return unexpired;
+        }
+        return prev;
+      });
+    };
+
+    const interval = setInterval(checkAndPrune, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [alertDismissMinutes]);
+
+  // Alert Action Handlers
+  const handleTogglePinAlert = useCallback((id: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, isPinned: !m.isPinned } : m))
+    );
+  }, []);
+
+  const handleToggleReadAlert = useCallback((id: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, isRead: !m.isRead } : m))
+    );
+  }, []);
+
+  const handleDismissAlert = useCallback((id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+  }, []);
+
+  const handleMarkAllAlertsRead = useCallback(() => {
+    setMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
+  }, []);
+
+  const handleClearUnpinnedAlerts = useCallback(() => {
+    setMessages((prev) => prev.filter((m) => m.isPinned));
+  }, []);
+
+  const handleUpdateAlertDismissMinutes = useCallback(async (mins: number) => {
+    setAlertDismissMinutes(mins);
+    try {
+      localStorage.setItem('chesterfield_alerts_ttl_minutes', String(mins));
+    } catch {}
+    if (user?.role === 'admin') {
+      try {
+        await getAdminConfigService().updateSettings({
+          fleetAlertsConfig: { autoDismissMinutes: mins },
+        });
+      } catch (e) {
+        console.warn('Failed to persist alerts autoDismissMinutes setting to server', e);
+      }
+    }
+  }, [user]);
+
+  // Active and sorted alerts: Pinned alerts stay at the top, unpinned sorted by newest, expired filtered
+  const activeAndSortedMessages = useMemo(() => {
+    const now = Date.now();
+    const ttlMs = alertDismissMinutes * 60 * 1000;
+    return messages
+      .filter((m) => {
+        if (alertDismissMinutes === 0) return true;
+        if (m.isPinned) return true;
+        return now - (m.createdAt || now) < ttlMs;
+      })
+      .sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+  }, [messages, alertDismissMinutes]);
+
+  const unreadAlertsCount = useMemo(() => {
+    return activeAndSortedMessages.filter((m) => !m.isRead).length;
+  }, [activeAndSortedMessages]);
+
+  const pinnedAlertsCount = useMemo(() => {
+    return activeAndSortedMessages.filter((m) => m.isPinned).length;
+  }, [activeAndSortedMessages]);
 
   // Tactical Presets State (Persisted)
   const [tacticalPresets, setTacticalPresets] = useState<string[]>(() => {
@@ -1155,9 +1265,12 @@ export default function DispatchRoute() {
       to: msgRecipient,
       text: msgText.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: Date.now(),
       priority: msgPriority,
+      isPinned: false,
+      isRead: false,
     };
-    setMessages([newMsg, ...messages]);
+    setMessages((prev) => [newMsg, ...prev]);
     setMsgText('');
   };
 
@@ -1793,15 +1906,29 @@ export default function DispatchRoute() {
 
         {/* Center: Brand Badge */}
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs tracking-tighter shadow-xs">
-            CT
+          <div
+            style={{
+              backgroundColor: 'var(--brand-primary, #2563eb)',
+              color: 'var(--btn-primary-text, #ffffff)',
+            }}
+            className="w-7 h-7 rounded-xl flex items-center justify-center font-black shadow-xs shrink-0"
+          >
+            {settings.branding?.logoUrl ? (
+              <img
+                src={settings.branding.logoUrl}
+                alt={settings.company?.name || COMPANY_CONFIG.name}
+                className="w-4.5 h-4.5 object-contain"
+              />
+            ) : (
+              <CarIcon className="w-4 h-4 text-white" />
+            )}
           </div>
           <span className="font-extrabold text-sm tracking-tight text-slate-900 hidden sm:inline">
-            {settings.company.name}
+            {settings.company?.name || COMPANY_CONFIG.name}
           </span>
         </div>
 
-        {/* Right: Operational Status + Screen Pop Call HUD + Alerts Bell + App Suite Launcher */}
+        {/* Right: Screen Pop Call HUD + Alerts Bell + App Suite Launcher */}
         <div className="flex items-center gap-2">
           <DispatchHeaderCallHud
             trips={trips}
@@ -1826,9 +1953,9 @@ export default function DispatchRoute() {
               aria-label="Alerts"
             >
               <BellIcon className="w-4 h-4" />
-              {messages.length > 0 && (
+              {unreadAlertsCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                  {messages.length}
+                  {unreadAlertsCount}
                 </span>
               )}
             </button>
@@ -1842,11 +1969,15 @@ export default function DispatchRoute() {
                     <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
                       Fleet Tactical Alerts
                     </span>
-                    {messages.length > 0 && (
+                    {unreadAlertsCount > 0 ? (
                       <span className="bg-rose-600 text-[10px] font-black px-1.5 py-0.2 rounded-full text-white">
-                        {messages.length}
+                        {unreadAlertsCount} new
                       </span>
-                    )}
+                    ) : activeAndSortedMessages.length > 0 ? (
+                      <span className="bg-slate-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full text-slate-300">
+                        {activeAndSortedMessages.length}
+                      </span>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -1860,12 +1991,54 @@ export default function DispatchRoute() {
                   </button>
                 </div>
 
+                {/* Quick Toolbar: Auto-Dismiss selector & Mark Read */}
+                <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[10px] text-slate-600">
+                  <div className="flex items-center gap-1">
+                    <span>⏳ Auto-dismiss:</span>
+                    <select
+                      value={alertDismissMinutes}
+                      onChange={(e) => handleUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
+                      className="font-bold text-slate-800 bg-transparent border-none cursor-pointer focus:outline-hidden"
+                      title="Admin-configured alert auto-dismiss window"
+                    >
+                      <option value={15}>15m</option>
+                      <option value={30}>30m</option>
+                      <option value={60}>1h (Default)</option>
+                      <option value={120}>2h</option>
+                      <option value={240}>4h</option>
+                      <option value={720}>12h</option>
+                      <option value={1440}>24h</option>
+                      <option value={0}>Never</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadAlertsCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllAlertsRead}
+                        className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    {activeAndSortedMessages.some((m) => !m.isPinned) && (
+                      <button
+                        type="button"
+                        onClick={handleClearUnpinnedAlerts}
+                        className="text-slate-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Clear unpinned
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Quick Broadcast Input */}
                 <form
                   onSubmit={(e) => {
                     handleSendMessage(e);
                   }}
-                  className="p-2.5 bg-slate-50 border-b border-slate-200 flex gap-1.5"
+                  className="p-2.5 bg-slate-50/50 border-b border-slate-200 flex gap-1.5"
                 >
                   <input
                     type="text"
@@ -1884,34 +2057,32 @@ export default function DispatchRoute() {
 
                 {/* Alerts List */}
                 <div className="max-h-72 overflow-y-auto p-3 space-y-2 text-xs">
-                  {messages.length === 0 ? (
+                  {activeAndSortedMessages.length === 0 ? (
                     <div className="text-center py-6 text-slate-400 space-y-1">
                       <p className="font-bold text-slate-600">No active fleet alerts</p>
                       <p className="text-[11px]">All drivers operating under normal conditions.</p>
                     </div>
                   ) : (
-                    messages.map((m) => (
-                      <div
+                    activeAndSortedMessages.map((m) => (
+                      <FleetAlertCard
                         key={m.id}
-                        className={`p-2.5 rounded-xl border text-xs space-y-1 ${
-                          m.priority === 'urgent'
-                            ? 'bg-rose-50 border-rose-300 text-rose-900'
-                            : 'bg-slate-50 border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between font-bold text-[10px]">
-                          <span className="flex items-center gap-1">
-                            <span>To: {m.to}</span>
-                            {m.priority === 'urgent' && (
-                              <span className="text-rose-600 font-extrabold uppercase">(Urgent)</span>
-                            )}
-                          </span>
-                          <span className="text-slate-400">{m.timestamp}</span>
-                        </div>
-                        <p className="text-xs leading-snug">{m.text}</p>
-                      </div>
+                        message={m}
+                        onTogglePin={handleTogglePinAlert}
+                        onToggleRead={handleToggleReadAlert}
+                        onDismiss={handleDismissAlert}
+                      />
                     ))
                   )}
+                </div>
+
+                {/* Popover Footer Info */}
+                <div className="p-2 bg-slate-50 border-t border-slate-200 text-center text-[10px] text-slate-500 flex items-center justify-between px-3">
+                  <span>
+                    {activeAndSortedMessages.length} active ({pinnedAlertsCount} pinned)
+                  </span>
+                  <span>
+                    Retention: {alertDismissMinutes === 0 ? 'Permanent' : `${alertDismissMinutes}m`}
+                  </span>
                 </div>
               </div>
             )}
@@ -1919,11 +2090,6 @@ export default function DispatchRoute() {
 
           {/* App Suite Launcher (9-Dot Grid) */}
           <AppSuiteLauncher />
-
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-600">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
-            <span>Operational</span>
-          </div>
         </div>
       </header>
 
@@ -4202,33 +4368,135 @@ export default function DispatchRoute() {
                     </div>
                   </form>
 
-                  {/* Message History */}
+                  {/* Filter & Retention Toolbar */}
+                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 text-xs">
+                    <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setAlertsFilter('all')}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
+                          alertsFilter === 'all'
+                            ? 'bg-white text-blue-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        All ({activeAndSortedMessages.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAlertsFilter('unread')}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
+                          alertsFilter === 'unread'
+                            ? 'bg-white text-blue-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Unread ({unreadAlertsCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAlertsFilter('pinned')}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
+                          alertsFilter === 'pinned'
+                            ? 'bg-white text-blue-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        📌 Pinned ({pinnedAlertsCount})
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className="text-slate-500 font-medium">⏳ Retention:</span>
+                      <select
+                        value={alertDismissMinutes}
+                        onChange={(e) => handleUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
+                        className="font-bold text-slate-800 bg-white border border-slate-300 rounded px-1.5 py-0.5 cursor-pointer shadow-2xs focus:outline-hidden"
+                        title="Admin-configured alert auto-dismiss window"
+                      >
+                        <option value={15}>15m</option>
+                        <option value={30}>30m</option>
+                        <option value={60}>1h (Default)</option>
+                        <option value={120}>2h</option>
+                        <option value={240}>4h</option>
+                        <option value={720}>12h</option>
+                        <option value={1440}>24h</option>
+                        <option value={0}>Never</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Secondary Toolbar: Bulk Actions */}
+                  <div className="px-3 py-1 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between text-[10px] text-slate-600 shrink-0">
+                    <span>
+                      Showing {alertsFilter === 'all' ? 'all' : alertsFilter} alerts ({
+                        activeAndSortedMessages.filter((m) => {
+                          if (alertsFilter === 'unread') return !m.isRead;
+                          if (alertsFilter === 'pinned') return m.isPinned;
+                          return true;
+                        }).length
+                      })
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {unreadAlertsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllAlertsRead}
+                          className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      {activeAndSortedMessages.some((m) => !m.isPinned) && (
+                        <button
+                          type="button"
+                          onClick={handleClearUnpinnedAlerts}
+                          className="text-slate-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
+                        >
+                          Clear unpinned
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Message History List */}
                   <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
-                    {messages.length === 0 ? (
+                    {activeAndSortedMessages
+                      .filter((m) => {
+                        if (alertsFilter === 'unread') return !m.isRead;
+                        if (alertsFilter === 'pinned') return m.isPinned;
+                        return true;
+                      })
+                      .length === 0 ? (
                       <div className="text-center py-8 text-slate-400">
                         <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-xs font-semibold">No alerts sent yet</p>
+                        <p className="text-xs font-semibold">
+                          {alertsFilter === 'unread'
+                            ? 'No unread alerts'
+                            : alertsFilter === 'pinned'
+                            ? 'No pinned alerts'
+                            : 'No active alerts'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Non-pinned alerts auto-dismiss after {alertDismissMinutes === 0 ? 'infinite' : `${alertDismissMinutes}m`}.
+                        </p>
                       </div>
                     ) : (
-                      messages.map((m) => (
-                        <div
-                          key={m.id}
-                          className={`p-3 rounded-xl border text-xs space-y-1 ${
-                            m.priority === 'urgent'
-                              ? 'bg-rose-50 border-rose-300 text-rose-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between font-bold text-[10px]">
-                            <span className="flex items-center gap-1">
-                              <span>To: {m.to}</span>
-                              {m.priority === 'urgent' && <span className="text-rose-600 font-extrabold">(URGENT)</span>}
-                            </span>
-                            <span className="text-slate-400">{m.timestamp}</span>
-                          </div>
-                          <p className="text-xs leading-snug">{m.text}</p>
-                        </div>
-                      ))
+                      activeAndSortedMessages
+                        .filter((m) => {
+                          if (alertsFilter === 'unread') return !m.isRead;
+                          if (alertsFilter === 'pinned') return m.isPinned;
+                          return true;
+                        })
+                        .map((m) => (
+                          <FleetAlertCard
+                            key={m.id}
+                            message={m}
+                            onTogglePin={handleTogglePinAlert}
+                            onToggleRead={handleToggleReadAlert}
+                            onDismiss={handleDismissAlert}
+                          />
+                        ))
                     )}
                   </div>
                 </div>

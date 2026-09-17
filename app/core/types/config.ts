@@ -285,6 +285,10 @@ export interface ConfigAuditEntry {
   changes?: Record<string, { before: any; after: any }>;
 }
 
+export interface FleetAlertsConfig {
+  autoDismissMinutes?: number; // default: 60 (1 hour)
+}
+
 export interface AppSettings {
   company: CompanyConfig;
   branding: BrandingConfig;
@@ -298,6 +302,7 @@ export interface AppSettings {
   invoices?: InvoiceRecord[];
   securityControls?: SecurityControlsConfig;
   configAuditTrail?: ConfigAuditEntry[];
+  fleetAlertsConfig?: FleetAlertsConfig;
   tariffs?: import('./tariff').TariffProfile[]; // Unified Tariff Profiles
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;

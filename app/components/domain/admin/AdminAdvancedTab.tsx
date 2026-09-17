@@ -73,6 +73,15 @@ export function AdminAdvancedTab({
   const [maintenanceBanner, setMaintenanceBanner] = useState(
     'Scheduled system maintenance in progress. Please call dispatch directly at (314) 738-0100.'
   );
+  const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(
+    settings.fleetAlertsConfig?.autoDismissMinutes ?? 60
+  );
+
+  useEffect(() => {
+    if (settings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
+      setAlertDismissMinutes(settings.fleetAlertsConfig.autoDismissMinutes);
+    }
+  }, [settings.fleetAlertsConfig?.autoDismissMinutes]);
 
   // Status feedback
   const [isSaving, setIsSaving] = useState(false);
@@ -502,6 +511,41 @@ export function AdminAdvancedTab({
                 >
                   Purge Local Cache
                 </Button>
+              </div>
+
+              {/* Fleet Tactical Alerts Retention & Auto-Dismiss Duration */}
+              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">Fleet Tactical Alerts Auto-Dismiss Retention</h4>
+                  <p className="text-[11px] text-slate-500">
+                    Automatically dismisses non-pinned tactical alerts from the Dispatch Console after a specified duration (1 hour default).
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={alertDismissMinutes}
+                    onChange={async (e) => {
+                      const mins = parseInt(e.target.value, 10);
+                      setAlertDismissMinutes(mins);
+                      await onSave({
+                        fleetAlertsConfig: { autoDismissMinutes: mins },
+                      });
+                      try {
+                        localStorage.setItem('chesterfield_alerts_ttl_minutes', String(mins));
+                      } catch {}
+                    }}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 shadow-2xs focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value={15}>15 Minutes</option>
+                    <option value={30}>30 Minutes</option>
+                    <option value={60}>1 Hour (Default)</option>
+                    <option value={120}>2 Hours</option>
+                    <option value={240}>4 Hours</option>
+                    <option value={720}>12 Hours</option>
+                    <option value={1440}>24 Hours</option>
+                    <option value={0}>Never Auto-Dismiss</option>
+                  </select>
+                </div>
               </div>
 
               {/* Developer Stress Testing */}
