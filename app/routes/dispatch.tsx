@@ -46,6 +46,8 @@ import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../components/ui/LayoutToggle';
 import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
+import { EmailDock } from '../components/domain/dispatch/EmailDock';
+import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher';
 import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 
@@ -284,7 +286,7 @@ function TripActionDropdown({
   );
 }
 
-export type DesktopDockTab = 'none' | 'comms' | 'drivers' | 'alerts';
+export type DesktopDockTab = 'none' | 'phone' | 'email' | 'drivers' | 'comms' | 'alerts';
 
 export default function DispatchRoute() {
   const navigate = useNavigate();
@@ -363,14 +365,18 @@ export default function DispatchRoute() {
   const [isTabOverflowOpen, setIsTabOverflowOpen] = useState(false);
   const tabOverflowRef = useRef<HTMLDivElement>(null);
 
-  // Operational Right Dock Tools (Unified Dock: Main / Comms / Drivers / Alerts)
+  // Operational Right Dock Tools (Unified Dock: Main / Phone / Email / Drivers)
   const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
   const isDriversOpen = activeDockTab === 'drivers';
   const isMessagesOpen = activeDockTab === 'alerts';
-  const isPhoneOpen = activeDockTab === 'comms';
+  const isPhoneOpen = activeDockTab === 'phone' || activeDockTab === 'comms';
+  const isEmailOpen = activeDockTab === 'email';
   const setIsDriversOpen = (open: boolean) => setActiveDockTab(open ? 'drivers' : 'none');
   const setIsMessagesOpen = (open: boolean) => setActiveDockTab(open ? 'alerts' : 'none');
-  const setIsPhoneOpen = (open: boolean) => setActiveDockTab(open ? 'comms' : 'none');
+  const setIsPhoneOpen = (open: boolean) => setActiveDockTab(open ? 'phone' : 'none');
+  const setIsEmailOpen = (open: boolean) => setActiveDockTab(open ? 'email' : 'none');
+  const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
+  const alertsDropdownRef = useRef<HTMLDivElement>(null);
   const [minimizedPanels, setMinimizedPanels] = useState<Record<string, boolean>>({});
   const operationsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -452,6 +458,9 @@ export default function DispatchRoute() {
     messages: 180,
     phone: 220,
   });
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
   const [isViewsDropdownOpen, setIsViewsDropdownOpen] = useState(false);
   const viewsDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -576,19 +585,46 @@ export default function DispatchRoute() {
       if (e.key === 'Escape') {
         setActiveDockTab('none');
         setIsMobileDrawerOpen(false);
+        setShowAlertsDropdown(false);
       } else if (e.key === 'm' || e.key === 'M') {
         setActiveDockTab('none');
-      } else if (e.key === 'c' || e.key === 'C') {
-        setActiveDockTab((prev) => (prev === 'comms' ? 'none' : 'comms'));
+      } else if (e.key === 'p' || e.key === 'P' || e.key === 'c' || e.key === 'C') {
+        setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
+      } else if (e.key === 'e' || e.key === 'E') {
+        setActiveDockTab((prev) => (prev === 'email' ? 'none' : 'email'));
       } else if (e.key === 'd' || e.key === 'D') {
         setActiveDockTab((prev) => (prev === 'drivers' ? 'none' : 'drivers'));
       } else if (e.key === 'a' || e.key === 'A') {
-        setActiveDockTab((prev) => (prev === 'alerts' ? 'none' : 'alerts'));
+        setShowAlertsDropdown((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Click-outside listener for header alerts dropdown
+  useEffect(() => {
+    function handleClickOutsideAlerts(e: MouseEvent) {
+      if (alertsDropdownRef.current && !alertsDropdownRef.current.contains(e.target as Node)) {
+        setShowAlertsDropdown(false);
+      }
+    }
+    if (showAlertsDropdown) {
+      document.addEventListener('mousedown', handleClickOutsideAlerts);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideAlerts);
+    };
+  }, [showAlertsDropdown]);
+
+  // Window resize listener to keep layout reactive across breakpoints and DevTools toggles
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Pricing Rules (Driver Permitted)
@@ -1698,22 +1734,37 @@ export default function DispatchRoute() {
               <span>Main</span>
             </button>
 
-            {/* Communications Tab */}
+            {/* Phone Tab (Calls, SMS, Voicemail) */}
             <button
               type="button"
-              onClick={() => setActiveDockTab(activeDockTab === 'comms' ? 'none' : 'comms')}
+              onClick={() => setActiveDockTab(activeDockTab === 'phone' || activeDockTab === 'comms' ? 'none' : 'phone')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeDockTab === 'comms'
+                activeDockTab === 'phone' || activeDockTab === 'comms'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100'
               }`}
-              title="Communications: Omnichannel Calls, Messages, and Voicemail"
+              title="Phone: Omnichannel Calls, Messages, and Voicemail (Alt+P)"
             >
               <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Communications</span>
+              <span>Phone</span>
               {activeCallStatus !== 'idle' && (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
               )}
+            </button>
+
+            {/* Email Tab */}
+            <button
+              type="button"
+              onClick={() => setActiveDockTab(activeDockTab === 'email' ? 'none' : 'email')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                activeDockTab === 'email'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Email: Inquiries, Bookings, Receipts (Alt+E)"
+            >
+              <MailIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Email</span>
             </button>
 
             {/* Drivers Tab */}
@@ -1725,7 +1776,7 @@ export default function DispatchRoute() {
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-700 hover:bg-slate-100'
               }`}
-              title="Drivers Roster & Status"
+              title="Drivers Roster & Status (Alt+D)"
             >
               <CarIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Drivers</span>
@@ -1736,30 +1787,6 @@ export default function DispatchRoute() {
               >
                 {drivers.filter((d) => d.status === 'available').length}
               </span>
-            </button>
-
-            {/* Alerts Tab */}
-            <button
-              type="button"
-              onClick={() => setActiveDockTab(activeDockTab === 'alerts' ? 'none' : 'alerts')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeDockTab === 'alerts'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-              title="Fleet Broadcasts & Tactical Alerts"
-            >
-              <BellIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Alerts</span>
-              {messages.length > 0 && (
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                    activeDockTab === 'alerts' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {messages.length}
-                </span>
-              )}
             </button>
           </div>
         </div>
@@ -1774,16 +1801,125 @@ export default function DispatchRoute() {
           </span>
         </div>
 
-        {/* Right: Operational Status / Dispatch Indicator + Screen Pop Call HUD */}
+        {/* Right: Operational Status + Screen Pop Call HUD + Alerts Bell + App Suite Launcher */}
         <div className="flex items-center gap-2">
           <DispatchHeaderCallHud
             trips={trips}
             onOpenBooking={() => setActiveMobileTab('booking')}
             onOpenComms={() => {
-              setActiveDockTab('comms');
+              setActiveDockTab('phone');
               setActiveMobileTab('comms');
             }}
           />
+
+          {/* Tactical Alerts Bell Notification Center */}
+          <div className="relative" ref={alertsDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowAlertsDropdown((prev) => !prev)}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+                showAlertsDropdown
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+              }`}
+              title="Fleet Broadcasts & Tactical Alerts"
+              aria-label="Alerts"
+            >
+              <BellIcon className="w-4 h-4" />
+              {messages.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  {messages.length}
+                </span>
+              )}
+            </button>
+
+            {/* Alerts Dropdown Popover */}
+            {showAlertsDropdown && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <BellIcon className="w-4 h-4 text-amber-400" />
+                    <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
+                      Fleet Tactical Alerts
+                    </span>
+                    {messages.length > 0 && (
+                      <span className="bg-rose-600 text-[10px] font-black px-1.5 py-0.2 rounded-full text-white">
+                        {messages.length}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAlertsDropdown(false);
+                      setActiveDockTab('alerts');
+                    }}
+                    className="text-xs font-bold text-blue-400 hover:text-blue-300 cursor-pointer"
+                  >
+                    Open Console ↗
+                  </button>
+                </div>
+
+                {/* Quick Broadcast Input */}
+                <form
+                  onSubmit={(e) => {
+                    handleSendMessage(e);
+                  }}
+                  className="p-2.5 bg-slate-50 border-b border-slate-200 flex gap-1.5"
+                >
+                  <input
+                    type="text"
+                    value={msgText}
+                    onChange={(e) => setMsgText(e.target.value)}
+                    placeholder="Broadcast alert to all drivers..."
+                    className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg shadow-2xs cursor-pointer"
+                  >
+                    Send
+                  </button>
+                </form>
+
+                {/* Alerts List */}
+                <div className="max-h-72 overflow-y-auto p-3 space-y-2 text-xs">
+                  {messages.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 space-y-1">
+                      <p className="font-bold text-slate-600">No active fleet alerts</p>
+                      <p className="text-[11px]">All drivers operating under normal conditions.</p>
+                    </div>
+                  ) : (
+                    messages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`p-2.5 rounded-xl border text-xs space-y-1 ${
+                          m.priority === 'urgent'
+                            ? 'bg-rose-50 border-rose-300 text-rose-900'
+                            : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold text-[10px]">
+                          <span className="flex items-center gap-1">
+                            <span>To: {m.to}</span>
+                            {m.priority === 'urgent' && (
+                              <span className="text-rose-600 font-extrabold uppercase">(Urgent)</span>
+                            )}
+                          </span>
+                          <span className="text-slate-400">{m.timestamp}</span>
+                        </div>
+                        <p className="text-xs leading-snug">{m.text}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* App Suite Launcher (9-Dot Grid) */}
+          <AppSuiteLauncher />
+
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
             <span>Operational</span>
@@ -1792,46 +1928,70 @@ export default function DispatchRoute() {
       </header>
 
       {/* ─────────────────────────────────────────────────────────────
-          1C. SLIDE-OUT OPERATIONS & PROFILE DRAWER
+          1C. SLIDE-OUT OPERATIONS & PROFILE DRAWER (MATCHING ADMIN SIDEBAR)
       ───────────────────────────────────────────────────────────── */}
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
             onClick={() => setIsMobileDrawerOpen(false)}
           />
-          <div className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-slate-950 flex items-center justify-center text-amber-400 font-black text-xs">
-                  CT
+          <div className="relative w-80 max-w-[85vw] bg-slate-900 border-r border-slate-800 text-slate-300 h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
+            {/* Drawer Header (Admin Logo & Operational Indicator) */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                <div
+                  style={{
+                    backgroundColor: 'var(--brand-primary, #2563eb)',
+                    color: 'var(--btn-primary-text, #ffffff)',
+                  }}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-md shrink-0"
+                >
+                  {settings.branding?.logoUrl ? (
+                    <img
+                      src={settings.branding.logoUrl}
+                      alt={settings.company?.name || COMPANY_CONFIG.name}
+                      className="w-6 h-6 object-contain"
+                    />
+                  ) : (
+                    <CarIcon className="w-5 h-5 text-white" />
+                  )}
                 </div>
-                <div>
-                  <div className="font-extrabold text-sm text-slate-900">
-                    Dispatch Hub
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-white tracking-tight truncate">
+                      {settings.company?.name || COMPANY_CONFIG.name}
+                    </span>
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Mobile Control Console
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <span className="font-bold uppercase tracking-wider text-[10px] text-emerald-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                      Operational
+                    </span>
+                    <span>•</span>
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                      Dispatch
+                    </span>
                   </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMobileDrawerOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 text-sm font-bold cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold cursor-pointer transition-colors"
+                title="Close drawer"
               >
                 ✕
               </button>
             </div>
 
             {/* Quick Operations Triggers */}
-            <div className="py-3 border-b border-slate-100 space-y-2">
+            <div className="py-3 border-b border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between px-1">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                  Docked Operations
+                  Operations
                 </span>
-                <span className="text-[10px] text-blue-600 font-bold">Detachable</span>
+                <span className="text-[10px] text-blue-400 font-bold">Detachable</span>
               </div>
 
               {/* Main Console */}
@@ -1844,45 +2004,89 @@ export default function DispatchRoute() {
                 }}
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeDockTab === 'none'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <Squares2X2Icon className="w-4 h-4" />
                   <span>Main Console</span>
                 </div>
                 <span className="text-[10px] opacity-80 font-bold">Booking • Map • Trips</span>
               </button>
 
-              {/* Unified Communications Hub with Pop-Out */}
+              {/* Phone Hub (Calls & SMS) with Pop-Out */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveDockTab('comms');
+                    setActiveDockTab('phone');
                     setActiveMobileTab('comms');
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeDockTab === 'comms' || activeMobileTab === 'comms'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    activeDockTab === 'phone' || activeDockTab === 'comms' || activeMobileTab === 'comms'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <PhoneIcon className="w-4 h-4" />
-                    <span>Communications</span>
+                    <span>Phone Hub</span>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 font-bold">
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      activeDockTab === 'phone' || activeDockTab === 'comms' || activeMobileTab === 'comms'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                    }`}
+                  >
                     Calls &amp; SMS
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('comms')}
-                  title="Pop out Comms Hub to detached window"
-                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  title="Pop out Phone Hub to detached window"
+                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                >
+                  ↗
+                </button>
+              </div>
+
+              {/* Email Console with Pop-Out */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDockTab('email');
+                    setIsMobileDrawerOpen(false);
+                  }}
+                  className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeDockTab === 'email'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <MailIcon className="w-4 h-4" />
+                    <span>Email Console</span>
+                  </div>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      activeDockTab === 'email'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    Inquiries
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => getWorkspaceBus().popOutModule('email')}
+                  title="Pop out Email Console to detached window"
+                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -1899,15 +2103,21 @@ export default function DispatchRoute() {
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     activeDockTab === 'drivers' || activeMobileTab === 'drivers'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <CarIcon className="w-4 h-4" />
                     <span>Drivers Roster</span>
                   </div>
-                  <span className="text-[11px] font-bold">
+                  <span
+                    className={`text-[11px] font-bold ${
+                      activeDockTab === 'drivers' || activeMobileTab === 'drivers'
+                        ? 'text-white'
+                        : 'text-slate-300'
+                    }`}
+                  >
                     {drivers.filter((d) => d.status === 'available').length} Avail
                   </span>
                 </button>
@@ -1915,7 +2125,7 @@ export default function DispatchRoute() {
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('drivers')}
                   title="Pop out Drivers to detached window"
-                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -1930,16 +2140,16 @@ export default function DispatchRoute() {
                 }}
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeDockTab === 'alerts'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <BellIcon className="w-4 h-4" />
                   <span>Alerts &amp; Broadcasts</span>
                 </div>
                 {messages.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">
                     {messages.length}
                   </span>
                 )}
@@ -1947,11 +2157,11 @@ export default function DispatchRoute() {
             </div>
 
             {/* Workspace Layout Preferences */}
-            <div className="py-3 border-b border-slate-100 space-y-2">
+            <div className="py-3 border-b border-slate-800/80 space-y-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
                 Workspace Workflow Layout
               </span>
-              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-center text-[10px] font-bold">
+              <div className="grid grid-cols-3 gap-1 bg-slate-950/80 p-1 rounded-xl text-center text-[10px] font-bold border border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -1959,7 +2169,9 @@ export default function DispatchRoute() {
                     setActiveDockTab('none');
                   }}
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                    workspaceLayout === 'compact' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    workspaceLayout === 'compact'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Compact HUD
@@ -1968,10 +2180,12 @@ export default function DispatchRoute() {
                   type="button"
                   onClick={() => {
                     setWorkspaceLayout('split');
-                    setActiveDockTab('comms');
+                    setActiveDockTab('phone');
                   }}
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                    workspaceLayout === 'split' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    workspaceLayout === 'split'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Split Dock
@@ -1983,13 +2197,15 @@ export default function DispatchRoute() {
                     getWorkspaceBus().popOutModule('comms');
                   }}
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                    workspaceLayout === 'popout' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    workspaceLayout === 'popout'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Pop-Out ↗
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 px-1 leading-tight">
+              <p className="text-[10px] text-slate-400 px-1 leading-tight">
                 {workspaceLayout === 'compact' && 'Minimal desktop: floating caller HUD + full queue space.'}
                 {workspaceLayout === 'split' && 'Multi-tasking: side-by-side dock with dialer & roster.'}
                 {workspaceLayout === 'popout' && 'Multi-monitor: detached windows with cross-window sync.'}
@@ -1997,39 +2213,42 @@ export default function DispatchRoute() {
             </div>
 
             {/* Quick Links */}
-            <div className="py-3 border-b border-slate-100 space-y-1">
+            <div className="py-3 border-b border-slate-800/80 space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1 mb-1">
+                System &amp; Platform
+              </span>
               <Link
                 to="/admin"
-                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
                 onClick={() => setIsMobileDrawerOpen(false)}
               >
                 <span className="flex items-center gap-2">
                   <span>👑</span>
                   <span>Admin Console</span>
                 </span>
-                <span className="text-slate-400">→</span>
+                <span className="text-slate-500">→</span>
               </Link>
               <a
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
                 onClick={() => setIsMobileDrawerOpen(false)}
               >
                 <span className="flex items-center gap-2">
                   <span>🌐</span>
                   <span>Public Live Site</span>
                 </span>
-                <span className="text-slate-400">↗</span>
+                <span className="text-slate-500">↗</span>
               </a>
             </div>
 
-            {/* Account and Profile Menu (Consistently in Side Drawer) */}
-            <div className="mt-auto pt-3 border-t border-slate-200 shrink-0">
+            {/* Account and Profile Menu (Consistently in Side Drawer with Dark Variant) */}
+            <div className="mt-auto pt-3 border-t border-slate-800 shrink-0">
               <UserDropdown
                 email={user?.email}
                 onSignOut={handleSignOut}
-                variant="light"
+                variant="dark"
                 currentView="dispatch"
                 dropUp={true}
                 triggerVariant="full"
@@ -2046,7 +2265,7 @@ export default function DispatchRoute() {
         {/* ─── A. LEFT SIDEBAR: TABBED DRAFT / EDIT ENGINE ─── */}
         <aside
           style={{
-            width: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${sidebarWidth}px` : undefined,
+            width: isDesktop ? `${sidebarWidth}px` : undefined,
           }}
           className={`h-full bg-white border-r border-slate-200 flex flex-col shrink-0 relative z-20 shadow-xs ${
             activeMobileTab === 'booking' ? 'flex w-full' : 'hidden lg:flex'
@@ -2217,7 +2436,11 @@ export default function DispatchRoute() {
         }`}>
           {/* Live Google Map Stage */}
           <div className={`w-full relative z-0 ${
-            activeMobileTab === 'map' ? 'flex-1 h-full' : activeMobileTab === 'queue' ? 'hidden lg:flex lg:flex-1' : 'flex-1'
+            activeMobileTab === 'map'
+              ? 'flex-1 h-full'
+              : activeMobileTab === 'queue'
+              ? 'hidden lg:flex lg:flex-1 lg:min-h-[160px]'
+              : 'flex-1 lg:min-h-[160px]'
           }`}>
             <LiveDispatchMap
               activeFormValues={activeDraft?.formValues}
@@ -2236,10 +2459,12 @@ export default function DispatchRoute() {
           {/* Bottom Docked Queue */}
           <div
             style={{
-              height: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `${queueHeight}px` : undefined,
+              height: isDesktop ? `${queueHeight}px` : undefined,
             }}
-            className={`w-full bg-white border-t border-slate-200 flex flex-col shrink-0 z-10 shadow-md ${
-              activeMobileTab === 'queue' ? 'flex-1 h-full' : 'hidden lg:flex'
+            className={`w-full bg-white border-t border-slate-200 flex flex-col z-10 shadow-md ${
+              activeMobileTab === 'queue'
+                ? 'flex-1 h-full lg:flex-none lg:h-auto lg:shrink-0'
+                : 'hidden lg:flex lg:flex-none lg:h-auto lg:shrink-0'
             }`}
           >
             {/* ─── Modern Filter & Trips Control Bar ─── */}
@@ -3599,23 +3824,37 @@ export default function DispatchRoute() {
 
             {/* Master Header with Tab Switchers & Actions */}
             <div className="h-10 px-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 text-xs shadow-2xs pl-4 gap-2">
-              {/* Tab Switcher Pills: Communications | Drivers | Alerts */}
+              {/* Tab Switcher Pills: Phone | Email | Drivers */}
               <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setActiveDockTab('comms')}
+                  onClick={() => setActiveDockTab('phone')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'comms'
+                    activeDockTab === 'phone' || activeDockTab === 'comms'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Communications Console"
+                  title="Phone Hub: Calls, SMS, Voicemail"
                 >
                   <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>Comms</span>
+                  <span>Phone</span>
                   {activeCallStatus !== 'idle' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveDockTab('email')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeDockTab === 'email'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Email Console: Requests, Bookings, Receipts"
+                >
+                  <MailIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Email</span>
                 </button>
 
                 <button
@@ -3638,29 +3877,6 @@ export default function DispatchRoute() {
                     {drivers.filter((d) => d.status === 'available').length}
                   </span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveDockTab('alerts')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'alerts'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="Alerts & Broadcasts"
-                >
-                  <BellIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>Alerts</span>
-                  {messages.length > 0 && (
-                    <span
-                      className={`text-[10px] font-bold px-1 py-0.1 rounded-full ${
-                        activeDockTab === 'alerts' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {messages.length}
-                    </span>
-                  )}
-                </button>
               </div>
 
               {/* Action Buttons: Pop-out and Close Dock */}
@@ -3668,7 +3884,8 @@ export default function DispatchRoute() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeDockTab === 'comms') getWorkspaceBus().popOutModule('comms');
+                    if (activeDockTab === 'phone' || activeDockTab === 'comms') getWorkspaceBus().popOutModule('comms');
+                    else if (activeDockTab === 'email') getWorkspaceBus().popOutModule('email');
                     else if (activeDockTab === 'drivers') getWorkspaceBus().popOutModule('drivers');
                     else getWorkspaceBus().popOutModule('trips');
                   }}
@@ -3691,8 +3908,8 @@ export default function DispatchRoute() {
 
             {/* Active Panel Viewport: Occupies Full Height */}
             <div ref={operationsContainerRef} className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
-              {/* 1. COMMUNICATIONS HUB (Omnichannel Console) */}
-              {activeDockTab === 'comms' && (
+              {/* 1. PHONE / COMMUNICATIONS HUB */}
+              {(activeDockTab === 'phone' || activeDockTab === 'comms') && (
                 <div className="flex-1 flex flex-col h-full overflow-hidden">
                   <CommsHub
                     user={user}
@@ -3711,6 +3928,35 @@ export default function DispatchRoute() {
                           ...currentForm,
                           passengerName: payload.passengerName || currentForm.passengerName || '',
                           passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                          pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                          dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                          internalNotes: payload.notes
+                            ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                            : currentForm.internalNotes,
+                        };
+                        return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                      });
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 2. EMAIL DOCK CONSOLE */}
+              {activeDockTab === 'email' && (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  <EmailDock
+                    onClose={() => setActiveDockTab('none')}
+                    onPopOut={() => getWorkspaceBus().popOutModule('email')}
+                    showWindowControls={false}
+                    onPopulateBooking={(payload) => {
+                      setDrafts((prev) => {
+                        const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                        if (!target) return prev;
+                        const currentForm = target.formValues || ({} as any);
+                        const updatedForm: DispatchFormValues = {
+                          ...currentForm,
+                          passengerName: payload.passenger?.fullName || payload.passengerName || currentForm.passengerName || '',
+                          passengerPhone: payload.passenger?.phone || payload.passengerPhone || currentForm.passengerPhone || '',
                           pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
                           dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
                           internalNotes: payload.notes

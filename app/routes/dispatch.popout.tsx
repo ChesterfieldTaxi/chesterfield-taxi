@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { getWorkspaceBus, type WorkspaceModuleKey } from '../core/services/workspace-bus.service';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
+import { EmailDock } from '../components/domain/dispatch/EmailDock';
 import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
@@ -55,6 +56,8 @@ export default function DispatchPopoutRoute() {
     switch (key) {
       case 'comms':
         return 'Omnichannel Communications Console';
+      case 'email':
+        return 'Dispatch Email & Bookings Console';
       case 'booking':
         return 'Quick Ride Booking & Reservation Engine';
       case 'drivers':
@@ -100,6 +103,17 @@ export default function DispatchPopoutRoute() {
             isPopout={true}
             drivers={drivers}
             trips={trips}
+            onPopulateBooking={(data) => {
+              workspaceBus.publish('POPULATE_BOOKING', data);
+            }}
+          />
+        )}
+
+        {moduleKey === 'email' && (
+          <EmailDock
+            isPopout={true}
+            showWindowControls={false}
+            onClose={() => window.close()}
             onPopulateBooking={(data) => {
               workspaceBus.publish('POPULATE_BOOKING', data);
             }}

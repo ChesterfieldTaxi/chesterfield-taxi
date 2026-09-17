@@ -8,7 +8,7 @@
  * can pop out into standalone windows while staying completely synchronized.
  */
 
-export type WorkspaceModuleKey = 'booking' | 'trips' | 'comms' | 'drivers' | 'map';
+export type WorkspaceModuleKey = 'booking' | 'trips' | 'comms' | 'drivers' | 'map' | 'email';
 
 export interface UpcomingBookingPreview {
   id: string;

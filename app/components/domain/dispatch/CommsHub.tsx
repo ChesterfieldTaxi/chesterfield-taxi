@@ -16,6 +16,9 @@ import {
   XIcon,
   UserIcon,
   SpinnerIcon,
+  ClockIcon,
+  TrashIcon,
+  ChatBubbleLeftRightIcon,
 } from '../../ui/Icons';
 
 export type CommsTab = 'all' | 'phone' | 'messages' | 'voicemail';
@@ -125,6 +128,35 @@ const INITIAL_INTERACTIONS: InteractionEvent[] = [
     snippet: 'Chesterfield Taxi: Driver Dave in Cab #14 is 4 mins away in a White Toyota Sienna.',
     isUnread: false,
   },
+  {
+    id: 'int-6',
+    type: 'call_outbound',
+    contactName: 'Cab 11 - Marcus Brody',
+    contactPhone: '(314) 555-0199',
+    mobilePhone: '(314) 555-0199',
+    contactType: 'driver',
+    timestamp: 'Today, 11:15 AM',
+    timestampMs: Date.now() - 195 * 60 * 1000,
+    durationSeconds: 58,
+    audioDuration: '0:58',
+    hasRecording: true,
+    transcription:
+      'Dispatcher called Marcus to re-route via I-64 due to heavy construction on Olive Blvd. Marcus acknowledged and took highway.',
+    snippet: 'Outbound Call ended – 58 sec (Recording available)',
+    isUnread: false,
+  },
+  {
+    id: 'int-7',
+    type: 'call_missed',
+    contactName: 'Dr. Elena Rossi',
+    contactPhone: '(314) 555-0191',
+    mobilePhone: '(314) 555-0191',
+    contactType: 'passenger',
+    timestamp: 'Today, 12:40 PM',
+    timestampMs: Date.now() - 110 * 60 * 1000,
+    snippet: 'Missed Call – Caller rang 24 seconds without leaving voicemail.',
+    isUnread: true,
+  },
 ];
 
 interface CommsHubProps {
@@ -156,6 +188,12 @@ export function CommsHub({
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Primary Interactions state
+  const [interactions, setInteractions] = useState<InteractionEvent[]>(INITIAL_INTERACTIONS);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [forwardToast, setForwardToast] = useState<string | null>(null);
+  const masterCheckboxRef = useRef<HTMLInputElement>(null);
+
   // Selected thread state
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
   const [smsReplyText, setSmsReplyText] = useState('');
@@ -169,6 +207,9 @@ export function CommsHub({
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnSpeaker, setIsOnSpeaker] = useState(false);
+  const [callsSubTab, setCallsSubTab] = useState<'keypad' | 'history' | 'missed'>('keypad');
+  const [activeKeypadFeedback, setActiveKeypadFeedback] = useState<string | null>(null);
+  const dialpadInputRef = useRef<HTMLInputElement>(null);
 
   // Audio voicemail & call recording playback state
   const [playingVoicemailId, setPlayingVoicemailId] = useState<string | null>(null);
@@ -189,6 +230,56 @@ export function CommsHub({
     return () => clearInterval(interval);
   }, [callStatus]);
 
+  // Focus dialpad input when switching to phone tab and keypad sub-tab
+  useEffect(() => {
+    if (activeTab === 'phone' && callsSubTab === 'keypad') {
+      const timer = setTimeout(() => {
+        dialpadInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, callsSubTab]);
+
+  // Physical keyboard dialing response (0-9, *, #, +, Backspace, Enter)
+  useEffect(() => {
+    if (activeTab !== 'phone') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // If typing in another text input, textarea, or contenteditable, don't intercept
+      if (target && target.tagName === 'INPUT' && target !== dialpadInputRef.current) {
+        return;
+      }
+      if (target && (target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const validDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '#', '+'];
+
+      if (validDigits.includes(e.key)) {
+        e.preventDefault();
+        setDialpadNumber((prev) => prev + e.key);
+        setActiveKeypadFeedback(e.key);
+        setTimeout(() => setActiveKeypadFeedback(null), 150);
+      } else if (e.key === 'Backspace') {
+        if (target !== dialpadInputRef.current) {
+          e.preventDefault();
+          setDialpadNumber((prev) => prev.slice(0, -1));
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (dialpadNumber.trim()) {
+          handleStartCall();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, dialpadNumber]);
+
   // Listen for bus incoming call events
   useEffect(() => {
     const unsub = workspaceBus.subscribe((msg) => {
@@ -202,7 +293,7 @@ export function CommsHub({
   }, [workspaceBus]);
 
   // Filter interaction events
-  const filteredInteractions = INITIAL_INTERACTIONS.filter((item) => {
+  const filteredInteractions = interactions.filter((item) => {
     if (filterUnreadOnly && !item.isUnread) return false;
 
     if (channelFilter === 'calls' && !item.type.startsWith('call_')) return false;
@@ -225,11 +316,87 @@ export function CommsHub({
     return true;
   });
 
-  const unreadCount = INITIAL_INTERACTIONS.filter((i) => i.isUnread).length;
+  const unreadCount = interactions.filter((i) => i.isUnread).length;
+
+  // Master checkbox selection calculation
+  const isAllSelected =
+    filteredInteractions.length > 0 &&
+    filteredInteractions.every((item) => selectedItemIds.has(item.id));
+  const isSomeSelected =
+    filteredInteractions.some((item) => selectedItemIds.has(item.id)) && !isAllSelected;
+
+  useEffect(() => {
+    if (masterCheckboxRef.current) {
+      masterCheckboxRef.current.indeterminate = isSomeSelected;
+    }
+  }, [isSomeSelected]);
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(filteredInteractions.map((item) => item.id)));
+    }
+  };
+
+  const handleToggleSelectRow = (id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBatchMarkRead = () => {
+    setInteractions((prev) =>
+      prev.map((item) => (selectedItemIds.has(item.id) ? { ...item, isUnread: false } : item))
+    );
+    setSelectedItemIds(new Set());
+  };
+
+  const handleBatchMarkUnread = () => {
+    setInteractions((prev) =>
+      prev.map((item) => (selectedItemIds.has(item.id) ? { ...item, isUnread: true } : item))
+    );
+    setSelectedItemIds(new Set());
+  };
+
+  const handleBatchArchive = () => {
+    setInteractions((prev) => prev.filter((item) => !selectedItemIds.has(item.id)));
+    setSelectedItemIds(new Set());
+  };
+
+  const handleToggleReadStatus = (id: string) => {
+    setInteractions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, isUnread: !item.isUnread } : item))
+    );
+  };
+
+  const handleArchiveItem = (id: string) => {
+    setInteractions((prev) => prev.filter((item) => item.id !== id));
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const handleForwardItem = (item: InteractionEvent) => {
+    const text = `[Chesterfield Taxi Comms Record]\nContact: ${item.contactName} (${item.contactPhone})\nTime: ${item.timestamp}\nType: ${item.type}\nContent: ${item.transcription || item.snippet}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setForwardToast(`Copied ${item.contactName}'s comms log to clipboard`);
+      setTimeout(() => setForwardToast(null), 2500);
+    }
+  };
 
   // Selected contact thread interactions
   const selectedInteractions = selectedContactPhone
-    ? INITIAL_INTERACTIONS.filter(
+    ? interactions.filter(
         (i) =>
           normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
           (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
@@ -370,7 +537,10 @@ export function CommsHub({
 
           <button
             type="button"
-            onClick={() => setActiveTab('phone')}
+            onClick={() => {
+              setActiveTab('phone');
+              setSelectedContactPhone(null);
+            }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'phone'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -378,7 +548,7 @@ export function CommsHub({
             }`}
           >
             <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Phone</span>
+            <span className="truncate">Calls</span>
             {callStatus !== 'idle' && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
             )}
@@ -399,7 +569,10 @@ export function CommsHub({
 
           <button
             type="button"
-            onClick={() => setActiveTab('voicemail')}
+            onClick={() => {
+              setActiveTab('voicemail');
+              setSelectedContactPhone(null);
+            }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'voicemail'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -482,55 +655,136 @@ export function CommsHub({
         {/* VIEW 1: UNIFIED ALL COMMUNICATIONS ACTIVITY STREAM */}
         {activeTab === 'all' && !selectedContactPhone && (
           <div className="flex-1 flex flex-col min-w-0 bg-white">
-            {/* Filter Toolbar */}
-            <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50">
-              <div className="flex items-center gap-2">
+            {/* Batch Actions Bar OR Filter Toolbar */}
+            {selectedItemIds.size > 0 ? (
+              <div className="p-2.5 px-3 bg-slate-900 text-white flex items-center justify-between gap-2 shadow-xs shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    ref={masterCheckboxRef}
+                    checked={isAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-400 cursor-pointer"
+                    title={isAllSelected ? 'Deselect all' : 'Select all'}
+                  />
+                  <span className="text-xs font-bold text-slate-200">
+                    {selectedItemIds.size} selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleBatchMarkRead}
+                    className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                    title="Mark selected as Read"
+                  >
+                    <CheckIcon className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Mark Read</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchMarkUnread}
+                    className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                    title="Mark selected as Unread"
+                  >
+                    <MailIcon className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Mark Unread</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchArchive}
+                    className="px-2 py-1 rounded-md bg-rose-950/70 hover:bg-rose-900 text-xs font-semibold text-rose-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 border border-rose-800/40"
+                    title="Archive / Remove selected"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                    <span>Archive</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemIds(new Set())}
+                    className="p-1 rounded-md text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+                    title="Clear selection"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 shrink-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    ref={masterCheckboxRef}
+                    checked={isAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    title="Select all communications"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterUnreadOnly(!filterUnreadOnly)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      filterUnreadOnly
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Unread ({unreadCount})
+                  </button>
+
+                  <select
+                    value={channelFilter}
+                    onChange={(e) => setChannelFilter(e.target.value as any)}
+                    className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+                  >
+                    <option value="all">All channels</option>
+                    <option value="calls">Calls Only</option>
+                    <option value="voicemail">Voicemail Only</option>
+                    <option value="messages">Messaging Only</option>
+                  </select>
+
+                  <select
+                    value={contactFilter}
+                    onChange={(e) => setContactFilter(e.target.value as any)}
+                    className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+                  >
+                    <option value="all">All contacts</option>
+                    <option value="passengers">Passengers &amp; VIPs</option>
+                    <option value="drivers">Active Drivers</option>
+                  </select>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Filter communications..."
+                    className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-44 focus:outline-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Temporary Toast for Forward / Clipboard Copy */}
+            {forwardToast && (
+              <div className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <CheckIcon className="w-3.5 h-3.5" />
+                  <span>{forwardToast}</span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setFilterUnreadOnly(!filterUnreadOnly)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                    filterUnreadOnly
-                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  onClick={() => setForwardToast(null)}
+                  className="text-blue-200 hover:text-white"
                 >
-                  Unread ({unreadCount})
+                  <XIcon className="w-3.5 h-3.5" />
                 </button>
-
-                <select
-                  value={channelFilter}
-                  onChange={(e) => setChannelFilter(e.target.value as any)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
-                >
-                  <option value="all">All channels</option>
-                  <option value="calls">Calls Only</option>
-                  <option value="voicemail">Voicemail Only</option>
-                  <option value="messages">Messaging Only</option>
-                </select>
-
-                <select
-                  value={contactFilter}
-                  onChange={(e) => setContactFilter(e.target.value as any)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
-                >
-                  <option value="all">All contacts</option>
-                  <option value="passengers">Passengers &amp; VIPs</option>
-                  <option value="drivers">Active Drivers</option>
-                </select>
               </div>
-
-              {/* Search input */}
-              <div className="relative">
-                <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter communications..."
-                  className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-44 focus:outline-blue-500"
-                />
-              </div>
-            </div>
+            )}
 
             {/* Event rows list */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -539,232 +793,329 @@ export function CommsHub({
                   No communications found matching the selected filters.
                 </div>
               ) : (
-                filteredInteractions.map((event) => (
-                  <div
-                    key={event.id}
-                    onClick={() => setSelectedContactPhone(event.contactPhone)}
-                    className={`p-3.5 hover:bg-blue-50/50 transition-colors cursor-pointer flex items-start justify-between gap-3 ${
-                      event.isUnread ? 'bg-blue-50/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      {/* Event Type Icon Badge */}
-                      <div className="shrink-0 mt-0.5">
-                        {event.type === 'voicemail' && (
-                          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
-                            🎙️
-                          </div>
-                        )}
-                        {event.type === 'call_inbound' && (
-                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
-                            <PhoneIcon className="w-4 h-4" />
-                          </div>
-                        )}
-                        {event.type === 'call_missed' && (
-                          <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
-                            ✕
-                          </div>
-                        )}
-                        {event.type.startsWith('sms_') && (
-                          <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                            <MailIcon className="w-4 h-4" />
-                          </div>
+                filteredInteractions.map((event) => {
+                  const isRowSelected = selectedItemIds.has(event.id);
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => setSelectedContactPhone(event.contactPhone)}
+                      className={`group relative p-3 transition-all cursor-pointer flex items-start justify-between gap-2.5 border-l-4 ${
+                        isRowSelected
+                          ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
+                          : event.isUnread
+                          ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                          : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
+                      }`}
+                    >
+                      {/* Checkbox column + Unread Indicator Dot */}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSelectRow(event.id);
+                        }}
+                        className="pt-1 flex items-center gap-1.5 shrink-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        {event.isUnread ? (
+                          <span
+                            className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                            title="Unread message"
+                          />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
                         )}
                       </div>
 
-                      {/* Contact & Event Details */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`text-xs ${
-                              event.isUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
-                            }`}
-                          >
-                            {event.contactName}
-                          </span>
-                          <span className="text-[11px] font-mono text-slate-500">
-                            {event.contactPhone}
-                          </span>
-                          {event.homePhone && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
-                              🏠 Home Line
-                            </span>
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        {/* Event Type Icon Badge */}
+                        <div className="shrink-0 mt-0.5">
+                          {event.type === 'voicemail' && (
+                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                              🎙️
+                            </div>
                           )}
-                          {event.contactType === 'driver' && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
-                              Driver
-                            </span>
+                          {event.type === 'call_inbound' && (
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                              <PhoneIcon className="w-4 h-4" />
+                            </div>
+                          )}
+                          {event.type === 'call_missed' && (
+                            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                              ✕
+                            </div>
+                          )}
+                          {event.type.startsWith('sms_') && (
+                            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                              <MailIcon className="w-4 h-4" />
+                            </div>
                           )}
                         </div>
 
-                        {/* Snippet / Transcript */}
-                        <p className="text-xs text-slate-600 line-clamp-1 mt-0.5">
-                          {event.snippet}
-                        </p>
-
-                        {/* Voicemail Audio Controls, Speed, & Booking Shortcut */}
-                        {event.type === 'voicemail' && (
-                          <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-2">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPlayingVoicemailId(
-                                      playingVoicemailId === event.id ? null : event.id
-                                    );
-                                  }}
-                                  className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
-                                >
-                                  {playingVoicemailId === event.id ? '⏸' : '▶'}
-                                </button>
-                                <span className="text-[11px] font-mono font-bold text-amber-900">
-                                  {event.audioDuration}
-                                </span>
-                                <div className="h-2 w-24 bg-amber-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full bg-amber-600 ${
-                                      playingVoicemailId === event.id ? 'w-2/3 animate-pulse' : 'w-0'
-                                    }`}
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1));
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300 transition-colors cursor-pointer"
-                                  title="Toggle playback speed"
-                                >
-                                  {playbackSpeed}x
-                                </button>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartCall(event.contactPhone, event.contactName);
-                                  }}
-                                  className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                                  title="Call back customer"
-                                >
-                                  <PhoneIcon className="w-2.5 h-2.5" />
-                                  <span>Call Back</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleConvertVoicemailToBooking(event.suggestedBooking);
-                                  }}
-                                  className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                                >
-                                  <span>➕ Convert to Booking</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {event.transcription && (
-                              <p className="text-[11px] text-slate-700 italic border-l-2 border-amber-400 pl-2">
-                                "{event.transcription}"
-                              </p>
+                        {/* Contact & Event Details */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`text-xs ${
+                                event.isUnread
+                                  ? 'font-black text-slate-900'
+                                  : 'font-bold text-slate-800'
+                              }`}
+                            >
+                              {event.contactName}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-500">
+                              {event.contactPhone}
+                            </span>
+                            {event.homePhone && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
+                                🏠 Home Line
+                              </span>
+                            )}
+                            {event.contactType === 'driver' && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-semibold border border-indigo-200">
+                                Driver
+                              </span>
                             )}
                           </div>
-                        )}
 
-                        {/* Call Recording Playback Scrubber for Call Events */}
-                        {event.type.startsWith('call_') && (event.hasRecording || (event.durationSeconds && event.durationSeconds > 0)) && (
-                          <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPlayingCallId(playingCallId === event.id ? null : event.id);
-                                  }}
-                                  className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
-                                >
-                                  {playingCallId === event.id ? '⏸' : '▶'}
-                                </button>
-                                <span className="text-[11px] font-mono font-bold text-emerald-950">
-                                  {event.audioDuration || `${Math.floor((event.durationSeconds || 60) / 60)}:${((event.durationSeconds || 60) % 60).toString().padStart(2, '0')}`}
-                                </span>
-                                <div className="h-2 w-24 bg-emerald-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full bg-emerald-600 ${
-                                      playingCallId === event.id ? 'w-2/3 animate-pulse' : 'w-0'
-                                    }`}
-                                  />
+                          {/* Snippet / Transcript */}
+                          <p
+                            className={`text-xs line-clamp-1 mt-0.5 ${
+                              event.isUnread ? 'text-slate-900 font-medium' : 'text-slate-600'
+                            }`}
+                          >
+                            {event.snippet}
+                          </p>
+
+                          {/* Voicemail Audio Controls, Speed, & Booking Shortcut */}
+                          {event.type === 'voicemail' && (
+                            <div className="mt-2.5 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 space-y-2">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPlayingVoicemailId(
+                                        playingVoicemailId === event.id ? null : event.id
+                                      );
+                                    }}
+                                    className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
+                                  >
+                                    {playingVoicemailId === event.id ? '⏸' : '▶'}
+                                  </button>
+                                  <span className="text-[11px] font-mono font-bold text-amber-900">
+                                    {event.audioDuration}
+                                  </span>
+                                  <div className="h-2 w-24 bg-amber-200 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full bg-amber-600 ${
+                                        playingVoicemailId === event.id ? 'w-2/3 animate-pulse' : 'w-0'
+                                      }`}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1));
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                                    title="Toggle playback speed"
+                                  >
+                                    {playbackSpeed}x
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1));
-                                  }}
-                                  className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-bold border border-emerald-300 transition-colors cursor-pointer"
-                                  title="Playback speed"
-                                >
-                                  {playbackSpeed}x
-                                </button>
+
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartCall(event.contactPhone, event.contactName);
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                                    title="Call back customer"
+                                  >
+                                    <PhoneIcon className="w-2.5 h-2.5" />
+                                    <span>Call Back</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleConvertVoicemailToBooking(event.suggestedBooking);
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                                  >
+                                    <span>➕ Convert to Booking</span>
+                                  </button>
+                                </div>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleStartCall(event.contactPhone, event.contactName);
-                                }}
-                                className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                              >
-                                <PhoneIcon className="w-2.5 h-2.5" />
-                                <span>Call Back</span>
-                              </button>
+                              {event.transcription && (
+                                <p className="text-[11px] text-slate-700 italic border-l-2 border-amber-400 pl-2">
+                                  "{event.transcription}"
+                                </p>
+                              )}
                             </div>
+                          )}
 
-                            {event.transcription && (
-                              <p className="text-[11px] text-slate-700 italic border-l-2 border-emerald-400 pl-2">
-                                "{event.transcription}"
-                              </p>
+                          {/* Call Recording Playback Scrubber for Call Events */}
+                          {event.type.startsWith('call_') &&
+                            (event.hasRecording ||
+                              (event.durationSeconds && event.durationSeconds > 0)) && (
+                              <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPlayingCallId(
+                                          playingCallId === event.id ? null : event.id
+                                        );
+                                      }}
+                                      className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
+                                    >
+                                      {playingCallId === event.id ? '⏸' : '▶'}
+                                    </button>
+                                    <span className="text-[11px] font-mono font-bold text-emerald-950">
+                                      {event.audioDuration ||
+                                        `${Math.floor(
+                                          (event.durationSeconds || 60) / 60
+                                        )}:${((event.durationSeconds || 60) % 60)
+                                          .toString()
+                                          .padStart(2, '0')}`}
+                                    </span>
+                                    <div className="h-2 w-24 bg-emerald-200 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full bg-emerald-600 ${
+                                          playingCallId === event.id ? 'w-2/3 animate-pulse' : 'w-0'
+                                        }`}
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1));
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                                      title="Playback speed"
+                                    >
+                                      {playbackSpeed}x
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartCall(event.contactPhone, event.contactName);
+                                    }}
+                                    className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                                  >
+                                    <PhoneIcon className="w-2.5 h-2.5" />
+                                    <span>Call Back</span>
+                                  </button>
+                                </div>
+
+                                {event.transcription && (
+                                  <p className="text-[11px] text-slate-700 italic border-l-2 border-emerald-400 pl-2">
+                                    "{event.transcription}"
+                                  </p>
+                                )}
+                              </div>
                             )}
-                          </div>
+                        </div>
+                      </div>
+
+                      {/* Timestamp & Quick Badges */}
+                      <div className="shrink-0 text-right flex flex-col items-end gap-1.5 pl-2">
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {event.timestamp}
+                        </span>
+                        {event.type === 'call_missed' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartCall(event.contactPhone);
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 cursor-pointer flex items-center gap-1"
+                          >
+                            <PhoneIcon className="w-2.5 h-2.5" />
+                            <span>Call back</span>
+                          </button>
                         )}
                       </div>
-                    </div>
 
-                    {/* Timestamp & Direct Actions */}
-                    <div className="shrink-0 text-right flex flex-col items-end gap-1.5">
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {event.timestamp}
-                      </span>
-                      {event.type === 'call_missed' && (
+                      {/* Hover Action Overlay Strip (Gmail / Linear Style) */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-3 top-3 hidden group-hover:flex items-center gap-1 bg-white/95 backdrop-blur-xs shadow-md border border-slate-200 rounded-xl px-2 py-1 z-20 animate-in fade-in zoom-in-95 duration-100"
+                      >
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartCall(event.contactPhone);
-                          }}
-                          className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 cursor-pointer flex items-center gap-1"
+                          onClick={() => handleToggleReadStatus(event.id)}
+                          title={event.isUnread ? 'Mark as Read' : 'Mark as Unread'}
+                          className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
                         >
-                          <PhoneIcon className="w-2.5 h-2.5" />
-                          <span>Call back</span>
+                          {event.isUnread ? (
+                            <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <MailIcon className="w-3.5 h-3.5" />
+                          )}
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall(event.contactPhone, event.contactName)}
+                          title={`Call ${event.contactName}`}
+                          className="p-1 rounded-lg hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
+                        >
+                          <PhoneIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedContactPhone(event.contactPhone)}
+                          title="Open SMS message thread"
+                          className="p-1 rounded-lg hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                        >
+                          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleForwardItem(event)}
+                          title="Copy summary to clipboard"
+                          className="p-1 rounded-lg hover:bg-amber-50 text-slate-600 hover:text-amber-600 transition-colors cursor-pointer"
+                        >
+                          <ExternalLinkIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleArchiveItem(event.id)}
+                          title="Archive / Remove"
+                          className="p-1 rounded-lg hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
         )}
 
-        {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD (When contact is clicked) */}
-        {selectedContactPhone && activeContactSummary && (
+        {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD (When contact is clicked in All or Messages) */}
+        {(activeTab === 'all' || activeTab === 'messages') && selectedContactPhone && activeContactSummary && (
           <div className="flex-1 flex flex-col min-w-0 bg-white">
             {/* Thread Header */}
             <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
@@ -1077,95 +1428,415 @@ export function CommsHub({
           </div>
         )}
 
-        {/* VIEW 3: FULL DTMF NUMERIC DIALPAD & SOFTPHONE */}
+        {/* VIEW 3: FULL DTMF NUMERIC DIALPAD & SOFTPHONE / CALL HISTORY */}
         {activeTab === 'phone' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white overflow-y-auto">
-            <div className="w-full max-w-xs space-y-4">
-              <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Outbound Caller ID: (314) 738-0100
-                </span>
-                <input
-                  type="text"
-                  value={dialpadNumber}
-                  onChange={(e) => setDialpadNumber(e.target.value)}
-                  placeholder="Enter phone number..."
-                  className="w-full text-center text-xl font-mono font-bold bg-transparent border-none focus:outline-none text-slate-900 mt-1"
-                />
-              </div>
-
-              {/* 12 Key DTMF Matrix */}
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { key: '1', sub: '' },
-                  { key: '2', sub: 'ABC' },
-                  { key: '3', sub: 'DEF' },
-                  { key: '4', sub: 'GHI' },
-                  { key: '5', sub: 'JKL' },
-                  { key: '6', sub: 'MNO' },
-                  { key: '7', sub: 'PQRS' },
-                  { key: '8', sub: 'TUV' },
-                  { key: '9', sub: 'WXYZ' },
-                  { key: '*', sub: '' },
-                  { key: '0', sub: '+' },
-                  { key: '#', sub: '' },
-                ].map((d) => (
-                  <button
-                    key={d.key}
-                    type="button"
-                    onClick={() => handleDialDigit(d.key)}
-                    className="p-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-blue-600 active:text-white transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs active:scale-95"
+          <div className="flex-1 flex flex-col bg-white overflow-hidden min-w-0">
+            {/* Top Sub-Switcher: Keypad vs All Calls vs Missed */}
+            <div className="px-3 py-2 border-b border-slate-200 bg-slate-50/80 shrink-0">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-200/70 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setCallsSubTab('keypad')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+                    callsSubTab === 'keypad'
+                      ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Keypad</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCallsSubTab('history')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+                    callsSubTab === 'history'
+                      ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">History</span>
+                  <span
+                    className={`text-[10px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
+                      callsSubTab === 'history' ? 'bg-blue-100 text-blue-800' : 'bg-slate-300 text-slate-700'
+                    }`}
                   >
-                    <span className="text-lg font-black">{d.key}</span>
-                    {d.sub && <span className="text-[9px] text-slate-400 font-semibold">{d.sub}</span>}
-                  </button>
-                ))}
-              </div>
-
-              {/* Call Controls */}
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setDialpadNumber('')}
-                  className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer flex-1"
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleStartCall()}
-                  disabled={!dialpadNumber.trim()}
-                  className="p-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer flex-2 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95"
-                >
-                  <PhoneIcon className="w-4 h-4" />
-                  <span>Call Number</span>
-                </button>
-              </div>
-
-              {/* Driver Quick Dials */}
-              {drivers.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Cab Speed Dials
+                    {interactions.filter((item) => item.type.startsWith('call_')).length}
                   </span>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {drivers.slice(0, 4).map((drv) => (
-                      <button
-                        key={drv.id}
-                        type="button"
-                        onClick={() => handleStartCall(drv.phone)}
-                        className="p-2 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/30 text-left text-xs transition-colors cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="font-bold text-slate-800 truncate">
-                          Cab #{drv.cabNumber}
-                        </span>
-                        <PhoneIcon className="w-3 h-3 text-emerald-600 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCallsSubTab('missed')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+                    callsSubTab === 'missed'
+                      ? 'bg-white text-rose-700 shadow-2xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span className="truncate">Missed</span>
+                  {interactions.filter((item) => item.type === 'call_missed').length > 0 && (
+                    <span
+                      className={`text-[10px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
+                        callsSubTab === 'missed' ? 'bg-rose-100 text-rose-800' : 'bg-rose-500 text-white'
+                      }`}
+                    >
+                      {interactions.filter((item) => item.type === 'call_missed').length}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* SUB-VIEW 1: KEYPAD */}
+            {callsSubTab === 'keypad' && (
+              <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-white overflow-y-auto">
+                <div className="w-full max-w-xs space-y-3.5">
+                  <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 text-center relative focus-within:ring-2 focus-within:ring-blue-500/30">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Outbound Caller ID: (314) 738-0100
+                    </span>
+                    <input
+                      ref={dialpadInputRef}
+                      type="text"
+                      value={dialpadNumber}
+                      onChange={(e) => setDialpadNumber(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (dialpadNumber.trim()) {
+                            handleStartCall();
+                          }
+                        }
+                      }}
+                      placeholder="Type or click number..."
+                      className="w-full text-center text-xl font-mono font-bold bg-transparent border-none focus:outline-none text-slate-900 mt-1"
+                    />
+                    {dialpadNumber && (
+                      <button
+                        type="button"
+                        onClick={() => setDialpadNumber('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer p-1"
+                        title="Clear number"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 12 Key DTMF Matrix */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      { key: '1', sub: '' },
+                      { key: '2', sub: 'ABC' },
+                      { key: '3', sub: 'DEF' },
+                      { key: '4', sub: 'GHI' },
+                      { key: '5', sub: 'JKL' },
+                      { key: '6', sub: 'MNO' },
+                      { key: '7', sub: 'PQRS' },
+                      { key: '8', sub: 'TUV' },
+                      { key: '9', sub: 'WXYZ' },
+                      { key: '*', sub: '' },
+                      { key: '0', sub: '+' },
+                      { key: '#', sub: '' },
+                    ].map((d) => {
+                      const isPressed = activeKeypadFeedback === d.key;
+                      return (
+                        <button
+                          key={d.key}
+                          type="button"
+                          onClick={() => handleDialDigit(d.key)}
+                          className={`p-3.5 rounded-2xl transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs active:scale-95 ${
+                            isPressed
+                              ? 'bg-blue-600 text-white scale-95 ring-2 ring-blue-400 shadow-md'
+                              : 'bg-slate-100 hover:bg-slate-200 active:bg-blue-600 active:text-white text-slate-900'
+                          }`}
+                        >
+                          <span className="text-lg font-black">{d.key}</span>
+                          {d.sub && (
+                            <span
+                              className={`text-[9px] font-semibold ${
+                                isPressed ? 'text-blue-100' : 'text-slate-400'
+                              }`}
+                            >
+                              {d.sub}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Call Controls */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setDialpadNumber((prev) => prev.slice(0, -1))}
+                      disabled={!dialpadNumber}
+                      className="p-3 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-2xl text-xs font-bold transition-all cursor-pointer flex-1"
+                      title="Backspace"
+                    >
+                      ⌫ Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartCall()}
+                      disabled={!dialpadNumber.trim()}
+                      className="p-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer flex-2 flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95"
+                    >
+                      <PhoneIcon className="w-4 h-4" />
+                      <span>Call Number</span>
+                    </button>
+                  </div>
+
+                  {/* Quick Tip */}
+                  <div className="text-center">
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Press 0-9 on keyboard to dial • Enter to call
+                    </span>
+                  </div>
+
+                  {/* Driver Quick Dials */}
+                  {drivers.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Cab Speed Dials
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {drivers.slice(0, 4).map((drv) => (
+                          <button
+                            key={drv.id}
+                            type="button"
+                            onClick={() => handleStartCall(drv.phone, `Cab #${drv.cabNumber}`)}
+                            className="p-2 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/30 text-left text-xs transition-colors cursor-pointer flex items-center justify-between"
+                          >
+                            <span className="font-bold text-slate-800 truncate">
+                              Cab #{drv.cabNumber}
+                            </span>
+                            <PhoneIcon className="w-3 h-3 text-emerald-600 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-VIEW 2: CALL HISTORY */}
+            {callsSubTab === 'history' && (
+              <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 p-3 overflow-y-auto space-y-2.5">
+                {interactions.filter((item) => item.type.startsWith('call_')).map((call) => {
+                  const isCallPlaying = playingCallId === call.id;
+                  const isMissed = call.type === 'call_missed';
+                  const isOutbound = call.type === 'call_outbound';
+
+                  return (
+                    <div
+                      key={call.id}
+                      className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition-all space-y-2"
+                    >
+                      {/* Caller Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                              isMissed
+                                ? 'bg-rose-100 text-rose-600'
+                                : isOutbound
+                                ? 'bg-blue-100 text-blue-600'
+                                : 'bg-emerald-100 text-emerald-600'
+                            }`}
+                          >
+                            <PhoneIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-xs text-slate-900 truncate">
+                              {call.contactName}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 font-mono">
+                              {call.contactPhone}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-400 block font-medium">
+                            {call.timestamp}
+                          </span>
+                          <span
+                            className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-md uppercase tracking-wider ${
+                              isMissed
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : isOutbound
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}
+                          >
+                            {isMissed ? 'Missed' : isOutbound ? 'Outbound' : 'Inbound'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Snippet / Description */}
+                      <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        {call.transcription || call.snippet}
+                      </p>
+
+                      {/* Audio Playback Scrubber if recording exists */}
+                      {call.hasRecording && (
+                        <div className="p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-emerald-800">
+                            <span className="flex items-center gap-1">
+                              <span>🎙️ Call Recording</span>
+                              <span className="text-slate-400 font-normal">
+                                ({call.audioDuration || '2:14'})
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))
+                              }
+                              className="px-1.5 py-0.5 bg-white border border-emerald-300 rounded font-mono font-bold text-[9px] text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                              title="Toggle playback speed"
+                            >
+                              {playbackSpeed}x
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPlayingCallId(isCallPlaying ? null : call.id)}
+                              className="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs active:scale-95 text-xs font-bold"
+                            >
+                              {isCallPlaying ? '⏸' : '▶'}
+                            </button>
+                            <div className="flex-1 h-2 bg-emerald-200/60 rounded-full overflow-hidden relative cursor-pointer">
+                              <div
+                                className={`h-full bg-emerald-500 rounded-full transition-all duration-300 ${
+                                  isCallPlaying ? 'w-2/3 animate-pulse' : 'w-0'
+                                }`}
+                              />
+                            </div>
+                            <span className="text-[10px] font-mono text-emerald-700 font-bold shrink-0">
+                              {isCallPlaying ? '0:45' : call.audioDuration || '0:00'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions: Call Back / Dial */}
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDialpadNumber(call.contactPhone);
+                            setCallsSubTab('keypad');
+                          }}
+                          className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                          Copy to Keypad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall(call.contactPhone, call.contactName)}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <PhoneIcon className="w-3 h-3" />
+                          <span>Call Back</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* SUB-VIEW 3: MISSED CALLS INBOX */}
+            {callsSubTab === 'missed' && (
+              <div className="flex-1 flex flex-col p-4 bg-white overflow-y-auto space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                      <span>Missed Inbound Calls</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Unanswered customer and driver attempts requiring callback</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                    {interactions.filter((item) => item.type === 'call_missed').length} Missed
+                  </span>
+                </div>
+
+                {interactions.filter((item) => item.type === 'call_missed').length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-lg">
+                      ✓
+                    </div>
+                    <p className="text-xs font-bold text-slate-600">No Missed Calls</p>
+                    <p className="text-[11px]">All incoming call attempts have been answered or resolved.</p>
+                  </div>
+                ) : (
+                  interactions.filter((item) => item.type === 'call_missed').map((call) => (
+                    <div
+                      key={call.id}
+                      className="p-3 bg-white border border-rose-200/90 rounded-2xl shadow-2xs hover:shadow-sm transition-all space-y-2.5 bg-gradient-to-r from-rose-50/30 to-white"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
+                            <PhoneIcon className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-xs text-slate-900 truncate">
+                              {call.contactName}
+                            </h4>
+                            <p className="text-[11px] text-slate-600 font-mono font-medium">
+                              {call.contactPhone}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-500 font-medium block">
+                            {call.timestamp}
+                          </span>
+                          <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
+                            Missed Call
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-700 bg-rose-50/60 p-2 rounded-xl border border-rose-100">
+                        {call.transcription || call.snippet}
+                      </p>
+
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDialpadNumber(call.contactPhone);
+                            setCallsSubTab('keypad');
+                          }}
+                          className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                          Copy to Keypad
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall(call.contactPhone, call.contactName)}
+                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <PhoneIcon className="w-3.5 h-3.5" />
+                          <span>Call Back</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1263,24 +1934,121 @@ export function CommsHub({
           <div className="flex-1 flex flex-col min-w-0 bg-white divide-y divide-slate-100 overflow-y-auto">
             {filteredInteractions
               .filter((i) => i.type.startsWith('sms_'))
-              .map((sms) => (
-                <div
-                  key={sms.id}
-                  onClick={() => setSelectedContactPhone(sms.contactPhone)}
-                  className="p-3.5 hover:bg-blue-50/50 transition-colors cursor-pointer flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                      💬
+              .map((sms) => {
+                const isRowSelected = selectedItemIds.has(sms.id);
+                return (
+                  <div
+                    key={sms.id}
+                    onClick={() => setSelectedContactPhone(sms.contactPhone)}
+                    className={`group relative p-3.5 transition-all cursor-pointer flex items-center justify-between gap-3 border-l-4 ${
+                      isRowSelected
+                        ? 'bg-blue-100/70 border-l-blue-700'
+                        : sms.isUnread
+                        ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                        : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Checkbox + Unread indicator */}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleSelectRow(sms.id);
+                        }}
+                        className="flex items-center gap-1.5 shrink-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        {sms.isUnread ? (
+                          <span
+                            className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                            title="Unread SMS"
+                          />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
+                        )}
+                      </div>
+
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                        💬
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs block ${
+                              sms.isUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
+                            }`}
+                          >
+                            {sms.contactName}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            {sms.contactPhone}
+                          </span>
+                        </div>
+                        <p
+                          className={`text-xs line-clamp-1 mt-0.5 ${
+                            sms.isUnread ? 'text-slate-900 font-medium' : 'text-slate-600'
+                          }`}
+                        >
+                          {sms.snippet}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-bold text-xs text-slate-900 block">{sms.contactName}</span>
-                      <p className="text-xs text-slate-600 line-clamp-1">{sms.snippet}</p>
+
+                    <span className="text-[10px] text-slate-400 font-medium shrink-0 pl-2">
+                      {sms.timestamp}
+                    </span>
+
+                    {/* Hover Action Overlay Strip */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white/95 backdrop-blur-xs shadow-md border border-slate-200 rounded-xl px-2 py-1 z-20 animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggleReadStatus(sms.id)}
+                        title={sms.isUnread ? 'Mark as Read' : 'Mark as Unread'}
+                        className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                      >
+                        {sms.isUnread ? (
+                          <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <MailIcon className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartCall(sms.contactPhone, sms.contactName)}
+                        title={`Call ${sms.contactName}`}
+                        className="p-1 rounded-lg hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
+                      >
+                        <PhoneIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleForwardItem(sms)}
+                        title="Copy summary to clipboard"
+                        className="p-1 rounded-lg hover:bg-amber-50 text-slate-600 hover:text-amber-600 transition-colors cursor-pointer"
+                      >
+                        <ExternalLinkIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveItem(sms.id)}
+                        title="Archive / Remove"
+                        className="p-1 rounded-lg hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors cursor-pointer"
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-400">{sms.timestamp}</span>
-                </div>
-              ))}
+                );
+              })}
           </div>
         )}
       </div>
