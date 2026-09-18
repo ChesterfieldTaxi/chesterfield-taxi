@@ -62,7 +62,7 @@ export function DispatchHeaderCallHud({
   const containerRef = useRef<HTMLDivElement>(null);
   const workspaceBus = getWorkspaceBus();
 
-  // Listen for incoming calls across windows via WorkspaceBus
+  // Listen for incoming and outbound calls across windows via WorkspaceBus
   useEffect(() => {
     const unsub = workspaceBus.subscribe((msg: WorkspaceMessage) => {
       if (msg.type === 'CALL_INCOMING') {
@@ -79,6 +79,20 @@ export function DispatchHeaderCallHud({
         setCallState('incoming');
         setCallDuration(0);
         setShowInboundFlydown(true);
+      } else if (msg.type === 'CALL_OUTBOUND_STARTED') {
+        const payload = msg.payload;
+        setActiveCall({
+          callSid: payload.callSid,
+          callerNumber: payload.targetNumber,
+          callerName: payload.contactName || payload.targetNumber,
+          numberType: 'mobile',
+          mobileForSms: payload.targetNumber,
+          upcomingBookings: [],
+        });
+        setCallState('connected');
+        setCallDuration(0);
+      } else if (msg.type === 'CALL_ANSWERED') {
+        setCallState('connected');
       } else if (msg.type === 'CALL_ENDED') {
         setActiveCall(null);
         setShowInboundFlydown(false);
@@ -393,6 +407,18 @@ export function DispatchHeaderCallHud({
                     </div>
 
                     <div className="pt-2 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onOpenComms) onOpenComms('phone', activeCall.callerNumber);
+                          setShowInboundFlydown(false);
+                        }}
+                        className="flex-1 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        title="Expand call to Phone Dock"
+                      >
+                        <PhoneIcon className="w-3.5 h-3.5" />
+                        <span>Open Phone</span>
+                      </button>
                       <button
                         type="button"
                         onClick={handleNewBooking}

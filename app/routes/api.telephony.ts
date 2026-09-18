@@ -706,7 +706,7 @@ export async function action({ request }: ActionFunctionArgs) {
       params.append('To', formattedTo);
       params.append('From', formattedFrom);
       params.append('Twiml', twiml);
-      params.append('Record', 'record-from-answer');
+      params.append('Record', 'true');
 
       const callResp = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,

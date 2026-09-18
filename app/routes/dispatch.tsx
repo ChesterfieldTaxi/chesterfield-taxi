@@ -726,6 +726,7 @@ export default function DispatchRoute() {
   // Phone Softphone State
   const [dialedNumber, setDialedNumber] = useState('');
   const [activeCallStatus, setActiveCallStatus] = useState<'idle' | 'calling' | 'connected'>('idle');
+  const [activeCallMeta, setActiveCallMeta] = useState<{ contactName: string; phoneNumber: string; duration: number } | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [softphoneNotice, setSoftphoneNotice] = useState<string | null>(null);
@@ -1562,12 +1563,50 @@ export default function DispatchRoute() {
     setShouldZoomMap(false);
   }, [activeDraftId]);
 
+  // Cross-component active call synchronization via WorkspaceBus
+  useEffect(() => {
+    const bus = getWorkspaceBus();
+    const unsub = bus.subscribe((msg) => {
+      if (msg.type === 'CALL_OUTBOUND_STARTED') {
+        setActiveCallStatus('connected');
+        setActiveCallMeta({
+          contactName: msg.payload.contactName || msg.payload.targetNumber,
+          phoneNumber: msg.payload.targetNumber,
+          duration: 0,
+        });
+      } else if (msg.type === 'CALL_ANSWERED') {
+        setActiveCallStatus('connected');
+        if (msg.payload.callerNumber) {
+          setActiveCallMeta((prev) => ({
+            contactName: prev?.contactName || msg.payload.callerNumber,
+            phoneNumber: msg.payload.callerNumber,
+            duration: prev?.duration || 0,
+          }));
+        }
+      } else if (msg.type === 'CALL_INCOMING') {
+        setActiveCallStatus('calling');
+        setActiveCallMeta({
+          contactName: msg.payload.callerName || msg.payload.callerNumber,
+          phoneNumber: msg.payload.callerNumber,
+          duration: 0,
+        });
+      } else if (msg.type === 'CALL_ENDED') {
+        setActiveCallStatus('idle');
+        setActiveCallMeta(null);
+        setCallDuration(0);
+      }
+    });
+
+    return unsub;
+  }, []);
+
   // Softphone call timer
   useEffect(() => {
     let interval: any;
     if (activeCallStatus === 'connected') {
       interval = setInterval(() => {
         setCallDuration((prev) => prev + 1);
+        setActiveCallMeta((prev) => (prev ? { ...prev, duration: prev.duration + 1 } : null));
       }, 1000);
     } else {
       setCallDuration(0);
@@ -2739,6 +2778,60 @@ export default function DispatchRoute() {
           <AppSuiteLauncher />
         </div>
       </header>
+
+      {/* ─── ACTIVE CALL TOP STICKY GREEN BANNER (CALL PERSISTENCE ACROSS TABS / DOCK CLOSE) ─── */}
+      {activeCallStatus !== 'idle' && (activeDockTab !== 'phone' || (activeMobileTab !== 'comms' && activeMobileTab !== 'phone')) && (
+        <div
+          onClick={() => {
+            setActiveDockTab('phone');
+            setCommsInitialTab('phone');
+            setActiveMobileTab('comms');
+          }}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2 flex items-center justify-between cursor-pointer shadow-md z-30 transition-colors select-none shrink-0"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative flex items-center justify-center shrink-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping absolute" />
+              <PhoneIcon className="w-4 h-4 text-white relative shrink-0" />
+            </div>
+            <span className="font-extrabold text-xs truncate">
+              In Call: {activeCallMeta?.contactName || activeCallMeta?.phoneNumber || dialedNumber || 'Live Customer'}
+            </span>
+            <span className="font-mono bg-emerald-800/80 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
+              {Math.floor((activeCallMeta?.duration ?? callDuration) / 60)}:
+              {((activeCallMeta?.duration ?? callDuration) % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveDockTab('phone');
+                setCommsInitialTab('phone');
+                setActiveMobileTab('comms');
+              }}
+              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Return to Call →</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                getWorkspaceBus().publish('CALL_ENDED', { durationSeconds: activeCallMeta?.duration ?? callDuration });
+                setActiveCallStatus('idle');
+                setActiveCallMeta(null);
+                setCallDuration(0);
+              }}
+              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            >
+              <span>End</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           1C. SLIDE-OUT OPERATIONS & PROFILE DRAWER (MATCHING ADMIN SIDEBAR)
@@ -4738,43 +4831,48 @@ export default function DispatchRoute() {
         )}
 
         {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Phone / Messages / Voicemail) */}
-        {(activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone') && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16">
-            <CommsHub
-              user={user}
-              drivers={drivers}
-              trips={trips}
-              initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
-              onPopulateBooking={(payload) => {
-                setActiveMobileTab('booking');
-                setDrafts((prev) => {
-                  const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                  if (!target) return prev;
-                  const currentForm = target.formValues || ({} as any);
-                  const updatedForm: DispatchFormValues = {
-                    ...currentForm,
-                    passengerName: payload.passengerName || currentForm.passengerName || '',
-                    passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
-                    pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                    dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                    internalNotes: payload.notes
-                      ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                      : currentForm.internalNotes,
-                  };
-                  return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-                });
-              }}
-              onPopOut={() => getWorkspaceBus().popOutModule('comms')}
-            />
-          </div>
-        )}
+        <div
+          className={`flex-1 flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16 ${
+            activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone'
+              ? 'flex'
+              : 'hidden'
+          }`}
+        >
+          <CommsHub
+            user={user}
+            drivers={drivers}
+            trips={trips}
+            initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
+            onPopulateBooking={(payload) => {
+              setActiveMobileTab('booking');
+              setDrafts((prev) => {
+                const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                if (!target) return prev;
+                const currentForm = target.formValues || ({} as any);
+                const updatedForm: DispatchFormValues = {
+                  ...currentForm,
+                  passengerName: payload.passengerName || currentForm.passengerName || '',
+                  passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                  pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                  dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                  internalNotes: payload.notes
+                    ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                    : currentForm.internalNotes,
+                };
+                return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+              });
+            }}
+            onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+          />
+        </div>
 
         {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (DESKTOP SINGLE ACTIVE VIEW) ─── */}
-        {activeDockTab !== 'none' && (
-          <aside
-            className="hidden lg:flex relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-2xl animate-in slide-in-from-right duration-250 ease-out"
-            style={{ width: `${operationsWidth}px` }}
-          >
+        <aside
+          className={`relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-2xl animate-in slide-in-from-right duration-250 ease-out ${
+            activeDockTab !== 'none' ? 'hidden lg:flex' : 'hidden'
+          }`}
+          style={{ width: `${operationsWidth}px` }}
+        >
             {/* Horizontal Resize Drag Handle on Left Edge */}
             <div
               onMouseDown={handleOperationsMouseDown}
@@ -4874,8 +4972,10 @@ export default function DispatchRoute() {
             {/* Active Panel Viewport: Occupies Full Height */}
             <div ref={operationsContainerRef} className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
               {/* 1. PHONE / COMMUNICATIONS HUB */}
-              {(activeDockTab === 'phone' || activeDockTab === 'comms') && (
-                <div className="flex-1 flex flex-col h-full overflow-hidden">
+              {(activeDockTab === 'phone' || activeDockTab === 'comms' || activeCallStatus !== 'idle') && (
+                <div className={`flex-1 flex-col h-full overflow-hidden ${
+                  activeDockTab === 'phone' || activeDockTab === 'comms' ? 'flex' : 'hidden'
+                }`}>
                   <CommsHub
                     user={user}
                     drivers={drivers}
@@ -5303,7 +5403,6 @@ export default function DispatchRoute() {
               )}
             </div>
           </aside>
-        )}
       </div>
 
       {/* Driver Fare Adjustment & Permitted Rules Modal */}

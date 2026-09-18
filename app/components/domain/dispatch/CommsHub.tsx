@@ -978,16 +978,18 @@ export function CommsHub({
     }
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = (broadcast = true) => {
     const finalSecs = callTimer > 0 ? callTimer : 1;
     const m = Math.floor(finalSecs / 60);
     const s = (finalSecs % 60).toString().padStart(2, '0');
     const durationLabel = `${m}:${s}`;
 
-    workspaceBus.publish('CALL_ENDED', {
-      callSid: activeCallSid || undefined,
-      durationSeconds: finalSecs,
-    });
+    if (broadcast) {
+      workspaceBus.publish('CALL_ENDED', {
+        callSid: activeCallSid || undefined,
+        durationSeconds: finalSecs,
+      });
+    }
 
     if (activeCallInteractionIdRef.current) {
       const activeId = activeCallInteractionIdRef.current;
@@ -1016,6 +1018,18 @@ export function CommsHub({
     setShowInCallNotes(false);
     activeCallInteractionIdRef.current = null;
   };
+
+  // Sync call ending from external triggers (header flydown or top banner)
+  useEffect(() => {
+    const unsub = workspaceBus.subscribe((msg) => {
+      if (msg.type === 'CALL_ENDED') {
+        if (callStatus !== 'idle') {
+          handleEndCall(false);
+        }
+      }
+    });
+    return unsub;
+  }, [workspaceBus, callStatus, callTimer, activeCallSid]);
 
   const handleInCallBookRide = () => {
     const payload = {
