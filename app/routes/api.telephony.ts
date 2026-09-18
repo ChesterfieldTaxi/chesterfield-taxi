@@ -809,7 +809,7 @@ export async function action({ request }: ActionFunctionArgs) {
         const formattedForwarding = sanitizeToE164(dispatchBridgePhone);
         twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial></Response>`;
       } else {
-        twiml = `<Response><Say voice="alice">Hello, this is Chesterfield Taxi and Car Service dispatch calling. Please hold while an operator joins your line.</Say><Pause length="5"/><Say voice="alice">Thank you for your patience. To connect directly with an agent, please set your dispatch forwarding phone or contact us at ${formattedFrom}.</Say></Response>`;
+        twiml = `<Response><Say voice="alice">Hello, thank you for answering Chesterfield Taxi and Car Service dispatch. Please hold while we connect your operator.</Say><Pause length="4"/><Say voice="alice">All operators are currently assisting callers. Please hold and someone will be with you shortly.</Say><Pause length="20"/></Response>`;
       }
 
       const params = new URLSearchParams();

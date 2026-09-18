@@ -67,6 +67,7 @@ const INITIAL_INTERACTIONS: InteractionEvent[] = [];
 interface CommsHubProps {
   user?: any;
   initialTab?: CommsTab;
+  onTabChange?: (tab: CommsTab) => void;
   isPopout?: boolean;
   showWindowControls?: boolean;
   onClose?: () => void;
@@ -309,6 +310,7 @@ function getInitialInteractions(): InteractionEvent[] {
 export function CommsHub({
   user,
   initialTab = 'all',
+  onTabChange,
   isPopout = false,
   showWindowControls = false,
   onClose,
@@ -322,8 +324,20 @@ export function CommsHub({
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
+      if (initialTab === 'phone' && callStatus === 'idle') {
+        setCallsSubTab('history');
+      }
+      onTabChange?.(initialTab);
     }
   }, [initialTab]);
+
+  const handleSelectTab = (tab: CommsTab) => {
+    setActiveTab(tab);
+    if (tab === 'phone' && callStatus === 'idle') {
+      setCallsSubTab('history');
+    }
+    onTabChange?.(tab);
+  };
 
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
@@ -370,8 +384,12 @@ export function CommsHub({
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnSpeaker, setIsOnSpeaker] = useState(false);
-  const [callsSubTab, setCallsSubTab] = useState<'keypad' | 'history' | 'missed'>('keypad');
+  const [callsSubTab, setCallsSubTab] = useState<'keypad' | 'history' | 'missed'>('history');
   const [activeKeypadFeedback, setActiveKeypadFeedback] = useState<string | null>(null);
+  const [operatorPhoneInput, setOperatorPhoneInput] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('ct_dispatch_operator_phone') || '' : ''
+  );
+  const [isEditingOperatorPhone, setIsEditingOperatorPhone] = useState(false);
   const dialpadInputRef = useRef<HTMLInputElement>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
@@ -947,6 +965,7 @@ export function CommsHub({
     }
 
     setCallStatus('idle');
+    setCallsSubTab('history');
     setActiveCallContact(null);
     setActiveCallPhone(null);
     setActiveCallSid(null);
@@ -1158,7 +1177,7 @@ export function CommsHub({
           <button
             type="button"
             onClick={() => {
-              setActiveTab('all');
+              handleSelectTab('all');
               setSelectedContactPhone(null);
             }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
@@ -1182,7 +1201,7 @@ export function CommsHub({
           <button
             type="button"
             onClick={() => {
-              setActiveTab('phone');
+              handleSelectTab('phone');
               setSelectedContactPhone(null);
             }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
@@ -1200,7 +1219,9 @@ export function CommsHub({
 
           <button
             type="button"
-            onClick={() => setActiveTab('messages')}
+            onClick={() => {
+              handleSelectTab('messages');
+            }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'messages'
                 ? 'bg-blue-600 text-white shadow-xs'
@@ -1214,7 +1235,7 @@ export function CommsHub({
           <button
             type="button"
             onClick={() => {
-              setActiveTab('voicemail');
+              handleSelectTab('voicemail');
               setSelectedContactPhone(null);
             }}
             className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
@@ -1960,18 +1981,6 @@ export function CommsHub({
               <div className="grid grid-cols-3 gap-1 p-1 bg-slate-200/70 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setCallsSubTab('keypad')}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
-                    callsSubTab === 'keypad'
-                      ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Keypad</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCallsSubTab('history')}
                   className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
                     callsSubTab === 'history'
@@ -1988,6 +1997,18 @@ export function CommsHub({
                   >
                     {interactions.filter((item) => item.type.startsWith('call_')).length}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCallsSubTab('keypad')}
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+                    callsSubTab === 'keypad'
+                      ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Keypad</span>
                 </button>
                 <button
                   type="button"
@@ -2339,9 +2360,57 @@ export function CommsHub({
                 <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-white overflow-y-auto">
                 <div className="w-full max-w-xs space-y-3.5">
                   <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 text-center relative focus-within:ring-2 focus-within:ring-blue-500/30">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Outbound Caller ID: {formatDisplayPhone(getClientTelephonyCredentials().phoneNumber)}
-                    </span>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1">
+                      <span className="uppercase tracking-wider">
+                        Caller ID: {formatDisplayPhone(getClientTelephonyCredentials().phoneNumber)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingOperatorPhone((v) => !v)}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-0.5"
+                        title="Configure forwarding cell/desk line to bridge live calls"
+                      >
+                        {operatorPhoneInput ? `Agent: ${formatDisplayPhone(operatorPhoneInput)}` : '+ Agent Line'}
+                      </button>
+                    </div>
+                    {isEditingOperatorPhone && (
+                      <div className="mb-2 p-2 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-1.5 text-left">
+                        <label className="text-[10px] font-bold text-slate-600 block">
+                          Dispatcher Forwarding / Agent Phone:
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="tel"
+                            value={operatorPhoneInput}
+                            onChange={(e) => setOperatorPhoneInput(e.target.value)}
+                            placeholder="(314) 555-0100"
+                            className="flex-1 px-2 py-1 text-xs rounded-lg border border-slate-300 font-mono bg-slate-50 focus:bg-white focus:outline-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== 'undefined' && window.localStorage) {
+                                localStorage.setItem('ct_dispatch_operator_phone', operatorPhoneInput.trim());
+                              }
+                              setIsEditingOperatorPhone(false);
+                            }}
+                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingOperatorPhone(false)}
+                            className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs rounded-lg cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-slate-400">
+                          Twilio calls the customer and bridges your agent phone into the live audio.
+                        </p>
+                      </div>
+                    )}
                     <input
                       ref={dialpadInputRef}
                       type="text"
