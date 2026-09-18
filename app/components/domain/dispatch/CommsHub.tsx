@@ -390,6 +390,12 @@ export function CommsHub({
     typeof window !== 'undefined' ? localStorage.getItem('ct_dispatch_operator_phone') || '' : ''
   );
   const [isEditingOperatorPhone, setIsEditingOperatorPhone] = useState(false);
+  const [showAgentSetupModal, setShowAgentSetupModal] = useState(false);
+  const [pendingCallTarget, setPendingCallTarget] = useState<{ phone: string; name?: string } | null>(null);
+  const [setupAgentPhoneInput, setSetupAgentPhoneInput] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('ct_dispatch_operator_phone') || '' : ''
+  );
+  const [setupAgentPhoneError, setSetupAgentPhoneError] = useState<string | null>(null);
   const dialpadInputRef = useRef<HTMLInputElement>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
@@ -800,6 +806,34 @@ export function CommsHub({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const handleSaveAgentAndCall = () => {
+    const trimmed = setupAgentPhoneInput.trim();
+    if (!trimmed) {
+      setSetupAgentPhoneError('Please enter your mobile or desk phone number.');
+      return;
+    }
+    const validated = validatePhoneNumber(trimmed);
+    if (!validated.isValid) {
+      setSetupAgentPhoneError(validated.error || 'Please enter a valid 10-digit phone number (e.g. 314-555-0100).');
+      return;
+    }
+    const cleanE164 = validated.e164;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('ct_dispatch_operator_phone', cleanE164);
+    }
+    setOperatorPhoneInput(cleanE164);
+    setSetupAgentPhoneError(null);
+    setShowAgentSetupModal(false);
+
+    if (pendingCallTarget) {
+      const target = pendingCallTarget;
+      setPendingCallTarget(null);
+      setTimeout(() => {
+        handleStartCall(target.phone, target.name);
+      }, 50);
+    }
+  };
+
   const handleStartCall = async (numberToCall?: string, contactName?: string) => {
     const num = numberToCall || dialpadNumber;
     if (!num.trim()) return;
@@ -809,13 +843,28 @@ export function CommsHub({
     const displayNum = phoneValidation.isValid ? formatDisplayPhone(phoneValidation.e164) : num;
     const callerDisplayName = contactName || displayNum;
 
+    // Check if operator forwarding line is configured before placing live call
+    const creds = getClientTelephonyCredentials();
+    const effectiveOperatorPhone = (operatorPhoneInput || creds.operatorPhone || '').trim();
+
+    if (!effectiveOperatorPhone) {
+      setPendingCallTarget({ phone: targetE164, name: callerDisplayName });
+      setSetupAgentPhoneInput('');
+      setSetupAgentPhoneError(null);
+      setShowAgentSetupModal(true);
+      return;
+    }
+
     const callId = `call_${Date.now()}`;
     activeCallInteractionIdRef.current = callId;
 
     setCallStatus('calling');
     setActiveCallContact(callerDisplayName);
     setActiveCallPhone(targetE164);
-    setCallNotice(null);
+    setCallNotice({
+      type: 'info',
+      message: `Connecting... Ringing your phone (${formatDisplayPhone(effectiveOperatorPhone)}) to bridge.`,
+    });
     setShowInCallKeypad(false);
     setShowInCallTrips(false);
     setShowInCallNotes(false);
@@ -847,8 +896,6 @@ export function CommsHub({
     });
 
     try {
-      const creds = getClientTelephonyCredentials();
-
       if (targetE164 === creds.phoneNumber) {
         setCallNotice({
           type: 'warning',
@@ -863,7 +910,7 @@ export function CommsHub({
           action: 'make_call',
           to: targetE164,
           from: creds.phoneNumber,
-          operatorPhone: creds.operatorPhone || undefined,
+          operatorPhone: effectiveOperatorPhone,
           credentials: creds.accountSid ? creds : undefined,
         }),
       });
@@ -874,7 +921,7 @@ export function CommsHub({
         setCallStatus('connected');
         setCallNotice({
           type: 'info',
-          message: 'Connected via Twilio Gateway.',
+          message: `Twilio bridge active. Ringing your phone (${formatDisplayPhone(effectiveOperatorPhone)})...`,
         });
         setInteractions((prev) =>
           prev.map((i) =>
@@ -892,28 +939,29 @@ export function CommsHub({
           callerNumber: targetE164,
         });
       } else {
-        // Fallback to connected softphone mode
-        setCallStatus('connected');
+        handleEndCall(false);
         const warningMsg =
-          resData.code === 'TWILIO_NUMBER_UNVERIFIED'
-            ? `Twilio Trial: Recipient must be verified in Twilio Console. Softphone active.`
-            : resData.error || resData.message || 'Call active in dispatch softphone mode.';
+          resData.code === 'NO_OPERATOR_PHONE'
+            ? 'Please enter your agent phone number to bridge live calls.'
+            : resData.code === 'TWILIO_NUMBER_UNVERIFIED'
+            ? 'Twilio Trial Error: Recipient phone number must be verified in Twilio Console.'
+            : (resData.error || resData.message || 'Call failed to initiate on Twilio.');
         setCallNotice({
           type: 'warning',
           message: warningMsg,
         });
-        workspaceBus.publish('CALL_ANSWERED', {
-          callerNumber: targetE164,
-        });
+        if (resData.code === 'NO_OPERATOR_PHONE') {
+          setPendingCallTarget({ phone: targetE164, name: callerDisplayName });
+          setSetupAgentPhoneInput('');
+          setSetupAgentPhoneError(null);
+          setShowAgentSetupModal(true);
+        }
       }
     } catch {
-      setCallStatus('connected');
+      handleEndCall(false);
       setCallNotice({
         type: 'warning',
-        message: 'Network offline. Call active in dispatch softphone mode.',
-      });
-      workspaceBus.publish('CALL_ANSWERED', {
-        callerNumber: targetE164,
+        message: 'Network offline. Unable to reach Twilio service.',
       });
     }
   };
@@ -986,12 +1034,21 @@ export function CommsHub({
     let isSubscribed = true;
     const interval = setInterval(async () => {
       try {
-        const resp = await fetch(`/api/telephony?action=get_call_status&callSid=${encodeURIComponent(activeCallSid)}`);
+        const creds = getClientTelephonyCredentials();
+        const resp = await fetch('/api/telephony', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get_call_status',
+            callSid: activeCallSid,
+            credentials: creds.accountSid ? creds : undefined,
+          }),
+        });
         if (resp.ok && isSubscribed) {
           const statusData = await resp.json();
           if (statusData.success && statusData.status) {
             const terminalStatuses = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
-            if (terminalStatuses.includes(statusData.status)) {
+            if (terminalStatuses.includes(statusData.status.toLowerCase())) {
               clearInterval(interval);
               handleEndCall(true);
             }
@@ -1000,7 +1057,7 @@ export function CommsHub({
       } catch {
         // Tolerated polling network error
       }
-    }, 2500);
+    }, 2000);
 
     return () => {
       isSubscribed = false;
@@ -2367,10 +2424,14 @@ export function CommsHub({
                       <button
                         type="button"
                         onClick={() => setIsEditingOperatorPhone((v) => !v)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-0.5"
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
+                          operatorPhoneInput
+                            ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                            : 'text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300'
+                        }`}
                         title="Configure forwarding cell/desk line to bridge live calls"
                       >
-                        {operatorPhoneInput ? `Agent: ${formatDisplayPhone(operatorPhoneInput)}` : '+ Agent Line'}
+                        {operatorPhoneInput ? `Agent: ${formatDisplayPhone(operatorPhoneInput)}` : '⚠️ Set Agent Line'}
                       </button>
                     </div>
                     {isEditingOperatorPhone && (
@@ -3198,6 +3259,80 @@ export function CommsHub({
           </div>
         )}
       </div>
+
+      {/* AGENT PHONE SETUP MODAL */}
+      {showAgentSetupModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <PhoneIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Set Dispatcher Line</h3>
+                <p className="text-[11px] text-slate-500">Connect your phone to speak live</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+              To connect you with <strong className="text-slate-900">{pendingCallTarget?.name || pendingCallTarget?.phone}</strong>, enter your mobile or desk phone number. Twilio dials the recipient and simultaneously rings your phone so you speak together live.
+            </p>
+
+            <div className="space-y-1 mb-4">
+              <label className="text-[11px] font-bold text-slate-700 block">
+                Your Phone Number (Mobile or Desk):
+              </label>
+              <input
+                type="tel"
+                autoFocus
+                placeholder="(314) 555-0100"
+                value={setupAgentPhoneInput}
+                onChange={(e) => {
+                  setSetupAgentPhoneInput(e.target.value);
+                  if (setupAgentPhoneError) setSetupAgentPhoneError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveAgentAndCall();
+                  }
+                }}
+                className={`w-full px-3 py-2 text-sm rounded-xl border font-mono bg-slate-50 focus:bg-white focus:outline-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
+                  setupAgentPhoneError ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
+                }`}
+              />
+              {setupAgentPhoneError ? (
+                <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
+              ) : (
+                <p className="text-[10px] text-slate-400">
+                  Saved locally on this device. You will only need to set this once.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAgentSetupModal(false);
+                  setPendingCallTarget(null);
+                  setSetupAgentPhoneError(null);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAgentAndCall}
+                className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <PhoneIcon className="w-3.5 h-3.5" />
+                <span>Save & Call Now</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

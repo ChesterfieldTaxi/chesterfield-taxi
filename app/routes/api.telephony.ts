@@ -12,6 +12,7 @@ export interface TelephonyApiRequest {
     | 'make_call'
     | 'end_call'
     | 'get_call_status'
+    | 'call_status_callback'
     | 'send_sms'
     | 'verify_credentials'
     | 'save_credentials'
@@ -28,6 +29,7 @@ export interface TelephonyApiRequest {
   from?: string;
   body?: string;
   callSid?: string;
+  status?: string;
   operatorPhone?: string;
   forwardingPhone?: string;
   customTwiml?: string;
@@ -75,9 +77,11 @@ export interface StoredSms {
 const telephonyStore: {
   voicemails: StoredVoicemail[];
   messages: StoredSms[];
+  callStatuses: Record<string, { status: string; timestamp: number }>;
 } = ((globalThis as any).__ct_telephony_store ||= {
   voicemails: [],
   messages: [],
+  callStatuses: {},
 });
 
 import { sanitizeToE164, validatePhoneNumber, formatDisplayPhone } from '../core/utils/phone';
@@ -173,25 +177,61 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  // ─── GET CALL STATUS FROM TWILIO REST API ───
+  // ─── TWILIO CALL STATUS WEBHOOK CALLBACK (GET) ───
+  if (action === 'call_status_callback') {
+    const callSid = url.searchParams.get('callSid') || url.searchParams.get('CallSid');
+    const callStatus = url.searchParams.get('CallStatus') || url.searchParams.get('status');
+    if (callSid && callStatus) {
+      telephonyStore.callStatuses[callSid] = { status: callStatus.toLowerCase(), timestamp: Date.now() };
+    }
+    return Response.json({ success: true, callSid, status: callStatus });
+  }
+
+  // ─── GET CALL STATUS FROM TWILIO REST API OR IN-MEMORY CACHE ───
   if (action === 'get_call_status') {
     const callSid = url.searchParams.get('callSid');
     if (!callSid) {
       return Response.json({ success: false, error: 'callSid is required' }, { status: 400 });
     }
-    const { accountSid, authToken } = await resolveCredentials();
-    if (!accountSid || !authToken) {
+
+    // Check cached status from Twilio status webhook first
+    const cached = telephonyStore.callStatuses && telephonyStore.callStatuses[callSid];
+    if (cached && ['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(cached.status)) {
+      return Response.json({
+        success: true,
+        callSid,
+        status: cached.status,
+      });
+    }
+
+    // Check headers or query params for fallback credentials
+    const headerSid = request.headers.get('x-twilio-sid');
+    const headerToken = request.headers.get('x-twilio-token');
+    const querySid = url.searchParams.get('sid') || url.searchParams.get('accountSid');
+    const queryToken = url.searchParams.get('token') || url.searchParams.get('authToken');
+
+    const resolved = await resolveCredentials();
+    const activeSid = headerSid || querySid || resolved.accountSid;
+    const activeToken = headerToken || queryToken || resolved.authToken;
+
+    if (!activeSid || !activeToken) {
+      if (cached) {
+        return Response.json({ success: true, callSid, status: cached.status });
+      }
       return Response.json({ success: false, error: 'Twilio not configured' }, { status: 401 });
     }
 
     try {
-      const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+      const authHeader = 'Basic ' + Buffer.from(`${activeSid}:${activeToken}`).toString('base64');
       const resp = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls/${encodeURIComponent(callSid)}.json`,
+        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(activeSid)}/Calls/${encodeURIComponent(callSid)}.json`,
         { headers: { Authorization: authHeader } }
       );
       const result = (await resp.json()) as any;
       if (resp.ok) {
+        if (result.status) {
+          telephonyStore.callStatuses[callSid] = { status: result.status.toLowerCase(), timestamp: Date.now() };
+        }
         return Response.json({
           success: true,
           callSid: result.sid,
@@ -397,13 +437,37 @@ export async function action({ request }: ActionFunctionArgs) {
     // Resolve credentials from environment, .env.local, or request payload
     let { accountSid, authToken, phoneNumber: twilioFromNumber, forwardingPhone } = await resolveCredentials(data);
 
+    // ─── TWILIO CALL STATUS WEBHOOK CALLBACK (POST) ───
+    if (data.action === 'call_status_callback' || queryAction === 'call_status_callback') {
+      const callSid = data.callSid || (data as any).CallSid || url.searchParams.get('callSid') || (data as any).call_sid;
+      const callStatus = data.status || (data as any).CallStatus || url.searchParams.get('CallStatus') || (data as any).call_status;
+      if (callSid && callStatus) {
+        telephonyStore.callStatuses[callSid] = { status: callStatus.toLowerCase(), timestamp: Date.now() };
+      }
+      return Response.json({ success: true, callSid, status: callStatus });
+    }
+
     // ─── GET CALL STATUS ACTION ───
     if (data.action === 'get_call_status') {
       const callSid = data.callSid || url.searchParams.get('callSid');
       if (!callSid) {
         return Response.json({ success: false, error: 'callSid is required' }, { status: 400 });
       }
+
+      // Check cached status from Twilio status webhook first
+      const cached = telephonyStore.callStatuses && telephonyStore.callStatuses[callSid];
+      if (cached && ['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(cached.status)) {
+        return Response.json({
+          success: true,
+          callSid,
+          status: cached.status,
+        });
+      }
+
       if (!accountSid || !authToken) {
+        if (cached) {
+          return Response.json({ success: true, callSid, status: cached.status });
+        }
         return Response.json({ success: false, error: 'Twilio not configured' }, { status: 401 });
       }
       try {
@@ -414,6 +478,9 @@ export async function action({ request }: ActionFunctionArgs) {
         );
         const result = (await resp.json()) as any;
         if (resp.ok) {
+          if (result.status) {
+            telephonyStore.callStatuses[callSid] = { status: result.status.toLowerCase(), timestamp: Date.now() };
+          }
           return Response.json({
             success: true,
             callSid: result.sid,
@@ -807,9 +874,18 @@ export async function action({ request }: ActionFunctionArgs) {
         twiml = data.customTwiml;
       } else if (dispatchBridgePhone) {
         const formattedForwarding = sanitizeToE164(dispatchBridgePhone);
-        twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial></Response>`;
+        twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial timeout="25" record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial><Say voice="alice">Our dispatch agent was unable to connect. We will call you back shortly. Thank you.</Say><Hangup/></Response>`;
       } else {
-        twiml = `<Response><Say voice="alice">Hello, thank you for answering Chesterfield Taxi and Car Service dispatch. Please hold while we connect your operator.</Say><Pause length="4"/><Say voice="alice">All operators are currently assisting callers. Please hold and someone will be with you shortly.</Say><Pause length="20"/></Response>`;
+        return Response.json(
+          {
+            success: false,
+            code: 'NO_OPERATOR_PHONE',
+            error: 'No dispatch operator phone configured.',
+            message:
+              'Please enter your mobile or desk phone number so Twilio can bridge you with the customer.',
+          },
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
       }
 
       const params = new URLSearchParams();
@@ -817,6 +893,21 @@ export async function action({ request }: ActionFunctionArgs) {
       params.append('From', formattedFrom);
       params.append('Twiml', twiml);
       params.append('Record', 'true');
+
+      // Register Twilio StatusCallback so backend receives instant notification when call ends
+      try {
+        const reqUrl = new URL(request.url);
+        const callbackUrl = `${reqUrl.protocol}//${reqUrl.host}/api/telephony?action=call_status_callback`;
+        params.append('StatusCallback', callbackUrl);
+        params.append('StatusCallbackMethod', 'POST');
+        params.append('StatusCallbackEvent', 'completed');
+        params.append('StatusCallbackEvent', 'busy');
+        params.append('StatusCallbackEvent', 'no-answer');
+        params.append('StatusCallbackEvent', 'failed');
+        params.append('StatusCallbackEvent', 'canceled');
+      } catch {
+        // Fallback gracefully
+      }
 
       const callResp = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
