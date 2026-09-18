@@ -978,13 +978,14 @@ export function CommsHub({
     }
   };
 
-  const handleEndCall = (broadcast = true) => {
+  const handleEndCall = (broadcast: boolean | React.MouseEvent | unknown = true) => {
     const finalSecs = callTimer > 0 ? callTimer : 1;
     const m = Math.floor(finalSecs / 60);
     const s = (finalSecs % 60).toString().padStart(2, '0');
     const durationLabel = `${m}:${s}`;
 
-    if (broadcast) {
+    const shouldBroadcast = typeof broadcast === 'boolean' ? broadcast : true;
+    if (shouldBroadcast) {
       workspaceBus.publish('CALL_ENDED', {
         callSid: activeCallSid || undefined,
         durationSeconds: finalSecs,
