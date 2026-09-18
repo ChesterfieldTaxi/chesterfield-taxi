@@ -62,113 +62,7 @@ export interface InteractionEvent {
   };
 }
 
-const INITIAL_INTERACTIONS: InteractionEvent[] = [
-  {
-    id: 'int-1',
-    type: 'voicemail',
-    contactName: 'Sarah Jenkins',
-    contactPhone: '(314) 532-1200', // Home phone
-    homePhone: '(314) 532-1200',
-    mobilePhone: '(314) 738-9921',
-    contactType: 'passenger',
-    timestamp: 'Today, 2:15 PM',
-    timestampMs: Date.now() - 15 * 60 * 1000,
-    durationSeconds: 34,
-    audioDuration: '0:34',
-    snippet: 'Voicemail: Airport pickup reservation for tomorrow morning 6:00 AM',
-    transcription:
-      'Hi Chesterfield Taxi, this is Sarah Jenkins calling from my home phone. I need a cab tomorrow morning at 6:00 AM from 14848 Conway Rd to Lambert Airport Terminal 1. Please text my cell at 314-738-9921 when the driver is on the way. Thank you!',
-    isUnread: true,
-    suggestedBooking: {
-      passengerName: 'Sarah Jenkins',
-      passengerPhone: '(314) 738-9921',
-      pickup: '14848 Conway Rd, Chesterfield, MO 63017',
-      dropoff: 'Lambert St. Louis International Airport (STL) Terminal 1',
-      pickupTime: 'Tomorrow 06:00 AM',
-    },
-  },
-  {
-    id: 'int-2',
-    type: 'sms_inbound',
-    contactName: 'Cab 14 - Dave Miller',
-    contactPhone: '(314) 555-0144',
-    mobilePhone: '(314) 555-0144',
-    contactType: 'driver',
-    timestamp: 'Today, 2:02 PM',
-    timestampMs: Date.now() - 28 * 60 * 1000,
-    snippet: 'Passenger picked up at Bayer Campus Building A. On route to STL Airport.',
-    isUnread: false,
-  },
-  {
-    id: 'int-3',
-    type: 'call_missed',
-    contactName: 'Mercy Hospital ER Desk',
-    contactPhone: '(314) 251-6000',
-    contactType: 'corporate',
-    timestamp: 'Today, 1:45 PM',
-    timestampMs: Date.now() - 45 * 60 * 1000,
-    snippet: 'Missed Call – No voicemail left (Ranged for 18 sec)',
-    isUnread: true,
-  },
-  {
-    id: 'int-4',
-    type: 'call_inbound',
-    contactName: 'Robert Vance',
-    contactPhone: '(314) 555-0182',
-    mobilePhone: '(314) 555-0182',
-    contactType: 'passenger',
-    timestamp: 'Today, 1:12 PM',
-    timestampMs: Date.now() - 78 * 60 * 1000,
-    durationSeconds: 134,
-    audioDuration: '2:14',
-    hasRecording: true,
-    transcription:
-      'Passenger called to confirm pickup at Chesterfield Mall Entrance 3. Advised driver to look for green luggage.',
-    snippet: 'Call ended – 2 min 14 sec (Recording available)',
-    isUnread: false,
-  },
-  {
-    id: 'int-5',
-    type: 'sms_outbound',
-    contactName: 'Sarah Jenkins',
-    contactPhone: '(314) 738-9921',
-    mobilePhone: '(314) 738-9921',
-    contactType: 'passenger',
-    timestamp: 'Today, 11:30 AM',
-    timestampMs: Date.now() - 180 * 60 * 1000,
-    snippet: 'Chesterfield Taxi: Driver Dave in Cab #14 is 4 mins away in a White Toyota Sienna.',
-    isUnread: false,
-  },
-  {
-    id: 'int-6',
-    type: 'call_outbound',
-    contactName: 'Cab 11 - Marcus Brody',
-    contactPhone: '(314) 555-0199',
-    mobilePhone: '(314) 555-0199',
-    contactType: 'driver',
-    timestamp: 'Today, 11:15 AM',
-    timestampMs: Date.now() - 195 * 60 * 1000,
-    durationSeconds: 58,
-    audioDuration: '0:58',
-    hasRecording: true,
-    transcription:
-      'Dispatcher called Marcus to re-route via I-64 due to heavy construction on Olive Blvd. Marcus acknowledged and took highway.',
-    snippet: 'Outbound Call ended – 58 sec (Recording available)',
-    isUnread: false,
-  },
-  {
-    id: 'int-7',
-    type: 'call_missed',
-    contactName: 'Dr. Elena Rossi',
-    contactPhone: '(314) 555-0191',
-    mobilePhone: '(314) 555-0191',
-    contactType: 'passenger',
-    timestamp: 'Today, 12:40 PM',
-    timestampMs: Date.now() - 110 * 60 * 1000,
-    snippet: 'Missed Call – Caller rang 24 seconds without leaving voicemail.',
-    isUnread: true,
-  },
-];
+const INITIAL_INTERACTIONS: InteractionEvent[] = [];
 
 interface CommsHubProps {
   user?: any;
@@ -352,12 +246,14 @@ export function getClientTelephonyCredentials() {
   let sid = '';
   let token = '';
   let phone = '';
+  let operatorPhone = '';
 
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       sid = localStorage.getItem('ct_twilio_sid') || '';
       token = localStorage.getItem('ct_twilio_token') || '';
       phone = localStorage.getItem('ct_twilio_phone') || '';
+      operatorPhone = localStorage.getItem('ct_dispatch_operator_phone') || '';
 
       if (!sid || !token || !phone) {
         const stored = localStorage.getItem('chesterfield_taxi_app_settings');
@@ -368,6 +264,7 @@ export function getClientTelephonyCredentials() {
             sid = sid || tel.accountSid || '';
             token = token || tel.authToken || '';
             phone = phone || tel.phoneNumber || '';
+            operatorPhone = operatorPhone || tel.operatorPhone || '';
           }
         }
       }
@@ -380,6 +277,7 @@ export function getClientTelephonyCredentials() {
     accountSid: sid.trim(),
     authToken: token.trim(),
     phoneNumber: phone.trim() || '+13147380100',
+    operatorPhone: operatorPhone.trim(),
   };
 }
 
@@ -390,7 +288,17 @@ function getInitialInteractions(): InteractionEvent[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Filter out mock test interactions while strictly preserving user's real call and SMS history
+          const realInteractions = parsed.filter(
+            (item: any) =>
+              !item.id?.startsWith('int-') &&
+              item.id !== 'vm_1' &&
+              item.id !== 'vm_2' &&
+              item.contactName !== 'Sarah Jenkins' &&
+              item.contactName !== 'Mercy Hospital ER Desk'
+          );
+          localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(realInteractions));
+          return realInteractions;
         }
       }
     } catch {}
@@ -809,7 +717,20 @@ export function CommsHub({
       )
     : [];
 
-  const activeContactSummary = selectedInteractions[0] || null;
+  const activeContactSummary =
+    selectedInteractions[0] ||
+    (selectedContactPhone
+      ? ({
+          id: `contact_${selectedContactPhone}`,
+          type: 'call_inbound',
+          contactName: formatDisplayPhone(selectedContactPhone),
+          contactPhone: selectedContactPhone,
+          contactType: 'passenger',
+          timestamp: 'Recent',
+          timestampMs: Date.now(),
+          snippet: 'Direct contact thread',
+        } as InteractionEvent)
+      : null);
 
   // Check upcoming bookings for the active contact
   const upcomingBookingsForContact: UpcomingBookingPreview[] = [];
@@ -924,6 +845,7 @@ export function CommsHub({
           action: 'make_call',
           to: targetE164,
           from: creds.phoneNumber,
+          operatorPhone: creds.operatorPhone || undefined,
           credentials: creds.accountSid ? creds : undefined,
         }),
       });
@@ -984,6 +906,22 @@ export function CommsHub({
     const s = (finalSecs % 60).toString().padStart(2, '0');
     const durationLabel = `${m}:${s}`;
 
+    // If activeCallSid exists, terminate call on Twilio so caller/callee phone hangs up simultaneously
+    if (activeCallSid) {
+      try {
+        const creds = getClientTelephonyCredentials();
+        fetch('/api/telephony', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'end_call',
+            callSid: activeCallSid,
+            credentials: creds.accountSid ? creds : undefined,
+          }),
+        }).catch(() => {});
+      } catch {}
+    }
+
     const shouldBroadcast = typeof broadcast === 'boolean' ? broadcast : true;
     if (shouldBroadcast) {
       workspaceBus.publish('CALL_ENDED', {
@@ -1019,6 +957,37 @@ export function CommsHub({
     setShowInCallNotes(false);
     activeCallInteractionIdRef.current = null;
   };
+
+  // Synchronize remote call completion from Twilio PSTN
+  useEffect(() => {
+    if (!activeCallSid || (callStatus !== 'calling' && callStatus !== 'connected' && callStatus !== 'on_hold')) {
+      return;
+    }
+
+    let isSubscribed = true;
+    const interval = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/telephony?action=get_call_status&callSid=${encodeURIComponent(activeCallSid)}`);
+        if (resp.ok && isSubscribed) {
+          const statusData = await resp.json();
+          if (statusData.success && statusData.status) {
+            const terminalStatuses = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
+            if (terminalStatuses.includes(statusData.status)) {
+              clearInterval(interval);
+              handleEndCall(true);
+            }
+          }
+        }
+      } catch {
+        // Tolerated polling network error
+      }
+    }, 2500);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [activeCallSid, callStatus]);
 
   // Sync call ending from external triggers (header flydown or top banner)
   useEffect(() => {
@@ -1669,8 +1638,8 @@ export function CommsHub({
           </div>
         )}
 
-        {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD (When contact is clicked in All or Messages) */}
-        {(activeTab === 'all' || activeTab === 'messages') && selectedContactPhone && activeContactSummary && (
+        {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD */}
+        {selectedContactPhone && activeContactSummary && (
           <div className="flex-1 flex flex-col min-w-0 bg-white">
             {/* Thread Header */}
             <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
@@ -1680,7 +1649,7 @@ export function CommsHub({
                   onClick={() => setSelectedContactPhone(null)}
                   className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
-                  ← All
+                  ← Back
                 </button>
                 <div>
                   <div className="flex items-center gap-2">
@@ -1984,7 +1953,7 @@ export function CommsHub({
         )}
 
         {/* VIEW 3: FULL DTMF NUMERIC DIALPAD & SOFTPHONE / CALL HISTORY */}
-        {activeTab === 'phone' && (
+        {activeTab === 'phone' && !selectedContactPhone && (
           <div className="flex-1 flex flex-col bg-white overflow-hidden min-w-0">
             {/* Top Sub-Switcher: Keypad vs All Calls vs Missed */}
             <div className="px-3 py-2 border-b border-slate-200 bg-slate-50/80 shrink-0">
@@ -2583,7 +2552,7 @@ export function CommsHub({
                     return (
                       <div
                         key={call.id}
-                        onClick={() => handleToggleSelectRow(call.id)}
+                        onClick={() => setSelectedContactPhone(call.contactPhone)}
                         className={`group relative p-3.5 transition-all cursor-pointer space-y-2 border-l-4 ${
                           isRowSelected
                             ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
@@ -2791,7 +2760,7 @@ export function CommsHub({
                       return (
                         <div
                           key={call.id}
-                          onClick={() => handleToggleSelectRow(call.id)}
+                          onClick={() => setSelectedContactPhone(call.contactPhone)}
                           className={`group relative p-3.5 transition-all cursor-pointer space-y-2.5 border-l-4 ${
                             isRowSelected
                               ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
@@ -2881,7 +2850,7 @@ export function CommsHub({
         )}
 
         {/* VIEW 4: VOICEMAIL INBOX */}
-        {activeTab === 'voicemail' && (
+        {activeTab === 'voicemail' && !selectedContactPhone && (
           <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
             <CommsBatchActionBar
               selectedCount={selectedItemIds.size}

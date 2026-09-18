@@ -10,6 +10,8 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 export interface TelephonyApiRequest {
   action:
     | 'make_call'
+    | 'end_call'
+    | 'get_call_status'
     | 'send_sms'
     | 'verify_credentials'
     | 'save_credentials'
@@ -25,6 +27,9 @@ export interface TelephonyApiRequest {
   to?: string;
   from?: string;
   body?: string;
+  callSid?: string;
+  operatorPhone?: string;
+  forwardingPhone?: string;
   customTwiml?: string;
   recordingSid?: string;
   credentials?: {
@@ -71,50 +76,7 @@ const telephonyStore: {
   voicemails: StoredVoicemail[];
   messages: StoredSms[];
 } = ((globalThis as any).__ct_telephony_store ||= {
-  voicemails: [
-    {
-      id: 'vm_1',
-      contactName: 'David S.',
-      contactPhone: '(314) 555-0199',
-      recordingSid: 'RE_demo_1',
-      audioUrl: '/api/telephony?action=audio_proxy&recordingSid=RE_demo_1',
-      audioDuration: '0:42',
-      transcription:
-        'Hi, this is David. Need a pickup at 18000 Edison Ave in Chesterfield Valley tomorrow morning at 6:30 AM heading to Terminal 1 at Lambert Airport. Two bags. Thank you.',
-      timestamp: 'Today, 8:45 AM',
-      timestampMs: Date.now() - 3600000 * 2,
-      isUnread: true,
-      suggestedBooking: {
-        passengerName: 'David S.',
-        passengerPhone: '+13145550199',
-        pickup: '18000 Edison Ave, Chesterfield, MO 63005',
-        dropoff: 'Lambert Airport Terminal 1, St. Louis, MO',
-        pickupTime: 'Tomorrow 6:30 AM',
-        notes: '2 bags. Early morning airport reservation via Voicemail.',
-      },
-    },
-    {
-      id: 'vm_2',
-      contactName: 'Dr. Katherine Miller',
-      contactPhone: '(314) 555-0144',
-      recordingSid: 'RE_demo_2',
-      audioUrl: '/api/telephony?action=audio_proxy&recordingSid=RE_demo_2',
-      audioDuration: '0:28',
-      transcription:
-        'Hello Chesterfield Taxi. Please send a sedan to St. Luke\'s Hospital Doctor\'s Building at 3:15 PM today going to 14848 Conway Road. Call my cell when the driver arrives.',
-      timestamp: 'Today, 9:20 AM',
-      timestampMs: Date.now() - 3600000 * 1,
-      isUnread: false,
-      suggestedBooking: {
-        passengerName: 'Dr. Katherine Miller',
-        passengerPhone: '+13145550144',
-        pickup: "St. Luke's Hospital, Chesterfield, MO",
-        dropoff: '14848 Conway Rd, Chesterfield, MO',
-        pickupTime: 'Today 3:15 PM',
-        notes: 'Sedan requested. Call cell on arrival.',
-      },
-    },
-  ],
+  voicemails: [],
   messages: [],
 });
 
@@ -128,9 +90,17 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
   let accountSid = (process.env.TWILIO_ACCOUNT_SID || data?.credentials?.accountSid || '').trim();
   let authToken = (process.env.TWILIO_AUTH_TOKEN || data?.credentials?.authToken || '').trim();
   let phoneNumber = (process.env.TWILIO_PHONE_NUMBER || data?.credentials?.phoneNumber || '').trim();
+  let forwardingPhone = (
+    process.env.DISPATCH_FORWARDING_PHONE ||
+    process.env.DISPATCH_PHONE_NUMBER ||
+    process.env.FORWARDING_PHONE_NUMBER ||
+    data?.operatorPhone ||
+    data?.forwardingPhone ||
+    ''
+  ).trim();
 
   // If missing from process.env, attempt reading from .env.local on filesystem
-  if (!accountSid || !authToken) {
+  if (!accountSid || !authToken || !forwardingPhone) {
     try {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -140,9 +110,15 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
         const sidMatch = content.match(/^TWILIO_ACCOUNT_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
         const tokenMatch = content.match(/^TWILIO_AUTH_TOKEN\s*=\s*["']?([^"'\r\n]+)["']?/m);
         const phoneMatch = content.match(/^TWILIO_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+        const fwdMatch =
+          content.match(/^DISPATCH_FORWARDING_PHONE\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
+          content.match(/^DISPATCH_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
+          content.match(/^FORWARDING_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+
         if (!accountSid && sidMatch) accountSid = sidMatch[1].trim();
         if (!authToken && tokenMatch) authToken = tokenMatch[1].trim();
         if (!phoneNumber && phoneMatch) phoneNumber = phoneMatch[1].trim();
+        if (!forwardingPhone && fwdMatch) forwardingPhone = fwdMatch[1].trim();
       }
     } catch {
       // Ignore filesystem access exceptions in edge environments
@@ -153,7 +129,7 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
     phoneNumber = '+13147380100';
   }
 
-  return { accountSid, authToken, phoneNumber };
+  return { accountSid, authToken, phoneNumber, forwardingPhone };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -197,14 +173,60 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
+  // ─── GET CALL STATUS FROM TWILIO REST API ───
+  if (action === 'get_call_status') {
+    const callSid = url.searchParams.get('callSid');
+    if (!callSid) {
+      return Response.json({ success: false, error: 'callSid is required' }, { status: 400 });
+    }
+    const { accountSid, authToken } = await resolveCredentials();
+    if (!accountSid || !authToken) {
+      return Response.json({ success: false, error: 'Twilio not configured' }, { status: 401 });
+    }
+
+    try {
+      const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+      const resp = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls/${encodeURIComponent(callSid)}.json`,
+        { headers: { Authorization: authHeader } }
+      );
+      const result = (await resp.json()) as any;
+      if (resp.ok) {
+        return Response.json({
+          success: true,
+          callSid: result.sid,
+          status: result.status,
+          duration: parseInt(result.duration || '0', 10),
+          direction: result.direction,
+          from: result.from,
+          to: result.to,
+        });
+      }
+      return Response.json({ success: false, error: result.message }, { status: resp.status });
+    } catch (err: any) {
+      return Response.json({ success: false, error: err.message }, { status: 500 });
+    }
+  }
+
   // ─── INBOUND VOICE CALL WEBHOOK (WITH RECORDING & VOICEMAIL ROLLOVER) ───
   if (action === 'incoming_call') {
-    const { phoneNumber } = await resolveCredentials();
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    const { phoneNumber, forwardingPhone } = await resolveCredentials();
+    let twiml: string;
+
+    if (forwardingPhone) {
+      const formattedForwarding = sanitizeToE164(forwardingPhone);
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.</Say>
-  <Dial timeout="18" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">+13147398444</Dial>
+  <Dial timeout="20" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">${formattedForwarding}</Dial>
 </Response>`;
+    } else {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Our dispatch desk is currently assisting other passengers. Please leave your name, phone number, pickup location, and desired pickup time after the tone. Press pound when finished.</Say>
+  <Record maxLength="120" finishOnKey="#" action="/api/telephony?action=voicemail_recorded" transcribe="true" transcribeCallback="/api/telephony?action=voicemail_transcription" playBeep="true" />
+</Response>`;
+    }
     return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
   }
 
@@ -373,16 +395,91 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Resolve credentials from environment, .env.local, or request payload
-    let { accountSid, authToken, phoneNumber: twilioFromNumber } = await resolveCredentials(data);
+    let { accountSid, authToken, phoneNumber: twilioFromNumber, forwardingPhone } = await resolveCredentials(data);
+
+    // ─── GET CALL STATUS ACTION ───
+    if (data.action === 'get_call_status') {
+      const callSid = data.callSid || url.searchParams.get('callSid');
+      if (!callSid) {
+        return Response.json({ success: false, error: 'callSid is required' }, { status: 400 });
+      }
+      if (!accountSid || !authToken) {
+        return Response.json({ success: false, error: 'Twilio not configured' }, { status: 401 });
+      }
+      try {
+        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const resp = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls/${encodeURIComponent(callSid)}.json`,
+          { headers: { Authorization: authHeader } }
+        );
+        const result = (await resp.json()) as any;
+        if (resp.ok) {
+          return Response.json({
+            success: true,
+            callSid: result.sid,
+            status: result.status,
+            duration: parseInt(result.duration || '0', 10),
+            direction: result.direction,
+            from: result.from,
+            to: result.to,
+          });
+        }
+        return Response.json({ success: false, error: result.message }, { status: resp.status });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500 });
+      }
+    }
+
+    // ─── END ACTIVE CALL ACTION ───
+    if (data.action === 'end_call') {
+      const callSid = data.callSid || url.searchParams.get('callSid');
+      if (!callSid) {
+        return Response.json({ success: false, error: 'callSid is required' }, { status: 400 });
+      }
+      if (!accountSid || !authToken) {
+        return Response.json({ success: true, message: 'Local call ended' });
+      }
+      try {
+        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const endParams = new URLSearchParams();
+        endParams.append('Status', 'completed');
+        const endResp = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Calls/${encodeURIComponent(callSid)}.json`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: authHeader,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: endParams.toString(),
+          }
+        );
+        const endResult = (await endResp.json()) as any;
+        return Response.json({ success: true, status: endResult.status });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500 });
+      }
+    }
 
     // ─── INBOUND WEBHOOK: VOICE CALL ───
     if (data.action === 'incoming_call') {
       const phoneNumber = twilioFromNumber;
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      let twiml: string;
+
+      if (forwardingPhone) {
+        const formattedForwarding = sanitizeToE164(forwardingPhone);
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.</Say>
-  <Dial timeout="18" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">+13147398444</Dial>
+  <Dial timeout="20" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">${formattedForwarding}</Dial>
 </Response>`;
+      } else {
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Our dispatch desk is currently assisting other passengers. Please leave your name, phone number, pickup location, and desired pickup time after the tone. Press pound when finished.</Say>
+  <Record maxLength="120" finishOnKey="#" action="/api/telephony?action=voicemail_recorded" transcribe="true" transcribeCallback="/api/telephony?action=voicemail_transcription" playBeep="true" />
+</Response>`;
+      }
       return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
     }
 
@@ -698,9 +795,22 @@ export async function action({ request }: ActionFunctionArgs) {
       const formattedTo = validationTo.e164;
       const formattedFrom = validationFrom.e164;
 
-      const twiml =
-        data.customTwiml ||
-        `<Response><Say voice="alice">Hello! This is Chesterfield Taxi dispatch connecting your call. Please hold while we connect you to dispatch.</Say><Pause length="1"/><Say voice="alice">Test call completed. Have a wonderful day!</Say></Response>`;
+      const dispatchBridgePhone = (
+        data.operatorPhone ||
+        data.forwardingPhone ||
+        forwardingPhone ||
+        ''
+      ).trim();
+
+      let twiml: string;
+      if (data.customTwiml) {
+        twiml = data.customTwiml;
+      } else if (dispatchBridgePhone) {
+        const formattedForwarding = sanitizeToE164(dispatchBridgePhone);
+        twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial></Response>`;
+      } else {
+        twiml = `<Response><Say voice="alice">Hello, this is Chesterfield Taxi and Car Service dispatch calling. Please hold while an operator joins your line.</Say><Pause length="5"/><Say voice="alice">Thank you for your patience. To connect directly with an agent, please set your dispatch forwarding phone or contact us at ${formattedFrom}.</Say></Response>`;
+      }
 
       const params = new URLSearchParams();
       params.append('To', formattedTo);
