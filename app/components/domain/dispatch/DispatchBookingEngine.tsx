@@ -1,14 +1,25 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Trip, GeoPoint, CreateTripInput, VehicleTier, PaymentMethod } from '../../../core/types';
-import type { NamedPricingRule } from '../../../core/types/config';
+import type { NamedPricingRule, CorporateAccountConfig } from '../../../core/types/config';
 import { getBookingService } from '../../../core/services/booking';
 import { calculateLiveRoute } from '../../../core/services/maps/live-routing.service';
 import { calculateTripPricing, getPricingRulesService } from '../../../core/services/pricing';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { getCorporateAccountService } from '../../../core/services/corporate-account.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
-import { SpinnerIcon, PlusIcon, UserIcon, PhoneIcon, MailIcon, LuggageIcon } from '../../ui/Icons';
+import {
+  SpinnerIcon,
+  PlusIcon,
+  UserIcon,
+  PhoneIcon,
+  MailIcon,
+  LuggageIcon,
+  ShieldCheckIcon,
+  AlertTriangleIcon,
+  CheckIcon,
+} from '../../ui/Icons';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 
 export interface AdditionalPassenger {
@@ -245,6 +256,18 @@ export function DispatchBookingEngine({
   useEffect(() => {
     const unsub = getPricingRulesService().subscribeToRules((rules) => {
       setAvailableNamedRules(rules.filter((r) => r.isActive));
+    });
+    return () => unsub();
+  }, []);
+
+  // Subscribe to real-time corporate accounts from Firestore / config
+  const [corporateAccountList, setCorporateAccountList] = useState<CorporateAccountConfig[]>([]);
+
+  useEffect(() => {
+    const unsub = getAdminConfigService().subscribeToSettings((settings) => {
+      if (settings?.corporateAccounts && settings.corporateAccounts.length > 0) {
+        setCorporateAccountList(settings.corporateAccounts);
+      }
     });
     return () => unsub();
   }, []);
@@ -1276,6 +1299,27 @@ export function DispatchBookingEngine({
       return;
     }
 
+    if (paymentMethod === 'account') {
+      const selectedCorp = corporateAccountList.find(
+        (c) => c.companyName === corporateAccount || c.id === corporateAccount || c.accountNumber === corporateAccount
+      );
+      if (selectedCorp) {
+        const poCheck = getCorporateAccountService().validateCorporatePo(selectedCorp, billingPo);
+        if (poCheck.status === 'expired_revoked') {
+          setSubmitError(
+            `FRAUD ALERT: The PO number "${billingPo}" was revoked/rotated on ${
+              poCheck.revokedRecord?.rotatedAt ? poCheck.revokedRecord.rotatedAt.slice(0, 10) : 'previously'
+            }. Corporate booking cannot proceed with a revoked PO.`
+          );
+          return;
+        }
+        if (selectedCorp.poRequired && !billingPo.trim()) {
+          setSubmitError(`PO Number is strictly required for corporate client "${selectedCorp.companyName}".`);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     const service = getBookingService();
 
@@ -2277,59 +2321,150 @@ export function DispatchBookingEngine({
           )}
 
           {/* Corporate Account Sub-Panel */}
-          {paymentMethod === 'account' && (
-            <div className="p-2 mb-2 bg-amber-50/80 border border-amber-300 rounded-lg space-y-1.5">
-              <div className="text-[10px] font-bold text-amber-900 uppercase">Corporate Account Billing</div>
-              <div>
-                <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Corporate Client</span>
-                <select
-                  value={corporateAccount}
-                  onChange={(e) => setCorporateAccount(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800"
-                >
-                  {DEFAULT_CORPORATE_ACCOUNTS.map((acc) => (
-                    <option key={acc} value={acc}>
-                      {acc}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <div>
-                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Billing PO / Code</span>
-                  <input
-                    type="text"
-                    placeholder="PO-2026-XXXX"
-                    value={billingPo}
-                    onChange={(e) => setBillingPo(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs"
-                  />
+          {paymentMethod === 'account' && (() => {
+            const selectedCorp = corporateAccountList.find(
+              (c) => c.companyName === corporateAccount || c.id === corporateAccount || c.accountNumber === corporateAccount
+            );
+            const poValidation = selectedCorp
+              ? getCorporateAccountService().validateCorporatePo(selectedCorp, billingPo)
+              : null;
+
+            return (
+              <div className="p-2.5 mb-2 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wide">
+                    Corporate Account Billing
+                  </span>
+                  {selectedCorp && (
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                        selectedCorp.poRequired
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {selectedCorp.poRequired ? 'PO Required on Booking' : 'PO Optional'}
+                    </span>
+                  )}
                 </div>
+
                 <div>
-                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Authorized By</span>
-                  <input
-                    type="text"
-                    placeholder="Dept Manager"
-                    value={authorizedBy}
-                    onChange={(e) => setAuthorizedBy(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs"
-                  />
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] text-slate-600 font-semibold">Corporate Client</span>
+                    {selectedCorp && (
+                      <span className="text-[10px] font-mono text-slate-500 font-semibold">
+                        Acct #{selectedCorp.accountNumber} • Limit: ${selectedCorp.creditLimit.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={corporateAccount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCorporateAccount(val);
+                    }}
+                    className="w-full px-2 py-1.5 bg-white border border-amber-300 rounded text-xs text-slate-800 font-medium"
+                  >
+                    {corporateAccountList.length > 0 ? (
+                      corporateAccountList.map((acc) => (
+                        <option key={acc.id} value={acc.companyName}>
+                          {acc.companyName} ({acc.accountNumber}){acc.poRequired ? ' [PO REQ]' : ''}
+                        </option>
+                      ))
+                    ) : (
+                      DEFAULT_CORPORATE_ACCOUNTS.map((acc) => (
+                        <option key={acc} value={acc}>
+                          {acc}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-slate-600 font-semibold">Billing PO / Code</span>
+                      {selectedCorp?.currentPoNumber && (
+                        <span className="text-[9px] font-mono text-slate-500">
+                          Active: {selectedCorp.currentPoNumber}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={selectedCorp?.currentPoNumber || 'PO-XXXX'}
+                      value={billingPo}
+                      onChange={(e) => setBillingPo(e.target.value)}
+                      className={`w-full px-2 py-1 bg-white border rounded text-xs font-mono font-bold ${
+                        poValidation?.status === 'expired_revoked'
+                          ? 'border-rose-500 bg-rose-50 text-rose-800 ring-2 ring-rose-500/20'
+                          : poValidation?.status === 'valid'
+                          ? 'border-emerald-500 text-emerald-800'
+                          : 'border-amber-300'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Authorized By / Contact</span>
+                    <input
+                      type="text"
+                      placeholder="Dept Manager or Email"
+                      value={authorizedBy}
+                      onChange={(e) => setAuthorizedBy(e.target.value)}
+                      className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Anti-Fraud PO Validation Feedback */}
+                {selectedCorp && billingPo.trim().length > 0 && (
+                  <div className="text-[10px]">
+                    {poValidation?.status === 'valid' && (
+                      <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                        <CheckIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                        <span className="font-semibold">Active Authorized PO verified.</span>
+                      </div>
+                    )}
+                    {poValidation?.status === 'expired_revoked' && (
+                      <div className="flex items-start gap-1.5 text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-300 font-medium">
+                        <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                        <div>
+                          <strong className="block font-bold">FRAUD ALERT: REVOKED PO DETECTED</strong>
+                          <span>
+                            PO &ldquo;{billingPo}&rdquo; was revoked/rotated on{' '}
+                            {poValidation.revokedRecord?.rotatedAt
+                              ? poValidation.revokedRecord.rotatedAt.slice(0, 10)
+                              : 'previously'}.
+                            This booking cannot proceed under this revoked authorization.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {poValidation?.status === 'mismatch' && (
+                      <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                        <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                        <span>PO does not match current authorized PO ({selectedCorp.currentPoNumber}).</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Invoicing Terms</span>
+                  <select
+                    value={invoicingTerms}
+                    onChange={(e) => setInvoicingTerms(e.target.value)}
+                    className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800"
+                  >
+                    <option value="Net 30 Direct Bill">Net 30 Direct Bill</option>
+                    <option value="Semi-Monthly Invoice">Semi-Monthly Invoice</option>
+                    <option value="Monthly Statement">Monthly Statement</option>
+                  </select>
                 </div>
               </div>
-              <div>
-                <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Invoicing Terms</span>
-                <select
-                  value={invoicingTerms}
-                  onChange={(e) => setInvoicingTerms(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800"
-                >
-                  <option value="Net 30 Direct Bill">Net 30 Direct Bill</option>
-                  <option value="Semi-Monthly Invoice">Semi-Monthly Invoice</option>
-                  <option value="Monthly Statement">Monthly Statement</option>
-                </select>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="grid grid-cols-2 gap-2">
             <div>

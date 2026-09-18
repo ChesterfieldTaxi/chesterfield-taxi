@@ -12,3 +12,4 @@ export * from './zones/zone.service';
 export * from './payment.service';
 export * from './invoicing.service';
 export * from './telephony.service';
+export * from './corporate-account.service';

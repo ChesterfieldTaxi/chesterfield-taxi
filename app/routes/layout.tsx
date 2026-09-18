@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { Navbar, Footer } from '../components/layout';
+import UnderConstruction from '../components/UnderConstruction';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import type { BrandingConfig } from '../core/types/config';
 
 export default function PublicLayout() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isPreview = searchParams.get('preview') === 'true';
+
+  const [constructionMode, setConstructionMode] = useState<boolean>(() => {
+    try {
+      const cached = getAdminConfigService().getCachedSettings();
+      if (cached?.constructionMode !== undefined) {
+        return cached.constructionMode;
+      }
+    } catch {}
+    return COMPANY_CONFIG.constructionMode ?? true;
+  });
+
   const [branding, setBranding] = useState<BrandingConfig>({
     primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb',
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a',
@@ -30,6 +45,9 @@ export default function PublicLayout() {
       if (cached?.branding) {
         setBranding((prev) => ({ ...prev, ...cached.branding }));
       }
+      if (cached?.constructionMode !== undefined) {
+        setConstructionMode(cached.constructionMode);
+      }
     } catch {}
 
     if (configService.subscribeToSettings) {
@@ -37,10 +55,17 @@ export default function PublicLayout() {
         if (settings?.branding) {
           setBranding((prev) => ({ ...prev, ...settings.branding }));
         }
+        if (settings?.constructionMode !== undefined) {
+          setConstructionMode(settings.constructionMode);
+        }
       });
       return unsub;
     }
   }, []);
+
+  if (constructionMode && !isPreview) {
+    return <UnderConstruction />;
+  }
 
   return (
     <div 

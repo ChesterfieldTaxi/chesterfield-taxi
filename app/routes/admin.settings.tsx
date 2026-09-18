@@ -103,6 +103,37 @@ export default function AdminSettingsRoute() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                const currentMode = settings.constructionMode !== false;
+                const nextVal = !currentMode;
+                await handleSaveSettings({ constructionMode: nextVal });
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                settings.constructionMode !== false
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+              }`}
+              title={
+                settings.constructionMode !== false
+                  ? 'Maintenance Mode is ON: Public customers see the Under Construction page. Click to turn OFF.'
+                  : 'Maintenance Mode is OFF: Public customers see the live booking site. Click to turn ON.'
+              }
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  settings.constructionMode !== false ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
+                }`}
+              />
+              <span className="hidden sm:inline">Maintenance Mode:</span>
+              <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                settings.constructionMode !== false ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {settings.constructionMode !== false ? 'ON' : 'OFF'}
+              </span>
+            </button>
+
             <Link
               to="/admin"
               className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"

@@ -454,8 +454,45 @@ export default function AdminLayout() {
               </div>
             </div>
 
-            {/* Right: Quick Launch Dispatch, Public Link, Status Badge (User profile is docked in the side drawer/sidebar) */}
+            {/* Right: Maintenance Mode Quick Toggle, Quick Launch Dispatch, Public Link, Status Badge */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* Prominent Maintenance / Construction Mode Switch */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const currentMode = settings.constructionMode !== false;
+                  const nextVal = !currentMode;
+                  await handleSaveSettings({
+                    constructionMode: nextVal,
+                    updatedAt: new Date().toISOString(),
+                  });
+                }}
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  settings.constructionMode !== false
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-900 shadow-xs hover:bg-amber-500/25'
+                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                }`}
+                title={
+                  settings.constructionMode !== false
+                    ? 'Maintenance Mode is currently ON (Under Construction page shown to customers). Click to turn OFF.'
+                    : 'Maintenance Mode is currently OFF (Site is live for booking). Click to turn ON.'
+                }
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    settings.constructionMode !== false
+                      ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.9)]'
+                      : 'bg-emerald-500'
+                  }`}
+                />
+                <span className="hidden sm:inline font-bold text-slate-700">Maintenance:</span>
+                <span className={`text-[11px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  settings.constructionMode !== false ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {settings.constructionMode !== false ? 'ON' : 'OFF'}
+                </span>
+              </button>
+
               <Link
                 to="/dispatch"
                 reloadDocument
@@ -557,6 +594,7 @@ export default function AdminLayout() {
             {normalizedTab === 'customers' && (
               <AdminCustomersSubpage
                 settings={settings}
+                onSave={handleSaveSettings}
                 initialSubTab={effectiveSub as any}
               />
             )}

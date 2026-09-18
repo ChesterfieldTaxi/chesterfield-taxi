@@ -171,6 +171,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isDispatcher();
     }
+    match /corporateAccounts/{document=**} {
+      allow read: if true;
+      allow write: if isDispatcher();
+    }
     match /fleet/{document=**} {
       allow read: if isAuthenticated();
       allow write: if isDispatcher();

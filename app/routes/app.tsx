@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useLocation } from 'react-router';
+import UnderConstruction from '../components/UnderConstruction';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { getBookingService } from '../core/services/booking';
 import {
   getPassengerService,
@@ -53,6 +55,39 @@ type TabKey = 'book' | 'trips' | 'places' | 'profile';
 
 export default function PassengerAppRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isPreview = searchParams.get('preview') === 'true';
+
+  const [constructionMode, setConstructionMode] = useState<boolean>(() => {
+    try {
+      const cached = getAdminConfigService().getCachedSettings();
+      if (cached?.constructionMode !== undefined) {
+        return cached.constructionMode;
+      }
+    } catch {}
+    return COMPANY_CONFIG.constructionMode ?? true;
+  });
+
+  useEffect(() => {
+    const configService = getAdminConfigService();
+    try {
+      const cached = configService.getCachedSettings();
+      if (cached?.constructionMode !== undefined) {
+        setConstructionMode(cached.constructionMode);
+      }
+    } catch {}
+
+    if (configService.subscribeToSettings) {
+      const unsub = configService.subscribeToSettings((settings) => {
+        if (settings?.constructionMode !== undefined) {
+          setConstructionMode(settings.constructionMode);
+        }
+      });
+      return unsub;
+    }
+  }, []);
+
   const passengerService = getPassengerService();
 
   const [account, setAccount] = useState<PassengerAccount>(() =>
@@ -62,6 +97,10 @@ export default function PassengerAppRoute() {
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoadingTrips, setIsLoadingTrips] = useState(true);
+
+  if (constructionMode && !isPreview) {
+    return <UnderConstruction />;
+  }
 
   // Auth guard
   useEffect(() => {

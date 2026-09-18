@@ -61,6 +61,11 @@ export interface CompanyBrandConfig {
    * with a straight-line polyline for zero API cost.
    */
   enableRealtimeRouting: boolean;
+  /**
+   * Construction / Maintenance Mode Toggle.
+   * When true, customer-facing booking routes display the UnderConstruction screen.
+   */
+  constructionMode?: boolean;
   // Phase 19: Granular Branding Studio Tokens
   headingFont?: string;
   bodyFont?: string;
@@ -106,6 +111,7 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   primaryColor: '#2563eb',
   secondaryColor: '#0f172a',
   enableRealtimeRouting: false,
+  constructionMode: true,
   headingFont: 'Inter',
   bodyFont: 'Inter',
   headingColor: '#0f172a',

@@ -23,6 +23,7 @@ import {
   ShieldIcon,
   HistoryIcon,
   SettingsIcon,
+  WrenchIcon,
   DownloadIcon,
 } from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
@@ -69,13 +70,19 @@ export function AdminAdvancedTab({
   });
 
   // ─── 2. System & Maintenance State ───
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(settings.constructionMode ?? true);
   const [maintenanceBanner, setMaintenanceBanner] = useState(
     'Scheduled system maintenance in progress. Please call dispatch directly at (314) 738-0100.'
   );
   const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(
     settings.fleetAlertsConfig?.autoDismissMinutes ?? 60
   );
+
+  useEffect(() => {
+    if (settings.constructionMode !== undefined) {
+      setMaintenanceMode(settings.constructionMode);
+    }
+  }, [settings.constructionMode]);
 
   useEffect(() => {
     if (settings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
@@ -163,6 +170,59 @@ export function AdminAdvancedTab({
 
   return (
     <div className="space-y-6">
+      {/* ─── System Maintenance & Construction Mode Quick Control ─── */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+        settings.constructionMode !== false
+          ? 'bg-amber-500/10 border-amber-500/30'
+          : 'bg-white border-slate-200/80 shadow-xs'
+      }`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              settings.constructionMode !== false ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <WrenchIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900">System Maintenance &amp; Construction Mode</h3>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  settings.constructionMode !== false ? 'bg-amber-500 text-slate-950' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {settings.constructionMode !== false ? 'Active (ON)' : 'Disabled (Live)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-9921). Dispatch and admin console remain 100% operational.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const currentMode = settings.constructionMode !== false;
+              const nextVal = !currentMode;
+              setMaintenanceMode(nextVal);
+              try {
+                await onSave({
+                  constructionMode: nextVal,
+                  updatedAt: new Date().toISOString(),
+                });
+              } catch (err) {
+                console.error('Failed to update construction mode:', err);
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+              settings.constructionMode !== false
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black'
+                : 'bg-slate-900 hover:bg-slate-800 text-white'
+            }`}
+          >
+            {settings.constructionMode !== false ? 'Turn Maintenance Mode OFF' : 'Turn Maintenance Mode ON'}
+          </button>
+        </div>
+      </div>
+
       {/* Contextual Action Bar for Audit / System Export */}
       {(activeSub === 'audit' || activeSub === 'system') && (
         <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -490,8 +550,19 @@ export function AdminAdvancedTab({
                 <input
                   type="checkbox"
                   checked={maintenanceMode}
-                  onChange={(e) => setMaintenanceMode(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600"
+                  onChange={async (e) => {
+                    const nextVal = e.target.checked;
+                    setMaintenanceMode(nextVal);
+                    try {
+                      await onSave({
+                        constructionMode: nextVal,
+                        updatedAt: new Date().toISOString(),
+                      });
+                    } catch (err) {
+                      console.error('Failed to update construction mode:', err);
+                    }
+                  }}
+                  className="w-4 h-4 rounded text-blue-600 cursor-pointer"
                 />
               </div>
 

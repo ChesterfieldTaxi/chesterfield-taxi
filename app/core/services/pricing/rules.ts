@@ -560,10 +560,13 @@ export function createSurgeStep(
       };
     }
 
+    const rawDate = context.input.pickupDateTime;
     const pickupDate =
-      typeof context.input.pickupDateTime === 'string'
-        ? new Date(context.input.pickupDateTime)
-        : context.input.pickupDateTime;
+      typeof rawDate === 'string'
+        ? new Date(rawDate)
+        : rawDate instanceof Date
+        ? rawDate
+        : new Date();
 
     // Find the highest applicable surge rule
     let matchedRule: SurgeRule | undefined;

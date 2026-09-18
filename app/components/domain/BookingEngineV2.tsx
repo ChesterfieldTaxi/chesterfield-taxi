@@ -532,18 +532,23 @@ export function BookingEngineV2({
 
   // Enforce customer vehicle auto-selection and capacity restrictions (single-vehicle mode):
   // Automatically choose cheapest vehicle capable of carrying the requested passengers & luggage
+  // If child safety car seats are requested, vehicle must automatically upgrade to SUV/Minivan
   useEffect(() => {
     if (!bookingConfig.allowMultiVehicle) {
       const totalLuggage = form.carryOnBags + form.checkedBags;
       let minVehicle: CustomerVehicleChoice = 'sedan';
       if (form.passengers > 6 || totalLuggage > 5 || form.specialRequests.wheelchair) {
         minVehicle = 'van';
-      } else if (form.passengers > 4 || totalLuggage > 3) {
+      } else if (form.passengers > 4 || totalLuggage > 3 || totalCarSeats > 0 || returnTotalCarSeats > 0) {
         minVehicle = 'suv';
       }
 
       const currentCap = vehicleCapacities[form.vehicleChoice] || { maxPassengers: 4, maxBags: 3 };
-      const canFitCurrent = form.passengers <= currentCap.maxPassengers && totalLuggage <= currentCap.maxBags;
+      const hasCarSeatConstraint = (totalCarSeats > 0 || returnTotalCarSeats > 0) && form.vehicleChoice === 'sedan';
+      const canFitCurrent =
+        form.passengers <= currentCap.maxPassengers &&
+        totalLuggage <= currentCap.maxBags &&
+        !hasCarSeatConstraint;
 
       if (!canFitCurrent) {
         setForm((prev) => ({
@@ -568,6 +573,8 @@ export function BookingEngineV2({
     form.specialRequests.wheelchair,
     form.isVehicleAutoAssigned,
     form.vehicleChoice,
+    totalCarSeats,
+    returnTotalCarSeats,
     vehicleCapacities,
   ]);
 
@@ -2316,8 +2323,17 @@ export function BookingEngineV2({
                         desc: 'Executive Lincoln / Camry',
                         passengers: vehicleCapacities.sedan.maxPassengers,
                         bags: vehicleCapacities.sedan.maxBags,
-                        isRestricted: form.passengers > 4 || (form.carryOnBags + form.checkedBags) > 3,
-                        restrictionReason: form.passengers > 4 ? 'Requires SUV or Van (5+ pax)' : 'Requires SUV or Van (4+ bags)',
+                        isRestricted:
+                          form.passengers > 4 ||
+                          (form.carryOnBags + form.checkedBags) > 3 ||
+                          totalCarSeats > 0 ||
+                          returnTotalCarSeats > 0,
+                        restrictionReason:
+                          (totalCarSeats > 0 || returnTotalCarSeats > 0)
+                            ? 'Requires SUV or Van (Car seats)'
+                            : form.passengers > 4
+                            ? 'Requires SUV or Van (5+ pax)'
+                            : 'Requires SUV or Van (4+ bags)',
                       },
                       {
                         key: 'suv',

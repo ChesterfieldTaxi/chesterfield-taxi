@@ -403,6 +403,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     payments: {},
   },
+  constructionMode: COMPANY_CONFIG.constructionMode ?? true,
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -509,6 +510,9 @@ export class AdminConfigService implements IAdminConfigService {
           ...(incoming.integrations?.payments || {}),
         },
       },
+      constructionMode: incoming.constructionMode !== undefined
+        ? incoming.constructionMode
+        : (DEFAULT_APP_SETTINGS.constructionMode ?? true),
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };

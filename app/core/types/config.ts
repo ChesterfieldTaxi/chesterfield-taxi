@@ -229,6 +229,14 @@ export interface CustomerBookingConfig {
   };
 }
 
+export interface PoHistoryRecord {
+  poNumber: string;
+  generatedAt: string;
+  rotatedAt: string;
+  rotatedBy?: string;
+  reason?: string;
+}
+
 export interface CorporateAccountConfig {
   id: string;
   companyName: string;
@@ -244,7 +252,17 @@ export interface CorporateAccountConfig {
   authorizedBookers?: string[];
   notes?: string;
   createdAt?: string;
+
+  // Extended PO Anti-Fraud & Lifecycle Management
+  currentPoNumber?: string;
+  poGeneratedAt?: string;
+  poExpiresAt?: string;
+  poNumberHistory?: PoHistoryRecord[];
+  billingAddress?: string;
+  taxId?: string;
+  updatedAt?: string;
 }
+
 
 export interface InvoiceRecord {
   id: string;
@@ -338,6 +356,7 @@ export interface AppSettings {
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
   integrations?: IntegrationsConfig;
+  constructionMode?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 }

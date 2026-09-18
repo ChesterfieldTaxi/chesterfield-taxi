@@ -285,6 +285,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           <RoleViewSwitcher variant="drawer" currentView="admin" user={user} onNavigate={onCloseMobile} />
         </div>
 
+        {/* Maintenance Mode Status Banner in Sidebar */}
+        {!isCollapsed && settings.constructionMode !== false && (
+          <div className="mx-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="font-bold text-[11px]">Maintenance Mode</span>
+            </div>
+            <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
+              ON
+            </span>
+          </div>
+        )}
+
         {/* Navigation Group Items */}
         <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-5 custom-scrollbar">
           {ADMIN_NAV_GROUPS.map((group) => (
@@ -323,7 +336,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     {!isCollapsed && (
                       <div className="flex-1 flex items-center justify-between min-w-0">
                         <span className="truncate text-left">{item.label}</span>
-                        {item.badge && (
+                        {item.key === 'advanced' && settings.constructionMode !== false ? (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md border ml-2 shrink-0 bg-amber-500/20 text-amber-300 border-amber-400/40 animate-pulse">
+                            MAINT ON
+                          </span>
+                        ) : item.badge ? (
                           <span
                             className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border ml-2 shrink-0 ${
                               item.badgeColor || 'bg-slate-700 text-slate-300 border-slate-600'
@@ -331,7 +348,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                           >
                             {item.badge}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </button>

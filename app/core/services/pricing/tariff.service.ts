@@ -27,63 +27,33 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
     name: 'Standard Flat Rate',
     currency: 'USD',
     units: 'imperial',
-    fareIncrement: 2.50,
+    fareIncrement: 0.10,
     priority: 90,
     isActive: true,
     isDefault: true,
     triggers: {
-      vehicleTiers: ['standard', 'sedan'],
+      vehicleTiers: ['standard', 'sedan', 'premium'],
     },
     taximeter: {
-      startPrice: 5.00,
+      startPrice: 0.00,
       initialDistanceIncluded: 0,
       initialTimeIncluded: 0,
       primaryDistanceStep: 0.1, // 176 yards
-      primaryDistanceRate: 0.255, // $2.55/mi
-      primaryDistanceLimit: 20.0, // 35200 yards
+      primaryDistanceRate: 0.255, // $0.255/0.1 mi ($2.55/mi)
+      primaryDistanceLimit: 20.0, // First 20 miles
       thenDistanceStep: 0.1,
-      thenDistanceRate: 0.230, // $2.30/mi (open-ended "then" step rate)
-      freeTrafficMinutes: 5.0,
-      waitingRatePerStep: 0.60,
+      thenDistanceRate: 0.230, // $0.23/0.1 mi ($2.30/mi after 20 mi)
+      freeTrafficMinutes: 9999,
+      waitingRatePerStep: 0.00, // No traffic overcharge
       waitingStepSeconds: 90,
-      minimumPrice: 15.00,
+      minimumPrice: 28.00, // $28 minimum
     },
-    corridors: [
-      {
-        id: 'corridor-chesterfield-lambert',
-        name: 'Chesterfield Valley ➔ Lambert Airport (STL)',
-        fromZoneId: 'zone-chesterfield-valley',
-        toZoneId: 'zone-lambert-airport',
-        flatPrice: 48.00,
-        allowReturn: true,
-        priorityRank: 95,
-      },
-      {
-        id: 'corridor-spirit-downtown',
-        name: 'Spirit Airport (SUS) ➔ Downtown St. Louis',
-        fromZoneId: 'zone-spirit-airport',
-        toZoneId: 'zone-downtown-stl',
-        flatPrice: 65.00,
-        allowReturn: true,
-        priorityRank: 90,
-      },
-      {
-        id: 'corridor-chesterfield-spirit',
-        name: 'Chesterfield Hub ➔ Spirit Airport (SUS)',
-        fromZoneId: 'zone-chesterfield-mall',
-        toZoneId: 'zone-spirit-airport',
-        flatPrice: 30.00,
-        allowReturn: true,
-        priorityRank: 85,
-      },
-    ],
+    corridors: [],
     extras: {
-      carSeatFeePerUnit: 5.00,
-      passengerBaseAllowance: 2,
-      extraPassengerFeePerHead: 3.00,
-      customSurcharges: [
-        { id: 'extra-gate-stl', name: 'Lambert Terminal Gate Fee', amount: 4.00, type: 'flat' },
-      ],
+      carSeatFeePerUnit: 10.00, // $10 per car seat
+      passengerBaseAllowance: 1, // First passenger free
+      extraPassengerFeePerHead: 1.00, // $1 for each additional passenger
+      customSurcharges: [],
     },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -93,124 +63,33 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
     name: 'MiniVan Flat Rate',
     currency: 'USD',
     units: 'imperial',
-    fareIncrement: 2.50,
+    fareIncrement: 0.10,
     priority: 85,
     isActive: true,
     isDefault: false,
     triggers: {
-      vehicleTiers: ['xl', 'van', 'suv'],
+      vehicleTiers: ['xl', 'van', 'suv', 'wheelchair'],
     },
     taximeter: {
-      startPrice: 8.00,
+      startPrice: 10.00, // $10 extra for suv and minivan vehicle classes
       initialDistanceIncluded: 0,
       initialTimeIncluded: 0,
       primaryDistanceStep: 0.1,
-      primaryDistanceRate: 0.320, // $3.20/mi
+      primaryDistanceRate: 0.255, // $0.255/0.1 mi
       primaryDistanceLimit: 20.0,
       thenDistanceStep: 0.1,
-      thenDistanceRate: 0.280, // $2.80/mi
-      freeTrafficMinutes: 5.0,
-      waitingRatePerStep: 0.75,
+      thenDistanceRate: 0.230, // $0.23/0.1 mi
+      freeTrafficMinutes: 9999,
+      waitingRatePerStep: 0.00, // No traffic overcharge
       waitingStepSeconds: 90,
-      minimumPrice: 25.00,
-    },
-    corridors: [
-      {
-        id: 'corridor-minivan-chesterfield-lambert',
-        name: 'MiniVan: Chesterfield Valley ➔ Lambert Airport (STL)',
-        fromZoneId: 'zone-chesterfield-valley',
-        toZoneId: 'zone-lambert-airport',
-        flatPrice: 68.00,
-        allowReturn: true,
-        priorityRank: 95,
-      },
-      {
-        id: 'corridor-minivan-spirit-downtown',
-        name: 'MiniVan: Spirit Airport (SUS) ➔ Downtown St. Louis',
-        fromZoneId: 'zone-spirit-airport',
-        toZoneId: 'zone-downtown-stl',
-        flatPrice: 85.00,
-        allowReturn: true,
-        priorityRank: 90,
-      },
-    ],
-    extras: {
-      carSeatFeePerUnit: 5.00,
-      passengerBaseAllowance: 4,
-      extraPassengerFeePerHead: 3.00,
-      customSurcharges: [
-        { id: 'extra-gate-stl', name: 'Lambert Terminal Gate Fee', amount: 4.00, type: 'flat' },
-      ],
-    },
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  },
-  {
-    id: 'tariff-meter-standard',
-    name: 'METER',
-    currency: 'USD',
-    units: 'imperial',
-    fareIncrement: 0.10,
-    priority: 80,
-    isActive: true,
-    isDefault: false,
-    triggers: {
-      vehicleTiers: ['standard', 'wheelchair'],
-    },
-    taximeter: {
-      startPrice: 4.50,
-      initialDistanceIncluded: 0,
-      initialTimeIncluded: 0,
-      primaryDistanceStep: 0.1,
-      primaryDistanceRate: 0.250, // $2.50/mi
-      primaryDistanceLimit: 20.0,
-      thenDistanceStep: 0.1,
-      thenDistanceRate: 0.225, // $2.25/mi
-      freeTrafficMinutes: 3.0,
-      waitingRatePerStep: 0.60,
-      waitingStepSeconds: 90,
-      minimumPrice: 10.00,
+      minimumPrice: 28.00, // $28 minimum
     },
     corridors: [],
     extras: {
-      carSeatFeePerUnit: 5.00,
-      passengerBaseAllowance: 2,
-      extraPassengerFeePerHead: 3.00,
-    },
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  },
-  {
-    id: 'tariff-meter-minivan',
-    name: 'MiniVan METER',
-    currency: 'USD',
-    units: 'imperial',
-    fareIncrement: 0.10,
-    priority: 75,
-    isActive: true,
-    isDefault: false,
-    triggers: {
-      vehicleTiers: ['xl', 'van'],
-    },
-    taximeter: {
-      startPrice: 7.00,
-      initialDistanceIncluded: 0,
-      initialTimeIncluded: 0,
-      primaryDistanceStep: 0.1,
-      primaryDistanceRate: 0.300, // $3.00/mi
-      primaryDistanceLimit: 20.0,
-      thenDistanceStep: 0.1,
-      thenDistanceRate: 0.270, // $2.70/mi
-      freeTrafficMinutes: 3.0,
-      waitingRatePerStep: 0.75,
-      waitingStepSeconds: 90,
-      minimumPrice: 18.00,
-    },
-    corridors: [],
-    extras: {
-      carSeatFeePerUnit: 5.00,
-      passengerBaseAllowance: 4,
-      extraPassengerFeePerHead: 3.00,
+      carSeatFeePerUnit: 10.00, // $10 per car seat
+      passengerBaseAllowance: 1, // First passenger free
+      extraPassengerFeePerHead: 1.00, // $1 for each additional passenger
+      customSurcharges: [],
     },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
@@ -442,7 +321,15 @@ export function matchTariffProfile(
     if (t.triggers.vehicleTiers && t.triggers.vehicleTiers.length > 0) {
       const matchVehicle = t.triggers.vehicleTiers.some((tier) => {
         const lower = tier.toLowerCase();
-        return lower === requestedTier || (lower === 'sedan' && requestedTier === 'standard') || (lower === 'van' && requestedTier === 'xl');
+        return (
+          lower === requestedTier ||
+          (lower === 'sedan' && (requestedTier === 'standard' || requestedTier === 'premium')) ||
+          (lower === 'standard' && (requestedTier === 'sedan' || requestedTier === 'premium')) ||
+          (lower === 'van' && (requestedTier === 'xl' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
+          (lower === 'xl' && (requestedTier === 'van' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
+          (lower === 'suv' && (requestedTier === 'xl' || requestedTier === 'van' || requestedTier === 'wheelchair')) ||
+          (lower === 'wheelchair' && (requestedTier === 'van' || requestedTier === 'xl'))
+        );
       });
       if (!matchVehicle) return false;
     }
@@ -648,7 +535,7 @@ export function evaluateTaximeterFare(
     const excessSeconds = Math.max(0, (durationMinutes - freeMins) * 60);
     const stepSecs = taximeter.waitingStepSeconds || 90;
     const waitSteps = Math.ceil(excessSeconds / stepSecs);
-    const waitRate = taximeter.waitingRatePerStep || 0.60;
+    const waitRate = taximeter.waitingRatePerStep ?? 0.00;
     delayFare = Number((waitSteps * waitRate).toFixed(2));
     auditDetails.push(
       `Waiting delay: ${(excessSeconds / 60).toFixed(1)} min past ${freeMins}m grace (${waitSteps} steps @ $${waitRate.toFixed(2)}) = $${delayFare.toFixed(2)}`

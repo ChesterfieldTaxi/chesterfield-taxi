@@ -1,20 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import type { AppSettings } from '../../../../core/types/config';
+import type { AppSettings, CorporateAccountConfig } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
-import { SpinnerIcon, UserIcon, UsersIcon, BuildingIcon, ShieldIcon, AlertTriangleIcon } from '../../../ui/Icons';
+import {
+  SpinnerIcon,
+  UserIcon,
+  UsersIcon,
+  BuildingIcon,
+  ShieldIcon,
+  AlertTriangleIcon,
+  ShieldCheckIcon,
+  CopyIcon,
+  RefreshCwIcon,
+  CheckIcon,
+} from '../../../ui/Icons';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
-import { CheckIcon } from '../../../ui/Icons';
+import {
+  RegeneratePoModal,
+  PoHistoryModal,
+} from '../corporate/CorporateAccountModals';
 
 export type CustomersSubTab = 'directory' | 'corporate';
 
 interface AdminCustomersSubpageProps {
   settings: AppSettings;
   initialSubTab?: CustomersSubTab;
+  onSave?: (updates: Partial<AppSettings>) => Promise<void>;
 }
 
 interface CustomerProfile {
@@ -37,6 +52,7 @@ interface CustomerProfile {
 export function AdminCustomersSubpage({
   settings,
   initialSubTab = 'directory',
+  onSave,
 }: AdminCustomersSubpageProps) {
   const [activeSub, setActiveSub] = useState<CustomersSubTab>(initialSubTab);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +62,16 @@ export function AdminCustomersSubpage({
   const [governanceRefreshKey, setGovernanceRefreshKey] = useState(0);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
+
+  // Corporate PO Management & Search State
+  const [selectedPoAccount, setSelectedPoAccount] = useState<CorporateAccountConfig | null>(null);
+  const [isRegeneratePoOpen, setIsRegeneratePoOpen] = useState(false);
+  const [isPoHistoryOpen, setIsPoHistoryOpen] = useState(false);
+  const [copiedPoId, setCopiedPoId] = useState<string | null>(null);
+  const [corpSearchTerm, setCorpSearchTerm] = useState('');
+  const [corpFilter, setCorpFilter] = useState<'all' | 'po_enforced' | 'po_disabled'>('all');
+  const [corpPage, setCorpPage] = useState(1);
+  const CORP_PAGE_SIZE = 30;
 
   useEffect(() => {
     setActiveSub(initialSubTab);
@@ -174,6 +200,28 @@ export function AdminCustomersSubpage({
   });
 
   const corporateClients = settings.corporateAccounts || [];
+
+  const handleTogglePoRequired = async (account: CorporateAccountConfig) => {
+    if (!onSave) return;
+    const updatedAccounts = corporateClients.map((a) =>
+      a.id === account.id ? { ...a, poRequired: !a.poRequired, updatedAt: new Date().toISOString() } : a
+    );
+    await onSave({ corporateAccounts: updatedAccounts });
+  };
+
+  const handlePoRegenerateSuccess = async (updatedAccount: CorporateAccountConfig) => {
+    if (!onSave) return;
+    const updatedAccounts = corporateClients.map((a) =>
+      a.id === updatedAccount.id ? updatedAccount : a
+    );
+    await onSave({ corporateAccounts: updatedAccounts });
+  };
+
+  const handleCopyPo = (po: string, id: string) => {
+    navigator.clipboard.writeText(po);
+    setCopiedPoId(id);
+    setTimeout(() => setCopiedPoId(null), 2000);
+  };
 
   return (
     <div className="space-y-6">
@@ -388,49 +436,274 @@ export function AdminCustomersSubpage({
       )}
 
       {/* ─── Corporate Subpage ─── */}
-      {activeSub === 'corporate' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {corporateClients.map((corp) => (
-            <Card key={corp.id} className="border border-slate-200/90 shadow-xs">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-black text-slate-900">
-                  {corp.companyName}
-                </CardTitle>
-                <CardDescription className="text-xs font-mono font-bold text-blue-600">
-                  {corp.accountNumber} • {corp.billingCycle.toUpperCase()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Credit Limit:</span>
-                    <span className="font-bold text-slate-900">${corp.creditLimit.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Contract Discount:</span>
-                    <span className="font-bold text-emerald-600">{corp.discountPercent}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">PO Number:</span>
-                    <span className="font-semibold">{corp.poRequired ? 'Required on Booking' : 'Not required'}</span>
-                  </div>
-                </div>
+      {activeSub === 'corporate' && (() => {
+        const filteredCorp = corporateClients.filter((corp) => {
+          if (corpFilter === 'po_enforced' && !corp.poRequired) return false;
+          if (corpFilter === 'po_disabled' && corp.poRequired) return false;
+          if (!corpSearchTerm.trim()) return true;
+          const q = corpSearchTerm.toLowerCase();
+          return (
+            corp.companyName.toLowerCase().includes(q) ||
+            corp.accountNumber.toLowerCase().includes(q) ||
+            (corp.currentPoNumber && corp.currentPoNumber.toLowerCase().includes(q)) ||
+            (corp.billingContactEmail && corp.billingContactEmail.toLowerCase().includes(q))
+          );
+        });
 
-                <div className="pt-1">
-                  <p className="font-bold text-slate-700 text-[11px]">Authorized Bookers:</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(corp.authorizedBookers || [corp.billingContactEmail]).map((b, idx) => (
-                      <span key={idx} className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                        {b}
-                      </span>
-                    ))}
+        const totalCorpPages = Math.max(1, Math.ceil(filteredCorp.length / CORP_PAGE_SIZE));
+        const paginatedCorp = filteredCorp.slice(
+          (corpPage - 1) * CORP_PAGE_SIZE,
+          corpPage * CORP_PAGE_SIZE
+        );
+
+        return (
+          <div className="space-y-4">
+            {/* Search and Filter */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <input
+                  type="text"
+                  placeholder={`Search ${corporateClients.length} corporate accounts...`}
+                  value={corpSearchTerm}
+                  onChange={(e) => {
+                    setCorpSearchTerm(e.target.value);
+                    setCorpPage(1);
+                  }}
+                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                {corpSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCorpSearchTerm('');
+                      setCorpPage(1);
+                    }}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCorpFilter('all');
+                    setCorpPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    corpFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({corporateClients.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCorpFilter('po_enforced');
+                    setCorpPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    corpFilter === 'po_enforced'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  PO Enforced ({corporateClients.filter((a) => a.poRequired).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCorpFilter('po_disabled');
+                    setCorpPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    corpFilter === 'po_disabled'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  PO Optional ({corporateClients.filter((a) => !a.poRequired).length})
+                </button>
+              </div>
+            </div>
+
+            {/* Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedCorp.map((corp) => (
+                <Card
+                  key={corp.id}
+                  className="border border-slate-200/90 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
+                >
+                  <div>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-black text-slate-900 line-clamp-1">
+                            {corp.companyName}
+                          </CardTitle>
+                          <CardDescription className="text-xs font-mono font-bold text-blue-600">
+                            {corp.accountNumber} • {corp.billingCycle.toUpperCase()}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={corp.isActive ? 'success' : 'default'} size="sm" className="text-[10px]">
+                          {corp.isActive ? 'Active' : 'Paused'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2.5 text-xs">
+                      {/* PO Container */}
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                            <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            Authorized PO Number
+                          </span>
+                          <Badge
+                            variant={corp.poRequired ? 'success' : 'default'}
+                            size="sm"
+                            className="text-[9px]"
+                          >
+                            {corp.poRequired ? 'PO Enforced' : 'PO Optional'}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-200">
+                          <span className="font-mono font-bold text-slate-900 text-xs">
+                            {corp.currentPoNumber || 'None'}
+                          </span>
+                          {corp.currentPoNumber && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPo(corp.currentPoNumber!, corp.id)}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedPoId === corp.id ? (
+                                <>
+                                  <CheckIcon className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-emerald-600 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CopyIcon className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* PO Buttons */}
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedPoAccount(corp);
+                              setIsRegeneratePoOpen(true);
+                            }}
+                            className="text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 flex-1 py-1 h-auto cursor-pointer"
+                          >
+                            <RefreshCwIcon className="w-3 h-3 mr-1" />
+                            Regenerate PO
+                          </Button>
+
+                          {onSave && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleTogglePoRequired(corp)}
+                              className="text-[10px] text-slate-600 hover:text-slate-900 py-1 h-auto px-2 cursor-pointer"
+                            >
+                              {corp.poRequired ? 'Disable PO' : 'Enforce PO'}
+                            </Button>
+                          )}
+
+                          {corp.poNumberHistory && corp.poNumberHistory.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedPoAccount(corp);
+                                setIsPoHistoryOpen(true);
+                              }}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 py-1 h-auto px-2 cursor-pointer"
+                            >
+                              History ({corp.poNumberHistory.length})
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Account Terms */}
+                      <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Credit Limit:</span>
+                          <span className="font-bold text-slate-900">${corp.creditLimit.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Contract Discount:</span>
+                          <span className="font-bold text-emerald-600">{corp.discountPercent}%</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <p className="font-bold text-slate-700 text-[11px]">Contact &amp; Authorized Email:</p>
+                        <p className="text-slate-600 text-[11px] truncate">{corp.billingContactEmail}</p>
+                      </div>
+                    </CardContent>
                   </div>
+                </Card>
+              ))}
+
+              {filteredCorp.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
+                  <p className="text-slate-400 font-medium text-xs">
+                    No corporate accounts found matching &ldquo;{corpSearchTerm}&rdquo;.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              )}
+            </div>
+
+            {/* Pagination */}
+            {totalCorpPages > 1 && (
+              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
+                <span className="text-slate-500 font-medium">
+                  Showing {((corpPage - 1) * CORP_PAGE_SIZE) + 1}–
+                  {Math.min(corpPage * CORP_PAGE_SIZE, filteredCorp.length)} of{' '}
+                  {filteredCorp.length} corporate accounts
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCorpPage((p) => Math.max(p - 1, 1))}
+                    disabled={corpPage === 1}
+                    className="text-xs px-2.5 py-1 cursor-pointer"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs font-bold text-slate-700 px-2">
+                    {corpPage} / {totalCorpPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCorpPage((p) => Math.min(p + 1, totalCorpPages))}
+                    disabled={corpPage === totalCorpPages}
+                    className="text-xs px-2.5 py-1 cursor-pointer"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── Customer Details Modal ─── */}
       {selectedCustomer && (
@@ -589,6 +862,33 @@ export function AdminCustomersSubpage({
           </div>
         </div>
       )}
+
+      {/* ─── Regenerate PO Modal ─── */}
+      {selectedPoAccount && (
+        <RegeneratePoModal
+          account={selectedPoAccount}
+          isOpen={isRegeneratePoOpen}
+          onClose={() => {
+            setIsRegeneratePoOpen(false);
+            setSelectedPoAccount(null);
+          }}
+          onSuccess={handlePoRegenerateSuccess}
+          operatorEmail="admin@chesterfieldtaxi.com"
+        />
+      )}
+
+      {/* ─── PO History Modal ─── */}
+      {selectedPoAccount && (
+        <PoHistoryModal
+          account={selectedPoAccount}
+          isOpen={isPoHistoryOpen}
+          onClose={() => {
+            setIsPoHistoryOpen(false);
+            setSelectedPoAccount(null);
+          }}
+        />
+      )}
     </div>
   );
 }
+
