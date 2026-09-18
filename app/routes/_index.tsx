@@ -1,4 +1,5 @@
 import React from 'react';
+import UnderConstruction from './construction';
 import { Link } from 'react-router';
 import {
   CarIcon,
@@ -90,6 +91,21 @@ const HIGHLIGHTS = [
 ];
 
 export default function IndexRoute() {
+  const [isProductionDomain, setIsProductionDomain] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (window.location.hostname.includes('chesterfieldtaxi.com')) {
+      setIsProductionDomain(true);
+    }
+  }, []);
+
+  // Serves the construction page ONLY on chesterfieldtaxi.com
+  if (isMounted && isProductionDomain) {
+    return <UnderConstruction />;
+  }
+  
   return (
     <div className="flex flex-col">
       {/* ─── Hero Section ─── */}
