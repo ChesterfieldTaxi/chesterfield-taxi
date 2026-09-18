@@ -1,6 +1,14 @@
 import React from 'react';
-import UnderConstruction from './construction';
 import { Link } from 'react-router';
+
+import UnderConstruction from "./construction";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const host = request.headers.get("host") || "";
+  const isProductionDomain = host.includes("chesterfieldtaxi.com");
+  return json({ isProductionDomain });
+}
+
 import {
   CarIcon,
   ShieldCheckIcon,
@@ -91,18 +99,10 @@ const HIGHLIGHTS = [
 ];
 
 export default function IndexRoute() {
-  const [isProductionDomain, setIsProductionDomain] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    if (window.location.hostname.includes('chesterfieldtaxi.com')) {
-      setIsProductionDomain(true);
-    }
-  }, []);
+  const { isProductionDomain } = useLoaderData<typeof loader>();
 
   // Serves the construction page ONLY on chesterfieldtaxi.com
-  if (isMounted && isProductionDomain) {
+  if (isProductionDomain) {
     return <UnderConstruction />;
   }
   
