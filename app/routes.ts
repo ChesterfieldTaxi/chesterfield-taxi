@@ -17,6 +17,7 @@ export default [
 
   // Dedicated Passenger App Shell (Suppresses public marketing header/footer)
   route("app", "routes/app.tsx"),
+  route("construction", "routes/construction.tsx"),
 
   // Mobile-Optimized Driver PWA Console
   route("driver", "routes/driver.tsx"),
