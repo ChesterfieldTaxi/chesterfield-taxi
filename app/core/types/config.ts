@@ -289,6 +289,37 @@ export interface FleetAlertsConfig {
   autoDismissMinutes?: number; // default: 60 (1 hour)
 }
 
+export interface TelephonyIntegrationConfig {
+  provider: 'twilio';
+  accountSid: string;
+  authToken: string;
+  phoneNumber: string;
+  status?: 'idle' | 'checking' | 'connected' | 'error';
+  statusMessage?: string;
+  updatedAt?: string;
+}
+
+export interface PaymentGatewaysConfig {
+  stripe?: {
+    mode: 'test' | 'live';
+    publishableKey: string;
+    secretKey: string;
+    webhookSecret?: string;
+    status?: 'idle' | 'checking' | 'connected' | 'error';
+  };
+  square?: {
+    applicationId: string;
+    accessToken: string;
+    locationId: string;
+    status?: 'idle' | 'checking' | 'connected' | 'error';
+  };
+}
+
+export interface IntegrationsConfig {
+  telephony?: TelephonyIntegrationConfig;
+  payments?: PaymentGatewaysConfig;
+}
+
 export interface AppSettings {
   company: CompanyConfig;
   branding: BrandingConfig;
@@ -306,6 +337,7 @@ export interface AppSettings {
   tariffs?: import('./tariff').TariffProfile[]; // Unified Tariff Profiles
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
+  integrations?: IntegrationsConfig;
   updatedAt?: string;
   updatedBy?: string;
 }

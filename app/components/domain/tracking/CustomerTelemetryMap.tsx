@@ -28,8 +28,15 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     lng: CHESTERFIELD_CENTER.lng + 0.035,
   };
 
-  // Calculate vehicle interpolated coordinate based on status
+  // Calculate vehicle coordinates: Prefer live GPS telemetry if broadcasted, fallback to interpolation
   const getVehicleCoordinates = () => {
+    if (trip.driverTelemetry?.coordinates?.lat && trip.driverTelemetry?.coordinates?.lng) {
+      return trip.driverTelemetry.coordinates;
+    }
+    if (trip.currentLocation?.coordinates?.lat && trip.currentLocation?.coordinates?.lng) {
+      return trip.currentLocation.coordinates;
+    }
+
     if (trip.status === 'en_route') {
       // Driver approaching pickup
       return {
@@ -56,16 +63,16 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
 
   const vehicleCoord = getVehicleCoordinates();
 
-  // Pulse simulated progress when in_progress
+  // Pulse simulated progress when in_progress and no live GPS telemetry is streaming
   useEffect(() => {
-    if (trip.status !== 'in_progress') return;
+    if (trip.status !== 'in_progress' || trip.driverTelemetry?.coordinates) return;
     const interval = setInterval(() => {
       setSimulatedProgress((prev) => (prev >= 0.9 ? 0.2 : prev + 0.05));
     }, 4000);
     return () => clearInterval(interval);
-  }, [trip.status]);
+  }, [trip.status, trip.driverTelemetry?.coordinates]);
 
-  // Initialize Google Maps if available
+  // Initialize and update Google Maps with comprehensive memory leak cleanup
   useEffect(() => {
     let isMounted = true;
     loadGoogleMaps()
@@ -114,7 +121,7 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
 
           setMapsLoaded(true);
         } else {
-          // Update positions
+          // Update positions smoothly
           markerVehicleRef.current?.setPosition(vehicleCoord);
           polylineRef.current?.setPath([pickupCoord, vehicleCoord, dropoffCoord]);
         }
@@ -123,8 +130,29 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
         setMapsLoaded(false);
       });
 
+    // Cleanup: explicitly detach markers, polyline, and clear listeners
     return () => {
       isMounted = false;
+      if (markerPickupRef.current) {
+        markerPickupRef.current.setMap(null);
+        markerPickupRef.current = null;
+      }
+      if (markerDropoffRef.current) {
+        markerDropoffRef.current.setMap(null);
+        markerDropoffRef.current = null;
+      }
+      if (markerVehicleRef.current) {
+        markerVehicleRef.current.setMap(null);
+        markerVehicleRef.current = null;
+      }
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
+      }
+      if (mapInstanceRef.current && typeof google !== 'undefined' && google?.maps?.event) {
+        google.maps.event.clearInstanceListeners(mapInstanceRef.current);
+        mapInstanceRef.current = null;
+      }
     };
   }, [pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng, vehicleCoord.lat, vehicleCoord.lng]);
 

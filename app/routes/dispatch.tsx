@@ -978,6 +978,30 @@ export default function DispatchRoute() {
           setSelectedQueueTripId(found.id);
           setActiveMobileTab('map');
         }
+      } else if (msg.type === 'DRIVER_TELEMETRY_PING') {
+        const payload = msg.payload;
+        if (payload?.tripId) {
+          const ping = {
+            coordinates: payload.coordinates,
+            speedMph: payload.speedMph,
+            heading: payload.heading,
+            accuracy: payload.accuracy,
+            timestamp: payload.timestamp,
+            status: payload.status,
+            isOfflineBuffer: payload.isOfflineBuffer,
+          };
+          setTrips((prev) =>
+            prev.map((t) =>
+              t.id === payload.tripId
+                ? {
+                    ...t,
+                    driverTelemetry: ping,
+                    currentLocation: ping,
+                  }
+                : t
+            )
+          );
+        }
       }
     });
     return unsub;
@@ -1996,6 +2020,29 @@ export default function DispatchRoute() {
     document.removeEventListener('mousemove', handleVerticalResizeMove);
     document.removeEventListener('mouseup', handleVerticalResizeUp);
   }, [handleVerticalResizeMove]);
+
+  // Phase 31.5: Explicit cleanup of document resize listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleSidebarMouseMove);
+      document.removeEventListener('mouseup', handleSidebarMouseUp);
+      document.removeEventListener('mousemove', handleQueueMouseMove);
+      document.removeEventListener('mouseup', handleQueueMouseUp);
+      document.removeEventListener('mousemove', handleOperationsMouseMove);
+      document.removeEventListener('mouseup', handleOperationsMouseUp);
+      document.removeEventListener('mousemove', handleVerticalResizeMove);
+      document.removeEventListener('mouseup', handleVerticalResizeUp);
+    };
+  }, [
+    handleSidebarMouseMove,
+    handleSidebarMouseUp,
+    handleQueueMouseMove,
+    handleQueueMouseUp,
+    handleOperationsMouseMove,
+    handleOperationsMouseUp,
+    handleVerticalResizeMove,
+    handleVerticalResizeUp,
+  ]);
 
   // Tactical Presets Admin Management
   const handleSaveNewPreset = () => {
@@ -6006,12 +6053,19 @@ function LiveDispatchMap({
         try {
           directionsRendererRef.current.setMap(null);
         } catch {}
+        directionsRendererRef.current = null;
       }
       if (mockPolylineRef.current) {
         try {
           mockPolylineRef.current.setMap(null);
         } catch {}
         mockPolylineRef.current = null;
+      }
+      if (mapInstanceRef.current && typeof google !== 'undefined' && google?.maps?.event) {
+        try {
+          google.maps.event.clearInstanceListeners(mapInstanceRef.current);
+        } catch {}
+        mapInstanceRef.current = null;
       }
     };
   }, []);

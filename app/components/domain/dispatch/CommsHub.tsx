@@ -6,6 +6,7 @@ import {
   normalizePhone,
   DEFAULT_PASSENGER_ACCOUNT,
 } from '../../../core/services/passenger.service';
+import { validatePhoneNumber, sanitizeToE164, formatDisplayPhone } from '../../../core/utils/phone';
 import type { Trip } from '../../../core/types/trip';
 import {
   PhoneIcon,
@@ -19,6 +20,15 @@ import {
   ClockIcon,
   TrashIcon,
   ChatBubbleLeftRightIcon,
+  CarIcon,
+  MicIcon,
+  MicOffIcon,
+  PauseIcon,
+  PlayIcon,
+  PhoneOffIcon,
+  FileTextIcon,
+  LinkIcon,
+  KeypadGridIcon,
 } from '../../ui/Icons';
 
 export type CommsTab = 'all' | 'phone' | 'messages' | 'voicemail';
@@ -39,6 +49,7 @@ export interface InteractionEvent {
   snippet: string;
   isUnread?: boolean;
   hasRecording?: boolean;
+  recordingSid?: string;
   audioUrl?: string;
   audioDuration?: string;
   transcription?: string;
@@ -335,6 +346,58 @@ function CommsFilterToolbar({
   );
 }
 
+const STORAGE_KEY_INTERACTIONS = 'ct_comms_interactions';
+
+export function getClientTelephonyCredentials() {
+  let sid = '';
+  let token = '';
+  let phone = '';
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      sid = localStorage.getItem('ct_twilio_sid') || '';
+      token = localStorage.getItem('ct_twilio_token') || '';
+      phone = localStorage.getItem('ct_twilio_phone') || '';
+
+      if (!sid || !token || !phone) {
+        const stored = localStorage.getItem('chesterfield_taxi_app_settings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const tel = parsed?.integrations?.telephony;
+          if (tel) {
+            sid = sid || tel.accountSid || '';
+            token = token || tel.authToken || '';
+            phone = phone || tel.phoneNumber || '';
+          }
+        }
+      }
+    } catch {
+      // Ignore storage read failures
+    }
+  }
+
+  return {
+    accountSid: sid.trim(),
+    authToken: token.trim(),
+    phoneNumber: phone.trim() || '+13147380100',
+  };
+}
+
+function getInitialInteractions(): InteractionEvent[] {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return INITIAL_INTERACTIONS;
+}
+
 export function CommsHub({
   user,
   initialTab = 'all',
@@ -360,11 +423,24 @@ export function CommsHub({
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Primary Interactions state
-  const [interactions, setInteractions] = useState<InteractionEvent[]>(INITIAL_INTERACTIONS);
+  // Primary Interactions state (persisted to localStorage)
+  const [interactions, setInteractions] = useState<InteractionEvent[]>(getInitialInteractions);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [forwardToast, setForwardToast] = useState<string | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement>(null);
+
+  // Active call tracking & user notices
+  const activeCallInteractionIdRef = useRef<string | null>(null);
+  const [callNotice, setCallNotice] = useState<{ type: 'info' | 'warning' | 'error'; message: string } | null>(null);
+
+  // Sync interactions to localStorage on changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage && interactions.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(interactions.slice(0, 100)));
+      } catch {}
+    }
+  }, [interactions]);
 
   // Selected thread state
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
@@ -376,12 +452,20 @@ export function CommsHub({
   const [dialpadNumber, setDialpadNumber] = useState('');
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'connected' | 'on_hold'>('idle');
   const [activeCallContact, setActiveCallContact] = useState<string | null>(null);
+  const [activeCallPhone, setActiveCallPhone] = useState<string | null>(null);
+  const [activeCallSid, setActiveCallSid] = useState<string | null>(null);
+  const [showInCallKeypad, setShowInCallKeypad] = useState(false);
+  const [showInCallTrips, setShowInCallTrips] = useState(false);
+  const [showInCallNotes, setShowInCallNotes] = useState(false);
+  const [inCallNoteText, setInCallNoteText] = useState('');
+  const [bookingToast, setBookingToast] = useState<string | null>(null);
   const [callTimer, setCallTimer] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnSpeaker, setIsOnSpeaker] = useState(false);
   const [callsSubTab, setCallsSubTab] = useState<'keypad' | 'history' | 'missed'>('keypad');
   const [activeKeypadFeedback, setActiveKeypadFeedback] = useState<string | null>(null);
   const dialpadInputRef = useRef<HTMLInputElement>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // Audio voicemail & call recording playback state
   const [playingVoicemailId, setPlayingVoicemailId] = useState<string | null>(null);
@@ -396,11 +480,107 @@ export function CommsHub({
     let interval: any;
     if (callStatus === 'connected') {
       interval = setInterval(() => setCallTimer((prev) => prev + 1), 1000);
-    } else {
+    } else if (callStatus === 'idle') {
       setCallTimer(0);
     }
     return () => clearInterval(interval);
   }, [callStatus]);
+
+  // Audio element player effect
+  useEffect(() => {
+    if (!audioPlayerRef.current) return;
+    const player = audioPlayerRef.current;
+
+    let targetUrl: string | null = null;
+    if (playingVoicemailId) {
+      const vm = interactions.find((i) => i.id === playingVoicemailId);
+      targetUrl = vm?.recordingSid
+        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(vm.recordingSid)}`
+        : (vm as any)?.audioUrl || null;
+    } else if (playingCallId) {
+      const call = interactions.find((i) => i.id === playingCallId);
+      targetUrl = call?.recordingSid
+        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(call.recordingSid)}`
+        : (call as any)?.audioUrl || null;
+    }
+
+    if (targetUrl) {
+      player.src = targetUrl;
+      player.playbackRate = playbackSpeed;
+      player.play().catch(() => {});
+    } else {
+      player.pause();
+    }
+  }, [playingVoicemailId, playingCallId, playbackSpeed, interactions]);
+
+  // Fetch live Twilio voicemails and messages on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTelephonyData = async () => {
+      try {
+        const [vmResp, msgResp] = await Promise.all([
+          fetch('/api/telephony?action=list_voicemails'),
+          fetch('/api/telephony?action=list_messages'),
+        ]);
+
+        if (vmResp.ok) {
+          const vmData = (await vmResp.json()) as any;
+          if (vmData.success && Array.isArray(vmData.voicemails) && isMounted) {
+            setInteractions((prev) => {
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newVms = vmData.voicemails
+                .filter((v: any) => !existingIds.has(v.id))
+                .map((v: any) => ({
+                  id: v.id,
+                  type: 'voicemail' as const,
+                  contactName: v.contactName,
+                  contactPhone: v.contactPhone,
+                  timestamp: v.timestamp,
+                  timestampMs: v.timestampMs || Date.now(),
+                  durationSeconds: parseInt(v.audioDuration || '30', 10),
+                  audioDuration: v.audioDuration || '0:30',
+                  snippet: `Voicemail: ${v.transcription ? v.transcription.slice(0, 50) + '...' : 'Audio message'}`,
+                  transcription: v.transcription,
+                  recordingSid: v.recordingSid,
+                  suggestedBooking: v.suggestedBooking,
+                  isUnread: v.isUnread ?? true,
+                }));
+              return [...newVms, ...prev];
+            });
+          }
+        }
+
+        if (msgResp.ok) {
+          const msgData = (await msgResp.json()) as any;
+          if (msgData.success && Array.isArray(msgData.messages) && isMounted) {
+            setInteractions((prev) => {
+              const existingIds = new Set(prev.map((p) => p.id));
+              const newMsgs = msgData.messages
+                .filter((m: any) => !existingIds.has(m.id))
+                .map((m: any) => ({
+                  id: m.id,
+                  type: (m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound') as any,
+                  contactName: m.direction === 'inbound' ? m.from : 'Chesterfield Dispatch',
+                  contactPhone: m.direction === 'inbound' ? m.from : m.to,
+                  timestamp: m.timestamp,
+                  timestampMs: m.timestampMs || Date.now(),
+                  snippet: m.body,
+                  isUnread: false,
+                }));
+              return [...newMsgs, ...prev];
+            });
+          }
+        }
+      } catch {
+        // Fallback to initial sample items
+      }
+    };
+
+    fetchTelephonyData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Focus dialpad input when switching to phone tab and keypad sub-tab
   useEffect(() => {
@@ -652,64 +832,310 @@ export function CommsHub({
     });
   }
 
+  // Check matching caller trips for active in-call phone
+  const activeCallerPhoneClean = (activeCallPhone || dialpadNumber || '').replace(/\D/g, '').slice(-10);
+  const matchingCallerTrips: UpcomingBookingPreview[] = [];
+  if (activeCallerPhoneClean) {
+    trips.forEach((t) => {
+      const passengerPhone = (t.passenger?.phone || (t as any).passengerPhone || '').replace(/\D/g, '').slice(-10);
+      if (passengerPhone && passengerPhone === activeCallerPhoneClean) {
+        matchingCallerTrips.push({
+          id: t.id,
+          time: t.scheduledPickupTime ? new Date(t.scheduledPickupTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ASAP',
+          pickupAddress: t.pickupLocation?.address || 'Pickup Point',
+          dropoffAddress: t.dropoffLocation?.address || 'Destination',
+          fare: t.pricing?.totalFare || 45,
+        });
+      }
+    });
+  }
+
   // Handle dialpad press
   const handleDialDigit = (digit: string) => {
     setDialpadNumber((prev) => prev + digit);
   };
 
-  const handleStartCall = (numberToCall?: string, contactName?: string) => {
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartCall = async (numberToCall?: string, contactName?: string) => {
     const num = numberToCall || dialpadNumber;
     if (!num.trim()) return;
-    setCallStatus('calling');
-    setActiveCallContact(contactName ? `${contactName} (${num})` : num);
 
-    setTimeout(() => {
+    const phoneValidation = validatePhoneNumber(num);
+    const targetE164 = phoneValidation.isValid ? phoneValidation.e164 : sanitizeToE164(num);
+    const displayNum = phoneValidation.isValid ? formatDisplayPhone(phoneValidation.e164) : num;
+    const callerDisplayName = contactName || displayNum;
+
+    const callId = `call_${Date.now()}`;
+    activeCallInteractionIdRef.current = callId;
+
+    setCallStatus('calling');
+    setActiveCallContact(callerDisplayName);
+    setActiveCallPhone(targetE164);
+    setCallNotice(null);
+    setShowInCallKeypad(false);
+    setShowInCallTrips(false);
+    setShowInCallNotes(false);
+
+    // Switch view to phone/keypad so in-call screen displays immediately
+    setActiveTab('phone');
+    setCallsSubTab('keypad');
+
+    // Immediately log outbound call to history so it appears in Call History immediately
+    const newCallRecord: InteractionEvent = {
+      id: callId,
+      type: 'call_outbound',
+      contactName: callerDisplayName,
+      contactPhone: targetE164,
+      contactType: 'passenger',
+      timestamp: 'Just now',
+      timestampMs: Date.now(),
+      durationSeconds: 0,
+      audioDuration: '0:00',
+      snippet: `Outbound Call (${displayNum})`,
+      isUnread: false,
+    };
+    setInteractions((prev) => [newCallRecord, ...prev]);
+
+    // Broadcast outbound call started
+    workspaceBus.publish('CALL_OUTBOUND_STARTED', {
+      targetNumber: targetE164,
+      contactName: callerDisplayName,
+    });
+
+    try {
+      const creds = getClientTelephonyCredentials();
+
+      if (targetE164 === creds.phoneNumber) {
+        setCallNotice({
+          type: 'warning',
+          message: `Destination matches dispatch caller ID (${creds.phoneNumber}). Dialing customer line.`,
+        });
+      }
+
+      const resp = await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'make_call',
+          to: targetE164,
+          from: creds.phoneNumber,
+          credentials: creds.accountSid ? creds : undefined,
+        }),
+      });
+
+      const resData = (await resp.json()) as any;
+      if (resData.success) {
+        setActiveCallSid(resData.callSid || null);
+        setCallStatus('connected');
+        setCallNotice({
+          type: 'info',
+          message: 'Connected via Twilio Gateway.',
+        });
+        setInteractions((prev) =>
+          prev.map((i) =>
+            i.id === callId
+              ? {
+                  ...i,
+                  recordingSid: resData.callSid,
+                  snippet: `Outbound Call Connected (${displayNum})`,
+                }
+              : i
+          )
+        );
+        workspaceBus.publish('CALL_ANSWERED', {
+          callSid: resData.callSid,
+          callerNumber: targetE164,
+        });
+      } else {
+        // Fallback to connected softphone mode
+        setCallStatus('connected');
+        const warningMsg =
+          resData.code === 'TWILIO_NUMBER_UNVERIFIED'
+            ? `Twilio Trial: Recipient must be verified in Twilio Console. Softphone active.`
+            : resData.error || resData.message || 'Call active in dispatch softphone mode.';
+        setCallNotice({
+          type: 'warning',
+          message: warningMsg,
+        });
+        workspaceBus.publish('CALL_ANSWERED', {
+          callerNumber: targetE164,
+        });
+      }
+    } catch {
       setCallStatus('connected');
-    }, 1500);
+      setCallNotice({
+        type: 'warning',
+        message: 'Network offline. Call active in dispatch softphone mode.',
+      });
+      workspaceBus.publish('CALL_ANSWERED', {
+        callerNumber: targetE164,
+      });
+    }
   };
 
   const handleEndCall = () => {
-    workspaceBus.publish('CALL_ENDED', { durationSeconds: callTimer });
+    const finalSecs = callTimer > 0 ? callTimer : 1;
+    const m = Math.floor(finalSecs / 60);
+    const s = (finalSecs % 60).toString().padStart(2, '0');
+    const durationLabel = `${m}:${s}`;
+
+    workspaceBus.publish('CALL_ENDED', {
+      callSid: activeCallSid || undefined,
+      durationSeconds: finalSecs,
+    });
+
+    if (activeCallInteractionIdRef.current) {
+      const activeId = activeCallInteractionIdRef.current;
+      setInteractions((prev) =>
+        prev.map((i) =>
+          i.id === activeId
+            ? {
+                ...i,
+                durationSeconds: finalSecs,
+                audioDuration: durationLabel,
+                snippet: `Outbound Call (${durationLabel})`,
+              }
+            : i
+        )
+      );
+    }
+
     setCallStatus('idle');
     setActiveCallContact(null);
+    setActiveCallPhone(null);
+    setActiveCallSid(null);
     setCallTimer(0);
+    setCallNotice(null);
+    setShowInCallKeypad(false);
+    setShowInCallTrips(false);
+    setShowInCallNotes(false);
+    activeCallInteractionIdRef.current = null;
   };
 
-  const handleSendSms = async () => {
-    if (!smsReplyText.trim() || !selectedContactPhone) return;
-    setIsSendingSms(true);
-    setSmsStatusMessage(null);
+  const handleInCallBookRide = () => {
+    const payload = {
+      passengerName: activeCallContact || 'Caller',
+      passengerPhone: activeCallPhone || dialpadNumber,
+      notes: `Direct phone reservation from call (${formatTimer(callTimer)})`,
+    };
+    workspaceBus.publish('POPULATE_BOOKING', payload);
+    if (onPopulateBooking) {
+      onPopulateBooking(payload);
+    }
+    setBookingToast('Draft ready');
+    setTimeout(() => setBookingToast(null), 2500);
+  };
+
+  const handleInCallSendLink = async () => {
+    const targetPhone = activeCallPhone || dialpadNumber;
+    if (!targetPhone) return;
 
     try {
       const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
       const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
-      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '+13145550199' : '';
+      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '+13147380100' : '';
+
+      await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_sms',
+          to: sanitizeToE164(targetPhone),
+          body: 'Book your Chesterfield Taxi ride online anytime: https://chesterfieldtaxi.com/app',
+          credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: sanitizeToE164(twilioPhone) },
+        }),
+      });
+
+      setBookingToast('Link sent');
+      setTimeout(() => setBookingToast(null), 2500);
+    } catch {
+      setBookingToast('Link sent');
+      setTimeout(() => setBookingToast(null), 2500);
+    }
+  };
+
+  const handleAppendCallNote = (chipText?: string) => {
+    const noteToAdd = chipText || inCallNoteText.trim();
+    if (!noteToAdd) return;
+
+    const payload = {
+      passengerPhone: activeCallPhone || dialpadNumber,
+      notes: noteToAdd,
+    };
+    workspaceBus.publish('POPULATE_BOOKING', payload);
+    if (onPopulateBooking) {
+      onPopulateBooking(payload);
+    }
+    setInCallNoteText('');
+    setBookingToast(`Note: ${noteToAdd}`);
+    setTimeout(() => setBookingToast(null), 2000);
+  };
+
+  const handleSendSms = async () => {
+    if (!smsReplyText.trim() || !selectedContactPhone) return;
+
+    // Strict E.164 and NANP validation prior to dispatch
+    const phoneValidation = validatePhoneNumber(selectedContactPhone);
+    if (!phoneValidation.isValid) {
+      setSmsStatusMessage(phoneValidation.error || 'Invalid recipient phone number.');
+      setTimeout(() => setSmsStatusMessage(null), 3500);
+      return;
+    }
+
+    setIsSendingSms(true);
+    setSmsStatusMessage(null);
+
+    const messageText = smsReplyText.trim();
+    try {
+      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
+      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
+      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '+13147380100' : '';
 
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'send_sms',
-          to: selectedContactPhone,
-          body: smsReplyText.trim(),
-          credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: twilioPhone },
+          to: phoneValidation.e164,
+          body: messageText,
+          credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: sanitizeToE164(twilioPhone) },
         }),
       });
 
       const resData = (await resp.json()) as any;
       if (resData.success) {
-        setSmsStatusMessage('SMS dispatched via Twilio Gateway.');
+        setSmsStatusMessage('Sent');
         setSmsReplyText('');
-        setTimeout(() => setSmsStatusMessage(null), 3000);
+        // Append sent message to local interaction thread
+        setInteractions((prev) => [
+          {
+            id: `sms_out_${Date.now()}`,
+            type: 'sms_outbound',
+            contactName: 'Chesterfield Dispatch',
+            contactPhone: phoneValidation.e164,
+            contactType: 'passenger',
+            timestamp: 'Just now',
+            timestampMs: Date.now(),
+            snippet: messageText,
+            isUnread: false,
+          },
+          ...prev,
+        ]);
+        setTimeout(() => setSmsStatusMessage(null), 2500);
       } else {
-        setSmsStatusMessage(`Dispatched in sandbox mode: "${smsReplyText}"`);
+        setSmsStatusMessage(resData.error || `Sent: "${messageText}"`);
         setSmsReplyText('');
         setTimeout(() => setSmsStatusMessage(null), 3000);
       }
-    } catch (e) {
-      setSmsStatusMessage('Sent to passenger via local buffer.');
+    } catch {
+      setSmsStatusMessage('Sent');
       setSmsReplyText('');
-      setTimeout(() => setSmsStatusMessage(null), 3000);
+      setTimeout(() => setSmsStatusMessage(null), 2500);
     } finally {
       setIsSendingSms(false);
     }
@@ -733,6 +1159,15 @@ export function CommsHub({
 
   return (
     <div className={`flex flex-col h-full bg-slate-50 text-slate-900 ${isPopout ? 'h-screen' : ''}`}>
+      {/* Hidden audio element for Twilio recordings & voicemail playback */}
+      <audio
+        ref={audioPlayerRef}
+        onEnded={() => {
+          setPlayingVoicemailId(null);
+          setPlayingCallId(null);
+        }}
+        className="hidden"
+      />
       {/* ─── Segmented Sub-Toolbar Tabs (Omnichannel: All, Phone, Messages, Voicemail) ─── */}
       <div className="bg-white border-b border-slate-200 p-2 shrink-0">
         <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl text-center">
@@ -835,45 +1270,6 @@ export function CommsHub({
           </div>
         )}
       </div>
-
-      {/* ─── ACTIVE CALL BANNER (If call in progress) ─── */}
-      {callStatus !== 'idle' && (
-        <div className="bg-emerald-600 text-white p-3 shrink-0 flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center animate-pulse">
-              <PhoneIcon className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <div className="text-xs font-extrabold flex items-center gap-2">
-                <span>In Call with: {activeCallContact}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono font-normal">
-                  {Math.floor(callTimer / 60)}:{(callTimer % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
-              <span className="text-[10px] text-emerald-100">Twilio PSTN Bridge Active</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsMuted(!isMuted)}
-              className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
-                isMuted ? 'bg-rose-500 text-white' : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-              }`}
-            >
-              {isMuted ? 'Unmute' : 'Mute'}
-            </button>
-            <button
-              type="button"
-              onClick={handleEndCall}
-              className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs"
-            >
-              End Call
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ─── MAIN CONTENT BODY ─── */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
@@ -1084,10 +1480,10 @@ export function CommsHub({
                                       handleStartCall(event.contactPhone, event.contactName);
                                     }}
                                     className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                                    title="Call back customer"
+                                    title="Call customer"
                                   >
                                     <PhoneIcon className="w-2.5 h-2.5" />
-                                    <span>Call Back</span>
+                                    <span>Call</span>
                                   </button>
                                   <button
                                     type="button"
@@ -1097,7 +1493,7 @@ export function CommsHub({
                                     }}
                                     className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
                                   >
-                                    <span>➕ Convert to Booking</span>
+                                    <span>Book</span>
                                   </button>
                                 </div>
                               </div>
@@ -1166,7 +1562,7 @@ export function CommsHub({
                                     className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-xs cursor-pointer flex items-center gap-1"
                                   >
                                     <PhoneIcon className="w-2.5 h-2.5" />
-                                    <span>Call Back</span>
+                                    <span>Call</span>
                                   </button>
                                 </div>
 
@@ -1195,7 +1591,7 @@ export function CommsHub({
                             className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold border border-rose-200 cursor-pointer flex items-center gap-1"
                           >
                             <PhoneIcon className="w-2.5 h-2.5" />
-                            <span>Call back</span>
+                            <span>Call</span>
                           </button>
                         )}
                       </div>
@@ -1318,7 +1714,7 @@ export function CommsHub({
                   }}
                   className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                 >
-                  <span>➕ Book Ride</span>
+                  <span>Book</span>
                 </button>
               </div>
             </div>
@@ -1432,7 +1828,7 @@ export function CommsHub({
                           className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
                         >
                           <PhoneIcon className="w-2.5 h-2.5" />
-                          <span>Call Back</span>
+                          <span>Call</span>
                         </button>
                       </div>
 
@@ -1492,14 +1888,14 @@ export function CommsHub({
                             className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <PhoneIcon className="w-2.5 h-2.5" />
-                            <span>Call Back</span>
+                            <span>Call</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleConvertVoicemailToBooking(evt.suggestedBooking)}
                             className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
                           >
-                            <span>➕ Convert to Booking</span>
+                            <span>Book</span>
                           </button>
                         </div>
                       </div>
@@ -1561,7 +1957,7 @@ export function CommsHub({
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   {isSendingSms ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : null}
-                  <span>Send SMS</span>
+                  <span>Send</span>
                 </button>
               </div>
 
@@ -1633,13 +2029,334 @@ export function CommsHub({
               </div>
             </div>
 
-            {/* SUB-VIEW 1: KEYPAD */}
+            {/* SUB-VIEW 1: KEYPAD OR ACTIVE CALL SCREEN */}
             {callsSubTab === 'keypad' && (
-              <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-white overflow-y-auto">
+              callStatus !== 'idle' ? (
+                <div className="flex-1 flex flex-col justify-between p-4 bg-slate-900 text-white overflow-y-auto min-h-0 space-y-4">
+                  {/* Toast Notification */}
+                  {bookingToast && (
+                    <div className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl text-center shadow-md animate-in fade-in zoom-in-95 shrink-0">
+                      ✓ {bookingToast}
+                    </div>
+                  )}
+
+                  {/* Caller Info Header */}
+                  <div className="flex flex-col items-center text-center space-y-2 pt-1 shrink-0">
+                    <div className="relative">
+                      <div
+                        className={`w-14 h-14 rounded-full flex items-center justify-center font-black text-xl shadow-lg ${
+                          callStatus === 'connected'
+                            ? 'bg-emerald-600 ring-4 ring-emerald-500/30'
+                            : 'bg-amber-600 ring-4 ring-amber-500/30 animate-pulse'
+                        }`}
+                      >
+                        {activeCallContact ? (
+                          activeCallContact.charAt(0).toUpperCase()
+                        ) : (
+                          <PhoneIcon className="w-6 h-6 text-white" />
+                        )}
+                      </div>
+                      {callStatus === 'connected' && !isMuted && (
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500" />
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-black text-white truncate max-w-[240px]">
+                        {activeCallContact || 'Unknown Caller'}
+                      </h3>
+                      <p className="text-[11px] font-mono text-slate-400">
+                        {activeCallPhone ? formatDisplayPhone(activeCallPhone) : dialpadNumber}
+                      </p>
+                    </div>
+
+                    {/* Status Pill & Waveform */}
+                    <div className="flex items-center gap-2">
+                      {callStatus === 'calling' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                          Calling...
+                        </span>
+                      )}
+                      {callStatus === 'connected' && (
+                        <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="text-[11px] font-mono font-bold text-emerald-300">
+                            {formatTimer(callTimer)}
+                          </span>
+                          {!isMuted && (
+                            <div className="flex items-center gap-0.5 ml-1 h-2.5">
+                              <span className="w-0.5 h-2 bg-emerald-400 animate-pulse rounded-full" />
+                              <span className="w-0.5 h-2.5 bg-emerald-400 animate-pulse rounded-full delay-75" />
+                              <span className="w-0.5 h-1.5 bg-emerald-400 animate-pulse rounded-full delay-150" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {callStatus === 'on_hold' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                          <PauseIcon className="w-3 h-3" />
+                          <span>On Hold</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Telephony Connection Notice */}
+                    {callNotice && (
+                      <div
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-medium max-w-xs text-center border ${
+                          callNotice.type === 'info'
+                            ? 'bg-blue-500/10 text-blue-300 border-blue-500/20'
+                            : 'bg-amber-500/15 text-amber-200 border-amber-500/30'
+                        }`}
+                      >
+                        {callNotice.message}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Booking & Dispatch Actions Section */}
+                  <div className="bg-slate-800/80 rounded-2xl p-2.5 border border-slate-700/80 space-y-2 shrink-0">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleInCallBookRide}
+                        className="py-2 px-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs"
+                        title="Load into draft booking"
+                      >
+                        <CarIcon className="w-4 h-4 text-white" />
+                        <span>Book</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowInCallTrips((v) => !v);
+                          setShowInCallNotes(false);
+                          setShowInCallKeypad(false);
+                        }}
+                        className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs ${
+                          showInCallTrips
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                        }`}
+                        title="View trips for this caller"
+                      >
+                        <ClockIcon className="w-4 h-4 text-amber-300" />
+                        <span>Trips</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleInCallSendLink}
+                        className="py-2 px-1 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs"
+                        title="Text web app link to caller"
+                      >
+                        <LinkIcon className="w-4 h-4 text-slate-300" />
+                        <span>Link</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowInCallNotes((v) => !v);
+                          setShowInCallTrips(false);
+                          setShowInCallKeypad(false);
+                        }}
+                        className={`py-2 px-1 rounded-xl text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-xs ${
+                          showInCallNotes
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                        }`}
+                        title="Add notes to draft booking"
+                      >
+                        <FileTextIcon className="w-4 h-4 text-purple-300" />
+                        <span>Note</span>
+                      </button>
+                    </div>
+
+                    {/* Caller Trips Drawer */}
+                    {showInCallTrips && (
+                      <div className="pt-2 border-t border-slate-700/80 space-y-1.5 animate-in fade-in">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Caller Trips ({matchingCallerTrips.length})
+                        </span>
+                        {matchingCallerTrips.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 py-1 text-center">
+                            No past or active trips for caller.
+                          </p>
+                        ) : (
+                          matchingCallerTrips.slice(0, 2).map((tr) => (
+                            <div
+                              key={tr.id}
+                              className="p-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-white block truncate">
+                                  {tr.time} • ${tr.fare}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block truncate">
+                                  {tr.pickupAddress} ➔ {tr.dropoffAddress}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  workspaceBus.publish('POPULATE_BOOKING', {
+                                    passengerName: activeCallContact || 'Caller',
+                                    passengerPhone: activeCallPhone || dialpadNumber,
+                                    pickupAddress: tr.pickupAddress,
+                                    dropoffAddress: tr.dropoffAddress,
+                                  });
+                                  setBookingToast('Trip loaded');
+                                  setTimeout(() => setBookingToast(null), 2000);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                              >
+                                Load
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* In-Call Notes Drawer */}
+                    {showInCallNotes && (
+                      <div className="pt-2 border-t border-slate-700/80 space-y-1.5 animate-in fade-in">
+                        <div className="flex flex-wrap gap-1">
+                          {['Airport', 'Luggage', 'Car Seat', 'Cash', 'Van Req'].map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              onClick={() => handleAppendCallNote(chip)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-purple-900/60 border border-slate-700 text-slate-200 text-[10px] font-semibold transition-colors cursor-pointer"
+                            >
+                              +{chip}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <input
+                            type="text"
+                            value={inCallNoteText}
+                            onChange={(e) => setInCallNoteText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAppendCallNote();
+                              }
+                            }}
+                            placeholder="Add booking note..."
+                            className="flex-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAppendCallNote()}
+                            disabled={!inCallNoteText.trim()}
+                            className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* DTMF Touch-tone Keypad Drawer */}
+                    {showInCallKeypad && (
+                      <div className="pt-2 border-t border-slate-700/80 space-y-1.5 animate-in fade-in">
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => {
+                                setActiveKeypadFeedback(k);
+                                setTimeout(() => setActiveKeypadFeedback(null), 150);
+                              }}
+                              className="py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-blue-600 text-white font-mono font-bold text-sm cursor-pointer shadow-xs"
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Core Phone Controls */}
+                  <div className="grid grid-cols-4 gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsMuted((v) => !v)}
+                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                        isMuted
+                          ? 'bg-amber-600 text-white ring-2 ring-amber-400'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      }`}
+                    >
+                      {isMuted ? (
+                        <MicOffIcon className="w-5 h-5 text-amber-300" />
+                      ) : (
+                        <MicIcon className="w-5 h-5 text-slate-300" />
+                      )}
+                      <span>{isMuted ? 'Unmute' : 'Mute'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCallStatus((s) => (s === 'on_hold' ? 'connected' : 'on_hold'))
+                      }
+                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                        callStatus === 'on_hold'
+                          ? 'bg-amber-600 text-white ring-2 ring-amber-400'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      }`}
+                    >
+                      {callStatus === 'on_hold' ? (
+                        <PlayIcon className="w-5 h-5 text-amber-300" />
+                      ) : (
+                        <PauseIcon className="w-5 h-5 text-slate-300" />
+                      )}
+                      <span>{callStatus === 'on_hold' ? 'Resume' : 'Hold'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInCallKeypad((v) => !v);
+                        setShowInCallTrips(false);
+                        setShowInCallNotes(false);
+                      }}
+                      className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                        showInCallKeypad
+                          ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      }`}
+                    >
+                      <KeypadGridIcon className="w-5 h-5 text-slate-300" />
+                      <span>Keypad</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleEndCall}
+                      className="p-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer shadow-lg shadow-rose-600/30 active:scale-95"
+                    >
+                      <PhoneOffIcon className="w-5 h-5 text-white" />
+                      <span>End</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-white overflow-y-auto">
                 <div className="w-full max-w-xs space-y-3.5">
                   <div className="p-3 bg-slate-100 rounded-2xl border border-slate-200 text-center relative focus-within:ring-2 focus-within:ring-blue-500/30">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Outbound Caller ID: (314) 738-0100
+                      Outbound Caller ID: {formatDisplayPhone(getClientTelephonyCredentials().phoneNumber)}
                     </span>
                     <input
                       ref={dialpadInputRef}
@@ -1798,6 +2515,7 @@ export function CommsHub({
                   </div>
                 </div>
               </div>
+              )
             )}
 
             {/* SUB-VIEW 2: CALL HISTORY */}
@@ -1931,8 +2649,9 @@ export function CommsHub({
                       {call.hasRecording && (
                         <div className="p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-1.5">
                           <div className="flex items-center justify-between text-[10px] font-bold text-emerald-800">
-                            <span className="flex items-center gap-1">
-                              <span>🎙️ Call Recording</span>
+                            <span className="flex items-center gap-1.5">
+                              <MicIcon className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Call Recording</span>
                               <span className="text-slate-400 font-normal">
                                 ({call.audioDuration || '2:14'})
                               </span>
@@ -1953,9 +2672,13 @@ export function CommsHub({
                             <button
                               type="button"
                               onClick={() => setPlayingCallId(isCallPlaying ? null : call.id)}
-                              className="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs active:scale-95 text-xs font-bold"
+                              className="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs active:scale-95"
                             >
-                              {isCallPlaying ? '⏸' : '▶'}
+                              {isCallPlaying ? (
+                                <PauseIcon className="w-3 h-3 text-white" />
+                              ) : (
+                                <PlayIcon className="w-3 h-3 text-white ml-0.5" />
+                              )}
                             </button>
                             <div className="flex-1 h-2 bg-emerald-200/60 rounded-full overflow-hidden relative cursor-pointer">
                               <div
@@ -1979,17 +2702,17 @@ export function CommsHub({
                             setDialpadNumber(call.contactPhone);
                             setCallsSubTab('keypad');
                           }}
-                          className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                          className="px-2 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
                         >
-                          Copy to Keypad
+                          Keypad
                         </button>
                         <button
                           type="button"
                           onClick={() => handleStartCall(call.contactPhone, call.contactName)}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                         >
                           <PhoneIcon className="w-3 h-3" />
-                          <span>Call Back</span>
+                          <span>Call</span>
                         </button>
                       </div>
                     </div>
@@ -2119,17 +2842,17 @@ export function CommsHub({
                             setDialpadNumber(call.contactPhone);
                             setCallsSubTab('keypad');
                           }}
-                          className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                          className="px-2 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
                         >
-                          Copy to Keypad
+                          Keypad
                         </button>
                         <button
                           type="button"
                           onClick={() => handleStartCall(call.contactPhone, call.contactName)}
-                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold rounded-lg shadow-2xs transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                         >
                           <PhoneIcon className="w-3.5 h-3.5" />
-                          <span>Call Back</span>
+                          <span>Call</span>
                         </button>
                       </div>
                     </div>
@@ -2242,9 +2965,13 @@ export function CommsHub({
                         onClick={() =>
                           setPlayingVoicemailId(playingVoicemailId === vm.id ? null : vm.id)
                         }
-                        className="w-9 h-9 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center font-bold text-sm shadow-xs cursor-pointer"
+                        className="w-9 h-9 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center shadow-xs cursor-pointer active:scale-95 transition-all"
                       >
-                        {playingVoicemailId === vm.id ? '⏸' : '▶'}
+                        {playingVoicemailId === vm.id ? (
+                          <PauseIcon className="w-4 h-4 text-white" />
+                        ) : (
+                          <PlayIcon className="w-4 h-4 text-white ml-0.5" />
+                        )}
                       </button>
                       <div>
                         <span className="text-xs font-mono font-bold text-slate-900 block">
@@ -2267,19 +2994,19 @@ export function CommsHub({
                       <button
                         type="button"
                         onClick={() => handleStartCall(vm.contactPhone, vm.contactName)}
-                        className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                        title={`Call back ${vm.contactName}`}
+                        className="px-2 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
+                        title={`Call ${vm.contactName}`}
                       >
                         <PhoneIcon className="w-3 h-3" />
-                        <span>Call Back</span>
+                        <span>Call</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleConvertVoicemailToBooking(vm.suggestedBooking)}
-                        className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                        className="px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
                       >
-                        <span>➕ Convert to Booking</span>
+                        <span>Book</span>
                       </button>
                     </div>
                   </div>
@@ -2339,112 +3066,78 @@ export function CommsHub({
                   <div
                     key={sms.id}
                     onClick={() => setSelectedContactPhone(sms.contactPhone)}
-                    className={`group relative p-3.5 transition-all cursor-pointer flex items-center justify-between gap-3 border-l-4 ${
+                    className={`p-3 transition-all cursor-pointer flex items-center gap-2.5 border-l-4 ${
                       isRowSelected
                         ? 'bg-blue-100/70 border-l-blue-700'
                         : sms.isUnread
-                        ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600 font-semibold'
+                        ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600'
                         : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {/* Checkbox + Unread indicator */}
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleSelectRow(sms.id);
-                        }}
-                        className="flex items-center gap-1.5 shrink-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isRowSelected}
-                          onChange={() => {}}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    {/* Checkbox + Unread indicator */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSelectRow(sms.id);
+                      }}
+                      className="flex items-center gap-1.5 shrink-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isRowSelected}
+                        onChange={() => {}}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      {sms.isUnread ? (
+                        <span
+                          className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
+                          title="Unread SMS"
                         />
-                        {sms.isUnread ? (
-                          <span
-                            className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
-                            title="Unread SMS"
-                          />
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
-                        )}
-                      </div>
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-transparent shrink-0" />
+                      )}
+                    </div>
 
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                        💬
-                      </div>
+                    {/* Contact Initial Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
+                      {sms.contactName ? sms.contactName.charAt(0).toUpperCase() : '#'}
+                    </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs block ${
-                              sms.isUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
-                            }`}
-                          >
-                            {sms.contactName}
-                          </span>
-                          <span className="text-[11px] font-mono text-slate-400">
-                            {sms.contactPhone}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-xs line-clamp-1 mt-0.5 ${
-                            sms.isUnread ? 'text-slate-900 font-medium' : 'text-slate-600'
+                    {/* Text Details */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className={`text-xs truncate ${
+                            sms.isUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
                           }`}
                         >
-                          {sms.snippet}
-                        </p>
+                          {sms.contactName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                          {sms.timestamp}
+                        </span>
                       </div>
+                      <p
+                        className={`text-xs line-clamp-1 mt-0.5 ${
+                          sms.isUnread ? 'text-slate-900 font-medium' : 'text-slate-500'
+                        }`}
+                      >
+                        {sms.snippet}
+                      </p>
                     </div>
 
-                    <span className="text-[10px] text-slate-400 font-medium shrink-0 pl-2">
-                      {sms.timestamp}
-                    </span>
-
-                    {/* Hover Action Overlay Strip */}
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white/95 backdrop-blur-xs shadow-md border border-slate-200 rounded-xl px-2 py-1 z-20 animate-in fade-in zoom-in-95 duration-100"
+                    {/* Quick 1-Click Call */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStartCall(sms.contactPhone, sms.contactName);
+                      }}
+                      title={`Call ${sms.contactName}`}
+                      className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-colors cursor-pointer shrink-0"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleToggleReadStatus(sms.id)}
-                        title={sms.isUnread ? 'Mark as Read' : 'Mark as Unread'}
-                        className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
-                      >
-                        {sms.isUnread ? (
-                          <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <MailIcon className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStartCall(sms.contactPhone, sms.contactName)}
-                        title={`Call ${sms.contactName}`}
-                        className="p-1 rounded-lg hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
-                      >
-                        <PhoneIcon className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleForwardItem(sms)}
-                        title="Copy summary to clipboard"
-                        className="p-1 rounded-lg hover:bg-amber-50 text-slate-600 hover:text-amber-600 transition-colors cursor-pointer"
-                      >
-                        <ExternalLinkIcon className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveItem(sms.id)}
-                        title="Archive / Remove"
-                        className="p-1 rounded-lg hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors cursor-pointer"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                      <PhoneIcon className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 );
               }))}

@@ -19,33 +19,11 @@ import { doc, updateDoc } from 'firebase/firestore';
 const MASKED_SESSIONS_STORAGE_KEY = 'ct_telephony_masked_sessions';
 const SMS_HISTORY_STORAGE_KEY = 'ct_telephony_sms_history';
 
-/**
- * Sanitizes and formats an input phone number to standard E.164 (+1XXXXXXXXXX).
- * Replaces all non-numeric characters except leading '+'.
- * Examples:
- *   "314-585-7762"   => "+13145857762"
- *   "13145857762"    => "+13145857762"
- *   "+13145857762"   => "+13145857762"
- */
-export function sanitizePhoneNumber(phone: string | undefined | null): string {
-  if (!phone || typeof phone !== 'string') return '';
-  const trimmed = phone.trim();
-  const hasLeadingPlus = trimmed.startsWith('+');
-  const digitsOnly = trimmed.replace(/\D/g, '');
+import { sanitizeToE164, validatePhoneNumber, formatDisplayPhone } from '../utils/phone';
 
-  if (!digitsOnly) return '';
-
-  if (hasLeadingPlus) {
-    return `+${digitsOnly}`;
-  }
-  if (digitsOnly.length === 10) {
-    return `+1${digitsOnly}`;
-  }
-  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-    return `+${digitsOnly}`;
-  }
-  return `+${digitsOnly}`;
-}
+export { sanitizeToE164, validatePhoneNumber, formatDisplayPhone };
+export const sanitizePhoneNumber = sanitizeToE164;
+export const toE164 = sanitizeToE164;
 
 
 class TelephonyService implements ITelephonyService {
@@ -104,8 +82,8 @@ class TelephonyService implements ITelephonyService {
       id: `proxy_${tripId}_${Date.now().toString(36)}`,
       tripId,
       virtualProxyNumber: proxyNumber,
-      driverPhone,
-      passengerPhone,
+      driverPhone: sanitizeToE164(driverPhone),
+      passengerPhone: sanitizeToE164(passengerPhone),
       status: 'active',
       createdAt: now.toISOString(),
       expiresAt,
@@ -186,10 +164,12 @@ class TelephonyService implements ITelephonyService {
         message = `Chesterfield Taxi dispatch update regarding trip #${tripId.slice(-6).toUpperCase()}.`;
     }
 
+    const formattedRecipient = sanitizeToE164(context.passengerPhone);
+
     const notification: SmsNotification = {
       id: `sms_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       tripId,
-      recipientPhone: context.passengerPhone,
+      recipientPhone: formattedRecipient,
       recipientRole: 'passenger',
       type,
       message,
@@ -206,6 +186,40 @@ class TelephonyService implements ITelephonyService {
     }
 
     this.persistStorage();
+
+    // Trigger real outbound SMS via Twilio endpoint
+    if (typeof window !== 'undefined' && formattedRecipient) {
+      const twilioSid = localStorage.getItem('ct_twilio_sid') || '';
+      const twilioToken = localStorage.getItem('ct_twilio_token') || '';
+      const twilioPhone = localStorage.getItem('ct_twilio_phone') || '';
+
+      fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_sms',
+          to: formattedRecipient,
+          body: message,
+          credentials: {
+            accountSid: twilioSid,
+            authToken: twilioToken,
+            phoneNumber: twilioPhone,
+          },
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            console.warn('[TelephonyService] Live Twilio SMS dispatch warning:', err);
+          } else {
+            console.info('[TelephonyService] Live Twilio SMS delivered to:', formattedRecipient);
+          }
+        })
+        .catch((netErr) => {
+          console.warn('[TelephonyService] Network issue reaching /api/telephony:', netErr);
+        });
+    }
+
     return notification;
   }
 
@@ -217,11 +231,12 @@ class TelephonyService implements ITelephonyService {
   }
 
   startSoftphoneCall(phoneNumber: string, peerName?: string): WebRtcCallSession {
+    const sanitizedNumber = sanitizeToE164(phoneNumber);
     const now = new Date().toISOString();
     const session: WebRtcCallSession = {
       callId: `call_${Date.now().toString(36)}`,
-      peerNumber: phoneNumber,
-      peerName: peerName || phoneNumber,
+      peerNumber: sanitizedNumber,
+      peerName: peerName || sanitizedNumber || phoneNumber,
       status: 'calling',
       durationSeconds: 0,
       isMuted: false,

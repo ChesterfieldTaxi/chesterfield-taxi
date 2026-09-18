@@ -90,6 +90,16 @@ export interface GeoPoint {
   lng: number;
 }
 
+export interface DriverTelemetryPing {
+  coordinates: GeoPoint;
+  speedMph?: number;
+  heading?: number;
+  accuracy?: number;
+  timestamp: string; // ISO 8601
+  status?: string;
+  isOfflineBuffer?: boolean;
+}
+
 export interface TripLocation {
   address: string;
   formattedAddress?: string;
@@ -307,6 +317,10 @@ export interface Trip {
   telephonySessionId?: string;
   proxyNumber?: string;
   meterExtras?: Array<{ id: string; name: string; amount: number; category: string }>;
+
+  // Phase 31.5: Driver Geolocation Telemetry
+  driverTelemetry?: DriverTelemetryPing;
+  currentLocation?: DriverTelemetryPing;
 
   /** State Machine Audit Trail */
   statusHistory: TripStatusHistoryEntry[];

@@ -6,6 +6,7 @@ import { COMPANY_CONFIG } from '../config/companyConfig';
 import { PhoneIcon, SpinnerIcon, SearchIcon } from '../components/ui/Icons';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
+import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 
 export function meta() {
   return [
@@ -91,8 +92,34 @@ export default function BookingStatusRoute() {
       );
     }
 
+    // Subscribe to cross-tab / WebSocket live driver telemetry pings
+    const bus = getWorkspaceBus();
+    const unsubBus = bus.subscribe((msg) => {
+      if (msg.type === 'DRIVER_TELEMETRY_PING' && msg.payload?.tripId === tripId) {
+        const ping = {
+          coordinates: msg.payload.coordinates,
+          speedMph: msg.payload.speedMph,
+          heading: msg.payload.heading,
+          accuracy: msg.payload.accuracy,
+          timestamp: msg.payload.timestamp,
+          status: msg.payload.status,
+          isOfflineBuffer: msg.payload.isOfflineBuffer,
+        };
+        setTrip((prev) =>
+          prev
+            ? {
+                ...prev,
+                driverTelemetry: ping,
+                currentLocation: ping,
+              }
+            : prev
+        );
+      }
+    });
+
     return () => {
       if (unsub) unsub();
+      unsubBus();
     };
   }, [tripId]);
 

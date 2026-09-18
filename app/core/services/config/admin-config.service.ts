@@ -393,6 +393,16 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   tariffs: [...DEFAULT_TARIFF_PROFILES],
   tariffGroups: [],
   fleetAlertsConfig: { ...DEFAULT_FLEET_ALERTS_CONFIG },
+  integrations: {
+    telephony: {
+      provider: 'twilio',
+      accountSid: '',
+      authToken: '',
+      phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
+      status: 'idle',
+    },
+    payments: {},
+  },
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -486,6 +496,19 @@ export class AdminConfigService implements IAdminConfigService {
       tariffGroups: incoming.tariffGroups && incoming.tariffGroups.length > 0
         ? incoming.tariffGroups
         : DEFAULT_APP_SETTINGS.tariffGroups,
+      integrations: {
+        telephony: {
+          provider: 'twilio',
+          accountSid: '',
+          authToken: '',
+          phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
+          status: 'idle',
+          ...(incoming.integrations?.telephony || {}),
+        },
+        payments: {
+          ...(incoming.integrations?.payments || {}),
+        },
+      },
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };

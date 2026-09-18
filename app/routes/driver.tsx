@@ -35,6 +35,8 @@ import {
   ShieldCheckIcon,
 } from '../components/ui/Icons';
 import { StripePaymentInput } from '../components/domain/payments/StripePaymentInput';
+import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
+import { validatePhoneNumber, sanitizeToE164, formatDisplayPhone } from '../core/utils/phone';
 
 export function meta() {
   return [
@@ -248,6 +250,13 @@ export default function DriverAppRoute() {
   );
 
   const activeTrip = assignedTrips.find((t) => t.id === activeTripId) || scheduledTrips[0] || assignedTrips[0] || null;
+
+  // Phase 31.5: Adaptive Driver Geolocation Telemetry Engine
+  const telemetry = useDriverTelemetry({
+    trip: activeTrip,
+    driverId: driver?.id,
+    isEnabled: Boolean(driver && activeTrip),
+  });
 
   // Handle Taximeter ticker when trip is in_progress
   useEffect(() => {
@@ -575,6 +584,14 @@ export default function DriverAppRoute() {
 
   const handleSendTwilioSms = async () => {
     if (!activeTrip?.passenger?.phone || !customSmsText.trim()) return;
+
+    // Strict E.164 / NANP validation
+    const phoneValidation = validatePhoneNumber(activeTrip.passenger.phone);
+    if (!phoneValidation.isValid) {
+      setTwilioSmsFeedback(phoneValidation.error || 'Invalid passenger phone number.');
+      return;
+    }
+
     setIsSendingTwilioSms(true);
     setTwilioSmsFeedback('Sending via Twilio SMS gateway...');
     try {
@@ -587,12 +604,12 @@ export default function DriverAppRoute() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'send_sms',
-          to: activeTrip.passenger.phone,
+          to: phoneValidation.e164,
           body: customSmsText.trim(),
           credentials: {
             accountSid: twilioSid,
             authToken: twilioToken,
-            phoneNumber: twilioPhone,
+            phoneNumber: sanitizeToE164(twilioPhone),
           },
         }),
       });
@@ -760,6 +777,39 @@ export default function DriverAppRoute() {
           )}
         </div>
       </header>
+
+      {/* Driver Telemetry Status Bar (Phase 31.5) */}
+      {telemetry.isTracking && (
+        <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-[11px] backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${telemetry.isOffline ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${telemetry.isOffline ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            </span>
+            <span className="font-semibold text-slate-200">
+              {telemetry.isOffline ? 'Offline GPS Buffer' : 'GPS Telemetry Active'}
+            </span>
+            <span className="text-slate-400 font-mono">
+              {telemetry.currentTelemetry?.speedMph ? `${telemetry.currentTelemetry.speedMph} mph` : '0 mph'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <span className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] font-mono">
+              {telemetry.currentIntervalSeconds}s throttle
+            </span>
+            {telemetry.isOffline && (
+              <span className="bg-amber-950/80 text-amber-400 border border-amber-800/50 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                Buffered: {telemetry.pendingOfflineBufferCount}
+              </span>
+            )}
+            {telemetry.lastBroadcastAt && !telemetry.isOffline && (
+              <span className="text-[10px] text-slate-400 hidden sm:inline">
+                Ping: {telemetry.lastBroadcastAt}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Notifications Toast */}
       {successNotice && (

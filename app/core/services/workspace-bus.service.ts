@@ -30,6 +30,11 @@ export interface WorkspaceEventMap {
     vipTag?: string;
     notes?: string;
   };
+  CALL_OUTBOUND_STARTED: {
+    callSid?: string;
+    targetNumber: string;
+    contactName?: string;
+  };
   CALL_ANSWERED: {
     callSid?: string;
     callerNumber: string;
@@ -37,6 +42,22 @@ export interface WorkspaceEventMap {
   CALL_ENDED: {
     callSid?: string;
     durationSeconds?: number;
+  };
+  VOICEMAIL_RECEIVED: {
+    id: string;
+    contactPhone: string;
+    contactName?: string;
+    audioUrl: string;
+    audioDuration?: string;
+    transcription?: string;
+    timestamp: string;
+  };
+  SMS_RECEIVED: {
+    messageSid: string;
+    from: string;
+    to: string;
+    body: string;
+    timestamp: number;
   };
   POPULATE_BOOKING: {
     passengerName?: string;
@@ -66,6 +87,17 @@ export interface WorkspaceEventMap {
   };
   WINDOW_UNLOAD: {
     moduleKey: WorkspaceModuleKey;
+  };
+  DRIVER_TELEMETRY_PING: {
+    tripId: string;
+    driverId?: string;
+    coordinates: { lat: number; lng: number };
+    speedMph?: number;
+    heading?: number;
+    accuracy?: number;
+    timestamp: string;
+    status?: string;
+    isOfflineBuffer?: boolean;
   };
 }
 

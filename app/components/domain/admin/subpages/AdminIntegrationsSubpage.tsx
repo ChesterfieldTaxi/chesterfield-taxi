@@ -13,7 +13,7 @@ import {
   CheckIcon,
   LockIcon,
 } from '../../../ui/Icons';
-import { sanitizePhoneNumber } from '../../../../core/services/telephony.service';
+import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
 
 
 export type IntegrationsSubTab = 'gateways' | 'telephony' | 'webhooks';
@@ -80,24 +80,49 @@ export function AdminIntegrationsSubpage({
 
   // Twilio Telephony Credentials
   const [twilioSid, setTwilioSid] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_sid')) || '';
+    return (
+      settings.integrations?.telephony?.accountSid ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_sid')) ||
+      ''
+    );
   });
   const [twilioToken, setTwilioToken] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_token')) || '';
+    return (
+      settings.integrations?.telephony?.authToken ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_token')) ||
+      ''
+    );
   });
   const [twilioPhone, setTwilioPhone] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) || '+13145550199';
+    return (
+      settings.integrations?.telephony?.phoneNumber ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) ||
+      '+13145550199'
+    );
   });
   const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>(() => {
+    if (settings.integrations?.telephony?.status === 'connected') return 'connected';
     return typeof window !== 'undefined' && localStorage.getItem('ct_twilio_status') === 'connected'
       ? 'connected'
       : 'idle';
   });
   const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(() => {
+    if (settings.integrations?.telephony?.statusMessage) return settings.integrations.telephony.statusMessage;
     return typeof window !== 'undefined' && localStorage.getItem('ct_twilio_status') === 'connected'
       ? 'Connected'
       : null;
   });
+
+  useEffect(() => {
+    if (settings.integrations?.telephony) {
+      const tel = settings.integrations.telephony;
+      if (tel.accountSid && !twilioSid) setTwilioSid(tel.accountSid);
+      if (tel.authToken && !twilioToken) setTwilioToken(tel.authToken);
+      if (tel.phoneNumber && (!twilioPhone || twilioPhone === '+13145550199')) setTwilioPhone(tel.phoneNumber);
+      if (tel.status === 'connected') setTwilioStatus('connected');
+      if (tel.statusMessage) setTwilioStatusMsg(tel.statusMessage);
+    }
+  }, [settings.integrations?.telephony]);
 
   // Live Outbound Phone Call Tester
   const [testCallPhone, setTestCallPhone] = useState('');
@@ -132,22 +157,95 @@ export function AdminIntegrationsSubpage({
     }
   };
 
-  // Save Telephony Handler
+  // Save Telephony Handler with live validation and persistence to server & AppSettings
   const handleSaveTelephony = async () => {
     setIsSaving(true);
+    setTwilioStatusMsg(null);
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ct_twilio_sid', twilioSid.trim());
-        localStorage.setItem('ct_twilio_token', twilioToken.trim());
-        localStorage.setItem('ct_twilio_phone', twilioPhone.trim());
-        if (twilioStatus === 'connected') {
-          localStorage.setItem('ct_twilio_status', 'connected');
-        }
+      const trimmedSid = twilioSid.trim();
+      const trimmedToken = twilioToken.trim();
+      const trimmedPhone = twilioPhone.trim();
+
+      if (!trimmedSid || !trimmedToken) {
+        setTwilioStatus('error');
+        setTwilioStatusMsg('Twilio Account SID and Auth Token are required.');
+        setIsSaving(false);
+        return;
       }
-      setSaveSuccessMessage('Twilio telephony gateway credentials saved.');
-      setTimeout(() => setSaveSuccessMessage(null), 3000);
+
+      if (!trimmedSid.startsWith('AC') || trimmedSid.length < 30) {
+        setTwilioStatus('error');
+        setTwilioStatusMsg("Invalid Account SID. Must start with 'AC' and be 34 characters.");
+        setIsSaving(false);
+        return;
+      }
+
+      const phoneValidation = validatePhoneNumber(trimmedPhone);
+      if (!phoneValidation.isValid) {
+        setTwilioStatus('error');
+        setTwilioStatusMsg(`Invalid Twilio Phone Number: ${phoneValidation.error}`);
+        setIsSaving(false);
+        return;
+      }
+
+      setTwilioStatus('checking');
+      setTwilioStatusMsg('Verifying credentials with Twilio REST API & saving...');
+
+      // 1. Call server API to verify credentials and write to server-side .env.local
+      const resp = await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_credentials',
+          credentials: {
+            accountSid: trimmedSid,
+            authToken: trimmedToken,
+            phoneNumber: phoneValidation.e164,
+          },
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        setTwilioStatus('error');
+        setTwilioStatusMsg(data.error || 'Twilio verification failed. Check SID and Auth Token.');
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. Persist to AppSettings in Firestore
+      await onSave({
+        integrations: {
+          ...settings.integrations,
+          telephony: {
+            provider: 'twilio',
+            accountSid: trimmedSid,
+            authToken: trimmedToken,
+            phoneNumber: phoneValidation.e164,
+            status: 'connected',
+            statusMessage: `Connected: ${data.friendlyName || trimmedSid}`,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      // 3. Save to localStorage for instant client fallback
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ct_twilio_sid', trimmedSid);
+        localStorage.setItem('ct_twilio_token', trimmedToken);
+        localStorage.setItem('ct_twilio_phone', phoneValidation.e164);
+        localStorage.setItem('ct_twilio_status', 'connected');
+      }
+
+      setTwilioStatus('connected');
+      setTwilioStatusMsg(`Connected (${data.friendlyName || 'Active Account'})`);
+      setSaveSuccessMessage('Twilio telephony gateway verified and saved! Live calling and messaging are now active.');
+      setTimeout(() => setSaveSuccessMessage(null), 5000);
     } catch (e: any) {
       console.error('Failed to save telephony config:', e);
+      setTwilioStatus('error');
+      setTwilioStatusMsg(e.message || 'Error saving telephony configuration.');
     } finally {
       setIsSaving(false);
     }
@@ -277,12 +375,13 @@ export function AdminIntegrationsSubpage({
   };
 
   const handleTriggerTestCall = async () => {
-    const cleanTo = sanitizePhoneNumber(testCallPhone);
-    if (!cleanTo) {
+    const validation = validatePhoneNumber(testCallPhone);
+    if (!validation.isValid) {
       setTestCallStatus('error');
-      setTestCallMsg('Please enter a valid recipient cell phone number to ring.');
+      setTestCallMsg(validation.error || 'Please enter a valid recipient cell phone number to ring.');
       return;
     }
+    const cleanTo = validation.e164;
     setTestCallStatus('calling');
     setTestCallMsg(`Initiating outbound call to ${cleanTo}...`);
     try {
@@ -329,12 +428,13 @@ export function AdminIntegrationsSubpage({
   };
 
   const handleTriggerTestSms = async () => {
-    const cleanTo = sanitizePhoneNumber(testSmsPhone);
-    if (!cleanTo) {
+    const validation = validatePhoneNumber(testSmsPhone);
+    if (!validation.isValid) {
       setTestSmsStatus('error');
-      setTestSmsMsg('Please enter a valid recipient phone number for the test SMS.');
+      setTestSmsMsg(validation.error || 'Please enter a valid recipient phone number for the test SMS.');
       return;
     }
+    const cleanTo = validation.e164;
     setTestSmsStatus('sending');
     setTestSmsMsg(`Dispatching SMS to ${cleanTo}...`);
     try {
