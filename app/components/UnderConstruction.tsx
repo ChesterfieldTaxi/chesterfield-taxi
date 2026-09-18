@@ -1,7 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Phone, Clock, ShieldCheck, MapPin } from 'lucide-react';
+import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import { COMPANY_CONFIG } from '../config/companyConfig';
 
 export default function UnderConstruction() {
+  const [companySettings, setCompanySettings] = useState(() => {
+    try {
+      return getAdminConfigService().getCachedSettings().company;
+    } catch {
+      return {
+        name: COMPANY_CONFIG.name,
+        phone: COMPANY_CONFIG.phone.dispatch || COMPANY_CONFIG.phone.primary,
+        email: COMPANY_CONFIG.email.dispatch,
+        address: COMPANY_CONFIG.address.formatted,
+      };
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const configService = getAdminConfigService();
+      const unsub = configService.subscribeToSettings((settings) => {
+        if (settings?.company) {
+          setCompanySettings(settings.company);
+        }
+      });
+      return unsub;
+    } catch {
+      // Ignore during SSR
+    }
+  }, []);
+
+  const displayPhone = companySettings?.phone || COMPANY_CONFIG.phone.dispatch || COMPANY_CONFIG.phone.primary || '(314) 738-0100';
+  const digits = displayPhone.replace(/\D/g, '');
+  const telHref = digits.length === 10 ? `tel:+1${digits}` : digits.length > 10 ? `tel:+${digits}` : `tel:${displayPhone}`;
+  const companyName = companySettings?.name || COMPANY_CONFIG.name || 'Chesterfield Taxi';
+  const brandTitle = companyName.includes('Car Service') ? companyName : `${companyName} & Car Service`;
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between p-6 font-sans">
       {/* Header / Brand */}
@@ -11,7 +46,7 @@ export default function UnderConstruction() {
             CT
           </div>
           <span className="text-xl font-bold tracking-tight text-white">
-            Chesterfield Taxi &amp; Car Service
+            {brandTitle}
           </span>
         </div>
       </header>
@@ -36,11 +71,11 @@ export default function UnderConstruction() {
             Need a ride immediately?
           </p>
           <a
-            href="tel:+13147389921"
+            href={telHref}
             className="inline-flex items-center justify-center gap-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-2xl px-8 py-4 rounded-xl transition-all duration-150 transform active:scale-95 shadow-lg shadow-amber-400/10 w-full sm:w-auto"
           >
             <Phone className="w-6 h-6 fill-current" />
-            (314) 738-9921
+            {displayPhone}
           </a>
           <p className="text-xs text-slate-400 mt-3">
             Click to call dispatch directly from your mobile device
@@ -69,7 +104,7 @@ export default function UnderConstruction() {
 
       {/* Footer */}
       <footer className="max-w-4xl mx-auto w-full text-center pb-6 text-xs text-slate-400">
-        &copy; {new Date().getFullYear()} Chesterfield Taxi &amp; Car Service. All rights reserved.
+        &copy; {new Date().getFullYear()} {brandTitle}. All rights reserved.
       </footer>
     </div>
   );
