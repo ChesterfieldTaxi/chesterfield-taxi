@@ -715,8 +715,11 @@ export class BookingRulesEngine {
       };
     }
 
+    // When Tier 1 Auto-Confirm is disabled, all non-blocked trips require human dispatcher review
     return {
-      mode: 'AUTO_CONFIRM',
+      mode: 'REQUIRE_REVIEW',
+      reason: 'Auto-confirm pass-through is disabled in booking rules. Held for dispatcher review.',
+      matchedRuleTags: ['AUTO_CONFIRM_DISABLED'],
       tierResults,
     };
   }

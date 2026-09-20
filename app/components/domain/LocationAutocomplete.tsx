@@ -260,6 +260,13 @@ export function LocationAutocomplete({
             handleSelectPrediction(displayPredictions[predIdx]);
           }
         }
+      } else if (inputValue.trim()) {
+        e.preventDefault();
+        onPlaceSelectedRef.current?.({
+          address: inputValue.trim(),
+          formattedAddress: inputValue.trim(),
+        });
+        setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
@@ -420,9 +427,19 @@ export function LocationAutocomplete({
           )}
 
           {matchingSpecialPlaces.length === 0 && !hasLivePredictions && (
-            <div className="px-3 py-2 text-xs text-slate-500 italic">
-              Press Enter or keep typing custom address "{inputValue}"
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onPlaceSelectedRef.current?.({
+                  address: inputValue.trim(),
+                  formattedAddress: inputValue.trim(),
+                });
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 font-medium rounded transition-colors cursor-pointer"
+            >
+              Use "{inputValue}" as address
+            </button>
           )}
         </div>
       )}

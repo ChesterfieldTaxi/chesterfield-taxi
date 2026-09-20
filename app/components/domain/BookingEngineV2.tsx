@@ -78,7 +78,7 @@ export interface BookingEngineV2Props {
 }
 
 export type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
-export type CustomerVehicleChoice = 'sedan' | 'suv' | 'van' | (string & {});
+export type CustomerVehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});
 
 export function formatTime12h(time24: string): string {
   if (!time24) return '';
@@ -267,9 +267,9 @@ export function BookingEngineV2({
     frontFacingCount: 0,
     boosterCount: 0,
 
-    vehicleChoice: 'sedan',
+    vehicleChoice: 'any',
     isVehicleAutoAssigned: true,
-    selectedVehicles: ['sedan'],
+    selectedVehicles: ['any'],
 
     returnTrip: false,
     returnPickupAddress: '',
@@ -283,8 +283,8 @@ export function BookingEngineV2({
     returnRearFacing: 0,
     returnFrontFacing: 0,
     returnBooster: 0,
-    returnVehicleChoice: 'sedan',
-    returnSelectedVehicles: ['sedan'],
+    returnVehicleChoice: 'any',
+    returnSelectedVehicles: ['any'],
 
     specialRequests: {
       petFriendly: false,
@@ -327,6 +327,7 @@ export function BookingEngineV2({
   const [isReturnQuoteLoading, setIsReturnQuoteLoading] = useState(false);
 
   // Submission state
+  const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmedTrip, setConfirmedTrip] = useState<Trip | null>(null);
@@ -385,8 +386,8 @@ export function BookingEngineV2({
           dropoffAddress: dropoffParam !== null ? dropoffParam : prev.dropoffAddress,
           dropoffCoordinates: dropoffLat && dropoffLng ? { lat: parseFloat(dropoffLat), lng: parseFloat(dropoffLng) } : prev.dropoffCoordinates,
           driverNotes: notesParam !== null ? notesParam : prev.driverNotes,
-          vehicleChoice: vehicleParam && ['sedan', 'suv', 'van'].includes(vehicleParam) ? vehicleParam : prev.vehicleChoice,
-          selectedVehicles: vehicleParam && ['sedan', 'suv', 'van'].includes(vehicleParam) ? [vehicleParam] : prev.selectedVehicles,
+          vehicleChoice: vehicleParam && ['any', 'sedan', 'suv', 'van'].includes(vehicleParam) ? vehicleParam : prev.vehicleChoice,
+          selectedVehicles: vehicleParam && ['any', 'sedan', 'suv', 'van'].includes(vehicleParam) ? [vehicleParam] : prev.selectedVehicles,
           passengers: passengersParam ? Math.max(1, parseInt(passengersParam, 10) || 1) : prev.passengers,
         }));
       }
@@ -411,7 +412,7 @@ export function BookingEngineV2({
       ...(initialValues.driverNotes !== undefined && initialValues.driverNotes !== ''
         ? { driverNotes: initialValues.driverNotes }
         : {}),
-      ...(initialValues.vehicleChoice && ['sedan', 'suv', 'van'].includes(initialValues.vehicleChoice)
+      ...(initialValues.vehicleChoice && ['any', 'sedan', 'suv', 'van'].includes(initialValues.vehicleChoice)
         ? {
             vehicleChoice: initialValues.vehicleChoice,
             selectedVehicles: [initialValues.vehicleChoice],
@@ -435,6 +436,10 @@ export function BookingEngineV2({
     );
   });
 
+  const [companyConfig, setCompanyConfig] = useState(() => {
+    return getAdminConfigService().getCachedSettings().company;
+  });
+
   const [vehicleTiers, setVehicleTiers] = useState<VehicleTierConfig[]>(() => {
     const cached = getAdminConfigService().getCachedSettings();
     if (cached.vehicles && cached.vehicles.length > 0) {
@@ -449,6 +454,9 @@ export function BookingEngineV2({
       if (s.customerBookingConfig) {
         setBookingConfig({ ...DEFAULT_CUSTOMER_BOOKING_CONFIG, ...s.customerBookingConfig });
       }
+      if (s.company) {
+        setCompanyConfig(s.company);
+      }
       if (s.vehicles && s.vehicles.length > 0) {
         setVehicleTiers(s.vehicles.filter((v) => !v.isArchived));
       }
@@ -459,8 +467,18 @@ export function BookingEngineV2({
   }, []);
 
   const activeVehicleTiers: VehicleTierConfig[] = useMemo(() => {
-    if (vehicleTiers.length > 0) return vehicleTiers;
-    return [
+    const anyTier: VehicleTierConfig = {
+      id: 'any',
+      name: 'Any Vehicle',
+      badge: 'Best Value',
+      baseMultiplier: 1.0,
+      maxPassengers: 4,
+      maxLuggage: 3,
+      description: 'Nearest available Sedan, SUV, or Minivan',
+      iconType: 'standard',
+    };
+
+    const baseTiers: VehicleTierConfig[] = vehicleTiers.length > 0 ? vehicleTiers : [
       {
         id: 'standard',
         name: 'Sedan',
@@ -492,6 +510,11 @@ export function BookingEngineV2({
         iconType: 'wheelchair',
       },
     ];
+
+    if (!baseTiers.some((t) => t.id === 'any')) {
+      return [anyTier, ...baseTiers];
+    }
+    return baseTiers;
   }, [vehicleTiers]);
 
   // Limits from company config
@@ -607,6 +630,7 @@ export function BookingEngineV2({
 
   // Map vehicle choice to vehicleTier
   const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
+    if (choice === 'any') return 'standard';
     if (choice === 'suv') return 'xl';
     if (choice === 'van') return 'wheelchair';
     if (choice === 'sedan') return 'standard';
@@ -635,10 +659,14 @@ export function BookingEngineV2({
           }
           return true;
         })
-        .sort((a, b) => a.baseMultiplier - b.baseMultiplier);
+        .sort((a, b) => {
+          if (a.id === 'any') return -1;
+          if (b.id === 'any') return 1;
+          return a.baseMultiplier - b.baseMultiplier;
+        });
 
-      const bestTier = capableTiers[0] || activeVehicleTiers[activeVehicleTiers.length - 1];
-      const minVehicle = bestTier.id as CustomerVehicleChoice;
+      const bestTier = capableTiers[0] || activeVehicleTiers[0];
+      const minVehicle = (bestTier?.id || 'any') as CustomerVehicleChoice;
 
       const currentCap = vehicleCapacities[form.vehicleChoice] || { maxPassengers: 4, maxBags: 3 };
       const hasCarSeatConstraint = requiresUpgradedVehicle && (form.vehicleChoice === 'sedan' || form.vehicleChoice === 'standard');
@@ -1219,8 +1247,10 @@ export function BookingEngineV2({
   // Submit Handler
   const handleBookRide = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
     if (!validateForm()) return;
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -1529,6 +1559,14 @@ export function BookingEngineV2({
             hasCheckedLuggage: form.hasCheckedLuggage,
             isAirportTrip: Boolean(airportDetection.isAirportTrip),
           },
+          status: createdTrip.status,
+          lambertPickupInstructions: bookingConfig.lambertPickupInstructions,
+          companySettings: {
+            name: companyConfig?.name,
+            phone: companyConfig?.phone,
+            address: companyConfig?.address,
+            email: companyConfig?.email,
+          },
         });
 
         // 2. Send immediate alert to operations / dispatch
@@ -1550,6 +1588,14 @@ export function BookingEngineV2({
           currency: createdTrip.pricing.currency,
           specialRequests: createdTrip.passenger.specialRequests,
           urgency: createdTrip.bookingType === 'asap' ? 'high' : 'normal',
+          status: createdTrip.status,
+          lambertPickupInstructions: bookingConfig.lambertPickupInstructions,
+          companySettings: {
+            name: companyConfig?.name,
+            phone: companyConfig?.phone,
+            address: companyConfig?.address,
+            email: companyConfig?.email,
+          },
         });
 
         setEmailDelivery({
@@ -1572,6 +1618,7 @@ export function BookingEngineV2({
       console.error('[BookingEngineV2] Booking creation failed:', err);
       setSubmitError(err instanceof Error ? err.message : 'Failed to record reservation. Please try again.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -1843,22 +1890,28 @@ export function BookingEngineV2({
                 </div>
               </div>
 
-              {/* Airport Assistance Box (Auto-detected for airport pickups only) */}
-              {airportDetection.isPickupAirport && (
+              {/* Airport Assistance Box (Auto-detected for airport pickups and dropoffs) */}
+              {airportDetection.isAirportTrip && (
                 <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
-                      <PlaneLandingIcon className="w-4 h-4 text-blue-600" />
-                      <span>Airport Transfer Assistance • {airportDetection.airport?.name}</span>
+                      <PlaneLandingIcon className={`w-4 h-4 text-blue-600 ${airportDetection.isDropoffAirport ? 'rotate-45' : ''}`} />
+                      <span>
+                        {airportDetection.isPickupAirport
+                          ? `Airport Arrival Tracking • ${airportDetection.airport?.name || 'STL Lambert Airport'}`
+                          : `Airport Dropoff & Terminal Assistance (Optional) • ${airportDetection.airport?.name || 'STL Lambert Airport'}`}
+                      </span>
                     </div>
                     <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold">
-                      Flight Delay Tracking
+                      {airportDetection.isPickupAirport ? 'Flight Delay Tracking' : 'Terminal Routing (Optional)'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
-                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Airline</span>
+                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Airline {airportDetection.isDropoffAirport ? '(Terminal Door)' : ''}
+                      </span>
                       <select
                         value={form.airline}
                         onChange={(e) => setForm((prev) => ({ ...prev, airline: e.target.value }))}
@@ -1873,7 +1926,9 @@ export function BookingEngineV2({
                       </select>
                     </div>
                     <div>
-                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Flight Number</span>
+                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        {airportDetection.isPickupAirport ? 'Flight Number' : 'Flight Number (Optional)'}
+                      </span>
                       <input
                         type="text"
                         placeholder="e.g. WN 1234"
@@ -1883,7 +1938,9 @@ export function BookingEngineV2({
                       />
                     </div>
                     <div>
-                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">Departing From</span>
+                      <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        {airportDetection.isPickupAirport ? 'Departing From (Origin)' : 'Departing To (Destination - Optional)'}
+                      </span>
                       <input
                         type="text"
                         placeholder="e.g. ORD, ATL, DEN"
@@ -1902,13 +1959,26 @@ export function BookingEngineV2({
                         onChange={(e) => setForm((prev) => ({ ...prev, hasCheckedLuggage: e.target.checked }))}
                         className="rounded border-blue-300 text-blue-600"
                       />
-                      <span>Passenger has checked baggage (allows baggage claim grace period)</span>
+                      <span>
+                        {airportDetection.isPickupAirport
+                          ? 'Passenger has checked baggage (allows baggage claim grace period)'
+                          : 'Passenger has checked baggage to drop off at curbside'}
+                      </span>
                     </label>
                   </div>
 
                   <div className="text-[10px] text-slate-600 bg-white/70 p-2 rounded border border-blue-100 space-y-0.5">
-                    <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
-                    <span>Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.</span>
+                    {airportDetection.isPickupAirport ? (
+                      <>
+                        <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
+                        <span>{bookingConfig.lambertPickupInstructions || 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-slate-800">STL Departures Dropoff Tip: </span>
+                        <span>Terminal 1: American, Delta, United, Spirit, Frontier • Terminal 2: Southwest Airlines. Providing your airline helps your chauffeur drop you off directly at your airline departures entrance.</span>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -2408,10 +2478,11 @@ export function BookingEngineV2({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                         {activeVehicleTiers.map((tier) => {
                           const isSelected =
                             vChoice === tier.id ||
+                            (vChoice === 'any' && tier.id === 'any') ||
                             (vChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
                             (vChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
                             (vChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));
@@ -2464,11 +2535,11 @@ export function BookingEngineV2({
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {activeVehicleTiers.map((tier) => {
                       const isCarSeatRestricted =
                         (totalCarSeats > 0 || returnTotalCarSeats > 0) &&
-                        (tier.id === 'sedan' || tier.id === 'standard' || tier.maxPassengers <= 4);
+                        (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
                       const isPaxRestricted = form.passengers > tier.maxPassengers;
                       const isLuggageRestricted = (form.carryOnBags + form.checkedBags) > tier.maxLuggage;
                       const isWheelchairRestricted =
@@ -2490,6 +2561,7 @@ export function BookingEngineV2({
 
                       const isSelected =
                         form.vehicleChoice === tier.id ||
+                        (form.vehicleChoice === 'any' && tier.id === 'any') ||
                         (form.vehicleChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
                         (form.vehicleChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
                         (form.vehicleChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));

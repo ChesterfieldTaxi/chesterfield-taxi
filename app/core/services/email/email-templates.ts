@@ -22,13 +22,36 @@ export interface RenderedEmail {
 /**
  * Common HTML email shell wrapping branded header, container, and footer.
  */
-function renderEmailShell(contentHtml: string, previewText: string = ''): string {
+export function formatVehicleTier(tier: string): string {
+  if (!tier) return 'Standard Sedan';
+  const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
+  if (clean === 'any') return 'Any Vehicle (Nearest Available)';
+  if (clean === 'standard' || clean === 'sedan') return 'Executive Sedan';
+  if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
+  if (clean === 'compact suv') return 'Compact SUV';
+  if (clean === 'wheelchair' || clean === 'van' || clean === 'wav') return 'Accessible Van / WAV';
+  return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Common HTML email shell wrapping branded header, container, and footer.
+ */
+function renderEmailShell(
+  contentHtml: string,
+  previewText: string = '',
+  companyOverride?: { name?: string; phone?: string; address?: string }
+): string {
+  const companyName = companyOverride?.name || COMPANY_CONFIG.name;
+  const companyPhone = companyOverride?.phone || COMPANY_CONFIG.phone.dispatch;
+  const companyAddress = companyOverride?.address || COMPANY_CONFIG.address.formatted;
+  const rawPhone = companyPhone.replace(/\D/g, '');
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${COMPANY_CONFIG.name}</title>
+  <title>${companyName}</title>
   <!--[if mso]>
   <style type="text/css">
     body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
@@ -45,25 +68,25 @@ function renderEmailShell(contentHtml: string, previewText: string = ''): string
     }
     table { border-collapse: collapse; }
     img { border: 0; outline: none; text-decoration: none; }
-    .email-wrapper { width: 100%; background-color: #f1f5f9; padding: 24px 0; }
-    .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); }
-    .header-banner { background: #0f172a; padding: 28px 24px; text-align: center; }
+    .email-wrapper { width: 100%; background-color: #f1f5f9; padding: 28px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; }
+    .header-banner { background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%); padding: 32px 24px; text-align: center; }
     .header-title { color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.025em; margin: 0; }
-    .header-tagline { color: #f59e0b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 0 0; }
+    .header-tagline { color: #dbeafe; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 6px 0 0 0; }
     .content-body { padding: 28px 24px; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 700; }
-    .badge-amber { background-color: #fef3c7; color: #92400e; }
-    .badge-emerald { background-color: #d1fae5; color: #065f46; }
-    .badge-blue { background-color: #dbeafe; color: #1e40af; }
-    .card-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; }
-    .item-label { font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .badge { display: inline-block; padding: 6px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; }
+    .badge-amber { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-emerald { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .badge-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .card-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 16px 0; }
+    .item-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
     .item-value { font-size: 15px; color: #0f172a; font-weight: 600; }
     .route-point { margin-bottom: 12px; }
     .route-point:last-child { margin-bottom: 0; }
-    .fare-total { font-size: 22px; font-weight: 800; color: #0f172a; }
-    .dispatch-box { background-color: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px; margin: 20px 0; }
+    .fare-total { font-size: 22px; font-weight: 800; color: #1e40af; }
+    .dispatch-box { background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 16px; margin: 20px 0; }
     .footer-section { background-color: #f8fafc; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6; }
-    .footer-link { color: #475569; text-decoration: underline; }
+    .footer-link { color: #2563eb; text-decoration: underline; }
     @media only screen and (max-width: 620px) {
       .email-container { width: 100% !important; border-radius: 0 !important; }
       .content-body { padding: 20px 16px !important; }
@@ -78,7 +101,7 @@ function renderEmailShell(contentHtml: string, previewText: string = ''): string
         <div class="email-container">
           <!-- Header Banner -->
           <div class="header-banner">
-            <h1 class="header-title">${COMPANY_CONFIG.name}</h1>
+            <h1 class="header-title">${companyName}</h1>
             <p class="header-tagline">${COMPANY_CONFIG.tagline}</p>
           </div>
           <!-- Body Content -->
@@ -88,13 +111,13 @@ function renderEmailShell(contentHtml: string, previewText: string = ''): string
           <!-- Footer -->
           <div class="footer-section">
             <p style="margin: 0 0 6px 0; font-weight: 600; color: #334155;">
-              24/7 Dispatch Desk: <a href="tel:${COMPANY_CONFIG.phone.primaryRaw}" style="color: #0f172a; text-decoration: none; font-weight: 700;">${COMPANY_CONFIG.phone.dispatch}</a>
+              24/7 Dispatch Desk: <a href="tel:${rawPhone || COMPANY_CONFIG.phone.primaryRaw}" style="color: #2563eb; text-decoration: none; font-weight: 700;">${companyPhone}</a>
             </p>
             <p style="margin: 0 0 8px 0;">
-              ${COMPANY_CONFIG.operatingHours} • ${COMPANY_CONFIG.address.formatted}
+              ${COMPANY_CONFIG.operatingHours} • ${companyAddress}
             </p>
             <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-              &copy; ${new Date().getFullYear()} ${COMPANY_CONFIG.legalName}. All rights reserved.
+              &copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.
             </p>
           </div>
         </div>
@@ -108,13 +131,15 @@ function renderEmailShell(contentHtml: string, previewText: string = ''): string
 /**
  * Formats payment method for display.
  */
-function formatPaymentMethod(method: string): string {
-  switch (method) {
+function formatPaymentMethod(method?: string): string {
+  if (!method) return 'Standard Fleet Billing';
+  switch (method.toLowerCase()) {
     case 'card':
       return 'Credit / Debit Card';
     case 'cash':
       return 'Pay in Vehicle (Cash / Card)';
     case 'corporate':
+    case 'account':
       return 'Corporate Billing Account';
     default:
       return method.toUpperCase();
@@ -127,51 +152,83 @@ function formatPaymentMethod(method: string): string {
 export function renderPassengerConfirmationEmail(
   payload: BookingConfirmationEmailPayload
 ): RenderedEmail {
-  const subject = `Booking Confirmation - Trip #${payload.tripId} | ${COMPANY_CONFIG.name}`;
+  const companyPhone = payload.companySettings?.phone || COMPANY_CONFIG.phone.dispatch;
+  const companyAddress = payload.companySettings?.address || COMPANY_CONFIG.address.formatted;
+  const companyName = payload.companySettings?.name || COMPANY_CONFIG.name;
+  const rawPhone = companyPhone.replace(/\D/g, '');
+
+  const isConfirmed = payload.status === 'CONFIRMED' || payload.status === 'confirmed';
   const isScheduled = payload.bookingType === 'scheduled';
   const hasFlight = Boolean(
     payload.flightDetails?.airlineCode ||
+    payload.flightDetails?.airlineName ||
     payload.flightDetails?.flightNumber ||
     payload.flightDetails?.isAirportTrip
   );
 
+  const isLambert = 
+    payload.pickupAddress?.toLowerCase().includes('lambert') ||
+    payload.pickupAddress?.toLowerCase().includes('stl airport') ||
+    payload.pickupAddress?.toLowerCase().includes('10701 lambert') ||
+    payload.pickupAddress?.toLowerCase().includes('st. louis lambert') ||
+    payload.pickupAddress?.toLowerCase().includes('st louis lambert');
+
+  const lambertInstructions = payload.lambertPickupInstructions || 
+    'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.';
+
+  const subject = isConfirmed
+    ? `Booking Confirmed - Trip #${payload.tripId} | ${companyName}`
+    : `Booking Request Received - Trip #${payload.tripId} | ${companyName}`;
+
   const html = renderEmailShell(
     `
     <div style="text-align: center; margin-bottom: 24px;">
-      <span class="badge badge-emerald" style="font-size: 13px; padding: 6px 14px;">
-        ✓ Reservation Confirmed
+      <span class="badge badge-blue" style="font-size: 13px; padding: 6px 14px;">
+        ${isConfirmed ? '✓ Reservation Confirmed' : '⏳ Booking Request Received • Under Review'}
       </span>
       <h2 style="font-size: 20px; font-weight: 800; color: #0f172a; margin: 14px 0 4px 0;">
         Thank You, ${payload.passenger.firstName}!
       </h2>
       <p style="margin: 0; color: #64748b; font-size: 14px;">
-        Your ride reservation <strong>#${payload.tripId}</strong> has entered our 24/7 dispatch queue.
+        Your reservation <strong>#${payload.tripId}</strong> ${isConfirmed ? 'is confirmed with dispatch.' : 'has entered our 24/7 dispatch queue.'}
       </p>
     </div>
 
     <!-- Trip Schedule & Vehicle Class -->
-    <div class="card-box" style="margin-top: 0;">
+    <div class="card-box" style="margin-top: 0; border-left: 4px solid #2563eb;">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td width="50%" valign="top" style="padding-bottom: 12px;">
             <div class="item-label">Pickup Timing</div>
             <div class="item-value">
               ${payload.pickupTime}
-              <div style="font-size: 12px; color: #d97706; font-weight: 600; margin-top: 2px;">
+              <div style="font-size: 12px; color: #2563eb; font-weight: 600; margin-top: 2px;">
                 ${isScheduled ? 'Scheduled Reservation' : 'Immediate Dispatch (ASAP)'}
               </div>
             </div>
           </td>
           <td width="50%" valign="top" style="padding-bottom: 12px;">
             <div class="item-label">Vehicle Tier</div>
-            <div class="item-value" style="text-transform: capitalize;">
-              ${payload.vehicleTier} Class
+            <div class="item-value">
+              ${formatVehicleTier(payload.vehicleTier)}
               ${payload.passengerCount ? `<div style="font-size: 12px; color: #64748b; font-weight: normal; margin-top: 2px;">${payload.passengerCount} Passengers • ${payload.luggageCount || 0} Bags</div>` : ''}
             </div>
           </td>
         </tr>
       </table>
     </div>
+
+    ${isLambert ? `
+    <!-- Lambert Airport Curbside Pickup Instructions Box -->
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 16px; margin: 16px 0;">
+      <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 4px;">
+        ✈ STL Lambert Curbside Pickup Instructions
+      </div>
+      <div style="font-size: 12px; color: #1e3a8a; line-height: 1.5;">
+        ${lambertInstructions}
+      </div>
+    </div>
+    ` : ''}
 
     <!-- Route Overview -->
     <div class="card-box">
@@ -180,7 +237,7 @@ export function renderPassengerConfirmationEmail(
       </div>
 
       <div class="route-point">
-        <div class="item-label" style="color: #d97706;">● Pickup Location</div>
+        <div class="item-label" style="color: #2563eb;">● Pickup Location</div>
         <div class="item-value" style="font-size: 14px; font-weight: 600;">
           ${payload.pickupAddress}
         </div>
@@ -208,8 +265,8 @@ export function renderPassengerConfirmationEmail(
 
     ${hasFlight ? `
     <!-- Airport Flight Operations Box -->
-    <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <div style="font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 10px; display: flex; align-items: center;">
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 10px; display: flex; align-items: center;">
         ✈ Airport Flight Operations
       </div>
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -222,16 +279,16 @@ export function renderPassengerConfirmationEmail(
             </div>
           </td>
           <td width="50%" valign="top" style="padding-bottom: 8px;">
-            <div class="item-label">Origin / Route</div>
+            <div class="item-label">Route / Terminal</div>
             <div class="item-value" style="font-size: 14px;">
-              ${payload.flightDetails?.departureAirport ? payload.flightDetails.departureAirport.toUpperCase() : 'Non-stop Arrival'}
+              ${payload.flightDetails?.departureAirport ? payload.flightDetails.departureAirport.toUpperCase() : 'Lambert Airport'}
             </div>
           </td>
         </tr>
         <tr>
           <td colspan="2" style="padding-top: 4px;">
-            <div style="font-size: 12px; color: #92400e;">
-              Checked Bags: <strong>${payload.flightDetails?.hasCheckedLuggage ? 'Yes (Driver will coordinate baggage claim timing)' : 'Carry-on only'}</strong>
+            <div style="font-size: 12px; color: #1e40af;">
+              Checked Bags: <strong>${payload.flightDetails?.hasCheckedLuggage ? 'Yes (Driver coordinates baggage claim timing)' : 'Carry-on only'}</strong>
             </div>
           </td>
         </tr>
@@ -250,7 +307,7 @@ export function renderPassengerConfirmationEmail(
     ` : ''}
 
     <!-- Fare & Payment Summary -->
-    <div class="card-box" style="background-color: #f1f5f9; border-color: #cbd5e1;">
+    <div class="card-box" style="background-color: #f8fafc; border-color: #cbd5e1;">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td valign="middle">
@@ -271,46 +328,49 @@ export function renderPassengerConfirmationEmail(
 
     <!-- Dispatch Assistance Callout -->
     <div class="dispatch-box">
-      <div style="font-weight: 700; color: #854d0e; font-size: 13px; margin-bottom: 4px;">
+      <div style="font-weight: 700; color: #1e40af; font-size: 13px; margin-bottom: 4px;">
         Need to change your pickup time or modify this reservation?
       </div>
-      <div style="font-size: 13px; color: #713f12; line-height: 1.5;">
-        Call our 24/7 dispatch supervisor directly at 
-        <a href="tel:${COMPANY_CONFIG.phone.primaryRaw}" style="font-weight: 700; color: #0f172a; text-decoration: underline;">
-          ${COMPANY_CONFIG.phone.dispatch}
+      <div style="font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+        Call our 24/7 dispatch desk directly at 
+        <a href="tel:${rawPhone || COMPANY_CONFIG.phone.primaryRaw}" style="font-weight: 700; color: #1d4ed8; text-decoration: underline;">
+          ${companyPhone}
         </a>. Reference trip ID <strong>#${payload.tripId}</strong>.
       </div>
     </div>
     `,
-    `Your ${COMPANY_CONFIG.name} reservation #${payload.tripId} is confirmed for ${payload.pickupTime}. Total: $${payload.totalFare.toFixed(2)}.`
+    `Your ${companyName} reservation #${payload.tripId} is ${isConfirmed ? 'confirmed' : 'received'} for ${payload.pickupTime}. Total: $${payload.totalFare.toFixed(2)}.`,
+    payload.companySettings
   );
 
   const text = `
 ========================================
-${COMPANY_CONFIG.name} - RIDE CONFIRMATION
+${companyName} - RIDE CONFIRMATION
 ========================================
 
 Dear ${payload.passenger.firstName} ${payload.passenger.lastName},
 
-Your reservation #${payload.tripId} has been confirmed.
+Your reservation #${payload.tripId} ${isConfirmed ? 'has been confirmed.' : 'has been received and is being processed.'}
 
 TRIP DETAILS:
 - Trip ID: #${payload.tripId}
+- Status: ${isConfirmed ? 'Confirmed' : 'Request Received (Under Review)'}
 - Timing: ${payload.pickupTime} (${isScheduled ? 'Scheduled' : 'ASAP'})
-- Vehicle Class: ${payload.vehicleTier.toUpperCase()}
+- Vehicle Class: ${formatVehicleTier(payload.vehicleTier)}
 - Passengers: ${payload.passengerCount || 1} | Bags: ${payload.luggageCount || 0}
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `(Note: ${payload.pickupNotes})` : ''}
 - Dropoff: ${payload.dropoffAddress} ${payload.dropoffNotes ? `(Note: ${payload.dropoffNotes})` : ''}
-${hasFlight ? `- Flight: ${payload.flightDetails?.airlineCode || ''} ${payload.flightDetails?.flightNumber || ''} from ${payload.flightDetails?.departureAirport || ''}\n` : ''}
+${isLambert ? `- Lambert Pickup Instructions: ${lambertInstructions}\n` : ''}
+${hasFlight ? `- Flight: ${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || ''} ${payload.flightDetails?.flightNumber || ''}\n` : ''}
 ${payload.specialRequests ? `- Driver Notes: ${payload.specialRequests}\n` : ''}
 
 PAYMENT:
 - Payment Method: ${formatPaymentMethod(payload.paymentMethod)}
 - Quoted Total: $${payload.totalFare.toFixed(2)} ${payload.currency}
 
-Need assistance or changes? Call 24/7 Dispatch at ${COMPANY_CONFIG.phone.dispatch}.
+Need assistance or changes? Call 24/7 Dispatch at ${companyPhone}.
 ========================================
-© ${new Date().getFullYear()} ${COMPANY_CONFIG.legalName}
+© ${new Date().getFullYear()} ${companyName}
   `.trim();
 
   return { subject, html, text };
@@ -361,7 +421,7 @@ export function renderDispatcherAlertEmail(
               ${payload.passengerCount || 1} Pax • ${payload.luggageCount || 0} Luggage
             </div>
             <div style="font-size: 12px; color: #d97706; font-weight: 700; text-transform: uppercase; margin-top: 4px;">
-              Tier: ${payload.vehicleTier}
+              Tier: ${formatVehicleTier(payload.vehicleTier)}
             </div>
           </td>
         </tr>
@@ -442,7 +502,8 @@ export function renderDispatcherAlertEmail(
       </table>
     </div>
     `,
-    `[ALERT] New Ride #${payload.tripId} (${payload.bookingType.toUpperCase()}) for ${payload.passengerName}. Pickup: ${payload.pickupAddress}`
+    `[ALERT] New Ride #${payload.tripId} (${payload.bookingType.toUpperCase()}) for ${payload.passengerName}. Pickup: ${payload.pickupAddress}`,
+    payload.companySettings
   );
 
   const text = `
@@ -458,7 +519,7 @@ Pax / Bags: ${payload.passengerCount || 1} Pax / ${payload.luggageCount || 0} Ba
 
 TIMING & TIER:
 - Pickup Time: ${payload.pickupTime}
-- Vehicle Tier: ${payload.vehicleTier.toUpperCase()}
+- Vehicle Tier: ${formatVehicleTier(payload.vehicleTier)}
 
 ROUTING:
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `[Note: ${payload.pickupNotes}]` : ''}

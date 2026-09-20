@@ -14,6 +14,7 @@ import {
   CheckIcon,
   CreditCardIcon,
   InfoIcon,
+  PlaneLandingIcon,
 } from '../../../ui/Icons';
 
 export interface WebsiteFormControlsTabProps {
@@ -367,16 +368,30 @@ export function WebsiteFormControlsTab({
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              ✈️ Airport Transfers &amp; Meet-and-Greet Policy
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
-                <div>
-                  <p className="text-xs font-bold text-slate-800">Require Flight # for Airports</p>
-                  <p className="text-[10px] text-slate-500">STL Lambert &amp; Spirit Airport transfers</p>
-                </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 3: STL Lambert Airport Rules & Curbside Description */}
+      <Card variant="elevated" className="border-blue-200 bg-white shadow-xs">
+        <CardHeader className="border-b border-blue-100 bg-blue-50/50 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-base font-extrabold text-blue-950 flex items-center gap-2">
+              <PlaneLandingIcon className="w-5 h-5 text-blue-600" />
+              STL Lambert Airport Rules &amp; Curbside Pickup Description
+            </CardTitle>
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider self-start sm:self-auto">
+              Airport Automation
+            </span>
+          </div>
+          <CardDescription className="text-xs text-blue-800/80">
+            Configure automated flight tracking, complimentary grace windows, terminal pickup meet points, and customer confirmation email instructions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800">Require Flight # for Airports</label>
                 <input
                   type="checkbox"
                   checked={formConfig.requireFlightNumberForAirport}
@@ -389,48 +404,76 @@ export function WebsiteFormControlsTab({
                   className="w-4 h-4 rounded text-blue-600"
                 />
               </div>
-
-              <div className="p-3 bg-white border border-slate-200 rounded-lg">
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Airport Meet &amp; Greet Preference
-                </label>
-                <select
-                  value={formConfig.airportMeetAndGreetOptions || 'curbside'}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      airportMeetAndGreetOptions: e.target.value as any,
-                    }))
-                  }
-                  className="w-full px-2 py-1 border border-slate-200 rounded text-xs"
-                >
-                  <option value="curbside">Curbside Pickup Only</option>
-                  <option value="baggage_claim">Baggage Claim Inside Escort</option>
-                  <option value="both">Customer Choice at Booking</option>
-                </select>
-              </div>
-
-              <div className="p-3 bg-white border border-slate-200 rounded-lg">
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Flight Delay Grace Period (Mins)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="120"
-                  step="5"
-                  value={formConfig.flightDelayGraceMinutes || 45}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      flightDelayGraceMinutes: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-bold"
-                />
-                <span className="text-[10px] text-slate-400 block mt-0.5">Complimentary airport wait time</span>
-              </div>
+              <span className="text-[10px] text-slate-500 block mt-1">STL Lambert &amp; Spirit transfers</span>
             </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-xs font-bold text-slate-800 block mb-1">
+                Airport Meet &amp; Greet Preference
+              </label>
+              <select
+                value={formConfig.airportMeetAndGreetOptions || 'curbside'}
+                onChange={(e) =>
+                  setFormConfig((prev) => ({
+                    ...prev,
+                    airportMeetAndGreetOptions: e.target.value as any,
+                  }))
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
+              >
+                <option value="curbside">Curbside Pickup Only</option>
+                <option value="baggage_claim">Baggage Claim Inside Escort</option>
+                <option value="both">Customer Choice at Booking</option>
+              </select>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-xs font-bold text-slate-800 block mb-1">
+                Flight Delay Grace Period (Mins)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="120"
+                step="5"
+                value={formConfig.flightDelayGraceMinutes || 45}
+                onChange={(e) =>
+                  setFormConfig((prev) => ({
+                    ...prev,
+                    flightDelayGraceMinutes: Number(e.target.value),
+                  }))
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+              />
+              <span className="text-[10px] text-slate-400 block mt-0.5">Complimentary airport wait time</span>
+            </div>
+          </div>
+
+          {/* Lambert Airport Pickup Location Description */}
+          <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-blue-950 block">
+                STL Lambert Airport Pickup Location Description (Curbside &amp; Baggage Claim)
+              </label>
+              <span className="text-[10px] text-blue-700 font-bold bg-white px-2.5 py-0.5 rounded border border-blue-200 shadow-2xs">
+                Email &amp; Confirmation Notice
+              </span>
+            </div>
+            <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
+              Curbside doors, terminal baggage claim instructions, or specific chauffeur meetup points shown to passengers on the confirmation screen and transactional emails when pickup is STL Lambert Airport.
+            </p>
+            <textarea
+              rows={3}
+              value={formConfig.lambertPickupInstructions ?? 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.'}
+              onChange={(e) =>
+                setFormConfig((prev) => ({
+                  ...prev,
+                  lambertPickupInstructions: e.target.value,
+                }))
+              }
+              placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2..."
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg text-xs text-slate-900 leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            />
           </div>
         </CardContent>
       </Card>

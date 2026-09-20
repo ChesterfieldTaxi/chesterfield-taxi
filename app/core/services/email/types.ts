@@ -39,6 +39,14 @@ export interface BookingConfirmationEmailPayload {
   paymentMethod: string;
   specialRequests?: string;
   flightDetails?: FlightOperationsEmailDetails;
+  status?: string;
+  lambertPickupInstructions?: string;
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 export interface AdminDispatchAlertEmailPayload {
@@ -62,6 +70,14 @@ export interface AdminDispatchAlertEmailPayload {
   specialRequests?: string;
   urgency: 'high' | 'normal';
   flightDetails?: FlightOperationsEmailDetails;
+  status?: string;
+  lambertPickupInstructions?: string;
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 export interface StatusUpdateEmailPayload {

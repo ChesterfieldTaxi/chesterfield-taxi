@@ -34,6 +34,7 @@ import { DEFAULT_TARIFF_PROFILES } from '../pricing/tariff.service';
 import { DEFAULT_UNIVERSAL_EXTRAS } from '../pricing/extras.service';
 import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
+import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,
@@ -48,6 +49,7 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   requireFlightNumberForAirport: false,
   airportMeetAndGreetOptions: 'curbside',
   flightDelayGraceMinutes: 45,
+  lambertPickupInstructions: 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.',
   allowRoundTrip: true,
   roundTripDiscountPercent: 5,
   allowChildSafetySeats: true,
@@ -414,6 +416,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     payments: {},
   },
   constructionMode: COMPANY_CONFIG.constructionMode ?? true,
+  bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
 };
 
 const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -523,6 +526,24 @@ export class AdminConfigService implements IAdminConfigService {
       constructionMode: incoming.constructionMode !== undefined
         ? incoming.constructionMode
         : (DEFAULT_APP_SETTINGS.constructionMode ?? true),
+      bookingRulesConfig: incoming.bookingRulesConfig
+        ? {
+            ...DEFAULT_BOOKING_RULES_CONFIG,
+            ...incoming.bookingRulesConfig,
+            tier1: {
+              ...DEFAULT_BOOKING_RULES_CONFIG.tier1,
+              ...(incoming.bookingRulesConfig.tier1 || {}),
+            },
+            tier2: {
+              ...DEFAULT_BOOKING_RULES_CONFIG.tier2,
+              ...(incoming.bookingRulesConfig.tier2 || {}),
+            },
+            tier3: {
+              ...DEFAULT_BOOKING_RULES_CONFIG.tier3,
+              ...(incoming.bookingRulesConfig.tier3 || {}),
+            },
+          }
+        : (this.cachedSettings?.bookingRulesConfig || { ...DEFAULT_BOOKING_RULES_CONFIG }),
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };
@@ -605,6 +626,24 @@ export class AdminConfigService implements IAdminConfigService {
       configAuditTrail: updatedAuditTrail,
       vehicles: updates.vehicles || this.cachedSettings.vehicles,
       fleet: updates.fleet || this.cachedSettings.fleet,
+      bookingRulesConfig: updates.bookingRulesConfig
+        ? {
+            ...(this.cachedSettings.bookingRulesConfig || DEFAULT_BOOKING_RULES_CONFIG),
+            ...updates.bookingRulesConfig,
+            tier1: {
+              ...(this.cachedSettings.bookingRulesConfig?.tier1 || DEFAULT_BOOKING_RULES_CONFIG.tier1),
+              ...(updates.bookingRulesConfig.tier1 || {}),
+            },
+            tier2: {
+              ...(this.cachedSettings.bookingRulesConfig?.tier2 || DEFAULT_BOOKING_RULES_CONFIG.tier2),
+              ...(updates.bookingRulesConfig.tier2 || {}),
+            },
+            tier3: {
+              ...(this.cachedSettings.bookingRulesConfig?.tier3 || DEFAULT_BOOKING_RULES_CONFIG.tier3),
+              ...(updates.bookingRulesConfig.tier3 || {}),
+            },
+          }
+        : (this.cachedSettings.bookingRulesConfig || { ...DEFAULT_BOOKING_RULES_CONFIG }),
       updatedAt: new Date().toISOString(),
     };
 

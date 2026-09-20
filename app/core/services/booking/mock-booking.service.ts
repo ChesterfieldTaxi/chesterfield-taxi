@@ -36,6 +36,7 @@ import { getTariffService } from '../pricing/tariff.service';
 import { getUniversalExtrasConfig } from '../pricing/extras.service';
 import { getSurchargesConfig } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
+import { generateTripId } from '../../utils/trip-id.util';
 
 
 const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
@@ -317,7 +318,11 @@ export class MockBookingService implements IBookingService {
 
   public async createBooking(payload: CreateTripInput): Promise<Trip> {
     const now = new Date().toISOString();
-    const id = payload.id ?? `trip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = payload.id ?? generateTripId(
+      payload.passenger?.phone,
+      payload.passenger?.email,
+      payload.passenger?.firstName
+    );
     let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
     let blockReason = '';
 

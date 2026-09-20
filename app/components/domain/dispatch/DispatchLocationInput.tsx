@@ -165,6 +165,13 @@ export function DispatchLocationInput({
         } else if (filteredRegional[highlightedIndex]) {
           handleSelectRegional(filteredRegional[highlightedIndex]);
         }
+      } else if (inputValue.trim()) {
+        e.preventDefault();
+        onPlaceSelectedRef.current?.({
+          address: inputValue.trim(),
+          formattedAddress: inputValue.trim(),
+        });
+        setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
@@ -266,8 +273,25 @@ export function DispatchLocationInput({
               </button>
             ))
           ) : (
-            <div className="px-2.5 py-1.5 text-slate-400 italic">
-              Press Enter to use "{inputValue}"
+            <button
+              type="button"
+              onClick={() => {
+                onPlaceSelectedRef.current?.({
+                  address: inputValue.trim(),
+                  formattedAddress: inputValue.trim(),
+                });
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-2.5 py-1.5 text-blue-600 hover:bg-blue-50 font-medium rounded transition-colors cursor-pointer"
+            >
+              Use "{inputValue}" as address
+            </button>
+          )}
+
+          {(mapsStatus === 'error' || hasQuotaError) && (
+            <div className="mt-1 px-2.5 py-1 bg-amber-50 border-t border-amber-200 rounded text-[10px] text-amber-800 flex items-center justify-between">
+              <span>Google Maps: {mapsStatus === 'error' ? 'domain restricted in Google Cloud' : 'quota limit'}</span>
+              <span className="font-semibold text-amber-700">Manual address mode</span>
             </div>
           )}
         </div>

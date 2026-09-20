@@ -56,6 +56,7 @@ import { getTariffService } from '../pricing/tariff.service';
 import { getUniversalExtrasConfig } from '../pricing/extras.service';
 import { getSurchargesConfig } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
+import { generateTripId } from '../../utils/trip-id.util';
 
 
 
@@ -312,11 +313,12 @@ export class FirebaseBookingService implements IBookingService {
 
   public async createBooking(payload: CreateTripInput): Promise<Trip> {
     const now = new Date().toISOString();
-    const tripDocRef = payload.id
-      ? doc(this.db, this.collectionName, payload.id)
-      : doc(collection(this.db, this.collectionName));
-
-    const id = tripDocRef.id;
+    const id = payload.id || generateTripId(
+      payload.passenger?.phone,
+      payload.passenger?.email,
+      payload.passenger?.firstName
+    );
+    const tripDocRef = doc(this.db, this.collectionName, id);
 
     // Phase 29: Evaluate booking request against Rules Engine & Universal Blacklist
     let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';

@@ -19,6 +19,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
+import { getAdminConfigService } from '../../core/services/config/admin-config.service';
+import { formatVehicleTier } from '../../core/utils/trip-id.util';
 
 export interface EmailDeliveryFeedback {
   status: 'idle' | 'sending' | 'sent' | 'simulated' | 'failed';
@@ -44,6 +46,24 @@ export function BookingConfirmation({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const [companyConfig, setCompanyConfig] = React.useState(() => {
+    return getAdminConfigService().getCachedSettings().company;
+  });
+  const [bookingConfig, setBookingConfig] = React.useState(() => {
+    return getAdminConfigService().getCachedSettings().customerBookingConfig;
+  });
+
+  React.useEffect(() => {
+    const configService = getAdminConfigService();
+    const unsubscribe = configService.subscribeToSettings((s) => {
+      if (s.company) setCompanyConfig(s.company);
+      if (s.customerBookingConfig) setBookingConfig(s.customerBookingConfig);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
   const isScheduled = trip.bookingType === 'scheduled';
   const paymentMethodLabel = {
     card: 'Credit / Debit Card',
@@ -54,24 +74,37 @@ export function BookingConfirmation({
 
   const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
 
+  const pickupLower = (trip.pickupLocation.address || '').toLowerCase();
+  const isPickupLambert =
+    pickupLower.includes('lambert') ||
+    pickupLower.includes('stl airport') ||
+    pickupLower.includes('10701 lambert') ||
+    pickupLower.includes('st. louis lambert') ||
+    pickupLower.includes('st louis lambert') ||
+    trip.metadata?.detectedAirportIata === 'STL';
+
+  const lambertInstructions =
+    bookingConfig?.lambertPickupInstructions ||
+    'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.';
+
   return (
-    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-emerald-200/70 shadow-lg'} ${className}`}>
+    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-blue-200/80 shadow-lg'} ${className}`}>
       {/* Top Banner */}
-      <div className={`${isUnconfirmed ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'} px-6 py-8 text-center relative`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-100 text-amber-600' : 'bg-white text-emerald-600'}`}>
+      <div className={`${isUnconfirmed ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white'} px-6 py-8 text-center relative`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-100 text-amber-600' : 'bg-white text-blue-600'}`}>
           {isUnconfirmed ? <ClockIcon className="w-8 h-8 stroke-[3]" /> : <CheckIcon className="w-8 h-8 stroke-[3]" />}
         </div>
         <h2 className="text-2xl font-extrabold tracking-tight">
-          {isUnconfirmed ? 'Ride Request Received' : 'Ride Confirmed!'}
+          {isUnconfirmed ? 'Ride Request Received' : 'Reservation Confirmed!'}
         </h2>
-        <p className={`${isUnconfirmed ? 'text-amber-50' : 'text-emerald-100'} text-sm mt-1 max-w-md mx-auto`}>
+        <p className={`${isUnconfirmed ? 'text-amber-50' : 'text-blue-100'} text-sm mt-1 max-w-md mx-auto`}>
           {isUnconfirmed
             ? 'Your request is under review by our dispatch team. We will notify you shortly via SMS/Email.'
-            : 'Your reservation has entered the Chesterfield dispatch system.'}
+            : `Your reservation has entered the ${companyConfig?.name || COMPANY_CONFIG.name} 24/7 dispatch system.`}
         </p>
 
-        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-amber-600' : 'bg-emerald-700/60'} px-4 py-1.5 rounded-full text-xs font-mono`}>
-          <span className={isUnconfirmed ? 'text-amber-100' : 'text-emerald-200'}>Trip Reference:</span>
+        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-amber-600' : 'bg-blue-800/70 border border-blue-400/30'} px-4 py-1.5 rounded-full text-xs font-mono`}>
+          <span className={isUnconfirmed ? 'text-amber-100' : 'text-blue-200'}>Trip Reference:</span>
           <span className="font-bold text-white tracking-wider">{trip.id}</span>
         </div>
       </div>
@@ -84,7 +117,7 @@ export function BookingConfirmation({
               Reservation Status
             </span>
             <span className="text-sm font-bold text-slate-900 uppercase flex items-center gap-1.5 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-blue-600'}`} />
               Status: {isUnconfirmed ? 'Pending Review' : 'Confirmed'}
             </span>
           </div>
@@ -104,7 +137,7 @@ export function BookingConfirmation({
                 <CalendarIcon className="w-3 h-3" /> Add to Calendar
               </button>
             )}
-            <Badge variant={isUnconfirmed ? 'warning' : 'success'} size="md">
+            <Badge variant={isUnconfirmed ? 'warning' : 'info'} size="md">
               {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
             </Badge>
           </div>
@@ -163,6 +196,23 @@ export function BookingConfirmation({
                 {emailDelivery.status === 'simulated' && (
                   <>A simulated confirmation was logged for <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> (development test mode).</>
                 )}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Lambert Airport Curbside Instructions Callout */}
+        {isPickupLambert && (
+          <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+              <PlaneLandingIcon className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 mb-1 flex items-center gap-1.5">
+                ✈ STL Lambert Curbside Pickup Instructions
+              </h4>
+              <p className="text-xs text-blue-950 leading-relaxed font-medium">
+                {lambertInstructions}
               </p>
             </div>
           </div>
@@ -236,9 +286,9 @@ export function BookingConfirmation({
               <CarIcon className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">Vehicle Tier</span>
-              <span className="text-sm font-bold text-slate-900 capitalize">
-                {trip.vehicleTier} Sedan / SUV
+              <span className="text-xs font-medium text-slate-500 block">Vehicle Preference</span>
+              <span className="text-sm font-bold text-slate-900">
+                {formatVehicleTier(trip.vehicleTier)}
               </span>
             </div>
           </div>
@@ -342,7 +392,18 @@ export function BookingConfirmation({
 
       <CardFooter className="bg-slate-50/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <span className="text-xs text-slate-500 text-center sm:text-left">
-          Questions about your ride? Call 24/7 Dispatch at {COMPANY_CONFIG.phone.dispatch}.
+          Questions about your ride? Call 24/7 Dispatch at{' '}
+          <a
+            href={`tel:${(companyConfig?.phone || COMPANY_CONFIG.phone.dispatch).replace(/\D/g, '')}`}
+            className="font-bold text-blue-600 hover:text-blue-800 underline"
+          >
+            {companyConfig?.phone || COMPANY_CONFIG.phone.dispatch}
+          </a>
+          {companyConfig?.address ? (
+            <span className="block sm:inline sm:before:content-['•'] sm:before:mx-1.5 text-slate-400">
+              {companyConfig.address}
+            </span>
+          ) : null}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           {!isUnconfirmed && trip.id && (

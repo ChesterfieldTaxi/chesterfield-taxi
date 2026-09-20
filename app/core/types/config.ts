@@ -297,6 +297,7 @@ export interface CustomerBookingConfig {
   requireFlightNumberForAirport: boolean;
   airportMeetAndGreetOptions?: 'curbside' | 'baggage_claim' | 'both';
   flightDelayGraceMinutes?: number; // e.g. 45 min
+  lambertPickupInstructions?: string; // Curbside door / baggage claim pickup instructions for STL Lambert Airport
   allowRoundTrip: boolean;
   roundTripDiscountPercent?: number; // e.g. 5%
   allowChildSafetySeats: boolean;

@@ -29,7 +29,7 @@ import {
   type RulePaymentMethod,
   DEFAULT_BOOKING_RULES_CONFIG,
 } from '../../../core/services/bookingRulesEngine';
-import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { getAdminConfigService, DEFAULT_CUSTOMER_BOOKING_CONFIG } from '../../../core/services/config/admin-config.service';
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../../../core/types/zone';
 
@@ -662,6 +662,13 @@ export function AdminRulesTab() {
   const [zones, setZones] = useState<ZoneGeofence[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [lambertInstructions, setLambertInstructions] = useState<string>(() => {
+    const cached = getAdminConfigService().getCachedSettings();
+    return (
+      cached.customerBookingConfig?.lambertPickupInstructions ||
+      'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.'
+    );
+  });
 
   // ─── Real-Time Interactive Simulator State ───
   const [simCustomerScore, setSimCustomerScore] = useState<number>(85);
@@ -685,6 +692,34 @@ export function AdminRulesTab() {
         setZones(res.filter((z) => z.isActive && !z.isArchived));
       })
       .catch(() => {});
+
+    const unsub = getAdminConfigService().subscribeToSettings((s) => {
+      if (s.bookingRulesConfig) {
+        setConfig({
+          ...DEFAULT_BOOKING_RULES_CONFIG,
+          ...s.bookingRulesConfig,
+          tier1: {
+            ...DEFAULT_BOOKING_RULES_CONFIG.tier1,
+            ...(s.bookingRulesConfig?.tier1 || {}),
+          },
+          tier2: {
+            ...DEFAULT_BOOKING_RULES_CONFIG.tier2,
+            ...(s.bookingRulesConfig?.tier2 || {}),
+          },
+          tier3: {
+            ...DEFAULT_BOOKING_RULES_CONFIG.tier3,
+            ...(s.bookingRulesConfig?.tier3 || {}),
+          },
+        });
+      }
+      if (s.customerBookingConfig?.lambertPickupInstructions !== undefined) {
+        setLambertInstructions(s.customerBookingConfig.lambertPickupInstructions);
+      }
+    });
+
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
   }, []);
 
   const handleSave = async () => {
@@ -704,6 +739,11 @@ export function AdminRulesTab() {
 
       await getAdminConfigService().updateSettings({
         bookingRulesConfig: syncConfig,
+        customerBookingConfig: {
+          ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
+          ...(getAdminConfigService().getCachedSettings().customerBookingConfig || {}),
+          lambertPickupInstructions: lambertInstructions,
+        },
       });
       setSaveStatus('Booking rules successfully saved and active.');
       setTimeout(() => setSaveStatus(null), 4000);
@@ -852,6 +892,46 @@ export function AdminRulesTab() {
           zones={zones}
           onChange={(t3) => setConfig({ ...config, tier3: t3 })}
         />
+
+        {/* AIRPORT RULES & CURBSIDE PICKUP INSTRUCTIONS CARD */}
+        <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">✈️</span>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  STL Lambert Airport Curbside Pickup Location Description
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Curbside doors, terminal baggage claim instructions, or specific chauffeur meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
+              Airport Rules
+            </span>
+          </div>
+
+          <textarea
+            rows={3}
+            value={lambertInstructions}
+            onChange={(e) => setLambertInstructions(e.target.value)}
+            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time."
+            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+          />
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>Also synced automatically with Website Studio &rarr; Form Controls &rarr; Airport Rules.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isSaving}
+              onClick={handleSave}
+              className="text-xs font-bold"
+            >
+              Save Airport Description
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* ─── LIVE EVALUATION SANDBOX & SIMULATOR ─── */}
