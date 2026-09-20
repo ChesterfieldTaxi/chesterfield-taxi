@@ -31,18 +31,27 @@ export interface EmailServiceConfig {
 }
 
 function getEnv(key: string): string | undefined {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
+  const envSource =
+    (typeof process !== 'undefined' && process.env) ||
+    (typeof globalThis !== 'undefined' && (globalThis as any).process?.env);
+  if (envSource && envSource[key]) {
+    return envSource[key];
   }
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    return import.meta.env[key];
+  if (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env as any)[key]) {
+    return (import.meta.env as any)[key];
   }
   return undefined;
 }
 
-const DEFAULT_SENDER_EMAIL = getEnv('RESEND_FROM_EMAIL') || COMPANY_CONFIG.email.dispatch;
+const DEFAULT_SENDER_EMAIL =
+  getEnv('RESEND_FROM_EMAIL') ||
+  getEnv('EMAIL_FROM') ||
+  COMPANY_CONFIG.email.dispatch;
 const DEFAULT_FROM_ADDRESS = `${COMPANY_CONFIG.name} <${DEFAULT_SENDER_EMAIL}>`;
-const DEFAULT_ADMIN_EMAIL = getEnv('DISPATCH_ALERT_EMAIL') || COMPANY_CONFIG.email.dispatch;
+const DEFAULT_ADMIN_EMAIL =
+  getEnv('DISPATCH_ALERT_EMAIL') ||
+  getEnv('ADMIN_ALERT_EMAIL') ||
+  COMPANY_CONFIG.email.dispatch;
 
 /**
  * Production Resend Email Dispatch Service.
@@ -52,7 +61,7 @@ const DEFAULT_ADMIN_EMAIL = getEnv('DISPATCH_ALERT_EMAIL') || COMPANY_CONFIG.ema
  */
 function getResolvedFromAddress(configuredFrom?: string): string {
   if (configuredFrom) return configuredFrom;
-  const envFrom = getEnv('RESEND_FROM_EMAIL');
+  const envFrom = getEnv('RESEND_FROM_EMAIL') || getEnv('EMAIL_FROM');
   if (envFrom) {
     return envFrom.includes('<') ? envFrom : `${COMPANY_CONFIG.name} <${envFrom}>`;
   }
@@ -70,7 +79,11 @@ export class ResendEmailService implements IEmailDispatchService {
   constructor(config?: EmailServiceConfig) {
     this.apiKey = config?.apiKey || getEnv('RESEND_API_KEY');
     this.fromAddress = getResolvedFromAddress(config?.fromAddress);
-    this.adminAlertRecipient = config?.adminAlertRecipient || getEnv('DISPATCH_ALERT_EMAIL') || COMPANY_CONFIG.email.dispatch;
+    this.adminAlertRecipient =
+      config?.adminAlertRecipient ||
+      getEnv('DISPATCH_ALERT_EMAIL') ||
+      getEnv('ADMIN_ALERT_EMAIL') ||
+      COMPANY_CONFIG.email.dispatch;
 
     if (this.apiKey) {
       try {
@@ -161,11 +174,17 @@ export class ResendEmailService implements IEmailDispatchService {
 
       if (response.error) {
         console.error('[ResendEmailService] Resend API error response:', response.error);
+        let errorMsg = response.error.message;
+        if (response.error.name === 'validation_error' && errorMsg.includes('not verified')) {
+          errorMsg = `Resend Domain Not Verified: ${errorMsg}. Please verify your domain in resend.com/domains by adding DNS records.`;
+        } else if (response.error.name === 'validation_error' && errorMsg.includes('testing emails')) {
+          errorMsg = `Resend Sandbox Restriction: ${errorMsg}`;
+        }
         return {
           success: false,
           recipient,
           subject,
-          error: response.error.message,
+          error: errorMsg,
           dispatchedAt: new Date().toISOString(),
         };
       }

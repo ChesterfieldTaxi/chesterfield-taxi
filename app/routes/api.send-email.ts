@@ -64,9 +64,32 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export async function loader() {
+  const getEnvVar = (key: string): string | undefined => {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key];
+    }
+    if (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.[key]) {
+      return (globalThis as any).process.env[key];
+    }
+    return undefined;
+  };
+
+  const apiKey = getEnvVar('RESEND_API_KEY');
+  const fromEmail = getEnvVar('RESEND_FROM_EMAIL') || getEnvVar('EMAIL_FROM');
+  const adminEmail = getEnvVar('DISPATCH_ALERT_EMAIL') || getEnvVar('ADMIN_ALERT_EMAIL');
+
   return Response.json({
     status: 'healthy',
     gateway: 'Chesterfield Taxi Resend Email Dispatch Gateway',
     timestamp: new Date().toISOString(),
+    environment: {
+      hasResendApiKey: Boolean(apiKey),
+      apiKeyPrefix: apiKey ? `${apiKey.substring(0, 7)}...` : 'MISSING (Check Vercel Environment Variables)',
+      configuredFromEmail: fromEmail || 'Chesterfield Taxi <onboarding@resend.dev> (Sandbox Default)',
+      configuredAdminAlert: adminEmail || 'dispatch@chesterfieldtaxi.com (Default)',
+    },
+    resendDomainNotice: !fromEmail || fromEmail.includes('onboarding@resend.dev')
+      ? 'Resend sandbox active: Only emails to the registered account owner (admin@chesterfieldtaxi.com) will deliver until a domain is verified at resend.com/domains.'
+      : 'Custom domain sender configured. Ensure your domain DNS records (DKIM, SPF) are verified at resend.com/domains.',
   });
 }

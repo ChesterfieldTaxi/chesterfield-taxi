@@ -110,6 +110,64 @@ export function BookingConfirmation({
           </div>
         </div>
 
+        {/* Email Delivery Feedback Notification */}
+        {emailDelivery && emailDelivery.status !== 'idle' && (
+          <div
+            className={`p-3.5 rounded-xl border text-xs flex items-start gap-3 ${
+              emailDelivery.status === 'sent'
+                ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                : emailDelivery.status === 'failed'
+                ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                : emailDelivery.status === 'simulated'
+                ? 'bg-blue-50/90 border-blue-200 text-blue-950'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="mt-0.5 shrink-0">
+              {emailDelivery.status === 'sent' ? (
+                <CheckIcon className="w-4 h-4 text-emerald-600" />
+              ) : emailDelivery.status === 'failed' ? (
+                <ClockIcon className="w-4 h-4 text-amber-600" />
+              ) : (
+                <MailIcon className="w-4 h-4 text-blue-600" />
+              )}
+            </div>
+            <div className="flex-1 space-y-1">
+              <div className="font-bold flex items-center justify-between">
+                <span>
+                  {emailDelivery.status === 'sent' && 'Confirmation Email Dispatched'}
+                  {emailDelivery.status === 'failed' && 'Email Confirmation Delivery Notice'}
+                  {emailDelivery.status === 'simulated' && 'Simulated Email (Test Mode)'}
+                  {emailDelivery.status === 'sending' && 'Sending Confirmation Email...'}
+                </span>
+                {emailDelivery.messageId && (
+                  <span className="font-mono text-[10px] text-slate-500 font-normal">
+                    ID: {emailDelivery.messageId}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] leading-relaxed opacity-90">
+                {emailDelivery.status === 'sent' && (
+                  <>An itemized confirmation and driver tracking receipt was delivered to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong>.</>
+                )}
+                {emailDelivery.status === 'failed' && (
+                  <>
+                    Your reservation has been saved in our dispatch system, but the email notification to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> could not be delivered by Resend.
+                    {emailDelivery.error && (
+                      <span className="block mt-1.5 p-2 bg-amber-100/70 rounded border border-amber-300/60 font-mono text-[10px] text-amber-950 break-words">
+                        {emailDelivery.error}
+                      </span>
+                    )}
+                  </>
+                )}
+                {emailDelivery.status === 'simulated' && (
+                  <>A simulated confirmation was logged for <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> (development test mode).</>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Route Details */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
