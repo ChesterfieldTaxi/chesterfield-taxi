@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { TariffProfile, TariffRateModel, TariffTaximeterRate } from '~/core/types/tariff';
-import type { VehicleType, VehicleClass } from '~/core/types/config';
+import type { VehicleType, VehicleClass, VehicleTierConfig } from '~/core/types/config';
+import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -20,14 +21,15 @@ import { DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service'
 
 export interface RatesPanelProps {
   tariffs: TariffProfile[];
+  vehicles?: VehicleTierConfig[];
   onSaveTariff: (tariff: TariffProfile) => Promise<void>;
   onDeleteTariff?: (id: string) => Promise<void>;
   isSaving?: boolean;
 }
 
-const VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
-  { id: 'sedan', label: 'Sedan' },
-  { id: 'suv', label: 'SUV' },
+const FALLBACK_VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
+  { id: 'sedan', label: 'Executive Sedan' },
+  { id: 'suv', label: 'SUV (XL)' },
   { id: 'minivan', label: 'Minivan' },
   { id: 'van', label: 'Van / Shuttle' },
   { id: 'wheelchair_wav', label: 'WAV Wheelchair' },
@@ -43,10 +45,29 @@ const VEHICLE_CLASSES: { id: VehicleClass; label: string }[] = [
 
 export function RatesPanel({
   tariffs,
+  vehicles,
   onSaveTariff,
   onDeleteTariff,
   isSaving = false,
 }: RatesPanelProps) {
+  const activeVehicleTypes = useMemo(() => {
+    let source = vehicles;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.vehicles;
+      } catch {
+        source = [];
+      }
+    }
+    if (source && source.length > 0) {
+      const active = source.filter((v) => !v.isArchived);
+      return active.map((v) => ({
+        id: v.id as VehicleType,
+        label: v.name || v.id,
+      }));
+    }
+    return FALLBACK_VEHICLE_TYPES;
+  }, [vehicles]);
   // Strictly show only the 2 primary rates (Airport Flat Rate and METER)
   const primaryTariffs = tariffs.filter(
     (t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter'
@@ -501,8 +522,8 @@ export function RatesPanel({
                 <div>
                   <span className="text-[11px] font-semibold text-slate-600 block mb-1">Eligible Physical Vehicle Types:</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {VEHICLE_TYPES.map((vt) => {
-                      const isChecked = workingCopy.eligibleVehicleTypes?.includes(vt.id);
+                    {activeVehicleTypes.map((vt) => {
+                      const isChecked = workingCopy.eligibleVehicleTypes?.some((t) => t.toLowerCase() === vt.id.toLowerCase());
                       return (
                         <button
                           key={vt.id}

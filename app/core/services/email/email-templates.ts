@@ -25,7 +25,7 @@ export interface RenderedEmail {
 export function formatVehicleTier(tier: string): string {
   if (!tier) return 'Standard Sedan';
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
-  if (clean === 'any') return 'Any Vehicle (Nearest Available)';
+  if (clean === 'any' || clean.startsWith('any')) return 'Any Vehicle (Best Available)';
   if (clean === 'standard' || clean === 'sedan') return 'Executive Sedan';
   if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
   if (clean === 'compact suv') return 'Compact SUV';
@@ -681,7 +681,15 @@ Need assistance or changes? Call 24/7 Dispatch at ${companyPhone}.
 export function renderPassengerConfirmationEmail(
   payload: BookingConfirmationEmailPayload
 ): RenderedEmail {
-  const isConfirmed = payload.status === 'CONFIRMED' || payload.status === 'confirmed';
+  const s = (payload.status || '').trim().toUpperCase();
+  const isConfirmed =
+    s === 'CONFIRMED' ||
+    s === 'ASSIGNED' ||
+    s === 'EN_ROUTE' ||
+    s === 'ARRIVED' ||
+    s === 'IN_PROGRESS' ||
+    s === 'COMPLETED' ||
+    s === 'ACCEPTED';
   if (isConfirmed) {
     return renderBookingConfirmedEmail(payload);
   }

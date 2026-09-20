@@ -666,7 +666,7 @@ export function BookingEngineV2({
 
   // Map vehicle choice to vehicleTier
   const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
-    if (choice === 'any') return 'standard';
+    if (choice === 'any') return 'any';
     if (choice === 'suv') return 'xl';
     if (choice === 'van') return 'wheelchair';
     if (choice === 'sedan') return 'standard';
@@ -719,7 +719,7 @@ export function BookingEngineV2({
           selectedVehicles: [minVehicle],
           isVehicleAutoAssigned: true,
         }));
-      } else if (form.isVehicleAutoAssigned && form.vehicleChoice !== minVehicle) {
+      } else if (form.isVehicleAutoAssigned && form.vehicleChoice !== minVehicle && form.vehicleChoice !== 'any') {
         setForm((prev) => ({
           ...prev,
           vehicleChoice: minVehicle,
@@ -1588,7 +1588,7 @@ export function BookingEngineV2({
               ? new Date(createdTrip.scheduledPickupTime).toLocaleString()
               : 'Immediate Ride (ASAP)',
           bookingType: createdTrip.bookingType,
-          vehicleTier: createdTrip.vehicleTier,
+          vehicleTier: form.vehicleChoice === 'any' ? 'any' : (createdTrip.vehicleTier || 'standard'),
           passengerCount: createdTrip.passenger.passengerCount,
           totalFare: createdTrip.pricing.totalFare,
           currency: createdTrip.pricing.currency || 'USD',

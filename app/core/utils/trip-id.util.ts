@@ -175,7 +175,7 @@ export function validateTripId(tripId: string): TripIdValidationResult {
 export function formatVehicleTier(tier?: string): string {
   if (!tier) return 'Standard Fleet';
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
-  if (clean === 'any') return 'Any Vehicle (Nearest Available)';
+  if (clean === 'any' || clean.startsWith('any')) return 'Any Vehicle (Best Available)';
   if (clean === 'standard' || clean === 'sedan') return 'Executive Sedan';
   if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
   if (clean === 'compact suv') return 'Compact SUV';

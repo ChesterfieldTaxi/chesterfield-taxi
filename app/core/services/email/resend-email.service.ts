@@ -109,10 +109,17 @@ export class ResendEmailService implements IEmailDispatchService {
     // 1. Browser client environment -> delegate to serverless API route
     if (isBrowser) {
       try {
+        const requestPayload = {
+          ...request,
+          recipient,
+          subject,
+          html,
+          text,
+        };
         const response = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
+          body: JSON.stringify(requestPayload),
         });
 
         if (response.ok) {
@@ -208,6 +215,24 @@ export class ResendEmailService implements IEmailDispatchService {
         dispatchedAt: new Date().toISOString(),
       };
     }
+  }
+
+  /**
+   * Dispatches pre-rendered transactional email directly.
+   */
+  public async sendDirect(params: {
+    recipient: string;
+    subject: string;
+    html: string;
+    text?: string;
+  }): Promise<EmailDispatchResult> {
+    return this.dispatch(
+      { type: 'booking_confirmation' as any, payload: {} as any },
+      params.recipient,
+      params.subject,
+      params.html,
+      params.text || ''
+    );
   }
 
   /**

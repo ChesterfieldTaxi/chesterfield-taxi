@@ -29,24 +29,33 @@ export async function action({ request }: ActionFunctionArgs) {
     const emailService = new ResendEmailService();
 
     let result;
-    switch (body.type) {
-      case 'booking_confirmation':
-        result = await emailService.sendBookingConfirmation(body.payload);
-        break;
-      case 'dispatcher_alert':
-        result = await emailService.sendAdminDispatchAlert(body.payload);
-        break;
-      case 'status_update':
-        result = await emailService.sendStatusUpdateNotification(body.payload);
-        break;
-      case 'booking_declined':
-        result = await emailService.sendBookingDeclined(body.payload);
-        break;
-      default:
-        return Response.json(
-          { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },
-          { status: 400 }
-        );
+    if (body.subject && body.html && body.recipient) {
+      result = await emailService.sendDirect({
+        recipient: body.recipient,
+        subject: body.subject,
+        html: body.html,
+        text: body.text,
+      });
+    } else {
+      switch (body.type) {
+        case 'booking_confirmation':
+          result = await emailService.sendBookingConfirmation(body.payload);
+          break;
+        case 'dispatcher_alert':
+          result = await emailService.sendAdminDispatchAlert(body.payload);
+          break;
+        case 'status_update':
+          result = await emailService.sendStatusUpdateNotification(body.payload);
+          break;
+        case 'booking_declined':
+          result = await emailService.sendBookingDeclined(body.payload);
+          break;
+        default:
+          return Response.json(
+            { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },
+            { status: 400 }
+          );
+      }
     }
 
     return Response.json(result);

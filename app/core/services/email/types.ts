@@ -133,11 +133,17 @@ export interface EmailDispatchResult {
   simulated?: boolean;
 }
 
-export type EmailDispatchApiRequest =
+export type EmailDispatchApiRequest = (
   | { type: 'booking_confirmation'; payload: BookingConfirmationEmailPayload }
   | { type: 'dispatcher_alert'; payload: AdminDispatchAlertEmailPayload }
   | { type: 'status_update'; payload: StatusUpdateEmailPayload }
-  | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload };
+  | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload }
+) & {
+  subject?: string;
+  html?: string;
+  text?: string;
+  recipient?: string;
+};
 
 /**
  * Transactional Email Dispatch Service Interface

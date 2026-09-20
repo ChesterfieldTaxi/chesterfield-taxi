@@ -217,6 +217,7 @@ export function PricingAdminWorkspace({
           {activeTab === 'rates' && (
             <RatesPanel
               tariffs={tariffs}
+              vehicles={settings?.vehicles}
               onSaveTariff={handleSaveTariff}
               onDeleteTariff={handleDeleteTariff}
               isSaving={isLoading}
@@ -235,6 +236,7 @@ export function PricingAdminWorkspace({
             <SurchargesPanel
               surcharges={surcharges}
               tariffs={tariffs}
+              vehicles={settings?.vehicles}
               onSave={handleSaveSurcharges}
               isSaving={isLoading}
             />

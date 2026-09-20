@@ -452,19 +452,21 @@ export function matchTariffProfile(
 
     // Vehicle tier check
     if (t.triggers.vehicleTiers && t.triggers.vehicleTiers.length > 0) {
-      const matchVehicle = t.triggers.vehicleTiers.some((tier) => {
-        const lower = tier.toLowerCase();
-        return (
-          lower === requestedTier ||
-          (lower === 'sedan' && (requestedTier === 'standard' || requestedTier === 'premium')) ||
-          (lower === 'standard' && (requestedTier === 'sedan' || requestedTier === 'premium')) ||
-          (lower === 'van' && (requestedTier === 'xl' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
-          (lower === 'xl' && (requestedTier === 'van' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
-          (lower === 'suv' && (requestedTier === 'xl' || requestedTier === 'van' || requestedTier === 'wheelchair')) ||
-          (lower === 'wheelchair' && (requestedTier === 'van' || requestedTier === 'xl'))
-        );
-      });
-      if (!matchVehicle) return false;
+      if (requestedTier !== 'any') {
+        const matchVehicle = t.triggers.vehicleTiers.some((tier) => {
+          const lower = tier.toLowerCase();
+          return (
+            lower === requestedTier ||
+            (lower === 'sedan' && (requestedTier === 'standard' || requestedTier === 'premium')) ||
+            (lower === 'standard' && (requestedTier === 'sedan' || requestedTier === 'premium')) ||
+            (lower === 'van' && (requestedTier === 'xl' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
+            (lower === 'xl' && (requestedTier === 'van' || requestedTier === 'wheelchair' || requestedTier === 'suv')) ||
+            (lower === 'suv' && (requestedTier === 'xl' || requestedTier === 'van' || requestedTier === 'wheelchair')) ||
+            (lower === 'wheelchair' && (requestedTier === 'van' || requestedTier === 'xl'))
+          );
+        });
+        if (!matchVehicle) return false;
+      }
     }
 
     // Day of week check

@@ -45,6 +45,7 @@ import {
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
+import { formatVehicleTier } from '../core/services/email/email-templates';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
@@ -1060,7 +1061,7 @@ export default function DispatchRoute() {
             ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
             : 'Immediate Ride (ASAP)',
         bookingType: reviewTrip.bookingType,
-        vehicleTier: reviewTrip.vehicleTier,
+        vehicleTier: reviewTrip.vehicleTier || (reviewMeta.vehiclePreference as string) || 'any',
         passengerCount: reviewTrip.passenger.passengerCount,
         luggageCount: reviewTrip.passenger.luggageCount,
         totalFare: reviewTrip.pricing?.totalFare || 0,
@@ -1349,8 +1350,8 @@ export default function DispatchRoute() {
       alert('All selected trip(s) are already confirmed or completed.');
       return;
     }
-
     try {
+      const emailService = getEmailDispatchService();
       for (const t of tripsToConfirm) {
         if (bookingService.updateTripStatus) {
           await bookingService.updateTripStatus(t.id, 'CONFIRMED', {
@@ -1359,6 +1360,41 @@ export default function DispatchRoute() {
           });
         } else if (bookingService.updateTrip) {
           await bookingService.updateTrip(t.id, { status: 'CONFIRMED' });
+        }
+
+        if (t.passenger?.email) {
+          try {
+            const meta = (t.metadata || {}) as Record<string, any>;
+            emailService.sendBookingConfirmation({
+              tripId: t.id,
+              status: 'CONFIRMED',
+              passenger: {
+                firstName: t.passenger.firstName,
+                lastName: t.passenger.lastName,
+                email: t.passenger.email,
+                phone: t.passenger.phone,
+              },
+              pickupAddress: t.pickupLocation?.address || '',
+              dropoffAddress: t.dropoffLocation?.address || '',
+              pickupTime:
+                t.bookingType === 'scheduled' && t.scheduledPickupTime
+                  ? new Date(t.scheduledPickupTime).toLocaleString()
+                  : 'Immediate Ride (ASAP)',
+              bookingType: t.bookingType,
+              vehicleTier: t.vehicleTier || (meta.vehiclePreference as string) || 'any',
+              passengerCount: t.passenger?.passengerCount,
+              luggageCount: t.passenger?.luggageCount,
+              totalFare: t.pricing?.totalFare || 0,
+              currency: t.pricing?.currency || 'USD',
+              paymentMethod: t.payment?.method || 'cash',
+              specialRequests: t.passenger?.specialRequests,
+              oversizedBags: meta.oversizedBags as Record<string, number> | undefined,
+              oversizedItemsSummary: meta.oversizedItemsSummary as string | undefined,
+              pickupNotes: meta.pickupLocationDescription as string | undefined,
+            }).catch((err) => console.warn('[Dispatch] Batch confirmation email error:', err));
+          } catch (e) {
+            console.warn('[Dispatch] Batch confirmation email skipped:', e);
+          }
         }
       }
       setTrips((prev) =>
@@ -5817,7 +5853,9 @@ export default function DispatchRoute() {
                     <div className="space-y-1 text-slate-600">
                       <div>
                         <span className="font-semibold">Vehicle Class: </span>
-                        <span className="capitalize font-bold text-slate-800">{reviewTrip.vehicleTier || 'Standard Sedan'}</span>
+                        <span className="font-bold text-slate-800">
+                          {formatVehicleTier(reviewTrip.vehicleTier || (reviewTrip.metadata as any)?.vehiclePreference || 'standard')}
+                        </span>
                       </div>
                       <div>
                         <span className="font-semibold">Estimated Fare: </span>

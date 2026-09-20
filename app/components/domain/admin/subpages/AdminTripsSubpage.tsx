@@ -297,6 +297,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
             const sendResult = await emailService.sendBookingConfirmation({
               tripId: currentTrip.id,
+              status: (newStatus === 'CONFIRMED' || newStatus === 'confirmed') ? 'CONFIRMED' : newStatus,
               passenger: {
                 firstName: currentTrip.passenger?.firstName || 'Valued',
                 lastName: currentTrip.passenger?.lastName || 'Customer',

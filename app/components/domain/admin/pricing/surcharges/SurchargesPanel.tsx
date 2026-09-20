@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import type { SurchargesConfig, CustomSurchargeItem, CustomSurchargeTrigger } from '~/core/types/config';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { SurchargesConfig, CustomSurchargeItem, CustomSurchargeTrigger, VehicleTierConfig } from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
+import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -19,12 +20,13 @@ import {
 export interface SurchargesPanelProps {
   surcharges: SurchargesConfig;
   tariffs: TariffProfile[];
+  vehicles?: VehicleTierConfig[];
   onSave: (updated: SurchargesConfig) => Promise<void>;
   isSaving?: boolean;
 }
 
-const COMMON_VEHICLES = [
-  { id: 'sedan', label: 'Sedan' },
+const FALLBACK_VEHICLES = [
+  { id: 'sedan', label: 'Executive Sedan' },
   { id: 'suv', label: 'SUV (XL)' },
   { id: 'minivan', label: 'Minivan' },
   { id: 'van', label: 'Van / Shuttle' },
@@ -34,9 +36,29 @@ const COMMON_VEHICLES = [
 export function SurchargesPanel({
   surcharges,
   tariffs,
+  vehicles,
   onSave,
   isSaving = false,
 }: SurchargesPanelProps) {
+  const activeVehicles = useMemo(() => {
+    let source = vehicles;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.vehicles;
+      } catch {
+        source = [];
+      }
+    }
+    if (source && source.length > 0) {
+      return source
+        .filter((v) => !v.isArchived)
+        .map((v) => ({
+          id: v.id,
+          label: v.name || v.id,
+        }));
+    }
+    return FALLBACK_VEHICLES;
+  }, [vehicles]);
   const normalizeConfig = (cfg: SurchargesConfig): SurchargesConfig => {
     const copy = JSON.parse(JSON.stringify(cfg));
     copy.airportGateFee = copy.airportGateFee ?? copy.airportCommercialGateFee ?? 4.0;
@@ -650,7 +672,10 @@ export function SurchargesPanel({
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       {item.triggers?.vehicleTiers && item.triggers.vehicleTiers.length > 0 && (
                         <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-medium">
-                          Vehicles: {item.triggers.vehicleTiers.join(', ').toUpperCase()}
+                          Vehicles: {item.triggers.vehicleTiers.map((tId) => {
+                            const found = activeVehicles.find((av) => av.id.toLowerCase() === tId.toLowerCase());
+                            return found ? found.label : tId.toUpperCase();
+                          }).join(', ')}
                         </Badge>
                       )}
                       {item.triggers?.minDistanceMiles !== undefined && (
@@ -770,8 +795,8 @@ export function SurchargesPanel({
                   Trigger on Vehicle Types (Leave empty for all vehicles):
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {COMMON_VEHICLES.map((v) => {
-                    const isSelected = formVehicleTiers.includes(v.id);
+                  {activeVehicles.map((v) => {
+                    const isSelected = formVehicleTiers.some((id) => id.toLowerCase() === v.id.toLowerCase());
                     return (
                       <button
                         key={v.id}
@@ -779,7 +804,7 @@ export function SurchargesPanel({
                         onClick={() => {
                           setFormVehicleTiers(
                             isSelected
-                              ? formVehicleTiers.filter((id) => id !== v.id)
+                              ? formVehicleTiers.filter((id) => id.toLowerCase() !== v.id.toLowerCase())
                               : [...formVehicleTiers, v.id]
                           );
                         }}

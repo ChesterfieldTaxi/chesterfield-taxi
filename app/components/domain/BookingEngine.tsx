@@ -854,7 +854,8 @@ export function BookingEngine({
               ? new Date(primaryTrip.scheduledPickupTime).toLocaleString()
               : 'Immediate Ride (ASAP)',
             bookingType: primaryTrip.bookingType,
-            vehicleTier: primaryTrip.vehicleTier,
+            status: primaryTrip.status || 'UNCONFIRMED',
+            vehicleTier: (formValues.vehicleTier as string) === 'any' ? 'any' : (primaryTrip.vehicleTier || 'standard'),
             passengerCount: primaryTrip.passenger.passengerCount,
             luggageCount: primaryTrip.passenger.luggageCount,
             totalFare: primaryTrip.pricing.totalFare,
