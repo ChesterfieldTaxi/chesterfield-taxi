@@ -74,6 +74,7 @@ export function BookingConfirmation({
   }[trip.payment.method];
 
   const isUnconfirmed = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+  const meta = (trip.metadata || {}) as Record<string, any>;
 
   const pickupLower = (trip.pickupLocation.address || '').toLowerCase();
   const isPickupLambert =
@@ -82,7 +83,7 @@ export function BookingConfirmation({
     pickupLower.includes('10701 lambert') ||
     pickupLower.includes('st. louis lambert') ||
     pickupLower.includes('st louis lambert') ||
-    trip.metadata?.detectedAirportIata === 'STL';
+    meta.detectedAirportIata === 'STL';
 
   const lambertInstructions =
     bookingConfig?.lambertPickupInstructions ||
@@ -366,7 +367,7 @@ export function BookingConfirmation({
                 <div>
                   <span className="text-slate-500 block font-medium">Airline</span>
                   <span className="font-bold text-slate-800">
-                    {String(trip.metadata?.airlineName || trip.metadata?.airlineCode || 'N/A')}
+                    {String(trip.metadata?.airlineName || trip.metadata?.airline || trip.metadata?.airlineCode || 'N/A')}
                   </span>
                 </div>
                 <div>
@@ -378,7 +379,9 @@ export function BookingConfirmation({
                 <div>
                   <span className="text-slate-500 block font-medium">Origin</span>
                   <span className="font-bold text-slate-800 truncate block">
-                    {trip.metadata?.departureAirport ? String(trip.metadata.departureAirport).toUpperCase() : 'N/A'}
+                    {trip.metadata?.flightOrigin || trip.metadata?.departureAirport
+                      ? String(trip.metadata.flightOrigin || trip.metadata.departureAirport).toUpperCase()
+                      : 'N/A'}
                   </span>
                 </div>
                 <div>
@@ -391,6 +394,81 @@ export function BookingConfirmation({
             </div>
           </div>
         ) : null}
+
+        {/* Linked Return Leg Summary (if booked as round trip) */}
+        {Boolean(meta.hasReturnTrip) && (
+          <div className="pt-4 border-t border-slate-100">
+            <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                  🔁 Return Trip Scheduled
+                  {Boolean(meta.returnTripId) && (
+                    <span className="font-mono text-[10px] text-indigo-700 font-normal">
+                      (Trip #{String(meta.returnTripId)})
+                    </span>
+                  )}
+                </span>
+                <Badge variant="info" size="sm">
+                  Round Trip Guaranteed
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 block font-medium">Return Pickup</span>
+                  <span className="font-bold text-slate-800 block truncate">
+                    {String(meta.returnPickupAddress || 'N/A')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Return Dropoff</span>
+                  <span className="font-bold text-slate-800 block truncate">
+                    {String(meta.returnDropoffAddress || 'N/A')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Date & Time</span>
+                  <span className="font-bold text-slate-800">
+                    {meta.returnDate ? `${meta.returnDate} at ${meta.returnTime || 'TBD'}` : 'Scheduled Return'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-medium">Return Fare</span>
+                  <span className="font-bold text-slate-800">
+                    ${Number(meta.returnFare || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {Boolean(meta.returnFlightNumber || meta.returnAirline) && (
+                <div className="pt-2 border-t border-indigo-200/60 bg-white/80 p-2.5 rounded-lg text-xs space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1">
+                    <PlaneLandingIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    Return Flight Information
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-500 block font-medium">Airline</span>
+                      <span className="font-bold text-slate-800">{String(meta.returnAirline || 'N/A')}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Flight #</span>
+                      <span className="font-bold text-slate-800">{String(meta.returnFlightNumber || 'N/A')}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Origin</span>
+                      <span className="font-bold text-slate-800">{String(meta.returnFlightOrigin || 'N/A')}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Checked Bags</span>
+                      <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Oversized Cargo Breakdown */}
         {Boolean(trip.metadata?.hasOversizedLuggage || trip.metadata?.oversizedItemsSummary) && (

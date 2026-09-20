@@ -1071,10 +1071,12 @@ export default function DispatchRoute() {
         oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
         oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
         pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
-        flightDetails: reviewMeta.flightNumber
+        flightDetails: (reviewMeta.flightNumber || reviewMeta.airline || reviewMeta.airlineName)
           ? {
-              flightNumber: String(reviewMeta.flightNumber),
-              airlineName: (reviewMeta.airlineName || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airlineCode) : undefined,
+              flightNumber: reviewMeta.flightNumber ? String(reviewMeta.flightNumber) : undefined,
+              airlineName: (reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) : undefined,
+              departureAirport: reviewMeta.flightOrigin || reviewMeta.departureAirport ? String(reviewMeta.flightOrigin || reviewMeta.departureAirport) : undefined,
+              hasCheckedLuggage: Boolean(reviewMeta.hasCheckedLuggage),
               isAirportTrip: Boolean(reviewMeta.isAirportTrip),
             }
           : undefined,
@@ -1389,8 +1391,16 @@ export default function DispatchRoute() {
               paymentMethod: t.payment?.method || 'cash',
               specialRequests: t.passenger?.specialRequests,
               oversizedBags: meta.oversizedBags as Record<string, number> | undefined,
-              oversizedItemsSummary: meta.oversizedItemsSummary as string | undefined,
               pickupNotes: meta.pickupLocationDescription as string | undefined,
+              flightDetails: (meta.flightNumber || meta.airline || meta.airlineName)
+                ? {
+                    flightNumber: meta.flightNumber ? String(meta.flightNumber) : undefined,
+                    airlineName: (meta.airlineName || meta.airline || meta.airlineCode) ? String(meta.airlineName || meta.airline || meta.airlineCode) : undefined,
+                    departureAirport: meta.flightOrigin || meta.departureAirport ? String(meta.flightOrigin || meta.departureAirport) : undefined,
+                    hasCheckedLuggage: Boolean(meta.hasCheckedLuggage),
+                    isAirportTrip: Boolean(meta.isAirportTrip),
+                  }
+                : undefined,
             }).catch((err) => console.warn('[Dispatch] Batch confirmation email error:', err));
           } catch (e) {
             console.warn('[Dispatch] Batch confirmation email skipped:', e);
@@ -5757,7 +5767,11 @@ export default function DispatchRoute() {
         const bookerPhone = tripMeta.bookerPhone ? String(tripMeta.bookerPhone) : null;
         const corporateOrgName = tripMeta.corporateOrgName ? String(tripMeta.corporateOrgName) : null;
         const flightNumber = tripMeta.flightNumber ? String(tripMeta.flightNumber) : null;
-        const airline = tripMeta.airline ? String(tripMeta.airline) : '';
+        const airline = tripMeta.airline || tripMeta.airlineName ? String(tripMeta.airline || tripMeta.airlineName) : '';
+        const flightOrigin = tripMeta.flightOrigin || tripMeta.departureAirport ? String(tripMeta.flightOrigin || tripMeta.departureAirport) : null;
+        const hasCheckedLuggage = Boolean(tripMeta.hasCheckedLuggage);
+        const isReturnRide = Boolean(tripMeta.isReturnRide || tripMeta.linkedTripId);
+        const linkedTripId = tripMeta.linkedTripId ? String(tripMeta.linkedTripId) : null;
         const luggageType = tripMeta.luggageType ? String(tripMeta.luggageType) : 'Standard';
         const oversizedLuggageNotes = tripMeta.oversizedLuggageNotes ? String(tripMeta.oversizedLuggageNotes) : null;
         const hasOversizedLuggage = Boolean(tripMeta.hasOversizedLuggage);
@@ -5777,6 +5791,11 @@ export default function DispatchRoute() {
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider animate-pulse">
                         Pending Review
                       </span>
+                      {isReturnRide && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-400 text-indigo-950 uppercase tracking-wider">
+                          🔁 Return Leg #{linkedTripId ? `(${linkedTripId})` : ''}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-400 font-mono">
                       Trip #{reviewTrip.id} • Created {new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}
@@ -5864,9 +5883,19 @@ export default function DispatchRoute() {
                         </span>{' '}
                         <span className="text-[10px] text-slate-500 uppercase">({reviewTrip.payment?.method || 'Cash'})</span>
                       </div>
-                      {flightNumber && (
-                        <div className="text-[11px] text-blue-700 font-semibold">
-                          ✈️ Flight: {airline} #{flightNumber}
+                      {(flightNumber || airline) && (
+                        <div className="p-2 bg-blue-50/80 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-0.5">
+                          <div className="font-bold flex items-center gap-1 text-blue-900">
+                            ✈️ Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}
+                          </div>
+                          {flightOrigin && (
+                            <div className="text-blue-800">
+                              Departing From: <span className="font-semibold">{flightOrigin}</span>
+                            </div>
+                          )}
+                          <div>
+                            Checked Luggage: <span className="font-semibold">{hasCheckedLuggage ? 'Yes (Baggage Claim)' : 'No'}</span>
+                          </div>
                         </div>
                       )}
                     </div>
