@@ -522,24 +522,41 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
 // STEP 3: Vehicle Multiplier Application
 // ----------------------------------------------------------------------------
 export const applyVehicleMultiplier: PricingPipelineStep = (context) => {
-  if (context.tariffProfileId) {
+  // If matched tariff has an explicit flat corridor, hourly charter, or zip matrix, preserve contract rate
+  if (context.matchedCorridorId || context.input.isHourlyBooking) {
     return context;
   }
+  const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
+  if (matchedTariff?.rateModel === 'zip_matrix' || matchedTariff?.rateModel === 'hourly') {
+    return context;
+  }
+  // If tariff has a single dedicated vehicle tier, that tariff already specifically prices that tier
+  if (matchedTariff?.triggers?.vehicleTiers && matchedTariff.triggers.vehicleTiers.length === 1) {
+    return context;
+  }
+
   const tier = context.input.vehicleTier || 'standard';
   const multiplier = context.config.vehicleMultipliers[tier] ?? 1.0;
+  if (multiplier === 1.0) {
+    return {
+      ...context,
+      vehicleMultiplier: 1.0,
+    };
+  }
 
   // The vehicle multiplier scales the mileage and duration fare
   const variableFare = context.distanceFare + context.timeFare;
   const scaledVariableFare = roundCurrency(variableFare * multiplier);
   const delta = roundCurrency(scaledVariableFare - variableFare);
 
-  const newSubtotal = roundCurrency(context.baseFare + scaledVariableFare);
+  const newSubtotal = roundCurrency(context.subtotal + delta);
+  const newTotalFare = roundCurrency(context.totalFare + delta);
 
   return {
     ...context,
     vehicleMultiplier: multiplier,
     subtotal: newSubtotal,
-    totalFare: newSubtotal,
+    totalFare: newTotalFare,
     auditTrail: appendAudit(
       context.auditTrail,
       3,

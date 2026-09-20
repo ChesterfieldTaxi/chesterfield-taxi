@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Trip, GeoPoint, CreateTripInput, VehicleTier, PaymentMethod } from '../../../core/types';
-import type { NamedPricingRule, CorporateAccountConfig } from '../../../core/types/config';
+import type { NamedPricingRule, CorporateAccountConfig, VehicleTierConfig } from '../../../core/types/config';
 import { getBookingService } from '../../../core/services/booking';
 import { calculateLiveRoute } from '../../../core/services/maps/live-routing.service';
 import { calculateTripPricing, getPricingRulesService } from '../../../core/services/pricing';
@@ -57,7 +57,7 @@ export interface CarSeatsBreakdown {
   booster: number;
 }
 
-export type VehicleChoice = 'any' | 'sedan' | 'suv' | 'van';
+export type VehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});
 
 export interface ReturnTripDetails {
   returnTrip: boolean;
@@ -260,13 +260,23 @@ export function DispatchBookingEngine({
     return () => unsub();
   }, []);
 
-  // Subscribe to real-time corporate accounts from Firestore / config
+  // Subscribe to real-time corporate accounts and vehicle classes from Firestore / config
   const [corporateAccountList, setCorporateAccountList] = useState<CorporateAccountConfig[]>([]);
+  const [vehicleTiers, setVehicleTiers] = useState<VehicleTierConfig[]>(() => {
+    const cached = getAdminConfigService().getCachedSettings();
+    if (cached?.vehicles && cached.vehicles.length > 0) {
+      return cached.vehicles.filter((v) => !v.isArchived);
+    }
+    return [];
+  });
 
   useEffect(() => {
     const unsub = getAdminConfigService().subscribeToSettings((settings) => {
       if (settings?.corporateAccounts && settings.corporateAccounts.length > 0) {
         setCorporateAccountList(settings.corporateAccounts);
+      }
+      if (settings?.vehicles && settings.vehicles.length > 0) {
+        setVehicleTiers(settings.vehicles.filter((v) => !v.isArchived));
       }
     });
     return () => unsub();
@@ -327,12 +337,48 @@ export function DispatchBookingEngine({
     maxTotalCarSeats: 4,
   };
 
-  const vehicleCapacities = COMPANY_CONFIG.vehicleCapacities || {
-    sedan: { maxPassengers: 4, maxBags: 3 },
-    suv: { maxPassengers: 6, maxBags: 5 },
-    van: { maxPassengers: 7, maxBags: 6 },
-    any: { maxPassengers: 4, maxBags: 3 },
-  };
+  const dispatchVehicleOptions = useMemo(() => {
+    const options: Array<{ key: VehicleChoice; label: string; badge?: string; maxPassengers: number; maxBags: number }> = [
+      { key: 'any', label: 'Any', maxPassengers: 4, maxBags: 3 }
+    ];
+
+    if (vehicleTiers.length > 0) {
+      for (const tier of vehicleTiers) {
+        options.push({
+          key: tier.id as VehicleChoice,
+          label: tier.name,
+          badge: tier.badge,
+          maxPassengers: tier.maxPassengers,
+          maxBags: tier.maxLuggage,
+        });
+      }
+    } else {
+      options.push(
+        { key: 'sedan', label: 'Sedan', maxPassengers: 4, maxBags: 3 },
+        { key: 'suv', label: 'SUV', maxPassengers: 6, maxBags: 5 },
+        { key: 'van', label: 'Van', maxPassengers: 7, maxBags: 6 },
+      );
+    }
+    return options;
+  }, [vehicleTiers]);
+
+  const vehicleCapacities = useMemo(() => {
+    const map: Record<string, { maxPassengers: number; maxBags: number; name?: string }> = {
+      any: { maxPassengers: 4, maxBags: 3, name: 'Any' },
+      sedan: { maxPassengers: 4, maxBags: 3, name: 'Sedan' },
+      suv: { maxPassengers: 6, maxBags: 5, name: 'SUV' },
+      van: { maxPassengers: 7, maxBags: 6, name: 'Van' },
+    };
+
+    for (const opt of dispatchVehicleOptions) {
+      map[opt.key] = {
+        maxPassengers: opt.maxPassengers,
+        maxBags: opt.maxBags,
+        name: opt.label,
+      };
+    }
+    return map;
+  }, [dispatchVehicleOptions]);
 
   // Compute fleet capacities from sum of selected vehicles
   const totalMaxPassengers = selectedVehicles.reduce(
@@ -1246,7 +1292,7 @@ export function DispatchBookingEngine({
         booster: boosterCount,
       },
       selectedVehicles,
-      vehicle: selectedVehicles[0] || { type: 'Sedan', count: 1 },
+      vehicle: selectedVehicles[0] || 'sedan',
       paymentMethod,
       cardDetails: {
         cardPaymentType,
@@ -2245,14 +2291,15 @@ export function DispatchBookingEngine({
                 className="p-1.5 bg-white border border-slate-300 rounded-lg shadow-2xs flex items-center gap-2"
               >
                 <span className="text-[10px] font-bold text-slate-400 w-5">#{idx + 1}</span>
-                <div className="flex-1 grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded">
-                  {(['any', 'sedan', 'suv', 'van'] as const).map((tierKey) => {
-                    const isSelected = vChoice === tierKey;
-                    const cap = vehicleCapacities[tierKey] || { maxPassengers: 4, maxBags: 3 };
-                    const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
-
+                <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-slate-100 rounded">
+                  {dispatchVehicleOptions.map((opt) => {
+                    const isSelected =
+                      vChoice === opt.key ||
+                      (vChoice === 'sedan' && (opt.key === 'standard' || opt.key === 'sedan')) ||
+                      (vChoice === 'suv' && (opt.key === 'xl' || opt.key === 'suv')) ||
+                      (vChoice === 'van' && (opt.key === 'wheelchair' || opt.key === 'van'));
                     const simulatedVehicles = [...selectedVehicles];
-                    simulatedVehicles[idx] = tierKey;
+                    simulatedVehicles[idx] = opt.key;
                     const simulatedCapacity = simulatedVehicles.reduce(
                       (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
                       0
@@ -2262,15 +2309,15 @@ export function DispatchBookingEngine({
                     return (
                       <button
                         type="button"
-                        key={tierKey}
+                        key={opt.key}
                         disabled={isCapacityInsufficient}
-                        onClick={() => handleUpdateVehicleChoice(idx, tierKey)}
+                        onClick={() => handleUpdateVehicleChoice(idx, opt.key)}
                         title={
                           isCapacityInsufficient
-                            ? `${label} fleet capacity (${simulatedCapacity}p) is insufficient for ${passengers} passengers. Requires Van or additional vehicles.`
-                            : undefined
+                            ? `${opt.label} fleet capacity (${simulatedCapacity}p) is insufficient for ${passengers} passengers. Requires larger vehicle or additional vehicles.`
+                            : `${opt.label} (${opt.maxPassengers}p / ${opt.maxBags}b)`
                         }
-                        className={`py-1 text-center rounded text-[11px] font-bold transition-all ${
+                        className={`flex-1 min-w-[50px] py-1 text-center rounded text-[11px] font-bold transition-all truncate px-1.5 ${
                           isCapacityInsufficient
                             ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400'
                             : isSelected
@@ -2278,7 +2325,7 @@ export function DispatchBookingEngine({
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                         }`}
                       >
-                        {label} <span className="text-[9px] opacity-80">({cap.maxPassengers}p)</span>
+                        {opt.label} <span className="text-[9px] opacity-80">({opt.maxPassengers}p)</span>
                       </button>
                     );
                   })}
@@ -2960,11 +3007,15 @@ export function DispatchBookingEngine({
                     {returnVehicles.map((rv, rIdx) => (
                       <div key={rIdx} className="flex items-center gap-1 text-[11px]">
                         <span className="text-slate-400 font-bold text-[9px]">#{rIdx + 1}</span>
-                        <div className="flex-1 grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded">
-                          {(['any', 'sedan', 'suv', 'van'] as const).map((tierKey) => {
-                            const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
+                        <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-slate-100 rounded">
+                          {dispatchVehicleOptions.map((opt) => {
+                            const isSelected =
+                              rv === opt.key ||
+                              (rv === 'sedan' && (opt.key === 'standard' || opt.key === 'sedan')) ||
+                              (rv === 'suv' && (opt.key === 'xl' || opt.key === 'suv')) ||
+                              (rv === 'van' && (opt.key === 'wheelchair' || opt.key === 'van'));
                             const simulatedReturnVehicles = [...returnVehicles];
-                            simulatedReturnVehicles[rIdx] = tierKey;
+                            simulatedReturnVehicles[rIdx] = opt.key;
                             const simulatedReturnCapacity = simulatedReturnVehicles.reduce(
                               (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
                               0
@@ -2974,23 +3025,23 @@ export function DispatchBookingEngine({
                             return (
                               <button
                                 type="button"
-                                key={tierKey}
+                                key={opt.key}
                                 disabled={isReturnCapacityInsufficient}
-                                onClick={() => handleUpdateReturnVehicle(rIdx, tierKey)}
+                                onClick={() => handleUpdateReturnVehicle(rIdx, opt.key)}
                                 title={
                                   isReturnCapacityInsufficient
-                                    ? `${label} fleet capacity (${simulatedReturnCapacity}p) is insufficient for ${returnPassengers} passengers.`
-                                    : undefined
+                                    ? `${opt.label} fleet capacity (${simulatedReturnCapacity}p) is insufficient for ${returnPassengers} passengers.`
+                                    : `${opt.label} (${opt.maxPassengers}p / ${opt.maxBags}b)`
                                 }
-                                className={`py-0.5 text-center rounded text-[10px] font-bold capitalize ${
+                                className={`flex-1 min-w-[45px] py-0.5 px-1 text-center rounded text-[10px] font-bold capitalize transition-all truncate ${
                                   isReturnCapacityInsufficient
                                     ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400'
-                                    : rv === tierKey
+                                    : isSelected
                                     ? 'bg-indigo-600 text-white'
                                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                                 }`}
                               >
-                                {label}
+                                {opt.label}
                               </button>
                             );
                           })}

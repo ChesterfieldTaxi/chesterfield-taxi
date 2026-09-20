@@ -19,6 +19,7 @@ import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config
 import { getFleetService } from '../../../core/services/fleet/fleet.service';
 import { getUniversalGovernanceService } from '../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from './UniversalArchiveDrawer';
+import { VehicleImagePicker } from './vehicles/VehicleImagePicker';
 
 
 export interface AdminFleetTabProps {
@@ -63,7 +64,11 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
     mileage: 0,
     status: 'active',
     maintenanceHistory: [],
+    imageUrl: '',
   });
+
+  // Edit Car modal state
+  const [editingCar, setEditingCar] = useState<FleetCarConfig | null>(null);
 
   // Maintenance Log Modal state
   const [selectedCarForMaintenance, setSelectedCarForMaintenance] = useState<FleetCarConfig | null>(null);
@@ -532,7 +537,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
               <VehicleImagePicker
                 value={newCar.imageUrl || ''}
-                onChange={(url) => setNewCar({ ...newCar, imageUrl: url })}
+                onChange={(url: string) => setNewCar({ ...newCar, imageUrl: url })}
                 allowClassImageFallback={true}
                 classImageUrl={settings.vehicles.find((v) => v.id === newCar.vehicleTypeId)?.imageUrl}
                 helperText="Optional vehicle image asset. Click 'Use Class Photo' to copy the assigned vehicle class image."
@@ -650,6 +655,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       }`}
                     >
                       <span>{car.isBlacklisted ? '✅ Restore Cab' : '🚫 Ground / Blacklist'}</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCar({ ...car })}
+                      className="text-xs h-8 flex items-center gap-1.5 border-blue-200 text-blue-700 bg-blue-50/60 hover:bg-blue-100 font-semibold"
+                      title="Edit vehicle details, driver, status, and photo"
+                    >
+                      <span>✏️ Edit Vehicle</span>
                     </Button>
 
                     <Button
@@ -905,6 +921,211 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
           {isSaving ? 'Saving...' : 'Save Fleet Inventory'}
         </Button>
       </div>
+
+      {/* Edit Vehicle Modal */}
+      {editingCar && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg font-bold shadow-xs">
+                  🚕
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Edit Fleet Vehicle: Cab {editingCar.unitNumber}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Modify vehicle specifications, driver assignment, service status, and photo asset.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCar(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 rounded-lg hover:bg-slate-200/50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditingCar} className="p-6 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Unit / Cab Number <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. CAB-104"
+                    value={editingCar.unitNumber}
+                    onChange={(e) => setEditingCar({ ...editingCar, unitNumber: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Vehicle Class</label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    value={editingCar.vehicleTypeId}
+                    onChange={(e) => setEditingCar({ ...editingCar, vehicleTypeId: e.target.value })}
+                  >
+                    {settings.vehicles.map((tier) => (
+                      <option key={tier.id} value={tier.id}>
+                        {tier.name} ({tier.badge || tier.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    className="w-full h-9 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    value={editingCar.status}
+                    onChange={(e) => setEditingCar({ ...editingCar, status: e.target.value as any })}
+                  >
+                    <option value="active">Active</option>
+                    <option value="maintenance">In Maintenance</option>
+                    <option value="out_of_service">Out of Service</option>
+                    <option value="inspecting">Inspecting</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Make <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. Toyota"
+                    value={editingCar.make}
+                    onChange={(e) => setEditingCar({ ...editingCar, make: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Model <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. Sienna"
+                    value={editingCar.model}
+                    onChange={(e) => setEditingCar({ ...editingCar, model: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Year</label>
+                  <Input
+                    type="number"
+                    value={editingCar.year}
+                    onChange={(e) => setEditingCar({ ...editingCar, year: Number(e.target.value) || 2024 })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Color</label>
+                  <Input
+                    placeholder="e.g. Silver"
+                    value={editingCar.color}
+                    onChange={(e) => setEditingCar({ ...editingCar, color: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">License Plate</label>
+                  <Input
+                    placeholder="e.g. 7XYZ99"
+                    value={editingCar.licensePlate}
+                    onChange={(e) => setEditingCar({ ...editingCar, licensePlate: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">VIN Number</label>
+                  <Input
+                    placeholder="17-character VIN"
+                    value={editingCar.vin}
+                    onChange={(e) => setEditingCar({ ...editingCar, vin: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Odometer (mi)</label>
+                  <Input
+                    type="number"
+                    value={editingCar.mileage}
+                    onChange={(e) => setEditingCar({ ...editingCar, mileage: Number(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Driver</label>
+                  <Input
+                    placeholder="Driver name"
+                    value={editingCar.assignedDriverName || ''}
+                    onChange={(e) => setEditingCar({ ...editingCar, assignedDriverName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Insurance Policy</label>
+                  <Input
+                    placeholder="Policy number"
+                    value={editingCar.insurancePolicy || ''}
+                    onChange={(e) => setEditingCar({ ...editingCar, insurancePolicy: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Insurance Expiry</label>
+                  <Input
+                    type="date"
+                    value={editingCar.insuranceExpiry || ''}
+                    onChange={(e) => setEditingCar({ ...editingCar, insuranceExpiry: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Photo Asset Picker */}
+              <VehicleImagePicker
+                value={editingCar.imageUrl || ''}
+                onChange={(url: string) => setEditingCar({ ...editingCar, imageUrl: url })}
+                allowClassImageFallback={true}
+                classImageUrl={settings.vehicles.find((v) => v.id === editingCar.vehicleTypeId)?.imageUrl}
+                helperText="Optional vehicle image asset. You can pick a stock preset, enter a custom URL, or click 'Use Class Photo' to copy from this car's class."
+              />
+
+              <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50 -mx-6 -mb-6 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingCar(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 font-bold"
+                >
+                  Save Vehicle Updates
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Shift History Modal */}
       {showShiftHistory && (

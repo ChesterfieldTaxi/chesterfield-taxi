@@ -17,7 +17,7 @@ import {
   getAdminConfigService,
   DEFAULT_CUSTOMER_BOOKING_CONFIG,
 } from '../../core/services/config/admin-config.service';
-import type { CustomerBookingConfig } from '../../core/types/config';
+import type { CustomerBookingConfig, VehicleTierConfig } from '../../core/types/config';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import {
@@ -78,7 +78,7 @@ export interface BookingEngineV2Props {
 }
 
 export type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
-export type CustomerVehicleChoice = 'sedan' | 'suv' | 'van';
+export type CustomerVehicleChoice = 'sedan' | 'suv' | 'van' | (string & {});
 
 export function formatTime12h(time24: string): string {
   if (!time24) return '';
@@ -427,7 +427,7 @@ export function BookingEngineV2({
     }));
   }, [initialValues]);
 
-  // Customer Booking Form Config from Admin Settings
+  // Customer Booking Form Config and Active Vehicle Classes from Admin Settings
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
     return (
       getAdminConfigService().getCachedSettings().customerBookingConfig ||
@@ -435,30 +435,86 @@ export function BookingEngineV2({
     );
   });
 
+  const [vehicleTiers, setVehicleTiers] = useState<VehicleTierConfig[]>(() => {
+    const cached = getAdminConfigService().getCachedSettings();
+    if (cached.vehicles && cached.vehicles.length > 0) {
+      return cached.vehicles.filter((v) => !v.isArchived);
+    }
+    return [];
+  });
+
   useEffect(() => {
     const configService = getAdminConfigService();
-    configService.getSettings().then((s) => {
+    const unsubscribe = configService.subscribeToSettings((s) => {
       if (s.customerBookingConfig) {
         setBookingConfig({ ...DEFAULT_CUSTOMER_BOOKING_CONFIG, ...s.customerBookingConfig });
       }
+      if (s.vehicles && s.vehicles.length > 0) {
+        setVehicleTiers(s.vehicles.filter((v) => !v.isArchived));
+      }
     });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
 
-  // If immediate ASAP is disabled, guarantee timingType defaults to 'later'
-  useEffect(() => {
-    if (!bookingConfig.allowImmediateAsap && form.timingType === 'asap') {
-      setForm((prev) => ({ ...prev, timingType: 'later' }));
-    }
-  }, [bookingConfig.allowImmediateAsap, form.timingType]);
+  const activeVehicleTiers: VehicleTierConfig[] = useMemo(() => {
+    if (vehicleTiers.length > 0) return vehicleTiers;
+    return [
+      {
+        id: 'standard',
+        name: 'Sedan',
+        badge: 'Executive',
+        baseMultiplier: 1.0,
+        maxPassengers: 4,
+        maxLuggage: 3,
+        description: 'Executive Lincoln / Camry',
+        iconType: 'standard',
+      },
+      {
+        id: 'xl',
+        name: 'SUV',
+        badge: 'Full-Size XL',
+        baseMultiplier: 1.3,
+        maxPassengers: 6,
+        maxLuggage: 5,
+        description: 'Full-size Chevy Suburban / Tahoe',
+        iconType: 'xl',
+      },
+      {
+        id: 'wheelchair',
+        name: 'Van / WAV',
+        badge: 'Accessible',
+        baseMultiplier: 1.5,
+        maxPassengers: 7,
+        maxLuggage: 6,
+        description: 'Transit / Wheelchair Ramp',
+        iconType: 'wheelchair',
+      },
+    ];
+  }, [vehicleTiers]);
 
   // Limits from company config
   const { carSeatLimits } = COMPANY_CONFIG;
-  const vehicleCapacities = COMPANY_CONFIG.vehicleCapacities || {
-    sedan: { maxPassengers: 4, maxBags: 3 },
-    suv: { maxPassengers: 6, maxBags: 5 },
-    van: { maxPassengers: 7, maxBags: 6 },
-    any: { maxPassengers: 4, maxBags: 3 },
-  };
+
+  // Dynamic capacities derived from active vehicle tiers with fallback defaults
+  const vehicleCapacities = useMemo(() => {
+    const map: Record<string, { maxPassengers: number; maxBags: number; name?: string }> = {
+      sedan: { maxPassengers: 4, maxBags: 3, name: 'Sedan' },
+      suv: { maxPassengers: 6, maxBags: 5, name: 'SUV' },
+      van: { maxPassengers: 7, maxBags: 6, name: 'Van / WAV' },
+      any: { maxPassengers: 4, maxBags: 3, name: 'Any Available' },
+    };
+
+    for (const tier of activeVehicleTiers) {
+      map[tier.id] = {
+        maxPassengers: tier.maxPassengers,
+        maxBags: tier.maxLuggage,
+        name: tier.name,
+      };
+    }
+    return map;
+  }, [activeVehicleTiers]);
 
   // Fleet capacity based on selected vehicles (multi-vehicle mode) or single vehicle (max based on biggest vehicle in fleet)
   const totalMaxPassengers = useMemo(() => {
@@ -553,28 +609,44 @@ export function BookingEngineV2({
   const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
     if (choice === 'suv') return 'xl';
     if (choice === 'van') return 'wheelchair';
-    return 'standard';
+    if (choice === 'sedan') return 'standard';
+    return choice as VehicleTier;
   }, []);
 
   // Enforce customer vehicle auto-selection and capacity restrictions (single-vehicle mode):
   // Automatically choose cheapest vehicle capable of carrying the requested passengers & luggage
   // If child safety car seats are requested, vehicle must automatically upgrade to SUV/Minivan
   useEffect(() => {
-    if (!bookingConfig.allowMultiVehicle) {
+    if (!bookingConfig.allowMultiVehicle && activeVehicleTiers.length > 0) {
       const totalLuggage = form.carryOnBags + form.checkedBags;
-      let minVehicle: CustomerVehicleChoice = 'sedan';
-      if (form.passengers > 6 || totalLuggage > 5 || form.specialRequests.wheelchair) {
-        minVehicle = 'van';
-      } else if (form.passengers > 4 || totalLuggage > 3 || totalCarSeats > 0 || returnTotalCarSeats > 0) {
-        minVehicle = 'suv';
-      }
+      const requiresUpgradedVehicle = totalCarSeats > 0 || returnTotalCarSeats > 0;
+      const requiresWheelchair = !!form.specialRequests.wheelchair;
+
+      // Find capable vehicles sorted by price multiplier ascending
+      const capableTiers = [...activeVehicleTiers]
+        .filter((tier) => {
+          if (form.passengers > tier.maxPassengers) return false;
+          if (totalLuggage > tier.maxLuggage) return false;
+          if (requiresWheelchair && tier.id !== 'wheelchair' && tier.iconType !== 'wheelchair' && tier.id !== 'van') {
+            return false;
+          }
+          if (requiresUpgradedVehicle && (tier.id === 'sedan' || tier.id === 'standard' || tier.maxPassengers <= 4)) {
+            return false;
+          }
+          return true;
+        })
+        .sort((a, b) => a.baseMultiplier - b.baseMultiplier);
+
+      const bestTier = capableTiers[0] || activeVehicleTiers[activeVehicleTiers.length - 1];
+      const minVehicle = bestTier.id as CustomerVehicleChoice;
 
       const currentCap = vehicleCapacities[form.vehicleChoice] || { maxPassengers: 4, maxBags: 3 };
-      const hasCarSeatConstraint = (totalCarSeats > 0 || returnTotalCarSeats > 0) && form.vehicleChoice === 'sedan';
+      const hasCarSeatConstraint = requiresUpgradedVehicle && (form.vehicleChoice === 'sedan' || form.vehicleChoice === 'standard');
       const canFitCurrent =
         form.passengers <= currentCap.maxPassengers &&
         totalLuggage <= currentCap.maxBags &&
-        !hasCarSeatConstraint;
+        !hasCarSeatConstraint &&
+        (!requiresWheelchair || form.vehicleChoice === 'van' || form.vehicleChoice === 'wheelchair' || form.vehicleChoice === bestTier.id);
 
       if (!canFitCurrent) {
         setForm((prev) => ({
@@ -602,18 +674,23 @@ export function BookingEngineV2({
     totalCarSeats,
     returnTotalCarSeats,
     vehicleCapacities,
+    activeVehicleTiers,
   ]);
 
   // If wheelchair requested, auto-select Van (WAV)
   useEffect(() => {
-    if (form.specialRequests.wheelchair && form.vehicleChoice !== 'van') {
-      setForm((prev) => ({
-        ...prev,
-        vehicleChoice: 'van',
-        selectedVehicles: prev.selectedVehicles.map((v, i) => (i === 0 ? 'van' : v)),
-      }));
+    if (form.specialRequests.wheelchair) {
+      const wavTier = activeVehicleTiers.find((v) => v.id === 'wheelchair' || v.iconType === 'wheelchair' || v.id === 'van');
+      const wavId = (wavTier?.id || 'wheelchair') as CustomerVehicleChoice;
+      if (form.vehicleChoice !== wavId && form.vehicleChoice !== 'van' && form.vehicleChoice !== 'wheelchair') {
+        setForm((prev) => ({
+          ...prev,
+          vehicleChoice: wavId,
+          selectedVehicles: prev.selectedVehicles.map((v, i) => (i === 0 ? wavId : v)),
+        }));
+      }
     }
-  }, [form.specialRequests.wheelchair, form.vehicleChoice]);
+  }, [form.specialRequests.wheelchair, form.vehicleChoice, activeVehicleTiers]);
 
   // Ensure selected payment method is allowed by admin configuration
   useEffect(() => {
@@ -2331,39 +2408,56 @@ export function BookingEngineV2({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { key: 'sedan', label: 'Sedan', cap: '4p / 3b', desc: 'Lincoln / Camry' },
-                          { key: 'suv', label: 'SUV', cap: '6p / 5b', desc: 'Chevy Suburban' },
-                          { key: 'van', label: 'Van / WAV', cap: '7p / 6b', desc: 'Transit / Ramp' },
-                        ].map((tier) => (
-                          <button
-                            key={tier.key}
-                            type="button"
-                            onClick={() => handleUpdateVehicleChoice(idx, tier.key as CustomerVehicleChoice)}
-                            className={`p-2 rounded-lg border text-left transition-all ${
-                              vChoice === tier.key
-                                ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
-                                : 'bg-white/60 border-slate-200 hover:bg-white text-slate-600'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-0.5">
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs font-bold text-slate-900">{tier.label}</span>
-                                {tier.key !== 'sedan' && (
-                                  <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded">
-                                    +$10
-                                  </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {activeVehicleTiers.map((tier) => {
+                          const isSelected =
+                            vChoice === tier.id ||
+                            (vChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
+                            (vChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
+                            (vChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));
+                          const multiplierDiff =
+                            tier.baseMultiplier > 1.0
+                              ? `+${Math.round((tier.baseMultiplier - 1.0) * 100)}%`
+                              : null;
+
+                          return (
+                            <button
+                              key={tier.id}
+                              type="button"
+                              onClick={() => handleUpdateVehicleChoice(idx, tier.id as CustomerVehicleChoice)}
+                              className={`p-2.5 rounded-xl border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-white border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                                  : 'bg-white/60 border-slate-200 hover:bg-white text-slate-600'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900">{tier.name}</span>
+                                  {tier.badge && (
+                                    <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1 py-0.2 rounded">
+                                      {tier.badge}
+                                    </span>
+                                  )}
+                                  {multiplierDiff && (
+                                    <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded">
+                                      {multiplierDiff}
+                                    </span>
+                                  )}
+                                </div>
+                                {isSelected && (
+                                  <span className="text-blue-600 text-xs font-bold">✓</span>
                                 )}
                               </div>
-                              {vChoice === tier.key && (
-                                <span className="text-blue-600 text-xs">✓</span>
+                              <div className="text-[10px] text-slate-500 font-medium">
+                                {tier.maxPassengers}p / {tier.maxLuggage}b
+                              </div>
+                              {tier.description && (
+                                <div className="text-[9px] text-slate-400 truncate mt-0.5">{tier.description}</div>
                               )}
-                            </div>
-                            <div className="text-[10px] text-slate-500">{tier.cap}</div>
-                            <div className="text-[9px] text-slate-400 truncate">{tier.desc}</div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -2371,99 +2465,119 @@ export function BookingEngineV2({
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {[
-                      {
-                        key: 'sedan',
-                        title: 'Sedan',
-                        desc: 'Executive Lincoln / Camry',
-                        passengers: vehicleCapacities.sedan.maxPassengers,
-                        bags: vehicleCapacities.sedan.maxBags,
-                        isRestricted:
-                          form.passengers > 4 ||
-                          (form.carryOnBags + form.checkedBags) > 3 ||
-                          totalCarSeats > 0 ||
-                          returnTotalCarSeats > 0,
-                        restrictionReason:
-                          (totalCarSeats > 0 || returnTotalCarSeats > 0)
-                            ? 'Requires SUV or Van (Car seats)'
-                            : form.passengers > 4
-                            ? 'Requires SUV or Van (5+ pax)'
-                            : 'Requires SUV or Van (4+ bags)',
-                      },
-                      {
-                        key: 'suv',
-                        title: 'SUV',
-                        desc: 'Full-size Chevy Suburban / Tahoe',
-                        passengers: vehicleCapacities.suv.maxPassengers,
-                        bags: vehicleCapacities.suv.maxBags,
-                        isRestricted: form.passengers > 6 || (form.carryOnBags + form.checkedBags) > 5,
-                        restrictionReason: 'Requires Passenger Van (7 pax)',
-                      },
-                      {
-                        key: 'van',
-                        title: 'Van / WAV',
-                        desc: 'Transit / Wheelchair Ramp',
-                        passengers: vehicleCapacities.van.maxPassengers,
-                        bags: vehicleCapacities.van.maxBags,
-                        isRestricted: false,
-                        restrictionReason: '',
-                      },
-                    ].map((tier) => {
-                      const isSelected = form.vehicleChoice === tier.key;
+                    {activeVehicleTiers.map((tier) => {
+                      const isCarSeatRestricted =
+                        (totalCarSeats > 0 || returnTotalCarSeats > 0) &&
+                        (tier.id === 'sedan' || tier.id === 'standard' || tier.maxPassengers <= 4);
+                      const isPaxRestricted = form.passengers > tier.maxPassengers;
+                      const isLuggageRestricted = (form.carryOnBags + form.checkedBags) > tier.maxLuggage;
+                      const isWheelchairRestricted =
+                        form.specialRequests.wheelchair &&
+                        (tier.id !== 'wheelchair' && tier.iconType !== 'wheelchair' && tier.id !== 'van');
+                      const isRestricted =
+                        isCarSeatRestricted || isPaxRestricted || isLuggageRestricted || isWheelchairRestricted;
+
+                      let restrictionReason = '';
+                      if (isWheelchairRestricted) {
+                        restrictionReason = 'Requires Wheelchair WAV';
+                      } else if (isCarSeatRestricted) {
+                        restrictionReason = 'Requires SUV or Van (Car seats)';
+                      } else if (isPaxRestricted) {
+                        restrictionReason = `Requires larger vehicle (${tier.maxPassengers}+ pax)`;
+                      } else if (isLuggageRestricted) {
+                        restrictionReason = `Requires larger vehicle (${tier.maxLuggage}+ bags)`;
+                      }
+
+                      const isSelected =
+                        form.vehicleChoice === tier.id ||
+                        (form.vehicleChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
+                        (form.vehicleChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
+                        (form.vehicleChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));
+
+                      const multiplierDiff =
+                        tier.baseMultiplier > 1.0
+                          ? `+${Math.round((tier.baseMultiplier - 1.0) * 100)}%`
+                          : null;
+
                       return (
                         <button
-                          key={tier.key}
+                          key={tier.id}
                           type="button"
-                          disabled={tier.isRestricted}
+                          disabled={isRestricted}
                           onClick={() =>
                             setForm((prev) => ({
                               ...prev,
-                              vehicleChoice: tier.key as CustomerVehicleChoice,
-                              selectedVehicles: [tier.key as CustomerVehicleChoice],
+                              vehicleChoice: tier.id as CustomerVehicleChoice,
+                              selectedVehicles: [tier.id as CustomerVehicleChoice],
                               isVehicleAutoAssigned: false,
                             }))
                           }
-                          className={`p-3 rounded-xl border text-left transition-all relative ${
-                            tier.isRestricted
+                          className={`p-3 rounded-xl border text-left transition-all relative group flex flex-col justify-between ${
+                            isRestricted
                               ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
                               : isSelected
                               ? 'bg-blue-50/80 border-blue-500 shadow-sm ring-1 ring-blue-500'
                               : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 text-sm">{tier.title}</span>
-                              {tier.key !== 'sedan' && (
-                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-200 px-1.5 py-0.2 rounded">
-                                  +$10
+                          <div>
+                            {tier.imageUrl ? (
+                              <div className="w-full h-24 mb-2.5 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/80">
+                                <img
+                                  src={tier.imageUrl}
+                                  alt={tier.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-900 text-sm">{tier.name}</span>
+                                {tier.badge && (
+                                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">
+                                    {tier.badge}
+                                  </span>
+                                )}
+                                {multiplierDiff && (
+                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-200 px-1.5 py-0.2 rounded">
+                                    {multiplierDiff}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] shrink-0">
+                                  ✓
                                 </span>
                               )}
                             </div>
-                            {isSelected && (
-                              <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
-                                ✓
-                              </span>
+                            {tier.description && (
+                              <p className="text-[11px] text-slate-500 mb-2">{tier.description}</p>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 mb-2">{tier.desc}</p>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-600 font-semibold">
-                            <span className="inline-flex items-center gap-1">
-                              <UserIcon className="w-3 h-3 text-slate-400" />
-                              {tier.passengers} Pax
-                            </span>
-                            <span>•</span>
-                            <span className="inline-flex items-center gap-1">
-                              <LuggageIcon className="w-3 h-3 text-slate-400" />
-                              {tier.bags} Bags
-                            </span>
-                          </div>
 
-                          {tier.isRestricted && (
-                            <div className="mt-2 text-[10px] text-red-600 font-semibold bg-red-50 p-1 rounded border border-red-200 text-center">
-                              {tier.restrictionReason}
+                          <div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-600 font-semibold mt-2 pt-2 border-t border-slate-100">
+                              <span className="inline-flex items-center gap-1">
+                                <UserIcon className="w-3 h-3 text-slate-400" />
+                                {tier.maxPassengers} Pax
+                              </span>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1">
+                                <LuggageIcon className="w-3 h-3 text-slate-400" />
+                                {tier.maxLuggage} Bags
+                              </span>
                             </div>
-                          )}
+
+                            {isRestricted && (
+                              <div className="mt-2 text-[10px] text-red-600 font-semibold bg-red-50 p-1 rounded border border-red-200 text-center">
+                                {restrictionReason}
+                              </div>
+                            )}
+                          </div>
                         </button>
                       );
                     })}
