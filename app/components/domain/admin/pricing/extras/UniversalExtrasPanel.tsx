@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { UniversalExtrasConfig, CustomFleetExtra } from '~/core/services/pricing/extras.service';
-import type { OversizedBagCategory } from '~/core/types/config';
-import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '~/core/services/config/admin-config.service';
+import { type OversizedBagCategory, DEFAULT_OVERSIZED_BAG_CATEGORIES } from '~/core/types/config';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';

@@ -11,13 +11,11 @@
  */
 
 import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore';
-import type { UniversalExtrasConfig } from '../../types/config';
+import { type UniversalExtrasConfig, DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 
 const EXTRAS_STORAGE_KEY = 'chesterfield_taxi_universal_extras';
-
-import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../config/admin-config.service';
 
 export const DEFAULT_UNIVERSAL_EXTRAS: UniversalExtrasConfig = {
   carSeatFeePerUnit: 10.00,

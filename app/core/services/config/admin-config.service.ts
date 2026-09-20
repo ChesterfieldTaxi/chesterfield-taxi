@@ -26,6 +26,7 @@ import type {
   FleetAlertsConfig,
   OversizedBagCategory,
 } from '../../types/config';
+import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
@@ -37,13 +38,7 @@ import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
 
-export const DEFAULT_OVERSIZED_BAG_CATEGORIES: OversizedBagCategory[] = [
-  { id: 'golf_bag', label: 'Golf Clubs / Bag', fee: 0, requiresUpgrade: true, maxCount: 4 },
-  { id: 'skis', label: 'Skis / Snowboard Bag', fee: 0, requiresUpgrade: true, maxCount: 4 },
-  { id: 'large_box', label: 'Large Cargo Box / Heavy Trunk', fee: 0, requiresUpgrade: true, maxCount: 4 },
-  { id: 'folding_wheelchair', label: 'Folding Wheelchair / Walker', fee: 0, requiresUpgrade: false, maxCount: 2 },
-  { id: 'bicycle_sports', label: 'Bicycle Box / Surfboard / Large Gear', fee: 10, requiresUpgrade: true, maxCount: 2 },
-];
+export { DEFAULT_OVERSIZED_BAG_CATEGORIES };
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,

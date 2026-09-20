@@ -16,9 +16,13 @@ import { getEmailDispatchService } from '../../core/services/email';
 import {
   getAdminConfigService,
   DEFAULT_CUSTOMER_BOOKING_CONFIG,
-  DEFAULT_OVERSIZED_BAG_CATEGORIES,
 } from '../../core/services/config/admin-config.service';
-import type { CustomerBookingConfig, VehicleTierConfig, OversizedBagCategory } from '../../core/types/config';
+import {
+  DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  type CustomerBookingConfig,
+  type VehicleTierConfig,
+  type OversizedBagCategory,
+} from '../../core/types/config';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import {
