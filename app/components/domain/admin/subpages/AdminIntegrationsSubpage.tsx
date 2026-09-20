@@ -100,6 +100,27 @@ export function AdminIntegrationsSubpage({
       '+13145550199'
     );
   });
+  const [twilioApiKey, setTwilioApiKey] = useState(() => {
+    return (
+      settings.integrations?.telephony?.apiKeySid ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_api_key')) ||
+      ''
+    );
+  });
+  const [twilioApiSecret, setTwilioApiSecret] = useState(() => {
+    return (
+      settings.integrations?.telephony?.apiKeySecret ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_api_secret')) ||
+      ''
+    );
+  });
+  const [twilioTwimlAppSid, setTwilioTwimlAppSid] = useState(() => {
+    return (
+      settings.integrations?.telephony?.twimlAppSid ||
+      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_twiml_app_sid')) ||
+      ''
+    );
+  });
   const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>(() => {
     if (settings.integrations?.telephony?.status === 'connected') return 'connected';
     return typeof window !== 'undefined' && localStorage.getItem('ct_twilio_status') === 'connected'
@@ -119,6 +140,9 @@ export function AdminIntegrationsSubpage({
       if (tel.accountSid && !twilioSid) setTwilioSid(tel.accountSid);
       if (tel.authToken && !twilioToken) setTwilioToken(tel.authToken);
       if (tel.phoneNumber && (!twilioPhone || twilioPhone === '+13145550199')) setTwilioPhone(tel.phoneNumber);
+      if (tel.apiKeySid && !twilioApiKey) setTwilioApiKey(tel.apiKeySid);
+      if (tel.apiKeySecret && !twilioApiSecret) setTwilioApiSecret(tel.apiKeySecret);
+      if (tel.twimlAppSid && !twilioTwimlAppSid) setTwilioTwimlAppSid(tel.twimlAppSid);
       if (tel.status === 'connected') setTwilioStatus('connected');
       if (tel.statusMessage) setTwilioStatusMsg(tel.statusMessage);
     }
@@ -223,6 +247,9 @@ export function AdminIntegrationsSubpage({
             accountSid: trimmedSid,
             authToken: trimmedToken,
             phoneNumber: phoneValidation.e164,
+            apiKeySid: twilioApiKey.trim() || undefined,
+            apiKeySecret: twilioApiSecret.trim() || undefined,
+            twimlAppSid: twilioTwimlAppSid.trim() || undefined,
             status: 'connected',
             statusMessage: `Connected: ${data.friendlyName || trimmedSid}`,
             updatedAt: new Date().toISOString(),
@@ -235,6 +262,9 @@ export function AdminIntegrationsSubpage({
         localStorage.setItem('ct_twilio_sid', trimmedSid);
         localStorage.setItem('ct_twilio_token', trimmedToken);
         localStorage.setItem('ct_twilio_phone', phoneValidation.e164);
+        localStorage.setItem('ct_twilio_api_key', twilioApiKey.trim());
+        localStorage.setItem('ct_twilio_api_secret', twilioApiSecret.trim());
+        localStorage.setItem('ct_twilio_twiml_app_sid', twilioTwimlAppSid.trim());
         localStorage.setItem('ct_twilio_status', 'connected');
       }
 
@@ -847,6 +877,70 @@ export function AdminIntegrationsSubpage({
                 )}
               </div>
 
+              {/* WebRTC In-Browser Softphone Section */}
+              <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="w-4 h-4 text-sky-600" />
+                    <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                      In-Browser WebRTC Softphone (Computer Mic &amp; Headset)
+                    </h4>
+                  </div>
+                  <Badge
+                    variant={twilioApiKey.trim() && twilioApiSecret.trim() && twilioTwimlAppSid.trim() ? 'success' : 'neutral'}
+                    className="text-[11px]"
+                  >
+                    {twilioApiKey.trim() && twilioApiSecret.trim() && twilioTwimlAppSid.trim()
+                      ? 'WebRTC Softphone Ready'
+                      : 'WebRTC Not Configured'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Enables dispatchers to speak and listen directly through their computer headset or microphone right in the browser, without calling physical phones. Required for browser-native audio.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Twilio API Key SID</label>
+                    <input
+                      type="text"
+                      value={twilioApiKey}
+                      onChange={(e) => setTwilioApiKey(e.target.value)}
+                      placeholder="SK..."
+                      className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400">Twilio Console &gt; Account &gt; API Keys</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                      <LockIcon className="w-3 h-3 text-slate-400" />
+                      <span>Twilio API Key Secret</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={twilioApiSecret}
+                      onChange={(e) => setTwilioApiSecret(e.target.value)}
+                      placeholder="API Key Secret string"
+                      className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400">Shown once when API Key is created</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">TwiML App SID</label>
+                    <input
+                      type="text"
+                      value={twilioTwimlAppSid}
+                      onChange={(e) => setTwilioTwimlAppSid(e.target.value)}
+                      placeholder="AP..."
+                      className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400">Twilio Console &gt; Voice &gt; TwiML Apps</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Interactive Phone Call Tester */}
               <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/30 space-y-3">
                 <div className="flex items-center gap-2">
@@ -963,17 +1057,27 @@ export function AdminIntegrationsSubpage({
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">Inbound Twilio Webhook URL:</span>
               <code className="text-xs font-mono bg-white p-2 rounded-lg border border-slate-200 block text-slate-700 select-all">
-                https://chesterfieldtaxi.com/api/telephony?action=incoming_call
+                https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_call
               </code>
               <p className="text-[11px] text-slate-500">
                 Paste this URL into your Twilio Console under Phone Numbers &gt; Active Numbers &gt; Voice &amp; Fax configuration.
               </p>
             </div>
 
+            <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/50 space-y-2">
+              <span className="text-xs font-bold text-slate-800 block">TwiML App Voice Request URL (WebRTC Softphone):</span>
+              <code className="text-xs font-mono bg-white p-2 rounded-lg border border-sky-300 block text-sky-800 select-all">
+                https://chesterfield-taxi.vercel.app/api/telephony?action=voice_client_twiml
+              </code>
+              <p className="text-[11px] text-slate-500">
+                In Twilio Console &gt; Voice &gt; TwiML Apps, create an App named "Dispatch Softphone" and paste this URL into the <strong>Voice Request URL</strong> field (HTTP POST or GET). Then paste the App SID (<code>AP...</code>) into the Telephony tab above.
+              </p>
+            </div>
+
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">Inbound SMS Webhook URL:</span>
               <code className="text-xs font-mono bg-white p-2 rounded-lg border border-slate-200 block text-slate-700 select-all">
-                https://chesterfieldtaxi.com/api/telephony?action=incoming_sms
+                https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_sms
               </code>
               <p className="text-[11px] text-slate-500">
                 Paste this URL into your Twilio Console under Messaging configuration to receive passenger text replies into the Dispatch console.

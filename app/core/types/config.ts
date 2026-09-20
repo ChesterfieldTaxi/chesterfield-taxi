@@ -399,6 +399,9 @@ export interface TelephonyIntegrationConfig {
   accountSid: string;
   authToken: string;
   phoneNumber: string;
+  apiKeySid?: string;
+  apiKeySecret?: string;
+  twimlAppSid?: string;
   status?: 'idle' | 'checking' | 'connected' | 'error';
   statusMessage?: string;
   updatedAt?: string;

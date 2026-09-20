@@ -6,6 +6,7 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
+import twilio from 'twilio';
 
 export interface TelephonyApiRequest {
   action:
@@ -13,6 +14,8 @@ export interface TelephonyApiRequest {
     | 'end_call'
     | 'get_call_status'
     | 'call_status_callback'
+    | 'get_voice_token'
+    | 'voice_client_twiml'
     | 'send_sms'
     | 'verify_credentials'
     | 'save_credentials'
@@ -30,6 +33,7 @@ export interface TelephonyApiRequest {
   body?: string;
   callSid?: string;
   status?: string;
+  identity?: string;
   operatorPhone?: string;
   forwardingPhone?: string;
   customTwiml?: string;
@@ -38,6 +42,9 @@ export interface TelephonyApiRequest {
     accountSid?: string;
     authToken?: string;
     phoneNumber?: string;
+    apiKeySid?: string;
+    apiKeySecret?: string;
+    twimlAppSid?: string;
   };
 }
 
@@ -94,6 +101,9 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
   let accountSid = (process.env.TWILIO_ACCOUNT_SID || data?.credentials?.accountSid || '').trim();
   let authToken = (process.env.TWILIO_AUTH_TOKEN || data?.credentials?.authToken || '').trim();
   let phoneNumber = (process.env.TWILIO_PHONE_NUMBER || data?.credentials?.phoneNumber || '').trim();
+  let apiKeySid = (process.env.TWILIO_API_KEY_SID || process.env.TWILIO_API_KEY || data?.credentials?.apiKeySid || '').trim();
+  let apiKeySecret = (process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_API_SECRET || data?.credentials?.apiKeySecret || '').trim();
+  let twimlAppSid = (process.env.TWILIO_TWIML_APP_SID || process.env.TWILIO_APP_SID || data?.credentials?.twimlAppSid || '').trim();
   let forwardingPhone = (
     process.env.DISPATCH_FORWARDING_PHONE ||
     process.env.DISPATCH_PHONE_NUMBER ||
@@ -104,7 +114,7 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
   ).trim();
 
   // If missing from process.env, attempt reading from .env.local on filesystem
-  if (!accountSid || !authToken || !forwardingPhone) {
+  if (!accountSid || !authToken || !forwardingPhone || !apiKeySid || !apiKeySecret || !twimlAppSid) {
     try {
       const fs = await import('node:fs');
       const path = await import('node:path');
@@ -114,6 +124,9 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
         const sidMatch = content.match(/^TWILIO_ACCOUNT_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
         const tokenMatch = content.match(/^TWILIO_AUTH_TOKEN\s*=\s*["']?([^"'\r\n]+)["']?/m);
         const phoneMatch = content.match(/^TWILIO_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+        const apiKeyMatch = content.match(/^TWILIO_API_KEY(?:_SID)?\s*=\s*["']?([^"'\r\n]+)["']?/m);
+        const apiSecretMatch = content.match(/^TWILIO_API_KEY_SECRET\s*=\s*["']?([^"'\r\n]+)["']?/m);
+        const twimlAppMatch = content.match(/^TWILIO_TWIML_APP_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
         const fwdMatch =
           content.match(/^DISPATCH_FORWARDING_PHONE\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
           content.match(/^DISPATCH_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
@@ -122,6 +135,9 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
         if (!accountSid && sidMatch) accountSid = sidMatch[1].trim();
         if (!authToken && tokenMatch) authToken = tokenMatch[1].trim();
         if (!phoneNumber && phoneMatch) phoneNumber = phoneMatch[1].trim();
+        if (!apiKeySid && apiKeyMatch) apiKeySid = apiKeyMatch[1].trim();
+        if (!apiKeySecret && apiSecretMatch) apiKeySecret = apiSecretMatch[1].trim();
+        if (!twimlAppSid && twimlAppMatch) twimlAppSid = twimlAppMatch[1].trim();
         if (!forwardingPhone && fwdMatch) forwardingPhone = fwdMatch[1].trim();
       }
     } catch {
@@ -133,7 +149,7 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
     phoneNumber = '+13147380100';
   }
 
-  return { accountSid, authToken, phoneNumber, forwardingPhone };
+  return { accountSid, authToken, phoneNumber, forwardingPhone, apiKeySid, apiKeySecret, twimlAppSid };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -248,26 +264,103 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
+  // ─── GET TWILIO WEBRTC VOICE ACCESS TOKEN (GET) ───
+  if (action === 'get_voice_token') {
+    const creds = await resolveCredentials();
+    const activeSid = url.searchParams.get('accountSid') || request.headers.get('x-twilio-sid') || creds.accountSid;
+    const activeApiKey = url.searchParams.get('apiKeySid') || url.searchParams.get('apiKey') || request.headers.get('x-twilio-api-key') || creds.apiKeySid;
+    const activeApiSecret = url.searchParams.get('apiKeySecret') || url.searchParams.get('apiSecret') || request.headers.get('x-twilio-api-secret') || creds.apiKeySecret;
+    const activeTwimlAppSid = url.searchParams.get('twimlAppSid') || request.headers.get('x-twilio-twiml-app-sid') || creds.twimlAppSid;
+    const identity = url.searchParams.get('identity') || 'dispatch_agent';
+
+    if (!activeSid || !activeApiKey || !activeApiSecret || !activeTwimlAppSid) {
+      return Response.json(
+        {
+          success: false,
+          code: 'MISSING_WEBRTC_CREDENTIALS',
+          error: 'Twilio API Key SID, API Key Secret, and TwiML App SID are required for in-browser softphone.',
+          missing: {
+            accountSid: !activeSid,
+            apiKeySid: !activeApiKey,
+            apiKeySecret: !activeApiSecret,
+            twimlAppSid: !activeTwimlAppSid,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const AccessToken = twilio.jwt.AccessToken;
+      const VoiceGrant = AccessToken.VoiceGrant;
+
+      const voiceGrant = new VoiceGrant({
+        outgoingApplicationSid: activeTwimlAppSid,
+        incomingAllow: true,
+      });
+
+      const token = new AccessToken(activeSid, activeApiKey, activeApiSecret, {
+        identity,
+        ttl: 28800,
+      });
+      token.addGrant(voiceGrant);
+
+      return Response.json({
+        success: true,
+        token: token.toJwt(),
+        identity,
+        phoneNumber: creds.phoneNumber,
+      });
+    } catch (err: any) {
+      return Response.json({ success: false, error: err.message }, { status: 500 });
+    }
+  }
+
+  // ─── TWIML APP OUTBOUND VOICE ROUTE (GET / Webhook fallback) ───
+  if (action === 'voice_client_twiml') {
+    const to = url.searchParams.get('To') || url.searchParams.get('to');
+    const { phoneNumber } = await resolveCredentials();
+    const VoiceResponse = twilio.twiml.VoiceResponse;
+    const response = new VoiceResponse();
+
+    if (to) {
+      const dial = response.dial({
+        callerId: phoneNumber,
+        record: 'record-from-answer',
+        timeout: 30,
+      });
+      dial.number(sanitizeToE164(to));
+    } else {
+      response.say({ voice: 'alice' }, 'No destination number provided.');
+    }
+
+    return new Response(response.toString(), {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  }
+
   // ─── INBOUND VOICE CALL WEBHOOK (WITH RECORDING & VOICEMAIL ROLLOVER) ───
   if (action === 'incoming_call') {
     const { phoneNumber, forwardingPhone } = await resolveCredentials();
-    let twiml: string;
+    const formattedForwarding = forwardingPhone ? sanitizeToE164(forwardingPhone) : '';
 
-    if (forwardingPhone) {
-      const formattedForwarding = sanitizeToE164(forwardingPhone);
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.</Say>
-  <Dial timeout="20" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">${formattedForwarding}</Dial>
-</Response>`;
-    } else {
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Our dispatch desk is currently assisting other passengers. Please leave your name, phone number, pickup location, and desired pickup time after the tone. Press pound when finished.</Say>
-  <Record maxLength="120" finishOnKey="#" action="/api/telephony?action=voicemail_recorded" transcribe="true" transcribeCallback="/api/telephony?action=voicemail_transcription" playBeep="true" />
-</Response>`;
+    const VoiceResponse = twilio.twiml.VoiceResponse;
+    const response = new VoiceResponse();
+    response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
+
+    const dial = response.dial({
+      timeout: 20,
+      record: 'record-from-answer',
+      callerId: phoneNumber,
+      action: '/api/telephony?action=handle_unanswered',
+    });
+    // Ring the WebRTC in-browser softphone
+    dial.client('dispatch_agent');
+    if (formattedForwarding) {
+      dial.number(formattedForwarding);
     }
-    return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
+
+    return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
   }
 
   // ─── UNANSWERED INBOUND CALL ROLLOVER TO VOICEMAIL ───
@@ -435,7 +528,80 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Resolve credentials from environment, .env.local, or request payload
-    let { accountSid, authToken, phoneNumber: twilioFromNumber, forwardingPhone } = await resolveCredentials(data);
+    let { accountSid, authToken, phoneNumber: twilioFromNumber, forwardingPhone, apiKeySid, apiKeySecret, twimlAppSid } = await resolveCredentials(data);
+
+    // ─── GET TWILIO WEBRTC VOICE ACCESS TOKEN (POST) ───
+    if (data.action === 'get_voice_token') {
+      const activeSid = data.credentials?.accountSid || request.headers.get('x-twilio-sid') || accountSid;
+      const activeApiKey = data.credentials?.apiKeySid || request.headers.get('x-twilio-api-key') || apiKeySid;
+      const activeApiSecret = data.credentials?.apiKeySecret || request.headers.get('x-twilio-api-secret') || apiKeySecret;
+      const activeTwimlAppSid = data.credentials?.twimlAppSid || request.headers.get('x-twilio-twiml-app-sid') || twimlAppSid;
+      const identity = data.identity || url.searchParams.get('identity') || 'dispatch_agent';
+
+      if (!activeSid || !activeApiKey || !activeApiSecret || !activeTwimlAppSid) {
+        return Response.json(
+          {
+            success: false,
+            code: 'MISSING_WEBRTC_CREDENTIALS',
+            error: 'Twilio API Key SID, API Key Secret, and TwiML App SID are required for in-browser softphone.',
+            missing: {
+              accountSid: !activeSid,
+              apiKeySid: !activeApiKey,
+              apiKeySecret: !activeApiSecret,
+              twimlAppSid: !activeTwimlAppSid,
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const AccessToken = twilio.jwt.AccessToken;
+        const VoiceGrant = AccessToken.VoiceGrant;
+
+        const voiceGrant = new VoiceGrant({
+          outgoingApplicationSid: activeTwimlAppSid,
+          incomingAllow: true,
+        });
+
+        const token = new AccessToken(activeSid, activeApiKey, activeApiSecret, {
+          identity,
+          ttl: 28800,
+        });
+        token.addGrant(voiceGrant);
+
+        return Response.json({
+          success: true,
+          token: token.toJwt(),
+          identity,
+          phoneNumber: twilioFromNumber,
+        });
+      } catch (err: any) {
+        return Response.json({ success: false, error: err.message }, { status: 500 });
+      }
+    }
+
+    // ─── TWIML APP OUTBOUND VOICE ROUTE (POST / Webhook) ───
+    if (data.action === 'voice_client_twiml' || queryAction === 'voice_client_twiml') {
+      const to = data.to || (data as any).To || url.searchParams.get('To') || url.searchParams.get('to');
+      const VoiceResponse = twilio.twiml.VoiceResponse;
+      const response = new VoiceResponse();
+
+      if (to) {
+        const dial = response.dial({
+          callerId: twilioFromNumber,
+          record: 'record-from-answer',
+          timeout: 30,
+        });
+        dial.number(sanitizeToE164(to));
+      } else {
+        response.say({ voice: 'alice' }, 'No destination number provided.');
+      }
+
+      return new Response(response.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
 
     // ─── TWILIO CALL STATUS WEBHOOK CALLBACK (POST) ───
     if (data.action === 'call_status_callback' || queryAction === 'call_status_callback') {
@@ -531,23 +697,25 @@ export async function action({ request }: ActionFunctionArgs) {
     // ─── INBOUND WEBHOOK: VOICE CALL ───
     if (data.action === 'incoming_call') {
       const phoneNumber = twilioFromNumber;
-      let twiml: string;
+      const formattedForwarding = forwardingPhone ? sanitizeToE164(forwardingPhone) : '';
 
-      if (forwardingPhone) {
-        const formattedForwarding = sanitizeToE164(forwardingPhone);
-        twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.</Say>
-  <Dial timeout="20" record="record-from-answer" callerId="${phoneNumber}" action="/api/telephony?action=handle_unanswered">${formattedForwarding}</Dial>
-</Response>`;
-      } else {
-        twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">Thank you for calling Chesterfield Taxi and Car Service. Our dispatch desk is currently assisting other passengers. Please leave your name, phone number, pickup location, and desired pickup time after the tone. Press pound when finished.</Say>
-  <Record maxLength="120" finishOnKey="#" action="/api/telephony?action=voicemail_recorded" transcribe="true" transcribeCallback="/api/telephony?action=voicemail_transcription" playBeep="true" />
-</Response>`;
+      const VoiceResponse = twilio.twiml.VoiceResponse;
+      const response = new VoiceResponse();
+      response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
+
+      const dial = response.dial({
+        timeout: 20,
+        record: 'record-from-answer',
+        callerId: phoneNumber,
+        action: '/api/telephony?action=handle_unanswered',
+      });
+      // Ring the WebRTC in-browser softphone
+      dial.client('dispatch_agent');
+      if (formattedForwarding) {
+        dial.number(formattedForwarding);
       }
-      return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
+
+      return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
     }
 
     // ─── UNANSWERED INBOUND CALL ROLLOVER TO VOICEMAIL ───

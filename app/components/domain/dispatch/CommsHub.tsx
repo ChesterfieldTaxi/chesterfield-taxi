@@ -248,6 +248,9 @@ export function getClientTelephonyCredentials() {
   let token = '';
   let phone = '';
   let operatorPhone = '';
+  let apiKeySid = '';
+  let apiKeySecret = '';
+  let twimlAppSid = '';
 
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
@@ -255,8 +258,11 @@ export function getClientTelephonyCredentials() {
       token = localStorage.getItem('ct_twilio_token') || '';
       phone = localStorage.getItem('ct_twilio_phone') || '';
       operatorPhone = localStorage.getItem('ct_dispatch_operator_phone') || '';
+      apiKeySid = localStorage.getItem('ct_twilio_api_key') || '';
+      apiKeySecret = localStorage.getItem('ct_twilio_api_secret') || '';
+      twimlAppSid = localStorage.getItem('ct_twilio_twiml_app_sid') || '';
 
-      if (!sid || !token || !phone) {
+      if (!sid || !token || !phone || !apiKeySid || !apiKeySecret || !twimlAppSid) {
         const stored = localStorage.getItem('chesterfield_taxi_app_settings');
         if (stored) {
           const parsed = JSON.parse(stored);
@@ -266,6 +272,9 @@ export function getClientTelephonyCredentials() {
             token = token || tel.authToken || '';
             phone = phone || tel.phoneNumber || '';
             operatorPhone = operatorPhone || tel.operatorPhone || '';
+            apiKeySid = apiKeySid || tel.apiKeySid || '';
+            apiKeySecret = apiKeySecret || tel.apiKeySecret || '';
+            twimlAppSid = twimlAppSid || tel.twimlAppSid || '';
           }
         }
       }
@@ -279,6 +288,9 @@ export function getClientTelephonyCredentials() {
     authToken: token.trim(),
     phoneNumber: phone.trim() || '+13147380100',
     operatorPhone: operatorPhone.trim(),
+    apiKeySid: apiKeySid.trim(),
+    apiKeySecret: apiKeySecret.trim(),
+    twimlAppSid: twimlAppSid.trim(),
   };
 }
 
@@ -399,6 +411,16 @@ export function CommsHub({
   const dialpadInputRef = useRef<HTMLInputElement>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
+  // In-Browser WebRTC Softphone state & refs
+  const [softphoneStatus, setSoftphoneStatus] = useState<
+    'unconfigured' | 'initializing' | 'ready' | 'connecting' | 'on_call' | 'error'
+  >('unconfigured');
+  const [incomingCallInfo, setIncomingCallInfo] = useState<{ from: string; callSid?: string } | null>(null);
+  const deviceRef = useRef<any>(null);
+  const activeCallRef = useRef<any>(null);
+  const incomingCallRef = useRef<any>(null);
+  const handleEndCallRef = useRef<(broadcast?: boolean) => void>(() => {});
+
   // Audio voicemail & call recording playback state
   const [playingVoicemailId, setPlayingVoicemailId] = useState<string | null>(null);
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
@@ -417,6 +439,154 @@ export function CommsHub({
     }
     return () => clearInterval(interval);
   }, [callStatus]);
+
+  // ─── Twilio WebRTC Device Initialization ───
+  useEffect(() => {
+    let isMounted = true;
+    let deviceInstance: any = null;
+
+    const initWebRtcDevice = async () => {
+      if (typeof window === 'undefined') return;
+      const creds = getClientTelephonyCredentials();
+
+      if (!creds.accountSid || !creds.apiKeySid || !creds.apiKeySecret || !creds.twimlAppSid) {
+        if (isMounted) setSoftphoneStatus('unconfigured');
+        return;
+      }
+
+      try {
+        if (isMounted) setSoftphoneStatus('initializing');
+        const tokenResp = await fetch('/api/telephony', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get_voice_token',
+            credentials: creds,
+            identity: 'dispatch_agent',
+          }),
+        });
+
+        if (!tokenResp.ok) {
+          if (isMounted) setSoftphoneStatus('error');
+          return;
+        }
+
+        const tokenData = await tokenResp.json();
+        if (!tokenData.success || !tokenData.token) {
+          if (isMounted) setSoftphoneStatus('error');
+          return;
+        }
+
+        const { Device, Call } = await import('@twilio/voice-sdk');
+        if (!isMounted) return;
+
+        const device = new Device(tokenData.token, {
+          codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
+          logLevel: 1,
+        });
+        deviceInstance = device;
+        deviceRef.current = device;
+
+        device.on('registered', () => {
+          if (isMounted) setSoftphoneStatus('ready');
+        });
+
+        device.on('error', (twErr: any) => {
+          console.warn('Twilio Voice Device Error:', twErr);
+          if (isMounted) setSoftphoneStatus('error');
+        });
+
+        device.on('incoming', (call: any) => {
+          incomingCallRef.current = call;
+          const callerNumber = call.parameters?.From || 'Incoming Passenger';
+          const callSid = call.parameters?.CallSid;
+          setIncomingCallInfo({ from: callerNumber, callSid });
+
+          call.on('disconnect', () => {
+            setIncomingCallInfo(null);
+            incomingCallRef.current = null;
+            if (activeCallRef.current === call) {
+              handleEndCallRef.current?.(true);
+            }
+          });
+
+          call.on('error', (err: any) => {
+            console.error('Incoming call error:', err);
+            setIncomingCallInfo(null);
+            incomingCallRef.current = null;
+          });
+        });
+
+        await device.register();
+      } catch (err) {
+        console.warn('Twilio WebRTC init error:', err);
+        if (isMounted) setSoftphoneStatus('error');
+      }
+    };
+
+    initWebRtcDevice();
+
+    return () => {
+      isMounted = false;
+      if (deviceInstance) {
+        try {
+          deviceInstance.destroy();
+        } catch {}
+      }
+      deviceRef.current = null;
+    };
+  }, []);
+
+  const handleAcceptIncomingCall = () => {
+    const call = incomingCallRef.current;
+    if (!call) return;
+    const callerFrom = incomingCallInfo?.from || 'Passenger';
+    const displayNum = formatDisplayPhone(callerFrom);
+    const callId = `call_${Date.now()}`;
+    activeCallInteractionIdRef.current = callId;
+    activeCallRef.current = call;
+
+    call.accept();
+    setIncomingCallInfo(null);
+    setCallStatus('connected');
+    setActiveCallContact(displayNum);
+    setActiveCallPhone(callerFrom);
+    setActiveCallSid(call.parameters?.CallSid || null);
+    setActiveTab('phone');
+    setCallsSubTab('keypad');
+
+    setInteractions((prev) => [
+      {
+        id: callId,
+        type: 'call_inbound',
+        contactName: displayNum,
+        contactPhone: callerFrom,
+        contactType: 'passenger',
+        timestamp: 'Just now',
+        timestampMs: Date.now(),
+        durationSeconds: 0,
+        audioDuration: '0:00',
+        snippet: `Inbound Call Answered (${displayNum})`,
+        isUnread: false,
+      },
+      ...prev,
+    ]);
+
+    call.on('disconnect', () => {
+      handleEndCallRef.current?.(true);
+    });
+  };
+
+  const handleRejectIncomingCall = () => {
+    const call = incomingCallRef.current;
+    if (call) {
+      try {
+        call.reject();
+      } catch {}
+      incomingCallRef.current = null;
+    }
+    setIncomingCallInfo(null);
+  };
 
   // Audio element player effect
   useEffect(() => {
@@ -842,9 +1012,107 @@ export function CommsHub({
     const targetE164 = phoneValidation.isValid ? phoneValidation.e164 : sanitizeToE164(num);
     const displayNum = phoneValidation.isValid ? formatDisplayPhone(phoneValidation.e164) : num;
     const callerDisplayName = contactName || displayNum;
-
-    // Check if operator forwarding line is configured before placing live call
     const creds = getClientTelephonyCredentials();
+
+    // ─── 1. TRUE IN-BROWSER WEBRTC SOFTPHONE (Direct Computer Mic & Headset) ───
+    if (deviceRef.current && softphoneStatus === 'ready') {
+      const callId = `call_${Date.now()}`;
+      activeCallInteractionIdRef.current = callId;
+
+      setCallStatus('calling');
+      setActiveCallContact(callerDisplayName);
+      setActiveCallPhone(targetE164);
+      setCallNotice({
+        type: 'info',
+        message: `Connecting live audio via computer microphone & headset to ${displayNum}...`,
+      });
+      setShowInCallKeypad(false);
+      setShowInCallTrips(false);
+      setShowInCallNotes(false);
+
+      // Switch view to phone/keypad so in-call screen displays immediately
+      setActiveTab('phone');
+      setCallsSubTab('keypad');
+
+      const newCallRecord: InteractionEvent = {
+        id: callId,
+        type: 'call_outbound',
+        contactName: callerDisplayName,
+        contactPhone: targetE164,
+        contactType: 'passenger',
+        timestamp: 'Just now',
+        timestampMs: Date.now(),
+        durationSeconds: 0,
+        audioDuration: '0:00',
+        snippet: `Outbound Call (${displayNum})`,
+        isUnread: false,
+      };
+      setInteractions((prev) => [newCallRecord, ...prev]);
+
+      workspaceBus.publish('CALL_OUTBOUND_STARTED', {
+        targetNumber: targetE164,
+        contactName: callerDisplayName,
+      });
+
+      try {
+        const call = await deviceRef.current.connect({
+          params: {
+            To: targetE164,
+          },
+        });
+        activeCallRef.current = call;
+
+        call.on('accept', () => {
+          setCallStatus('connected');
+          const twCallSid = call.parameters?.CallSid || null;
+          setActiveCallSid(twCallSid);
+          setCallNotice({
+            type: 'info',
+            message: `Connected via Browser Softphone. Audio live through headset.`,
+          });
+          setInteractions((prev) =>
+            prev.map((i) =>
+              i.id === callId
+                ? {
+                    ...i,
+                    recordingSid: twCallSid || undefined,
+                    snippet: `Outbound Call Connected (${displayNum})`,
+                  }
+                : i
+            )
+          );
+          if (twCallSid) {
+            workspaceBus.publish('CALL_ANSWERED', {
+              callSid: twCallSid,
+              callerNumber: targetE164,
+            });
+          }
+        });
+
+        call.on('disconnect', () => {
+          handleEndCallRef.current?.(true);
+        });
+
+        call.on('error', (callErr: any) => {
+          console.error('Softphone call connection error:', callErr);
+          handleEndCallRef.current?.(false);
+          setCallNotice({
+            type: 'warning',
+            message: callErr?.message || 'Softphone audio error. Check microphone permissions.',
+          });
+        });
+      } catch (err: any) {
+        console.error('Failed to connect WebRTC call:', err);
+        handleEndCallRef.current?.(false);
+        setCallNotice({
+          type: 'warning',
+          message: err?.message || 'Failed to start WebRTC softphone call.',
+        });
+      }
+      return;
+    }
+
+    // ─── 2. FALLBACK: PSTN BRIDGE (If WebRTC keys not yet configured) ───
     const effectiveOperatorPhone = (operatorPhoneInput || creds.operatorPhone || '').trim();
 
     if (!effectiveOperatorPhone) {
@@ -939,7 +1207,7 @@ export function CommsHub({
           callerNumber: targetE164,
         });
       } else {
-        handleEndCall(false);
+        handleEndCallRef.current?.(false);
         const warningMsg =
           resData.code === 'NO_OPERATOR_PHONE'
             ? 'Please enter your agent phone number to bridge live calls.'
@@ -958,7 +1226,7 @@ export function CommsHub({
         }
       }
     } catch {
-      handleEndCall(false);
+      handleEndCallRef.current?.(false);
       setCallNotice({
         type: 'warning',
         message: 'Network offline. Unable to reach Twilio service.',
@@ -967,6 +1235,14 @@ export function CommsHub({
   };
 
   const handleEndCall = (broadcast: boolean | React.MouseEvent | unknown = true) => {
+    // 1. Disconnect active Twilio WebRTC call if active
+    if (activeCallRef.current) {
+      try {
+        activeCallRef.current.disconnect();
+      } catch {}
+      activeCallRef.current = null;
+    }
+
     const finalSecs = callTimer > 0 ? callTimer : 1;
     const m = Math.floor(finalSecs / 60);
     const s = (finalSecs % 60).toString().padStart(2, '0');
@@ -1024,6 +1300,7 @@ export function CommsHub({
     setShowInCallNotes(false);
     activeCallInteractionIdRef.current = null;
   };
+  handleEndCallRef.current = handleEndCall;
 
   // Synchronize remote call completion from Twilio PSTN
   useEffect(() => {
@@ -1228,6 +1505,38 @@ export function CommsHub({
         }}
         className="hidden"
       />
+
+      {/* ─── Incoming Softphone Call Banner ─── */}
+      {incomingCallInfo && (
+        <div className="bg-emerald-600 text-white px-4 py-3 shrink-0 shadow-lg flex items-center justify-between border-b border-emerald-700 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+              <PhoneIcon className="w-5 h-5 text-white animate-bounce" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200">Incoming Softphone Call</p>
+              <p className="text-sm font-bold font-mono">{formatDisplayPhone(incomingCallInfo.from)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRejectIncomingCall}
+              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+            >
+              Decline
+            </button>
+            <button
+              type="button"
+              onClick={handleAcceptIncomingCall}
+              className="px-4 py-1.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black cursor-pointer shadow-md transition-all active:scale-95"
+            >
+              Answer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Segmented Sub-Toolbar Tabs (Omnichannel: All, Phone, Messages, Voicemail) ─── */}
       <div className="bg-white border-b border-slate-200 p-2 shrink-0">
         <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl text-center">
@@ -2336,6 +2645,11 @@ export function CommsHub({
                               type="button"
                               onClick={() => {
                                 setActiveKeypadFeedback(k);
+                                if (activeCallRef.current) {
+                                  try {
+                                    activeCallRef.current.sendDigits(k);
+                                  } catch {}
+                                }
                                 setTimeout(() => setActiveKeypadFeedback(null), 150);
                               }}
                               className="py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-blue-600 text-white font-mono font-bold text-sm cursor-pointer shadow-xs"
@@ -2352,7 +2666,15 @@ export function CommsHub({
                   <div className="grid grid-cols-4 gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setIsMuted((v) => !v)}
+                      onClick={() => {
+                        const nextMute = !isMuted;
+                        setIsMuted(nextMute);
+                        if (activeCallRef.current) {
+                          try {
+                            activeCallRef.current.mute(nextMute);
+                          } catch {}
+                        }
+                      }}
                       className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-[11px] font-bold transition-all cursor-pointer ${
                         isMuted
                           ? 'bg-amber-600 text-white ring-2 ring-amber-400'
@@ -2421,18 +2743,33 @@ export function CommsHub({
                       <span className="uppercase tracking-wider">
                         Caller ID: {formatDisplayPhone(getClientTelephonyCredentials().phoneNumber)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingOperatorPhone((v) => !v)}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
-                          operatorPhoneInput
-                            ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
-                            : 'text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300'
-                        }`}
-                        title="Configure forwarding cell/desk line to bridge live calls"
-                      >
-                        {operatorPhoneInput ? `Agent: ${formatDisplayPhone(operatorPhoneInput)}` : '⚠️ Set Agent Line'}
-                      </button>
+                      {softphoneStatus === 'ready' ? (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200"
+                          title="In-Browser Softphone active. Calls connect directly through your computer headset/microphone."
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Softphone: Headset Ready</span>
+                        </span>
+                      ) : softphoneStatus === 'initializing' ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 text-blue-700 bg-blue-50 border border-blue-200">
+                          <SpinnerIcon className="w-2.5 h-2.5 animate-spin text-blue-600" />
+                          <span>Connecting Softphone...</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingOperatorPhone((v) => !v)}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer flex items-center gap-1 ${
+                            operatorPhoneInput
+                              ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                              : 'text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300'
+                          }`}
+                          title="Configure forwarding cell/desk line to bridge live calls"
+                        >
+                          {operatorPhoneInput ? `Agent Line: ${formatDisplayPhone(operatorPhoneInput)}` : '⚠️ Set Agent Line'}
+                        </button>
+                      )}
                     </div>
                     {isEditingOperatorPhone && (
                       <div className="mb-2 p-2 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-1.5 text-left">
@@ -3304,7 +3641,7 @@ export function CommsHub({
                 <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
               ) : (
                 <p className="text-[10px] text-slate-400">
-                  Saved locally on this device. You will only need to set this once.
+                  Tip: Want to speak through your computer microphone & headset without ringing your cell phone? Configure Twilio WebRTC keys in Admin &gt; Integrations.
                 </p>
               )}
             </div>
