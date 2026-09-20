@@ -22,6 +22,7 @@
       "routes/terms": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/privacy": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/app": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/construction": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/driver": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/signin": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/register": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -126,6 +127,13 @@
         "parentId": "root",
         "file": "app/routes/app.tsx",
         "path": "app",
+        "config": {}
+      },
+      "routes/construction": {
+        "id": "routes/construction",
+        "parentId": "root",
+        "file": "app/routes/construction.tsx",
+        "path": "construction",
         "config": {}
       },
       "routes/driver": {
@@ -311,6 +319,12 @@
         "file": "routes/app.tsx",
         "path": "app"
       },
+      "routes/construction": {
+        "id": "routes/construction",
+        "parentId": "root",
+        "file": "routes/construction.tsx",
+        "path": "construction"
+      },
       "routes/driver": {
         "id": "routes/driver",
         "parentId": "root",
@@ -453,6 +467,10 @@
           {
             "file": "routes/app.tsx",
             "path": "app"
+          },
+          {
+            "file": "routes/construction.tsx",
+            "path": "construction"
           },
           {
             "file": "routes/driver.tsx",

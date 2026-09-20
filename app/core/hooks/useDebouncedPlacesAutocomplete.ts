@@ -15,6 +15,7 @@ import {
 import type { GeoPoint } from '../types/trip';
 import { getZoneService } from '../services/zones/zone.service';
 import type { LocationCollection } from '../types/zone';
+import { placesCache } from '../services/maps/places-cache';
 
 export interface AutocompletePredictionItem {
   placeId: string;
@@ -126,6 +127,7 @@ export function useDebouncedPlacesAutocomplete({
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
 
   // Initialize Google Places services once mapsStatus is 'ready'
   useEffect(() => {
@@ -154,6 +156,7 @@ export function useDebouncedPlacesAutocomplete({
       // Clean up references on unmount
       autocompleteServiceRef.current = null;
       placesServiceRef.current = null;
+      sessionTokenRef.current = null;
     };
   }, [mapsStatus]);
 
@@ -171,10 +174,28 @@ export function useDebouncedPlacesAutocomplete({
     if (!enabled || query.length < 2 || mapsStatus !== 'ready') {
       setPredictions([]);
       setIsLoading(false);
+      sessionTokenRef.current = null;
+      return;
+    }
+
+    // Check client-side placesCache for instant response (zero network calls, zero API cost)
+    const cachedPredictions = placesCache.getPredictions(query);
+    if (cachedPredictions) {
+      setPredictions(cachedPredictions);
+      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+
+    // Initialize AutocompleteSessionToken if not yet created for this typing session
+    if (!sessionTokenRef.current && window.google?.maps?.places?.AutocompleteSessionToken) {
+      try {
+        sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+      } catch {
+        // Fallback gracefully if session token creation fails
+      }
+    }
 
     // Enforce strict 300ms quiet period before hitting Google Places API
     debounceTimerRef.current = setTimeout(() => {
@@ -189,12 +210,17 @@ export function useDebouncedPlacesAutocomplete({
           new window.google.maps.LatLng(ST_LOUIS_METRO_BOUNDS.north, ST_LOUIS_METRO_BOUNDS.east)
         );
 
+        const autocompletionRequest: google.maps.places.AutocompletionRequest = {
+          input: query,
+          bounds: stlBounds,
+          componentRestrictions: { country: 'us' },
+        };
+        if (sessionTokenRef.current) {
+          autocompletionRequest.sessionToken = sessionTokenRef.current;
+        }
+
         autocompleteServiceRef.current.getPlacePredictions(
-          {
-            input: query,
-            bounds: stlBounds,
-            componentRestrictions: { country: 'us' },
-          },
+          autocompletionRequest,
           (results, status) => {
             setIsLoading(false);
 
@@ -241,6 +267,7 @@ export function useDebouncedPlacesAutocomplete({
                 });
               }
 
+              placesCache.setPredictions(query, consolidatedList);
               setPredictions(consolidatedList);
             } else if (
               status === window.google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT ||
@@ -275,6 +302,7 @@ export function useDebouncedPlacesAutocomplete({
       return new Promise((resolve) => {
         // Fast-path for canonical collections
         if (placeId.startsWith('canonical-coll-')) {
+          sessionTokenRef.current = null;
           const collId = placeId.replace('canonical-coll-', '');
           const coll = getZoneService()
             .getLocationCollectionsSync()
@@ -292,7 +320,16 @@ export function useDebouncedPlacesAutocomplete({
 
         // Fast-path for canonical consolidated Lambert STL
         if (placeId === CANONICAL_LAMBERT_PREDICTION.placeId) {
+          sessionTokenRef.current = null;
           resolve(CANONICAL_LAMBERT_DETAILS);
+          return;
+        }
+
+        // Check client-side places details cache (memory / sessionStorage)
+        const cachedDetails = placesCache.getDetails(placeId);
+        if (cachedDetails) {
+          sessionTokenRef.current = null;
+          resolve(cachedDetails);
           return;
         }
 
@@ -302,11 +339,20 @@ export function useDebouncedPlacesAutocomplete({
         }
 
         try {
+          const currentSessionToken = sessionTokenRef.current;
+          // Conclude the autocomplete session upon details request
+          sessionTokenRef.current = null;
+
+          const detailsRequest: google.maps.places.PlaceDetailsRequest = {
+            placeId,
+            fields: ['formatted_address', 'geometry', 'name', 'place_id'],
+          };
+          if (currentSessionToken) {
+            detailsRequest.sessionToken = currentSessionToken;
+          }
+
           placesServiceRef.current.getDetails(
-            {
-              placeId,
-              fields: ['formatted_address', 'geometry', 'name', 'place_id'],
-            },
+            detailsRequest,
             (place, status) => {
               if (
                 status === window.google.maps.places.PlacesServiceStatus.OK &&
@@ -324,12 +370,15 @@ export function useDebouncedPlacesAutocomplete({
                   }
                 }
 
-                resolve({
+                const result: PlaceDetailsResult = {
                   address,
                   formattedAddress: place.formatted_address || address,
                   placeId: place.place_id,
                   coordinates,
-                });
+                };
+                // Cache place details for subsequent lookups
+                placesCache.setDetails(placeId, result);
+                resolve(result);
               } else {
                 console.warn('[useDebouncedPlacesAutocomplete] getDetails status:', status);
                 resolve(null);

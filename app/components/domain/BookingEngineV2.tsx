@@ -481,8 +481,28 @@ export function BookingEngineV2({
     return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxBags || 3), 6);
   }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]);
 
-  const totalCarSeats = form.rearFacingCount + form.frontFacingCount + form.boosterCount;
-  const returnTotalCarSeats = form.returnRearFacing + form.returnFrontFacing + form.returnBooster;
+  const totalCarSeats = form.carSeats ? (form.rearFacingCount + form.frontFacingCount + form.boosterCount) : 0;
+  const returnTotalCarSeats = form.returnCarSeats ? (form.returnRearFacing + form.returnFrontFacing + form.returnBooster) : 0;
+
+  const handleToggleCarSeats = (checked: boolean) => {
+    setForm((prev) => {
+      if (!checked) {
+        return {
+          ...prev,
+          carSeats: false,
+          rearFacingCount: 0,
+          frontFacingCount: 0,
+          boosterCount: 0,
+        };
+      }
+      const hasExisting = prev.rearFacingCount > 0 || prev.frontFacingCount > 0 || prev.boosterCount > 0;
+      return {
+        ...prev,
+        carSeats: true,
+        rearFacingCount: hasExisting ? prev.rearFacingCount : 1,
+      };
+    });
+  };
 
   // Multi-vehicle handlers
   const handleAddVehicle = () => {
@@ -514,6 +534,7 @@ export function BookingEngineV2({
         ...prev,
         selectedVehicles: updated,
         vehicleChoice: updated[0] || choice,
+        isVehicleAutoAssigned: false,
       };
     });
   };
@@ -2143,7 +2164,7 @@ export function BookingEngineV2({
                         <input
                           type="checkbox"
                           checked={form.carSeats}
-                          onChange={(e) => setForm((prev) => ({ ...prev, carSeats: e.target.checked }))}
+                          onChange={(e) => handleToggleCarSeats(e.target.checked)}
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                         <span className="font-semibold text-xs">Child Safety Seats Required</span>
@@ -2394,7 +2415,14 @@ export function BookingEngineV2({
                           key={tier.key}
                           type="button"
                           disabled={tier.isRestricted}
-                          onClick={() => setForm((prev) => ({ ...prev, vehicleChoice: tier.key as CustomerVehicleChoice }))}
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              vehicleChoice: tier.key as CustomerVehicleChoice,
+                              selectedVehicles: [tier.key as CustomerVehicleChoice],
+                              isVehicleAutoAssigned: false,
+                            }))
+                          }
                           className={`p-3 rounded-xl border text-left transition-all relative ${
                             tier.isRestricted
                               ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'

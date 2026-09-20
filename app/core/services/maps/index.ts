@@ -3,4 +3,5 @@ export * from './server-route.service';
 export * from './google-maps-loader';
 export * from './live-routing.service';
 export * from './route-cache';
+export * from './places-cache';
 export * from './mock-routing';

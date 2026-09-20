@@ -343,7 +343,8 @@ export function DispatchBookingEngine({
     (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
     0
   );
-  const totalCarSeats = rearFacingCount + frontFacingCount + boosterCount;
+  const totalCarSeats = carSeats ? (rearFacingCount + frontFacingCount + boosterCount) : 0;
+  const returnTotalCarSeats = returnCarSeats ? (returnRearFacing + returnFrontFacing + returnBooster) : 0;
 
   // Hydrate from initialTrip if provided
   useEffect(() => {
@@ -397,18 +398,35 @@ export function DispatchBookingEngine({
         setRearFacingCount(1);
       }
 
-      // Hydrate vehicle
-      if (meta.selectedVehicles && Array.isArray(meta.selectedVehicles)) {
-        setSelectedVehicles(meta.selectedVehicles);
+      // Hydrate vehicle with capacity validation
+      let initialVehicles: VehicleChoice[] = ['any'];
+      if (meta.selectedVehicles && Array.isArray(meta.selectedVehicles) && meta.selectedVehicles.length > 0) {
+        initialVehicles = meta.selectedVehicles;
       } else if (initialTrip.vehicleTier === 'xl') {
-        setSelectedVehicles(['suv']);
+        initialVehicles = ['suv'];
       } else if (initialTrip.vehicleTier === 'wheelchair') {
-        setSelectedVehicles(['van']);
+        initialVehicles = ['van'];
       } else if (initialTrip.vehicleTier === 'premium') {
-        setSelectedVehicles(['sedan']);
-      } else {
-        setSelectedVehicles(['any']);
+        initialVehicles = ['sedan'];
       }
+
+      const initialPax = initialTrip.passenger?.passengerCount || 1;
+      const initialCapacity = initialVehicles.reduce(
+        (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
+        0
+      );
+      if (initialCapacity < initialPax) {
+        if (initialPax <= 7) {
+          initialVehicles = ['van'];
+        } else {
+          while (
+            initialVehicles.reduce((acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4), 0) < initialPax
+          ) {
+            initialVehicles.push('van');
+          }
+        }
+      }
+      setSelectedVehicles(initialVehicles);
 
       // Hydrate payment
       if (initialTrip.payment?.method === 'card') setPaymentMethod('card');
@@ -1063,6 +1081,10 @@ export function DispatchBookingEngine({
   const handleUpdateVehicleChoice = (index: number, choice: VehicleChoice) => {
     const updated = [...selectedVehicles];
     updated[index] = choice;
+    const simCap = updated.reduce((acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4), 0);
+    if (simCap < passengers) {
+      return;
+    }
     setSelectedVehicles(updated);
   };
 
@@ -1079,6 +1101,10 @@ export function DispatchBookingEngine({
   const handleUpdateReturnVehicle = (index: number, choice: VehicleChoice) => {
     const updated = [...returnVehicles];
     updated[index] = choice;
+    const simCap = updated.reduce((acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4), 0);
+    if (simCap < returnPassengers) {
+      return;
+    }
     setReturnVehicles(updated);
   };
 
@@ -1093,6 +1119,20 @@ export function DispatchBookingEngine({
       setRearFacingCount(0);
       setFrontFacingCount(0);
       setBoosterCount(0);
+    }
+  };
+
+  // Toggle Return Car Seats master switch
+  const handleToggleReturnCarSeats = (checked: boolean) => {
+    setReturnCarSeats(checked);
+    if (checked) {
+      if (returnRearFacing === 0 && returnFrontFacing === 0 && returnBooster === 0) {
+        setReturnRearFacing(1);
+      }
+    } else {
+      setReturnRearFacing(0);
+      setReturnFrontFacing(0);
+      setReturnBooster(0);
     }
   };
 
@@ -2210,13 +2250,30 @@ export function DispatchBookingEngine({
                     const isSelected = vChoice === tierKey;
                     const cap = vehicleCapacities[tierKey] || { maxPassengers: 4, maxBags: 3 };
                     const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
+
+                    const simulatedVehicles = [...selectedVehicles];
+                    simulatedVehicles[idx] = tierKey;
+                    const simulatedCapacity = simulatedVehicles.reduce(
+                      (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
+                      0
+                    );
+                    const isCapacityInsufficient = simulatedCapacity < passengers;
+
                     return (
                       <button
                         type="button"
                         key={tierKey}
+                        disabled={isCapacityInsufficient}
                         onClick={() => handleUpdateVehicleChoice(idx, tierKey)}
+                        title={
+                          isCapacityInsufficient
+                            ? `${label} fleet capacity (${simulatedCapacity}p) is insufficient for ${passengers} passengers. Requires Van or additional vehicles.`
+                            : undefined
+                        }
                         className={`py-1 text-center rounded text-[11px] font-bold transition-all ${
-                          isSelected
+                          isCapacityInsufficient
+                            ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400'
+                            : isSelected
                             ? 'bg-blue-600 text-white shadow-xs'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                         }`}
@@ -2816,7 +2873,7 @@ export function DispatchBookingEngine({
                       <input
                         type="checkbox"
                         checked={returnCarSeats}
-                        onChange={(e) => setReturnCarSeats(e.target.checked)}
+                        onChange={(e) => handleToggleReturnCarSeats(e.target.checked)}
                         className="rounded border-indigo-300 text-indigo-600"
                       />
                       <span>Return Car Seats Required</span>
@@ -2906,13 +2963,31 @@ export function DispatchBookingEngine({
                         <div className="flex-1 grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded">
                           {(['any', 'sedan', 'suv', 'van'] as const).map((tierKey) => {
                             const label = tierKey === 'any' ? 'Any' : tierKey === 'sedan' ? 'Sedan' : tierKey === 'suv' ? 'SUV' : 'Van';
+                            const simulatedReturnVehicles = [...returnVehicles];
+                            simulatedReturnVehicles[rIdx] = tierKey;
+                            const simulatedReturnCapacity = simulatedReturnVehicles.reduce(
+                              (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
+                              0
+                            );
+                            const isReturnCapacityInsufficient = simulatedReturnCapacity < returnPassengers;
+
                             return (
                               <button
                                 type="button"
                                 key={tierKey}
+                                disabled={isReturnCapacityInsufficient}
                                 onClick={() => handleUpdateReturnVehicle(rIdx, tierKey)}
+                                title={
+                                  isReturnCapacityInsufficient
+                                    ? `${label} fleet capacity (${simulatedReturnCapacity}p) is insufficient for ${returnPassengers} passengers.`
+                                    : undefined
+                                }
                                 className={`py-0.5 text-center rounded text-[10px] font-bold capitalize ${
-                                  rv === tierKey ? 'bg-indigo-600 text-white' : 'text-slate-600'
+                                  isReturnCapacityInsufficient
+                                    ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400'
+                                    : rv === tierKey
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                                 }`}
                               >
                                 {label}
