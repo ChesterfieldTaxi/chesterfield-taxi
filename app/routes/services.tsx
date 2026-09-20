@@ -13,6 +13,8 @@ import {
 } from '../components/ui/Icons';
 import { Card } from '../components/ui/Card';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import type { AppSettings, VehicleTierConfig } from '../core/types/config';
 
 export function meta() {
   return [
@@ -23,6 +25,17 @@ export function meta() {
         `Comprehensive transportation services including Lambert STL airport transfers, corporate accounts, hourly charters, and WAV handicap accessible taxi service in ${COMPANY_CONFIG.name}, MO.`,
     },
   ];
+}
+
+function getVehicleIcon(iconType?: string, id?: string) {
+  const type = (iconType || id || '').toLowerCase();
+  if (type.includes('wheelchair') || type.includes('wav')) {
+    return <AccessibilityIcon className="w-6 h-6 text-blue-600" />;
+  }
+  if (type.includes('suv') || type.includes('xl') || type.includes('luxury')) {
+    return <SparklesIcon className="w-6 h-6 text-blue-600" />;
+  }
+  return <CarIcon className="w-6 h-6 text-slate-900" />;
 }
 
 interface ServiceItem {
@@ -108,26 +121,7 @@ const SERVICES: ServiceItem[] = [
   },
 ];
 
-const FLEET_TIERS = [
-  {
-    name: 'Standard Sedan',
-    capacity: 'Up to 4 Passengers &bull; 3 Luggage',
-    description: 'Clean, fuel-efficient sedans ideal for daily commutes, errands, and quick solo airport runs.',
-    icon: <CarIcon className="w-6 h-6 text-slate-900" />,
-  },
-  {
-    name: 'Executive SUV',
-    capacity: 'Up to 6 Passengers &bull; 6 Luggage',
-    description: 'Full-size luxury SUVs with leather seating, rear climate controls, and immense luggage volume.',
-    icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
-  },
-  {
-    name: 'Wheelchair Accessible (WAV)',
-    capacity: '1 Wheelchair + 3 Passengers &bull; 2 Luggage',
-    description: 'Rear or side-entry ramp equipped vans with ADA-certified four-point tie-down safety locks.',
-    icon: <AccessibilityIcon className="w-6 h-6 text-blue-600" />,
-  },
-];
+
 const SERVICE_ZONES = [
   { city: 'Chesterfield', zip: '63005, 63017', note: 'Primary Hub & Instant Dispatch' },
   { city: 'Wildwood', zip: '63038, 63040', note: 'Full Coverage Residential & Commercial' },
@@ -140,6 +134,33 @@ const SERVICE_ZONES = [
 ];
 
 export default function ServicesRoute() {
+  const [vehicles, setVehicles] = React.useState<VehicleTierConfig[]>(() => {
+    try {
+      const active = getAdminConfigService().getCachedSettings().vehicles.filter((v: VehicleTierConfig) => !v.isArchived);
+      return active.length > 0 ? active : [];
+    } catch {
+      return [];
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      const configService = getAdminConfigService();
+      if (typeof configService.subscribeToSettings === 'function') {
+        const unsub = configService.subscribeToSettings((settings: AppSettings) => {
+          if (settings?.vehicles) {
+            setVehicles(settings.vehicles.filter((v: VehicleTierConfig) => !v.isArchived));
+          }
+        });
+        return () => {
+          if (typeof unsub === 'function') unsub();
+        };
+      }
+    } catch (err) {
+      console.warn('Error subscribing to vehicles in ServicesRoute:', err);
+    }
+  }, []);
+
   return (
     <div className="py-12 bg-slate-50 flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
@@ -237,25 +258,31 @@ export default function ServicesRoute() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {FLEET_TIERS.map((tier) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {vehicles.map((tier) => (
               <div
-                key={tier.name}
+                key={tier.id}
                 className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between space-y-4"
               >
                 <div className="space-y-3">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
-                    {tier.icon}
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                      {getVehicleIcon(tier.iconType, tier.id)}
+                    </div>
+                    {tier.badge && (
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full uppercase">
+                        {tier.badge}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">{tier.name}</h3>
-                    <p
-                      className="text-xs font-semibold text-blue-700 mt-0.5"
-                      dangerouslySetInnerHTML={{ __html: tier.capacity }}
-                    />
+                    <p className="text-xs font-semibold text-blue-700 mt-0.5">
+                      Up to {tier.maxPassengers} Passengers • {tier.maxLuggage} Luggage
+                    </p>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    {tier.description}
+                    {tier.description || 'Clean, sanitized, and climate-controlled commercial transportation.'}
                   </p>
                 </div>
 

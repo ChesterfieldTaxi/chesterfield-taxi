@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { UniversalExtrasConfig, CustomFleetExtra } from '~/core/services/pricing/extras.service';
+import type { OversizedBagCategory } from '~/core/types/config';
+import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '~/core/services/config/admin-config.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -14,6 +16,7 @@ import {
   CheckIcon,
   SlidersIcon,
   ShieldCheckIcon,
+  LuggageIcon,
 } from '~/components/ui/Icons';
 
 export interface UniversalExtrasPanelProps {
@@ -43,6 +46,17 @@ export function UniversalExtrasPanel({
       ...workingCopy,
       [field]: val,
     });
+  };
+
+  const oversizedList: OversizedBagCategory[] =
+    workingCopy.oversizedBagsConfig && workingCopy.oversizedBagsConfig.length > 0
+      ? workingCopy.oversizedBagsConfig
+      : DEFAULT_OVERSIZED_BAG_CATEGORIES;
+
+  const handleUpdateOversizedCategory = (index: number, updates: Partial<OversizedBagCategory>) => {
+    const list = [...oversizedList];
+    list[index] = { ...list[index], ...updates };
+    updateField('oversizedBagsConfig', list);
   };
 
   const handleSave = async () => {
@@ -300,7 +314,73 @@ export function UniversalExtrasPanel({
         </div>
       </div>
 
-      {/* 5. Custom Fleet Extras Catalog */}
+      {/* 5. Oversized Baggage & Special Cargo Rules */}
+      <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <LuggageIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Oversized Cargo & Vehicle Upgrades</h3>
+                <p className="text-[11px] text-slate-500">Configure itemized baggage counters, fees, and automatic vehicle upgrade triggers</p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+              <input
+                type="checkbox"
+                checked={workingCopy.oversizedAutoUpgradeVehicleType !== false}
+                onChange={(e) => updateField('oversizedAutoUpgradeVehicleType', e.target.checked)}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>Enable Auto-Upgrade to SUV/Van</span>
+            </label>
+          </div>
+
+          <div className="space-y-2.5 pt-2 border-t border-slate-100">
+            {oversizedList.map((cat, idx) => (
+              <div
+                key={cat.id || idx}
+                className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200 items-center text-xs"
+              >
+                <div className="sm:col-span-5 font-bold text-slate-900 flex items-center gap-2">
+                  <span>{cat.label}</span>
+                </div>
+                <div className="sm:col-span-3 flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium">Fee:</span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1.5 text-slate-400 font-semibold">$</span>
+                    <Input
+                      type="number"
+                      step="1.00"
+                      min="0"
+                      value={cat.fee}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        handleUpdateOversizedCategory(idx, { fee: parseFloat(e.target.value) || 0 })
+                      }
+                      className="h-7 pl-5 text-xs bg-white border-slate-300 text-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="sm:col-span-4 flex items-center justify-end gap-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-700 font-semibold select-none">
+                    <input
+                      type="checkbox"
+                      checked={cat.requiresUpgrade}
+                      onChange={(e) =>
+                        handleUpdateOversizedCategory(idx, { requiresUpgrade: e.target.checked })
+                      }
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Force SUV/Van Upgrade</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      {/* 6. Custom Fleet Extras Catalog */}
       <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
         <div className="flex items-center justify-between">
           <div>

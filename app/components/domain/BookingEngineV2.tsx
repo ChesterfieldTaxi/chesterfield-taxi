@@ -16,8 +16,9 @@ import { getEmailDispatchService } from '../../core/services/email';
 import {
   getAdminConfigService,
   DEFAULT_CUSTOMER_BOOKING_CONFIG,
+  DEFAULT_OVERSIZED_BAG_CATEGORIES,
 } from '../../core/services/config/admin-config.service';
-import type { CustomerBookingConfig, VehicleTierConfig } from '../../core/types/config';
+import type { CustomerBookingConfig, VehicleTierConfig, OversizedBagCategory } from '../../core/types/config';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import {
@@ -146,6 +147,7 @@ interface FormState {
   luggageType: 'standard' | 'carryon_only' | 'oversized';
   hasOversizedLuggage: boolean;
   oversizedLuggageNotes: string;
+  oversizedBags: Record<string, number>;
 
   // Child Safety Seats
   carSeats: boolean;
@@ -261,6 +263,7 @@ export function BookingEngineV2({
     luggageType: 'standard',
     hasOversizedLuggage: false,
     oversizedLuggageNotes: '',
+    oversizedBags: {},
 
     carSeats: false,
     rearFacingCount: 0,
@@ -563,6 +566,35 @@ export function BookingEngineV2({
   const totalCarSeats = form.carSeats ? (form.rearFacingCount + form.frontFacingCount + form.boosterCount) : 0;
   const returnTotalCarSeats = form.returnCarSeats ? (form.returnRearFacing + form.returnFrontFacing + form.returnBooster) : 0;
 
+  const oversizedCategories: OversizedBagCategory[] = useMemo(() => {
+    return bookingConfig.oversizedBags && bookingConfig.oversizedBags.length > 0
+      ? bookingConfig.oversizedBags
+      : DEFAULT_OVERSIZED_BAG_CATEGORIES;
+  }, [bookingConfig.oversizedBags]);
+
+  const totalOversizedCount = useMemo(() => {
+    return Object.values(form.oversizedBags || {}).reduce((sum, count) => sum + count, 0);
+  }, [form.oversizedBags]);
+
+  const oversizedRequiresUpgrade = useMemo(() => {
+    if (!form.hasOversizedLuggage) return false;
+    return Object.entries(form.oversizedBags || {}).some(([id, count]) => {
+      if (count <= 0) return false;
+      const cat = oversizedCategories.find((c) => c.id === id);
+      return cat ? cat.requiresUpgrade : true;
+    });
+  }, [form.hasOversizedLuggage, form.oversizedBags, oversizedCategories]);
+
+  const oversizedItemsSummary = useMemo(() => {
+    const items = Object.entries(form.oversizedBags || {})
+      .filter(([_, count]) => count > 0)
+      .map(([id, count]) => {
+        const cat = oversizedCategories.find((c) => c.id === id);
+        return `${count}x ${cat?.label || id}`;
+      });
+    return items.join(', ');
+  }, [form.oversizedBags, oversizedCategories]);
+
   const handleToggleCarSeats = (checked: boolean) => {
     setForm((prev) => {
       if (!checked) {
@@ -643,7 +675,7 @@ export function BookingEngineV2({
   useEffect(() => {
     if (!bookingConfig.allowMultiVehicle && activeVehicleTiers.length > 0) {
       const totalLuggage = form.carryOnBags + form.checkedBags;
-      const requiresUpgradedVehicle = totalCarSeats > 0 || returnTotalCarSeats > 0;
+      const requiresUpgradedVehicle = totalCarSeats > 0 || returnTotalCarSeats > 0 || oversizedRequiresUpgrade;
       const requiresWheelchair = !!form.specialRequests.wheelchair;
 
       // Find capable vehicles sorted by price multiplier ascending
@@ -701,6 +733,7 @@ export function BookingEngineV2({
     form.vehicleChoice,
     totalCarSeats,
     returnTotalCarSeats,
+    oversizedRequiresUpgrade,
     vehicleCapacities,
     activeVehicleTiers,
   ]);
@@ -1456,6 +1489,8 @@ export function BookingEngineV2({
           luggageType: form.luggageType,
           hasOversizedLuggage: form.hasOversizedLuggage,
           oversizedLuggageNotes: form.oversizedLuggageNotes,
+          oversizedBags: form.oversizedBags,
+          oversizedItemsSummary: oversizedItemsSummary,
           createdByRole: 'customer_web',
           selectedVehicles: bookingConfig.allowMultiVehicle ? form.selectedVehicles : [form.vehicleChoice],
         },
@@ -1514,6 +1549,9 @@ export function BookingEngineV2({
                 booster: form.returnBooster,
                 total: returnTotalCarSeats,
               },
+              hasOversizedLuggage: form.hasOversizedLuggage,
+              oversizedBags: form.oversizedBags,
+              oversizedItemsSummary: oversizedItemsSummary,
             },
           };
 
@@ -1552,6 +1590,8 @@ export function BookingEngineV2({
           currency: createdTrip.pricing.currency || 'USD',
           paymentMethod: createdTrip.payment.method,
           specialRequests: createdTrip.passenger.specialRequests,
+          oversizedBags: form.oversizedBags,
+          oversizedItemsSummary: oversizedItemsSummary,
           flightDetails: {
             airlineName: form.airline,
             flightNumber: form.flightNumber,
@@ -1575,6 +1615,10 @@ export function BookingEngineV2({
           passengerName: `${createdTrip.passenger.firstName} ${createdTrip.passenger.lastName}`.trim(),
           passengerPhone: createdTrip.passenger.phone,
           passengerEmail: createdTrip.passenger.email,
+          passengerCount: createdTrip.passenger.passengerCount,
+          luggageCount: createdTrip.passenger.luggageCount,
+          oversizedBags: form.oversizedBags,
+          oversizedItemsSummary: oversizedItemsSummary,
           pickupAddress: createdTrip.pickupLocation.address,
           dropoffAddress: createdTrip.dropoffLocation.address,
           pickupTime:
@@ -1583,7 +1627,6 @@ export function BookingEngineV2({
               : 'Immediate Ride (ASAP)',
           bookingType: createdTrip.bookingType,
           vehicleTier: createdTrip.vehicleTier,
-          passengerCount: createdTrip.passenger.passengerCount,
           totalFare: createdTrip.pricing.totalFare,
           currency: createdTrip.pricing.currency,
           specialRequests: createdTrip.passenger.specialRequests,
@@ -1898,12 +1941,12 @@ export function BookingEngineV2({
                       <PlaneLandingIcon className={`w-4 h-4 text-blue-600 ${airportDetection.isDropoffAirport ? 'rotate-45' : ''}`} />
                       <span>
                         {airportDetection.isPickupAirport
-                          ? `Airport Arrival Tracking • ${airportDetection.airport?.name || 'STL Lambert Airport'}`
-                          : `Airport Dropoff & Terminal Assistance (Optional) • ${airportDetection.airport?.name || 'STL Lambert Airport'}`}
+                          ? `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Arrival Details`
+                          : `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Dropoff Details`}
                       </span>
                     </div>
                     <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold">
-                      {airportDetection.isPickupAirport ? 'Flight Delay Tracking' : 'Terminal Routing (Optional)'}
+                      {airportDetection.isPickupAirport ? 'Flight Delay Tracking' : 'Terminal Routing'}
                     </span>
                   </div>
 
@@ -2278,30 +2321,112 @@ export function BookingEngineV2({
                   </div>
                 </div>
 
-                {/* Oversized / Special Gear */}
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={form.hasOversizedLuggage}
-                        onChange={(e) => setForm((prev) => ({ ...prev, hasOversizedLuggage: e.target.checked }))}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="font-semibold text-slate-800">Oversized / Special Gear (Skis, Golf Clubs, Wheelchairs)</span>
-                    </label>
-                  </div>
+                {/* Oversized / Special Cargo Counters */}
+                {bookingConfig.allowOversizedLuggage !== false && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={form.hasOversizedLuggage}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setForm((prev) => ({
+                              ...prev,
+                              hasOversizedLuggage: checked,
+                              oversizedBags: checked ? prev.oversizedBags : {},
+                            }));
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="font-semibold text-slate-800">Oversized / Special Cargo (Golf Bags, Skis, Wheelchairs)</span>
+                      </label>
+                      {form.hasOversizedLuggage && totalOversizedCount > 0 && (
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                          {totalOversizedCount} Item{totalOversizedCount > 1 ? 's' : ''} Declared
+                        </span>
+                      )}
+                    </div>
 
-                  {form.hasOversizedLuggage && (
-                    <input
-                      type="text"
-                      placeholder="Specify oversized gear (e.g. 2 sets of golf clubs, folding wheelchair)"
-                      value={form.oversizedLuggageNotes}
-                      onChange={(e) => setForm((prev) => ({ ...prev, oversizedLuggageNotes: e.target.value }))}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs"
-                    />
-                  )}
-                </div>
+                    {form.hasOversizedLuggage && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                        <div className="text-[11px] text-slate-500 leading-tight">
+                          Select specific oversized items to guarantee proper vehicle assignment.
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {oversizedCategories.map((cat) => {
+                            const count = form.oversizedBags[cat.id] || 0;
+                            return (
+                              <div
+                                key={cat.id}
+                                className="flex items-center justify-between text-xs bg-white p-2 rounded-lg border border-slate-200 shadow-2xs"
+                              >
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-semibold text-slate-800">{cat.label}</span>
+                                  {cat.requiresUpgrade && (
+                                    <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                      Requires SUV/Van
+                                    </span>
+                                  )}
+                                  {cat.fee > 0 && (
+                                    <span className="text-[10px] font-bold text-emerald-700">
+                                      +${cat.fee.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        oversizedBags: {
+                                          ...prev.oversizedBags,
+                                          [cat.id]: Math.max(0, (prev.oversizedBags[cat.id] || 0) - 1),
+                                        },
+                                      }))
+                                    }
+                                    className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="w-4 text-center font-bold text-slate-800 text-xs">{count}</span>
+                                  <button
+                                    type="button"
+                                    disabled={count >= (cat.maxCount || 4)}
+                                    onClick={() =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        oversizedBags: {
+                                          ...prev.oversizedBags,
+                                          [cat.id]: Math.min(cat.maxCount || 4, (prev.oversizedBags[cat.id] || 0) + 1),
+                                        },
+                                      }))
+                                    }
+                                    className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-xs leading-none"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Additional cargo notes (e.g. dimensions, delicate instruments)"
+                            value={form.oversizedLuggageNotes}
+                            onChange={(e) => setForm((prev) => ({ ...prev, oversizedLuggageNotes: e.target.value }))}
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs placeholder:text-slate-400 focus:outline-blue-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Car Seats Master Toggle & 3 Granular Steppers (Admin Configurable) */}
                 {bookingConfig.allowChildSafetySeats && (
@@ -2535,10 +2660,20 @@ export function BookingEngineV2({
                 </div>
               ) : (
                 <>
+                  {oversizedRequiresUpgrade && (
+                    <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center gap-2">
+                      <span className="font-bold">🚗 Automatic Vehicle Upgrade:</span>
+                      <span>Selected oversized cargo requires SUV or Minivan cargo capacity.</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {activeVehicleTiers.map((tier) => {
                       const isCarSeatRestricted =
                         (totalCarSeats > 0 || returnTotalCarSeats > 0) &&
+                        (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
+                      const isOversizedRestricted =
+                        oversizedRequiresUpgrade &&
                         (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
                       const isPaxRestricted = form.passengers > tier.maxPassengers;
                       const isLuggageRestricted = (form.carryOnBags + form.checkedBags) > tier.maxLuggage;
@@ -2546,17 +2681,19 @@ export function BookingEngineV2({
                         form.specialRequests.wheelchair &&
                         (tier.id !== 'wheelchair' && tier.iconType !== 'wheelchair' && tier.id !== 'van');
                       const isRestricted =
-                        isCarSeatRestricted || isPaxRestricted || isLuggageRestricted || isWheelchairRestricted;
+                        isCarSeatRestricted || isOversizedRestricted || isPaxRestricted || isLuggageRestricted || isWheelchairRestricted;
 
                       let restrictionReason = '';
                       if (isWheelchairRestricted) {
                         restrictionReason = 'Requires Wheelchair WAV';
+                      } else if (isOversizedRestricted) {
+                        restrictionReason = 'Requires SUV/Van (Oversized cargo)';
                       } else if (isCarSeatRestricted) {
                         restrictionReason = 'Requires SUV or Van (Car seats)';
                       } else if (isPaxRestricted) {
-                        restrictionReason = `Requires larger vehicle (${tier.maxPassengers}+ pax)`;
+                        restrictionReason = `Exceeds max ${tier.maxPassengers} passengers`;
                       } else if (isLuggageRestricted) {
-                        restrictionReason = `Requires larger vehicle (${tier.maxLuggage}+ bags)`;
+                        restrictionReason = `Exceeds max ${tier.maxLuggage} luggage`;
                       }
 
                       const isSelected =
@@ -3091,6 +3228,19 @@ export function BookingEngineV2({
                       <span className="text-[10px] text-blue-700 font-bold uppercase block">Child Safety Seats</span>
                       <span className="font-semibold text-slate-800">
                         {totalCarSeats} Seat(s) Requested
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {form.hasOversizedLuggage && (totalOversizedCount > 0 || form.oversizedLuggageNotes) && (
+                  <div className="flex items-start gap-2">
+                    <LuggageIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-blue-700 font-bold uppercase block">Oversized Cargo</span>
+                      <span className="font-semibold text-slate-800">
+                        {oversizedItemsSummary || 'Special Equipment'}
+                        {form.oversizedLuggageNotes ? ` (${form.oversizedLuggageNotes})` : ''}
                       </span>
                     </div>
                   </div>

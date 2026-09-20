@@ -1043,8 +1043,10 @@ export default function DispatchRoute() {
 
       // Dispatch confirmation email to passenger
       const emailService = getEmailDispatchService();
+      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
       await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
+        status: 'CONFIRMED',
         passenger: {
           firstName: reviewTrip.passenger.firstName,
           lastName: reviewTrip.passenger.lastName,
@@ -1065,6 +1067,16 @@ export default function DispatchRoute() {
         currency: reviewTrip.pricing?.currency || 'USD',
         paymentMethod: reviewTrip.payment?.method || 'cash',
         specialRequests: reviewTrip.passenger.specialRequests,
+        oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
+        oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
+        pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
+        flightDetails: reviewMeta.flightNumber
+          ? {
+              flightNumber: String(reviewMeta.flightNumber),
+              airlineName: (reviewMeta.airlineName || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airlineCode) : undefined,
+              isAirportTrip: Boolean(reviewMeta.isAirportTrip),
+            }
+          : undefined,
       });
 
       const nowIso = new Date().toISOString();
@@ -5885,10 +5897,24 @@ export default function DispatchRoute() {
                       </div>
                     </div>
                   </div>
-                  {hasOversizedLuggage && oversizedLuggageNotes && (
-                    <div className="p-2 bg-white rounded-lg border border-amber-200 text-[11px] text-amber-900">
-                      <span className="font-bold">Oversized Cargo: </span>
-                      {oversizedLuggageNotes}
+                  {(hasOversizedLuggage || tripMeta.oversizedItemsSummary) && (
+                    <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 text-xs text-amber-950 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1.5">
+                          🧳 Oversized Cargo Breakdown:
+                        </span>
+                        <span className="text-[10px] bg-amber-200 font-bold px-1.5 py-0.5 rounded text-amber-900 uppercase">
+                          Special Cargo
+                        </span>
+                      </div>
+                      <div className="font-semibold text-amber-900">
+                        {tripMeta.oversizedItemsSummary || 'Special Oversized Cargo Declared'}
+                      </div>
+                      {oversizedLuggageNotes && (
+                        <div className="text-[11px] text-amber-800 italic">
+                          Notes: {oversizedLuggageNotes}
+                        </div>
+                      )}
                     </div>
                   )}
                   {reviewTrip.passenger.specialRequests && (

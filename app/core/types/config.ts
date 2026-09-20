@@ -79,9 +79,19 @@ export interface RulePassengerFilter {
 export type VehicleType = 'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav';
 export type VehicleClass = 'standard' | 'executive' | 'xl' | 'medical' | 'delivery';
 
+export interface OversizedBagCategory {
+  id: string;
+  label: string;
+  fee: number;
+  requiresUpgrade: boolean;
+  maxCount: number;
+}
+
 export interface UniversalExtrasConfig {
   carSeatFeePerUnit: number; // $10.00
   carSeatAutoUpgradeVehicleType?: boolean; // true -> forces SUV/Minivan
+  oversizedBagsConfig?: OversizedBagCategory[];
+  oversizedAutoUpgradeVehicleType?: boolean;
   passengerBaseAllowance: number; // 1 free
   extraPassengerFeePerHead: number; // $1.00
   intermediateStopFee: number; // $5.00
@@ -312,6 +322,8 @@ export interface CustomerBookingConfig {
   allowPetRequest?: boolean;
   allowWheelchairRequest?: boolean;
   allowLuggageSpecialRequest?: boolean;
+  allowOversizedLuggage?: boolean;
+  oversizedBags?: OversizedBagCategory[];
   publicFormBanner?: {
     enabled: boolean;
     text: string;

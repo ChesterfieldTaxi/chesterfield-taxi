@@ -38,6 +38,8 @@ export interface BookingConfirmationEmailPayload {
   currency: string;
   paymentMethod: string;
   specialRequests?: string;
+  oversizedBags?: Record<string, number>;
+  oversizedItemsSummary?: string;
   flightDetails?: FlightOperationsEmailDetails;
   status?: string;
   lambertPickupInstructions?: string;
@@ -56,6 +58,8 @@ export interface AdminDispatchAlertEmailPayload {
   passengerEmail: string;
   passengerCount?: number;
   luggageCount?: number;
+  oversizedBags?: Record<string, number>;
+  oversizedItemsSummary?: string;
   pickupAddress: string;
   pickupNotes?: string;
   intermediateStops?: Array<{ address: string; notes?: string }>;

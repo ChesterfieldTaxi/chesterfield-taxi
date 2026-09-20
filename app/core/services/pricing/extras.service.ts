@@ -17,6 +17,8 @@ import { sanitizePayload } from '../firestore-sanitizer';
 
 const EXTRAS_STORAGE_KEY = 'chesterfield_taxi_universal_extras';
 
+import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../config/admin-config.service';
+
 export const DEFAULT_UNIVERSAL_EXTRAS: UniversalExtrasConfig = {
   carSeatFeePerUnit: 10.00,
   carSeatAutoUpgradeVehicleType: true,
@@ -27,6 +29,8 @@ export const DEFAULT_UNIVERSAL_EXTRAS: UniversalExtrasConfig = {
   curbWaitingGraceMinutes: 10, // 10 min grace at pickup curb
   curbWaitingRatePerMinute: 0.50, // $0.50/min thereafter
   petFee: 0.00,
+  oversizedBagsConfig: DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  oversizedAutoUpgradeVehicleType: true,
   customExtras: [],
 };
 

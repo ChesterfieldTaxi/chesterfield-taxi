@@ -14,6 +14,7 @@ import {
   CashIcon,
   ShieldCheckIcon,
   PlaneLandingIcon,
+  LuggageIcon,
 } from '../ui/Icons';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -144,11 +145,13 @@ export function BookingConfirmation({
         </div>
 
         {/* Email Delivery Feedback Notification */}
-        {emailDelivery && emailDelivery.status !== 'idle' && (
+        {emailDelivery && (
           <div
-            className={`p-3.5 rounded-xl border text-xs flex items-start gap-3 ${
+            className={`p-3.5 rounded-xl border flex items-start gap-3 text-xs ${
               emailDelivery.status === 'sent'
-                ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                ? isUnconfirmed
+                  ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
                 : emailDelivery.status === 'failed'
                 ? 'bg-amber-50/90 border-amber-200 text-amber-950'
                 : emailDelivery.status === 'simulated'
@@ -158,7 +161,11 @@ export function BookingConfirmation({
           >
             <div className="mt-0.5 shrink-0">
               {emailDelivery.status === 'sent' ? (
-                <CheckIcon className="w-4 h-4 text-emerald-600" />
+                isUnconfirmed ? (
+                  <ClockIcon className="w-4 h-4 text-amber-600" />
+                ) : (
+                  <CheckIcon className="w-4 h-4 text-emerald-600" />
+                )
               ) : emailDelivery.status === 'failed' ? (
                 <ClockIcon className="w-4 h-4 text-amber-600" />
               ) : (
@@ -168,10 +175,14 @@ export function BookingConfirmation({
             <div className="flex-1 space-y-1">
               <div className="font-bold flex items-center justify-between">
                 <span>
-                  {emailDelivery.status === 'sent' && 'Confirmation Email Dispatched'}
-                  {emailDelivery.status === 'failed' && 'Email Confirmation Delivery Notice'}
+                  {emailDelivery.status === 'sent' && (
+                    isUnconfirmed ? '📬 Request Acknowledgement Sent' : '✓ Confirmation Email Dispatched'
+                  )}
+                  {emailDelivery.status === 'failed' && 'Email Notification Notice'}
                   {emailDelivery.status === 'simulated' && 'Simulated Email (Test Mode)'}
-                  {emailDelivery.status === 'sending' && 'Sending Confirmation Email...'}
+                  {emailDelivery.status === 'sending' && (
+                    isUnconfirmed ? 'Dispatching Request Acknowledgement...' : 'Sending Confirmation Email...'
+                  )}
                 </span>
                 {emailDelivery.messageId && (
                   <span className="font-mono text-[10px] text-slate-500 font-normal">
@@ -181,7 +192,11 @@ export function BookingConfirmation({
               </div>
               <p className="text-[11px] leading-relaxed opacity-90">
                 {emailDelivery.status === 'sent' && (
-                  <>An itemized confirmation and driver tracking receipt was delivered to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong>.</>
+                  isUnconfirmed ? (
+                    <>A booking request summary was delivered to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong>. Our dispatch team is reviewing your itinerary and will confirm your reservation shortly.</>
+                  ) : (
+                    <>An itemized confirmation and driver tracking receipt was delivered to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong>.</>
+                  )
                 )}
                 {emailDelivery.status === 'failed' && (
                   <>
@@ -194,7 +209,7 @@ export function BookingConfirmation({
                   </>
                 )}
                 {emailDelivery.status === 'simulated' && (
-                  <>A simulated confirmation was logged for <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> (development test mode).</>
+                  <>A simulated notification was logged for <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> (development test mode).</>
                 )}
               </p>
             </div>
@@ -376,6 +391,31 @@ export function BookingConfirmation({
             </div>
           </div>
         ) : null}
+
+        {/* Oversized Cargo Breakdown */}
+        {Boolean(trip.metadata?.hasOversizedLuggage || trip.metadata?.oversizedItemsSummary) && (
+          <div className="pt-4 border-t border-slate-100">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <LuggageIcon className="w-4 h-4 text-blue-600" />
+                  Declared Oversized Cargo & Equipment
+                </span>
+                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">
+                  Special Handling
+                </span>
+              </div>
+              <p className="text-xs text-slate-800 font-semibold">
+                {String(trip.metadata?.oversizedItemsSummary || 'Special Oversized Cargo')}
+              </p>
+              {Boolean(trip.metadata?.oversizedLuggageNotes) && (
+                <p className="text-xs text-slate-500 italic">
+                  Note: {String(trip.metadata?.oversizedLuggageNotes)}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Special Requests / Driver Notes */}
         {trip.passenger.specialRequests && (

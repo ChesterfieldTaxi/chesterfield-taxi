@@ -24,6 +24,7 @@ import type {
   IAdminConfigService,
   VehicleTierConfig,
   FleetAlertsConfig,
+  OversizedBagCategory,
 } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
@@ -35,6 +36,14 @@ import { DEFAULT_UNIVERSAL_EXTRAS } from '../pricing/extras.service';
 import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
+
+export const DEFAULT_OVERSIZED_BAG_CATEGORIES: OversizedBagCategory[] = [
+  { id: 'golf_bag', label: 'Golf Clubs / Bag', fee: 0, requiresUpgrade: true, maxCount: 4 },
+  { id: 'skis', label: 'Skis / Snowboard Bag', fee: 0, requiresUpgrade: true, maxCount: 4 },
+  { id: 'large_box', label: 'Large Cargo Box / Heavy Trunk', fee: 0, requiresUpgrade: true, maxCount: 4 },
+  { id: 'folding_wheelchair', label: 'Folding Wheelchair / Walker', fee: 0, requiresUpgrade: false, maxCount: 2 },
+  { id: 'bicycle_sports', label: 'Bicycle Box / Surfboard / Large Gear', fee: 10, requiresUpgrade: true, maxCount: 2 },
+];
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,
@@ -64,6 +73,8 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowPetRequest: true,
   allowWheelchairRequest: true,
   allowLuggageSpecialRequest: true,
+  allowOversizedLuggage: true,
+  oversizedBags: [...DEFAULT_OVERSIZED_BAG_CATEGORIES],
   publicFormBanner: {
     enabled: false,
     text: '24/7 Airport & Regional Chauffeur Service across Greater St. Louis.',
@@ -490,6 +501,9 @@ export class AdminConfigService implements IAdminConfigService {
       customerBookingConfig: {
         ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
         ...(incoming.customerBookingConfig || {}),
+        oversizedBags: (incoming.customerBookingConfig?.oversizedBags && incoming.customerBookingConfig.oversizedBags.length > 0)
+          ? incoming.customerBookingConfig.oversizedBags
+          : [...DEFAULT_OVERSIZED_BAG_CATEGORIES],
       },
       corporateAccounts: incoming.corporateAccounts && incoming.corporateAccounts.length > 0
         ? incoming.corporateAccounts
