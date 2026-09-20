@@ -193,20 +193,19 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'corporate', label: 'Corporate' },
   ],
   rates: [
-    { key: 'tariffs', label: 'Unified Tariffs' },
-    { key: 'base', label: 'Standard Rates' },
-    { key: 'named_rules', label: 'Surge Rules' },
-    { key: 'step_increments', label: 'Distance Tiers' },
-    { key: 'condition_surcharges', label: 'Surcharges' },
+    { key: 'rates', label: 'Tariffs & Rates' },
+    { key: 'extras', label: 'Extras & Services' },
+    { key: 'surcharges', label: 'Surcharges' },
+    { key: 'rules', label: 'Rules & Routing' },
   ],
   vehicles: [
     { key: 'types', label: 'Service Classes' },
     { key: 'fleet', label: 'Fleet Inventory' },
   ],
   zones: [
-    { key: 'zones', label: 'Geofences' },
+    { key: 'places', label: 'Special Places & Landmarks' },
+    { key: 'zones', label: 'Operational Geofences' },
     { key: 'groups', label: 'Zone Groups' },
-    { key: 'collections', label: 'POI Collections' },
     { key: 'blacklists', label: 'Exclusion Zones' },
   ],
   operators: [

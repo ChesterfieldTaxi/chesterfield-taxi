@@ -50,7 +50,12 @@ export interface PricingConfig {
   tariffs?: import('../../types/tariff').TariffProfile[];
   /** Optional active/selected tariff profile override */
   activeTariffId?: string;
+  /** Universal Extras Catalog (Car seats, extra pax, stops, curb waiting) */
+  universalExtras?: import('../../types/config').UniversalExtrasConfig;
+  /** Surcharges Catalog (Airport fee, surge, remote radius, cancel/no-show) */
+  surchargesCatalog?: import('../../types/config').SurchargesConfig;
 }
+
 
 
 export interface SurgeRule {
@@ -74,12 +79,16 @@ export interface PricingInput {
   distanceMiles: number;
   /** Estimated duration in minutes calculated server-side */
   durationMinutes: number;
-  /** Selected vehicle tier */
-  vehicleTier: VehicleTier;
-  /** Pickup datetime ISO string or Date */
-  pickupDateTime: string | Date;
+  /** Selected vehicle tier (default: standard) */
+  vehicleTier?: VehicleTier;
+  /** Pickup datetime ISO string or Date (default: now) */
+  pickupDateTime?: string | Date;
   /** Whether the pickup is at an airport terminal */
   isAirportPickup?: boolean;
+  /** Whether the dropoff is at an airport terminal */
+  isAirportDropoff?: boolean;
+  /** Whether either leg of the trip involves an airport transfer */
+  isAirportTrip?: boolean;
   /** Optional promo or voucher code */
   promoCode?: string;
   /** Optional custom toll or fee additions */
@@ -130,7 +139,21 @@ export interface PricingInput {
   delayMinutes?: number;
   /** Dispatcher or driver selected Named Pricing Rule ID */
   selectedRuleId?: string;
+  /** Pickup and Dropoff Postal Codes (for Zip-code matrix tariffs) */
+  pickupZipCode?: string;
+  dropoffZipCode?: string;
+  /** Corporate Account ID (e.g. 'corp-smoke-house') */
+  corporateAccountId?: string;
+  /** Dual vehicle classifications */
+  vehicleType?: import('../../types/config').VehicleType;
+  vehicleClass?: import('../../types/config').VehicleClass;
+  /** Hourly charter bookings */
+  isHourlyBooking?: boolean;
+  hourlyDurationHours?: number;
+  /** Curb waiting at pickup */
+  curbWaitMinutes?: number;
 }
+
 
 export interface SurchargeEntry {
   name: string;
@@ -188,6 +211,12 @@ export interface PricingContext {
   readonly tariffProfileName?: string;
   readonly matchedCorridorId?: string;
   readonly matchedCorridorName?: string;
+  readonly targetTariffId?: string;
+  readonly overruleExtras?: Partial<import('../../types/config').UniversalExtrasConfig>;
+  readonly overruleSurcharges?: Partial<import('../../types/config').SurchargesConfig>;
+  readonly layeredZoneFee?: number;
+  readonly driverPay?: number;
+
 
   // Step-by-step calculation trace for transparency and auditing
   readonly auditTrail: ReadonlyArray<CalculationAuditStep>;

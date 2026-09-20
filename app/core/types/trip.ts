@@ -147,6 +147,11 @@ export interface TripPricing {
   tariffProfileName?: string;
   matchedCorridorId?: string;
   matchedCorridorName?: string;
+  itemizedSurcharges?: Array<{
+    name: string;
+    amount: number;
+    description?: string;
+  }>;
   // Phase 24: In-Vehicle Taximeter & Extra Fees
   meterDistanceMiles?: number;
   meterDurationMinutes?: number;

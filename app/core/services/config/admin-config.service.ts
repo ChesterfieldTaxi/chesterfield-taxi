@@ -31,6 +31,9 @@ import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DEFAULT_TARIFF_PROFILES } from '../pricing/tariff.service';
+import { DEFAULT_UNIVERSAL_EXTRAS } from '../pricing/extras.service';
+import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
+import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,
@@ -684,6 +687,9 @@ export class AdminConfigService implements IAdminConfigService {
       delayRate: settings.pricing.delayRate,
       conditionSurcharges: settings.pricing.conditionSurcharges,
       tariffs: settings.tariffs ?? DEFAULT_TARIFF_PROFILES,
+      universalExtras: DEFAULT_UNIVERSAL_EXTRAS,
+      surchargesCatalog: DEFAULT_SURCHARGES_CONFIG,
+      namedPricingRules: DEFAULT_NAMED_PRICING_RULES,
     };
   }
 }

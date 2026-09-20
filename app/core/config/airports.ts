@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Airport Constants & Utilities
  *
  * Defines supported regional airports in the St. Louis / Chesterfield service area,
@@ -42,11 +42,14 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
       'lambert airport',
       'lambert-st. louis',
       'lambert st louis',
+      'lambert international',
+      'lambert international blvd',
       'st. louis international',
       'st louis international',
       'terminal 1',
       'terminal 2',
       'natural bridge ave',
+      '63145',
     ],
   },
   {
@@ -61,6 +64,9 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
       'spirit airport',
       'chesterfield airport',
       'spirit st louis',
+      'spirit dr',
+      'spirit drive',
+      '63005',
     ],
   },
   {

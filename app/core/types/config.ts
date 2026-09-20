@@ -76,12 +76,90 @@ export interface RulePassengerFilter {
   max?: number;
 }
 
+export type VehicleType = 'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav';
+export type VehicleClass = 'standard' | 'executive' | 'xl' | 'medical' | 'delivery';
+
+export interface UniversalExtrasConfig {
+  carSeatFeePerUnit: number; // $10.00
+  carSeatAutoUpgradeVehicleType?: boolean; // true -> forces SUV/Minivan
+  passengerBaseAllowance: number; // 1 free
+  extraPassengerFeePerHead: number; // $1.00
+  intermediateStopFee: number; // $5.00
+  intermediateStopFreeWaitingMinutes?: number; // 5 min
+  curbWaitingGraceMinutes: number; // e.g. 5 or 10 min
+  curbWaitingRatePerMinute: number; // e.g. $0.50
+  pickupGraceMinutes?: number; // alias
+  waitingRatePerMinute?: number; // alias
+  petFee?: number;
+  waiveCarSeatFee?: boolean;
+  waiveExtraPaxFee?: boolean;
+  customExtras?: Array<{
+    id: string;
+    name: string;
+    fee: number;
+    description?: string;
+    isPerUnit?: boolean;
+    isActive?: boolean;
+  }>;
+}
+
+export interface SurchargesConfig {
+  airportGateFee: number; // $4.00
+  airportCommercialGateFee?: number; // alias
+  airportTargetZoneIds?: string[]; // e.g. ['zone-lambert-airport', 'zone-spirit-airport']
+  peakSurgeMultiplier: number; // e.g. 1.25
+  isPeakSurgeActive?: boolean;
+  outOfAreaRemoteFee: number; // $15.00
+  remoteServiceFlatFee?: number; // alias
+  outOfAreaThresholdMiles?: number; // 15.0 mi radius
+  remoteBoundaryDistanceMiles?: number; // alias
+  cancellationFeeWithinOneHour: number; // e.g. $15.00 or $28.00
+  cancellationFee?: number; // alias
+  cancellationWindowMinutes?: number; // 60 min
+  noShowFee: number; // e.g. $28.00
+  airportFeeApplicableTariffs?: string[];
+  surgeApplicableTariffs?: string[];
+  remoteFeeApplicableTariffs?: string[];
+  waiveAirportFee?: boolean;
+  waiveRemoteFee?: boolean;
+  customSurcharges?: CustomSurchargeItem[];
+}
+
+export interface CustomSurchargeTrigger {
+  vehicleTiers?: string[];
+  vehicleTypes?: string[];
+  vehicleClasses?: string[];
+  minDistanceMiles?: number;
+  maxDistanceMiles?: number;
+  timeWindow?: {
+    startHour: number;
+    endHour: number;
+  };
+  daysOfWeek?: number[];
+  zoneIds?: string[];
+}
+
+export interface CustomSurchargeItem {
+  id: string;
+  name: string;
+  description?: string;
+  amount: number;
+  type: 'flat' | 'percent';
+  isActive: boolean;
+  applicableTariffIds?: string[];
+  applicableRateIds?: string[];
+  applicableVehicleTypes?: string[];
+  applicableVehicleClasses?: string[];
+  triggers?: CustomSurchargeTrigger;
+}
+
 export interface PricingRuleTrigger {
   zoneIds?: string[];
   zoneGroupIds?: string[];
   locationCollectionIds?: string[];
   fromZoneId?: string; // Origin Zone for Corridor rules
   toZoneId?: string; // Destination Zone for Corridor rules
+  isBidirectionalTransfer?: boolean; // When true, matches if Pickup OR Dropoff is in zoneIds/zoneGroupIds
   minDistanceMiles?: number;
   maxDistanceMiles?: number;
   minDurationMinutes?: number;
@@ -91,7 +169,9 @@ export interface PricingRuleTrigger {
   holidayDates?: string[]; // "YYYY-MM-DD"
   accountTypes?: Array<'retail' | 'corporate' | 'vip'>;
   accountTags?: string[];
-  vehicleTiers?: string[]; // e.g. 'standard', 'premium', 'xl', 'wheelchair'
+  vehicleTiers?: string[]; // Legacy tiers
+  vehicleTypes?: VehicleType[]; // 'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav'
+  vehicleClasses?: VehicleClass[]; // 'standard' | 'executive' | 'xl' | 'medical' | 'delivery'
   equipment?: RuleEquipmentFilter;
   passengers?: RulePassengerFilter;
 }
@@ -104,13 +184,20 @@ export interface RuleSurchargeAdder {
 }
 
 export interface PricingRuleModifier {
-  type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent' | 'base_override';
+  type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent' | 'base_override' | 'apply_tariff';
   value: number;
-  // Phase 20 Delta & Base Overrides
+  targetTariffId?: string; // Applied Tariff Profile ID (e.g. Airport Flat Rate)
   baseFareOverride?: number;
   perMileRateOverride?: number;
   perMinuteRateOverride?: number;
   surchargeAdders?: RuleSurchargeAdder[];
+  // Overrule Universal Extras for this rule
+  overruleExtras?: Partial<UniversalExtrasConfig>;
+  // Overrule Surcharges for this rule (e.g. Waive airport fee)
+  overruleSurcharges?: Partial<SurchargesConfig>;
+  // Layering
+  layerZoneFee?: number;
+  excessMileageRate?: { thresholdMiles: number; ratePerMile: number };
   // Explicit inheritance override toggles
   overrideBaseFare?: boolean;
   overrideRates?: boolean;

@@ -22,7 +22,26 @@ import { sanitizePayload } from '../firestore-sanitizer';
 
 const PRICING_RULES_STORAGE_KEY = 'chesterfield_taxi_pricing_rules';
 
-export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [];
+export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
+  {
+    id: 'rule-airport-transfer-flat',
+    name: 'Airport Transfer Flat Rate (Lambert & Spirit)',
+    description: 'Directly applies Airport Flat Rate tariff when trip originates or terminates at Lambert (STL) or Spirit (SUS) airports.',
+    priority: 95,
+    isActive: true,
+    allowDriverSelection: false,
+    triggers: {
+      isBidirectionalTransfer: true,
+      zoneGroupIds: ['group-regional-aviation', 'group-airports'],
+      zoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],
+    },
+    modifier: {
+      type: 'apply_tariff',
+      value: 0,
+      targetTariffId: 'tariff-airport-flat',
+    },
+  },
+];
 
 export interface RuleEvaluationInput {
   distanceMiles: number;
@@ -32,11 +51,19 @@ export interface RuleEvaluationInput {
   zoneIds?: string[];
   originZoneId?: string;
   destinationZoneId?: string;
+  isAirportPickup?: boolean;
+  isAirportDropoff?: boolean;
+  isAirportTrip?: boolean;
   zoneGroupIds?: string[];
   locationCollectionIds?: string[];
   accountType?: 'retail' | 'corporate' | 'vip';
   accountTags?: string[];
   vehicleTier?: string;
+  vehicleType?: import('../../types/config').VehicleType;
+  vehicleClass?: import('../../types/config').VehicleClass;
+  corporateAccountId?: string;
+  pickupZipCode?: string;
+  dropoffZipCode?: string;
   selectedRuleId?: string;
   equipment?: {
     carSeats?: number;
@@ -55,9 +82,14 @@ export interface EvaluatedRulesSummary {
   perMileRateOverride?: number;
   perMinuteRateOverride?: number;
   surchargeAdders?: import('../../types/config').RuleSurchargeAdder[];
+  targetTariffId?: string;
+  overruleExtras?: Partial<import('../../types/config').UniversalExtrasConfig>;
+  overruleSurcharges?: Partial<import('../../types/config').SurchargesConfig>;
+  layeredZoneFee?: number;
   stoppedProcessingByRule?: NamedPricingRule;
   auditTrail: string[];
 }
+
 
 export class PricingRulesService {
   private isConfigured: boolean;
@@ -97,6 +129,10 @@ export class PricingRulesService {
     } catch {
       // Ignore storage errors
     }
+  }
+
+  public getAllRules(): NamedPricingRule[] {
+    return this.getCachedRules().sort((a, b) => b.priority - a.priority);
   }
 
   public async getRules(): Promise<NamedPricingRule[]> {
@@ -399,8 +435,38 @@ export function evaluateApplicablePricingRules(
       const { triggers } = rule;
       let matches = true;
 
-      // 0. Origin -> Destination Corridor check
-      if (triggers.fromZoneId) {
+      // 0. Bidirectional Transfer check (e.g. Airport Transfer Rule)
+      if (triggers.isBidirectionalTransfer) {
+        let hasTransferMatch = false;
+        const allTripZoneIds = [
+          ...(input.zoneIds || []),
+          ...(input.originZoneId ? [input.originZoneId] : []),
+          ...(input.destinationZoneId ? [input.destinationZoneId] : []),
+        ];
+        if (triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
+          if (input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid))) {
+            hasTransferMatch = true;
+          }
+        }
+        if (triggers.zoneIds && triggers.zoneIds.length > 0) {
+          if (allTripZoneIds.some((zid) => triggers.zoneIds!.includes(zid))) {
+            hasTransferMatch = true;
+          }
+        }
+        if (
+          (rule.id === 'rule-airport-transfer-flat' || rule.modifier.targetTariffId === 'tariff-airport-flat') &&
+          (input.isAirportPickup || input.isAirportDropoff || input.isAirportTrip)
+        ) {
+          hasTransferMatch = true;
+        }
+        if (!hasTransferMatch) {
+          matches = false;
+        }
+      }
+
+
+      // 0b. Origin -> Destination Corridor check
+      if (matches && triggers.fromZoneId) {
         const matchesOrigin =
           input.originZoneId === triggers.fromZoneId ||
           (input.zoneIds && input.zoneIds.length > 0 && input.zoneIds[0] === triggers.fromZoneId);
@@ -418,16 +484,22 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 1. Zone Geofence check
-      if (matches && triggers.zoneIds && triggers.zoneIds.length > 0) {
-        const hasZoneMatch = input.zoneIds?.some((zid) => triggers.zoneIds!.includes(zid));
+      // 1. Zone Geofence check (if not bidirectional)
+      if (matches && !triggers.isBidirectionalTransfer && triggers.zoneIds && triggers.zoneIds.length > 0) {
+        const allTripZoneIds = [
+          ...(input.zoneIds || []),
+          ...(input.originZoneId ? [input.originZoneId] : []),
+          ...(input.destinationZoneId ? [input.destinationZoneId] : []),
+        ];
+        const hasZoneMatch = allTripZoneIds.some((zid) => triggers.zoneIds!.includes(zid));
         if (!hasZoneMatch) {
           matches = false;
         }
       }
 
-      // 2. Zone Group check
-      if (matches && triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
+
+      // 2. Zone Group check (if not bidirectional)
+      if (matches && !triggers.isBidirectionalTransfer && triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
         const hasGroupMatch = input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid));
         if (!hasGroupMatch) {
           matches = false;
@@ -506,9 +578,21 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 11. Vehicle tier check
+      // 11. Vehicle tier check (legacy)
       if (matches && triggers.vehicleTiers && triggers.vehicleTiers.length > 0) {
         if (!input.vehicleTier || !triggers.vehicleTiers.includes(input.vehicleTier)) {
+          matches = false;
+        }
+      }
+
+      // 11b. Dual Vehicle classification checks
+      if (matches && triggers.vehicleTypes && triggers.vehicleTypes.length > 0) {
+        if (!input.vehicleType || !triggers.vehicleTypes.includes(input.vehicleType)) {
+          matches = false;
+        }
+      }
+      if (matches && triggers.vehicleClasses && triggers.vehicleClasses.length > 0) {
+        if (!input.vehicleClass || !triggers.vehicleClasses.includes(input.vehicleClass)) {
           matches = false;
         }
       }
@@ -569,10 +653,40 @@ export function evaluateApplicablePricingRules(
   let perMileRateOverride: number | undefined = undefined;
   let perMinuteRateOverride: number | undefined = undefined;
   const surchargeAdders: import('../../types/config').RuleSurchargeAdder[] = [];
+  let targetTariffId: string | undefined = undefined;
+  let overruleExtras: Partial<import('../../types/config').UniversalExtrasConfig> | undefined = undefined;
+  let overruleSurcharges: Partial<import('../../types/config').SurchargesConfig> | undefined = undefined;
+  let layeredZoneFee = 0;
 
   for (const rule of matchedRules) {
-    const { type, value, baseFareOverride: bfo, perMileRateOverride: pmro, perMinuteRateOverride: ptmro, surchargeAdders: sAdders } =
-      rule.modifier;
+    const {
+      type,
+      value,
+      targetTariffId: tTariffId,
+      baseFareOverride: bfo,
+      perMileRateOverride: pmro,
+      perMinuteRateOverride: ptmro,
+      surchargeAdders: sAdders,
+      overruleExtras: oExtras,
+      overruleSurcharges: oSurcharges,
+      layerZoneFee: lzFee,
+    } = rule.modifier;
+
+    if (tTariffId && !targetTariffId) {
+      targetTariffId = tTariffId;
+    }
+
+    if (oExtras) {
+      overruleExtras = { ...(overruleExtras || {}), ...oExtras };
+    }
+
+    if (oSurcharges) {
+      overruleSurcharges = { ...(overruleSurcharges || {}), ...oSurcharges };
+    }
+
+    if (typeof lzFee === 'number') {
+      layeredZoneFee += lzFee;
+    }
 
     if (type === 'flat_override') {
       if (flatOverride === undefined) {
@@ -610,6 +724,10 @@ export function evaluateApplicablePricingRules(
     perMileRateOverride,
     perMinuteRateOverride,
     surchargeAdders,
+    targetTariffId,
+    overruleExtras,
+    overruleSurcharges,
+    layeredZoneFee,
     stoppedProcessingByRule,
     auditTrail,
   };

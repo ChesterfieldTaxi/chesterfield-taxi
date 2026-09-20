@@ -51,6 +51,13 @@ export interface QuoteRequest {
   waiveAirportFee?: boolean;
   manualDiscount?: number;
   manualFareOverride?: number;
+  isAirportPickup?: boolean;
+  isAirportDropoff?: boolean;
+  isAirportTrip?: boolean;
+  originZoneId?: string;
+  destinationZoneId?: string;
+  curbWaitMinutes?: number;
+  delayMinutes?: number;
 }
 
 /**

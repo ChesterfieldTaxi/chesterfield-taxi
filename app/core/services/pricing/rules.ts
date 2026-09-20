@@ -28,7 +28,11 @@ import {
   matchTariffProfile,
   matchTariffCorridor,
   evaluateTaximeterFare,
+  evaluateZipMatrixFare,
+  evaluateHourlyFare,
 } from './tariff.service';
+import { DEFAULT_UNIVERSAL_EXTRAS } from './extras.service';
+import { DEFAULT_SURCHARGES_CONFIG } from './surcharges.service';
 
 /**
  * Default production pricing configuration.
@@ -75,7 +79,10 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   },
   namedPricingRules: DEFAULT_NAMED_PRICING_RULES,
   tariffs: DEFAULT_TARIFF_PROFILES,
+  universalExtras: DEFAULT_UNIVERSAL_EXTRAS,
+  surchargesCatalog: DEFAULT_SURCHARGES_CONFIG,
 };
+
 
 /**
  * Standard Time-of-Day Surge Rules.
@@ -193,40 +200,83 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     return context;
   }
 
-  // 1. Match highest priority active TariffProfile (honoring activeTariffId or vehicle/schedule)
-  const candidateTariffs = context.config.activeTariffId
-    ? tariffs.filter((t) => t.id === context.config.activeTariffId)
+  // 1. Match highest priority active TariffProfile (honoring targetTariffId, activeTariffId or vehicle/schedule)
+  const requestedTariffId = context.targetTariffId || context.config.activeTariffId;
+  const candidateTariffs = requestedTariffId
+    ? tariffs.filter((t) => t.id === requestedTariffId)
     : tariffs;
   const matchedProfile = matchTariffProfile(context.input, candidateTariffs.length > 0 ? candidateTariffs : tariffs);
   if (!matchedProfile) {
     return context;
   }
 
-  // 2. Check if trip matches an explicit From/To Flat Corridor inside that profile
+  // 2. Check if trip is an Agreed Zip-Code Matrix (e.g. Smoke House Chesterfield)
+  if (matchedProfile.rateModel === 'zip_matrix' || (matchedProfile.zipMatrix && matchedProfile.zipMatrix.length > 0)) {
+    const zipResult = evaluateZipMatrixFare(
+      matchedProfile,
+      context.input.pickupZipCode,
+      context.input.dropoffZipCode
+    );
+    if (zipResult) {
+      const flatFare = roundCurrency(zipResult.subtotal);
+      const auditTrail = appendAudit(
+        context.auditTrail,
+        1,
+        `Tariff Profile: ${matchedProfile.name}`,
+        zipResult.auditDetails.join(' | '),
+        flatFare,
+        flatFare
+      );
+      return {
+        ...context,
+        tariffProfileId: matchedProfile.id,
+        tariffProfileName: matchedProfile.name,
+        baseFare: flatFare,
+        distanceFare: 0,
+        timeFare: 0,
+        driverPay: zipResult.matchedEntry.driverPay ?? zipResult.matchedEntry.customerCharge,
+        subtotal: flatFare,
+        totalFare: flatFare,
+        auditTrail,
+      };
+    }
+  }
+
+  // 3. Check if trip is an Hourly Charter
+  if (matchedProfile.rateModel === 'hourly' || context.input.isHourlyBooking) {
+    const hourlyResult = evaluateHourlyFare(
+      matchedProfile,
+      context.input.hourlyDurationHours ?? 2,
+      context.input.distanceMiles
+    );
+    const hourlyFare = roundCurrency(hourlyResult.subtotal);
+    const auditTrail = appendAudit(
+      context.auditTrail,
+      1,
+      `Tariff Profile: ${matchedProfile.name}`,
+      hourlyResult.auditDetails.join(' | '),
+      hourlyFare,
+      hourlyFare
+    );
+    return {
+      ...context,
+      tariffProfileId: matchedProfile.id,
+      tariffProfileName: matchedProfile.name,
+      baseFare: hourlyFare,
+      distanceFare: 0,
+      timeFare: 0,
+      subtotal: hourlyFare,
+      totalFare: hourlyFare,
+      auditTrail,
+    };
+  }
+
+  // 4. Check if trip matches an explicit From/To Flat Corridor inside that profile
   const matchedCorridor = matchTariffCorridor(context.input, matchedProfile);
   if (matchedCorridor) {
     const flatFare = roundCurrency(matchedCorridor.flatPrice);
     let currentSubtotal = flatFare;
     const newSurcharges: SurchargeEntry[] = [...context.surcharges];
-
-    // Evaluate child safety car seats
-    let carSeatFee = 0;
-    const carSeatRate = matchedProfile.extras?.carSeatFeePerUnit ?? context.config.conditionSurcharges?.carSeatFeePerUnit ?? 0;
-    if (carSeatRate > 0) {
-      const breakdown = context.input.carSeatsBreakdown;
-      const totalCarSeats = breakdown
-        ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
-        : (context.input.equipment?.carSeats ?? 0);
-      if (totalCarSeats > 0) {
-        carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
-        newSurcharges.push({
-          name: `Child Safety Seats (${totalCarSeats})`,
-          amount: carSeatFee,
-          description: `$${carSeatRate.toFixed(2)} x ${totalCarSeats} seat(s)`,
-        });
-        currentSubtotal = roundCurrency(currentSubtotal + carSeatFee);
-      }
-    }
 
     // Evaluate custom surcharges from profile
     if (matchedProfile.extras?.customSurcharges) {
@@ -261,7 +311,6 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
       baseFare: 0,
       distanceFare: 0,
       timeFare: 0,
-      carSeatFee,
       surcharges: newSurcharges,
       subtotal: currentSubtotal,
       totalFare: currentSubtotal,
@@ -269,53 +318,20 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     };
   }
 
-  // 3. Taximeter Step Bracket Calculation
-  const totalDuration = context.input.durationMinutes + (context.input.delayMinutes ?? 0);
+  // 5. Taximeter Step Bracket Calculation
+  if (!matchedProfile.taximeter) {
+    return context;
+  }
+  const delayDuration = (context.input.delayMinutes ?? 0) + (context.input.curbWaitMinutes ?? 0);
   const meterResult = evaluateTaximeterFare(
     matchedProfile.taximeter,
     context.input.distanceMiles,
-    totalDuration
+    delayDuration
   );
+
 
   let currentSubtotal = meterResult.subtotal;
   const newSurcharges: SurchargeEntry[] = [...context.surcharges];
-
-  // Evaluate extras: car seats
-  let carSeatFee = 0;
-  const carSeatRate = matchedProfile.extras?.carSeatFeePerUnit ?? context.config.conditionSurcharges?.carSeatFeePerUnit ?? 0;
-  if (carSeatRate > 0) {
-    const breakdown = context.input.carSeatsBreakdown;
-    const totalCarSeats = breakdown
-      ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
-      : (context.input.equipment?.carSeats ?? 0);
-    if (totalCarSeats > 0) {
-      carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
-      newSurcharges.push({
-        name: `Child Safety Seats (${totalCarSeats})`,
-        amount: carSeatFee,
-        description: `$${carSeatRate.toFixed(2)} x ${totalCarSeats} seat(s)`,
-      });
-      currentSubtotal = roundCurrency(currentSubtotal + carSeatFee);
-    }
-  }
-
-  // Evaluate extras: extra passengers over base allowance
-  let passengerSurcharge = 0;
-  const allowance = matchedProfile.extras?.passengerBaseAllowance ?? context.config.conditionSurcharges?.passengerBaseAllowance;
-  const perHeadFee = matchedProfile.extras?.extraPassengerFeePerHead ?? context.config.conditionSurcharges?.extraPassengerFeePerHead;
-  if (allowance !== undefined && perHeadFee && perHeadFee > 0) {
-    const paxCount = typeof context.input.passengers === 'number' ? context.input.passengers : 1;
-    if (paxCount > allowance) {
-      const extraPax = paxCount - allowance;
-      passengerSurcharge = roundCurrency(extraPax * perHeadFee);
-      newSurcharges.push({
-        name: `Additional Passengers (${extraPax})`,
-        amount: passengerSurcharge,
-        description: `$${perHeadFee.toFixed(2)}/head over ${allowance} base allowance`,
-      });
-      currentSubtotal = roundCurrency(currentSubtotal + passengerSurcharge);
-    }
-  }
 
   // Evaluate custom surcharges from profile
   if (matchedProfile.extras?.customSurcharges) {
@@ -349,13 +365,12 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     distanceFare: meterResult.distanceFare,
     timeFare: meterResult.delayFare,
     delayFee: meterResult.delayFare,
-    carSeatFee,
-    passengerSurcharge,
     surcharges: newSurcharges,
     subtotal: currentSubtotal,
     totalFare: currentSubtotal,
     auditTrail,
   };
+
 };
 
 // ----------------------------------------------------------------------------
@@ -365,7 +380,7 @@ export const applyBaseFare: PricingPipelineStep = (context) => {
   if (context.tariffProfileId) {
     return context;
   }
-  const tier = context.input.vehicleTier;
+  const tier = context.input.vehicleTier || 'standard';
   const configuredBaseFare =
     context.config.vehicleBaseFares?.[tier] ?? context.config.baseFare;
   const baseFare = roundCurrency(configuredBaseFare);
@@ -413,7 +428,7 @@ export const applyDistanceAndTimeRates: PricingPipelineStep = (context) => {
 
   const flagDropMiles = Math.max(0, flagDropIncludedMiles ?? 0);
   const billableDistance = Math.max(0, distanceMiles - flagDropMiles);
-  const effectivePerMileRate = vehicleMileRates?.[vehicleTier] ?? perMileRate;
+  const effectivePerMileRate = (context.input.vehicleTier ? vehicleMileRates?.[context.input.vehicleTier] : undefined) ?? perMileRate;
 
   let distanceFare = 0;
   let distanceAuditDesc = '';
@@ -510,7 +525,7 @@ export const applyVehicleMultiplier: PricingPipelineStep = (context) => {
   if (context.tariffProfileId) {
     return context;
   }
-  const tier = context.input.vehicleTier;
+  const tier = context.input.vehicleTier || 'standard';
   const multiplier = context.config.vehicleMultipliers[tier] ?? 1.0;
 
   // The vehicle multiplier scales the mileage and duration fare
@@ -559,6 +574,25 @@ export function createSurgeStep(
         ),
       };
     }
+
+    // Check if matched tariff exempts surge pricing (e.g. Smoke House contract)
+    const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
+    if (matchedTariff && matchedTariff.allowSurgeMultiplier === false) {
+      return {
+        ...context,
+        surgeMultiplier: 1.0,
+        surgeDescription: `Surge exempt under agreed contract (${matchedTariff.name})`,
+        auditTrail: appendAudit(
+          context.auditTrail,
+          4,
+          'Surge / Time-of-Day',
+          `Surge multiplier exempt under tariff contract: ${matchedTariff.name}`,
+          0,
+          context.subtotal
+        ),
+      };
+    }
+
 
     const rawDate = context.input.pickupDateTime;
     const pickupDate =
@@ -628,102 +662,119 @@ export function createSurgeStep(
 export const applySurgeMultiplier: PricingPipelineStep = createSurgeStep(DEFAULT_SURGE_RULES);
 
 // ----------------------------------------------------------------------------
-// STEP 5: Condition-Based Surcharges (Car Seats, Extra Passengers, Zones)
+// STEP 5: Universal Extras & Services (Car Seats, Extra Passengers, Stops, Curb Wait)
 // ----------------------------------------------------------------------------
 export const applyConditionSurcharges: PricingPipelineStep = (context) => {
-  if (context.tariffProfileId) {
+  // Customer amenities (child seats, extra passengers, stops) apply across all tariffs unless explicitly waived
+  const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
+  if (matchedTariff && (matchedTariff as any).allowCustomerAddons === false) {
     return context;
   }
+
   const newSurcharges: SurchargeEntry[] = [];
-  const cfg = context.config.conditionSurcharges;
+  const extras = context.config.universalExtras || DEFAULT_UNIVERSAL_EXTRAS;
+  const overrules = context.overruleExtras || {};
   let runningAdditions = 0;
 
-  // 1. Child safety car seat equipment fee
+  // 1. Child safety car seat equipment fee ($10/seat default)
   let carSeatFee = 0;
-  if (cfg?.carSeatFeePerUnit && cfg.carSeatFeePerUnit > 0) {
+  const carSeatRate = overrules.carSeatFeePerUnit ?? extras.carSeatFeePerUnit;
+  if (carSeatRate > 0) {
     const breakdown = context.input.carSeatsBreakdown;
     const totalCarSeats = breakdown
       ? (breakdown.total ?? ((breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)))
-      : 0;
+      : (context.input.equipment?.carSeats ?? 0);
 
     if (totalCarSeats > 0) {
-      carSeatFee = roundCurrency(totalCarSeats * cfg.carSeatFeePerUnit);
+      carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
       newSurcharges.push({
         name: `Child Safety Seats (${totalCarSeats})`,
         amount: carSeatFee,
-        description: `$${cfg.carSeatFeePerUnit.toFixed(2)} equipment fee x ${totalCarSeats} seat(s)`,
+        description: `$${carSeatRate.toFixed(2)} equipment fee x ${totalCarSeats} seat(s)`,
       });
       runningAdditions += carSeatFee;
     }
   }
 
-  // 2. Extra passenger allowance fee
+  // 2. Extra passenger allowance fee (1 included free, $1/additional head)
   let passengerSurcharge = 0;
-  const passengers = Math.max(0, context.input.passengers ?? 0);
-  if (
-    cfg?.passengerBaseAllowance !== undefined &&
-    cfg?.extraPassengerFeePerHead &&
-    cfg.extraPassengerFeePerHead > 0 &&
-    passengers > cfg.passengerBaseAllowance
-  ) {
-    const extraHeads = passengers - cfg.passengerBaseAllowance;
-    passengerSurcharge = roundCurrency(extraHeads * cfg.extraPassengerFeePerHead);
+  const allowance = overrules.passengerBaseAllowance ?? extras.passengerBaseAllowance;
+  const perHeadFee = overrules.extraPassengerFeePerHead ?? extras.extraPassengerFeePerHead;
+  const passengers = Math.max(0, context.input.passengers ?? 1);
+  if (allowance !== undefined && perHeadFee > 0 && passengers > allowance) {
+    const extraHeads = passengers - allowance;
+    passengerSurcharge = roundCurrency(extraHeads * perHeadFee);
     newSurcharges.push({
       name: `Additional Passenger Fee (+${extraHeads})`,
       amount: passengerSurcharge,
-      description: `$${cfg.extraPassengerFeePerHead.toFixed(2)}/head over ${cfg.passengerBaseAllowance} passenger base allowance`,
+      description: `$${perHeadFee.toFixed(2)}/head over ${allowance} passenger base allowance`,
     });
     runningAdditions += passengerSurcharge;
   }
 
-  // 3. Vehicle tier specific surcharges
-  const tier = context.input.vehicleTier;
-  if (cfg?.vehicleTierSurcharges?.[tier]) {
-    const tierSurcharge = cfg.vehicleTierSurcharges[tier];
-    if (tierSurcharge.flat > 0) {
+  // 3. Multi-stop intermediate waypoint fee ($5/stop default)
+  const stopsCount = Math.max(0, context.input.intermediateStopsCount ?? 0);
+  if (stopsCount > 0) {
+    const stopFeeRate = overrules.intermediateStopFee ?? extras.intermediateStopFee;
+    if (context.input.waiveMultiStopFees || stopFeeRate === 0) {
       newSurcharges.push({
-        name: `${tier.toUpperCase()} Vehicle Premium`,
-        amount: roundCurrency(tierSurcharge.flat),
-        description: `Fixed vehicle class surcharge for ${tier}`,
+        name: `Intermediate Stops (${stopsCount} stop${stopsCount > 1 ? 's' : ''} - Waived)`,
+        amount: 0,
+        description: `Intermediate stop fee waived by dispatcher override`,
       });
-      runningAdditions += tierSurcharge.flat;
-    }
-    if (tierSurcharge.percent > 0) {
-      const pctAmount = roundCurrency(context.subtotal * (tierSurcharge.percent / 100));
+    } else {
+      const totalStopFee = roundCurrency(stopsCount * stopFeeRate);
       newSurcharges.push({
-        name: `${tier.toUpperCase()} Class Fee (${tierSurcharge.percent}%)`,
-        amount: pctAmount,
-        description: `${tierSurcharge.percent}% vehicle tier adder`,
+        name: `Intermediate Stops (${stopsCount} stop${stopsCount > 1 ? 's' : ''})`,
+        amount: totalStopFee,
+        description: `$${stopFeeRate.toFixed(2)} per intermediate waypoint`,
       });
-      runningAdditions += pctAmount;
+      runningAdditions += totalStopFee;
     }
   }
 
-  // 4. Zone surcharges
-  if (cfg?.zoneSurcharges && context.input.zoneIds?.length) {
-    for (const zid of context.input.zoneIds) {
-      const zoneSurcharge = cfg.zoneSurcharges[zid];
-      if (zoneSurcharge) {
-        if (zoneSurcharge.flat > 0) {
+  // 4. Curb Waiting delay fee (grace period & $/min)
+  const curbWaitMins = context.input.curbWaitMinutes ?? 0;
+  const graceMins = overrules.curbWaitingGraceMinutes ?? extras.curbWaitingGraceMinutes;
+  const curbRate = overrules.curbWaitingRatePerMinute ?? extras.curbWaitingRatePerMinute;
+  if (curbWaitMins > graceMins && curbRate > 0) {
+    const billableMins = curbWaitMins - graceMins;
+    const curbFee = roundCurrency(billableMins * curbRate);
+    newSurcharges.push({
+      name: `Curb Waiting (${billableMins} min)`,
+      amount: curbFee,
+      description: `${billableMins} min past ${graceMins} min grace @ $${curbRate.toFixed(2)}/min`,
+    });
+    runningAdditions += curbFee;
+  }
+
+  // 5. Layered Zone Fee (if applied by rule)
+  if (context.layeredZoneFee && context.layeredZoneFee > 0) {
+    newSurcharges.push({
+      name: 'Layered Zone Rate Adder',
+      amount: roundCurrency(context.layeredZoneFee),
+      description: `Rule layered zone corridor fee`,
+    });
+    runningAdditions += context.layeredZoneFee;
+  }
+
+  // 6. Custom Extras from config
+  if (extras.customExtras && extras.customExtras.length > 0) {
+    for (const ce of extras.customExtras) {
+      if (ce.fee > 0) {
+        if (ce.name.toLowerCase().includes('pet') && (context.input.equipment as any)?.petCarrier) {
+          const petFee = roundCurrency(ce.fee);
           newSurcharges.push({
-            name: `Zone Surcharge (${zid})`,
-            amount: roundCurrency(zoneSurcharge.flat),
-            description: `Regional geofence operational adder`,
+            name: ce.name,
+            amount: petFee,
+            description: ce.description || 'Pet transport fee',
           });
-          runningAdditions += zoneSurcharge.flat;
-        }
-        if (zoneSurcharge.percent > 0) {
-          const pctAmount = roundCurrency(context.subtotal * (zoneSurcharge.percent / 100));
-          newSurcharges.push({
-            name: `Zone Surcharge (${zoneSurcharge.percent}%)`,
-            amount: pctAmount,
-            description: `${zoneSurcharge.percent}% regional zone adder`,
-          });
-          runningAdditions += pctAmount;
+          runningAdditions += petFee;
         }
       }
     }
   }
+
 
   if (newSurcharges.length === 0) {
     return context;
@@ -742,13 +793,14 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
     auditTrail: appendAudit(
       context.auditTrail,
       5,
-      'Condition Surcharges & Extras',
-      `Applied ${newSurcharges.length} condition surcharge(s): ${newSurcharges.map((s) => `${s.name} (+$${s.amount.toFixed(2)})`).join(', ')}`,
+      'Universal Extras & Services',
+      `Applied ${newSurcharges.length} extras: ${newSurcharges.map((s) => `${s.name} (+$${s.amount.toFixed(2)})`).join(', ')}`,
       roundedDelta,
       newSubtotal
     ),
   };
 };
+
 
 // ----------------------------------------------------------------------------
 // STEP 6: Named Pricing Rules Matrix (Dynamic Evaluation & Driver Selection)
@@ -788,6 +840,11 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
       accountType: context.input.accountType,
       accountTags: context.input.accountTags,
       vehicleTier: context.input.vehicleTier,
+      vehicleType: context.input.vehicleType,
+      vehicleClass: context.input.vehicleClass,
+      corporateAccountId: context.input.corporateAccountId,
+      pickupZipCode: context.input.pickupZipCode,
+      dropoffZipCode: context.input.dropoffZipCode,
       selectedRuleId: context.input.selectedRuleId,
       equipment: context.input.equipment,
       passengers: context.input.passengers,
@@ -812,6 +869,10 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
     return {
       ...context,
       appliedRuleNames: appliedNames,
+      targetTariffId: evaluationResult.targetTariffId ?? context.targetTariffId,
+      overruleExtras: evaluationResult.overruleExtras ?? context.overruleExtras,
+      overruleSurcharges: evaluationResult.overruleSurcharges ?? context.overruleSurcharges,
+      layeredZoneFee: evaluationResult.layeredZoneFee ?? context.layeredZoneFee,
       subtotal: currentSubtotal,
       totalFare: currentSubtotal,
       auditTrail: appendAudit(
@@ -869,6 +930,10 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
   return {
     ...context,
     appliedRuleNames: appliedNames,
+    targetTariffId: evaluationResult.targetTariffId ?? context.targetTariffId,
+    overruleExtras: evaluationResult.overruleExtras ?? context.overruleExtras,
+    overruleSurcharges: evaluationResult.overruleSurcharges ?? context.overruleSurcharges,
+    layeredZoneFee: evaluationResult.layeredZoneFee ?? context.layeredZoneFee,
     surcharges: [...context.surcharges, ...newSurcharges],
     subtotal: currentSubtotal,
     totalFare: currentSubtotal,
@@ -876,11 +941,12 @@ export const applyNamedPricingRules: PricingPipelineStep = (context) => {
       context.auditTrail,
       6,
       'Named Pricing Rules Matrix',
-      `Applied named rule(s) [${appliedNames.join(', ')}]: ${evaluationResult.auditTrail.join(', ')}`,
+      `Applied named rule(s) [${appliedNames.join(', ')}]: ${evaluationResult.auditTrail.join(', ')}${evaluationResult.targetTariffId ? ` -> Target Tariff: ${evaluationResult.targetTariffId}` : ''}`,
       totalDelta,
       currentSubtotal
     ),
   };
+
 };
 
 // ----------------------------------------------------------------------------
@@ -894,30 +960,21 @@ export function createSurchargesAndDiscountsStep(
     const newDiscounts: DiscountEntry[] = [];
     let currentSubtotal = context.subtotal;
 
-    // 1. Multi-stop waypoint surcharge
-    const stopsCount = Math.max(0, context.input.intermediateStopsCount ?? 0);
-    if (stopsCount > 0) {
-      const perStopFee = context.config.multiStopFee ?? 5.00;
-      if (context.input.waiveMultiStopFees) {
-        newSurcharges.push({
-          name: `Multi-Stop Surcharge (${stopsCount} stop${stopsCount > 1 ? 's' : ''} - Waived)`,
-          amount: 0,
-          description: `Dispatcher waived $${(stopsCount * perStopFee).toFixed(2)} fee for ${stopsCount} intermediate stop(s)`,
-        });
-      } else {
-        const totalStopFee = roundCurrency(stopsCount * perStopFee);
-        newSurcharges.push({
-          name: `Multi-Stop Surcharge (${stopsCount} stop${stopsCount > 1 ? 's' : ''})`,
-          amount: totalStopFee,
-          description: `$${perStopFee.toFixed(2)} per intermediate waypoint`,
-        });
-        currentSubtotal = roundCurrency(currentSubtotal + totalStopFee);
-      }
-    }
+    // Check if matched tariff exempts operational surcharges (e.g. Smoke House contract)
+    const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
+    const allowOperationalSurcharges = matchedTariff ? (matchedTariff.allowOperationalSurcharges !== false) : true;
 
-    // 2. Airport surcharge
-    if (context.input.isAirportPickup && context.config.airportSurcharge > 0) {
-      const airportFee = roundCurrency(context.config.airportSurcharge);
+    const surchargesCatalog = context.config.surchargesCatalog || DEFAULT_SURCHARGES_CONFIG;
+    const overrules = context.overruleSurcharges || {};
+
+    // 1. Airport Access Fee ($4.00)
+    const airportFeeRate = overrules.airportGateFee ?? surchargesCatalog.airportGateFee ?? 4.00;
+    const isAirport =
+      context.input.isAirportPickup ||
+      (context.input.originZoneId && surchargesCatalog.airportTargetZoneIds?.includes(context.input.originZoneId)) ||
+      (context.input.destinationZoneId && surchargesCatalog.airportTargetZoneIds?.includes(context.input.destinationZoneId));
+
+    if (isAirport && airportFeeRate > 0 && allowOperationalSurcharges) {
       if (context.input.waiveAirportFee) {
         newSurcharges.push({
           name: 'Airport Terminal Access Fee (Waived)',
@@ -925,14 +982,30 @@ export function createSurchargesAndDiscountsStep(
           description: 'Dispatcher waived airport commercial terminal fee',
         });
       } else {
+        const airportFee = roundCurrency(airportFeeRate);
         newSurcharges.push({
-          name: 'Airport Terminal Access Fee',
+          name: 'Airport Commercial Access Fee',
           amount: airportFee,
-          description: 'Mandatory airport commercial terminal fee',
+          description: 'Mandatory Lambert / Spirit airport commercial access fee',
         });
         currentSubtotal = roundCurrency(currentSubtotal + airportFee);
       }
     }
+
+    // 2. Out-of-Area Remote Service Surcharge ($15.00)
+    const remoteThreshold = surchargesCatalog.outOfAreaThresholdMiles ?? 15.0;
+    const remoteFeeRate = overrules.outOfAreaRemoteFee ?? surchargesCatalog.outOfAreaRemoteFee ?? 0;
+    const isAirportTrip = isAirport || context.tariffProfileId === 'tariff-airport-flat';
+    if (context.input.distanceMiles > remoteThreshold && remoteFeeRate > 0 && allowOperationalSurcharges && !isAirportTrip) {
+      const remoteFee = roundCurrency(remoteFeeRate);
+      newSurcharges.push({
+        name: 'Out-of-Area Remote Service Fee',
+        amount: remoteFee,
+        description: `Trip distance (${context.input.distanceMiles.toFixed(1)} mi) exceeds regional boundary (${remoteThreshold} mi)`,
+      });
+      currentSubtotal = roundCurrency(currentSubtotal + remoteFee);
+    }
+
 
     // 3. Tolls & highway surcharge
     const tollAmount =
@@ -948,6 +1021,101 @@ export function createSurchargesAndDiscountsStep(
         description: 'Bridge, express lane, and highway toll fees',
       });
       currentSubtotal = roundCurrency(currentSubtotal + tollFee);
+    }
+
+    // 4. Custom Conditional Surcharges (e.g. SUV / Minivan $10 fee, Late Night fee, etc.)
+    if (surchargesCatalog.customSurcharges && surchargesCatalog.customSurcharges.length > 0) {
+      for (const custom of surchargesCatalog.customSurcharges) {
+        if (!custom.isActive) continue;
+
+        // Check applicable tariffs
+        if (custom.applicableTariffIds && custom.applicableTariffIds.length > 0) {
+          if (context.tariffProfileId && !custom.applicableTariffIds.includes(context.tariffProfileId)) {
+            continue;
+          }
+        }
+
+        // Check conditional triggers
+        const triggers = custom.triggers;
+        if (triggers) {
+          // Vehicle Tiers / Types / Classes check
+          const allowedVehicles = [
+            ...(triggers.vehicleTiers || []),
+            ...(triggers.vehicleTypes || []),
+            ...(triggers.vehicleClasses || []),
+            ...(custom.applicableVehicleTypes || []),
+            ...(custom.applicableVehicleClasses || []),
+          ].map((v) => v.toLowerCase());
+
+          if (allowedVehicles.length > 0) {
+            const currentTier = (context.input.vehicleTier || '').toLowerCase();
+            const currentType = (context.input.vehicleType || '').toLowerCase();
+            const currentClass = (context.input.vehicleClass || '').toLowerCase();
+            const matchesVehicle =
+              allowedVehicles.includes(currentTier) ||
+              allowedVehicles.includes(currentType) ||
+              allowedVehicles.includes(currentClass) ||
+              (allowedVehicles.includes('xl') && (currentTier === 'suv' || currentTier === 'xl')) ||
+              (allowedVehicles.includes('suv') && (currentTier === 'suv' || currentTier === 'xl')) ||
+              (allowedVehicles.includes('van') && (currentTier === 'van' || currentTier === 'wheelchair' || currentTier === 'wheelchair_wav')) ||
+              (allowedVehicles.includes('minivan') && (currentTier === 'van' || currentTier === 'minivan' || currentTier === 'wheelchair' || currentTier === 'wheelchair_wav'));
+
+            if (!matchesVehicle) {
+              continue;
+            }
+          }
+
+          // Distance condition
+          if (triggers.minDistanceMiles !== undefined && context.input.distanceMiles < triggers.minDistanceMiles) {
+            continue;
+          }
+          if (triggers.maxDistanceMiles !== undefined && context.input.distanceMiles > triggers.maxDistanceMiles) {
+            continue;
+          }
+
+          // Time of day window
+          if (triggers.timeWindow && context.input.pickupDateTime) {
+            const tripDate = new Date(context.input.pickupDateTime);
+            const hour = tripDate.getHours();
+            const { startHour, endHour } = triggers.timeWindow;
+            if (startHour <= endHour) {
+              if (hour < startHour || hour >= endHour) continue;
+            } else {
+              if (hour < startHour && hour >= endHour) continue;
+            }
+          }
+
+          // Days of week
+          if (triggers.daysOfWeek && triggers.daysOfWeek.length > 0 && context.input.pickupDateTime) {
+            const tripDate = new Date(context.input.pickupDateTime);
+            const day = tripDate.getDay();
+            if (!triggers.daysOfWeek.includes(day)) continue;
+          }
+
+          // Zones
+          if (triggers.zoneIds && triggers.zoneIds.length > 0) {
+            const zoneMatches =
+              (context.input.originZoneId && triggers.zoneIds.includes(context.input.originZoneId)) ||
+              (context.input.destinationZoneId && triggers.zoneIds.includes(context.input.destinationZoneId)) ||
+              (context.input.zoneIds && context.input.zoneIds.some((z) => triggers.zoneIds?.includes(z)));
+            if (!zoneMatches) continue;
+          }
+        }
+
+        // Calculate fee
+        const fee = custom.type === 'percent'
+          ? roundCurrency(currentSubtotal * (custom.amount / 100))
+          : roundCurrency(custom.amount);
+
+        if (fee > 0) {
+          newSurcharges.push({
+            name: custom.name,
+            amount: fee,
+            description: custom.description || `${custom.name}: $${fee.toFixed(2)}`,
+          });
+          currentSubtotal = roundCurrency(currentSubtotal + fee);
+        }
+      }
     }
 
     // 4. Dispatcher Courtesy Discount
@@ -999,7 +1167,7 @@ export function createSurchargesAndDiscountsStep(
       typeof context.input.manualFareOverride === 'number' &&
       context.input.manualFareOverride >= 0
     ) {
-      const overrideFare = roundCurrency(context.input.manualFareOverride);
+      const overrideFare = Math.ceil(context.input.manualFareOverride);
       return {
         ...context,
         surcharges: [...context.surcharges, ...newSurcharges],
@@ -1030,6 +1198,18 @@ export function createSurchargesAndDiscountsStep(
       });
     }
 
+    // 8. Round prices to ceiling dollar
+    const ceilFare = Math.ceil(currentSubtotal);
+    if (ceilFare > currentSubtotal) {
+      const roundingAdjustment = roundCurrency(ceilFare - currentSubtotal);
+      newSurcharges.push({
+        name: 'Ceiling Dollar Rounding',
+        amount: roundingAdjustment,
+        description: `Rounded up to ceiling dollar ($${ceilFare.toFixed(2)})`,
+      });
+      currentSubtotal = ceilFare;
+    }
+
     const finalFare = roundCurrency(currentSubtotal);
     const delta = roundCurrency(
       newSurcharges.reduce((acc, s) => acc + s.amount, 0) - totalDiscountAmount
@@ -1045,7 +1225,7 @@ export function createSurchargesAndDiscountsStep(
         context.auditTrail,
         5,
         'Surcharges & Discounts',
-        `Applied ${newSurcharges.length} surcharge(s) (+$${newSurcharges.reduce((sum, s) => sum + s.amount, 0).toFixed(2)}) and ${newDiscounts.length} discount(s) (-$${totalDiscountAmount.toFixed(2)}) with minimum fare floor ($${minFare.toFixed(2)})`,
+        `Applied ${newSurcharges.length} surcharge(s) (+$${newSurcharges.reduce((sum, s) => sum + s.amount, 0).toFixed(2)}) and ${newDiscounts.length} discount(s) (-$${totalDiscountAmount.toFixed(2)}) with minimum fare floor ($${minFare.toFixed(2)}) and ceiling dollar rounding ($${finalFare.toFixed(2)})`,
         delta,
         finalFare
       ),

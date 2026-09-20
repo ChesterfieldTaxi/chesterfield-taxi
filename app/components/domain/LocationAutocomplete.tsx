@@ -1,6 +1,6 @@
 /// <reference types="google.maps" />
 
-import React, { useState, useRef, useEffect, useId } from 'react';
+import React, { useState, useRef, useEffect, useId, useMemo } from 'react';
 import type { GeoPoint } from '../../core/types';
 import {
   loadGoogleMaps,
@@ -14,7 +14,11 @@ import {
   useDebouncedPlacesAutocomplete,
   type AutocompletePredictionItem,
 } from '../../core/hooks/useDebouncedPlacesAutocomplete';
-import { MapPinIcon, FlagIcon, CheckIcon, SpinnerIcon } from '../ui/Icons';
+import { MapPinIcon, FlagIcon, CheckIcon, SpinnerIcon, SparklesIcon } from '../ui/Icons';
+import {
+  getSpecialPlacesService,
+  type SpecialPlace,
+} from '../../core/services/places/special-places.service';
 
 export interface PlaceSelectedDetails {
   address: string;
@@ -38,19 +42,6 @@ export interface LocationAutocompleteProps {
   autoFocus?: boolean;
   className?: string;
 }
-
-const POPULAR_LOCATIONS = [
-  'Chesterfield Valley Shopping Center, Chesterfield, MO',
-  'Spirit of St. Louis Airport (SUS), Chesterfield, MO',
-  'St. Louis Lambert International Airport (STL), St. Louis, MO',
-  'Chesterfield Mall / Downtown Chesterfield, MO',
-  "St. Luke's Hospital, Chesterfield, MO",
-  'Chesterfield Amphitheater, Chesterfield, MO',
-  'Faust Park / Butterfly House, Chesterfield, MO',
-  'Downtown St. Louis / Gateway Arch, St. Louis, MO',
-  'Town and Country Crossing, Town and Country, MO',
-  'Centene Community Ice Center, Maryland Heights, MO',
-];
 
 export function LocationAutocomplete({
   name,
@@ -91,6 +82,12 @@ export function LocationAutocomplete({
   useEffect(() => {
     setInputValue(value);
   }, [value]);
+
+  // Special places search
+  const specialPlacesService = getSpecialPlacesService();
+  const matchingSpecialPlaces = useMemo(() => {
+    return specialPlacesService.searchPlaces(inputValue);
+  }, [inputValue, specialPlacesService]);
 
   // Subscribe to Google Maps API status
   useEffect(() => {
@@ -167,15 +164,17 @@ export function LocationAutocomplete({
     };
   }, [mapsStatus, hasQuotaError, disabled, inputValue, placeholder]);
 
-  // Handle clicking outside to dismiss suggestions dropdown
+  // Close dropdown on click outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
-    }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,9 +186,7 @@ export function LocationAutocomplete({
   };
 
   const handleInputFocus = () => {
-    if (inputValue.trim().length > 0 || filteredPopularLocations.length > 0) {
-      setIsOpen(true);
-    }
+    setIsOpen(true);
   };
 
   const handleSelectPrediction = async (prediction: AutocompletePredictionItem) => {
@@ -210,23 +207,32 @@ export function LocationAutocomplete({
     }
   };
 
-  const handleSelectPopularLocation = (loc: string) => {
-    setInputValue(loc);
-    onChangeRef.current?.(loc);
+  const handleSelectSpecialPlace = (place: SpecialPlace) => {
+    setInputValue(place.name);
+    onChangeRef.current?.(place.name);
     onPlaceSelectedRef.current?.({
-      address: loc,
-      formattedAddress: loc,
+      address: place.name,
+      formattedAddress: place.address,
+      placeId: place.id,
+      coordinates: place.coordinates,
     });
     setIsOpen(false);
   };
 
-  const filteredPopularLocations = POPULAR_LOCATIONS.filter((loc) =>
-    loc.toLowerCase().includes(inputValue.toLowerCase())
+  // Filter predictions to suppress duplicate canonical Lambert entry if Special Places already shows Lambert
+  const hasSpecialLambert = matchingSpecialPlaces.some(
+    (p) => p.id === 'place-lambert-airport-stl' || p.name.includes('Lambert')
   );
+  const displayPredictions = useMemo(() => {
+    if (!hasSpecialLambert) return predictions;
+    return predictions.filter((p) => p.placeId !== 'canonical-lambert-stl');
+  }, [predictions, hasSpecialLambert]);
 
   const hasLivePredictions =
-    mapsStatus === 'ready' && !hasQuotaError && predictions.length > 0;
+    mapsStatus === 'ready' && !hasQuotaError && displayPredictions.length > 0;
   const isGoogleLive = mapsStatus === 'ready' && !hasQuotaError;
+
+  const totalItemsCount = matchingSpecialPlaces.length + (hasLivePredictions ? displayPredictions.length : 0);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
@@ -237,23 +243,22 @@ export function LocationAutocomplete({
       return;
     }
 
-    const currentItemsCount = hasLivePredictions
-      ? predictions.length
-      : filteredPopularLocations.length;
-
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev < currentItemsCount - 1 ? prev + 1 : 0));
+      setHighlightedIndex((prev) => (prev < totalItemsCount - 1 ? prev + 1 : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : currentItemsCount - 1));
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : totalItemsCount - 1));
     } else if (e.key === 'Enter') {
       if (highlightedIndex >= 0) {
         e.preventDefault();
-        if (hasLivePredictions && predictions[highlightedIndex]) {
-          handleSelectPrediction(predictions[highlightedIndex]);
-        } else if (filteredPopularLocations[highlightedIndex]) {
-          handleSelectPopularLocation(filteredPopularLocations[highlightedIndex]);
+        if (highlightedIndex < matchingSpecialPlaces.length) {
+          handleSelectSpecialPlace(matchingSpecialPlaces[highlightedIndex]);
+        } else if (hasLivePredictions) {
+          const predIdx = highlightedIndex - matchingSpecialPlaces.length;
+          if (displayPredictions[predIdx]) {
+            handleSelectPrediction(displayPredictions[predIdx]);
+          }
         }
       }
     } else if (e.key === 'Escape') {
@@ -324,86 +329,97 @@ export function LocationAutocomplete({
           role="listbox"
           className="absolute z-50 left-0 right-0 top-full mt-1.5 max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all"
         >
-          <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            <span>
-              {hasLivePredictions
-                ? 'Google Places Predictions (300ms Debounced)'
-                : 'Suggested Regional Locations'}
-            </span>
-            <span
-              className={`text-[10px] font-normal normal-case px-1.5 py-0.5 rounded ${
-                hasLivePredictions
-                  ? 'text-emerald-700 bg-emerald-50'
-                  : 'text-amber-700 bg-amber-50'
-              }`}
-            >
-              {hasLivePredictions
-                ? 'Live Places'
-                : hasQuotaError
-                ? 'Quota Limit Fallback'
-                : 'Offline / Regional'}
-            </span>
-          </div>
-
-          {hasLivePredictions ? (
-            predictions.map((pred, idx) => {
-              const isHighlighted = idx === highlightedIndex;
-              return (
-                <button
-                  key={pred.placeId}
-                  type="button"
-                  role="option"
-                  aria-selected={isHighlighted}
-                  onClick={() => handleSelectPrediction(pred)}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs rounded-lg transition-colors cursor-pointer ${
-                    isHighlighted
-                      ? 'bg-amber-50 text-amber-900 font-medium'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <MapPinIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <div className="flex flex-col min-w-0 truncate">
-                      <span className="truncate font-semibold text-slate-900">{pred.mainText}</span>
-                      {pred.secondaryText && (
-                        <span className="truncate text-[11px] text-slate-500">{pred.secondaryText}</span>
-                      )}
+          {/* Special Places & Landmarks Section */}
+          {matchingSpecialPlaces.length > 0 && (
+            <div className="mb-1">
+              <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/80 rounded-md mb-1">
+                <span className="flex items-center gap-1.5">
+                  <SparklesIcon className="w-3 h-3 text-amber-600" />
+                  Special Places & Landmarks
+                </span>
+                <span className="text-[9px] font-semibold text-amber-700 font-mono">
+                  {matchingSpecialPlaces.length}
+                </span>
+              </div>
+              {matchingSpecialPlaces.map((place, idx) => {
+                const isHighlighted = idx === highlightedIndex;
+                const isSelected = inputValue.trim().toLowerCase() === place.name.toLowerCase();
+                return (
+                  <button
+                    key={place.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isHighlighted}
+                    onClick={() => handleSelectSpecialPlace(place)}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs rounded-lg transition-colors cursor-pointer ${
+                      isHighlighted || isSelected
+                        ? 'bg-amber-50 text-amber-900 font-medium'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <MapPinIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <div className="flex flex-col min-w-0 truncate">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="truncate font-semibold text-slate-900">{place.name}</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100/80 text-amber-800 font-medium uppercase shrink-0">
+                            {place.category}
+                          </span>
+                        </div>
+                        <span className="truncate text-[11px] text-slate-500">{place.address}</span>
+                      </div>
                     </div>
-                  </div>
-                  {inputValue.trim().toLowerCase() === pred.description.toLowerCase() && (
-                    <CheckIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  )}
-                </button>
-              );
-            })
-          ) : filteredPopularLocations.length > 0 ? (
-            filteredPopularLocations.map((loc, idx) => {
-              const isSelected = inputValue.trim().toLowerCase() === loc.toLowerCase();
-              const isHighlighted = idx === highlightedIndex;
-              return (
-                <button
-                  key={loc}
-                  type="button"
-                  role="option"
-                  aria-selected={isHighlighted}
-                  onClick={() => handleSelectPopularLocation(loc)}
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs rounded-lg transition-colors cursor-pointer ${
-                    isHighlighted || isSelected
-                      ? 'bg-amber-50 text-amber-900 font-medium'
-                      : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{loc}</span>
-                  </div>
-                  {isSelected && <CheckIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                </button>
-              );
-            })
-          ) : (
+                    {isSelected && <CheckIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Google Places Live Predictions */}
+          {hasLivePredictions && (
+            <div>
+              <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-t border-slate-100 pt-1.5 mt-1">
+                <span>Google Places Predictions</span>
+                <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded">Live</span>
+              </div>
+              {displayPredictions.map((pred, predIdx) => {
+                const globalIdx = matchingSpecialPlaces.length + predIdx;
+                const isHighlighted = globalIdx === highlightedIndex;
+                return (
+                  <button
+                    key={pred.placeId}
+                    type="button"
+                    role="option"
+                    aria-selected={isHighlighted}
+                    onClick={() => handleSelectPrediction(pred)}
+                    onMouseEnter={() => setHighlightedIndex(globalIdx)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs rounded-lg transition-colors cursor-pointer ${
+                      isHighlighted
+                        ? 'bg-blue-50 text-blue-900 font-medium'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <MapPinIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <div className="flex flex-col min-w-0 truncate">
+                        <span className="truncate font-semibold text-slate-900">{pred.mainText}</span>
+                        {pred.secondaryText && (
+                          <span className="truncate text-[11px] text-slate-500">{pred.secondaryText}</span>
+                        )}
+                      </div>
+                    </div>
+                    {inputValue.trim().toLowerCase() === pred.description.toLowerCase() && (
+                      <CheckIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {matchingSpecialPlaces.length === 0 && !hasLivePredictions && (
             <div className="px-3 py-2 text-xs text-slate-500 italic">
               Press Enter or keep typing custom address "{inputValue}"
             </div>

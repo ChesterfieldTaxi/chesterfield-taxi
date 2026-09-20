@@ -523,6 +523,11 @@ export function BookingEngineV2({
     return detectAirportInAddresses(form.pickupAddress, form.dropoffAddress);
   }, [form.pickupAddress, form.dropoffAddress]);
 
+  // Airport detection for return route
+  const returnAirportDetection = useMemo(() => {
+    return detectAirportInAddresses(form.returnPickupAddress || '', form.returnDropoffAddress || '');
+  }, [form.returnPickupAddress, form.returnDropoffAddress]);
+
   // Map vehicle choice to vehicleTier
   const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
     if (choice === 'suv') return 'xl';
@@ -684,6 +689,11 @@ export function BookingEngineV2({
                 hasOversizedLuggage: form.hasOversizedLuggage,
                 luggageType: form.luggageType,
               },
+              isAirportPickup: airportDetection.isPickupAirport,
+              isAirportDropoff: airportDetection.isDropoffAirport,
+              isAirportTrip: airportDetection.isAirportTrip,
+              originZoneId: airportDetection.isPickupAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+              destinationZoneId: airportDetection.isDropoffAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
             })
           )
         );
@@ -729,6 +739,11 @@ export function BookingEngineV2({
             hasOversizedLuggage: form.hasOversizedLuggage,
             luggageType: form.luggageType,
           },
+          isAirportPickup: airportDetection.isPickupAirport,
+          isAirportDropoff: airportDetection.isDropoffAirport,
+          isAirportTrip: airportDetection.isAirportTrip,
+          originZoneId: airportDetection.isPickupAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+          destinationZoneId: airportDetection.isDropoffAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
         });
 
         setQuote(quoteRes);
@@ -815,6 +830,11 @@ export function BookingEngineV2({
                 carSeats: returnTotalCarSeats,
                 luggageCount: form.returnBags,
               },
+              isAirportPickup: returnAirportDetection.isPickupAirport,
+              isAirportDropoff: returnAirportDetection.isDropoffAirport,
+              isAirportTrip: returnAirportDetection.isAirportTrip,
+              originZoneId: returnAirportDetection.isPickupAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+              destinationZoneId: returnAirportDetection.isDropoffAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
             })
           )
         );
@@ -856,6 +876,11 @@ export function BookingEngineV2({
             carSeats: returnTotalCarSeats,
             luggageCount: form.returnBags,
           },
+          isAirportPickup: returnAirportDetection.isPickupAirport,
+          isAirportDropoff: returnAirportDetection.isDropoffAirport,
+          isAirportTrip: returnAirportDetection.isAirportTrip,
+          originZoneId: returnAirportDetection.isPickupAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+          destinationZoneId: returnAirportDetection.isDropoffAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
         });
 
         setReturnQuote(retQuoteRes);
@@ -1146,7 +1171,7 @@ export function BookingEngineV2({
         combinedNotes = `[Flight: ${form.airline} #${form.flightNumber} from ${form.flightOrigin || 'N/A'}${form.hasCheckedLuggage ? ' (Checked Luggage)' : ''}] ${combinedNotes}`.trim();
       }
 
-      const effectivePricing: TripPricing = quote?.pricing || {
+      let effectivePricing: TripPricing = quote?.pricing || {
         baseFare: 5.0,
         distanceMiles: 5,
         durationMinutes: 15,
@@ -1159,6 +1184,40 @@ export function BookingEngineV2({
         totalFare: 25.0,
         currency: 'USD',
       };
+
+      let returnEffectivePricing: TripPricing = returnQuote?.pricing || {
+        baseFare: 5.0,
+        distanceMiles: effectivePricing.distanceMiles,
+        durationMinutes: effectivePricing.durationMinutes,
+        distanceRate: 2.5,
+        timeRate: 0.5,
+        vehicleMultiplier: 1.0,
+        surgeMultiplier: 1.0,
+        discountAmount: 0,
+        subtotal: effectivePricing.subtotal,
+        totalFare: effectivePricing.totalFare,
+        currency: 'USD',
+      };
+
+      if (form.returnTrip) {
+        // Roundtrip Reverse-Route Balancing:
+        // Round prices to ceiling dollar and ensure equal price taking the higher leg
+        const outboundCeil = Math.ceil(effectivePricing.totalFare);
+        const returnCeil = Math.ceil(returnEffectivePricing.totalFare);
+        const balancedLegFare = Math.max(outboundCeil, returnCeil);
+
+        effectivePricing = {
+          ...effectivePricing,
+          subtotal: balancedLegFare,
+          totalFare: balancedLegFare,
+        };
+
+        returnEffectivePricing = {
+          ...returnEffectivePricing,
+          subtotal: balancedLegFare,
+          totalFare: balancedLegFare,
+        };
+      }
 
       const scheduledPickupTime =
         form.timingType === 'later' && form.scheduledDate && form.scheduledTime
@@ -1279,20 +1338,6 @@ export function BookingEngineV2({
       // Handle linked return trip creation if requested
       if (form.returnTrip) {
         try {
-          const returnEffectivePricing: TripPricing = returnQuote?.pricing || {
-            baseFare: 5.0,
-            distanceMiles: effectivePricing.distanceMiles,
-            durationMinutes: effectivePricing.durationMinutes,
-            distanceRate: 2.5,
-            timeRate: 0.5,
-            vehicleMultiplier: 1.0,
-            surgeMultiplier: 1.0,
-            discountAmount: 0,
-            subtotal: effectivePricing.subtotal,
-            totalFare: effectivePricing.totalFare,
-            currency: 'USD',
-          };
-
           const returnScheduledPickupTime =
             form.returnDate && form.returnTime
               ? new Date(`${form.returnDate}T${form.returnTime}:00`).toISOString()
@@ -1459,44 +1504,26 @@ export function BookingEngineV2({
     );
   }
 
-  const outboundFare = quote?.pricing.totalFare ?? null;
-  const returnFare = returnQuote?.pricing.totalFare ?? null;
+  const outboundRawFare = quote?.pricing.totalFare ?? null;
+  const returnRawFare = returnQuote?.pricing.totalFare ?? null;
+
+  // Roundtrip Reverse-Route Balancing:
+  // Round prices to ceiling dollar, and ensure equal leg price taking the higher leg
+  let outboundFare: number | null = outboundRawFare !== null ? Math.ceil(outboundRawFare) : null;
+  let returnFare: number | null = returnRawFare !== null ? Math.ceil(returnRawFare) : null;
+
+  if (form.returnTrip && outboundFare !== null && returnFare !== null) {
+    const balancedLegFare = Math.max(outboundFare, returnFare);
+    outboundFare = balancedLegFare;
+    returnFare = balancedLegFare;
+  }
+
   const totalDisplayFare = outboundFare !== null
     ? (form.returnTrip && returnFare !== null ? outboundFare + returnFare : outboundFare)
     : null;
 
   return (
     <div className={`relative max-w-6xl mx-auto ${className}`}>
-      {/* ─── 24/7 Dispatch Review & Reassurance Notice Banner ─── */}
-      {!hideDispatchBanner && (
-        <div className="mb-5 p-3.5 bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white rounded-xl shadow-md border border-blue-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600/40 border border-blue-400/50 flex items-center justify-center shrink-0 text-blue-300 text-lg">
-              <ShieldCheckIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-blue-200">
-                  Direct Dispatch Confirmation
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  24/7 Service
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Every trip is reviewed by our local dispatch team and confirmed via text &amp; email.
-              </p>
-            </div>
-          </div>
-
-          <div className="shrink-0 flex items-center gap-2 text-xs font-semibold text-slate-300 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 self-stretch sm:self-auto justify-center">
-            <PhoneIcon className="w-3.5 h-3.5 text-blue-300" />
-            <span>Dispatch: (314) 738-0100</span>
-          </div>
-        </div>
-      )}
-
       <form onSubmit={handleBookRide} className="select-none">
         {/* Grid: Left Main Stack (Col 8), Right Sticky Summary (Col 4) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-20">
@@ -2300,7 +2327,14 @@ export function BookingEngineV2({
                             }`}
                           >
                             <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-xs font-bold text-slate-900">{tier.label}</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-bold text-slate-900">{tier.label}</span>
+                                {tier.key !== 'sedan' && (
+                                  <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1 py-0.2 rounded">
+                                    +$10
+                                  </span>
+                                )}
+                              </div>
                               {vChoice === tier.key && (
                                 <span className="text-blue-600 text-xs">✓</span>
                               )}
@@ -2370,7 +2404,14 @@ export function BookingEngineV2({
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-slate-900 text-sm">{tier.title}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 text-sm">{tier.title}</span>
+                              {tier.key !== 'sedan' && (
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-200 px-1.5 py-0.2 rounded">
+                                  +$10
+                                </span>
+                              )}
+                            </div>
                             {isSelected && (
                               <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
                                 ✓
@@ -2528,8 +2569,10 @@ export function BookingEngineV2({
                       <span>
                         {isReturnQuoteLoading ? (
                           <span className="text-indigo-600">Calculating...</span>
+                        ) : returnFare !== null ? (
+                          `$${returnFare.toFixed(2)}`
                         ) : returnQuote ? (
-                          `$${returnQuote.pricing.totalFare.toFixed(2)}`
+                          `$${Math.ceil(returnQuote.pricing.totalFare).toFixed(2)}`
                         ) : (
                           '$--'
                         )}
@@ -2840,11 +2883,11 @@ export function BookingEngineV2({
                 )}
               </div>
 
-              {/* Total Upfront Fare */}
+              {/* Total Estimated Fare */}
               <div className="pt-3 border-t border-slate-200 flex items-baseline justify-between">
                 <div>
-                  <span className="text-xs text-slate-500 font-bold uppercase block">Upfront Fare</span>
-                  <span className="text-[10px] text-emerald-600 font-bold">Zero Surge Guarantee</span>
+                  <span className="text-xs text-slate-500 font-bold uppercase block">Estimated Fare</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Final fare will be in confirmation email.</span>
                 </div>
                 <div className="text-right">
                   {isQuoteLoading ? (
@@ -2866,7 +2909,7 @@ export function BookingEngineV2({
               <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5 text-[11px] text-slate-600">
                 <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
                   <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Fixed Upfront Pricing • No hidden fees</span>
+                  <span>Transparent Estimated Fare • No hidden surge</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
                   <ClockIcon className="w-3.5 h-3.5 text-blue-600" />

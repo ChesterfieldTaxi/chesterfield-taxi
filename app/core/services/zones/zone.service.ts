@@ -142,6 +142,14 @@ export const DEFAULT_LOCATION_COLLECTIONS: LocationCollection[] = [
     surchargeMultiplier: 1.0,
     proximityRadiusMiles: 0.6,
     isActive: true,
+    consolidateInAutocomplete: true,
+    canonicalPlace: {
+      name: 'St. Louis Lambert International Airport (STL)',
+      address: '10701 Lambert International Blvd, St. Louis, MO 63145',
+      placeId: 'canonical-lambert-stl',
+      coordinates: { lat: 38.7487, lng: -90.3700 },
+    },
+    suppressKeywords: ['lambert', 'stl airport', 'terminal 1', 'terminal 2', 'air cargo rd', 'lambert international'],
     locations: [
       {
         id: 'poi-stl-t1',
@@ -453,13 +461,32 @@ export class ZoneService {
   }
 
   // --- Location Collections Cache ---
+  public getLocationCollectionsSync(): LocationCollection[] {
+    return this.getCachedLocationCollections();
+  }
+
   private getCachedLocationCollections(): LocationCollection[] {
     if (typeof window === 'undefined') return DEFAULT_LOCATION_COLLECTIONS;
     try {
       const raw = localStorage.getItem(LOCATION_COLLECTIONS_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((col: LocationCollection) => {
+            if (col.id === 'collection-regional-airports' && !col.canonicalPlace) {
+              const defaultColl = DEFAULT_LOCATION_COLLECTIONS.find((d) => d.id === col.id);
+              if (defaultColl) {
+                return {
+                  ...col,
+                  consolidateInAutocomplete: col.consolidateInAutocomplete ?? defaultColl.consolidateInAutocomplete,
+                  canonicalPlace: col.canonicalPlace ?? defaultColl.canonicalPlace,
+                  suppressKeywords: col.suppressKeywords ?? defaultColl.suppressKeywords,
+                };
+              }
+            }
+            return col;
+          });
+        }
       }
     } catch {
       // Ignore storage errors
@@ -1081,4 +1108,104 @@ export function getZoneService(): ZoneService {
     zoneServiceInstance = new ZoneService();
   }
   return zoneServiceInstance;
+}
+
+/**
+ * Calculates Great-Circle distance in statute miles between two coordinates (Haversine formula).
+ */
+export function haversineDistanceMiles(
+  c1: { lat: number; lng: number },
+  c2: { lat: number; lng: number }
+): number {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const R = 3958.8; // Earth radius in miles
+  const dLat = toRad(c2.lat - c1.lat);
+  const dLng = toRad(c2.lng - c1.lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(c1.lat)) * Math.cos(toRad(c2.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Ray-casting algorithm to test if a coordinate falls inside a polygon.
+ */
+export function isPointInPolygon(
+  point: { lat: number; lng: number },
+  vertices: { lat: number; lng: number }[]
+): boolean {
+  if (!vertices || vertices.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const xi = vertices[i].lng;
+    const yi = vertices[i].lat;
+    const xj = vertices[j].lng;
+    const yj = vertices[j].lat;
+
+    const intersect =
+      yi > point.lat !== yj > point.lat &&
+      point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Pure evaluation checking if a location point matches a Unified Zone across any of its geometries
+ * (polygons, radii, POIs, or zip codes).
+ */
+export function isPointInUnifiedZone(
+  point: { lat?: number; lng?: number; zip?: string },
+  zone: import('../../types/zone').UnifiedZone
+): boolean {
+  if (!zone.isActive || zone.isArchived) return false;
+
+  // 1. Zip Code match
+  const zoneZips = zone.geometries?.zipCodes;
+  if (point.zip && zoneZips && zoneZips.length > 0) {
+    const cleanZip = point.zip.trim().slice(0, 5);
+    if (zoneZips.some((z: string) => z.trim().slice(0, 5) === cleanZip)) {
+      return true;
+    }
+  }
+
+
+  if (typeof point.lat !== 'number' || typeof point.lng !== 'number') {
+    return false;
+  }
+
+  const coord = { lat: point.lat, lng: point.lng };
+
+  // 2. Polygons match
+  if (zone.geometries?.polygons) {
+    for (const poly of zone.geometries.polygons) {
+      if (isPointInPolygon(coord, poly.vertices)) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Radii match
+  if (zone.geometries?.radii) {
+    for (const rad of zone.geometries.radii) {
+      const dist = haversineDistanceMiles(coord, rad.center);
+      if (dist <= rad.radiusMiles) {
+        return true;
+      }
+    }
+  }
+
+  // 4. Curated POI proximity match
+  if (zone.geometries?.pois) {
+    for (const poi of zone.geometries.pois) {
+      const dist = haversineDistanceMiles(coord, poi.coordinates);
+      const threshold = poi.proximityRadiusMiles ?? 0.5;
+      if (dist <= threshold) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }

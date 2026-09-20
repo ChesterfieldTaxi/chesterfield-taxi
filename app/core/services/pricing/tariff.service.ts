@@ -18,22 +18,34 @@ import type { TariffProfile, TariffCorridor, TariffTaximeterRate } from '../../t
 import type { PricingInput } from './types';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
+import { SMOKE_HOUSE_2023_RATES } from './smoke-house-rates.data';
 
-const TARIFFS_STORAGE_KEY = 'chesterfield_taxi_tariff_profiles';
+const TARIFFS_STORAGE_KEY = 'chesterfield_taxi_tariff_profiles_v5';
+
 
 export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
   {
-    id: 'tariff-standard-flat',
-    name: 'Standard Flat Rate',
+    id: 'tariff-airport-flat',
+    name: 'Airport Flat Rate',
+    description: 'Flat rate airport transfer tariff to/from Lambert International (STL) and Spirit of St. Louis (SUS).',
+    rateModel: 'taximeter',
     currency: 'USD',
     units: 'imperial',
     fareIncrement: 0.10,
-    priority: 90,
+    priority: 95,
     isActive: true,
-    isDefault: true,
+    isDefault: false,
+    allowSurgeMultiplier: false,
+    allowOperationalSurcharges: false,
     triggers: {
-      vehicleTiers: ['standard', 'sedan', 'premium'],
+
+      zoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],
+      zoneGroupIds: ['group-regional-aviation', 'group-airports'],
+      vehicleTiers: ['standard', 'sedan', 'premium', 'xl', 'van', 'suv', 'wheelchair'],
+      vehicleTypes: ['sedan', 'suv', 'minivan', 'van', 'wheelchair_wav'],
+      vehicleClasses: ['standard', 'executive', 'xl', 'medical', 'delivery'],
     },
+
     taximeter: {
       startPrice: 0.00,
       initialDistanceIncluded: 0,
@@ -44,57 +56,88 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
       thenDistanceStep: 0.1,
       thenDistanceRate: 0.230, // $0.23/0.1 mi ($2.30/mi after 20 mi)
       freeTrafficMinutes: 9999,
-      waitingRatePerStep: 0.00, // No traffic overcharge
-      waitingStepSeconds: 90,
-      minimumPrice: 28.00, // $28 minimum
+      waitingRatePerStep: 0.00, // No traffic overcharge on airport transfers
+      waitingStepSeconds: 60,
+      minimumPrice: 28.00, // $28 minimum floor
+    },
+    taximeterRate: {
+      startPrice: 0.00,
+      initialDistanceIncluded: 0,
+      initialTimeIncluded: 0,
+      primaryDistanceStep: 0.1,
+      primaryDistanceRate: 0.255,
+      primaryDistanceLimit: 20.0,
+      thenDistanceStep: 0.1,
+      thenDistanceRate: 0.230,
+      freeTrafficMinutes: 9999,
+      waitingRatePerStep: 0.00,
+      waitingStepSeconds: 60,
+      minimumPrice: 28.00,
     },
     corridors: [],
     extras: {
-      carSeatFeePerUnit: 10.00, // $10 per car seat
-      passengerBaseAllowance: 1, // First passenger free
-      extraPassengerFeePerHead: 1.00, // $1 for each additional passenger
+      carSeatFeePerUnit: 10.00,
+      passengerBaseAllowance: 1,
+      extraPassengerFeePerHead: 1.00,
       customSurcharges: [],
     },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
   },
   {
-    id: 'tariff-minivan-flat',
-    name: 'MiniVan Flat Rate',
+    id: 'tariff-point-to-point-meter',
+    name: 'METER',
+    description: 'City taximeter tariff for standard non-airport passenger trips across Chesterfield and St. Louis metro ($4.50 first 0.1 mi, $0.30/0.1 mi after with $40.00/hour waiting time).',
+    rateModel: 'taximeter',
     currency: 'USD',
     units: 'imperial',
     fareIncrement: 0.10,
-    priority: 85,
+    priority: 80,
     isActive: true,
-    isDefault: false,
-    triggers: {
-      vehicleTiers: ['xl', 'van', 'suv', 'wheelchair'],
-    },
+    isDefault: true,
+    allowSurgeMultiplier: true,
+    allowOperationalSurcharges: true,
+    triggers: {},
     taximeter: {
-      startPrice: 10.00, // $10 extra for suv and minivan vehicle classes
-      initialDistanceIncluded: 0,
+      startPrice: 4.50, // $4.50 first 0.1 mi
+      initialDistanceIncluded: 0.1,
       initialTimeIncluded: 0,
       primaryDistanceStep: 0.1,
-      primaryDistanceRate: 0.255, // $0.255/0.1 mi
-      primaryDistanceLimit: 20.0,
+      primaryDistanceRate: 0.30, // $0.30/0.1 mi ($3.00/mile)
+      primaryDistanceLimit: 999.0,
       thenDistanceStep: 0.1,
-      thenDistanceRate: 0.230, // $0.23/0.1 mi
-      freeTrafficMinutes: 9999,
-      waitingRatePerStep: 0.00, // No traffic overcharge
-      waitingStepSeconds: 90,
-      minimumPrice: 28.00, // $28 minimum
+      thenDistanceRate: 0.30,
+      freeTrafficMinutes: 5,
+      waitingRatePerStep: 0.667, // $40.00/hour waiting time ($0.667/minute)
+      waitingStepSeconds: 60,
+      minimumPrice: 4.50, // $4.50 minimum
+    },
+    taximeterRate: {
+      startPrice: 4.50,
+      initialDistanceIncluded: 0.1,
+      initialTimeIncluded: 0,
+      primaryDistanceStep: 0.1,
+      primaryDistanceRate: 0.30,
+      primaryDistanceLimit: 999.0,
+      thenDistanceStep: 0.1,
+      thenDistanceRate: 0.30,
+      freeTrafficMinutes: 5,
+      waitingRatePerStep: 0.667,
+      waitingStepSeconds: 60,
+      minimumPrice: 4.50,
     },
     corridors: [],
     extras: {
-      carSeatFeePerUnit: 10.00, // $10 per car seat
-      passengerBaseAllowance: 1, // First passenger free
-      extraPassengerFeePerHead: 1.00, // $1 for each additional passenger
+      carSeatFeePerUnit: 10.00,
+      passengerBaseAllowance: 1,
+      extraPassengerFeePerHead: 1.00,
       customSurcharges: [],
     },
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
   },
 ];
+
 
 export class TariffService {
   private cache: TariffProfile[] | null = null;
@@ -131,7 +174,21 @@ export class TariffService {
       this.saveToLocalStorage(this.cache);
     }
 
-    return [...this.cache];
+    return this.cache.filter((t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter');
+  }
+
+  public getAllTariffProfiles(): TariffProfile[] {
+    const local = this.loadFromLocalStorage();
+    const source = local && local.length > 0 ? local : this.cache && this.cache.length > 0 ? this.cache : DEFAULT_TARIFF_PROFILES;
+    return source.filter((t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter');
+  }
+
+  public saveTariffProfile(tariff: TariffProfile): void {
+    this.saveTariff(tariff).catch((e) => console.error(e));
+  }
+
+  public deleteTariffProfile(id: string): void {
+    this.deleteTariff(id).catch((e) => console.error(e));
   }
 
   public async saveTariff(tariff: TariffProfile): Promise<void> {
@@ -254,9 +311,25 @@ export class TariffService {
   private loadFromLocalStorage(): TariffProfile[] | null {
     if (typeof window === 'undefined' || !window.localStorage) return null;
     try {
+      // Clean up legacy keys from earlier iterations
+      window.localStorage.removeItem('chesterfield_taxi_tariff_profiles');
+      window.localStorage.removeItem('chesterfield_taxi_pricing_tariffs_v2');
+      window.localStorage.removeItem('chesterfield_taxi_tariff_profiles_v3');
+      window.localStorage.removeItem('chesterfield_taxi_tariff_profiles_v4');
+
       const stored = window.localStorage.getItem(TARIFFS_STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored) as TariffProfile[];
+        const parsed = JSON.parse(stored) as TariffProfile[];
+        // Filter strictly to the 2 primary tariffs
+        const filtered = parsed.filter(
+          (t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter'
+        );
+        // If legacy tariffs were present or missing required profiles, reseed defaults
+        if (filtered.length !== 2) {
+          this.saveToLocalStorage(DEFAULT_TARIFF_PROFILES);
+          return [...DEFAULT_TARIFF_PROFILES];
+        }
+        return filtered;
       }
     } catch {
       // Ignore JSON parse errors
@@ -300,6 +373,18 @@ export function matchTariffProfile(
     return DEFAULT_TARIFF_PROFILES[0];
   }
 
+  // If hourly booking requested
+  if (input.isHourlyBooking) {
+    const hourlyTariff = activeTariffs.find((t) => t.rateModel === 'hourly' || t.id === 'tariff-hourly-charter');
+    if (hourlyTariff) return resolveTariffProfile(hourlyTariff, tariffs);
+  }
+
+  // If corporate account requested
+  if (input.corporateAccountId) {
+    const corporateTariff = activeTariffs.find((t) => t.triggers.accountIds?.includes(input.corporateAccountId!));
+    if (corporateTariff) return resolveTariffProfile(corporateTariff, tariffs);
+  }
+
   const requestedTier = (input.vehicleTier || 'standard').toLowerCase();
 
   // Parse pickup day and time
@@ -317,6 +402,54 @@ export function matchTariffProfile(
 
   // Filter candidates matching vehicle tier and schedule
   const candidates = activeTariffs.filter((t) => {
+    // Account ID requirement check: If tariff has accountIds, ONLY match if input.corporateAccountId matches
+    if (t.triggers.accountIds && t.triggers.accountIds.length > 0) {
+
+      if (!input.corporateAccountId || !t.triggers.accountIds.includes(input.corporateAccountId)) {
+        return false;
+      }
+    }
+
+    // Hourly rate model check: only match if isHourlyBooking
+    if (t.rateModel === 'hourly' && !input.isHourlyBooking) {
+      return false;
+    }
+
+    // Zip matrix rate model check: only match if corporateAccountId is specified
+    if (t.rateModel === 'zip_matrix' && !input.corporateAccountId) {
+      return false;
+    }
+
+    // Zone IDs check (e.g. Airport Transfer flat rate zones)
+    if (t.triggers.zoneIds && t.triggers.zoneIds.length > 0) {
+      const allTripZones = [
+        ...(input.zoneIds || []),
+        ...(input.originZoneId ? [input.originZoneId] : []),
+        ...(input.destinationZoneId ? [input.destinationZoneId] : []),
+      ];
+      const isAirportIntent = Boolean(input.isAirportPickup || input.isAirportDropoff || input.isAirportTrip);
+      const matchZone =
+        allTripZones.some((zid) => t.triggers.zoneIds!.includes(zid)) ||
+        (t.id === 'tariff-airport-flat' && isAirportIntent);
+      if (!matchZone) return false;
+    }
+
+    // Zone Group check
+    if (t.triggers.zoneGroupIds && t.triggers.zoneGroupIds.length > 0) {
+      const matchGroup = input.zoneGroupIds?.some((gid) => t.triggers.zoneGroupIds!.includes(gid));
+      if (!matchGroup) return false;
+    }
+
+
+    // Dual vehicle types & classes check
+    if (t.triggers.vehicleTypes && t.triggers.vehicleTypes.length > 0 && input.vehicleType) {
+      if (!t.triggers.vehicleTypes.includes(input.vehicleType)) return false;
+    }
+    if (t.triggers.vehicleClasses && t.triggers.vehicleClasses.length > 0 && input.vehicleClass) {
+      if (!t.triggers.vehicleClasses.includes(input.vehicleClass)) return false;
+    }
+
+
     // Vehicle tier check
     if (t.triggers.vehicleTiers && t.triggers.vehicleTiers.length > 0) {
       const matchVehicle = t.triggers.vehicleTiers.some((tier) => {
@@ -347,6 +480,7 @@ export function matchTariffProfile(
 
     return true;
   });
+
 
   let matched: TariffProfile | undefined;
   if (candidates.length > 0) {
@@ -553,6 +687,15 @@ export function evaluateTaximeterFare(
     isFloorApplied = true;
   }
 
+  // Ceiling dollar rounding: Round up to next dollar
+  const ceilSubtotal = Math.ceil(calculatedSubtotal);
+  if (ceilSubtotal > calculatedSubtotal) {
+    auditDetails.push(
+      `Ceiling dollar rounding: $${calculatedSubtotal.toFixed(2)} -> $${ceilSubtotal.toFixed(2)}`
+    );
+    calculatedSubtotal = ceilSubtotal;
+  }
+
   return {
     baseFare,
     distanceFare: Number(distanceFare.toFixed(2)),
@@ -562,4 +705,63 @@ export function evaluateTaximeterFare(
     auditDetails,
   };
 }
+
+/**
+ * Evaluates agreed customer charge & driver pay from a Zip-code matrix (e.g. Smoke House Chesterfield).
+ */
+export function evaluateZipMatrixFare(
+  tariff: TariffProfile,
+  pickupZip?: string,
+  dropoffZip?: string
+): { matchedEntry: import('../../types/tariff').ZipRateMatrixEntry; subtotal: number; auditDetails: string[] } | null {
+  if (!tariff.zipMatrix || tariff.zipMatrix.length === 0) return null;
+  const cleanDropoff = dropoffZip?.trim().slice(0, 5);
+  const cleanPickup = pickupZip?.trim().slice(0, 5);
+
+  let entry = cleanDropoff ? tariff.zipMatrix.find((e) => e.zip.trim().slice(0, 5) === cleanDropoff) : undefined;
+  if (!entry && cleanPickup) {
+    entry = tariff.zipMatrix.find((e) => e.zip.trim().slice(0, 5) === cleanPickup);
+  }
+  if (!entry) return null;
+
+
+  return {
+    matchedEntry: entry,
+    subtotal: entry.customerCharge,
+    auditDetails: [
+      `Zip-Code Flat Matrix (${tariff.name}): Zip ${entry.zip} (${entry.city}) -> Customer Charge $${entry.customerCharge.toFixed(2)} (Driver Pay $${(entry.driverPay ?? entry.customerCharge).toFixed(2)})`
+    ],
+  };
+}
+
+/**
+ * Evaluates charter hourly fare.
+ */
+export function evaluateHourlyFare(
+  tariff: TariffProfile,
+  durationHours: number,
+  distanceMiles: number = 0
+): { subtotal: number; auditDetails: string[] } {
+  const config = tariff.hourlyConfig || { ratePerHour: 75.0, minimumHours: 2, includedMilesPerHour: 20, excessMileageRate: 2.50 };
+  const billableHours = Math.max(config.minimumHours, Math.ceil(durationHours || 1));
+  const baseHourlyCost = billableHours * config.ratePerHour;
+  
+  let excessMileageCost = 0;
+  if (config.includedMilesPerHour && config.excessMileageRate) {
+    const includedMiles = billableHours * config.includedMilesPerHour;
+    if (distanceMiles > includedMiles) {
+      const excessMiles = distanceMiles - includedMiles;
+      excessMileageCost = excessMiles * config.excessMileageRate;
+    }
+  }
+
+  const subtotal = Number((baseHourlyCost + excessMileageCost).toFixed(2));
+  return {
+    subtotal,
+    auditDetails: [
+      `Hourly Charter (${tariff.name}): ${billableHours} hrs @ $${config.ratePerHour.toFixed(2)}/hr ($${baseHourlyCost.toFixed(2)})${excessMileageCost > 0 ? ` + Excess mileage $${excessMileageCost.toFixed(2)}` : ''} = $${subtotal.toFixed(2)}`
+    ],
+  };
+}
+
 

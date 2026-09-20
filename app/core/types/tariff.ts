@@ -73,11 +73,34 @@ export interface TariffGroup {
   updatedAt?: string;
 }
 
+export type TariffRateModel = 'taximeter' | 'zip_matrix' | 'hourly' | 'corridor';
+
+export interface ZipRateMatrixEntry {
+  id?: string; // e.g. "zip-63005"
+  zip: string; // "63005"
+  city: string; // "Chesterfield"
+  car: number; // Driver base fare e.g. 12.00
+  tip: number; // Agreed tip e.g. 2.50
+  total: number; // Car + Tip e.g. 14.50
+  customerCharge: number; // Invoiced Customer Charge e.g. 17.00
+  driverPay?: number; // Driver payout (defaults to customerCharge)
+  notes?: string;
+}
+
+export interface HourlyRateConfig {
+  ratePerHour: number; // e.g. 75.00
+  minimumHours: number; // e.g. 2 hours
+  includedMilesPerHour?: number; // e.g. 20 mi/hr included
+  excessMileageRate?: number; // e.g. $2.50/mi after included miles
+}
+
 export interface TariffProfile {
   id: string;
-  name: string; // e.g. "Standard Flat Rate", "MiniVan Flat Rate", "METER", "MiniVan METER"
+  name: string; // e.g. "Airport Flat Rate", "Point-to-Point METER", "Smoke House Agreed Rates", "Hourly Charter"
+  description?: string;
   currency: string; // "USD"
   units: 'imperial' | 'metric';
+
   fareIncrement?: number; // e.g. 0.10 or 2.50
   priority: number; // 1 to 100 (higher evaluated first)
   isActive: boolean;
@@ -88,18 +111,43 @@ export interface TariffProfile {
   groupId?: string; // Group this tariff belongs to
   parentTariffId?: string; // Parent tariff to inherit from
   inheritance?: TariffInheritanceConfig;
+
+  // Rate Model
+  rateModel?: TariffRateModel; // 'taximeter' | 'zip_matrix' | 'hourly' | 'corridor'
+
+  // Surcharge & Protection Policies
+  allowSurgeMultiplier?: boolean; // When false, surge multipliers (e.g. 1.25x) are locked out
+  allowOperationalSurcharges?: boolean; // When false, airport/toll surcharges are excluded
+
   triggers: {
-    vehicleTiers?: string[]; // e.g. ['standard'], ['suv'], ['xl'], ['wheelchair']
+    vehicleTiers?: string[]; // Legacy tiers
+    vehicleTypes?: string[]; // e.g. ['sedan', 'suv', 'minivan', 'van', 'wheelchair_wav']
+    vehicleClasses?: string[]; // e.g. ['standard', 'executive', 'xl', 'medical', 'delivery']
+    accountIds?: string[]; // e.g. ['corp-smoke-house']
     zoneIds?: string[];
     zoneGroupIds?: string[];
     locationCollectionIds?: string[];
     daysOfWeek?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
     timeWindows?: Array<{ start: string; end: string }>; // "HH:MM" 24h
   };
+
   taximeter: TariffTaximeterRate;
   corridors: TariffCorridor[];
+
+
   extras: TariffExtras;
+
+  // Optional rate-model specific payloads
+  zipMatrix?: ZipRateMatrixEntry[];
+  zipMatrixRates?: ZipRateMatrixEntry[]; // alias
+  hourlyConfig?: HourlyRateConfig;
+  hourlyRate?: HourlyRateConfig; // alias
+  taximeterRate?: TariffTaximeterRate; // alias
+  eligibleVehicleTypes?: string[];
+  eligibleVehicleClasses?: string[];
+
   createdAt?: string;
   updatedAt?: string;
 }
+
 

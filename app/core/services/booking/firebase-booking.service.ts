@@ -52,6 +52,10 @@ import {
   isCoordinateNearLocationCollection,
 } from '../zones/zone.service';
 import { getPricingRulesService } from '../pricing/pricing-rules.service';
+import { getTariffService } from '../pricing/tariff.service';
+import { getUniversalExtrasConfig } from '../pricing/extras.service';
+import { getSurchargesConfig } from '../pricing/surcharges.service';
+import { detectAirportInAddresses } from '../../config/airports';
 
 
 
@@ -155,7 +159,17 @@ export class FirebaseBookingService implements IBookingService {
     const settings = await adminConfig.getSettings();
     const dynamicPricingConfig = adminConfig.toPricingConfig(settings);
 
-    // Hydrate namedPricingRules from PricingRulesService
+    // 4-Pillar Config Hydration: Tariffs, Rules, Universal Extras, and Surcharges
+    try {
+      const tariffService = getTariffService();
+      const allTariffs = await tariffService.getAllTariffProfiles();
+      if (allTariffs && allTariffs.length > 0) {
+        dynamicPricingConfig.tariffs = allTariffs;
+      }
+    } catch (tariffErr) {
+      console.warn('[FirebaseBookingService] Could not load active tariffs:', tariffErr);
+    }
+
     try {
       const pricingRulesService = getPricingRulesService();
       const allRules = await pricingRulesService.getRules();
@@ -164,16 +178,51 @@ export class FirebaseBookingService implements IBookingService {
       console.warn('[FirebaseBookingService] Could not load active pricing rules:', rulesErr);
     }
 
+    try {
+      const extras = await getUniversalExtrasConfig();
+      if (extras) {
+        dynamicPricingConfig.universalExtras = extras;
+      }
+    } catch (extrasErr) {
+      console.warn('[FirebaseBookingService] Could not load universal extras:', extrasErr);
+    }
+
+    try {
+      const surcharges = await getSurchargesConfig();
+      if (surcharges) {
+        dynamicPricingConfig.surchargesCatalog = surcharges;
+      }
+    } catch (surchargesErr) {
+      console.warn('[FirebaseBookingService] Could not load surcharges:', surchargesErr);
+    }
+
     const validIntermediateStops = (request.intermediateStops ?? []).filter((s) => {
       if (s.coordinates) return true;
       if (s.address && s.address.trim().length > 0) return true;
       return false;
     });
 
+    // Detect airport in pickup and dropoff addresses
+    const airportCheck = detectAirportInAddresses(
+      request.pickupLocation.address || '',
+      request.dropoffLocation.address || ''
+    );
+    const isAirportPickup = Boolean(request.isAirportPickup ?? airportCheck.isPickupAirport);
+    const isAirportDropoff = Boolean(request.isAirportDropoff ?? airportCheck.isDropoffAirport);
+    const isAirportTrip = Boolean(request.isAirportTrip ?? airportCheck.isAirportTrip);
+
     // Resolve spatial containment (Zones, Zone Groups, Location Collections)
     const matchedZoneIds = new Set<string>(request.zoneIds || []);
     const matchedZoneGroupIds = new Set<string>(request.zoneGroupIds || []);
     const matchedLocationCollectionIds = new Set<string>(request.locationCollectionIds || []);
+
+    if (airportCheck.isAirportTrip && airportCheck.airport) {
+      if (airportCheck.airport.iataCode === 'STL' || airportCheck.airport.iataCode === 'CPS') {
+        matchedZoneIds.add('zone-lambert-airport');
+      } else if (airportCheck.airport.iataCode === 'SUS') {
+        matchedZoneIds.add('zone-spirit-airport');
+      }
+    }
 
     const coordsToTest = [
       request.pickupLocation.coordinates,
@@ -220,7 +269,13 @@ export class FirebaseBookingService implements IBookingService {
         vehicleTier: request.vehicleTier,
         pickupDateTime,
         promoCode: request.promoCode,
-        isAirportPickup: request.pickupLocation.address.toLowerCase().includes('airport'),
+        isAirportPickup,
+        isAirportDropoff,
+        isAirportTrip,
+        originZoneId: request.originZoneId || (isAirportPickup ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
+        destinationZoneId: request.destinationZoneId || (isAirportDropoff ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
+        curbWaitMinutes: request.curbWaitMinutes,
+        delayMinutes: request.delayMinutes,
         intermediateStopsCount: validIntermediateStops.length,
         tolls: request.tolls,
         customTollsOrFees: request.customTollsOrFees,

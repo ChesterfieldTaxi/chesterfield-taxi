@@ -86,6 +86,13 @@ export interface LocationPoint {
   isArchived?: boolean;
 }
 
+export interface CanonicalConsolidationPlace {
+  name: string;
+  address: string;
+  placeId?: string;
+  coordinates: ZoneCoordinate;
+}
+
 export interface LocationCollection {
   id: string; // e.g. "collection-regional-airports"
   name: string; // e.g. "Regional Aviation Hubs"
@@ -96,6 +103,9 @@ export interface LocationCollection {
   surchargeMultiplier?: number;
   proximityRadiusMiles?: number; // Detection tolerance in miles, default 0.5 mi
   isActive: boolean;
+  consolidateInAutocomplete?: boolean; // When true, consolidates multi-terminal suggestions into single canonical place
+  canonicalPlace?: CanonicalConsolidationPlace;
+  suppressKeywords?: string[];
   isArchived?: boolean;
   archivedAt?: string;
   archiveReason?: string;
@@ -127,3 +137,72 @@ export interface BlacklistedLocation {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// ============================================================================
+// UNIFIED OPERATIONAL ZONES (Polygons, Radii, POIs, Zip Codes)
+// ============================================================================
+
+export interface UnifiedZonePoi {
+  id: string;
+  name: string; // e.g. "Terminal 1 Gate 4", "Main Entrance"
+  address: string;
+  coordinates: ZoneCoordinate;
+  proximityRadiusMiles?: number; // Default 0.25 mi buffer
+}
+
+export interface UnifiedZonePolygon {
+  id: string;
+  name?: string;
+  vertices: ZoneCoordinate[];
+}
+
+export interface UnifiedZoneRadius {
+  id: string;
+  center: ZoneCoordinate;
+  radiusMiles: number;
+}
+
+export interface UnifiedZoneGeometries {
+  polygons?: UnifiedZonePolygon[];
+  radii?: UnifiedZoneRadius[];
+  pois?: UnifiedZonePoi[];
+  zipCodes?: string[];
+}
+
+export interface UnifiedZone {
+  id: string; // e.g. "zone-lambert-airport"
+  name: string; // e.g. "Lambert International Airport"
+  category: 'airport' | 'commercial' | 'residential' | 'venue' | 'restricted' | 'other';
+  color: string; // Hex color e.g. "#f59e0b"
+  isActive: boolean;
+  isArchived?: boolean;
+  groupId?: string; // e.g. "group-airports"
+
+  geometries: UnifiedZoneGeometries;
+
+  pricing?: {
+    flatFee?: number; // e.g. $4.00 Airport Gate Access Fee
+    surchargeMultiplier?: number; // e.g. 1.10 (+10% remote fee)
+  };
+
+  restriction?: {
+    isRestricted: boolean;
+    restrictionType: 'BLOCK' | 'REQUIRE_DISPATCH_CONFIRMATION';
+    reason?: string;
+  };
+
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UnifiedZoneGroup {
+  id: string; // e.g. "group-airports"
+  name: string; // e.g. "Airports"
+  description?: string;
+  zoneIds: string[]; // e.g. ["zone-lambert-airport", "zone-spirit-airport"]
+  color: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+

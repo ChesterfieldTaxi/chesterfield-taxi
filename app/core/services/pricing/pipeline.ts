@@ -59,20 +59,22 @@ export function createInitialContext(
 
 /**
  * Standard prioritized pipeline steps array.
- * Step 0: TaxiCaller Unified Tariff Profile (Corridor Flat Fare OR Taximeter Step Rate + Extras)
- * Steps 1-2: Fallback Base Fare and Distance/Time Rates (if no tariff profile active)
- * Steps 3-7: Overlays (Surge, Custom Condition Rules, Multi-Stop, Tolls, Discounts)
+ * Step 1: Named Pricing Rules (Intelligent routing: Airport flat transfer rule, vehicle triggers, overrule flags)
+ * Step 2: Unified Tariff Profiles (Taximeter step rates, Smoke House zip-matrix, Hourly charter)
+ * Steps 3-4: Fallback Base Fare and Distance/Time Rates (if no tariff profile active)
+ * Steps 5-8: Overlays (Vehicle multiplier, Surge, Universal Extras, Surcharges & Discounts)
  */
 export const DEFAULT_PIPELINE_STEPS: readonly PricingPipelineStep[] = [
+  applyNamedPricingRules,
   applyUnifiedTariffEngine,
   applyBaseFare,
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
   applySurgeMultiplier,
   applyConditionSurcharges,
-  applyNamedPricingRules,
   applySurchargesAndDiscounts,
 ] as const;
+
 
 /**
  * Executes a sequence of pure pricing pipeline steps on a given context.
@@ -106,8 +108,8 @@ export function toTripPricing(context: PricingContext): TripPricing {
     vehicleMultiplier: context.vehicleMultiplier,
     surgeMultiplier: context.surgeMultiplier,
     discountAmount,
-    subtotal: context.subtotal,
-    totalFare: context.totalFare,
+    subtotal: Math.ceil(context.subtotal),
+    totalFare: Math.ceil(context.totalFare),
     currency: context.currency,
     intermediateStopsCount: context.input.intermediateStopsCount || 0,
     multiStopSurcharge: multiStopItem ? multiStopItem.amount : 0,
@@ -121,6 +123,32 @@ export function toTripPricing(context: PricingContext): TripPricing {
     tariffProfileName: context.tariffProfileName,
     matchedCorridorId: context.matchedCorridorId,
     matchedCorridorName: context.matchedCorridorName,
+    itemizedSurcharges: context.surcharges.map((s) => ({
+      name: s.name,
+      amount: s.amount,
+      description: s.description,
+    })),
+  };
+}
+
+/**
+ * Balances round-trip leg fares so that both the outbound and return legs
+ * are priced identically using the higher price of the two legs, rounded up
+ * to the ceiling dollar.
+ */
+export function balanceRoundTripLegFares(
+  outboundFare: number,
+  returnFare: number
+): {
+  balancedLegFare: number;
+  totalRoundTripFare: number;
+} {
+  const ceilOutbound = Math.ceil(outboundFare);
+  const ceilReturn = Math.ceil(returnFare);
+  const balancedLegFare = Math.max(ceilOutbound, ceilReturn);
+  return {
+    balancedLegFare,
+    totalRoundTripFare: balancedLegFare * 2,
   };
 }
 

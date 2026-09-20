@@ -19,16 +19,17 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
-import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon, AlertTriangleIcon } from '../../ui/Icons';
+import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon, AlertTriangleIcon, ZapIcon } from '../../ui/Icons';
+import { SpecialPlacesAdminPanel } from './places/SpecialPlacesAdminPanel';
 
-type AdminZonesSubTab = 'zones' | 'groups' | 'collections' | 'blacklists';
+type AdminZonesSubTab = 'places' | 'zones' | 'groups' | 'collections' | 'blacklists';
 
 export interface AdminZonesTabProps {
   initialSubTab?: AdminZonesSubTab;
 }
 
-export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>(initialSubTab || 'zones');
+export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>(initialSubTab || 'places');
 
   useEffect(() => {
     if (initialSubTab) {
@@ -86,6 +87,13 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
     surchargeMultiplier: 1.0,
     proximityRadiusMiles: 0.5,
     isActive: true,
+    consolidateInAutocomplete: false,
+    canonicalPlace: {
+      name: '',
+      address: '',
+      coordinates: { lat: 38.7487, lng: -90.3700 },
+    },
+    suppressKeywords: [],
     locations: [],
   });
 
@@ -436,15 +444,50 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
       surchargeMultiplier: 1.0,
       proximityRadiusMiles: 0.5,
       isActive: true,
+      consolidateInAutocomplete: false,
+      canonicalPlace: {
+        name: '',
+        address: '',
+        coordinates: { lat: 38.7487, lng: -90.3700 },
+      },
+      suppressKeywords: [],
       locations: [],
     });
     setIsEditingCollection(true);
   };
 
   const handleStartEditCollection = (coll: LocationCollection) => {
-    setCollectionFormData({ ...coll, locations: [...coll.locations] });
+    setCollectionFormData({
+      ...coll,
+      consolidateInAutocomplete: coll.consolidateInAutocomplete ?? false,
+      canonicalPlace: coll.canonicalPlace ?? {
+        name: coll.name,
+        address: coll.locations[0]?.address || '',
+        coordinates: coll.locations[0]?.coordinates || { lat: 38.7487, lng: -90.3700 },
+      },
+      suppressKeywords: coll.suppressKeywords ?? [],
+      locations: [...coll.locations],
+    });
     setSelectedCollectionId(coll.id);
     setIsEditingCollection(true);
+  };
+
+  const handleToggleCollectionConsolidation = async (coll: LocationCollection) => {
+    const service = getZoneService();
+    const willConsolidate = !coll.consolidateInAutocomplete;
+    const updated: LocationCollection = {
+      ...coll,
+      consolidateInAutocomplete: willConsolidate,
+      canonicalPlace: coll.canonicalPlace || {
+        name: coll.name,
+        address: coll.locations[0]?.address || '',
+        coordinates: coll.locations[0]?.coordinates || { lat: 38.7487, lng: -90.3700 },
+      },
+      suppressKeywords: coll.suppressKeywords || [coll.name.toLowerCase()],
+    };
+    await service.saveLocationCollection(updated);
+    setSaveSuccess(`Consolidation ${willConsolidate ? 'enabled' : 'disabled'} for "${coll.name}".`);
+    setTimeout(() => setSaveSuccess(null), 3000);
   };
 
   const handleSaveCollection = async (e: React.FormEvent) => {
@@ -593,6 +636,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
         return '📍';
     }
   };
+
+  if (activeSubTab === 'places') {
+    return <SpecialPlacesAdminPanel />;
+  }
 
   return (
     <div className="space-y-6">
@@ -1214,6 +1261,42 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                 </button>
                               </div>
                             </div>
+
+                            {/* Autocomplete Consolidation Row */}
+                            <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100 bg-slate-50/50 -mx-3 -mb-3 px-3 py-1.5 rounded-b-xl">
+                              <div className="flex items-center gap-1.5">
+                                {c.consolidateInAutocomplete ? (
+                                  <span className="font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <ZapIcon className="w-2.5 h-2.5" />
+                                    Consolidated
+                                  </span>
+                                ) : (
+                                  <span className="font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                                    Standard Autocomplete
+                                  </span>
+                                )}
+                                {c.consolidateInAutocomplete && c.canonicalPlace?.name && (
+                                  <span className="text-slate-500 truncate max-w-[150px]" title={c.canonicalPlace.name}>
+                                    → {c.canonicalPlace.name}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleCollectionConsolidation(c);
+                                }}
+                                className={`px-2 py-0.5 font-bold rounded border transition-colors ${
+                                  c.consolidateInAutocomplete
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                                }`}
+                                title="Toggle Customer Autocomplete Consolidation"
+                              >
+                                {c.consolidateInAutocomplete ? 'Consolidating ON' : '+ Consolidate'}
+                              </button>
+                            </div>
                           </div>
                         );
                       })
@@ -1651,6 +1734,186 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                       }
                       helperText="1.0 = standard"
                     />
+                  </div>
+
+                  {/* Autocomplete Consolidation Settings */}
+                  <div className="pt-3 border-t border-emerald-200/60 space-y-3 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200/80">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h5 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                          <ZapIcon className="w-3.5 h-3.5 text-amber-600" />
+                          Customer Autocomplete Consolidation
+                        </h5>
+                        <p className="text-[11px] text-amber-800">
+                          Collapse multiple Google Places suggestions (terminals, gates, cargo roads) into ONE canonical entry with deterministic coordinates so fares remain exact.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                        <input
+                          type="checkbox"
+                          checked={collectionFormData.consolidateInAutocomplete || false}
+                          onChange={(e) =>
+                            setCollectionFormData((prev) => ({
+                              ...prev,
+                              consolidateInAutocomplete: e.target.checked,
+                              canonicalPlace: prev.canonicalPlace || {
+                                name: prev.name,
+                                address: prev.locations[0]?.address || '',
+                                coordinates: prev.locations[0]?.coordinates || { lat: 38.7487, lng: -90.3700 },
+                              },
+                              suppressKeywords: prev.suppressKeywords || [prev.name.toLowerCase()],
+                            }))
+                          }
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      </label>
+                    </div>
+
+                    {collectionFormData.consolidateInAutocomplete && (
+                      <div className="space-y-2.5 pt-2 border-t border-amber-200/60">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <Input
+                            label="Canonical Suggestion Title"
+                            placeholder="e.g. St. Louis Lambert International Airport (STL)"
+                            value={collectionFormData.canonicalPlace?.name || ''}
+                            onChange={(e) =>
+                              setCollectionFormData((prev) => ({
+                                ...prev,
+                                canonicalPlace: {
+                                  ...(prev.canonicalPlace || {
+                                    address: '',
+                                    coordinates: { lat: 38.7487, lng: -90.3700 },
+                                  }),
+                                  name: e.target.value,
+                                },
+                              }))
+                            }
+                            className="text-xs h-8 bg-white"
+                            helperText="Single unified suggestion title shown to customers"
+                            required={collectionFormData.consolidateInAutocomplete}
+                          />
+
+                          <Input
+                            label="Canonical Formatted Address"
+                            placeholder="e.g. 10701 Lambert International Blvd, St. Louis, MO 63145"
+                            value={collectionFormData.canonicalPlace?.address || ''}
+                            onChange={(e) =>
+                              setCollectionFormData((prev) => ({
+                                ...prev,
+                                canonicalPlace: {
+                                  ...(prev.canonicalPlace || {
+                                    name: prev.name,
+                                    coordinates: { lat: 38.7487, lng: -90.3700 },
+                                  }),
+                                  address: e.target.value,
+                                },
+                              }))
+                            }
+                            className="text-xs h-8 bg-white"
+                            helperText="Address stored and routed for dispatch"
+                            required={collectionFormData.consolidateInAutocomplete}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <Input
+                            label="Fixed Latitude"
+                            type="number"
+                            step="0.0001"
+                            value={collectionFormData.canonicalPlace?.coordinates?.lat ?? 38.7487}
+                            onChange={(e) =>
+                              setCollectionFormData((prev) => ({
+                                ...prev,
+                                canonicalPlace: {
+                                  ...(prev.canonicalPlace || {
+                                    name: prev.name,
+                                    address: '',
+                                    coordinates: { lat: 38.7487, lng: -90.3700 },
+                                  }),
+                                  coordinates: {
+                                    lat: parseFloat(e.target.value) || 0,
+                                    lng: prev.canonicalPlace?.coordinates?.lng ?? -90.3700,
+                                  },
+                                },
+                              }))
+                            }
+                            className="text-xs h-8 bg-white"
+                          />
+
+                          <Input
+                            label="Fixed Longitude"
+                            type="number"
+                            step="0.0001"
+                            value={collectionFormData.canonicalPlace?.coordinates?.lng ?? -90.3700}
+                            onChange={(e) =>
+                              setCollectionFormData((prev) => ({
+                                ...prev,
+                                canonicalPlace: {
+                                  ...(prev.canonicalPlace || {
+                                    name: prev.name,
+                                    address: '',
+                                    coordinates: { lat: 38.7487, lng: -90.3700 },
+                                  }),
+                                  coordinates: {
+                                    lat: prev.canonicalPlace?.coordinates?.lat ?? 38.7487,
+                                    lng: parseFloat(e.target.value) || 0,
+                                  },
+                                },
+                              }))
+                            }
+                            className="text-xs h-8 bg-white"
+                          />
+
+                          <div className="flex items-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (collectionFormData.locations.length > 0) {
+                                  const first = collectionFormData.locations[0];
+                                  setCollectionFormData((prev) => ({
+                                    ...prev,
+                                    canonicalPlace: {
+                                      name: prev.canonicalPlace?.name || first.name,
+                                      address: prev.canonicalPlace?.address || first.address || '',
+                                      coordinates: { ...first.coordinates },
+                                    },
+                                  }));
+                                }
+                              }}
+                              disabled={collectionFormData.locations.length === 0}
+                              className="h-8 w-full text-xs bg-white text-slate-700 border-slate-300"
+                            >
+                              Copy from 1st POI
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-medium text-slate-700 block mb-0.5">
+                            Suppressed Search Keywords (comma-separated)
+                          </label>
+                          <Input
+                            placeholder="e.g. lambert, terminal 1, terminal 2, departures, arrivals, air cargo rd"
+                            value={(collectionFormData.suppressKeywords || []).join(', ')}
+                            onChange={(e) => {
+                              const list = e.target.value
+                                .split(',')
+                                .map((s) => s.trim().toLowerCase())
+                                .filter(Boolean);
+                              setCollectionFormData((prev) => ({
+                                ...prev,
+                                suppressKeywords: list,
+                              }));
+                            }}
+                            className="text-xs h-8 bg-white"
+                            helperText="Any search matching these keywords will be replaced with this single canonical place"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Included POI List */}

@@ -13,6 +13,8 @@ import {
   type GoogleMapsStatus,
 } from '../services/maps/google-maps-loader';
 import type { GeoPoint } from '../types/trip';
+import { getZoneService } from '../services/zones/zone.service';
+import type { LocationCollection } from '../types/zone';
 
 export interface AutocompletePredictionItem {
   placeId: string;
@@ -26,6 +28,82 @@ export interface PlaceDetailsResult {
   formattedAddress?: string;
   placeId?: string;
   coordinates?: GeoPoint;
+}
+
+export const CANONICAL_LAMBERT_PREDICTION: AutocompletePredictionItem = {
+  placeId: 'canonical-lambert-stl',
+  description: 'St. Louis Lambert International Airport (STL)',
+  mainText: 'St. Louis Lambert International Airport (STL)',
+  secondaryText: '10701 Lambert International Blvd, St. Louis, MO 63145',
+};
+
+export const CANONICAL_LAMBERT_DETAILS: PlaceDetailsResult = {
+  address: 'St. Louis Lambert International Airport (STL)',
+  formattedAddress: '10701 Lambert International Blvd, St. Louis, MO 63145',
+  placeId: 'canonical-lambert-stl',
+  coordinates: { lat: 38.7487, lng: -90.3700 },
+};
+
+export function isLambertAirportPrediction(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    (lower.includes('lambert') && (
+      lower.includes('airport') ||
+      lower.includes('terminal') ||
+      lower.includes('blvd') ||
+      lower.includes('boulevard') ||
+      lower.includes('stl') ||
+      lower.includes('st. louis') ||
+      lower.includes('international')
+    )) ||
+    lower.includes('stl terminal') ||
+    lower.includes('air cargo rd') ||
+    lower.includes('air cargo road') ||
+    lower.includes('10701 lambert')
+  );
+}
+
+export function matchConsolidatedCollection(
+  text: string,
+  collections: LocationCollection[]
+): LocationCollection | null {
+  const lower = text.toLowerCase();
+  for (const coll of collections) {
+    if (!coll.consolidateInAutocomplete || !coll.canonicalPlace) continue;
+
+    // 1. Check canonical place name
+    if (coll.canonicalPlace.name && lower.includes(coll.canonicalPlace.name.toLowerCase())) {
+      return coll;
+    }
+
+    // 2. Check collection name
+    if (coll.name && lower.includes(coll.name.toLowerCase())) {
+      return coll;
+    }
+
+    // 3. Check suppressKeywords
+    if (Array.isArray(coll.suppressKeywords)) {
+      for (const kw of coll.suppressKeywords) {
+        const cleanKw = kw.trim().toLowerCase();
+        if (cleanKw.length >= 2 && lower.includes(cleanKw)) {
+          return coll;
+        }
+      }
+    }
+
+    // 4. Check individual locations within this collection
+    if (Array.isArray(coll.locations)) {
+      for (const loc of coll.locations) {
+        if (loc.name && lower.includes(loc.name.toLowerCase())) {
+          return coll;
+        }
+        if (loc.address && lower.includes(loc.address.toLowerCase())) {
+          return coll;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 export interface UseDebouncedPlacesAutocompleteOptions {
@@ -122,13 +200,48 @@ export function useDebouncedPlacesAutocomplete({
 
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               setHasQuotaError(false);
-              const mapped: AutocompletePredictionItem[] = results.map((r) => ({
-                placeId: r.place_id,
-                description: r.description,
-                mainText: r.structured_formatting?.main_text || r.description,
-                secondaryText: r.structured_formatting?.secondary_text || '',
-              }));
-              setPredictions(mapped);
+              const consolidatedList: AutocompletePredictionItem[] = [];
+              const seenCollectionIds = new Set<string>();
+
+              const activeCollections = getZoneService()
+                .getLocationCollectionsSync()
+                .filter((c) => c.isActive !== false && c.consolidateInAutocomplete && c.canonicalPlace);
+
+              for (const r of results) {
+                const fullText = `${r.description} ${r.structured_formatting?.main_text || ''} ${r.structured_formatting?.secondary_text || ''}`;
+                
+                const matchedColl = matchConsolidatedCollection(fullText, activeCollections);
+                if (matchedColl && matchedColl.canonicalPlace) {
+                  if (!seenCollectionIds.has(matchedColl.id)) {
+                    consolidatedList.push({
+                      placeId: `canonical-coll-${matchedColl.id}`,
+                      description: matchedColl.canonicalPlace.name,
+                      mainText: matchedColl.canonicalPlace.name,
+                      secondaryText: matchedColl.canonicalPlace.address,
+                    });
+                    seenCollectionIds.add(matchedColl.id);
+                  }
+                  // Suppress individual raw Google Places suggestion
+                  continue;
+                }
+
+                if (isLambertAirportPrediction(fullText)) {
+                  if (!seenCollectionIds.has('canonical-lambert-stl')) {
+                    consolidatedList.push(CANONICAL_LAMBERT_PREDICTION);
+                    seenCollectionIds.add('canonical-lambert-stl');
+                  }
+                  continue;
+                }
+
+                consolidatedList.push({
+                  placeId: r.place_id,
+                  description: r.description,
+                  mainText: r.structured_formatting?.main_text || r.description,
+                  secondaryText: r.structured_formatting?.secondary_text || '',
+                });
+              }
+
+              setPredictions(consolidatedList);
             } else if (
               status === window.google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT ||
               status === window.google.maps.places.PlacesServiceStatus.REQUEST_DENIED
@@ -160,6 +273,29 @@ export function useDebouncedPlacesAutocomplete({
   const getPlaceDetails = useCallback(
     (placeId: string): Promise<PlaceDetailsResult | null> => {
       return new Promise((resolve) => {
+        // Fast-path for canonical collections
+        if (placeId.startsWith('canonical-coll-')) {
+          const collId = placeId.replace('canonical-coll-', '');
+          const coll = getZoneService()
+            .getLocationCollectionsSync()
+            .find((c) => c.id === collId);
+          if (coll && coll.canonicalPlace) {
+            resolve({
+              address: coll.canonicalPlace.name,
+              formattedAddress: coll.canonicalPlace.address,
+              placeId,
+              coordinates: coll.canonicalPlace.coordinates,
+            });
+            return;
+          }
+        }
+
+        // Fast-path for canonical consolidated Lambert STL
+        if (placeId === CANONICAL_LAMBERT_PREDICTION.placeId) {
+          resolve(CANONICAL_LAMBERT_DETAILS);
+          return;
+        }
+
         if (!placesServiceRef.current || !window.google?.maps) {
           resolve(null);
           return;

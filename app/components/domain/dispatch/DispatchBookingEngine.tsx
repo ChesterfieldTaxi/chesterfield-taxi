@@ -699,9 +699,11 @@ export function DispatchBookingEngine({
         repeatWeeksPattern,
         repeatsRoundTrip: returnTrip,
       },
-      estimatedFare,
-      returnEstimatedFare,
-      totalCalculatedFare: returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare,
+      estimatedFare: returnTrip ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) : Math.ceil(estimatedFare),
+      returnEstimatedFare: returnTrip ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) : Math.ceil(returnEstimatedFare),
+      totalCalculatedFare: returnTrip 
+        ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) * 2 
+        : Math.ceil(estimatedFare),
       manualFare,
       isFareOverridden,
       estimatedDurationMinutes,
@@ -1259,9 +1261,11 @@ export function DispatchBookingEngine({
         repeatWeeksPattern: 'all',
         repeatsRoundTrip: returnTrip,
       },
-      estimatedFare,
-      returnEstimatedFare,
-      totalCalculatedFare: returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare,
+      estimatedFare: returnTrip ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) : Math.ceil(estimatedFare),
+      returnEstimatedFare: returnTrip ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) : Math.ceil(returnEstimatedFare),
+      totalCalculatedFare: returnTrip 
+        ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) * 2 
+        : Math.ceil(estimatedFare),
       manualFare,
       isFareOverridden,
       estimatedDurationMinutes,
@@ -1334,11 +1338,21 @@ export function DispatchBookingEngine({
     if (paymentMethod === 'card') method = 'card';
     if (paymentMethod === 'account') method = 'corporate';
 
-    const totalCalculatedFare = returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare;
-    // Single-leg fare for outbound trip vs return trip leg fare
-    const outboundFare = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : estimatedFare;
-    const returnLegFare = returnEstimatedFare || estimatedFare;
+    const outboundRaw = isFareOverridden && manualFare ? parseFloat(manualFare) || 0 : estimatedFare;
+    const returnLegRaw = returnEstimatedFare || estimatedFare;
+
+    let outboundFare = Math.ceil(outboundRaw);
+    let returnLegFare = Math.ceil(returnLegRaw);
+
+    if (returnTrip) {
+      // Reverse-Route Balancing: taking higher price between legs rounded to ceiling dollar
+      const balancedFare = Math.max(outboundFare, returnLegFare);
+      outboundFare = balancedFare;
+      returnLegFare = balancedFare;
+    }
+
     const finalFare = outboundFare;
+    const totalCalculatedFare = returnTrip ? outboundFare + returnLegFare : outboundFare;
 
     const names = passengerName.trim().split(/\s+/);
     const firstName = names[0] || 'Guest';
@@ -1621,14 +1635,14 @@ export function DispatchBookingEngine({
                 vehicleMultiplier: 1.0,
                 surgeMultiplier: 1.0,
                 discountAmount: 0,
-                subtotal: returnEstimatedFare || estimatedFare,
-                totalFare: returnEstimatedFare || estimatedFare,
+                subtotal: returnLegFare,
+                totalFare: returnLegFare,
                 currency: 'USD',
               },
               payment: {
                 method,
                 status: 'pending',
-                amount: returnEstimatedFare || estimatedFare,
+                amount: returnLegFare,
               },
               metadata: {
                 ...metadataPayload,
@@ -3084,14 +3098,17 @@ export function DispatchBookingEngine({
               <div
                 onClick={() => {
                   setIsFareOverridden(true);
-                  const total = returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare;
+                  const balancedLeg = Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare));
+                  const total = returnTrip ? balancedLeg * 2 : Math.ceil(estimatedFare);
                   setManualFare(total ? total.toFixed(2) : '');
                 }}
                 className="cursor-pointer group flex items-baseline gap-1"
                 title="Click to manually override fare"
               >
                 <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors">
-                  ${(returnTrip ? estimatedFare + returnEstimatedFare : estimatedFare).toFixed(2)}
+                  ${(returnTrip
+                    ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)) * 2
+                    : Math.ceil(estimatedFare)).toFixed(2)}
                 </span>
                 {repeat && (
                   <span className="text-xs font-bold text-indigo-600">
@@ -3116,7 +3133,7 @@ export function DispatchBookingEngine({
           {/* Subtitle breakdown for return trip */}
           {returnTrip && (
             <div className="text-[10px] text-slate-500 font-medium">
-              Leg 1: ${estimatedFare.toFixed(2)} | Return Leg: ${returnEstimatedFare.toFixed(2)}
+              Leg 1: ${Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)).toFixed(2)} | Return Leg: ${Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare)).toFixed(2)}
             </div>
           )}
         </div>
