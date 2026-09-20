@@ -30,6 +30,13 @@ export interface WorkspaceEventMap {
     vipTag?: string;
     notes?: string;
   };
+  INCOMING_CALL: {
+    from: string;
+    callSid?: string;
+  };
+  INCOMING_CALL_DISMISSED: Record<string, any>;
+  ANSWER_INCOMING_CALL: Record<string, any>;
+  REJECT_INCOMING_CALL: Record<string, any>;
   CALL_OUTBOUND_STARTED: {
     callSid?: string;
     targetNumber: string;

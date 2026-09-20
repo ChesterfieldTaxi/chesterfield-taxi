@@ -245,6 +245,7 @@ export interface VehicleTierConfig {
   description?: string;
   badge?: string;
   iconType?: 'standard' | 'premium' | 'xl' | 'wheelchair';
+  imageUrl?: string; // Optional vehicle photo / illustration URL
   isArchived?: boolean;
   archivedAt?: string;
   archiveReason?: string;
@@ -275,6 +276,7 @@ export interface FleetCarConfig {
   insuranceExpiry?: string;
   mileage: number; // e.g. 45210
   status: 'active' | 'maintenance' | 'out_of_service' | 'inspecting';
+  imageUrl?: string; // Optional physical vehicle photo URL
   maintenanceHistory?: MaintenanceRecord[];
   isArchived?: boolean;
   isBlacklisted?: boolean;

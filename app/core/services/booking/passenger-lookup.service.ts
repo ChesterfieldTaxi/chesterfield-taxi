@@ -134,7 +134,7 @@ export class PassengerLookupService {
               email: trip.passenger.email,
               corporateAccountId: (trip.metadata?.corporateAccountId as string) || undefined,
               notes: trip.passenger.specialRequests || trip.driverNotes,
-              preferredVehicleTier: trip.vehicleTier,
+              preferredVehicleTier: trip.vehicleTier as any,
               recentPickupAddress: trip.pickupLocation?.address,
               recentDropoffAddress: trip.dropoffLocation?.address,
               totalTrips: 1,

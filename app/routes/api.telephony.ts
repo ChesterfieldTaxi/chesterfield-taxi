@@ -320,12 +320,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (action === 'voice_client_twiml') {
     const to = url.searchParams.get('To') || url.searchParams.get('to');
     const { phoneNumber } = await resolveCredentials();
+    const callerId =
+      url.searchParams.get('FromNumber') ||
+      url.searchParams.get('CallerId') ||
+      url.searchParams.get('fromNumber') ||
+      url.searchParams.get('callerId') ||
+      phoneNumber;
     const VoiceResponse = twilio.twiml.VoiceResponse;
     const response = new VoiceResponse();
 
     if (to) {
       const dial = response.dial({
-        callerId: phoneNumber,
+        callerId: callerId ? sanitizeToE164(callerId) : undefined,
         record: 'record-from-answer',
         timeout: 30,
       });
@@ -341,7 +347,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // ─── INBOUND VOICE CALL WEBHOOK (WITH RECORDING & VOICEMAIL ROLLOVER) ───
   if (action === 'incoming_call') {
-    const { phoneNumber, forwardingPhone } = await resolveCredentials();
+    const { forwardingPhone } = await resolveCredentials();
     const formattedForwarding = forwardingPhone ? sanitizeToE164(forwardingPhone) : '';
 
     const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -349,9 +355,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
 
     const dial = response.dial({
-      timeout: 20,
+      timeout: 30,
       record: 'record-from-answer',
-      callerId: phoneNumber,
       action: '/api/telephony?action=handle_unanswered',
     });
     // Ring the WebRTC in-browser softphone
@@ -509,6 +514,7 @@ export async function action({ request }: ActionFunctionArgs) {
         const formObj: Record<string, any> = {};
         formData.forEach((val, key) => { formObj[key] = val; });
         data = {
+          ...formObj,
           action: (formObj.action || queryAction || (formObj.CallSid ? 'incoming_call' : formObj.MessageSid ? 'incoming_sms' : 'verify_credentials')) as any,
           to: formObj.To || formObj.to,
           from: formObj.From || formObj.from,
@@ -584,12 +590,20 @@ export async function action({ request }: ActionFunctionArgs) {
     // ─── TWIML APP OUTBOUND VOICE ROUTE (POST / Webhook) ───
     if (data.action === 'voice_client_twiml' || queryAction === 'voice_client_twiml') {
       const to = data.to || (data as any).To || url.searchParams.get('To') || url.searchParams.get('to');
+      const callerId =
+        (data as any).FromNumber ||
+        (data as any).fromNumber ||
+        (data as any).CallerId ||
+        (data as any).callerId ||
+        url.searchParams.get('FromNumber') ||
+        url.searchParams.get('CallerId') ||
+        twilioFromNumber;
       const VoiceResponse = twilio.twiml.VoiceResponse;
       const response = new VoiceResponse();
 
       if (to) {
         const dial = response.dial({
-          callerId: twilioFromNumber,
+          callerId: callerId ? sanitizeToE164(callerId) : undefined,
           record: 'record-from-answer',
           timeout: 30,
         });
@@ -696,7 +710,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // ─── INBOUND WEBHOOK: VOICE CALL ───
     if (data.action === 'incoming_call') {
-      const phoneNumber = twilioFromNumber;
       const formattedForwarding = forwardingPhone ? sanitizeToE164(forwardingPhone) : '';
 
       const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -704,9 +717,8 @@ export async function action({ request }: ActionFunctionArgs) {
       response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
 
       const dial = response.dial({
-        timeout: 20,
+        timeout: 30,
         record: 'record-from-answer',
-        callerId: phoneNumber,
         action: '/api/telephony?action=handle_unanswered',
       });
       // Ring the WebRTC in-browser softphone

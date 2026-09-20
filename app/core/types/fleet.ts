@@ -22,6 +22,7 @@ export interface PhysicalFleetAsset {
   insuranceExpiry?: string; // ISO date string e.g. "2026-12-31"
   mileage: number; // current odometer reading
   status: FleetAssetStatus;
+  imageUrl?: string; // Optional physical vehicle photo URL
   assignedDriverId?: string;
   assignedDriverName?: string;
   maintenanceHistory?: MaintenanceRecord[];

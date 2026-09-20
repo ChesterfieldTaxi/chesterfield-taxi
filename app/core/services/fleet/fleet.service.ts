@@ -39,6 +39,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
     insuranceExpiry: '2027-06-30',
     mileage: 48250,
     status: 'active',
+    imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
     maintenanceHistory: [
       {
         id: 'm-1',
@@ -66,6 +67,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
     insuranceExpiry: '2027-06-30',
     mileage: 62100,
     status: 'active',
+    imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
     maintenanceHistory: [
       {
         id: 'm-2',
@@ -93,6 +95,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
     insuranceExpiry: '2027-06-30',
     mileage: 31400,
     status: 'active',
+    imageUrl: 'https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80',
     maintenanceHistory: [
       {
         id: 'm-3',
@@ -120,6 +123,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
     insuranceExpiry: '2026-11-30',
     mileage: 78500,
     status: 'maintenance',
+    imageUrl: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=800&q=80',
     maintenanceHistory: [
       {
         id: 'm-4',

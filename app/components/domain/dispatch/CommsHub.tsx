@@ -319,6 +319,73 @@ function getInitialInteractions(): InteractionEvent[] {
   return INITIAL_INTERACTIONS;
 }
 
+let ringtoneAudioCtx: any = null;
+let ringtoneIntervalTimer: any = null;
+
+function playInboundRingtone() {
+  try {
+    if (typeof window === 'undefined') return;
+    const isMuted = localStorage.getItem('chesterfield_sound_muted') === 'true' || localStorage.getItem('ct_dispatch_sound_muted') === 'true';
+    if (isMuted) return;
+
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') {
+      ringtoneAudioCtx = new AudioContextClass();
+    }
+    const ctx = ringtoneAudioCtx;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const ringCycle = () => {
+      try {
+        if (!ringtoneAudioCtx || ringtoneAudioCtx.state === 'closed') return;
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(440, now);
+        osc2.frequency.setValueAtTime(480, now);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.setValueAtTime(0.18, now + 1.8);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 2.0);
+        osc2.stop(now + 2.0);
+      } catch {}
+    };
+
+    ringCycle();
+    if (ringtoneIntervalTimer) clearInterval(ringtoneIntervalTimer);
+    ringtoneIntervalTimer = setInterval(ringCycle, 3800);
+  } catch {}
+}
+
+function stopInboundRingtone() {
+  try {
+    if (ringtoneIntervalTimer) {
+      clearInterval(ringtoneIntervalTimer);
+      ringtoneIntervalTimer = null;
+    }
+    if (ringtoneAudioCtx) {
+      ringtoneAudioCtx.close().catch(() => {});
+      ringtoneAudioCtx = null;
+    }
+  } catch {}
+}
+
 export function CommsHub({
   user,
   initialTab = 'all',
@@ -502,9 +569,15 @@ export function CommsHub({
           const callSid = call.parameters?.CallSid;
           setIncomingCallInfo({ from: callerNumber, callSid });
 
+          // Start audible ringtone & alert dispatch workspace
+          playInboundRingtone();
+          workspaceBus.publish('INCOMING_CALL', { from: callerNumber, callSid });
+
           call.on('disconnect', () => {
+            stopInboundRingtone();
             setIncomingCallInfo(null);
             incomingCallRef.current = null;
+            workspaceBus.publish('INCOMING_CALL_DISMISSED', {});
             if (activeCallRef.current === call) {
               handleEndCallRef.current?.(true);
             }
@@ -512,8 +585,10 @@ export function CommsHub({
 
           call.on('error', (err: any) => {
             console.error('Incoming call error:', err);
+            stopInboundRingtone();
             setIncomingCallInfo(null);
             incomingCallRef.current = null;
+            workspaceBus.publish('INCOMING_CALL_DISMISSED', {});
           });
         });
 
@@ -528,6 +603,7 @@ export function CommsHub({
 
     return () => {
       isMounted = false;
+      stopInboundRingtone();
       if (deviceInstance) {
         try {
           deviceInstance.destroy();
@@ -538,6 +614,8 @@ export function CommsHub({
   }, []);
 
   const handleAcceptIncomingCall = () => {
+    stopInboundRingtone();
+    workspaceBus.publish('INCOMING_CALL_DISMISSED', {});
     const call = incomingCallRef.current;
     if (!call) return;
     const callerFrom = incomingCallInfo?.from || 'Passenger';
@@ -578,6 +656,8 @@ export function CommsHub({
   };
 
   const handleRejectIncomingCall = () => {
+    stopInboundRingtone();
+    workspaceBus.publish('INCOMING_CALL_DISMISSED', {});
     const call = incomingCallRef.current;
     if (call) {
       try {
@@ -587,6 +667,18 @@ export function CommsHub({
     }
     setIncomingCallInfo(null);
   };
+
+  // Subscribe to global workspace bus for cross-dock answering and rejection
+  useEffect(() => {
+    const unsub = workspaceBus.subscribe((msg) => {
+      if (msg.type === 'ANSWER_INCOMING_CALL') {
+        handleAcceptIncomingCall();
+      } else if (msg.type === 'REJECT_INCOMING_CALL') {
+        handleRejectIncomingCall();
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Audio element player effect
   useEffect(() => {
@@ -1058,6 +1150,8 @@ export function CommsHub({
         const call = await deviceRef.current.connect({
           params: {
             To: targetE164,
+            FromNumber: creds.phoneNumber,
+            CallerId: creds.phoneNumber,
           },
         });
         activeCallRef.current = call;

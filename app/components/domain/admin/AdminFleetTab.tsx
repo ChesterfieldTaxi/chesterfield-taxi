@@ -136,6 +136,49 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
     );
   };
 
+  const handleSaveEditingCar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCar) return;
+    if (!editingCar.unitNumber.trim() || !editingCar.make.trim() || !editingCar.model.trim()) {
+      alert('Unit Number, Make, and Model are required.');
+      return;
+    }
+
+    const updatedCar: FleetCarConfig = {
+      ...editingCar,
+      unitNumber: editingCar.unitNumber.trim(),
+      make: editingCar.make.trim(),
+      model: editingCar.model.trim(),
+      year: Number(editingCar.year) || new Date().getFullYear(),
+      mileage: Number(editingCar.mileage) || 0,
+    };
+
+    handleUpdateCar(updatedCar.id, updatedCar);
+    getFleetService().saveAsset({
+      id: updatedCar.id,
+      unitNumber: updatedCar.unitNumber,
+      vehicleTypeId: updatedCar.vehicleTypeId,
+      make: updatedCar.make,
+      model: updatedCar.model,
+      year: updatedCar.year,
+      color: updatedCar.color,
+      licensePlate: updatedCar.licensePlate,
+      vin: updatedCar.vin,
+      insurancePolicy: updatedCar.insurancePolicy,
+      insuranceExpiry: updatedCar.insuranceExpiry,
+      mileage: updatedCar.mileage,
+      status: updatedCar.status,
+      imageUrl: updatedCar.imageUrl,
+      assignedDriverName: updatedCar.assignedDriverName,
+      maintenanceHistory: updatedCar.maintenanceHistory,
+      isArchived: updatedCar.isArchived,
+      isBlacklisted: updatedCar.isBlacklisted,
+      blacklistReason: updatedCar.blacklistReason,
+    }).catch((err) => console.warn('[AdminFleetTab] FleetService saveAsset error:', err));
+
+    setEditingCar(null);
+  };
+
   const handleAddMaintenanceRecord = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCarForMaintenance || !newMaintenanceRecord.description.trim()) return;
@@ -200,6 +243,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             insuranceExpiry: car.insuranceExpiry || '',
             mileage: car.mileage,
             status: car.status as any,
+            imageUrl: car.imageUrl,
             maintenanceHistory: car.maintenanceHistory as any,
           })
           .catch((err) => console.warn('[AdminFleetTab] FleetService sync error:', err));
@@ -486,6 +530,14 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
               </div>
 
+              <VehicleImagePicker
+                value={newCar.imageUrl || ''}
+                onChange={(url) => setNewCar({ ...newCar, imageUrl: url })}
+                allowClassImageFallback={true}
+                classImageUrl={settings.vehicles.find((v) => v.id === newCar.vehicleTypeId)?.imageUrl}
+                helperText="Optional vehicle image asset. Click 'Use Class Photo' to copy the assigned vehicle class image."
+              />
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   type="button"
@@ -522,9 +574,19 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm shadow-xs">
-                      🚕
-                    </div>
+                    {car.imageUrl ? (
+                      <div className="w-14 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+                        <img
+                          src={car.imageUrl}
+                          alt={car.unitNumber}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm shadow-xs shrink-0">
+                        🚕
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="text-base font-extrabold text-slate-900">{car.unitNumber}</h4>

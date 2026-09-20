@@ -83,7 +83,7 @@ export function isValidTripTransition(
 /**
  * Vehicle tier categories supported by the platform.
  */
-export type VehicleTier = 'standard' | 'premium' | 'xl' | 'wheelchair';
+export type VehicleTier = 'standard' | 'premium' | 'xl' | 'wheelchair' | (string & {});
 
 export interface GeoPoint {
   lat: number;

@@ -45,7 +45,7 @@ import {
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
-import { getTelephonyService, sanitizePhoneNumber } from '../core/services/telephony.service';
+import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../components/ui/LayoutToggle';
@@ -731,6 +731,7 @@ export default function DispatchRoute() {
   const [callDuration, setCallDuration] = useState(0);
   const [showKeypad, setShowKeypad] = useState(false);
   const [softphoneNotice, setSoftphoneNotice] = useState<string | null>(null);
+  const [incomingCallAlert, setIncomingCallAlert] = useState<{ from: string; callSid?: string } | null>(null);
 
   // Driver Fare Console Modal State
   const [driverModalTrip, setDriverModalTrip] = useState<Trip | null>(null);
@@ -973,6 +974,14 @@ export default function DispatchRoute() {
           };
           return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
         });
+      } else if (msg.type === 'INCOMING_CALL') {
+        const payload = msg.payload;
+        setIncomingCallAlert({ from: payload.from, callSid: payload.callSid });
+        setActiveDockTab('phone');
+        setCommsInitialTab('phone');
+        setCommsActiveTab('phone');
+      } else if (msg.type === 'INCOMING_CALL_DISMISSED') {
+        setIncomingCallAlert(null);
       } else if (msg.type === 'FOCUS_TRIP_ON_MAP') {
         const found = trips.find((t) => t.id === msg.payload.tripId);
         if (found) {
@@ -2392,6 +2401,58 @@ export default function DispatchRoute() {
 
   return (
     <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden text-slate-900 select-none">
+      {/* ─────────────────────────────────────────────────────────────
+          INCOMING WEBRTC SOFTPHONE CALL ALERT BANNER
+      ───────────────────────────────────────────────────────────── */}
+      {incomingCallAlert && (
+        <div className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-2.5 flex items-center justify-between shadow-xl z-50 shrink-0 border-b-2 border-emerald-400 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-white animate-ping absolute opacity-75" />
+              <PhoneIcon className="w-5 h-5 text-white relative animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                  Incoming Softphone Call
+                </span>
+                <span className="text-sm font-extrabold tracking-wide">
+                  {formatDisplayPhone(incomingCallAlert.from)}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-100 font-medium">
+                Customer is calling the dispatch desk. Click Answer to connect headset audio.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                getWorkspaceBus().publish('ANSWER_INCOMING_CALL', {});
+                setIncomingCallAlert(null);
+                setActiveDockTab('phone');
+                setCommsActiveTab('phone');
+              }}
+              className="px-4 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
+            >
+              <PhoneIcon className="w-4 h-4 text-emerald-600" />
+              <span>Answer Call</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                getWorkspaceBus().publish('REJECT_INCOMING_CALL', {});
+                setIncomingCallAlert(null);
+              }}
+              className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              <span>Decline</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────────
           1. TOP NAVIGATION BAR (Functional & Rerouted)
       ───────────────────────────────────────────────────────────── */}
@@ -4856,41 +4917,37 @@ export default function DispatchRoute() {
         )}
 
         {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Phone / Messages / Voicemail) */}
-        <div
-          className={`flex-1 flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16 ${
-            activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone'
-              ? 'flex'
-              : 'hidden'
-          }`}
-        >
-          <CommsHub
-            user={user}
-            drivers={drivers}
-            trips={trips}
-            onTabChange={(tab) => setCommsActiveTab(tab)}
-            initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
-            onPopulateBooking={(payload) => {
-              setActiveMobileTab('booking');
-              setDrafts((prev) => {
-                const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                if (!target) return prev;
-                const currentForm = target.formValues || ({} as any);
-                const updatedForm: DispatchFormValues = {
-                  ...currentForm,
-                  passengerName: payload.passengerName || currentForm.passengerName || '',
-                  passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
-                  pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                  dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                  internalNotes: payload.notes
-                    ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                    : currentForm.internalNotes,
-                };
-                return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-              });
-            }}
-            onPopOut={() => getWorkspaceBus().popOutModule('comms')}
-          />
-        </div>
+        {!isDesktop && (activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone') && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16">
+            <CommsHub
+              user={user}
+              drivers={drivers}
+              trips={trips}
+              onTabChange={(tab) => setCommsActiveTab(tab)}
+              initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
+              onPopulateBooking={(payload) => {
+                setActiveMobileTab('booking');
+                setDrafts((prev) => {
+                  const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                  if (!target) return prev;
+                  const currentForm = target.formValues || ({} as any);
+                  const updatedForm: DispatchFormValues = {
+                    ...currentForm,
+                    passengerName: payload.passengerName || currentForm.passengerName || '',
+                    passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                    pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                    dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                    internalNotes: payload.notes
+                      ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                      : currentForm.internalNotes,
+                  };
+                  return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                });
+              }}
+              onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+            />
+          </div>
+        )}
 
         {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (DESKTOP SINGLE ACTIVE VIEW) ─── */}
         <aside
@@ -4998,41 +5055,39 @@ export default function DispatchRoute() {
 
             {/* Active Panel Viewport: Occupies Full Height */}
             <div ref={operationsContainerRef} className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white">
-              {/* 1. PHONE / COMMUNICATIONS HUB */}
-              {(activeDockTab === 'phone' || activeDockTab === 'comms' || activeCallStatus !== 'idle') && (
-                <div className={`flex-1 flex-col h-full overflow-hidden ${
-                  activeDockTab === 'phone' || activeDockTab === 'comms' ? 'flex' : 'hidden'
-                }`}>
-                  <CommsHub
-                    user={user}
-                    drivers={drivers}
-                    trips={trips}
-                    initialTab={commsInitialTab}
-                    onTabChange={(tab) => setCommsActiveTab(tab)}
-                    isPopout={false}
-                    onPopOut={() => getWorkspaceBus().popOutModule('comms')}
-                    onClose={() => setActiveDockTab('none')}
-                    onPopulateBooking={(payload) => {
-                      setDrafts((prev) => {
-                        const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                        if (!target) return prev;
-                        const currentForm = target.formValues || ({} as any);
-                        const updatedForm: DispatchFormValues = {
-                          ...currentForm,
-                          passengerName: payload.passengerName || currentForm.passengerName || '',
-                          passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
-                          pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                          dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                          internalNotes: payload.notes
-                            ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                            : currentForm.internalNotes,
-                        };
-                        return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-                      });
-                    }}
-                  />
-                </div>
-              )}
+              {/* 1. PHONE / COMMUNICATIONS HUB (Persistently mounted on desktop so WebRTC softphone stays online) */}
+              <div className={`flex-1 flex-col h-full overflow-hidden ${
+                activeDockTab === 'phone' || activeDockTab === 'comms' ? 'flex' : 'hidden'
+              }`}>
+                <CommsHub
+                  user={user}
+                  drivers={drivers}
+                  trips={trips}
+                  initialTab={commsInitialTab}
+                  onTabChange={(tab) => setCommsActiveTab(tab)}
+                  isPopout={false}
+                  onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+                  onClose={() => setActiveDockTab('none')}
+                  onPopulateBooking={(payload) => {
+                    setDrafts((prev) => {
+                      const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                      if (!target) return prev;
+                      const currentForm = target.formValues || ({} as any);
+                      const updatedForm: DispatchFormValues = {
+                        ...currentForm,
+                        passengerName: payload.passengerName || currentForm.passengerName || '',
+                        passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                        pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                        dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                        internalNotes: payload.notes
+                          ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                          : currentForm.internalNotes,
+                      };
+                      return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                    });
+                  }}
+                />
+              </div>
 
               {/* 2. EMAIL DOCK CONSOLE */}
               {activeDockTab === 'email' && (

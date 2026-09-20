@@ -272,6 +272,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Comfortable full-size sedan for daily local commutes, errands, and regional trips.',
       badge: 'Popular',
       iconType: 'standard',
+      imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'premium',
@@ -282,6 +283,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Luxury sedan offering executive comfort, quiet cabin, and refreshments for VIP travel.',
       badge: 'Executive',
       iconType: 'premium',
+      imageUrl: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'xl',
@@ -292,6 +294,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Spacious high-capacity vehicle designed for families, airport transfers, and group outings.',
       badge: 'Family',
       iconType: 'xl',
+      imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'wheelchair',
@@ -302,6 +305,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Equipped with certified motorized ramps, secure floor tie-downs, and trained drivers.',
       badge: 'Accessible',
       iconType: 'wheelchair',
+      imageUrl: 'https://images.unsplash.com/photo-1517524008697-84bbe3c3fd98?auto=format&fit=crop&w=800&q=80',
     },
   ],
   fleet: [
@@ -321,6 +325,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       insuranceExpiry: '2027-06-30',
       mileage: 48250,
       status: 'active',
+      imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
       maintenanceHistory: [
         {
           id: 'm-1',
@@ -348,6 +353,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       insuranceExpiry: '2027-06-30',
       mileage: 26800,
       status: 'active',
+      imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
       maintenanceHistory: [
         {
           id: 'm-2',
@@ -375,6 +381,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       insuranceExpiry: '2027-06-30',
       mileage: 72150,
       status: 'active',
+      imageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=800&q=80',
       maintenanceHistory: [
         {
           id: 'm-3',

@@ -17,6 +17,7 @@ import {
 } from '../../ui/Icons';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
 import { AdminFleetTab } from './AdminFleetTab';
+import { VehicleImagePicker } from './vehicles/VehicleImagePicker';
 
 export interface AdminVehiclesTabProps {
   settings: AppSettings;
@@ -41,6 +42,44 @@ export function AdminVehiclesTab({
 
   const [vehicles, setVehicles] = useState<VehicleTierConfig[]>([...settings.vehicles]);
   const [vehicleFilter, setVehicleFilter] = useState<'active' | 'archived' | 'all'>('active');
+
+  // Edit vehicle type modal state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<VehicleTierConfig | null>(null);
+
+  const handleOpenEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditForm({ ...vehicles[index] });
+  };
+
+  const handleCloseEdit = () => {
+    setEditingIndex(null);
+    setEditForm(null);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingIndex === null || !editForm) return;
+
+    if (!editForm.name.trim()) {
+      alert('Vehicle Class Name cannot be blank.');
+      return;
+    }
+
+    setVehicles((prev) => {
+      const next = [...prev];
+      next[editingIndex] = {
+        ...editForm,
+        name: editForm.name.trim(),
+        baseMultiplier: Number(editForm.baseMultiplier) || 1.0,
+        maxPassengers: Number(editForm.maxPassengers) || 1,
+        maxLuggage: Number(editForm.maxLuggage) || 0,
+      };
+      return next;
+    });
+
+    handleCloseEdit();
+  };
 
   const handleToggleArchive = (index: number) => {
     setVehicles((prev) => {
@@ -71,6 +110,7 @@ export function AdminVehiclesTab({
     description: '',
     badge: '',
     iconType: 'standard',
+    imageUrl: '',
   });
 
   const handleUpdateVehicle = (index: number, updates: Partial<VehicleTierConfig>) => {
@@ -122,6 +162,7 @@ export function AdminVehiclesTab({
       description: '',
       badge: '',
       iconType: 'standard',
+      imageUrl: '',
     });
   };
 
@@ -355,6 +396,12 @@ export function AdminVehiclesTab({
                     />
                   </div>
 
+                  <VehicleImagePicker
+                    value={newTier.imageUrl || ''}
+                    onChange={(url) => setNewTier({ ...newTier, imageUrl: url })}
+                    helperText="Optional vehicle image shown to customers on the booking form. Leave blank to use category icon."
+                  />
+
                   <div className="flex justify-end gap-2 pt-2 border-t border-blue-200/60">
                     <Button
                       type="button"
@@ -429,32 +476,59 @@ export function AdminVehiclesTab({
               <Card
                 key={v.id}
                 variant="elevated"
-                className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
+                className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden"
               >
+                {v.imageUrl && (
+                  <div className="relative w-full h-36 bg-slate-100 overflow-hidden border-b border-slate-100">
+                    <img
+                      src={v.imageUrl}
+                      alt={v.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                      {v.badge && (
+                        <span className="bg-amber-500/95 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                          {v.badge}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <CardHeader className="p-4 pb-2 border-b border-slate-100 flex flex-row items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
                       {v.iconType === 'xl' ? '🚙' : v.iconType === 'wheelchair' ? '♿' : v.iconType === 'premium' ? '✨' : '🚗'}
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <CardTitle className="text-sm font-bold text-slate-900">{v.name}</CardTitle>
-                        {v.badge && (
+                        {v.badge && !v.imageUrl && (
                           <Badge variant="warning" size="sm" className="text-[10px] py-0 px-1.5">
                             {v.badge}
                           </Badge>
                         )}
                       </div>
-                      <span className="text-[10px] font-mono text-slate-400">ID: {v.id}</span>
-                      {v.isArchived && (
-                        <span className="ml-1.5 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
-                          ARCHIVED
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-mono text-slate-400">ID: {v.id}</span>
+                        {v.isArchived && (
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                            ARCHIVED
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(index)}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                      title="Edit All Vehicle Class Details"
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleToggleArchive(index)}
@@ -569,6 +643,147 @@ export function AdminVehiclesTab({
               {isSaving ? <CheckIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
               {isSaving ? 'Saving...' : 'Save Vehicle Types'}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Vehicle Class Modal */}
+      {editingIndex !== null && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Edit Vehicle Class: {editForm.name}</h3>
+                <p className="text-xs text-slate-500">Update rates, capacities, silhouette, and customer photo</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseEdit}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Display Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Marketing Badge
+                  </label>
+                  <Input
+                    placeholder="e.g. Popular, VIP, Family"
+                    value={editForm.badge || ''}
+                    onChange={(e) => setEditForm({ ...editForm, badge: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Multiplier
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    min="0.5"
+                    max="5.0"
+                    value={editForm.baseMultiplier}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, baseMultiplier: parseFloat(e.target.value) || 1.0 })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Max Passengers
+                  </label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={editForm.maxPassengers}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, maxPassengers: parseInt(e.target.value) || 1 })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Max Luggage
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editForm.maxLuggage}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, maxLuggage: parseInt(e.target.value) || 0 })
+                    }
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Icon Silhouette
+                </label>
+                <select
+                  className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs text-slate-800 focus:ring-1 focus:ring-blue-500"
+                  value={editForm.iconType || 'standard'}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, iconType: e.target.value as any })
+                  }
+                >
+                  <option value="standard">Standard Sedan 🚗</option>
+                  <option value="premium">Executive Premium ✨</option>
+                  <option value="xl">XL / SUV / Van 🚙</option>
+                  <option value="wheelchair">WAV Accessible ♿</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Customer Description
+                </label>
+                <textarea
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  value={editForm.description || ''}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Details displayed to customers..."
+                />
+              </div>
+
+              <VehicleImagePicker
+                value={editForm.imageUrl || ''}
+                onChange={(url) => setEditForm({ ...editForm, imageUrl: url })}
+                helperText="Optional image displayed to customers in the vehicle selection cards on the booking form."
+              />
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <Button type="button" variant="outline" size="sm" onClick={handleCloseEdit}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  Apply Changes
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}
