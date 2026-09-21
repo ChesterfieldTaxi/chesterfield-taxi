@@ -162,6 +162,7 @@ export interface DispatchFormValues {
 export interface DispatchBookingEngineProps {
   draftId: string;
   initialTrip?: Trip | null;
+  allTrips?: Trip[];
   onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
@@ -193,6 +194,7 @@ const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export function DispatchBookingEngine({
   draftId,
   initialTrip,
+  allTrips,
   onBookingSuccess,
   onValuesChange,
   onClearDraft,
@@ -206,10 +208,26 @@ export function DispatchBookingEngine({
   const outboundTripId =
     initialTrip?.linkedTripId ||
     (initialTrip?.metadata as any)?.linkedTripId;
-  const returnTripId =
+  const explicitReturnTripId =
     initialTrip?.linkedReturnTripId ||
     (initialTrip?.metadata as any)?.linkedReturnTripId ||
     (initialTrip?.metadata as any)?.returnTripId;
+
+  // If first leg doesn't have returnTripId explicitly saved, search allTrips for a paired trip pointing to initialTrip.id
+  const discoveredReturnTripId = useMemo(() => {
+    if (explicitReturnTripId) return explicitReturnTripId;
+    if (!initialTrip?.id || !allTrips || allTrips.length === 0) return undefined;
+    const paired = allTrips.find(
+      (t) =>
+        t.id !== initialTrip.id &&
+        (t.linkedTripId === initialTrip.id ||
+          (t.metadata as any)?.linkedTripId === initialTrip.id) &&
+        (t.isReturnRide || (t.metadata as any)?.isReturnRide)
+    );
+    return paired?.id;
+  }, [explicitReturnTripId, initialTrip?.id, allTrips]);
+
+  const returnTripId = explicitReturnTripId || discoveredReturnTripId;
   const isReturnRide = Boolean(
     initialTrip?.isReturnRide ||
     (initialTrip?.metadata as any)?.isReturnRide ||
@@ -2267,25 +2285,18 @@ export function DispatchBookingEngine({
                   </div>
                 </div>
 
-                {airportDetection.isDropoffAirport && (
-                  <div className="text-[10.5px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-start gap-1.5">
-                    <span className="font-bold text-amber-800">ℹ️ Note:</span>
-                    <span>Your chauffeur will arrive at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.</span>
-                  </div>
-                )}
-
                 {provideFlightInfo && (
                   <div className="space-y-2 pt-0.5">
                     {airportDetection.isPrivateAviation ? (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            FBO Facility / Terminal
+                            FBO Facility
                           </span>
                           <input
                             type="text"
                             list="dispatch-outbound-fbo-list"
-                            placeholder="e.g. Signature Aviation, TAC Air..."
+                            placeholder="e.g. Signature Flight Support"
                             value={fboFacility}
                             onChange={(e) => setFboFacility(e.target.value)}
                             className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
@@ -2298,7 +2309,7 @@ export function DispatchBookingEngine({
                         </div>
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            Aircraft Tail Number {airportDetection.isPickupAirport ? '(Required)' : '(Optional)'}
+                            Tail #
                           </span>
                           <input
                             type="text"
@@ -2310,7 +2321,7 @@ export function DispatchBookingEngine({
                         </div>
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            {airportDetection.isPickupAirport ? 'Departing From (Origin - Optional)' : 'Departing To (Destination - Optional)'}
+                            {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                           </span>
                           <input
                             type="text"
@@ -2325,7 +2336,7 @@ export function DispatchBookingEngine({
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            Airline {airportDetection.isDropoffAirport ? '(Terminal Door)' : ''}
+                            Airline
                           </span>
                           <select
                             value={airline}
@@ -2342,7 +2353,7 @@ export function DispatchBookingEngine({
                         </div>
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            {airportDetection.isPickupAirport ? 'Flight Number (1–4 digits)' : 'Flight Number (Optional, 1–4 digits)'}
+                            Flight #
                           </span>
                           <input
                             type="text"
@@ -2360,7 +2371,7 @@ export function DispatchBookingEngine({
                         </div>
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            {airportDetection.isPickupAirport ? 'Departing From (Origin)' : 'Departing To (Destination - Optional)'}
+                            {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                           </span>
                           <input
                             type="text"
@@ -2381,31 +2392,8 @@ export function DispatchBookingEngine({
                           onChange={(e) => setHasCheckedLuggage(e.target.checked)}
                           className="rounded border-blue-300 text-blue-600"
                         />
-                        <span>
-                          {airportDetection.isPickupAirport
-                            ? 'Passenger has checked baggage (allows baggage claim grace period)'
-                            : 'Passenger has checked baggage to drop off at curbside'}
-                        </span>
+                        <span>Checked Baggage</span>
                       </label>
-                    </div>
-
-                    <div className="text-[10px] text-slate-600 bg-white/80 p-2 rounded border border-blue-100 space-y-0.5">
-                      {airportDetection.isPrivateAviation ? (
-                        <>
-                          <span className="font-bold text-slate-800">Private Aviation FBO Coordinates: </span>
-                          <span>Chauffeur coordinates directly with the FBO front desk for ramp-side or lobby greetings. Tail number ensures rapid aircraft arrival verification.</span>
-                        </>
-                      ) : airportDetection.isPickupAirport ? (
-                        <>
-                          <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
-                          <span>Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-bold text-slate-800">Airport Curbside Dropoff: </span>
-                          <span>Chauffeur routes directly to passenger's departure terminal and airline ticketing door.</span>
-                        </>
-                      )}
                     </div>
                   </div>
                 )}
@@ -3208,7 +3196,6 @@ export function DispatchBookingEngine({
                     <button
                       type="button"
                       onClick={() => {
-                        window.open(`/dispatch?tripId=${linkedTripId}`, '_blank');
                         onOpenLinkedTrip?.(linkedTripId);
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs active:scale-98"
@@ -3368,25 +3355,18 @@ export function DispatchBookingEngine({
                           </div>
                         </div>
 
-                        {returnAirportDetection.isDropoffAirport && (
-                          <div className="text-[10.5px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-start gap-1.5">
-                            <span className="font-bold text-amber-800">ℹ️ Note:</span>
-                            <span>Your chauffeur will arrive at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.</span>
-                          </div>
-                        )}
-
                         {returnProvideFlightInfo && (
                           <div className="space-y-2 pt-0.5">
                             {returnAirportDetection.isPrivateAviation ? (
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    FBO Facility / Terminal
+                                    FBO Facility
                                   </span>
                                   <input
                                     type="text"
                                     list="dispatch-return-fbo-list"
-                                    placeholder="e.g. Signature Aviation, TAC Air..."
+                                    placeholder="e.g. Signature Flight Support"
                                     value={returnFboFacility}
                                     onChange={(e) => setReturnFboFacility(e.target.value)}
                                     className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-800"
@@ -3399,7 +3379,7 @@ export function DispatchBookingEngine({
                                 </div>
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    Aircraft Tail Number {returnAirportDetection.isPickupAirport ? '(Required)' : '(Optional)'}
+                                    Tail #
                                   </span>
                                   <input
                                     type="text"
@@ -3411,7 +3391,7 @@ export function DispatchBookingEngine({
                                 </div>
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    {returnAirportDetection.isPickupAirport ? 'Departing From (Origin - Optional)' : 'Departing To (Destination - Optional)'}
+                                    {returnAirportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                                   </span>
                                   <input
                                     type="text"
@@ -3426,7 +3406,7 @@ export function DispatchBookingEngine({
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    Airline {returnAirportDetection.isDropoffAirport ? '(Terminal Door)' : ''}
+                                    Airline
                                   </span>
                                   <select
                                     value={returnAirline}
@@ -3443,7 +3423,7 @@ export function DispatchBookingEngine({
                                 </div>
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    {returnAirportDetection.isPickupAirport ? 'Flight Number (1–4 digits)' : 'Flight Number (Optional, 1–4 digits)'}
+                                    Flight #
                                   </span>
                                   <input
                                     type="text"
@@ -3461,7 +3441,7 @@ export function DispatchBookingEngine({
                                 </div>
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    {returnAirportDetection.isPickupAirport ? 'Departing From (Origin)' : 'Departing To (Destination - Optional)'}
+                                    {returnAirportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                                   </span>
                                   <input
                                     type="text"
@@ -3482,31 +3462,8 @@ export function DispatchBookingEngine({
                                   onChange={(e) => setReturnHasCheckedLuggage(e.target.checked)}
                                   className="rounded border-indigo-300 text-indigo-600"
                                 />
-                                <span>
-                                  {returnAirportDetection.isPickupAirport
-                                    ? 'Passenger has checked baggage (allows baggage claim grace period)'
-                                    : 'Passenger has checked baggage to drop off at curbside'}
-                                </span>
+                                <span>Checked Baggage</span>
                               </label>
-                            </div>
-
-                            <div className="text-[10px] text-slate-600 bg-white/80 p-2 rounded border border-indigo-100 space-y-0.5">
-                              {returnAirportDetection.isPrivateAviation ? (
-                                <>
-                                  <span className="font-bold text-slate-800">Private Aviation FBO Coordinates: </span>
-                                  <span>Chauffeur coordinates directly with the FBO front desk for ramp-side or lobby greetings. Tail number ensures rapid aircraft arrival verification.</span>
-                                </>
-                              ) : returnAirportDetection.isPickupAirport ? (
-                                <>
-                                  <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
-                                  <span>Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="font-bold text-slate-800">Airport Curbside Dropoff: </span>
-                                  <span>Chauffeur routes directly to passenger's departure terminal and airline ticketing door.</span>
-                                </>
-                              )}
                             </div>
                           </div>
                         )}

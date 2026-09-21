@@ -1101,6 +1101,8 @@ export default function DispatchRoute() {
                 ? new Date(linkedTripObj.scheduledPickupTime).toLocaleString()
                 : 'Scheduled Return',
             vehicleTier: linkedTripObj.vehicleTier || 'standard',
+            passengerCount: linkedTripObj.passenger?.passengerCount,
+            luggageCount: linkedTripObj.passenger?.luggageCount,
             totalFare: linkedTripObj.pricing?.totalFare || 0,
             flightDetails: ((linkedTripObj.metadata as any)?.flightNumber || (linkedTripObj.metadata as any)?.tailNumber) ? {
               airlineName: (linkedTripObj.metadata as any)?.airlineName || (linkedTripObj.metadata as any)?.airline,
@@ -1135,6 +1137,19 @@ export default function DispatchRoute() {
         vehicleTier: reviewTrip.vehicleTier || (reviewMeta.vehiclePreference as string) || 'any',
         passengerCount: reviewTrip.passenger.passengerCount,
         luggageCount: reviewTrip.passenger.luggageCount,
+        contactPerson: reviewMeta.contactPerson
+          ? (reviewMeta.contactPerson as any)
+          : (reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName)
+          ? {
+              isBookerDifferent: Boolean(reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName),
+              contactName: reviewMeta.bookerName || reviewMeta.contactName,
+              contactPhone: reviewMeta.bookerPhone || reviewMeta.contactPhone,
+              contactEmail: reviewMeta.bookerEmail || reviewMeta.contactEmail,
+              contactRole: reviewMeta.bookerRole || reviewMeta.contactRole,
+            }
+          : undefined,
+        carSeatsBreakdown: reviewMeta.carSeatsBreakdown ? (reviewMeta.carSeatsBreakdown as any) : undefined,
+        additionalPassengers: reviewMeta.additionalPassengers ? (reviewMeta.additionalPassengers as any) : undefined,
         totalFare: reviewTrip.pricing?.totalFare || 0,
         currency: reviewTrip.pricing?.currency || 'USD',
         paymentMethod: reviewTrip.payment?.method || 'cash',
@@ -1615,6 +1630,19 @@ export default function DispatchRoute() {
               vehicleTier: t.vehicleTier || (meta.vehiclePreference as string) || 'any',
               passengerCount: t.passenger?.passengerCount,
               luggageCount: t.passenger?.luggageCount,
+              contactPerson: meta.contactPerson
+                ? (meta.contactPerson as any)
+                : (meta.isBookerDifferent || meta.bookerName || meta.contactName)
+                ? {
+                    isBookerDifferent: Boolean(meta.isBookerDifferent || meta.bookerName || meta.contactName),
+                    contactName: meta.bookerName || meta.contactName,
+                    contactPhone: meta.bookerPhone || meta.contactPhone,
+                    contactEmail: meta.bookerEmail || meta.contactEmail,
+                    contactRole: meta.bookerRole || meta.contactRole,
+                  }
+                : undefined,
+              carSeatsBreakdown: meta.carSeatsBreakdown ? (meta.carSeatsBreakdown as any) : undefined,
+              additionalPassengers: meta.additionalPassengers ? (meta.additionalPassengers as any) : undefined,
               totalFare: t.pricing?.totalFare || 0,
               currency: t.pricing?.currency || 'USD',
               paymentMethod: t.payment?.method || 'cash',
@@ -3700,6 +3728,7 @@ export default function DispatchRoute() {
                 <DispatchBookingEngine
                   draftId={d.id}
                   initialTrip={d.trip}
+                  allTrips={trips}
                   onValuesChange={(vals) => handleDraftValuesChange(d.id, vals)}
                   onBookingSuccess={(savedTrip, isEdit) => {
                     if (isEdit) {
@@ -3713,10 +3742,19 @@ export default function DispatchRoute() {
                   }}
                   onCopyBooking={handleCloneBookingToNewDraft}
                   onCloneBooking={handleCloneBookingToNewDraft}
-                  onOpenLinkedTrip={(linkedTripId) => {
+                  onOpenLinkedTrip={async (linkedTripId) => {
                     const linkedTrip = trips.find((t) => t.id === linkedTripId);
                     if (linkedTrip) {
                       handleOpenEditTrip(linkedTrip);
+                    } else {
+                      try {
+                        const statusRes = await getBookingService().getBookingStatus(linkedTripId);
+                        if (statusRes?.trip) {
+                          handleOpenEditTrip(statusRes.trip);
+                        }
+                      } catch (err) {
+                        console.error('Failed to load linked trip:', err);
+                      }
                     }
                   }}
                 />

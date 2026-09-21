@@ -106,6 +106,9 @@ export interface WorkspaceEventMap {
     status?: string;
     isOfflineBuffer?: boolean;
   };
+  CONTACT_UPDATED: {
+    contact: any;
+  };
 }
 
 export type WorkspaceEventType = keyof WorkspaceEventMap;

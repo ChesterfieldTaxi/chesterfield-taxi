@@ -159,6 +159,154 @@ function formatPaymentMethod(method?: string): string {
 }
 
 /**
+ * Renders complete passenger, contact person, child seat, and party breakdown card for emails.
+ */
+function renderPassengerDetailsCard(
+  passenger: BookingConfirmationEmailPayload['passenger'],
+  passengerCount?: number,
+  luggageCount?: number,
+  contactPerson?: BookingConfirmationEmailPayload['contactPerson'],
+  additionalPassengers?: BookingConfirmationEmailPayload['additionalPassengers'],
+  carSeatsBreakdown?: BookingConfirmationEmailPayload['carSeatsBreakdown'],
+  themeColor: string = '#2563eb'
+): string {
+  const hasCarSeats = Boolean(
+    carSeatsBreakdown &&
+    ((carSeatsBreakdown.total && carSeatsBreakdown.total > 0) ||
+      (carSeatsBreakdown.rearFacing && carSeatsBreakdown.rearFacing > 0) ||
+      (carSeatsBreakdown.frontFacing && carSeatsBreakdown.frontFacing > 0) ||
+      (carSeatsBreakdown.booster && carSeatsBreakdown.booster > 0))
+  );
+
+  const carSeatParts: string[] = [];
+  if (carSeatsBreakdown?.rearFacing) carSeatParts.push(`${carSeatsBreakdown.rearFacing} Rear-Facing`);
+  if (carSeatsBreakdown?.frontFacing) carSeatParts.push(`${carSeatsBreakdown.frontFacing} Front-Facing`);
+  if (carSeatsBreakdown?.booster) carSeatParts.push(`${carSeatsBreakdown.booster} Booster`);
+
+  const hasBooker = Boolean(
+    contactPerson?.isBookerDifferent && contactPerson?.contactName
+  );
+
+  const hasAdditional = Boolean(
+    additionalPassengers && additionalPassengers.length > 0
+  );
+
+  const rawPhone = passenger.phone ? passenger.phone.replace(/\D/g, '') : '';
+
+  return `
+    <!-- Complete Passenger Details Card -->
+    <div class="card-box" style="margin-top: 14px; margin-bottom: 16px; border-left: 4px solid ${themeColor}; background-color: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid ${themeColor};">
+      <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        👤 Complete Passenger &amp; Contact Details
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td width="55%" valign="top" style="padding-bottom: 10px;">
+            <div class="item-label">Primary Passenger</div>
+            <div style="font-size: 15px; font-weight: 700; color: #0f172a;">
+              ${passenger.firstName} ${passenger.lastName}
+            </div>
+            <div style="margin-top: 5px; font-size: 13px; color: #475569;">
+              📞 <a href="tel:${rawPhone || passenger.phone}" style="color: ${themeColor}; text-decoration: none; font-weight: 600;">${passenger.phone || 'Phone not provided'}</a>
+            </div>
+            ${passenger.email ? `
+            <div style="margin-top: 3px; font-size: 13px; color: #475569;">
+              ✉️ <a href="mailto:${passenger.email}" style="color: ${themeColor}; text-decoration: none;">${passenger.email}</a>
+            </div>
+            ` : ''}
+          </td>
+          <td width="45%" valign="top" style="padding-bottom: 10px;">
+            <div class="item-label">Party &amp; Luggage Capacity</div>
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a;">
+              👥 ${passengerCount || 1} Passenger${(passengerCount || 1) > 1 ? 's' : ''}
+            </div>
+            <div style="margin-top: 4px; font-size: 13px; color: #475569; font-weight: 500;">
+              🧳 ${luggageCount ?? 0} Standard Bag${(luggageCount ?? 0) === 1 ? '' : 's'}
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      ${hasBooker && contactPerson ? `
+      <!-- Booker / Contact Person -->
+      <div style="margin-top: 8px; padding: 10px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
+          📋 Booker / Authorized Contact (Different from Passenger)
+        </div>
+        <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 2px;">
+          ${contactPerson.contactName} ${contactPerson.contactRole ? `<span style="font-weight: 500; color: #64748b;">(${contactPerson.contactRole})</span>` : ''}
+        </div>
+        <div style="font-size: 12px; color: #475569; margin-top: 3px;">
+          ${contactPerson.contactPhone ? `Phone: <a href="tel:${contactPerson.contactPhone.replace(/\D/g, '')}" style="color: ${themeColor}; text-decoration: none; font-weight: 600;">${contactPerson.contactPhone}</a>` : ''}
+          ${contactPerson.contactPhone && contactPerson.contactEmail ? ' • ' : ''}
+          ${contactPerson.contactEmail ? `Email: <a href="mailto:${contactPerson.contactEmail}" style="color: ${themeColor}; text-decoration: none;">${contactPerson.contactEmail}</a>` : ''}
+        </div>
+      </div>
+      ` : ''}
+
+      ${hasCarSeats ? `
+      <!-- Child Safety Car Seats -->
+      <div style="margin-top: 8px; padding: 8px 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+        <span style="font-size: 11px; font-weight: 800; color: #1e40af; text-transform: uppercase;">
+          👶 Requested Child Car Seats:
+        </span>
+        <span style="font-size: 13px; font-weight: 700; color: #1e3a8a; margin-left: 4px;">
+          ${carSeatParts.join(' • ')}
+        </span>
+      </div>
+      ` : ''}
+
+      ${hasAdditional && additionalPassengers ? `
+      <!-- Additional Passengers -->
+      <div style="margin-top: 8px; padding: 8px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase;">
+          👥 Additional Named Passengers:
+        </div>
+        <div style="font-size: 12px; color: #1e293b; margin-top: 3px;">
+          ${additionalPassengers.map((ap) => `${ap.name}${ap.phone ? ` (${ap.phone})` : ''}`).join(' • ')}
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderPassengerDetailsText(
+  passenger: BookingConfirmationEmailPayload['passenger'],
+  passengerCount?: number,
+  luggageCount?: number,
+  contactPerson?: BookingConfirmationEmailPayload['contactPerson'],
+  additionalPassengers?: BookingConfirmationEmailPayload['additionalPassengers'],
+  carSeatsBreakdown?: BookingConfirmationEmailPayload['carSeatsBreakdown']
+): string {
+  let out = `PASSENGER & CONTACT DETAILS:
+- Primary Passenger: ${passenger.firstName} ${passenger.lastName}
+- Direct Phone: ${passenger.phone || 'N/A'}
+- Direct Email: ${passenger.email || 'N/A'}
+- Party Size: ${passengerCount || 1} Passengers | Standard Luggage: ${luggageCount ?? 0} Bags`;
+
+  if (contactPerson?.isBookerDifferent && contactPerson?.contactName) {
+    out += `\n- Booker / Authorized Contact: ${contactPerson.contactName}${contactPerson.contactRole ? ` (${contactPerson.contactRole})` : ''} [Phone: ${contactPerson.contactPhone || 'N/A'}, Email: ${contactPerson.contactEmail || 'N/A'}]`;
+  }
+
+  if (carSeatsBreakdown) {
+    const parts: string[] = [];
+    if (carSeatsBreakdown.rearFacing) parts.push(`${carSeatsBreakdown.rearFacing} Rear-Facing`);
+    if (carSeatsBreakdown.frontFacing) parts.push(`${carSeatsBreakdown.frontFacing} Front-Facing`);
+    if (carSeatsBreakdown.booster) parts.push(`${carSeatsBreakdown.booster} Booster`);
+    if (parts.length > 0) {
+      out += `\n- Child Safety Car Seats: ${parts.join(', ')}`;
+    }
+  }
+
+  if (additionalPassengers && additionalPassengers.length > 0) {
+    out += `\n- Additional Named Passengers: ${additionalPassengers.map((a) => `${a.name}${a.phone ? ` (${a.phone})` : ''}`).join(', ')}`;
+  }
+
+  return out;
+}
+
+/**
  * 1. Passenger Confirmation Receipt
  */
 /**
@@ -244,10 +392,21 @@ export function renderBookingRequestReceivedEmail(
       </div>
     </div>
 
+    <!-- Complete Passenger Details -->
+    ${renderPassengerDetailsCard(
+      payload.passenger,
+      payload.passengerCount,
+      payload.luggageCount,
+      payload.contactPerson,
+      payload.additionalPassengers,
+      payload.carSeatsBreakdown,
+      '#d97706'
+    )}
+
     <!-- Outbound Leg Card -->
     <div class="card-box" style="margin-top: 0; border-left: 4px solid #d97706;">
       <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        ${hasReturn ? `1. Outbound Journey (#${payload.tripId})` : 'Requested Itinerary'}
+        ${hasReturn ? `1. Outbound Journey (#${payload.tripId})` : `Requested Itinerary (#${payload.tripId})`}
       </div>
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
@@ -264,9 +423,6 @@ export function renderBookingRequestReceivedEmail(
             <div class="item-label">Vehicle Preference</div>
             <div class="item-value">
               ${formatVehicleTier(payload.vehicleTier)}
-              <div style="font-size: 12px; color: #64748b; font-weight: normal; margin-top: 2px;">
-                ${payload.passengerCount || 1} Passengers • ${payload.luggageCount || 0} Luggage
-              </div>
             </div>
           </td>
         </tr>
@@ -375,7 +531,7 @@ export function renderBookingRequestReceivedEmail(
     <!-- Oversized Luggage & Cargo Notice -->
     <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 8px; padding: 14px 16px; margin: 14px 0;">
       <div style="font-size: 12px; font-weight: 700; color: #92400e; text-transform: uppercase;">
-        🧳 Declared Oversized Cargo & Equipment
+        🧳 Declared Oversized Cargo &amp; Equipment
       </div>
       <div style="font-size: 13px; font-weight: 600; color: #78350f; margin-top: 3px;">
         ${payload.oversizedItemsSummary}
@@ -455,10 +611,18 @@ Dear ${payload.passenger.firstName} ${payload.passenger.lastName},
 We have received your ${hasReturn ? 'round-trip ' : ''}ride request #${payload.tripId}${hasReturn ? ` & #${payload.returnTripDetails?.tripId}` : ''}.
 Our 24/7 dispatch operations team is reviewing route timing and vehicle availability. You will receive an official confirmation shortly.
 
+${renderPassengerDetailsText(
+  payload.passenger,
+  payload.passengerCount,
+  payload.luggageCount,
+  payload.contactPerson,
+  payload.additionalPassengers,
+  payload.carSeatsBreakdown
+)}
+
 OUTBOUND LEG: #${payload.tripId}
 - Timing: ${payload.pickupTime} (${isScheduled ? 'Scheduled' : 'ASAP'})
 - Vehicle Preference: ${formatVehicleTier(payload.vehicleTier)}
-- Passengers: ${payload.passengerCount || 1} | Bags: ${payload.luggageCount || 0}
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `(Note: ${payload.pickupNotes})` : ''}
 - Dropoff: ${payload.dropoffAddress} ${payload.dropoffNotes ? `(Note: ${payload.dropoffNotes})` : ''}
 ${hasFlight ? `- Flight: ${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || ''} ${payload.flightDetails?.flightNumber || payload.flightDetails?.tailNumber || ''}\n` : ''}
@@ -471,6 +635,8 @@ RETURN LEG: #${payload.returnTripDetails.tripId}
 - Return Dropoff: ${payload.returnTripDetails.dropoffAddress}
 ${payload.returnTripDetails.flightDetails ? `- Return Flight: ${payload.returnTripDetails.flightDetails.airlineName || payload.returnTripDetails.flightDetails.airlineCode || ''} ${payload.returnTripDetails.flightDetails.flightNumber || payload.returnTripDetails.flightDetails.tailNumber || ''}\n` : ''}
 ` : ''}
+
+${payload.specialRequests ? `SPECIAL REQUESTS / NOTES:\n${payload.specialRequests}\n` : ''}
 
 PAYMENT & FARE:
 - Payment Method: ${formatPaymentMethod(payload.paymentMethod)}
@@ -514,7 +680,14 @@ export function renderBookingConfirmedEmail(
     payload.lambertPickupInstructions ||
     'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.';
 
-  const subject = `✓ Booking Confirmed: #${payload.tripId} | ${companyName}`;
+  const hasReturn = Boolean(payload.returnTripDetails);
+  const totalCombinedFare = hasReturn
+    ? payload.totalFare + (payload.returnTripDetails?.totalFare || 0)
+    : payload.totalFare;
+
+  const subject = hasReturn
+    ? `✓ Round-Trip Booking Confirmed: #${payload.tripId} & #${payload.returnTripDetails?.tripId} | ${companyName}`
+    : `✓ Booking Confirmed: #${payload.tripId} | ${companyName}`;
 
   const registerUrl = `https://chesterfieldtaxi.com/register?email=${encodeURIComponent(
     payload.passenger.email
@@ -526,18 +699,36 @@ export function renderBookingConfirmedEmail(
     `
     <div style="text-align: center; margin-bottom: 24px;">
       <span class="badge badge-emerald" style="font-size: 13px; padding: 6px 16px;">
-        ✓ Reservation Confirmed &amp; Dispatched
+        ✓ ${hasReturn ? 'Round-Trip' : 'Reservation'} Confirmed &amp; Dispatched
       </span>
       <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 16px 0 6px 0;">
         Your Ride is Confirmed, ${payload.passenger.firstName}!
       </h2>
       <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.5;">
-        Your reservation <strong>#${payload.tripId}</strong> has been locked in our 24/7 dispatch schedule. A professional chauffeur will arrive at your requested pickup location.
+        ${
+          hasReturn
+            ? `Your round-trip reservations <strong>#${payload.tripId}</strong> (Outbound) and <strong>#${payload.returnTripDetails?.tripId}</strong> (Return) have been locked into our 24/7 dispatch schedule. A professional chauffeur will arrive at your requested pickup location.`
+            : `Your reservation <strong>#${payload.tripId}</strong> has been locked in our 24/7 dispatch schedule. A professional chauffeur will arrive at your requested pickup location.`
+        }
       </p>
     </div>
 
-    <!-- Trip Schedule & Vehicle Class -->
+    <!-- Complete Passenger Details -->
+    ${renderPassengerDetailsCard(
+      payload.passenger,
+      payload.passengerCount,
+      payload.luggageCount,
+      payload.contactPerson,
+      payload.additionalPassengers,
+      payload.carSeatsBreakdown,
+      '#2563eb'
+    )}
+
+    <!-- Outbound Leg Card -->
     <div class="card-box" style="margin-top: 0; border-left: 4px solid #2563eb;">
+      <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        ${hasReturn ? `1. Outbound Journey (#${payload.tripId})` : `Confirmed Itinerary (#${payload.tripId})`}
+      </div>
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td width="50%" valign="top" style="padding-bottom: 12px;">
@@ -553,46 +744,12 @@ export function renderBookingConfirmedEmail(
             <div class="item-label">Vehicle Tier</div>
             <div class="item-value">
               ${formatVehicleTier(payload.vehicleTier)}
-              <div style="font-size: 12px; color: #64748b; font-weight: normal; margin-top: 2px;">
-                ${payload.passengerCount || 1} Passengers • ${payload.luggageCount || 0} Luggage
-              </div>
             </div>
           </td>
         </tr>
       </table>
-    </div>
 
-    ${isLambert ? `
-    <!-- Lambert Airport Curbside Pickup Instructions Box -->
-    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 16px; margin: 16px 0;">
-      <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 4px;">
-        ✈ STL Lambert Curbside Pickup Instructions
-      </div>
-      <div style="font-size: 12px; color: #1e3a8a; line-height: 1.5;">
-        ${lambertInstructions}
-      </div>
-    </div>
-    ` : ''}
-
-    ${payload.oversizedItemsSummary ? `
-    <!-- Oversized Luggage & Cargo Details -->
-    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 16px; margin: 14px 0;">
-      <div style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase;">
-        🧳 Confirmed Oversized Cargo & Equipment
-      </div>
-      <div style="font-size: 13px; font-weight: 600; color: #1e3a8a; margin-top: 3px;">
-        ${payload.oversizedItemsSummary}
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Route Overview -->
-    <div class="card-box">
-      <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-        Confirmed Itinerary
-      </div>
-
-      <div class="route-point">
+      <div class="route-point" style="margin-top: 8px;">
         <div class="item-label" style="color: #2563eb;">● Pickup Location</div>
         <div class="item-value" style="font-size: 14px; font-weight: 600;">
           ${payload.pickupAddress}
@@ -617,38 +774,121 @@ export function renderBookingConfirmedEmail(
         </div>
         ${payload.dropoffNotes ? `<div style="font-size: 12px; color: #64748b; margin-top: 3px; font-style: italic;">Note: ${payload.dropoffNotes}</div>` : ''}
       </div>
+
+      ${hasFlight ? `
+      <!-- Airport Flight Operations Box -->
+      <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; margin-top: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+          ✈ Airport Flight Operations (Real-Time Delay Tracking)
+        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td width="50%" valign="top">
+              <div class="item-label">Carrier &amp; Flight</div>
+              <div class="item-value" style="font-size: 14px;">
+                ${
+                  payload.flightDetails?.isPrivateAviation || payload.flightDetails?.tailNumber
+                    ? `Tail #${payload.flightDetails?.tailNumber || 'N/A'}${payload.flightDetails?.fboFacility ? ` (${payload.flightDetails.fboFacility})` : ''}`
+                    : `${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || 'Commercial Carrier'}${payload.flightDetails?.flightNumber ? ` #${payload.flightDetails.flightNumber}` : ''}`
+                }
+              </div>
+            </td>
+            <td width="50%" valign="top">
+              <div class="item-label">Origin / Terminal</div>
+              <div class="item-value" style="font-size: 14px;">
+                ${payload.flightDetails?.departureAirport ? payload.flightDetails.departureAirport.toUpperCase() : 'Terminal Arrival'}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      ` : ''}
     </div>
 
-    ${hasFlight ? `
-    <!-- Airport Flight Operations Box -->
-    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 10px;">
-        ✈ Airport Flight Operations (Real-Time Delay Tracking)
+    ${hasReturn && payload.returnTripDetails ? `
+    <!-- Return Leg Card -->
+    <div class="card-box" style="margin-top: 16px; border-left: 4px solid #0284c7;">
+      <div style="font-size: 13px; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        2. Return Journey (#${payload.returnTripDetails.tripId})
       </div>
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
-          <td width="50%" valign="top" style="padding-bottom: 8px;">
-            <div class="item-label">Airline & Flight</div>
-            <div class="item-value" style="font-size: 14px;">
-              ${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || 'Commercial Carrier'}
-              ${payload.flightDetails?.flightNumber ? ` #${payload.flightDetails.flightNumber}` : ''}
+          <td width="50%" valign="top" style="padding-bottom: 12px;">
+            <div class="item-label">Return Scheduled Timing</div>
+            <div class="item-value">
+              ${payload.returnTripDetails.pickupTime}
             </div>
           </td>
-          <td width="50%" valign="top" style="padding-bottom: 8px;">
-            <div class="item-label">Origin / Terminal</div>
-            <div class="item-value" style="font-size: 14px;">
-              ${payload.flightDetails?.departureAirport ? payload.flightDetails.departureAirport.toUpperCase() : 'Lambert Airport'}
+          <td width="50%" valign="top" style="padding-bottom: 12px;">
+            <div class="item-label">Vehicle Tier</div>
+            <div class="item-value">
+              ${formatVehicleTier(payload.returnTripDetails.vehicleTier)}
             </div>
           </td>
         </tr>
       </table>
+
+      <div class="route-point" style="margin-top: 8px;">
+        <div class="item-label" style="color: #0284c7;">● Return Pickup</div>
+        <div class="item-value" style="font-size: 14px; font-weight: 600;">
+          ${payload.returnTripDetails.pickupAddress}
+        </div>
+      </div>
+
+      <div style="border-left: 2px dashed #cbd5e1; height: 16px; margin-left: 4px;"></div>
+
+      <div class="route-point">
+        <div class="item-label" style="color: #0f172a;">■ Return Dropoff</div>
+        <div class="item-value" style="font-size: 14px; font-weight: 600;">
+          ${payload.returnTripDetails.dropoffAddress}
+        </div>
+      </div>
+
+      ${payload.returnTripDetails.flightDetails ? `
+      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 14px; margin-top: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #0369a1; margin-bottom: 6px;">
+          ✈ Return Flight Tracking
+        </div>
+        <div style="font-size: 13px; color: #0f172a;">
+          ${
+            payload.returnTripDetails.flightDetails.isPrivateAviation || payload.returnTripDetails.flightDetails.tailNumber
+              ? `Private Aviation: Tail #${payload.returnTripDetails.flightDetails.tailNumber || 'N/A'}${payload.returnTripDetails.flightDetails.fboFacility ? ` (${payload.returnTripDetails.flightDetails.fboFacility})` : ''}`
+              : `${payload.returnTripDetails.flightDetails.airlineName || payload.returnTripDetails.flightDetails.airlineCode || 'Airline'} ${payload.returnTripDetails.flightDetails.flightNumber ? `Flight #${payload.returnTripDetails.flightDetails.flightNumber}` : ''}${payload.returnTripDetails.flightDetails.departureAirport ? ` (${payload.returnTripDetails.flightDetails.departureAirport.toUpperCase()})` : ''}`
+          }
+        </div>
+      </div>
+      ` : ''}
+    </div>
+    ` : ''}
+
+    ${isLambert ? `
+    <!-- Lambert Airport Curbside Pickup Instructions Box -->
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 16px; margin: 16px 0;">
+      <div style="font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 4px;">
+        ✈ STL Lambert Curbside Pickup Instructions
+      </div>
+      <div style="font-size: 12px; color: #1e3a8a; line-height: 1.5;">
+        ${lambertInstructions}
+      </div>
+    </div>
+    ` : ''}
+
+    ${payload.oversizedItemsSummary ? `
+    <!-- Oversized Luggage & Cargo Details -->
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 8px; padding: 14px 16px; margin: 14px 0;">
+      <div style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase;">
+        🧳 Confirmed Oversized Cargo &amp; Equipment
+      </div>
+      <div style="font-size: 13px; font-weight: 600; color: #1e3a8a; margin-top: 3px;">
+        ${payload.oversizedItemsSummary}
+      </div>
     </div>
     ` : ''}
 
     ${payload.specialRequests ? `
     <!-- Driver Notes -->
     <div class="card-box">
-      <div class="item-label">Driver Dispatch Remarks</div>
+      <div class="item-label">Driver Dispatch Remarks / Special Requests</div>
       <div style="font-size: 13px; color: #334155; margin-top: 4px; line-height: 1.5;">
         ${payload.specialRequests}
       </div>
@@ -664,12 +904,14 @@ export function renderBookingConfirmedEmail(
             <div class="item-value" style="font-size: 14px;">
               ${formatPaymentMethod(payload.paymentMethod)}
             </div>
+            ${hasReturn ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">Covers Outbound &amp; Return Journeys</div>` : ''}
           </td>
           <td align="right" valign="middle">
-            <div class="item-label">Total Quoted Fare</div>
+            <div class="item-label">${hasReturn ? 'Combined Round-Trip Fare' : 'Total Quoted Fare'}</div>
             <div class="fare-total">
-              $${payload.totalFare.toFixed(2)} <span style="font-size: 13px; color: #64748b; font-weight: 600;">${payload.currency}</span>
+              $${totalCombinedFare.toFixed(2)} <span style="font-size: 13px; color: #64748b; font-weight: 600;">${payload.currency}</span>
             </div>
+            ${hasReturn ? `<div style="font-size: 11px; color: #64748b;">(Outbound: $${payload.totalFare.toFixed(2)} + Return: $${payload.returnTripDetails?.totalFare.toFixed(2)})</div>` : ''}
           </td>
         </tr>
       </table>
@@ -699,40 +941,58 @@ export function renderBookingConfirmedEmail(
         Call our 24/7 dispatch desk directly at 
         <a href="tel:${rawPhone || COMPANY_CONFIG.phone.primaryRaw}" style="font-weight: 700; color: #1d4ed8; text-decoration: underline;">
           ${companyPhone}
-        </a>. Reference trip ID <strong>#${payload.tripId}</strong>.
+        </a>. Reference trip ID <strong>#${payload.tripId}</strong>${hasReturn ? ` or <strong>#${payload.returnTripDetails?.tripId}</strong>` : ''}.
       </div>
     </div>
     `,
-    `Your ${companyName} reservation #${payload.tripId} is confirmed for ${payload.pickupTime}. Total: $${payload.totalFare.toFixed(2)}.`,
+    `Your ${companyName} reservation #${payload.tripId} is confirmed for ${payload.pickupTime}. Total: $${totalCombinedFare.toFixed(2)}.`,
     payload.companySettings,
     'blue'
   );
 
   const text = `
 ========================================
-${companyName} - RESERVATION CONFIRMED
+${companyName} - ${hasReturn ? 'ROUND-TRIP ' : ''}RESERVATION CONFIRMED
 ========================================
 
 Dear ${payload.passenger.firstName} ${payload.passenger.lastName},
 
-Your reservation #${payload.tripId} has been confirmed with our 24/7 dispatch operations.
+Your reservation #${payload.tripId}${hasReturn ? ` & #${payload.returnTripDetails?.tripId}` : ''} has been confirmed with our 24/7 dispatch operations.
 
-TRIP DETAILS:
-- Trip ID: #${payload.tripId}
+${renderPassengerDetailsText(
+  payload.passenger,
+  payload.passengerCount,
+  payload.luggageCount,
+  payload.contactPerson,
+  payload.additionalPassengers,
+  payload.carSeatsBreakdown
+)}
+
+OUTBOUND LEG: #${payload.tripId}
 - Status: Confirmed
 - Timing: ${payload.pickupTime} (${isScheduled ? 'Scheduled' : 'ASAP'})
 - Vehicle Class: ${formatVehicleTier(payload.vehicleTier)}
-- Passengers: ${payload.passengerCount || 1} | Bags: ${payload.luggageCount || 0}
-${payload.oversizedItemsSummary ? `- Oversized Cargo: ${payload.oversizedItemsSummary}\n` : ''}
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `(Note: ${payload.pickupNotes})` : ''}
 - Dropoff: ${payload.dropoffAddress} ${payload.dropoffNotes ? `(Note: ${payload.dropoffNotes})` : ''}
 ${isLambert ? `- Lambert Pickup Instructions: ${lambertInstructions}\n` : ''}
 ${hasFlight ? `- Flight: ${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || ''} ${payload.flightDetails?.flightNumber || ''}\n` : ''}
+
+${hasReturn && payload.returnTripDetails ? `
+RETURN LEG: #${payload.returnTripDetails.tripId}
+- Status: Confirmed
+- Timing: ${payload.returnTripDetails.pickupTime}
+- Vehicle Class: ${formatVehicleTier(payload.returnTripDetails.vehicleTier)}
+- Return Pickup: ${payload.returnTripDetails.pickupAddress}
+- Return Dropoff: ${payload.returnTripDetails.dropoffAddress}
+${payload.returnTripDetails.flightDetails ? `- Return Flight: ${payload.returnTripDetails.flightDetails.airlineName || payload.returnTripDetails.flightDetails.airlineCode || ''} ${payload.returnTripDetails.flightDetails.flightNumber || payload.returnTripDetails.flightDetails.tailNumber || ''}\n` : ''}
+` : ''}
+
+${payload.oversizedItemsSummary ? `- Oversized Cargo: ${payload.oversizedItemsSummary}\n` : ''}
 ${payload.specialRequests ? `- Driver Notes: ${payload.specialRequests}\n` : ''}
 
 PAYMENT & TOTAL:
 - Payment Method: ${formatPaymentMethod(payload.paymentMethod)}
-- Quoted Total: $${payload.totalFare.toFixed(2)} ${payload.currency}
+- ${hasReturn ? 'Combined Fare' : 'Quoted Total'}: $${totalCombinedFare.toFixed(2)} ${payload.currency}
 
 CREATE A PASSENGER ACCOUNT:
 Save time on future rides: ${registerUrl}

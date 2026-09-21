@@ -19,6 +19,7 @@ import {
 } from '../../../ui/Icons';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
+import { getContactService } from '../../../../core/services/customer/contact.service';
 import {
   RegeneratePoModal,
   PoHistoryModal,
@@ -44,6 +45,7 @@ interface CustomerProfile {
   corporateAccountName?: string;
   preferredVehicle?: string;
   customerScore?: number;
+  notes?: string;
   isBlacklisted?: boolean;
   blacklistReason?: string;
   isArchived?: boolean;
@@ -59,6 +61,9 @@ export function AdminCustomersSubpage({
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<CustomerProfile>>({});
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [governanceRefreshKey, setGovernanceRefreshKey] = useState(0);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
@@ -76,6 +81,97 @@ export function AdminCustomersSubpage({
   useEffect(() => {
     setActiveSub(initialSubTab);
   }, [initialSubTab]);
+
+  // Deep-link integration: Auto-open customer from URL search params (?phone=... or ?id=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const targetPhone = params.get('phone');
+      const targetId = params.get('id');
+      if (targetPhone || targetId) {
+        const contactService = getContactService();
+        const match = targetPhone
+          ? contactService.getContactByPhone(targetPhone)
+          : contactService.getContactById(targetId!);
+        if (match) {
+          handleOpenCustomer(
+            {
+              id: match.id,
+              name: match.name,
+              email: match.email || 'N/A',
+              phone: match.phone,
+              tripCount: match.tripCount || 1,
+              totalSpend: match.totalSpend || 0,
+              lastRideDate: 'Recent',
+              isVip: match.isVip ?? false,
+              preferredVehicle: match.preferredVehicleTier,
+              corporateAccountName: match.corporateAccountName,
+              notes: match.notes,
+              customerScore: match.customerScore ?? 90,
+            },
+            true
+          );
+        }
+      }
+    } catch {}
+  }, []);
+
+  const handleOpenCustomer = (cust: CustomerProfile, edit = false) => {
+    setSelectedCustomer(cust);
+    setIsEditingCustomer(edit);
+    setEditForm({
+      name: cust.name,
+      phone: cust.phone,
+      email: cust.email === 'N/A' ? '' : cust.email,
+      corporateAccountName: cust.corporateAccountName || '',
+      isVip: cust.isVip || false,
+      preferredVehicle: cust.preferredVehicle || 'Standard Sedan',
+      notes: cust.notes || '',
+    });
+    setSaveSuccessMessage(null);
+  };
+
+  const handleSaveCustomer = () => {
+    if (!editForm.name?.trim() || !editForm.phone?.trim()) {
+      alert('Passenger Name and Phone Number are required.');
+      return;
+    }
+    const service = getContactService();
+    const saved = service.saveContact({
+      id: selectedCustomer?.id?.startsWith('cust_new_') ? undefined : selectedCustomer?.id,
+      name: editForm.name.trim(),
+      phone: editForm.phone.trim(),
+      email: editForm.email?.trim() || '',
+      corporateAccountName: editForm.corporateAccountName?.trim() || undefined,
+      isVip: editForm.isVip ?? false,
+      preferredVehicleTier: (editForm.preferredVehicle as any) || 'standard',
+      notes: editForm.notes || '',
+      customerScore: selectedCustomer?.customerScore ?? 90,
+      tripCount: selectedCustomer?.tripCount ?? 1,
+      totalSpend: selectedCustomer?.totalSpend ?? 0,
+    });
+
+    setSelectedCustomer((prev) =>
+      prev
+        ? {
+            ...prev,
+            id: saved.id,
+            name: saved.name,
+            phone: saved.phone,
+            email: saved.email || 'N/A',
+            corporateAccountName: saved.corporateAccountName,
+            isVip: saved.isVip ?? false,
+            preferredVehicle: saved.preferredVehicleTier,
+            notes: saved.notes,
+          }
+        : null
+    );
+    setIsEditingCustomer(false);
+    setSaveSuccessMessage('Contact profile saved successfully.');
+    setGovernanceRefreshKey((k) => k + 1);
+    setTimeout(() => setSaveSuccessMessage(null), 3500);
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -159,6 +255,33 @@ export function AdminCustomersSubpage({
       });
     }
   });
+
+  // Merge contacts from ContactService (custom created or edited profiles)
+  try {
+    const contactService = getContactService();
+    const savedContacts = contactService.getAllContacts();
+    for (const sc of savedContacts) {
+      const key = sc.email && sc.email !== 'N/A' ? sc.email : sc.phone || sc.id;
+      const existing = customerMap.get(key);
+      customerMap.set(key, {
+        id: sc.id,
+        name: sc.name,
+        email: sc.email || 'N/A',
+        phone: sc.phone,
+        tripCount: existing ? existing.tripCount : sc.tripCount || 1,
+        totalSpend: existing ? existing.totalSpend : sc.totalSpend || 0,
+        lastRideDate: existing ? existing.lastRideDate : 'Recent',
+        isVip: sc.isVip ?? false,
+        corporateAccountName: sc.corporateAccountName,
+        preferredVehicle: sc.preferredVehicleTier,
+        notes: sc.notes,
+        customerScore: sc.customerScore,
+        isBlacklisted: sc.isBlacklisted,
+        blacklistReason: sc.blacklistReason,
+        isArchived: sc.isArchived,
+      });
+    }
+  } catch {}
 
   const govService = getUniversalGovernanceService();
   const allCustomers = Array.from(customerMap.values()).map((c) => {
@@ -280,6 +403,28 @@ export function AdminCustomersSubpage({
               </button>
             </div>
           )}
+
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => {
+              handleOpenCustomer({
+                id: `cust_new_${Date.now()}`,
+                name: '',
+                email: '',
+                phone: '',
+                tripCount: 0,
+                totalSpend: 0,
+                lastRideDate: 'New',
+                isVip: false,
+                preferredVehicle: 'Standard Sedan',
+              }, true);
+            }}
+            className="text-xs font-bold inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+          >
+            <span>+ Add Contact</span>
+          </Button>
 
           <Button
             type="button"
@@ -420,10 +565,18 @@ export function AdminCustomersSubpage({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setSelectedCustomer(cust)}
-                          className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold"
+                          onClick={() => handleOpenCustomer(cust, false)}
+                          className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
                         >
                           Details
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenCustomer(cust, true)}
+                          className="text-[11px] px-2 py-1 text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+                        >
+                          Edit
                         </Button>
                       </div>
                     </td>
@@ -705,160 +858,385 @@ export function AdminCustomersSubpage({
         );
       })()}
 
-      {/* ─── Customer Details Modal ─── */}
+      {/* ─── Customer Details & Edit Modal ─── */}
       {selectedCustomer && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
-            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
               <div>
-                <h3 className="font-black text-slate-900 text-base">{selectedCustomer.name}</h3>
-                <p className="text-xs text-slate-500">{selectedCustomer.email}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCustomer(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              {/* Customer Score Banner */}
-              <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
-                    Dual-Scoring Engine
-                  </span>
-                  <div className="text-sm font-black text-slate-900 mt-0.5">
-                    Customer Score: {selectedCustomer.customerScore ?? 90} / 100
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Evaluated from ride frequency, completion fidelity, and cancellations.
-                  </div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black text-slate-900 text-base">
+                    {isEditingCustomer
+                      ? selectedCustomer.id?.startsWith('cust_new_')
+                        ? 'New Passenger Contact'
+                        : `Edit Contact: ${selectedCustomer.name || 'Passenger'}`
+                      : selectedCustomer.name}
+                  </h3>
+                  {selectedCustomer.isVip && !isEditingCustomer && (
+                    <Badge variant="warning" className="text-[10px] font-extrabold uppercase">
+                      VIP
+                    </Badge>
+                  )}
                 </div>
-                <div
-                  className={`text-xl font-black px-3 py-1.5 rounded-xl border shrink-0 ${
-                    (selectedCustomer.customerScore ?? 90) >= 80
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : (selectedCustomer.customerScore ?? 90) >= 60
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                  }`}
-                >
-                  ★ {selectedCustomer.customerScore ?? 90}
-                </div>
-              </div>
-
-              {selectedCustomer.isBlacklisted && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
-                  <div className="font-black flex items-center gap-1.5">
-                    <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
-                    <span>BLACKLISTED PASSENGER</span>
-                  </div>
-                  <p className="text-[11px] text-rose-700">
-                    Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
-                  </p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Bookings</span>
-                  <span className="text-base font-black text-slate-900">{selectedCustomer.tripCount} Trips</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Volume</span>
-                  <span className="text-base font-black text-emerald-600">${selectedCustomer.totalSpend.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div>
-                <span className="font-bold text-slate-700 block mb-1">Phone Number</span>
-                <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg">{selectedCustomer.phone}</p>
-              </div>
-
-              <div>
-                <span className="font-bold text-slate-700 block mb-1">Preferred Chauffeur Class</span>
-                <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg capitalize">
-                  {selectedCustomer.preferredVehicle || 'Standard Sedan'}
+                <p className="text-xs text-slate-500">
+                  {isEditingCustomer
+                    ? 'Update profile details, notes, and chauffeur tier preferences'
+                    : selectedCustomer.email}
                 </p>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200 gap-2">
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const gov = getUniversalGovernanceService();
-                    const isCurrentlyBl = !!selectedCustomer.isBlacklisted;
-                    if (!isCurrentlyBl) {
-                      const reason = window.prompt(`Enter blacklist reason for ${selectedCustomer.name}:`);
-                      if (reason === null) return;
-                      await gov.setBlacklistStatus('passenger', selectedCustomer.phone, true, reason || 'Blacklisted by Admin');
-                      if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
-                        await gov.setBlacklistStatus('passenger', selectedCustomer.email, true, reason || 'Blacklisted by Admin');
+                {!selectedCustomer.id?.startsWith('cust_new_') && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={isEditingCustomer ? 'outline' : 'primary'}
+                    onClick={() => {
+                      if (!isEditingCustomer) {
+                        setEditForm({
+                          name: selectedCustomer.name,
+                          phone: selectedCustomer.phone,
+                          email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
+                          corporateAccountName: selectedCustomer.corporateAccountName || '',
+                          isVip: selectedCustomer.isVip || false,
+                          preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
+                          notes: selectedCustomer.notes || '',
+                        });
                       }
-                      setSelectedCustomer({
-                        ...selectedCustomer,
-                        isBlacklisted: true,
-                        blacklistReason: reason || 'Blacklisted by Admin',
-                      });
-                    } else {
-                      await gov.setBlacklistStatus('passenger', selectedCustomer.phone, false);
-                      if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
-                        await gov.setBlacklistStatus('passenger', selectedCustomer.email, false);
-                      }
-                      setSelectedCustomer({
-                        ...selectedCustomer,
-                        isBlacklisted: false,
-                        blacklistReason: undefined,
-                      });
-                    }
-                    setGovernanceRefreshKey((k) => k + 1);
-                  }}
-                  className={`text-xs font-bold ${
-                    selectedCustomer.isBlacklisted
-                      ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50'
-                      : 'text-rose-700 border-rose-300 hover:bg-rose-50'
-                  }`}
-                >
-                  {selectedCustomer.isBlacklisted ? '✅ Restore Passenger' : '🚫 Blacklist'}
-                </Button>
-
-                <Button
+                      setIsEditingCustomer(!isEditingCustomer);
+                    }}
+                    className="text-xs font-bold cursor-pointer"
+                  >
+                    {isEditingCustomer ? 'View Details' : 'Edit Profile'}
+                  </Button>
+                )}
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const gov = getUniversalGovernanceService();
-                    const newArchived = !selectedCustomer.isArchived;
-                    await gov.setArchiveStatus('passenger', selectedCustomer.phone, newArchived);
-                    setSelectedCustomer({
-                      ...selectedCustomer,
-                      isArchived: newArchived,
-                    });
-                    setGovernanceRefreshKey((k) => k + 1);
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setIsEditingCustomer(false);
                   }}
-                  className="text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-50"
+                  className="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer"
                 >
-                  {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
-                </Button>
+                  ✕
+                </button>
               </div>
-
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => setSelectedCustomer(null)}
-                className="bg-blue-600 text-white font-bold"
-              >
-                Close
-              </Button>
             </div>
+
+            {saveSuccessMessage && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
+                <CheckIcon className="w-4 h-4 text-emerald-600" />
+                <span>{saveSuccessMessage}</span>
+              </div>
+            )}
+
+            {isEditingCustomer ? (
+              /* ─── EDIT MODE ─── */
+              <div className="space-y-3.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.name || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Eleanor Davis"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Phone Number <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={editForm.phone || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="e.g. (314) 555-0199"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={editForm.email || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="e.g. passenger@example.com"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Corporate Account</label>
+                    <input
+                      type="text"
+                      value={editForm.corporateAccountName || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, corporateAccountName: e.target.value }))}
+                      placeholder="e.g. Bayer Crop Science"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Preferred Chauffeur Class</label>
+                    <select
+                      value={editForm.preferredVehicle || 'Standard Sedan'}
+                      onChange={(e) => setEditForm((f) => ({ ...f, preferredVehicle: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Standard Sedan">Standard Sedan</option>
+                      <option value="Premium Executive">Premium Executive</option>
+                      <option value="XL Minivan / SUV">XL Minivan / SUV</option>
+                      <option value="Wheelchair Accessible (WAV)">Wheelchair Accessible (WAV)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center pt-5">
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.isVip}
+                        onChange={(e) => setEditForm((f) => ({ ...f, isVip: e.target.checked }))}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span className="font-bold text-slate-800">VIP Priority Passenger</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Dispatcher & Driver Notes</label>
+                  <textarea
+                    rows={3}
+                    value={editForm.notes || ''}
+                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                    placeholder="Special luggage requests, gate codes, terminal preferences, mobility needs..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedCustomer.id?.startsWith('cust_new_')) {
+                        setSelectedCustomer(null);
+                      }
+                      setIsEditingCustomer(false);
+                    }}
+                    className="text-slate-600 hover:text-slate-800 cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveCustomer}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
+                  >
+                    Save Contact
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* ─── VIEW MODE ─── */
+              <div className="space-y-3 text-xs">
+                {/* Customer Score Banner */}
+                <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
+                      Dual-Scoring Engine
+                    </span>
+                    <div className="text-sm font-black text-slate-900 mt-0.5">
+                      Customer Score: {selectedCustomer.customerScore ?? 90} / 100
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Evaluated from ride frequency, completion fidelity, and cancellations.
+                    </div>
+                  </div>
+                  <div
+                    className={`text-xl font-black px-3 py-1.5 rounded-xl border shrink-0 ${
+                      (selectedCustomer.customerScore ?? 90) >= 80
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : (selectedCustomer.customerScore ?? 90) >= 60
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}
+                  >
+                    ★ {selectedCustomer.customerScore ?? 90}
+                  </div>
+                </div>
+
+                {selectedCustomer.isBlacklisted && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
+                    <div className="font-black flex items-center gap-1.5">
+                      <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
+                      <span>BLACKLISTED PASSENGER</span>
+                    </div>
+                    <p className="text-[11px] text-rose-700">
+                      Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Bookings</span>
+                    <span className="text-base font-black text-slate-900">{selectedCustomer.tripCount} Trips</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Volume</span>
+                    <span className="text-base font-black text-emerald-600">${selectedCustomer.totalSpend.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-1">Phone Number</span>
+                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono">{selectedCustomer.phone}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-1">Email</span>
+                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg truncate">{selectedCustomer.email || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {selectedCustomer.corporateAccountName && (
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-1">Corporate Account</span>
+                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-semibold">
+                      {selectedCustomer.corporateAccountName}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <span className="font-bold text-slate-700 block mb-1">Preferred Chauffeur Class</span>
+                  <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg capitalize">
+                    {selectedCustomer.preferredVehicle || 'Standard Sedan'}
+                  </p>
+                </div>
+
+                {selectedCustomer.notes && (
+                  <div>
+                    <span className="font-bold text-slate-700 block mb-1">Dispatcher Notes</span>
+                    <p className="p-2 bg-amber-50/70 border border-amber-200/80 rounded-lg text-amber-900">
+                      {selectedCustomer.notes}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-200 gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const gov = getUniversalGovernanceService();
+                        const isCurrentlyBl = !!selectedCustomer.isBlacklisted;
+                        if (!isCurrentlyBl) {
+                          const reason = window.prompt(`Enter blacklist reason for ${selectedCustomer.name}:`);
+                          if (reason === null) return;
+                          await gov.setBlacklistStatus('passenger', selectedCustomer.phone, true, reason || 'Blacklisted by Admin');
+                          if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
+                            await gov.setBlacklistStatus('passenger', selectedCustomer.email, true, reason || 'Blacklisted by Admin');
+                          }
+                          setSelectedCustomer({
+                            ...selectedCustomer,
+                            isBlacklisted: true,
+                            blacklistReason: reason || 'Blacklisted by Admin',
+                          });
+                        } else {
+                          await gov.setBlacklistStatus('passenger', selectedCustomer.phone, false);
+                          if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
+                            await gov.setBlacklistStatus('passenger', selectedCustomer.email, false);
+                          }
+                          setSelectedCustomer({
+                            ...selectedCustomer,
+                            isBlacklisted: false,
+                            blacklistReason: undefined,
+                          });
+                        }
+                        setGovernanceRefreshKey((k) => k + 1);
+                      }}
+                      className={`text-xs font-bold cursor-pointer ${
+                        selectedCustomer.isBlacklisted
+                          ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                          : 'text-rose-700 border-rose-300 hover:bg-rose-50'
+                      }`}
+                    >
+                      {selectedCustomer.isBlacklisted ? '✅ Restore Passenger' : '🚫 Blacklist'}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const gov = getUniversalGovernanceService();
+                        const newArchived = !selectedCustomer.isArchived;
+                        await gov.setArchiveStatus('passenger', selectedCustomer.phone, newArchived);
+                        setSelectedCustomer({
+                          ...selectedCustomer,
+                          isArchived: newArchived,
+                        });
+                        setGovernanceRefreshKey((k) => k + 1);
+                      }}
+                      className="text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-50 cursor-pointer"
+                    >
+                      {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditForm({
+                          name: selectedCustomer.name,
+                          phone: selectedCustomer.phone,
+                          email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
+                          corporateAccountName: selectedCustomer.corporateAccountName || '',
+                          isVip: selectedCustomer.isVip || false,
+                          preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
+                          notes: selectedCustomer.notes || '',
+                        });
+                        setIsEditingCustomer(true);
+                      }}
+                      className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer"
+                    >
+                      Edit Contact
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setIsEditingCustomer(false);
+                      }}
+                      className="bg-blue-600 text-white font-bold cursor-pointer"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1674,10 +1674,11 @@ export function BookingEngineV2({
           const returnTripObj = await bookingService.createBooking(returnPayload);
           createdReturnTripObj = returnTripObj;
 
-          // Annotate createdTrip metadata with return trip details for client confirmation
+          // Annotate and persist createdTrip with return trip details in Firestore
           if (createdTrip.metadata) {
             createdTrip.metadata.hasReturnTrip = true;
             createdTrip.metadata.returnTripId = returnTripObj.id;
+            createdTrip.metadata.linkedReturnTripId = returnTripObj.id;
             createdTrip.metadata.returnDate = form.returnDate;
             createdTrip.metadata.returnTime = form.returnTime;
             createdTrip.metadata.returnPickupAddress = form.returnPickupAddress;
@@ -1692,6 +1693,18 @@ export function BookingEngineV2({
             createdTrip.metadata.returnIsPrivateAviation = Boolean(returnAirportDetection.isPrivateAviation);
             createdTrip.metadata.returnHasCheckedLuggage = form.returnProvideFlightInfo ? form.returnHasCheckedLuggage : false;
             createdTrip.metadata.returnIsAirportTrip = Boolean(returnAirportDetection.isAirportTrip);
+          }
+
+          if (bookingService.updateTrip && returnTripObj?.id) {
+            await bookingService.updateTrip(createdTrip.id, {
+              linkedReturnTripId: returnTripObj.id,
+              metadata: {
+                ...createdTrip.metadata,
+                linkedReturnTripId: returnTripObj.id,
+                returnTripId: returnTripObj.id,
+                hasReturnTrip: true,
+              },
+            });
           }
         } catch (retErr) {
           console.warn('[BookingEngineV2] Linked return trip creation warning:', retErr);
@@ -1723,6 +1736,21 @@ export function BookingEngineV2({
           bookingType: createdTrip.bookingType,
           vehicleTier: form.vehicleChoice === 'any' ? 'any' : (createdTrip.vehicleTier || 'standard'),
           passengerCount: createdTrip.passenger.passengerCount,
+          luggageCount: createdTrip.passenger.luggageCount,
+          contactPerson: form.isBookerDifferent ? {
+            isBookerDifferent: form.isBookerDifferent,
+            contactName: form.contactName,
+            contactPhone: form.contactPhone,
+            contactEmail: form.contactEmail,
+            contactRole: form.contactRole,
+          } : undefined,
+          carSeatsBreakdown: {
+            rearFacing: form.rearFacingCount,
+            frontFacing: form.frontFacingCount,
+            booster: form.boosterCount,
+            total: totalCarSeats,
+          },
+          additionalPassengers: form.additionalPassengers,
           totalFare: createdTrip.pricing.totalFare,
           currency: createdTrip.pricing.currency || 'USD',
           paymentMethod: createdTrip.payment.method,
@@ -1748,6 +1776,8 @@ export function BookingEngineV2({
                 ? new Date(createdReturnTripObj.scheduledPickupTime).toLocaleString()
                 : 'Scheduled Return',
             vehicleTier: form.returnVehicleChoice === 'any' ? 'any' : (createdReturnTripObj.vehicleTier || 'standard'),
+            passengerCount: createdReturnTripObj.passenger?.passengerCount,
+            luggageCount: createdReturnTripObj.passenger?.luggageCount,
             totalFare: createdReturnTripObj.pricing.totalFare,
             flightDetails: form.returnProvideFlightInfo ? {
               airlineName: form.returnAirline,

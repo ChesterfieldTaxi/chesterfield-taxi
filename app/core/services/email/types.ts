@@ -46,6 +46,23 @@ export interface BookingConfirmationEmailPayload {
   flightDetails?: FlightOperationsEmailDetails;
   status?: string;
   lambertPickupInstructions?: string;
+  contactPerson?: {
+    isBookerDifferent?: boolean;
+    contactName?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    contactRole?: string;
+  };
+  carSeatsBreakdown?: {
+    rearFacing?: number;
+    frontFacing?: number;
+    booster?: number;
+    total?: number;
+  };
+  additionalPassengers?: Array<{
+    name: string;
+    phone?: string;
+  }>;
   returnTripDetails?: {
     tripId: string;
     pickupAddress: string;
@@ -53,6 +70,8 @@ export interface BookingConfirmationEmailPayload {
     pickupTime: string;
     vehicleTier: string;
     totalFare: number;
+    passengerCount?: number;
+    luggageCount?: number;
     flightDetails?: FlightOperationsEmailDetails;
   };
   companySettings?: {
