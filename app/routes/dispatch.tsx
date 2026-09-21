@@ -470,8 +470,32 @@ export default function DispatchRoute() {
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
   const [auditTrailTrip, setAuditTrailTrip] = useState<Trip | null>(null);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(2);
-  const [missedCallsCount, setMissedCallsCount] = useState<number>(1);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const stored = localStorage.getItem('ct_interactions_database');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((i: any) => i.type?.startsWith('sms_') && i.isUnread).length;
+        }
+      }
+    } catch {}
+    return 0;
+  });
+  const [missedCallsCount, setMissedCallsCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const stored = localStorage.getItem('ct_interactions_database');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((i: any) => i.type === 'call_missed' && i.isUnread).length;
+        }
+      }
+    } catch {}
+    return 0;
+  });
 
   // Dispatcher Review Modal State for UNCONFIRMED web bookings
   const [reviewTrip, setReviewTrip] = useState<Trip | null>(null);
@@ -974,15 +998,53 @@ export default function DispatchRoute() {
           const updatedForm: DispatchFormValues = {
             ...currentForm,
             passengerName: payload.passengerName || currentForm.passengerName || '',
-            passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+            phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+            email: payload.passengerEmail || payload.email || currentForm.email || '',
             pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
             dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+            vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+            selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+            corporateDetails: {
+              ...currentForm.corporateDetails,
+              corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+              billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+              authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+              invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+            },
+            paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
             internalNotes: payload.notes
               ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
               : currentForm.internalNotes,
           };
           return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
         });
+      } else if (msg.type === 'OPEN_EDIT_TRIP') {
+        const payload = msg.payload;
+        let found = payload.tripId ? trips.find((t) => t.id === payload.tripId) : undefined;
+        if (!found && payload.phone) {
+          const cleanTarget = payload.phone.replace(/\D/g, '').slice(-10);
+          if (cleanTarget) {
+            found = trips.find((t) => {
+              const tp = (t.passenger?.phone || (t as any).passengerPhone || '').replace(/\D/g, '').slice(-10);
+              return tp === cleanTarget;
+            });
+          }
+        }
+        if (found) {
+          setSelectedQueueTripId(found.id);
+          setSelectedMapTrip(found);
+          setShouldZoomMap(true);
+          handleOpenEditTrip(found);
+          setActiveMobileTab('booking');
+        }
+      } else if (msg.type === 'UNREAD_COUNTS_CHANGED') {
+        const payload = msg.payload;
+        if (typeof payload.unreadMessages === 'number') {
+          setUnreadMessagesCount(payload.unreadMessages);
+        }
+        if (typeof payload.missedCalls === 'number') {
+          setMissedCallsCount(payload.missedCalls);
+        }
       } else if (msg.type === 'INCOMING_CALL') {
         const payload = msg.payload;
         setIncomingCallAlert({ from: payload.from, callSid: payload.callSid });
@@ -2966,9 +3028,20 @@ export default function DispatchRoute() {
                 const updatedForm: DispatchFormValues = {
                   ...currentForm,
                   passengerName: payload.passengerName || currentForm.passengerName || '',
-                  passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                  phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+                  email: payload.passengerEmail || payload.email || currentForm.email || '',
                   pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
                   dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                  vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+                  selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+                  corporateDetails: {
+                    ...currentForm.corporateDetails,
+                    corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+                    billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+                    authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+                    invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+                  },
+                  paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
                   internalNotes: payload.notes
                     ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
                     : currentForm.internalNotes,
@@ -3727,6 +3800,7 @@ export default function DispatchRoute() {
               >
                 <DispatchBookingEngine
                   draftId={d.id}
+                  isActiveDraft={d.id === activeDraftId}
                   initialTrip={d.trip}
                   allTrips={trips}
                   onValuesChange={(vals) => handleDraftValuesChange(d.id, vals)}
@@ -5262,6 +5336,16 @@ export default function DispatchRoute() {
               trips={trips}
               onTabChange={(tab) => setCommsActiveTab(tab)}
               initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
+              onOpenEditTrip={(tripId) => {
+                const found = trips.find((t) => t.id === tripId);
+                if (found) {
+                  setSelectedQueueTripId(found.id);
+                  setSelectedMapTrip(found);
+                  setShouldZoomMap(true);
+                  handleOpenEditTrip(found);
+                  setActiveMobileTab('booking');
+                }
+              }}
               onPopulateBooking={(payload) => {
                 setActiveMobileTab('booking');
                 setDrafts((prev) => {
@@ -5271,9 +5355,20 @@ export default function DispatchRoute() {
                   const updatedForm: DispatchFormValues = {
                     ...currentForm,
                     passengerName: payload.passengerName || currentForm.passengerName || '',
-                    passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                    phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+                    email: payload.passengerEmail || payload.email || currentForm.email || '',
                     pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
                     dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                    vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+                    selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+                    corporateDetails: {
+                      ...currentForm.corporateDetails,
+                      corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+                      billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+                      authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+                      invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+                    },
+                    paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
                     internalNotes: payload.notes
                       ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
                       : currentForm.internalNotes,
@@ -5405,6 +5500,16 @@ export default function DispatchRoute() {
                   isPopout={false}
                   onPopOut={() => getWorkspaceBus().popOutModule('comms')}
                   onClose={() => setActiveDockTab('none')}
+                  onOpenEditTrip={(tripId) => {
+                    const found = trips.find((t) => t.id === tripId);
+                    if (found) {
+                      setSelectedQueueTripId(found.id);
+                      setSelectedMapTrip(found);
+                      setShouldZoomMap(true);
+                      handleOpenEditTrip(found);
+                      setActiveMobileTab('booking');
+                    }
+                  }}
                   onPopulateBooking={(payload) => {
                     setDrafts((prev) => {
                       const target = prev.find((d) => d.id === activeDraftId) || prev[0];
@@ -5413,9 +5518,20 @@ export default function DispatchRoute() {
                       const updatedForm: DispatchFormValues = {
                         ...currentForm,
                         passengerName: payload.passengerName || currentForm.passengerName || '',
-                        passengerPhone: payload.passengerPhone || currentForm.passengerPhone || '',
+                        phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+                        email: payload.passengerEmail || payload.email || currentForm.email || '',
                         pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
                         dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                        vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+                        selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+                        corporateDetails: {
+                          ...currentForm.corporateDetails,
+                          corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+                          billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+                          authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+                          invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+                        },
+                        paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
                         internalNotes: payload.notes
                           ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
                           : currentForm.internalNotes,

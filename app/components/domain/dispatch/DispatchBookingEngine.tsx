@@ -7,6 +7,7 @@ import { calculateTripPricing, getPricingRulesService } from '../../../core/serv
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getCorporateAccountService } from '../../../core/services/corporate-account.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { DispatchLocationInput } from './DispatchLocationInput';
 import {
@@ -161,6 +162,7 @@ export interface DispatchFormValues {
 
 export interface DispatchBookingEngineProps {
   draftId: string;
+  isActiveDraft?: boolean;
   initialTrip?: Trip | null;
   allTrips?: Trip[];
   onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
@@ -193,6 +195,7 @@ const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function DispatchBookingEngine({
   draftId,
+  isActiveDraft,
   initialTrip,
   allTrips,
   onBookingSuccess,
@@ -736,6 +739,69 @@ export function DispatchBookingEngine({
       } catch {}
     }
   }, [initialTrip, draftStorageKey]);
+
+  // Listen for POPULATE_BOOKING on workspaceBus to hydrate active draft with complete contact & trip data
+  useEffect(() => {
+    const bus = getWorkspaceBus();
+    const unsub = bus.subscribe((msg) => {
+      if (msg.type === 'POPULATE_BOOKING') {
+        const payload = msg.payload as any;
+        // Only populate if this draft is designated or if this is the active draft (or if no draft targeted)
+        if (payload.targetDraftId && payload.targetDraftId !== draftId) {
+          return;
+        }
+        if (isActiveDraft === false && !payload.targetDraftId) {
+          return;
+        }
+
+        if (payload.passengerName) setPassengerName(payload.passengerName);
+        const contactPhone = payload.passengerPhone || payload.phone;
+        if (contactPhone) setPhone(contactPhone);
+        const contactEmail = payload.passengerEmail || payload.email;
+        if (contactEmail) setEmail(contactEmail);
+
+        if (payload.pickupAddress) setPickupAddress(payload.pickupAddress);
+        if (payload.pickupCoordinates) setPickupCoordinates(payload.pickupCoordinates);
+        if (payload.dropoffAddress) setDropoffAddress(payload.dropoffAddress);
+        if (payload.dropoffCoordinates) setDropoffCoordinates(payload.dropoffCoordinates);
+
+        if (payload.vehicleTier || payload.vehicle) {
+          const v = (payload.vehicleTier || payload.vehicle).toLowerCase();
+          setSelectedVehicles([v as any]);
+        }
+
+        const acct = payload.corporateAccount || payload.corporateAccountName || payload.accountNumber;
+        if (acct) {
+          setCorporateAccount(acct);
+          setPaymentMethod('account');
+        }
+
+        const po = payload.billingPo || payload.poNumber;
+        if (po) {
+          setBillingPo(po);
+        }
+
+        if (payload.notes) {
+          setInternalNotes((prev) => (prev ? `${prev}\n${payload.notes}` : payload.notes));
+        }
+
+        if (payload.accessibilityNeeds) {
+          let needsWheelchair = false;
+          if (Array.isArray(payload.accessibilityNeeds)) {
+            needsWheelchair = payload.accessibilityNeeds.some((n: string) =>
+              n.toLowerCase().includes('wheelchair') || n.toLowerCase().includes('ramp')
+            );
+          } else if (typeof payload.accessibilityNeeds === 'object') {
+            needsWheelchair = !!(payload.accessibilityNeeds as any).wheelchair;
+          }
+          if (needsWheelchair) {
+            setSelectedVehicles(['wheelchair']);
+          }
+        }
+      }
+    });
+    return unsub;
+  }, [draftId, isActiveDraft]);
 
   // When return trip is enabled, prefill return pickup with dropoff and return dropoff with pickup if empty
   useEffect(() => {

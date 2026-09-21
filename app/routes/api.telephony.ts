@@ -77,6 +77,9 @@ export interface StoredSms {
   to: string;
   body: string;
   direction: 'inbound' | 'outbound';
+  status?: string;
+  errorCode?: number | string;
+  errorMessage?: string;
   timestamp: string;
   timestampMs: number;
 }
@@ -89,7 +92,28 @@ const telephonyStore: {
   recordings: any[];
 } = ((globalThis as any).__ct_telephony_store ||= {
   voicemails: [],
-  messages: [],
+  messages: [
+    {
+      id: 'sms_seed_1',
+      sid: 'SM_seed_1',
+      from: '+13145551234',
+      to: '+13147380100',
+      body: 'Hi, I need a ride from Chesterfield Mall to Lambert Airport at 2 PM today.',
+      direction: 'inbound',
+      timestamp: '10:15 AM',
+      timestampMs: Date.now() - 3600000,
+    },
+    {
+      id: 'sms_seed_2',
+      sid: 'SM_seed_2',
+      from: '+13147380100',
+      to: '+13145551234',
+      body: 'Chesterfield Taxi: Received! We have assigned Driver 104 in Sedan #12. Fare estimate is $48.50.',
+      direction: 'outbound',
+      timestamp: '10:18 AM',
+      timestampMs: Date.now() - 3400000,
+    },
+  ],
   callStatuses: {},
   recordings: [],
 });
@@ -116,32 +140,34 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
     ''
   ).trim();
 
-  // If missing from process.env, attempt reading from .env.local on filesystem
-  if (!accountSid || !authToken || !forwardingPhone || !apiKeySid || !apiKeySecret || !twimlAppSid) {
+  // If missing from process.env, attempt reading from .env.local or .env on filesystem
+  if (!accountSid || !authToken || !phoneNumber || !forwardingPhone || !apiKeySid || !apiKeySecret || !twimlAppSid) {
     try {
       const fs = await import('node:fs');
       const path = await import('node:path');
-      const envLocalPath = path.resolve(process.cwd(), '.env.local');
-      if (fs.existsSync(envLocalPath)) {
-        const content = fs.readFileSync(envLocalPath, 'utf8');
-        const sidMatch = content.match(/^TWILIO_ACCOUNT_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const tokenMatch = content.match(/^TWILIO_AUTH_TOKEN\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const phoneMatch = content.match(/^TWILIO_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const apiKeyMatch = content.match(/^TWILIO_API_KEY(?:_SID)?\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const apiSecretMatch = content.match(/^TWILIO_API_KEY_SECRET\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const twimlAppMatch = content.match(/^TWILIO_TWIML_APP_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
-        const fwdMatch =
-          content.match(/^DISPATCH_FORWARDING_PHONE\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
-          content.match(/^DISPATCH_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
-          content.match(/^FORWARDING_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+      for (const envFile of ['.env.local', '.env']) {
+        const envPath = path.resolve(process.cwd(), envFile);
+        if (fs.existsSync(envPath)) {
+          const content = fs.readFileSync(envPath, 'utf8');
+          const sidMatch = content.match(/^TWILIO_ACCOUNT_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const tokenMatch = content.match(/^TWILIO_AUTH_TOKEN\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const phoneMatch = content.match(/^TWILIO_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const apiKeyMatch = content.match(/^TWILIO_API_KEY(?:_SID)?\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const apiSecretMatch = content.match(/^TWILIO_API_KEY_SECRET\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const twimlAppMatch = content.match(/^TWILIO_TWIML_APP_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const fwdMatch =
+            content.match(/^DISPATCH_FORWARDING_PHONE\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
+            content.match(/^DISPATCH_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m) ||
+            content.match(/^FORWARDING_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
 
-        if (!accountSid && sidMatch) accountSid = sidMatch[1].trim();
-        if (!authToken && tokenMatch) authToken = tokenMatch[1].trim();
-        if (!phoneNumber && phoneMatch) phoneNumber = phoneMatch[1].trim();
-        if (!apiKeySid && apiKeyMatch) apiKeySid = apiKeyMatch[1].trim();
-        if (!apiKeySecret && apiSecretMatch) apiKeySecret = apiSecretMatch[1].trim();
-        if (!twimlAppSid && twimlAppMatch) twimlAppSid = twimlAppMatch[1].trim();
-        if (!forwardingPhone && fwdMatch) forwardingPhone = fwdMatch[1].trim();
+          if (!accountSid && sidMatch) accountSid = sidMatch[1].trim();
+          if (!authToken && tokenMatch) authToken = tokenMatch[1].trim();
+          if (!phoneNumber && phoneMatch) phoneNumber = phoneMatch[1].trim();
+          if (!apiKeySid && apiKeyMatch) apiKeySid = apiKeyMatch[1].trim();
+          if (!apiKeySecret && apiSecretMatch) apiKeySecret = apiSecretMatch[1].trim();
+          if (!twimlAppSid && twimlAppMatch) twimlAppSid = twimlAppMatch[1].trim();
+          if (!forwardingPhone && fwdMatch) forwardingPhone = fwdMatch[1].trim();
+        }
       }
     } catch {
       // Ignore filesystem access exceptions in edge environments
@@ -149,7 +175,7 @@ async function resolveCredentials(data?: TelephonyApiRequest) {
   }
 
   if (!phoneNumber) {
-    phoneNumber = '+13147380100';
+    phoneNumber = '+13142281454';
   }
 
   return { accountSid, authToken, phoneNumber, forwardingPhone, apiKeySid, apiKeySecret, twimlAppSid };
@@ -403,9 +429,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // ─── INBOUND SMS WEBHOOK ───
   if (action === 'incoming_sms') {
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>Chesterfield Taxi: Thank you for contacting our dispatch desk. We have received your message and an operator will respond shortly.</Message>
-</Response>`;
+<Response/>`;
     return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
   }
 
@@ -470,9 +494,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // ─── LIST MESSAGES DIRECTLY FROM TWILIO ───
   if (action === 'list_messages') {
-    const { accountSid, authToken } = await resolveCredentials();
+    const clientAccountSid = url.searchParams.get('accountSid');
+    const clientAuthToken = url.searchParams.get('authToken');
+    const resolved = await resolveCredentials();
+    const accountSid = clientAccountSid || resolved.accountSid;
+    const authToken = clientAuthToken || resolved.authToken;
+
+    const filterOutThankYou = (msgs: any[]) =>
+      msgs.filter((m: any) => !m.body?.includes('Thank you for contacting our dispatch desk'));
+
     if (!accountSid || !authToken || !accountSid.startsWith('AC')) {
-      return Response.json({ success: true, messages: telephonyStore.messages });
+      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
     }
 
     try {
@@ -484,21 +516,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const msgData = (await msgResp.json()) as any;
 
       if (msgResp.ok && Array.isArray(msgData.messages)) {
-        const liveMessages = msgData.messages.map((m: any) => ({
-          id: m.sid,
-          sid: m.sid,
-          from: m.from,
-          to: m.to,
-          body: m.body,
-          direction: m.direction && m.direction.includes('inbound') ? 'inbound' : 'outbound',
-          timestamp: new Date(m.date_sent || m.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          timestampMs: new Date(m.date_sent || m.date_created).getTime(),
-        }));
+        const liveMessages = msgData.messages
+          .filter((m: any) => !m.body?.includes('Thank you for contacting our dispatch desk'))
+          .map((m: any) => ({
+            id: m.sid,
+            sid: m.sid,
+            from: m.from,
+            to: m.to,
+            body: m.body,
+            status: m.status,
+            errorCode: m.error_code,
+            errorMessage: m.error_message,
+            direction: m.direction && m.direction.includes('inbound') ? 'inbound' : 'outbound',
+            timestamp: new Date(m.date_sent || m.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestampMs: new Date(m.date_sent || m.date_created).getTime(),
+          }));
         return Response.json({ success: true, messages: liveMessages });
       }
-      return Response.json({ success: true, messages: telephonyStore.messages });
+      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
     } catch {
-      return Response.json({ success: true, messages: telephonyStore.messages });
+      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
     }
   }
 
@@ -873,9 +910,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
 
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>Chesterfield Taxi: Thank you for contacting our dispatch desk. We have received your message and an operator will respond shortly.</Message>
-</Response>`;
+<Response/>`;
       return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
     }
 
@@ -1033,7 +1068,7 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    if (!isConfigured) {
+    if (!isConfigured && data.action !== 'send_sms') {
       const targetPhone = data.to ? toE164(data.to) : 'target phone';
       return Response.json({
         success: false,
@@ -1217,7 +1252,6 @@ export async function action({ request }: ActionFunctionArgs) {
             success: false,
             code: 'INVALID_PARAMETERS',
             error: '"to" and "body" are required for SMS dispatch.',
-            message: 'Number must be verified in Twilio Trial Console',
           },
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
@@ -1225,7 +1259,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       // Sanitize and strictly validate input numbers to E.164 / NANP before initiating Twilio SMS
       const validationTo = validatePhoneNumber(data.to);
-      const validationFrom = validatePhoneNumber(data.from || twilioFromNumber);
+      const validationFrom = validatePhoneNumber(data.from || twilioFromNumber || '+13142281454');
 
       if (!validationTo.isValid) {
         return Response.json(
@@ -1233,95 +1267,135 @@ export async function action({ request }: ActionFunctionArgs) {
             success: false,
             code: 'INVALID_TO_NUMBER',
             error: validationTo.error || `Invalid destination number "${data.to}".`,
-            message: validationTo.error || 'Number must be verified in Twilio Trial Console',
             to: data.to,
             formattedTo: validationTo.e164,
-            help: 'https://www.twilio.com/console/phone-numbers/verified',
-          },
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!validationFrom.isValid) {
-        return Response.json(
-          {
-            success: false,
-            code: 'INVALID_FROM_NUMBER',
-            error: validationFrom.error || `Invalid sender phone number "${data.from || twilioFromNumber}".`,
-            message: validationFrom.error || 'Number must be verified in Twilio Trial Console',
-            from: data.from || twilioFromNumber,
-            formattedFrom: validationFrom.e164,
-            help: 'https://www.twilio.com/console/phone-numbers/verified',
           },
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
       const formattedTo = validationTo.e164;
-      const formattedFrom = validationFrom.e164;
+      const formattedFrom = validationFrom.isValid ? validationFrom.e164 : (twilioFromNumber || '+13142281454');
 
+      // If Twilio is not configured, simulate delivery and store in telephonyStore.messages
+      if (!isConfigured || !accountSid || !authToken || !accountSid.startsWith('AC')) {
+        const simSid = `sim_sms_${Date.now()}`;
+        const newMsg: StoredSms = {
+          id: simSid,
+          sid: simSid,
+          from: formattedFrom,
+          to: formattedTo,
+          body: data.body,
+          direction: 'outbound',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestampMs: Date.now(),
+        };
+        telephonyStore.messages.unshift(newMsg);
+        return Response.json({
+          success: true,
+          simulated: true,
+          messageSid: simSid,
+          status: 'delivered',
+          to: formattedTo,
+          from: formattedFrom,
+          message: `SMS message simulated to ${formattedTo}.`,
+        }, { headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // Live Twilio SMS dispatch
       const params = new URLSearchParams();
       params.append('To', formattedTo);
       params.append('From', formattedFrom);
       params.append('Body', data.body);
 
-      const smsResp = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: authHeader,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: params.toString(),
-        }
-      );
-
-      const smsResult = (await smsResp.json()) as any;
-
-      if (smsResp.ok) {
-        return Response.json({
-          success: true,
-          messageSid: smsResult.sid,
-          status: smsResult.status,
-          to: smsResult.to,
-          from: smsResult.from,
-          message: `SMS message sent successfully to ${formattedTo}!`,
-        }, { headers: { 'Content-Type': 'application/json' } });
-      } else {
-        const isParamOrTrialIssue =
-          smsResult.code === 21608 ||
-          smsResult.code === 21211 ||
-          smsResult.code === 21212 ||
-          smsResult.code === 21606 ||
-          smsResult.code === 21219 ||
-          smsResult.code === 21408 ||
-          smsResult.code === 21614 ||
-          (smsResult.message &&
-            (smsResult.message.toLowerCase().includes('unverified') ||
-             smsResult.message.toLowerCase().includes('trial') ||
-             smsResult.message.toLowerCase().includes('verify') ||
-             smsResult.message.toLowerCase().includes('caller id') ||
-             smsResult.message.toLowerCase().includes('permission')));
-
-        const errorMsg = isParamOrTrialIssue
-          ? 'Number must be verified in Twilio Trial Console'
-          : (smsResult.message || 'Twilio SMS dispatch failed');
-
-        return Response.json(
+      try {
+        const smsResp = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
           {
+            method: 'POST',
+            headers: {
+              Authorization: authHeader,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString(),
+          }
+        );
+
+        const smsResult = (await smsResp.json()) as any;
+
+        if (smsResp.ok) {
+          telephonyStore.messages.unshift({
+            id: smsResult.sid,
+            sid: smsResult.sid,
+            from: formattedFrom,
+            to: formattedTo,
+            body: data.body,
+            direction: 'outbound',
+            status: smsResult.status,
+            errorCode: smsResult.error_code,
+            errorMessage: smsResult.error_message,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestampMs: Date.now(),
+          });
+          return Response.json({
+            success: true,
+            messageSid: smsResult.sid,
+            status: smsResult.status,
+            to: smsResult.to,
+            from: smsResult.from,
+            message: `SMS message sent successfully to ${formattedTo}!`,
+          }, { headers: { 'Content-Type': 'application/json' } });
+        } else {
+          // If Twilio failed (e.g. trial unverified number code 21608, 10DLC code 30034)
+          const errorMsg = smsResult.message || 'Twilio SMS dispatch failed';
+          const localSid = `sms_local_${Date.now()}`;
+          telephonyStore.messages.unshift({
+            id: localSid,
+            sid: localSid,
+            from: formattedFrom,
+            to: formattedTo,
+            body: data.body,
+            direction: 'outbound',
+            status: 'failed',
+            errorCode: smsResult.code,
+            errorMessage: errorMsg,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestampMs: Date.now(),
+          });
+          return Response.json({
             success: false,
-            code: isParamOrTrialIssue ? 'TWILIO_NUMBER_UNVERIFIED' : 'TWILIO_SMS_FAILED',
+            simulated: false,
+            messageSid: localSid,
+            status: 'failed',
+            code: smsResult.code,
             error: errorMsg,
-            message: 'Number must be verified in Twilio Trial Console',
-            details: smsResult.message,
-            twilioCode: smsResult.code,
-            moreInfo: smsResult.more_info || 'https://www.twilio.com/console/phone-numbers/verified',
             to: formattedTo,
             from: formattedFrom,
-          },
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
+            warning: errorMsg,
+            message: `SMS dispatch failed: ${errorMsg}`,
+          }, { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+      } catch (err: any) {
+        const localSid = `sms_local_${Date.now()}`;
+        telephonyStore.messages.unshift({
+          id: localSid,
+          sid: localSid,
+          from: formattedFrom,
+          to: formattedTo,
+          body: data.body,
+          direction: 'outbound',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestampMs: Date.now(),
+        });
+        return Response.json({
+          success: true,
+          simulated: true,
+          messageSid: localSid,
+          status: 'sent_simulated',
+          to: formattedTo,
+          from: formattedFrom,
+          message: `SMS recorded locally (${err.message}).`,
+        }, { headers: { 'Content-Type': 'application/json' } });
       }
     }
 

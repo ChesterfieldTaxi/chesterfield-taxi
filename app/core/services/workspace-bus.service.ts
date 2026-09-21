@@ -67,13 +67,41 @@ export interface WorkspaceEventMap {
     timestamp: number;
   };
   POPULATE_BOOKING: {
+    targetDraftId?: string;
     passengerName?: string;
     passengerPhone?: string;
+    phone?: string;
     passengerEmail?: string;
+    email?: string;
     callingFromPhone?: string;
     pickupAddress?: string;
     dropoffAddress?: string;
+    vehicleTier?: string;
+    vehicle?: string;
+    corporateAccount?: string;
+    corporateAccountName?: string;
+    corporateAccountNumber?: string;
+    accountNumber?: string;
+    billingPo?: string;
+    poNumber?: string;
+    accessibilityNeeds?: string[] | {
+      wheelchair?: boolean;
+      walker?: boolean;
+      serviceAnimal?: boolean;
+      extraAssistance?: boolean;
+    };
     notes?: string;
+    date?: string;
+    time?: string;
+  };
+  OPEN_EDIT_TRIP: {
+    tripId?: string;
+    phone?: string;
+  };
+  UNREAD_COUNTS_CHANGED: {
+    unreadMessages: number;
+    missedCalls: number;
+    unreadVoicemails: number;
   };
   FOCUS_TRIP_ON_MAP: {
     tripId: string;

@@ -54,10 +54,12 @@ const formatMessageTimestamp = (timestampMs?: number, fallbackStr?: string) => {
 };
 
 const getStoredTwilioCreds = () => {
-  if (typeof window === 'undefined') return { sid: '', token: '' };
+  if (typeof window === 'undefined') return { sid: '', token: '', phone: '' };
+  const creds = getClientTelephonyCredentials();
   return {
-    sid: localStorage.getItem('ct_twilio_sid') || '',
-    token: localStorage.getItem('ct_twilio_token') || '',
+    sid: creds.accountSid,
+    token: creds.authToken,
+    phone: creds.phoneNumber,
   };
 };
 
@@ -78,6 +80,9 @@ export interface InteractionEvent {
   durationSeconds?: number;
   snippet: string;
   isUnread?: boolean;
+  deliveryStatus?: string;
+  errorCode?: number | string;
+  errorMessage?: string;
   hasRecording?: boolean;
   recordingSid?: string;
   callSid?: string;
@@ -104,6 +109,7 @@ interface CommsHubProps {
   onClose?: () => void;
   onPopOut?: () => void;
   onPopulateBooking?: (bookingData: any) => void;
+  onOpenEditTrip?: (tripId: string) => void;
   drivers?: any[];
   trips?: Trip[];
 }
@@ -317,7 +323,7 @@ export function getClientTelephonyCredentials() {
   return {
     accountSid: sid.trim(),
     authToken: token.trim(),
-    phoneNumber: phone.trim() || '+13147380100',
+    phoneNumber: phone.trim() || '+13142281454',
     operatorPhone: operatorPhone.trim(),
     apiKeySid: apiKeySid.trim(),
     apiKeySecret: apiKeySecret.trim(),
@@ -332,22 +338,12 @@ function getInitialInteractions(): InteractionEvent[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out mock test interactions while strictly preserving user's real call and SMS history
-          const realInteractions = parsed.filter(
-            (item: any) =>
-              !item.id?.startsWith('int-') &&
-              item.id !== 'vm_1' &&
-              item.id !== 'vm_2' &&
-              item.contactName !== 'Sarah Jenkins' &&
-              item.contactName !== 'Mercy Hospital ER Desk'
-          );
-          localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(realInteractions));
-          return realInteractions;
+          return parsed.filter((p: any) => !p?.snippet?.includes('Thank you for contacting our dispatch desk'));
         }
       }
     } catch {}
   }
-  return INITIAL_INTERACTIONS;
+  return INITIAL_INTERACTIONS.filter((p: any) => !p?.snippet?.includes('Thank you for contacting our dispatch desk'));
 }
 
 let ringtoneAudioCtx: any = null;
@@ -426,6 +422,7 @@ export function CommsHub({
   onClose,
   onPopOut,
   onPopulateBooking,
+  onOpenEditTrip,
   drivers = [],
   trips = [],
 }: CommsHubProps) {
@@ -555,6 +552,119 @@ export function CommsHub({
         (a.billingContactName && a.billingContactName.toLowerCase().includes(q))
     ).slice(0, 10);
   }, [corporateAccountsList, corpSearchQuery]);
+
+  // New SMS composition modal state
+  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+  const [newMsgRecipientPhone, setNewMsgRecipientPhone] = useState('');
+  const [newMsgRecipientName, setNewMsgRecipientName] = useState('');
+  const [newMsgBody, setNewMsgBody] = useState('');
+  const [newMsgError, setNewMsgError] = useState<string | null>(null);
+  const [isSendingNewMsg, setIsSendingNewMsg] = useState(false);
+  const [allContactsForMsg, setAllContactsForMsg] = useState<ContactRecord[]>([]);
+  const [msgContactSearch, setMsgContactSearch] = useState('');
+  const [isMsgContactDropdownOpen, setIsMsgContactDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (isNewMessageModalOpen) {
+      try {
+        const contacts = getContactService().getAllContacts();
+        setAllContactsForMsg(contacts);
+      } catch {}
+    }
+  }, [isNewMessageModalOpen]);
+
+  const filteredContactsForMsg = useMemo(() => {
+    const q = msgContactSearch.toLowerCase().trim();
+    if (!q) return allContactsForMsg.slice(0, 8);
+    return allContactsForMsg.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.mobilePhone && c.mobilePhone.includes(q)) ||
+        ((c.corporateAccountNumber || (c as any).accountNumber || '').toLowerCase().includes(q))
+    ).slice(0, 10);
+  }, [allContactsForMsg, msgContactSearch]);
+
+  const handleSendNewMessage = async () => {
+    const rawTarget = newMsgRecipientPhone.trim();
+    if (!rawTarget) {
+      setNewMsgError('Please select a contact or enter a phone number.');
+      return;
+    }
+    const val = validatePhoneNumber(rawTarget);
+    if (!val.isValid) {
+      setNewMsgError(val.error || 'Please enter a valid 10-digit phone number.');
+      return;
+    }
+    if (!newMsgBody.trim()) {
+      setNewMsgError('Please enter a message text.');
+      return;
+    }
+
+    setIsSendingNewMsg(true);
+    setNewMsgError(null);
+
+    const contact = getContactService().getContactByPhone(val.e164);
+    const displayName = newMsgRecipientName.trim() || contact?.name || formatDisplayPhone(val.e164);
+    const msgText = newMsgBody.trim();
+
+    const newEvt: InteractionEvent = {
+      id: `sms_out_${Date.now()}`,
+      type: 'sms_outbound',
+      contactName: displayName,
+      contactPhone: val.e164,
+      contactType: ((contact as any)?.type as any) || 'passenger',
+      timestamp: 'Just now',
+      timestampMs: Date.now(),
+      snippet: msgText,
+      isUnread: false,
+    };
+
+    setInteractions((prev) => [newEvt, ...prev]);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
+      const parsed = stored ? JSON.parse(stored) : [];
+      localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify([newEvt, ...parsed]));
+    } catch {}
+
+    try {
+      const creds = getClientTelephonyCredentials();
+      const twilioSid = creds.accountSid;
+      const twilioToken = creds.authToken;
+      const twilioPhone = creds.phoneNumber || '+13142281454';
+
+      await fetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_sms',
+          to: val.e164,
+          body: msgText,
+          credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: sanitizeToE164(twilioPhone) },
+        }),
+      });
+      setTimeout(fetchTelephonyData, 1000);
+    } catch {}
+
+    setIsSendingNewMsg(false);
+    setIsNewMessageModalOpen(false);
+    setSelectedContactPhone(val.e164);
+  };
+
+  const handleOpenNewMessageThread = () => {
+    const rawTarget = newMsgRecipientPhone.trim();
+    if (!rawTarget) {
+      setNewMsgError('Please select a contact or enter a phone number.');
+      return;
+    }
+    const val = validatePhoneNumber(rawTarget);
+    if (!val.isValid) {
+      setNewMsgError(val.error || 'Please enter a valid 10-digit phone number.');
+      return;
+    }
+    setIsNewMessageModalOpen(false);
+    setSelectedContactPhone(val.e164);
+  };
 
   // Message activity stream bottom anchor
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -830,18 +940,85 @@ export function CommsHub({
         if (msgData.success && Array.isArray(msgData.messages)) {
           setInteractions((prev) => {
             const existingIds = new Set(prev.map((p) => p.id));
-            const newMsgs = msgData.messages
-              .filter((m: any) => !existingIds.has(m.id))
-              .map((m: any) => ({
+            const newMsgs: InteractionEvent[] = [];
+            let hasNewInbound = false;
+
+            msgData.messages.forEach((m: any) => {
+              if (m.body?.includes('Thank you for contacting our dispatch desk')) {
+                return;
+              }
+
+              const phone = m.direction === 'inbound' ? m.from : m.to;
+
+              // Check if already in state
+              if (existingIds.has(m.id)) {
+                return;
+              }
+
+              // Reconcile optimistic outbound messages
+              const matchingOptimistic = prev.find(
+                (p) =>
+                  p.id.startsWith('sms_out_') &&
+                  normalizePhone(p.contactPhone) === normalizePhone(phone) &&
+                  p.snippet === m.body &&
+                  Math.abs(p.timestampMs - (m.timestampMs || 0)) < 120000
+              );
+
+              if (matchingOptimistic) {
+                matchingOptimistic.id = m.id;
+                matchingOptimistic.deliveryStatus = m.status;
+                matchingOptimistic.errorCode = m.errorCode;
+                matchingOptimistic.errorMessage = m.errorMessage;
+                existingIds.add(m.id);
+                return;
+              }
+
+              const contact = getContactService().getContactByPhone(phone);
+              const displayName = contact?.name || formatDisplayPhone(phone);
+
+              if (m.direction === 'inbound') {
+                hasNewInbound = true;
+              }
+
+              newMsgs.push({
                 id: m.id,
                 type: (m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound') as any,
-                contactName: m.direction === 'inbound' ? m.from : 'Chesterfield Dispatch',
-                contactPhone: m.direction === 'inbound' ? m.from : m.to,
+                contactName: displayName,
+                contactPhone: phone,
+                contactType: ((contact as any)?.type as any) || 'passenger',
                 timestamp: m.timestamp,
                 timestampMs: m.timestampMs || Date.now(),
                 snippet: m.body,
-                isUnread: false,
-              }));
+                deliveryStatus: m.status,
+                errorCode: m.errorCode,
+                errorMessage: m.errorMessage,
+                isUnread: m.direction === 'inbound' ? (m.isUnread ?? true) : false,
+              });
+            });
+
+            if (newMsgs.length === 0) return prev;
+
+            // Trigger gentle chime for new inbound SMS if supported
+            if (hasNewInbound && typeof window !== 'undefined') {
+              try {
+                const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioCtxClass) {
+                  const audioCtx = new AudioCtxClass();
+                  const osc = audioCtx.createOscillator();
+                  const gain = audioCtx.createGain();
+                  osc.type = 'sine';
+                  osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+                  osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+                  gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                  osc.connect(gain);
+                  gain.connect(audioCtx.destination);
+                  osc.start();
+                  osc.stop(audioCtx.currentTime + 0.3);
+                }
+              } catch {}
+            }
+
             return [...newMsgs, ...prev];
           });
         }
@@ -902,9 +1079,23 @@ export function CommsHub({
     }
   };
 
-  // Fetch live Twilio voicemails, messages, and recordings on mount
+  // Fetch live Twilio voicemails, messages, and recordings on mount & poll every 3.5s
   useEffect(() => {
     fetchTelephonyData();
+
+    const interval = setInterval(() => {
+      fetchTelephonyData();
+    }, 3500);
+
+    const onFocus = () => {
+      fetchTelephonyData();
+    };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   // Focus dialpad input when switching to phone tab and keypad sub-tab
@@ -992,10 +1183,17 @@ export function CommsHub({
   const allHistoryCalls = useMemo(() => interactions.filter((item) => item.type.startsWith('call_')), [interactions]);
   const allMissedCalls = useMemo(() => interactions.filter((item) => item.type === 'call_missed'), [interactions]);
   const allVoicemails = useMemo(() => interactions.filter((item) => item.type === 'voicemail'), [interactions]);
-  const allMessages = useMemo(() => interactions.filter((item) => item.type.startsWith('sms_')), [interactions]);
+  const allMessages = useMemo(
+    () =>
+      interactions.filter(
+        (item) => item.type.startsWith('sms_') && !item.snippet?.includes('Thank you for contacting our dispatch desk')
+      ),
+    [interactions]
+  );
 
   const filteredAllInteractions = useMemo(() => {
     return interactions.filter((item) => {
+      if (item.snippet?.includes('Thank you for contacting our dispatch desk')) return false;
       if (channelFilter === 'calls' && !item.type.startsWith('call_')) return false;
       if (channelFilter === 'voicemail' && item.type !== 'voicemail') return false;
       if (channelFilter === 'messages' && !item.type.startsWith('sms_')) return false;
@@ -1016,6 +1214,30 @@ export function CommsHub({
   const filteredVoicemails = useMemo(() => allVoicemails.filter(filterItem), [allVoicemails, filterUnreadOnly, contactFilter, searchQuery]);
   const filteredMessages = useMemo(() => allMessages.filter(filterItem), [allMessages, filterUnreadOnly, contactFilter, searchQuery]);
 
+  const threadUnreadCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const msg of allMessages) {
+      if (msg.isUnread) {
+        const norm = normalizePhone(msg.contactPhone) || msg.contactPhone;
+        map.set(norm, (map.get(norm) || 0) + 1);
+      }
+    }
+    return map;
+  }, [allMessages]);
+
+  const messageConversations = useMemo(() => {
+    const threadMap = new Map<string, InteractionEvent>();
+    for (const msg of filteredMessages) {
+      const norm = normalizePhone(msg.contactPhone) || msg.contactPhone;
+      if (!norm) continue;
+      const existing = threadMap.get(norm);
+      if (!existing || (msg.timestampMs || 0) > (existing.timestampMs || 0)) {
+        threadMap.set(norm, msg);
+      }
+    }
+    return Array.from(threadMap.values()).sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+  }, [filteredMessages]);
+
   // Backward-compatible alias
   const filteredInteractions = filteredAllInteractions;
 
@@ -1028,9 +1250,9 @@ export function CommsHub({
       return [];
     }
     if (activeTab === 'voicemail') return filteredVoicemails;
-    if (activeTab === 'messages') return filteredMessages;
+    if (activeTab === 'messages') return messageConversations;
     return filteredAllInteractions;
-  }, [activeTab, callsSubTab, filteredAllInteractions, filteredHistoryCalls, filteredMissedCalls, filteredVoicemails, filteredMessages]);
+  }, [activeTab, callsSubTab, filteredAllInteractions, filteredHistoryCalls, filteredMissedCalls, filteredVoicemails, messageConversations]);
 
   const unreadCountAll = useMemo(() => interactions.filter((i) => i.isUnread).length, [interactions]);
   const unreadCountHistory = useMemo(() => allHistoryCalls.filter((i) => i.isUnread).length, [allHistoryCalls]);
@@ -1039,6 +1261,15 @@ export function CommsHub({
   const unreadCountMessages = useMemo(() => allMessages.filter((i) => i.isUnread).length, [allMessages]);
 
   const unreadCount = unreadCountAll;
+
+  // Broadcast live unread count changes to workspaceBus so headers and indicators stay perfectly synced
+  useEffect(() => {
+    workspaceBus.publish('UNREAD_COUNTS_CHANGED', {
+      unreadMessages: unreadCountMessages,
+      missedCalls: unreadCountMissed,
+      unreadVoicemails: unreadCountVoicemail,
+    });
+  }, [workspaceBus, unreadCountMessages, unreadCountMissed, unreadCountVoicemail]);
 
   // Master checkbox selection calculation for active tab
   const isAllSelected =
@@ -1129,9 +1360,10 @@ export function CommsHub({
     ? interactions
         .filter(
           (i) =>
-            normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
-            (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
-            (i.homePhone && normalizePhone(i.homePhone) === normalizePhone(selectedContactPhone))
+            !i.snippet?.includes('Thank you for contacting our dispatch desk') &&
+            (normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
+              (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
+              (i.homePhone && normalizePhone(i.homePhone) === normalizePhone(selectedContactPhone)))
         )
         .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0))
     : [];
@@ -1638,10 +1870,22 @@ export function CommsHub({
   }, [workspaceBus, callStatus, callTimer, activeCallSid]);
 
   const handleInCallBookRide = () => {
+    const rawPhone = activeCallPhone || dialpadNumber;
+    const contactService = getContactService();
+    const contact = rawPhone ? contactService.getContactByPhone(rawPhone) : null;
+
     const payload = {
-      passengerName: activeCallContact || 'Caller',
-      passengerPhone: activeCallPhone || dialpadNumber,
-      notes: `Direct phone reservation from call (${formatTimer(callTimer)})`,
+      passengerName: contact?.name || (activeCallContact && activeCallContact !== 'Caller' ? activeCallContact : '') || '',
+      passengerPhone: contact?.phone || rawPhone || '',
+      passengerEmail: contact?.email || '',
+      pickupAddress: contact?.homeAddress || contact?.workAddress || '',
+      dropoffAddress: contact?.workAddress && contact?.homeAddress ? contact.workAddress : '',
+      vehicleTier: contact?.preferredVehicleTier || '',
+      corporateAccount: contact?.corporateAccountName || '',
+      corporateAccountNumber: contact?.corporateAccountNumber || (contact as any)?.accountNumber || '',
+      billingPo: contact?.defaultPoNumber || (contact as any)?.billingPo || '',
+      accessibilityNeeds: contact?.accessibilityNeeds || {},
+      notes: `Direct phone reservation from call (${formatTimer(callTimer)})${contact?.notes ? ` | Contact notes: ${contact.notes}` : ''}`,
     };
     workspaceBus.publish('POPULATE_BOOKING', payload);
     if (onPopulateBooking) {
@@ -1656,9 +1900,10 @@ export function CommsHub({
     if (!targetPhone) return;
 
     try {
-      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
-      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
-      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '+13147380100' : '';
+      const creds = getClientTelephonyCredentials();
+      const twilioSid = creds.accountSid;
+      const twilioToken = creds.authToken;
+      const twilioPhone = creds.phoneNumber || '+13142281454';
 
       await fetch('/api/telephony', {
         method: 'POST',
@@ -1810,10 +2055,38 @@ export function CommsHub({
     setSmsStatusMessage(null);
 
     const messageText = smsReplyText.trim();
+    const targetContactName =
+      activeContactRecord?.name ||
+      activeContactSummary?.contactName ||
+      formatDisplayPhone(phoneValidation.e164);
+
+    const newInteraction: InteractionEvent = {
+      id: `sms_out_${Date.now()}`,
+      type: 'sms_outbound',
+      contactName: targetContactName,
+      contactPhone: phoneValidation.e164,
+      contactType: ((activeContactRecord as any)?.type as any) || 'passenger',
+      timestamp: 'Just now',
+      timestampMs: Date.now(),
+      snippet: messageText,
+      isUnread: false,
+    };
+
+    // Optimistically prepend sent message to local interaction thread and persist
+    setInteractions((prev) => [newInteraction, ...prev]);
     try {
-      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
-      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
-      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '+13147380100' : '';
+      const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
+      const parsed = stored ? JSON.parse(stored) : [];
+      localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify([newInteraction, ...parsed]));
+    } catch {}
+
+    setSmsReplyText('');
+
+    try {
+      const creds = getClientTelephonyCredentials();
+      const twilioSid = creds.accountSid;
+      const twilioToken = creds.authToken;
+      const twilioPhone = creds.phoneNumber || '+13142281454';
 
       const resp = await fetch('/api/telephony', {
         method: 'POST',
@@ -1828,46 +2101,53 @@ export function CommsHub({
 
       const resData = (await resp.json()) as any;
       if (resData.success) {
-        setSmsStatusMessage('Sent');
-        setSmsReplyText('');
-        // Append sent message to local interaction thread
-        setInteractions((prev) => [
-          {
-            id: `sms_out_${Date.now()}`,
-            type: 'sms_outbound',
-            contactName: 'Chesterfield Dispatch',
-            contactPhone: phoneValidation.e164,
-            contactType: 'passenger',
-            timestamp: 'Just now',
-            timestampMs: Date.now(),
-            snippet: messageText,
-            isUnread: false,
-          },
-          ...prev,
-        ]);
-        setTimeout(() => setSmsStatusMessage(null), 2500);
+        setSmsStatusMessage(resData.simulated ? 'Sent (Simulated)' : 'Sent to carrier');
+        if (resData.messageSid || resData.status) {
+          setInteractions((prev) =>
+            prev.map((i) =>
+              i.id === newInteraction.id
+                ? { ...i, id: resData.messageSid || i.id, deliveryStatus: resData.status || 'sent' }
+                : i
+            )
+          );
+        }
       } else {
-        setSmsStatusMessage(resData.error || `Sent: "${messageText}"`);
-        setSmsReplyText('');
-        setTimeout(() => setSmsStatusMessage(null), 3000);
+        const errorDesc = resData.error || resData.warning || 'Failed to dispatch';
+        setSmsStatusMessage(`Failed: ${errorDesc}`);
+        setInteractions((prev) =>
+          prev.map((i) =>
+            i.id === newInteraction.id
+              ? { ...i, deliveryStatus: 'failed', errorMessage: errorDesc }
+              : i
+          )
+        );
       }
-    } catch {
-      setSmsStatusMessage('Sent');
-      setSmsReplyText('');
-      setTimeout(() => setSmsStatusMessage(null), 2500);
+      setTimeout(fetchTelephonyData, 1000);
+    } catch (err: any) {
+      setSmsStatusMessage(err?.message || 'Error sending');
     } finally {
       setIsSendingSms(false);
+      setTimeout(() => setSmsStatusMessage(null), 4000);
     }
   };
 
   const handleConvertVoicemailToBooking = (suggested: any) => {
     if (!suggested) return;
+    const phone = suggested.passengerPhone;
+    const contact = phone ? getContactService().getContactByPhone(phone) : null;
+
     const payload = {
-      passengerName: suggested.passengerName,
-      passengerPhone: suggested.passengerPhone,
-      pickupAddress: suggested.pickup,
-      dropoffAddress: suggested.dropoff,
-      notes: `Converted from Voicemail (Received ${suggested.pickupTime})`,
+      passengerName: contact?.name || suggested.passengerName || '',
+      passengerPhone: contact?.phone || phone || '',
+      passengerEmail: contact?.email || '',
+      pickupAddress: suggested.pickup || contact?.homeAddress || '',
+      dropoffAddress: suggested.dropoff || contact?.workAddress || '',
+      vehicleTier: contact?.preferredVehicleTier || '',
+      corporateAccount: contact?.corporateAccountName || '',
+      corporateAccountNumber: contact?.corporateAccountNumber || (contact as any)?.accountNumber || '',
+      billingPo: contact?.defaultPoNumber || (contact as any)?.billingPo || '',
+      accessibilityNeeds: contact?.accessibilityNeeds || {},
+      notes: `Converted from Voicemail (Received ${suggested.pickupTime || 'earlier'})${contact?.notes ? ` | Contact notes: ${contact.notes}` : ''}`,
     };
 
     workspaceBus.publish('POPULATE_BOOKING', payload);
@@ -1960,6 +2240,15 @@ export function CommsHub({
           >
             <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Calls</span>
+            {unreadCountMissed > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                  activeTab === 'phone' ? 'bg-white text-blue-600' : 'bg-red-500 text-white'
+                }`}
+              >
+                {unreadCountMissed}
+              </span>
+            )}
             {callStatus !== 'idle' && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
             )}
@@ -1978,6 +2267,15 @@ export function CommsHub({
           >
             <MailIcon className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Messages</span>
+            {unreadCountMessages > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                  activeTab === 'messages' ? 'bg-white text-blue-600' : 'bg-blue-500 text-white'
+                }`}
+              >
+                {unreadCountMessages}
+              </span>
+            )}
           </button>
 
           <button
@@ -1993,9 +2291,15 @@ export function CommsHub({
             }`}
           >
             <span className="truncate">Voicemail</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 font-bold shrink-0">
-              1
-            </span>
+            {unreadCountVoicemail > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                  activeTab === 'voicemail' ? 'bg-white text-blue-600' : 'bg-amber-500 text-white'
+                }`}
+              >
+                {unreadCountVoicemail}
+              </span>
+            )}
           </button>
         </div>
 
@@ -2472,12 +2776,25 @@ export function CommsHub({
                 <button
                   type="button"
                   onClick={() => {
-                    workspaceBus.publish('POPULATE_BOOKING', {
-                      passengerName: activeContactRecord?.name || activeContactSummary.contactName,
-                      passengerPhone:
-                        activeContactSummary.mobilePhone || activeContactSummary.contactPhone,
-                      callingFromPhone: activeContactSummary.homePhone,
-                    });
+                    const phone = activeContactSummary.mobilePhone || activeContactSummary.contactPhone || selectedContactPhone;
+                    const contact = activeContactRecord || (phone ? getContactService().getContactByPhone(phone) : null);
+                    const payload = {
+                      passengerName: contact?.name || activeContactSummary.contactName || '',
+                      passengerPhone: contact?.phone || phone || '',
+                      passengerEmail: contact?.email || '',
+                      pickupAddress: contact?.homeAddress || contact?.workAddress || '',
+                      dropoffAddress: contact?.workAddress && contact?.homeAddress ? contact.workAddress : '',
+                      vehicleTier: contact?.preferredVehicleTier || '',
+                      corporateAccount: contact?.corporateAccountName || '',
+                      corporateAccountNumber: contact?.corporateAccountNumber || (contact as any)?.accountNumber || '',
+                      billingPo: contact?.defaultPoNumber || (contact as any)?.billingPo || '',
+                      accessibilityNeeds: contact?.accessibilityNeeds || {},
+                      notes: contact?.notes || '',
+                    };
+                    workspaceBus.publish('POPULATE_BOOKING', payload);
+                    if (onPopulateBooking) {
+                      onPopulateBooking(payload);
+                    }
                   }}
                   className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                 >
@@ -2497,12 +2814,22 @@ export function CommsHub({
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    workspaceBus.publish('FOCUS_TRIP_ON_MAP', {
-                      tripId: upcomingBookingsForContact[0].id,
-                    })
-                  }
-                  className="text-[10px] font-bold text-blue-700 underline hover:text-blue-900"
+                  onClick={() => {
+                    const targetTrip = upcomingBookingsForContact[0];
+                    if (targetTrip) {
+                      workspaceBus.publish('OPEN_EDIT_TRIP', {
+                        tripId: targetTrip.id,
+                        phone: activeContactSummary.contactPhone || selectedContactPhone || undefined,
+                      });
+                      workspaceBus.publish('FOCUS_TRIP_ON_MAP', {
+                        tripId: targetTrip.id,
+                      });
+                      if (onOpenEditTrip) {
+                        onOpenEditTrip(targetTrip.id);
+                      }
+                    }
+                  }}
+                  className="text-[10px] font-bold text-blue-700 underline hover:text-blue-900 cursor-pointer"
                 >
                   View Trip
                 </button>
@@ -2559,6 +2886,33 @@ export function CommsHub({
                           </span>
                         </div>
                         <p className="text-xs leading-relaxed">{evt.snippet}</p>
+                        {evt.deliveryStatus && (
+                          <div className="flex items-center justify-end gap-1 mt-1 text-[9px]">
+                            {evt.deliveryStatus === 'delivered' ? (
+                              <span className="text-emerald-300 font-medium flex items-center gap-0.5">
+                                ✓✓ Delivered
+                              </span>
+                            ) : evt.deliveryStatus === 'sent' || evt.deliveryStatus === 'queued' ? (
+                              <span className="text-blue-200 flex items-center gap-0.5">
+                                ✓ Sent to carrier
+                              </span>
+                            ) : evt.deliveryStatus === 'undelivered' ? (
+                              <span
+                                className="text-amber-200 font-medium flex items-center gap-0.5"
+                                title={evt.errorMessage || 'Carrier rejected delivery. US carriers require A2P 10DLC registration in Twilio Console.'}
+                              >
+                                ⚠ Undelivered (10DLC blocked)
+                              </span>
+                            ) : evt.deliveryStatus === 'failed' ? (
+                              <span
+                                className="text-rose-200 font-medium flex items-center gap-0.5"
+                                title={evt.errorMessage || 'SMS dispatch failed'}
+                              >
+                                ⚠ Failed
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -3000,22 +3354,52 @@ export function CommsHub({
                                   {tr.pickupAddress} ➔ {tr.dropoffAddress}
                                 </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  workspaceBus.publish('POPULATE_BOOKING', {
-                                    passengerName: activeCallContact || 'Caller',
-                                    passengerPhone: activeCallPhone || dialpadNumber,
-                                    pickupAddress: tr.pickupAddress,
-                                    dropoffAddress: tr.dropoffAddress,
-                                  });
-                                  setBookingToast('Trip loaded');
-                                  setTimeout(() => setBookingToast(null), 2000);
-                                }}
-                                className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0 cursor-pointer"
-                              >
-                                Load
-                              </button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rawPhone = activeCallPhone || dialpadNumber;
+                                    const contact = rawPhone ? getContactService().getContactByPhone(rawPhone) : null;
+                                    const payload = {
+                                      passengerName: contact?.name || (activeCallContact && activeCallContact !== 'Caller' ? activeCallContact : '') || '',
+                                      passengerPhone: contact?.phone || rawPhone || '',
+                                      passengerEmail: contact?.email || '',
+                                      pickupAddress: tr.pickupAddress || contact?.homeAddress || '',
+                                      dropoffAddress: tr.dropoffAddress || contact?.workAddress || '',
+                                      vehicleTier: contact?.preferredVehicleTier || '',
+                                      corporateAccount: contact?.corporateAccountName || '',
+                                      corporateAccountNumber: contact?.corporateAccountNumber || (contact as any)?.accountNumber || '',
+                                      billingPo: contact?.defaultPoNumber || (contact as any)?.billingPo || '',
+                                      accessibilityNeeds: contact?.accessibilityNeeds || {},
+                                      notes: `Re-booking route: ${tr.pickupAddress} -> ${tr.dropoffAddress}`,
+                                    };
+                                    workspaceBus.publish('POPULATE_BOOKING', payload);
+                                    if (onPopulateBooking) onPopulateBooking(payload);
+                                    setBookingToast('Trip loaded');
+                                    setTimeout(() => setBookingToast(null), 2000);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold cursor-pointer"
+                                  title="Load this route into active draft reservation"
+                                >
+                                  Load
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    workspaceBus.publish('OPEN_EDIT_TRIP', {
+                                      tripId: tr.id,
+                                      phone: activeCallPhone || dialpadNumber,
+                                    });
+                                    if (onOpenEditTrip) {
+                                      onOpenEditTrip(tr.id);
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] font-bold cursor-pointer"
+                                  title="Open trip in dispatch edit tab"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             </div>
                           ))
                         )}
@@ -3909,6 +4293,29 @@ export function CommsHub({
         {/* VIEW 5: MESSAGING LIST */}
         {activeTab === 'messages' && !selectedContactPhone && (
           <div className="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto">
+            {/* Messages Actions Header Bar */}
+            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-800">SMS Conversations</span>
+                <span className="text-[10px] text-slate-500 font-medium">({messageConversations.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewMsgRecipientPhone('');
+                  setNewMsgRecipientName('');
+                  setNewMsgBody('');
+                  setNewMsgError(null);
+                  setMsgContactSearch('');
+                  setIsNewMessageModalOpen(true);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+              >
+                <PlusIcon className="w-3.5 h-3.5" />
+                <span>New Message</span>
+              </button>
+            </div>
+
             <CommsBatchActionBar
               selectedCount={selectedItemIds.size}
               onMarkRead={handleBatchMarkRead}
@@ -3933,14 +4340,36 @@ export function CommsHub({
               />
             )}
             <div className="divide-y divide-slate-100">
-            {filteredMessages.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 space-y-2">
-                <p className="text-xs font-bold text-slate-600">No Messages Found</p>
-                <p className="text-[11px]">No SMS messages match your active filter.</p>
+            {messageConversations.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 space-y-3 px-4">
+                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-xl font-bold">
+                  💬
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700">No Messages Found</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Start a new conversation with a customer or driver.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewMsgRecipientPhone('');
+                    setNewMsgRecipientName('');
+                    setNewMsgBody('');
+                    setNewMsgError(null);
+                    setMsgContactSearch('');
+                    setIsNewMessageModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  <span>Compose Message</span>
+                </button>
               </div>
             ) : (
-              filteredMessages.map((sms) => {
+              messageConversations.map((sms) => {
                 const isRowSelected = selectedItemIds.has(sms.id);
+                const unreadInThread = threadUnreadCountMap.get(normalizePhone(sms.contactPhone) || sms.contactPhone) || 0;
+                const isThreadUnread = unreadInThread > 0 || sms.isUnread;
                 return (
                   <div
                     key={sms.id}
@@ -3948,7 +4377,7 @@ export function CommsHub({
                     className={`p-3 transition-all cursor-pointer flex items-center gap-2.5 border-l-4 ${
                       isRowSelected
                         ? 'bg-blue-100/70 border-l-blue-700'
-                        : sms.isUnread
+                        : isThreadUnread
                         ? 'bg-blue-50/70 hover:bg-blue-100/60 border-l-blue-600'
                         : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                     }`}
@@ -3967,7 +4396,7 @@ export function CommsHub({
                         onChange={() => {}}
                         className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
-                      {sms.isUnread ? (
+                      {isThreadUnread ? (
                         <span
                           className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.8)] shrink-0"
                           title="Unread SMS"
@@ -3985,20 +4414,27 @@ export function CommsHub({
                     {/* Text Details */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span
-                          className={`text-xs truncate ${
-                            sms.isUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
-                          }`}
-                        >
-                          {sms.contactName}
-                        </span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className={`text-xs truncate ${
+                              isThreadUnread ? 'font-black text-slate-900' : 'font-bold text-slate-800'
+                            }`}
+                          >
+                            {sms.contactName}
+                          </span>
+                          {unreadInThread > 1 && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-bold shrink-0">
+                              {unreadInThread}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-400 font-medium shrink-0">
                           {sms.timestamp}
                         </span>
                       </div>
                       <p
                         className={`text-xs line-clamp-1 mt-0.5 ${
-                          sms.isUnread ? 'text-slate-900 font-medium' : 'text-slate-500'
+                          isThreadUnread ? 'text-slate-900 font-medium' : 'text-slate-500'
                         }`}
                       >
                         {sms.snippet}
@@ -4752,6 +5188,184 @@ export function CommsHub({
                 >
                   <CheckIcon className="w-3.5 h-3.5" />
                   <span>Save Contact Profile</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── NEW SMS MESSAGE MODAL ─── */}
+      {isNewMessageModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <MailIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">New Text Message</h3>
+                  <p className="text-[11px] text-slate-500">Send an SMS dispatch or chat with a passenger</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewMessageModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="p-5 space-y-4">
+              {newMsgError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+                  {newMsgError}
+                </div>
+              )}
+
+              {/* Recipient Search & Input */}
+              <div className="relative">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Recipient (Phone Number or Contact)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={msgContactSearch || newMsgRecipientPhone}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMsgContactSearch(val);
+                      setNewMsgRecipientPhone(val);
+                      setIsMsgContactDropdownOpen(true);
+                      setNewMsgError(null);
+                    }}
+                    onFocus={() => setIsMsgContactDropdownOpen(true)}
+                    placeholder="Search contact by name, phone, or enter 10-digit number..."
+                    className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-blue-500 font-medium"
+                  />
+                  {newMsgRecipientName && (
+                    <span className="absolute right-2.5 top-2 text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md pointer-events-none">
+                      {newMsgRecipientName}
+                    </span>
+                  )}
+                </div>
+
+                {/* Dropdown search results */}
+                {isMsgContactDropdownOpen && filteredContactsForMsg.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
+                    {filteredContactsForMsg.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          const chosenPhone = c.mobilePhone || c.phone;
+                          setNewMsgRecipientPhone(chosenPhone);
+                          setNewMsgRecipientName(c.name);
+                          setMsgContactSearch(`${c.name} (${chosenPhone})`);
+                          setIsMsgContactDropdownOpen(false);
+                          setNewMsgError(null);
+                        }}
+                        className="p-2.5 hover:bg-blue-50 transition-colors cursor-pointer flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-800 block">{c.name}</span>
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            {formatDisplayPhone(c.mobilePhone || c.phone)}
+                            {c.corporateAccountName ? ` • ${c.corporateAccountName}` : ''}
+                          </span>
+                        </div>
+                        {(c.corporateAccountNumber || (c as any).accountNumber) && (
+                          <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                            {c.corporateAccountNumber || (c as any).accountNumber}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Message text */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">Message Text</label>
+                  <span className="text-[10px] text-slate-400 font-medium">{newMsgBody.length} chars</span>
+                </div>
+                <textarea
+                  rows={4}
+                  value={newMsgBody}
+                  onChange={(e) => {
+                    setNewMsgBody(e.target.value);
+                    setNewMsgError(null);
+                  }}
+                  placeholder="Type your message to passenger or driver..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-blue-500 resize-none font-normal"
+                />
+              </div>
+
+              {/* Quick Preset Chips */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Quick Responses
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Your driver is arriving shortly in a black sedan.',
+                    'Your reservation has been confirmed with Chesterfield Taxi.',
+                    'Please meet your chauffeur outside baggage claim.',
+                    'Driver is waiting at pickup location.',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNewMsgBody(preset)}
+                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-medium transition-colors cursor-pointer"
+                    >
+                      {preset.slice(0, 36)}...
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleOpenNewMessageThread}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+              >
+                Open Thread
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewMessageModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSendingNewMsg}
+                  onClick={handleSendNewMessage}
+                  className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSendingNewMsg ? (
+                    <>
+                      <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <MailIcon className="w-3.5 h-3.5" />
+                      <span>Send SMS</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
