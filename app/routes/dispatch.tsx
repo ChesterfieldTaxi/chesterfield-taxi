@@ -58,7 +58,7 @@ import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHea
 import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
-import { getOperatorService, type DriverRosterItem } from '../core/services/operator.service';
+import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../core/services/operator.service';
 
 export type { DriverRosterItem };
 
@@ -4222,7 +4222,7 @@ export default function DispatchRoute() {
                               <option value="all">All Drivers ▾</option>
                               {drivers.map((d) => (
                                 <option key={d.id} value={d.id}>
-                                  {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
+                                  {d.formattedLabel || formatDriverAssignmentLabel(d)}
                                 </option>
                               ))}
                             </select>
@@ -4634,7 +4634,7 @@ export default function DispatchRoute() {
                       <option value="all">All</option>
                       {drivers.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
+                          {d.formattedLabel || formatDriverAssignmentLabel(d)}
                         </option>
                       ))}
                     </select>
@@ -4889,7 +4889,7 @@ export default function DispatchRoute() {
                                 value={drv.id}
                                 disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                               >
-                                {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                                {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
                               </option>
                             ))}
                           </select>
@@ -5026,7 +5026,7 @@ export default function DispatchRoute() {
                               value={drv.id}
                               disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                             >
-                              {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                              {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
                             </option>
                           ))}
                         </select>
@@ -5216,17 +5216,17 @@ export default function DispatchRoute() {
                                 }`}
                                 title="Quick-assign driver to this trip"
                               >
-                                 <option value="unassigned">⚠️ Unassigned</option>
-                                 {drivers.map((drv) => (
-                                   <option
-                                     key={drv.id}
-                                     value={drv.id}
-                                     disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                                   >
-                                     {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
-                                   </option>
-                                 ))}
-                              </select>
+                                  <option value="unassigned">⚠️ Unassigned</option>
+                                  {drivers.map((drv) => (
+                                    <option
+                                      key={drv.id}
+                                      value={drv.id}
+                                      disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                                    >
+                                      {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                                    </option>
+                                  ))}
+                               </select>
                             </td>
                             <td className="py-2 px-3">
                               <span className="capitalize px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
@@ -5951,7 +5951,7 @@ export default function DispatchRoute() {
                           <option value="All Drivers">📢 All Drivers</option>
                           {drivers.map((d) => (
                             <option key={d.id} value={d.name}>
-                              {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
+                              {d.formattedLabel || formatDriverAssignmentLabel(d)}
                             </option>
                           ))}
                         </select>
@@ -6729,7 +6729,7 @@ export default function DispatchRoute() {
                           value={drv.id}
                           disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                         >
-                          {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                          {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
                         </option>
                       ))}
                     </select>

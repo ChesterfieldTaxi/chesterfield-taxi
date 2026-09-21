@@ -26,7 +26,7 @@ import {
 } from '../../ui/Icons';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
-import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
+import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../../../core/services/operator.service';
 
 export const COMMON_FBO_FACILITIES = [
   'Signature Flight Support (STL - Hangar 2)',
@@ -3202,7 +3202,7 @@ export function DispatchBookingEngine({
                     value={d.id}
                     disabled={d.isBlacklisted || d.zone === 'Suspended'}
                   >
-                    {d.name} {d.vehicle ? `• ${d.vehicle}` : ''} {d.zone === 'Suspended' ? '(Suspended)' : ''}
+                    {d.formattedLabel || formatDriverAssignmentLabel(d)}{d.zone === 'Suspended' ? ' (Suspended)' : ''}
                   </option>
                 ))}
               </select>

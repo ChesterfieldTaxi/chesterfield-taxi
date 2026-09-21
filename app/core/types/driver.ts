@@ -32,6 +32,10 @@ export interface DriverScheduleConfig {
 export interface DriverProfile {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  cabNumber?: string;
   phone: string;
   email?: string;
   dutyStatus: DriverDutyStatus;

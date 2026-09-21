@@ -134,12 +134,19 @@ export default function DispatchPopoutRoute() {
               {drivers.map((drv) => (
                 <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-sm text-slate-900">{drv.vehicle}</span>
+                    <span className="font-extrabold text-sm text-slate-900">{drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">
                       {drv.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600">{drv.name}</p>
+                  <div className="flex items-center justify-between text-xs text-slate-600">
+                    <span>{drv.vehicle}</span>
+                    {drv.username && (
+                      <span className="text-[11px] font-mono text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
+                        @{drv.username}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
                 </div>
               ))}

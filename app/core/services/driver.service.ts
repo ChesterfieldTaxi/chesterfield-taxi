@@ -125,12 +125,21 @@ export class DriverService {
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const uData = userSnap.data();
+          const firstName = uData.firstName || (uData.displayName ? uData.displayName.split(' ')[0] : '');
+          const lastName = uData.lastName || (uData.displayName ? uData.displayName.split(' ').slice(1).join(' ') : '');
+          const cabNumber = uData.cabNumber || (uData.assignedUnit ? (uData.assignedUnit.match(/#?(\d+)/)?.[1] || uData.assignedUnit) : '');
+          const username = uData.username || '';
+
           return {
             id,
             name: uData.displayName || uData.name || id,
+            firstName,
+            lastName,
+            cabNumber,
+            username,
             phone: uData.phone || '(314) 738-0100',
             dutyStatus: (uData.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
-            vehicleUnit: uData.assignedUnit || 'Unassigned',
+            vehicleUnit: uData.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : 'Unassigned'),
             vehicleTier: 'standard',
             zone: uData.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
             schedule: DEFAULT_SCHEDULE,
@@ -150,9 +159,13 @@ export class DriverService {
       return {
         id: op.uid,
         name: op.displayName || op.email.split('@')[0],
+        firstName: op.firstName,
+        lastName: op.lastName,
+        cabNumber: op.cabNumber,
+        username: op.username,
         phone: op.phone || '(314) 738-0100',
         dutyStatus: (op.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
-        vehicleUnit: op.assignedUnit || 'Unassigned',
+        vehicleUnit: op.assignedUnit || (op.cabNumber ? `Cab #${op.cabNumber}` : 'Unassigned'),
         vehicleTier: 'standard',
         zone: op.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
         schedule: DEFAULT_SCHEDULE,

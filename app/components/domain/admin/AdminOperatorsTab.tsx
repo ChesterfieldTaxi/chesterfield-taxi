@@ -17,6 +17,7 @@ import {
   type OperatorUser,
   DEFAULT_OPERATORS,
   getOperatorService,
+  generateDriverUsername,
 } from '../../../core/services/operator.service';
 
 export type { OperatorUser };
@@ -54,6 +55,10 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newCabNumber, setNewCabNumber] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('driver');
   const [newPhone, setNewPhone] = useState('');
   const [newLicense, setNewLicense] = useState('');
@@ -62,6 +67,10 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   // Edit Operator Modal State
   const [editingOperator, setEditingOperator] = useState<OperatorUser | null>(null);
   const [editName, setEditName] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editCabNumber, setEditCabNumber] = useState('');
+  const [editUsername, setEditUsername] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editLicense, setEditLicense] = useState('');
   const [editUnit, setEditUnit] = useState('');
@@ -200,11 +209,20 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
     setError(null);
     setSuccess(null);
 
-    const updates = {
-      displayName: editName.trim(),
+    const fullName = `${editFirstName.trim()} ${editLastName.trim()}`.trim() || editName.trim();
+    const cleanCab = editCabNumber.trim().replace(/^#/, '');
+    const cleanUsername = editUsername.trim().toLowerCase() || generateDriverUsername(editFirstName, editLastName, cleanCab);
+    const assignedUnit = editUnit.trim() || (cleanCab ? `Cab #${cleanCab}` : '');
+
+    const updates: Partial<OperatorUser> = {
+      displayName: fullName,
+      firstName: editFirstName.trim(),
+      lastName: editLastName.trim(),
+      cabNumber: cleanCab,
+      username: cleanUsername,
       phone: editPhone.trim(),
       driverLicense: editLicense.trim(),
-      assignedUnit: editUnit.trim(),
+      assignedUnit,
     };
 
     try {
@@ -218,7 +236,9 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
            const fleetRef = doc(db, 'fleet', `driver-${editingOperator.uid}`);
            await setDoc(fleetRef, { 
              name: updates.displayName,
-             license: updates.driverLicense
+             license: updates.driverLicense,
+             cabNumber: cleanCab,
+             username: cleanUsername,
            }, { merge: true });
         }
       }
@@ -254,6 +274,11 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
     setError(null);
     setSuccess(null);
 
+    const fullName = `${newFirstName.trim()} ${newLastName.trim()}`.trim() || newName.trim();
+    const cleanCab = newCabNumber.trim().replace(/^#/, '');
+    const cleanUsername = newUsername.trim().toLowerCase() || generateDriverUsername(newFirstName, newLastName, cleanCab);
+    const assignedUnit = newUnit.trim() || (cleanCab ? `Cab #${cleanCab}` : '');
+
     try {
       let createdUid = `user-${Date.now().toString(36)}`;
 
@@ -279,11 +304,15 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         await setDoc(doc(db, 'users', createdUid), {
           uid: createdUid,
           email: cleanEmail,
-          displayName: newName.trim(),
+          displayName: fullName,
+          firstName: newFirstName.trim(),
+          lastName: newLastName.trim(),
+          cabNumber: cleanCab,
+          username: cleanUsername,
           role: newRole,
           phone: newPhone.trim(),
           driverLicense: newLicense.trim(),
-          assignedUnit: newUnit.trim(),
+          assignedUnit,
           status: 'active',
           createdAt: new Date().toISOString(),
         });
@@ -292,11 +321,15 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       const newOp: OperatorUser = {
         uid: createdUid,
         email: cleanEmail,
-        displayName: newName.trim(),
+        displayName: fullName,
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        cabNumber: cleanCab,
+        username: cleanUsername,
         role: newRole,
         phone: newPhone.trim(),
         driverLicense: newLicense.trim(),
-        assignedUnit: newUnit.trim(),
+        assignedUnit,
         status: 'active',
         createdAt: new Date().toISOString(),
       };
@@ -308,6 +341,10 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       setNewEmail('');
       setNewPassword('');
       setNewName('');
+      setNewFirstName('');
+      setNewLastName('');
+      setNewCabNumber('');
+      setNewUsername('');
       setNewPhone('');
       setNewLicense('');
       setNewUnit('');
@@ -557,11 +594,21 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                           {op.displayName ? op.displayName.charAt(0).toUpperCase() : '👤'}
                         </div>
                         <div>
-                          <div className="font-extrabold text-slate-900 text-xs">
-                            {op.displayName || 'Unnamed Operator'}
+                          <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                            <span>{op.displayName || 'Unnamed Operator'}</span>
+                            {op.cabNumber && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
+                                #{op.cabNumber}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            {op.email}
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono mt-0.5">
+                            <span>{op.email}</span>
+                            {op.username && (
+                              <span className="px-1 py-0.2 rounded bg-slate-100 text-slate-600 font-bold border border-slate-200 text-[10px]">
+                                @{op.username}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -667,10 +714,18 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                         type="button"
                         onClick={() => {
                           setEditingOperator(op);
+                          const first = op.firstName || (op.displayName ? op.displayName.split(' ')[0] : '');
+                          const last = op.lastName || (op.displayName ? op.displayName.split(' ').slice(1).join(' ') : '');
+                          const cab = op.cabNumber || (op.assignedUnit ? (op.assignedUnit.match(/#?(\d+)/)?.[1] || op.assignedUnit) : '');
+                          const uname = op.username || generateDriverUsername(first, last, cab);
                           setEditName(op.displayName || '');
+                          setEditFirstName(first);
+                          setEditLastName(last);
+                          setEditCabNumber(cab);
+                          setEditUsername(uname);
                           setEditPhone(op.phone || '');
                           setEditLicense(op.driverLicense || '');
-                          setEditUnit(op.assignedUnit || '');
+                          setEditUnit(op.assignedUnit || (cab ? `Cab #${cab}` : ''));
                         }}
                         className="text-slate-500 hover:text-blue-600 text-[11px] font-semibold underline transition-colors"
                         title="Edit Operator Profile"
@@ -810,20 +865,47 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
             <form onSubmit={handleCreateOperator} className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Full Name"
-                  placeholder="e.g. Marcus Vance"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  label="First Name"
+                  placeholder="e.g. Michael"
+                  value={newFirstName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewFirstName(val);
+                    if (newRole === 'driver') {
+                      setNewUsername(generateDriverUsername(val, newLastName, newCabNumber));
+                    }
+                  }}
                   required
                 />
+                <Input
+                  label="Last Name"
+                  placeholder="e.g. Johnson"
+                  value={newLastName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewLastName(val);
+                    if (newRole === 'driver') {
+                      setNewUsername(generateDriverUsername(newFirstName, val, newCabNumber));
+                    }
+                  }}
+                  required
+                />
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     System Role <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={newRole}
-                    onChange={(e) => setNewRole(e.target.value as UserRole)}
+                    onChange={(e) => {
+                      const r = e.target.value as UserRole;
+                      setNewRole(r);
+                      if (r === 'driver') {
+                        setNewUsername(generateDriverUsername(newFirstName, newLastName, newCabNumber));
+                      }
+                    }}
                     className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="driver">🚕 Driver (In-vehicle app &amp; jobs)</option>
@@ -831,7 +913,36 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     <option value="admin">🛡️ Administrator (Full system privileges)</option>
                   </select>
                 </div>
+
+                {newRole === 'driver' && (
+                  <Input
+                    label="Cab / Unit Number"
+                    placeholder="e.g. 400"
+                    value={newCabNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewCabNumber(val);
+                      setNewUsername(generateDriverUsername(newFirstName, newLastName, val));
+                    }}
+                    helperText="Unit number (e.g. 400 for #400)"
+                    required
+                  />
+                )}
               </div>
+
+              {newRole === 'driver' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-bold text-slate-700">System Username</div>
+                    <div className="text-[11px] text-slate-500">Auto-generated: [first][last_initial][cab]</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-extrabold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                      @{newUsername || generateDriverUsername(newFirstName, newLastName, newCabNumber) || 'username'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
@@ -939,18 +1050,61 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
             <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Full Name"
-                  placeholder="e.g. Marcus Vance"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  label="First Name"
+                  placeholder="e.g. Michael"
+                  value={editFirstName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditFirstName(val);
+                    if ((editingOperator.roles || [editingOperator.role]).includes('driver')) {
+                      setEditUsername(generateDriverUsername(val, editLastName, editCabNumber));
+                    }
+                  }}
                   required
                 />
+                <Input
+                  label="Last Name"
+                  placeholder="e.g. Johnson"
+                  value={editLastName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditLastName(val);
+                    if ((editingOperator.roles || [editingOperator.role]).includes('driver')) {
+                      setEditUsername(generateDriverUsername(editFirstName, val, editCabNumber));
+                    }
+                  }}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Phone Number"
                   placeholder="(314) 555-0199"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                 />
+
+                {((editingOperator.roles || [editingOperator.role]).includes('driver')) ? (
+                  <Input
+                    label="Cab / Unit Number"
+                    placeholder="e.g. 400"
+                    value={editCabNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditCabNumber(val);
+                      setEditUsername(generateDriverUsername(editFirstName, editLastName, val));
+                    }}
+                    helperText="Assigned cab # (e.g. 400 for #400)"
+                  />
+                ) : (
+                  <Input
+                    label="Desk Phone Extension"
+                    placeholder="Ext. 104"
+                    value={editUnit}
+                    onChange={(e) => setEditUnit(e.target.value)}
+                  />
+                )}
               </div>
 
               {((editingOperator.roles || [editingOperator.role]).includes('driver')) && (
@@ -964,10 +1118,22 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     />
                     <Input
                       label="Assigned Vehicle Unit #"
-                      placeholder="e.g. Unit #101"
+                      placeholder="e.g. Unit #400"
                       value={editUnit}
                       onChange={(e) => setEditUnit(e.target.value)}
                     />
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-bold text-slate-700">Driver System Username</div>
+                      <div className="text-[11px] text-slate-500">Pattern: [first][last_initial][cab]</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-extrabold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                        @{editUsername || generateDriverUsername(editFirstName, editLastName, editCabNumber) || 'username'}
+                      </span>
+                    </div>
                   </div>
                 </>
               )}
