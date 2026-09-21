@@ -45,7 +45,7 @@ import {
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
-import { formatVehicleTier } from '../core/services/email/email-templates';
+import { formatVehicleTier, formatVehicleTierDisplay } from '../core/services/email/email-templates';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { TripAuditModal, TripAuditTimeline } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
@@ -3256,6 +3256,39 @@ export default function DispatchRoute() {
             )}
           </button>
 
+          {/* Drivers Roster Dock Trigger Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (activeDockTab === 'drivers') {
+                setActiveDockTab('none');
+              } else {
+                setActiveDockTab('drivers');
+                setActiveMobileTab('drivers');
+              }
+            }}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+              activeDockTab === 'drivers'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+            }`}
+            title="Open Drivers Tab in Dock"
+            aria-label="Drivers Roster"
+          >
+            <CarIcon className="w-4 h-4" />
+            {drivers.filter((d) => d.status === 'available').length > 0 && (
+              <span
+                className={`absolute -top-1 -right-1 text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs ${
+                  activeDockTab === 'drivers'
+                    ? 'bg-blue-800 text-white border border-white'
+                    : 'bg-emerald-600 text-white'
+                }`}
+              >
+                {drivers.filter((d) => d.status === 'available').length}
+              </span>
+            )}
+          </button>
+
           {/* Tactical Alerts Bell Notification Center */}
           <div className="relative" ref={alertsDropdownRef}>
             <button
@@ -4865,8 +4898,8 @@ export default function DispatchRoute() {
                           <span className="font-black text-slate-900 text-sm">
                             ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                           </span>
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                            {trip.vehicleTier || 'Standard'}
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                            {formatVehicleTierDisplay(trip.vehicleTier)}
                           </span>
                           <select
                             value={trip.assignedDriverId || 'unassigned'}
@@ -4889,7 +4922,7 @@ export default function DispatchRoute() {
                                 value={drv.id}
                                 disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                               >
-                                {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                                {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                               </option>
                             ))}
                           </select>
@@ -5026,7 +5059,7 @@ export default function DispatchRoute() {
                               value={drv.id}
                               disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                             >
-                              {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                              {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                             </option>
                           ))}
                         </select>
@@ -5223,14 +5256,14 @@ export default function DispatchRoute() {
                                       value={drv.id}
                                       disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                                     >
-                                      {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                                      {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                                     </option>
                                   ))}
                                </select>
                             </td>
                             <td className="py-2 px-3">
-                              <span className="capitalize px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                                {trip.vehicleTier || 'Standard'}
+                              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                                {formatVehicleTierDisplay(trip.vehicleTier)}
                               </span>
                             </td>
                             <td className="py-2 px-3 font-bold text-slate-900">
@@ -6729,7 +6762,7 @@ export default function DispatchRoute() {
                           value={drv.id}
                           disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                         >
-                          {drv.formattedLabel || formatDriverAssignmentLabel(drv)} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                          {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                         </option>
                       ))}
                     </select>

@@ -3202,7 +3202,7 @@ export function DispatchBookingEngine({
                     value={d.id}
                     disabled={d.isBlacklisted || d.zone === 'Suspended'}
                   >
-                    {d.formattedLabel || formatDriverAssignmentLabel(d)}{d.zone === 'Suspended' ? ' (Suspended)' : ''}
+                    {d.formattedLabel || formatDriverAssignmentLabel(d)}
                   </option>
                 ))}
               </select>

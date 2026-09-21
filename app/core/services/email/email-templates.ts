@@ -30,7 +30,27 @@ export function formatVehicleTier(tier: string): string {
   if (clean === 'standard' || clean === 'sedan') return 'Executive Sedan';
   if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
   if (clean === 'compact suv') return 'Compact SUV';
+  if (clean === 'midsize suv') return 'Midsize SUV';
   if (clean === 'wheelchair' || clean === 'van' || clean === 'wav') return 'Accessible Van / WAV';
+  return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Concise UI badge formatting for vehicle tiers in tables, queues, and cards
+ */
+export function formatVehicleTierDisplay(tier?: string): string {
+  if (!tier) return 'Standard';
+  const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
+  if (clean === 'any') return 'Any';
+  if (clean === 'compact suv') return 'Compact SUV';
+  if (clean === 'midsize suv') return 'Midsize SUV';
+  if (clean === 'standard') return 'Standard';
+  if (clean === 'sedan') return 'Sedan';
+  if (clean === 'xl') return 'SUV (XL)';
+  if (clean === 'suv' || clean === 'large suv' || clean === 'full size suv') return 'Full-Size SUV';
+  if (clean === 'minivan') return 'Minivan';
+  if (clean === 'van' || clean === 'wheelchair' || clean === 'wav') return 'Van / WAV';
+  if (clean === 'premium') return 'Premium';
   return clean.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

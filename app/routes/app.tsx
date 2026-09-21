@@ -39,6 +39,7 @@ import {
 } from '../components/ui/Icons';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
+import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 
 export function meta() {
   return [
@@ -806,8 +807,8 @@ export default function PassengerAppRoute() {
                         {/* Date & Vehicle */}
                         <div className="text-xs font-semibold text-slate-500 flex items-center justify-between">
                           <span>{dateFormatted}</span>
-                          <span className="capitalize font-bold text-slate-700">
-                            {trip.vehicleTier || 'standard'} class
+                          <span className="font-bold text-slate-700">
+                            {formatVehicleTierDisplay(trip.vehicleTier)} class
                           </span>
                         </div>
 
@@ -1416,7 +1417,7 @@ export default function PassengerAppRoute() {
                 </span>
                 <span className="text-slate-500 block">
                   {String(selectedReceiptTrip.metadata?.vehicleUnit || 'Cab #204')} (
-                  <span className="capitalize">{selectedReceiptTrip.vehicleTier}</span>)
+                  <span>{formatVehicleTierDisplay(selectedReceiptTrip.vehicleTier)}</span>)
                 </span>
               </div>
             </div>

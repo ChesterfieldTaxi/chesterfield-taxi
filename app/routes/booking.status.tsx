@@ -7,6 +7,7 @@ import { PhoneIcon, SpinnerIcon, SearchIcon } from '../components/ui/Icons';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
+import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 
 export function meta() {
   return [
@@ -219,7 +220,7 @@ export default function BookingStatusRoute() {
           <div className="mt-6 pt-6 border-t border-slate-800 grid grid-cols-2 gap-4">
             <div>
               <span className="text-[11px] text-slate-400 uppercase font-mono block">Vehicle Class</span>
-              <span className="text-sm font-bold text-white uppercase">{trip.vehicleTier}</span>
+              <span className="text-sm font-bold text-white uppercase">{formatVehicleTierDisplay(trip.vehicleTier)}</span>
             </div>
             <div className="text-right">
               <span className="text-[11px] text-slate-400 uppercase font-mono block">Fare Total</span>

@@ -37,6 +37,7 @@ import {
 import { StripePaymentInput } from '../components/domain/payments/StripePaymentInput';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { validatePhoneNumber, sanitizeToE164, formatDisplayPhone } from '../core/utils/phone';
+import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 
 export function meta() {
   return [
@@ -1280,7 +1281,7 @@ export default function DriverAppRoute() {
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-mono text-slate-500">Tier Class</span>
-                    <span className="font-bold text-blue-400 uppercase">{driver?.vehicleTier}</span>
+                    <span className="font-bold text-blue-400 uppercase">{formatVehicleTierDisplay(driver?.vehicleTier)}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-mono text-slate-500">Area</span>
