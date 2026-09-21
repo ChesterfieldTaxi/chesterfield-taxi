@@ -12,6 +12,9 @@ export interface FlightOperationsEmailDetails {
   airlineCode?: string;
   flightNumber?: string;
   departureAirport?: string;
+  tailNumber?: string;
+  fboFacility?: string;
+  isPrivateAviation?: boolean;
   hasCheckedLuggage?: boolean;
   isAirportTrip?: boolean;
 }
@@ -43,6 +46,15 @@ export interface BookingConfirmationEmailPayload {
   flightDetails?: FlightOperationsEmailDetails;
   status?: string;
   lambertPickupInstructions?: string;
+  returnTripDetails?: {
+    tripId: string;
+    pickupAddress: string;
+    dropoffAddress: string;
+    pickupTime: string;
+    vehicleTier: string;
+    totalFare: number;
+    flightDetails?: FlightOperationsEmailDetails;
+  };
   companySettings?: {
     name?: string;
     phone?: string;
@@ -76,6 +88,15 @@ export interface AdminDispatchAlertEmailPayload {
   flightDetails?: FlightOperationsEmailDetails;
   status?: string;
   lambertPickupInstructions?: string;
+  returnTripDetails?: {
+    tripId: string;
+    pickupAddress: string;
+    dropoffAddress: string;
+    pickupTime: string;
+    vehicleTier: string;
+    totalFare: number;
+    flightDetails?: FlightOperationsEmailDetails;
+  };
   companySettings?: {
     name?: string;
     phone?: string;
@@ -121,6 +142,31 @@ export interface BookingDeclinedEmailPayload {
   vehicleTier?: string;
   reason: string;
   customNotes?: string;
+  legScope?: 'outbound' | 'return' | 'roundtrip';
+  linkedTripId?: string;
+}
+
+export interface BookingClarificationRequestEmailPayload {
+  tripId: string;
+  passenger: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  pickupAddress: string;
+  dropoffAddress: string;
+  pickupTime: string;
+  vehicleTier?: string;
+  clarificationTopic: string;
+  customMessage?: string;
+  legScope?: 'outbound' | 'return' | 'roundtrip';
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 export interface EmailDispatchResult {
@@ -138,6 +184,7 @@ export type EmailDispatchApiRequest = (
   | { type: 'dispatcher_alert'; payload: AdminDispatchAlertEmailPayload }
   | { type: 'status_update'; payload: StatusUpdateEmailPayload }
   | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload }
+  | { type: 'clarification_request'; payload: BookingClarificationRequestEmailPayload }
 ) & {
   subject?: string;
   html?: string;
@@ -161,6 +208,13 @@ export interface IEmailDispatchService {
    */
   sendBookingDeclined(
     payload: BookingDeclinedEmailPayload
+  ): Promise<EmailDispatchResult>;
+
+  /**
+   * Sends request for information or clarification email to the passenger.
+   */
+  sendClarificationRequest(
+    payload: BookingClarificationRequestEmailPayload
   ): Promise<EmailDispatchResult>;
 
   /**

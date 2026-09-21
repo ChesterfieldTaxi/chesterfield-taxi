@@ -50,6 +50,9 @@ export async function action({ request }: ActionFunctionArgs) {
         case 'booking_declined':
           result = await emailService.sendBookingDeclined(body.payload);
           break;
+        case 'clarification_request':
+          result = await emailService.sendClarificationRequest(body.payload);
+          break;
         default:
           return Response.json(
             { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },

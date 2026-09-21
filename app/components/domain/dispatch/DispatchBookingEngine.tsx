@@ -19,8 +19,22 @@ import {
   ShieldCheckIcon,
   AlertTriangleIcon,
   CheckIcon,
+  PlaneIcon,
+  PlaneLandingIcon,
+  PlaneTakeoffIcon,
 } from '../../ui/Icons';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
+import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
+
+export const COMMON_FBO_FACILITIES = [
+  'Signature Flight Support (STL - Hangar 2)',
+  'Signature Aviation (SUS - Spirit of St. Louis)',
+  'Million Air (SUS - Spirit of St. Louis)',
+  'TAC Air / Signature (CPS - St. Louis Downtown)',
+  'Premier Jet Center (SUS)',
+  'Helicopter / Private Ramp Area',
+  'Other / General Aviation Hangar',
+];
 
 export interface AdditionalPassenger {
   name: string;
@@ -77,6 +91,13 @@ export interface ReturnTripDetails {
   returnEstimatedFare?: number;
   returnEstimatedDurationMinutes?: number;
   returnEstimatedDistanceMiles?: number;
+  returnProvideFlightInfo?: boolean;
+  returnAirline?: string;
+  returnFlightNumber?: string;
+  returnFlightOrigin?: string;
+  returnTailNumber?: string;
+  returnFboFacility?: string;
+  returnHasCheckedLuggage?: boolean;
 }
 
 export interface RepeatTripDetails {
@@ -129,6 +150,13 @@ export interface DispatchFormValues {
   isFareOverridden: boolean;
   estimatedDurationMinutes: number;
   estimatedDistanceMiles: number;
+  provideFlightInfo?: boolean;
+  airline?: string;
+  flightNumber?: string;
+  flightOrigin?: string;
+  tailNumber?: string;
+  fboFacility?: string;
+  hasCheckedLuggage?: boolean;
 }
 
 export interface DispatchBookingEngineProps {
@@ -175,20 +203,27 @@ export function DispatchBookingEngine({
   const isEditMode = Boolean(initialTrip?.id);
   const isCompleted = initialTrip?.status === 'completed';
   const isCancelled = initialTrip?.status === 'cancelled';
-  const linkedTripId =
+  const outboundTripId =
     initialTrip?.linkedTripId ||
+    (initialTrip?.metadata as any)?.linkedTripId;
+  const returnTripId =
     initialTrip?.linkedReturnTripId ||
-    (initialTrip?.metadata as any)?.linkedTripId ||
-    (initialTrip?.metadata as any)?.linkedReturnTripId;
+    (initialTrip?.metadata as any)?.linkedReturnTripId ||
+    (initialTrip?.metadata as any)?.returnTripId;
   const isReturnRide = Boolean(
     initialTrip?.isReturnRide ||
     (initialTrip?.metadata as any)?.isReturnRide ||
-    initialTrip?.linkedTripId
+    outboundTripId
   );
+  const targetLegTripId = isReturnRide ? outboundTripId : returnTripId;
+  const linkedTripId = targetLegTripId;
   const returnScheduledTime =
     initialTrip?.returnScheduledPickupTime ||
-    (initialTrip?.metadata as any)?.returnScheduledPickupTime;
-  const hasLinkedTrip = Boolean(linkedTripId);
+    (initialTrip?.metadata as any)?.returnScheduledPickupTime ||
+    ((initialTrip?.metadata as any)?.returnDate && (initialTrip?.metadata as any)?.returnTime
+      ? `${(initialTrip?.metadata as any)?.returnDate}T${(initialTrip?.metadata as any)?.returnTime}:00`
+      : undefined);
+  const hasLinkedTrip = Boolean(targetLegTripId);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
 
   // Keep latest onValuesChange in a ref to avoid infinite dependency re-triggers
@@ -208,6 +243,15 @@ export function DispatchBookingEngine({
   const [dropoffAddress, setDropoffAddress] = useState('');
   const [dropoffCoordinates, setDropoffCoordinates] = useState<GeoPoint | undefined>();
   const [intermediateStops, setIntermediateStops] = useState<Array<{ address: string; coordinates?: GeoPoint }>>([]);
+
+  // Flight & Aviation State: Outbound
+  const [provideFlightInfo, setProvideFlightInfo] = useState(false);
+  const [airline, setAirline] = useState('');
+  const [flightNumber, setFlightNumber] = useState('');
+  const [flightOrigin, setFlightOrigin] = useState('');
+  const [tailNumber, setTailNumber] = useState('');
+  const [fboFacility, setFboFacility] = useState('');
+  const [hasCheckedLuggage, setHasCheckedLuggage] = useState(false);
 
   // Passenger & Contact Person
   const [passengerName, setPassengerName] = useState('');
@@ -306,6 +350,38 @@ export function DispatchBookingEngine({
   const [returnEstimatedDurationMinutes, setReturnEstimatedDurationMinutes] = useState(0);
   const [returnEstimatedDistanceMiles, setReturnEstimatedDistanceMiles] = useState(0);
   const [returnEstimatedFare, setReturnEstimatedFare] = useState(0);
+
+  // Flight & Aviation State: Return
+  const [returnProvideFlightInfo, setReturnProvideFlightInfo] = useState(false);
+  const [returnAirline, setReturnAirline] = useState('');
+  const [returnFlightNumber, setReturnFlightNumber] = useState('');
+  const [returnFlightOrigin, setReturnFlightOrigin] = useState('');
+  const [returnTailNumber, setReturnTailNumber] = useState('');
+  const [returnFboFacility, setReturnFboFacility] = useState('');
+  const [returnHasCheckedLuggage, setReturnHasCheckedLuggage] = useState(false);
+
+  // Airport & Aviation auto-detection
+  const airportDetection = useMemo(() => {
+    return detectAirportInAddresses(pickupAddress, dropoffAddress);
+  }, [pickupAddress, dropoffAddress]);
+
+  const returnAirportDetection = useMemo(() => {
+    return detectAirportInAddresses(returnPickupAddress || '', returnDropoffAddress || '');
+  }, [returnPickupAddress, returnDropoffAddress]);
+
+  // Auto-toggle flight info when airport address is detected on outbound
+  useEffect(() => {
+    if (airportDetection.isAirportTrip) {
+      setProvideFlightInfo(true);
+    }
+  }, [airportDetection.isAirportTrip]);
+
+  // Auto-toggle return flight info when return airport address is detected
+  useEffect(() => {
+    if (returnAirportDetection.isAirportTrip) {
+      setReturnProvideFlightInfo(true);
+    }
+  }, [returnAirportDetection.isAirportTrip]);
 
   // Repeat / Recurring Schedule
   const [repeat, setRepeat] = useState(false);
@@ -518,6 +594,48 @@ export function DispatchBookingEngine({
       if (initialTrip.pricing?.totalFare) {
         setEstimatedFare(initialTrip.pricing.totalFare);
       }
+
+      // Hydrate flight & aviation info
+      const hasFlightInfo = Boolean(
+        meta.provideFlightInfo ||
+        meta.airline ||
+        meta.airlineName ||
+        meta.flightNumber ||
+        meta.tailNumber ||
+        meta.fboFacility ||
+        meta.isAirportTrip ||
+        (initialTrip as any).flightDetails?.airlineName ||
+        (initialTrip as any).flightDetails?.flightNumber ||
+        (initialTrip as any).flightDetails?.tailNumber
+      );
+      setProvideFlightInfo(hasFlightInfo);
+      setAirline(meta.airline || meta.airlineName || (initialTrip as any).flightDetails?.airlineName || '');
+      setFlightNumber(meta.flightNumber || (initialTrip as any).flightDetails?.flightNumber || '');
+      setFlightOrigin(meta.flightOrigin || meta.departureAirport || (initialTrip as any).flightDetails?.departureAirport || '');
+      setTailNumber(meta.tailNumber || (initialTrip as any).flightDetails?.tailNumber || '');
+      setFboFacility(meta.fboFacility || (initialTrip as any).flightDetails?.fboFacility || '');
+      setHasCheckedLuggage(Boolean(meta.hasCheckedLuggage || (initialTrip as any).flightDetails?.hasCheckedLuggage));
+
+      // Hydrate return flight info if present
+      const returnMeta = (meta.returnTripDetails || meta.returnFlightDetails || {}) as Record<string, any>;
+      const hasReturnFlightInfo = Boolean(
+        meta.returnProvideFlightInfo ||
+        returnMeta.provideFlightInfo ||
+        meta.returnAirline ||
+        meta.returnFlightNumber ||
+        meta.returnTailNumber ||
+        returnMeta.airline ||
+        returnMeta.flightDetails?.airlineName ||
+        returnMeta.flightDetails?.flightNumber ||
+        returnMeta.flightDetails?.tailNumber
+      );
+      setReturnProvideFlightInfo(hasReturnFlightInfo);
+      setReturnAirline(meta.returnAirline || returnMeta.airline || returnMeta.flightDetails?.airlineName || '');
+      setReturnFlightNumber(meta.returnFlightNumber || returnMeta.flightNumber || returnMeta.flightDetails?.flightNumber || '');
+      setReturnFlightOrigin(meta.returnFlightOrigin || returnMeta.flightOrigin || returnMeta.departureAirport || returnMeta.flightDetails?.departureAirport || '');
+      setReturnTailNumber(meta.returnTailNumber || returnMeta.tailNumber || returnMeta.flightDetails?.tailNumber || '');
+      setReturnFboFacility(meta.returnFboFacility || returnMeta.fboFacility || returnMeta.flightDetails?.fboFacility || '');
+      setReturnHasCheckedLuggage(Boolean(meta.returnHasCheckedLuggage || returnMeta.hasCheckedLuggage || returnMeta.flightDetails?.hasCheckedLuggage));
     } else {
       // Restore from localStorage draft
       try {
@@ -582,6 +700,20 @@ export function DispatchBookingEngine({
           if (parsed.returnEstimatedFare) setReturnEstimatedFare(parsed.returnEstimatedFare);
           if (parsed.manualFare) setManualFare(parsed.manualFare);
           if (parsed.isFareOverridden !== undefined) setIsFareOverridden(parsed.isFareOverridden);
+          if (parsed.provideFlightInfo !== undefined) setProvideFlightInfo(parsed.provideFlightInfo);
+          if (parsed.airline) setAirline(parsed.airline);
+          if (parsed.flightNumber) setFlightNumber(parsed.flightNumber);
+          if (parsed.flightOrigin) setFlightOrigin(parsed.flightOrigin);
+          if (parsed.tailNumber) setTailNumber(parsed.tailNumber);
+          if (parsed.fboFacility) setFboFacility(parsed.fboFacility);
+          if (parsed.hasCheckedLuggage !== undefined) setHasCheckedLuggage(parsed.hasCheckedLuggage);
+          if (parsed.returnProvideFlightInfo !== undefined) setReturnProvideFlightInfo(parsed.returnProvideFlightInfo);
+          if (parsed.returnAirline) setReturnAirline(parsed.returnAirline);
+          if (parsed.returnFlightNumber) setReturnFlightNumber(parsed.returnFlightNumber);
+          if (parsed.returnFlightOrigin) setReturnFlightOrigin(parsed.returnFlightOrigin);
+          if (parsed.returnTailNumber) setReturnTailNumber(parsed.returnTailNumber);
+          if (parsed.returnFboFacility) setReturnFboFacility(parsed.returnFboFacility);
+          if (parsed.returnHasCheckedLuggage !== undefined) setReturnHasCheckedLuggage(parsed.returnHasCheckedLuggage);
         }
       } catch {}
     }
@@ -672,6 +804,20 @@ export function DispatchBookingEngine({
       estimatedFare,
       manualFare,
       isFareOverridden,
+      provideFlightInfo,
+      airline,
+      flightNumber,
+      flightOrigin,
+      tailNumber,
+      fboFacility,
+      hasCheckedLuggage,
+      returnProvideFlightInfo,
+      returnAirline,
+      returnFlightNumber,
+      returnFlightOrigin,
+      returnTailNumber,
+      returnFboFacility,
+      returnHasCheckedLuggage,
     };
 
     try {
@@ -753,6 +899,13 @@ export function DispatchBookingEngine({
         returnEstimatedFare,
         returnEstimatedDurationMinutes,
         returnEstimatedDistanceMiles,
+        returnProvideFlightInfo,
+        returnAirline,
+        returnFlightNumber,
+        returnFlightOrigin,
+        returnTailNumber,
+        returnFboFacility,
+        returnHasCheckedLuggage,
       },
       repeatDetails: {
         repeat,
@@ -772,6 +925,13 @@ export function DispatchBookingEngine({
       isFareOverridden,
       estimatedDurationMinutes,
       estimatedDistanceMiles,
+      provideFlightInfo,
+      airline,
+      flightNumber,
+      flightOrigin,
+      tailNumber,
+      fboFacility,
+      hasCheckedLuggage,
     });
   }, [
     draftStorageKey,
@@ -847,6 +1007,20 @@ export function DispatchBookingEngine({
     isFareOverridden,
     estimatedDurationMinutes,
     estimatedDistanceMiles,
+    provideFlightInfo,
+    airline,
+    flightNumber,
+    flightOrigin,
+    tailNumber,
+    fboFacility,
+    hasCheckedLuggage,
+    returnProvideFlightInfo,
+    returnAirline,
+    returnFlightNumber,
+    returnFlightOrigin,
+    returnTailNumber,
+    returnFboFacility,
+    returnHasCheckedLuggage,
   ]);
 
   // Live route calculation & pricing (Outbound, wrapped in 800ms debounce & trigger guard)
@@ -1246,6 +1420,20 @@ export function DispatchBookingEngine({
     setIsFareOverridden(false);
     setEstimatedDurationMinutes(0);
     setEstimatedDistanceMiles(0);
+    setProvideFlightInfo(false);
+    setAirline('');
+    setFlightNumber('');
+    setFlightOrigin('');
+    setTailNumber('');
+    setFboFacility('');
+    setHasCheckedLuggage(false);
+    setReturnProvideFlightInfo(false);
+    setReturnAirline('');
+    setReturnFlightNumber('');
+    setReturnFlightOrigin('');
+    setReturnTailNumber('');
+    setReturnFboFacility('');
+    setReturnHasCheckedLuggage(false);
     setSubmitError(null);
 
     try {
@@ -1337,6 +1525,13 @@ export function DispatchBookingEngine({
         returnEstimatedFare,
         returnEstimatedDurationMinutes,
         returnEstimatedDistanceMiles,
+        returnProvideFlightInfo,
+        returnAirline,
+        returnFlightNumber,
+        returnFlightOrigin,
+        returnTailNumber,
+        returnFboFacility,
+        returnHasCheckedLuggage,
       },
       repeatDetails: {
         repeat,
@@ -1356,6 +1551,13 @@ export function DispatchBookingEngine({
       isFareOverridden,
       estimatedDurationMinutes,
       estimatedDistanceMiles,
+      provideFlightInfo,
+      airline,
+      flightNumber,
+      flightOrigin,
+      tailNumber,
+      fboFacility,
+      hasCheckedLuggage,
     };
 
     if (onCopyBooking) {
@@ -1459,6 +1661,32 @@ export function DispatchBookingEngine({
       ? `Car Seats: ${carSeatSummaryParts.join(', ')}`
       : undefined;
 
+    let outboundFlightNotes = '';
+    if (provideFlightInfo) {
+      if (airportDetection.isPrivateAviation) {
+        if (tailNumber || fboFacility) {
+          outboundFlightNotes = `[Private Aviation: Tail #${tailNumber || 'N/A'}, FBO: ${fboFacility || 'N/A'}${hasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
+        }
+      } else {
+        if (airline || flightNumber) {
+          outboundFlightNotes = `[Flight: ${airline || 'N/A'} #${flightNumber || 'N/A'}${flightOrigin ? ` from ${flightOrigin}` : ''}${hasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
+        }
+      }
+    }
+
+    let returnLegFlightNotes = '';
+    if (returnProvideFlightInfo) {
+      if (returnAirportDetection.isPrivateAviation) {
+        if (returnTailNumber || returnFboFacility) {
+          returnLegFlightNotes = `[Return Private Aviation: Tail #${returnTailNumber || 'N/A'}, FBO: ${returnFboFacility || 'N/A'}${returnHasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
+        }
+      } else {
+        if (returnAirline || returnFlightNumber) {
+          returnLegFlightNotes = `[Return Flight: ${returnAirline || 'N/A'} #${returnFlightNumber || 'N/A'}${returnFlightOrigin ? ` from ${returnFlightOrigin}` : ''}${returnHasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
+        }
+      }
+    }
+
     const metadataPayload = {
       company,
       internalNotes,
@@ -1522,6 +1750,13 @@ export function DispatchBookingEngine({
             returnEstimatedFare,
             returnEstimatedDurationMinutes,
             returnEstimatedDistanceMiles,
+            returnProvideFlightInfo,
+            returnAirline: returnProvideFlightInfo ? returnAirline : undefined,
+            returnFlightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
+            returnFlightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+            returnTailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
+            returnFboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
+            returnHasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
           }
         : undefined,
       repeatDetails: repeat
@@ -1535,6 +1770,29 @@ export function DispatchBookingEngine({
             repeatsRoundTrip: returnTrip,
           }
         : undefined,
+      flightNotes: outboundFlightNotes || undefined,
+      flightDetails: provideFlightInfo
+        ? {
+            airlineName: airline || undefined,
+            flightNumber: flightNumber || undefined,
+            departureAirport: flightOrigin || undefined,
+            tailNumber: tailNumber || undefined,
+            fboFacility: fboFacility || undefined,
+            hasCheckedLuggage,
+          }
+        : undefined,
+      provideFlightInfo,
+      airline: provideFlightInfo ? airline : undefined,
+      airlineName: provideFlightInfo ? airline : undefined,
+      flightNumber: provideFlightInfo ? flightNumber : undefined,
+      flightOrigin: provideFlightInfo ? flightOrigin : undefined,
+      departureAirport: provideFlightInfo ? flightOrigin : undefined,
+      tailNumber: provideFlightInfo ? tailNumber : undefined,
+      fboFacility: provideFlightInfo ? fboFacility : undefined,
+      isPrivateAviation: Boolean(airportDetection.isPrivateAviation),
+      hasCheckedLuggage: provideFlightInfo ? hasCheckedLuggage : false,
+      isAirportTrip: Boolean(airportDetection.isAirportTrip),
+      airportIataCode: airportDetection.airport?.iataCode,
     };
 
     try {
@@ -1570,6 +1828,7 @@ export function DispatchBookingEngine({
           bookingType: timingType === 'later' ? 'scheduled' : 'asap',
           scheduledPickupTime,
           driverNotes: notesForAll,
+          flightNotes: outboundFlightNotes || undefined,
           assignedDriverId: driverId === 'unassigned' ? null : driverId,
           status: driverId !== 'unassigned' && initialTrip.status === 'pending' ? 'assigned' : initialTrip.status,
           pricing: {
@@ -1626,6 +1885,7 @@ export function DispatchBookingEngine({
           },
           vehicleTier: tier,
           driverNotes: notesForAll,
+          flightNotes: outboundFlightNotes || undefined,
           pricing: {
             baseFare: 5.0,
             distanceMiles: estimatedDistanceMiles,
@@ -1712,6 +1972,7 @@ export function DispatchBookingEngine({
                   ? 'premium'
                   : 'standard',
               driverNotes: notesForAll,
+              flightNotes: returnLegFlightNotes || undefined,
               pricing: {
                 baseFare: 5.0,
                 distanceMiles: returnEstimatedDistanceMiles || estimatedDistanceMiles,
@@ -1735,6 +1996,17 @@ export function DispatchBookingEngine({
                 linkedTripId: createdTrip.id,
                 isReturnRide: true,
                 createdByRole: 'dispatcher',
+                airline: returnProvideFlightInfo ? returnAirline : undefined,
+                airlineName: returnProvideFlightInfo ? returnAirline : undefined,
+                flightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
+                flightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                departureAirport: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                tailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
+                fboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
+                isPrivateAviation: Boolean(returnAirportDetection.isPrivateAviation),
+                hasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
+                isAirportTrip: Boolean(returnAirportDetection.isAirportTrip),
+                airportIataCode: returnAirportDetection.airport?.iataCode,
               },
             };
             const createdReturnTrip = await service.createBooking(returnPayload);
@@ -1935,15 +2207,210 @@ export function DispatchBookingEngine({
                 Estimate: <span className="font-bold text-slate-700">{estimatedDurationMinutes} min</span>,{' '}
                 <span className="font-bold text-slate-700">{estimatedDistanceMiles} mi</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setIntermediateStops([...intermediateStops, { address: '' }])}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
-              >
-                <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
-                <span>Add stop</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {!airportDetection.isAirportTrip && !provideFlightInfo && (
+                  <button
+                    type="button"
+                    onClick={() => setProvideFlightInfo(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs border border-sky-200 transition-all shadow-2xs active:scale-95"
+                  >
+                    <PlaneIcon className="w-3.5 h-3.5 text-sky-600" />
+                    <span>+ Flight Info</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIntermediateStops([...intermediateStops, { address: '' }])}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
+                >
+                  <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Add stop</span>
+                </button>
+              </div>
             </div>
+
+            {/* Outbound Flight / Aviation Details Box (Auto-detected for airport pickups/dropoffs or dispatcher-enabled) */}
+            {(airportDetection.isAirportTrip || provideFlightInfo) && (
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
+                    <PlaneLandingIcon className={`w-4 h-4 text-blue-600 ${airportDetection.isDropoffAirport ? 'rotate-45' : ''}`} />
+                    <span>
+                      {airportDetection.isPrivateAviation
+                        ? (airportDetection.isPickupAirport
+                            ? `🛩️ ${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Arrival`
+                            : `🛩️ ${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Dropoff`)
+                        : (airportDetection.isPickupAirport
+                            ? `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Arrival Details`
+                            : `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Dropoff Details`)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-semibold text-blue-900 bg-white/90 px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
+                      <input
+                        type="checkbox"
+                        checked={provideFlightInfo}
+                        onChange={(e) => setProvideFlightInfo(e.target.checked)}
+                        className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 w-3 h-3"
+                      />
+                      <span>
+                        {airportDetection.isPickupAirport
+                          ? 'Track Inbound Flight'
+                          : (airportDetection.isPrivateAviation ? 'Provide Aviation Details' : 'Provide Airline')}
+                      </span>
+                    </label>
+                    <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold">
+                      {airportDetection.isPrivateAviation
+                        ? '🛩️ Private Aviation (FBO)'
+                        : (airportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing')}
+                    </span>
+                  </div>
+                </div>
+
+                {airportDetection.isDropoffAirport && (
+                  <div className="text-[10.5px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-start gap-1.5">
+                    <span className="font-bold text-amber-800">ℹ️ Note:</span>
+                    <span>Your chauffeur will arrive at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.</span>
+                  </div>
+                )}
+
+                {provideFlightInfo && (
+                  <div className="space-y-2 pt-0.5">
+                    {airportDetection.isPrivateAviation ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            FBO Facility / Terminal
+                          </span>
+                          <input
+                            type="text"
+                            list="dispatch-outbound-fbo-list"
+                            placeholder="e.g. Signature Aviation, TAC Air..."
+                            value={fboFacility}
+                            onChange={(e) => setFboFacility(e.target.value)}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
+                          />
+                          <datalist id="dispatch-outbound-fbo-list">
+                            {COMMON_FBO_FACILITIES.map((fbo) => (
+                              <option key={fbo} value={fbo} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            Aircraft Tail Number {airportDetection.isPickupAirport ? '(Required)' : '(Optional)'}
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="e.g. N12345"
+                            value={tailNumber}
+                            onChange={(e) => setTailNumber(e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase font-mono font-bold"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            {airportDetection.isPickupAirport ? 'Departing From (Origin - Optional)' : 'Departing To (Destination - Optional)'}
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="e.g. TEB, VNY, PWK"
+                            value={flightOrigin}
+                            onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            Airline {airportDetection.isDropoffAirport ? '(Terminal Door)' : ''}
+                          </span>
+                          <select
+                            value={airline}
+                            onChange={(e) => setAirline(e.target.value)}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
+                          >
+                            <option value="">Select Airline</option>
+                            {MAJOR_AIRLINES.map((al) => (
+                              <option key={al.code} value={al.name}>
+                                {al.name} ({al.code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            {airportDetection.isPickupAirport ? 'Flight Number (1–4 digits)' : 'Flight Number (Optional, 1–4 digits)'}
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{1,4}"
+                            maxLength={4}
+                            placeholder="e.g. 1234"
+                            value={flightNumber}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setFlightNumber(val);
+                            }}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs font-mono font-bold"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                            {airportDetection.isPickupAirport ? 'Departing From (Origin)' : 'Departing To (Destination - Optional)'}
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="e.g. ORD, ATL, DEN"
+                            value={flightOrigin}
+                            onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 text-[11px] text-blue-950">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasCheckedLuggage}
+                          onChange={(e) => setHasCheckedLuggage(e.target.checked)}
+                          className="rounded border-blue-300 text-blue-600"
+                        />
+                        <span>
+                          {airportDetection.isPickupAirport
+                            ? 'Passenger has checked baggage (allows baggage claim grace period)'
+                            : 'Passenger has checked baggage to drop off at curbside'}
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="text-[10px] text-slate-600 bg-white/80 p-2 rounded border border-blue-100 space-y-0.5">
+                      {airportDetection.isPrivateAviation ? (
+                        <>
+                          <span className="font-bold text-slate-800">Private Aviation FBO Coordinates: </span>
+                          <span>Chauffeur coordinates directly with the FBO front desk for ramp-side or lobby greetings. Tail number ensures rapid aircraft arrival verification.</span>
+                        </>
+                      ) : airportDetection.isPickupAirport ? (
+                        <>
+                          <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
+                          <span>Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-slate-800">Airport Curbside Dropoff: </span>
+                          <span>Chauffeur routes directly to passenger's departure terminal and airline ticketing door.</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -2725,25 +3192,28 @@ export function DispatchBookingEngine({
                       <p>
                         This booking represents the <strong>return leg</strong> of a round-trip. Linked to primary outbound trip{' '}
                         <span className="font-mono font-bold bg-indigo-100/70 px-1 py-0.5 rounded">
-                          #{linkedTripId?.slice(0, 8)}
+                          #{linkedTripId?.slice(0, 8) || linkedTripId}
                         </span>.
                       </p>
                     ) : (
                       <p>
                         Linked return leg exists
                         {returnScheduledTime ? ` scheduled for ${new Date(returnScheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
-                        {' '}(Trip <span className="font-mono font-bold bg-indigo-100/70 px-1 py-0.5 rounded">#{linkedTripId?.slice(0, 8)}</span>).
+                        {' '}(Trip <span className="font-mono font-bold bg-indigo-100/70 px-1 py-0.5 rounded">#{linkedTripId?.slice(0, 8) || linkedTripId}</span>).
                       </p>
                     )}
                   </div>
 
-                  {onOpenLinkedTrip && linkedTripId && (
+                  {linkedTripId && (
                     <button
                       type="button"
-                      onClick={() => onOpenLinkedTrip(linkedTripId)}
+                      onClick={() => {
+                        window.open(`/dispatch?tripId=${linkedTripId}`, '_blank');
+                        onOpenLinkedTrip?.(linkedTripId);
+                      }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs active:scale-98"
                     >
-                      <span>✎ Open &amp; Edit {isReturnRide ? 'Outbound Leg' : 'Return Leg'} in New Tab</span>
+                      <span>↗ {isReturnRide ? 'Open Outbound Leg in New Tab' : 'Open Return Leg in New Tab'}</span>
                     </button>
                   )}
                 </div>
@@ -2838,14 +3308,210 @@ export function DispatchBookingEngine({
                         <span className="font-bold text-slate-700">{returnEstimatedDurationMinutes} min</span>,{' '}
                         <span className="font-bold text-slate-700">{returnEstimatedDistanceMiles} mi</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
-                        className="text-indigo-600 hover:text-indigo-800 font-semibold"
-                      >
-                        + Add stop
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {!returnAirportDetection.isAirportTrip && !returnProvideFlightInfo && (
+                          <button
+                            type="button"
+                            onClick={() => setReturnProvideFlightInfo(true)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition-all shadow-2xs active:scale-95"
+                          >
+                            <PlaneIcon className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>+ Flight Info</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition-all shadow-2xs active:scale-95"
+                        >
+                          <PlusIcon className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Add stop</span>
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Return Flight / Aviation Details Box (Auto-detected for return airport pickups/dropoffs or dispatcher-enabled) */}
+                    {(returnAirportDetection.isAirportTrip || returnProvideFlightInfo) && (
+                      <div className="p-3 bg-white/90 border border-indigo-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
+                            <PlaneLandingIcon className={`w-4 h-4 text-indigo-600 ${returnAirportDetection.isDropoffAirport ? 'rotate-45' : ''}`} />
+                            <span>
+                              {returnAirportDetection.isPrivateAviation
+                                ? (returnAirportDetection.isPickupAirport
+                                    ? `🛩️ ${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Arrival`
+                                    : `🛩️ ${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Dropoff`)
+                                : (returnAirportDetection.isPickupAirport
+                                    ? `✈️ ${returnAirportDetection.airport?.iataCode || 'Airport'} Return Arrival Details`
+                                    : `✈️ ${returnAirportDetection.airport?.iataCode || 'Airport'} Return Dropoff Details`)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-semibold text-indigo-900 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                              <input
+                                type="checkbox"
+                                checked={returnProvideFlightInfo}
+                                onChange={(e) => setReturnProvideFlightInfo(e.target.checked)}
+                                className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3"
+                              />
+                              <span>
+                                {returnAirportDetection.isPickupAirport
+                                  ? 'Track Inbound Flight'
+                                  : (returnAirportDetection.isPrivateAviation ? 'Provide Aviation Details' : 'Provide Airline')}
+                              </span>
+                            </label>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded font-bold">
+                              {returnAirportDetection.isPrivateAviation
+                                ? '🛩️ Private Aviation (FBO)'
+                                : (returnAirportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {returnAirportDetection.isDropoffAirport && (
+                          <div className="text-[10.5px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-md p-2 flex items-start gap-1.5">
+                            <span className="font-bold text-amber-800">ℹ️ Note:</span>
+                            <span>Your chauffeur will arrive at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.</span>
+                          </div>
+                        )}
+
+                        {returnProvideFlightInfo && (
+                          <div className="space-y-2 pt-0.5">
+                            {returnAirportDetection.isPrivateAviation ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    FBO Facility / Terminal
+                                  </span>
+                                  <input
+                                    type="text"
+                                    list="dispatch-return-fbo-list"
+                                    placeholder="e.g. Signature Aviation, TAC Air..."
+                                    value={returnFboFacility}
+                                    onChange={(e) => setReturnFboFacility(e.target.value)}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-800"
+                                  />
+                                  <datalist id="dispatch-return-fbo-list">
+                                    {COMMON_FBO_FACILITIES.map((fbo) => (
+                                      <option key={fbo} value={fbo} />
+                                    ))}
+                                  </datalist>
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    Aircraft Tail Number {returnAirportDetection.isPickupAirport ? '(Required)' : '(Optional)'}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. N12345"
+                                    value={returnTailNumber}
+                                    onChange={(e) => setReturnTailNumber(e.target.value.toUpperCase())}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs uppercase font-mono font-bold"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    {returnAirportDetection.isPickupAirport ? 'Departing From (Origin - Optional)' : 'Departing To (Destination - Optional)'}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. TEB, VNY, PWK"
+                                    value={returnFlightOrigin}
+                                    onChange={(e) => setReturnFlightOrigin(e.target.value.toUpperCase())}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs uppercase"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    Airline {returnAirportDetection.isDropoffAirport ? '(Terminal Door)' : ''}
+                                  </span>
+                                  <select
+                                    value={returnAirline}
+                                    onChange={(e) => setReturnAirline(e.target.value)}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-800"
+                                  >
+                                    <option value="">Select Airline</option>
+                                    {MAJOR_AIRLINES.map((al) => (
+                                      <option key={al.code} value={al.name}>
+                                        {al.name} ({al.code})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    {returnAirportDetection.isPickupAirport ? 'Flight Number (1–4 digits)' : 'Flight Number (Optional, 1–4 digits)'}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]{1,4}"
+                                    maxLength={4}
+                                    placeholder="e.g. 1234"
+                                    value={returnFlightNumber}
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                      setReturnFlightNumber(val);
+                                    }}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs font-mono font-bold"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                    {returnAirportDetection.isPickupAirport ? 'Departing From (Origin)' : 'Departing To (Destination - Optional)'}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. ORD, ATL, DEN"
+                                    value={returnFlightOrigin}
+                                    onChange={(e) => setReturnFlightOrigin(e.target.value.toUpperCase())}
+                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs uppercase"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-1 border-t border-indigo-200/60 text-[11px] text-indigo-950">
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={returnHasCheckedLuggage}
+                                  onChange={(e) => setReturnHasCheckedLuggage(e.target.checked)}
+                                  className="rounded border-indigo-300 text-indigo-600"
+                                />
+                                <span>
+                                  {returnAirportDetection.isPickupAirport
+                                    ? 'Passenger has checked baggage (allows baggage claim grace period)'
+                                    : 'Passenger has checked baggage to drop off at curbside'}
+                                </span>
+                              </label>
+                            </div>
+
+                            <div className="text-[10px] text-slate-600 bg-white/80 p-2 rounded border border-indigo-100 space-y-0.5">
+                              {returnAirportDetection.isPrivateAviation ? (
+                                <>
+                                  <span className="font-bold text-slate-800">Private Aviation FBO Coordinates: </span>
+                                  <span>Chauffeur coordinates directly with the FBO front desk for ramp-side or lobby greetings. Tail number ensures rapid aircraft arrival verification.</span>
+                                </>
+                              ) : returnAirportDetection.isPickupAirport ? (
+                                <>
+                                  <span className="font-bold text-slate-800">STL Curbside Pickup Instructions: </span>
+                                  <span>Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-bold text-slate-800">Airport Curbside Dropoff: </span>
+                                  <span>Chauffeur routes directly to passenger's departure terminal and airline ticketing door.</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Return Date & Time */}

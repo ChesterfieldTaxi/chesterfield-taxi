@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, Link, useSearchParams } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { getBookingService } from '../core/services/booking';
@@ -444,6 +444,9 @@ export type DesktopDockTab = 'none' | 'phone' | 'email' | 'drivers' | 'comms' | 
 
 export default function DispatchRoute() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlTripId = searchParams.get('tripId');
+  const handledUrlTripIdRef = useRef<string | null>(null);
 
   // Auth & Settings state
   const [user, setUser] = useState<AdminUser | null>(() => getAdminAuthService().getCurrentUser());
@@ -473,8 +476,13 @@ export default function DispatchRoute() {
   // Dispatcher Review Modal State for UNCONFIRMED web bookings
   const [reviewTrip, setReviewTrip] = useState<Trip | null>(null);
   const [reviewDeclineMode, setReviewDeclineMode] = useState<boolean>(false);
-  const [selectedDeclineReason, setSelectedDeclineReason] = useState<string>('No driver availability');
+  const [reviewClarifyMode, setReviewClarifyMode] = useState<boolean>(false);
+  const [selectedDeclineReason, setSelectedDeclineReason] = useState<string>('No driver availability for requested time');
+  const [declineScope, setDeclineScope] = useState<'leg' | 'both'>('leg');
+  const [confirmScope, setConfirmScope] = useState<'both' | 'leg'>('both');
   const [reviewCustomNotes, setReviewCustomNotes] = useState<string>('');
+  const [clarifyTopic, setClarifyTopic] = useState<string>('Pickup or Dropoff location details');
+  const [clarifyMessage, setClarifyMessage] = useState<string>('');
   const [isProcessingReview, setIsProcessingReview] = useState<boolean>(false);
   const [reviewAlert, setReviewAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -1022,8 +1030,13 @@ export default function DispatchRoute() {
   const handleOpenReviewModal = (trip: Trip) => {
     setReviewTrip(trip);
     setReviewDeclineMode(false);
-    setSelectedDeclineReason('No driver availability');
+    setReviewClarifyMode(false);
+    setSelectedDeclineReason('No driver availability for requested time');
+    setDeclineScope('leg');
+    setConfirmScope('both');
     setReviewCustomNotes('');
+    setClarifyTopic('Pickup or Dropoff location details');
+    setClarifyMessage('');
     setReviewAlert(null);
   };
 
@@ -1033,18 +1046,76 @@ export default function DispatchRoute() {
     setReviewAlert(null);
     try {
       const bookingService = getBookingService();
+      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+      const emailService = getEmailDispatchService();
+
+      const isReturn = Boolean(reviewMeta.isReturnRide || reviewMeta.linkedTripId);
+      const linkedLegId =
+        (reviewMeta.hasReturnTrip && reviewMeta.returnTripId) ||
+        (reviewMeta.isReturnRide && reviewMeta.linkedTripId) ||
+        reviewTrip.linkedReturnTripId ||
+        reviewTrip.linkedTripId;
+
+      const shouldConfirmBoth = Boolean(confirmScope === 'both' && linkedLegId);
+      const linkedTripObj = shouldConfirmBoth ? trips.find((t) => t.id === linkedLegId) : null;
+
       if (bookingService.updateTripStatus) {
         await bookingService.updateTripStatus(reviewTrip.id, 'CONFIRMED', {
           actorRole: 'admin',
-          reason: 'Dispatcher accepted web booking',
+          reason: shouldConfirmBoth ? 'Dispatcher accepted round-trip web booking' : 'Dispatcher accepted web booking leg',
         });
+        if (shouldConfirmBoth && linkedLegId) {
+          await bookingService.updateTripStatus(linkedLegId, 'CONFIRMED', {
+            actorRole: 'admin',
+            reason: `Dispatcher accepted round-trip leg linked to #${reviewTrip.id}`,
+          });
+        }
       } else if (bookingService.updateTrip) {
         await bookingService.updateTrip(reviewTrip.id, { status: 'CONFIRMED' });
+        if (shouldConfirmBoth && linkedLegId) {
+          await bookingService.updateTrip(linkedLegId, { status: 'CONFIRMED' });
+        }
       }
 
+      // Flight / Aviation details for email
+      const outboundFlightDetails = (reviewMeta.flightNumber || reviewMeta.airline || reviewMeta.airlineName || reviewMeta.tailNumber)
+        ? {
+            flightNumber: reviewMeta.flightNumber ? String(reviewMeta.flightNumber) : undefined,
+            airlineName: (reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) : undefined,
+            departureAirport: reviewMeta.flightOrigin || reviewMeta.departureAirport ? String(reviewMeta.flightOrigin || reviewMeta.departureAirport) : undefined,
+            tailNumber: reviewMeta.tailNumber ? String(reviewMeta.tailNumber) : undefined,
+            fboFacility: reviewMeta.fboFacility ? String(reviewMeta.fboFacility) : undefined,
+            isPrivateAviation: Boolean(reviewMeta.isPrivateAviation || reviewMeta.tailNumber || reviewMeta.fboFacility),
+            hasCheckedLuggage: Boolean(reviewMeta.hasCheckedLuggage),
+            isAirportTrip: Boolean(reviewMeta.isAirportTrip),
+          }
+        : undefined;
+
+      const returnTripPayload = (reviewMeta.hasReturnTrip && linkedTripObj)
+        ? {
+            tripId: linkedTripObj.id,
+            pickupAddress: linkedTripObj.pickupLocation.address,
+            dropoffAddress: linkedTripObj.dropoffLocation.address,
+            pickupTime:
+              linkedTripObj.bookingType === 'scheduled' && linkedTripObj.scheduledPickupTime
+                ? new Date(linkedTripObj.scheduledPickupTime).toLocaleString()
+                : 'Scheduled Return',
+            vehicleTier: linkedTripObj.vehicleTier || 'standard',
+            totalFare: linkedTripObj.pricing?.totalFare || 0,
+            flightDetails: ((linkedTripObj.metadata as any)?.flightNumber || (linkedTripObj.metadata as any)?.tailNumber) ? {
+              airlineName: (linkedTripObj.metadata as any)?.airlineName || (linkedTripObj.metadata as any)?.airline,
+              flightNumber: (linkedTripObj.metadata as any)?.flightNumber,
+              departureAirport: (linkedTripObj.metadata as any)?.departureAirport || (linkedTripObj.metadata as any)?.flightOrigin,
+              tailNumber: (linkedTripObj.metadata as any)?.tailNumber,
+              fboFacility: (linkedTripObj.metadata as any)?.fboFacility,
+              isPrivateAviation: Boolean((linkedTripObj.metadata as any)?.isPrivateAviation || (linkedTripObj.metadata as any)?.tailNumber),
+              hasCheckedLuggage: Boolean((linkedTripObj.metadata as any)?.hasCheckedLuggage),
+              isAirportTrip: Boolean((linkedTripObj.metadata as any)?.isAirportTrip),
+            } : undefined,
+          }
+        : undefined;
+
       // Dispatch confirmation email to passenger
-      const emailService = getEmailDispatchService();
-      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
       await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
         status: 'CONFIRMED',
@@ -1071,15 +1142,8 @@ export default function DispatchRoute() {
         oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
         oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
         pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
-        flightDetails: (reviewMeta.flightNumber || reviewMeta.airline || reviewMeta.airlineName)
-          ? {
-              flightNumber: reviewMeta.flightNumber ? String(reviewMeta.flightNumber) : undefined,
-              airlineName: (reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) : undefined,
-              departureAirport: reviewMeta.flightOrigin || reviewMeta.departureAirport ? String(reviewMeta.flightOrigin || reviewMeta.departureAirport) : undefined,
-              hasCheckedLuggage: Boolean(reviewMeta.hasCheckedLuggage),
-              isAirportTrip: Boolean(reviewMeta.isAirportTrip),
-            }
-          : undefined,
+        flightDetails: outboundFlightDetails,
+        returnTripDetails: shouldConfirmBoth ? returnTripPayload : undefined,
       });
 
       const nowIso = new Date().toISOString();
@@ -1094,7 +1158,9 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: confRef,
-          context: 'Dispatcher reviewed and confirmed reservation',
+          context: shouldConfirmBoth
+            ? `Dispatcher reviewed and confirmed round-trip (#${reviewTrip.id} & #${linkedLegId})`
+            : 'Dispatcher reviewed and confirmed reservation',
         },
         {
           action: 'EMAIL_LOGGED',
@@ -1110,16 +1176,42 @@ export default function DispatchRoute() {
           status: 'CONFIRMED',
           auditLog: newAuditEvents,
         });
+        if (shouldConfirmBoth && linkedLegId) {
+          const linkedAudit: TripAuditEvent[] = [
+            ...(linkedTripObj?.auditLog || []),
+            {
+              action: 'AUTO_CONFIRMED',
+              timestamp: nowIso,
+              actorRole: 'dispatcher',
+              referenceNumber: `CNF-${linkedLegId.replace(/[^0-9]/g, '').slice(-4) || '2002'}`,
+              context: `Confirmed as part of round-trip reservation with #${reviewTrip.id}`,
+            },
+          ];
+          await bookingService.updateTrip(linkedLegId, {
+            status: 'CONFIRMED',
+            auditLog: linkedAudit,
+          });
+        }
       }
 
       // Update local state
       setTrips((prev) =>
-        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'CONFIRMED' as TripStatus, auditLog: newAuditEvents }) : t))
+        prev.map((t) => {
+          if (t.id === reviewTrip.id) {
+            return { ...t, status: 'CONFIRMED' as TripStatus, auditLog: newAuditEvents };
+          }
+          if (shouldConfirmBoth && t.id === linkedLegId) {
+            return { ...t, status: 'CONFIRMED' as TripStatus };
+          }
+          return t;
+        })
       );
 
       setReviewAlert({
         type: 'success',
-        message: `Booking #${reviewTrip.id} confirmed! Confirmation email dispatched to ${reviewTrip.passenger.email}.`,
+        message: shouldConfirmBoth
+          ? `Round-trip reservations #${reviewTrip.id} & #${linkedLegId} confirmed! Confirmation dispatched to ${reviewTrip.passenger.email}.`
+          : `Booking #${reviewTrip.id} confirmed! Confirmation email dispatched to ${reviewTrip.passenger.email}.`,
       });
       setTimeout(() => {
         setReviewTrip(null);
@@ -1140,8 +1232,23 @@ export default function DispatchRoute() {
     setIsProcessingReview(true);
     setReviewAlert(null);
     try {
+      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+      const isReturnRide = Boolean(reviewMeta.isReturnRide || reviewMeta.linkedTripId);
+      const linkedLegId =
+        (reviewMeta.hasReturnTrip && reviewMeta.returnTripId) ||
+        (reviewMeta.isReturnRide && reviewMeta.linkedTripId) ||
+        reviewTrip.linkedReturnTripId ||
+        reviewTrip.linkedTripId;
+
+      const hasLinkedLeg = Boolean(linkedLegId);
+      const shouldDeclineBoth = hasLinkedLeg && declineScope === 'both';
+
+      const legScopeParam: 'outbound' | 'return' | 'roundtrip' | undefined = hasLinkedLeg
+        ? (shouldDeclineBoth ? 'roundtrip' : (isReturnRide ? 'return' : 'outbound'))
+        : undefined;
+
       const reasonToSave =
-        selectedDeclineReason === 'Custom message'
+        selectedDeclineReason === 'Custom reason'
           ? reviewCustomNotes.trim() || 'Trip request declined by dispatch'
           : selectedDeclineReason;
 
@@ -1151,8 +1258,17 @@ export default function DispatchRoute() {
           actorRole: 'admin',
           reason: reasonToSave,
         });
+        if (shouldDeclineBoth && linkedLegId) {
+          await bookingService.updateTripStatus(linkedLegId, 'DECLINED', {
+            actorRole: 'admin',
+            reason: `Round-trip cancelled by dispatch: ${reasonToSave}`,
+          });
+        }
       } else if (bookingService.updateTrip) {
         await bookingService.updateTrip(reviewTrip.id, { status: 'DECLINED' });
+        if (shouldDeclineBoth && linkedLegId) {
+          await bookingService.updateTrip(linkedLegId, { status: 'DECLINED' });
+        }
       }
 
       // Dispatch decline notification email to passenger
@@ -1174,6 +1290,8 @@ export default function DispatchRoute() {
         vehicleTier: reviewTrip.vehicleTier,
         reason: selectedDeclineReason,
         customNotes: reviewCustomNotes.trim() || undefined,
+        legScope: legScopeParam,
+        linkedTripId: hasLinkedLeg && !shouldDeclineBoth ? linkedLegId : undefined,
       });
 
       const nowIso = new Date().toISOString();
@@ -1188,14 +1306,14 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: decRef,
-          context: `Dispatcher declined booking: ${reasonToSave}`,
+          context: `Dispatcher declined booking (${legScopeParam || 'single'}): ${reasonToSave}`,
         },
         {
           action: 'EMAIL_LOGGED',
           timestamp: nowIso,
           actorRole: 'system',
           referenceNumber: emailRef,
-          context: `Sent cancellation notice email to ${reviewTrip.passenger.email}`,
+          context: `Sent decline notice email to ${reviewTrip.passenger.email}`,
         },
       ];
 
@@ -1204,16 +1322,42 @@ export default function DispatchRoute() {
           status: 'DECLINED',
           auditLog: newAuditEvents,
         });
+        if (shouldDeclineBoth && linkedLegId) {
+          const linkedAudit: TripAuditEvent[] = [
+            ...(trips.find((t) => t.id === linkedLegId)?.auditLog || []),
+            {
+              action: 'DRIVER_DECLINED',
+              timestamp: nowIso,
+              actorRole: 'dispatcher',
+              referenceNumber: `DEC-${linkedLegId.replace(/[^0-9]/g, '').slice(-4) || '3002'}`,
+              context: `Round-trip leg declined along with #${reviewTrip.id}: ${reasonToSave}`,
+            },
+          ];
+          await bookingService.updateTrip(linkedLegId, {
+            status: 'DECLINED',
+            auditLog: linkedAudit,
+          });
+        }
       }
 
       // Update local state
       setTrips((prev) =>
-        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, status: 'DECLINED' as TripStatus, auditLog: newAuditEvents }) : t))
+        prev.map((t) => {
+          if (t.id === reviewTrip.id) {
+            return { ...t, status: 'DECLINED' as TripStatus, auditLog: newAuditEvents };
+          }
+          if (shouldDeclineBoth && t.id === linkedLegId) {
+            return { ...t, status: 'DECLINED' as TripStatus };
+          }
+          return t;
+        })
       );
 
       setReviewAlert({
         type: 'success',
-        message: `Booking #${reviewTrip.id} declined. Notification email sent to ${reviewTrip.passenger.email}.`,
+        message: shouldDeclineBoth
+          ? `Round-trip reservations #${reviewTrip.id} & #${linkedLegId} declined. Notification email sent to ${reviewTrip.passenger.email}.`
+          : `Booking #${reviewTrip.id} declined. Notification email sent to ${reviewTrip.passenger.email}.`,
       });
       setTimeout(() => {
         setReviewTrip(null);
@@ -1223,6 +1367,91 @@ export default function DispatchRoute() {
       setReviewAlert({
         type: 'error',
         message: err instanceof Error ? err.message : 'Failed to decline trip.',
+      });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
+  const handleSendClarificationRequest = async () => {
+    if (!reviewTrip) return;
+    if (!clarifyMessage.trim()) {
+      setReviewAlert({
+        type: 'error',
+        message: 'Please provide a clear question or description for the passenger.',
+      });
+      return;
+    }
+    setIsProcessingReview(true);
+    setReviewAlert(null);
+    try {
+      const emailService = getEmailDispatchService();
+      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+      const isReturn = Boolean(reviewMeta.isReturnRide || reviewMeta.linkedTripId);
+      const legScopeVal = (reviewMeta.hasReturnTrip || reviewMeta.isReturnRide)
+        ? (isReturn ? 'return' : 'outbound')
+        : undefined;
+
+      await emailService.sendClarificationRequest({
+        tripId: reviewTrip.id,
+        passenger: {
+          firstName: reviewTrip.passenger.firstName,
+          lastName: reviewTrip.passenger.lastName,
+          email: reviewTrip.passenger.email,
+          phone: reviewTrip.passenger.phone,
+        },
+        pickupAddress: reviewTrip.pickupLocation.address,
+        dropoffAddress: reviewTrip.dropoffLocation.address,
+        pickupTime:
+          reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+            ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate Ride (ASAP)',
+        clarificationTopic: clarifyTopic,
+        customMessage: clarifyMessage.trim(),
+        legScope: legScopeVal as any,
+        companySettings: {
+          name: COMPANY_CONFIG.name,
+          phone: COMPANY_CONFIG.phone.primary || COMPANY_CONFIG.phone.dispatch,
+          email: COMPANY_CONFIG.email.dispatch || COMPANY_CONFIG.email.support,
+        },
+      });
+
+      const nowIso = new Date().toISOString();
+      const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '4001';
+      const reqRef = `REQ-${numPart}`;
+      const newAuditEvents: TripAuditEvent[] = [
+        ...(reviewTrip.auditLog || []),
+        {
+          action: 'EMAIL_LOGGED',
+          timestamp: nowIso,
+          actorRole: 'dispatcher',
+          referenceNumber: reqRef,
+          context: `Clarification request sent to ${reviewTrip.passenger.email}: [${clarifyTopic}] ${clarifyMessage.trim()}`,
+        },
+      ];
+
+      const bookingService = getBookingService();
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          auditLog: newAuditEvents,
+        });
+      }
+
+      setTrips((prev) =>
+        prev.map((t) => (t.id === reviewTrip.id ? ({ ...t, auditLog: newAuditEvents }) : t))
+      );
+
+      setReviewAlert({
+        type: 'success',
+        message: `Clarification request emailed to ${reviewTrip.passenger.email}.`,
+      });
+      setReviewClarifyMode(false);
+      setClarifyMessage('');
+    } catch (err: unknown) {
+      console.error('Failed to send clarification request:', err);
+      setReviewAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to send clarification request.',
       });
     } finally {
       setIsProcessingReview(false);
@@ -1772,6 +2001,18 @@ export default function DispatchRoute() {
     setDrafts([...drafts, editDraft]);
     setActiveDraftId(editDraft.id);
   };
+
+  // Automatically open trip edit tab when tripId query parameter is present (e.g. Open Leg in New Tab)
+  useEffect(() => {
+    if (urlTripId && trips.length > 0 && handledUrlTripIdRef.current !== urlTripId) {
+      const match = trips.find((t) => t.id === urlTripId);
+      if (match) {
+        handledUrlTripIdRef.current = urlTripId;
+        handleOpenEditTrip(match);
+        setActiveMobileTab('booking');
+      }
+    }
+  }, [urlTripId, trips]);
 
   // Clone an existing trip into a new booking draft tab
   const handleCloneBooking = (trip: Trip) => {
@@ -5769,9 +6010,16 @@ export default function DispatchRoute() {
         const flightNumber = tripMeta.flightNumber ? String(tripMeta.flightNumber) : null;
         const airline = tripMeta.airline || tripMeta.airlineName ? String(tripMeta.airline || tripMeta.airlineName) : '';
         const flightOrigin = tripMeta.flightOrigin || tripMeta.departureAirport ? String(tripMeta.flightOrigin || tripMeta.departureAirport) : null;
+        const tailNumber = tripMeta.tailNumber ? String(tripMeta.tailNumber) : null;
+        const fboFacility = tripMeta.fboFacility ? String(tripMeta.fboFacility) : null;
+        const isPrivateAviation = Boolean(tripMeta.isPrivateAviation || tailNumber || fboFacility);
         const hasCheckedLuggage = Boolean(tripMeta.hasCheckedLuggage);
         const isReturnRide = Boolean(tripMeta.isReturnRide || tripMeta.linkedTripId);
+        const hasReturnTrip = Boolean(tripMeta.hasReturnTrip || tripMeta.returnTripId);
+        const returnTripId = tripMeta.returnTripId ? String(tripMeta.returnTripId) : null;
         const linkedTripId = tripMeta.linkedTripId ? String(tripMeta.linkedTripId) : null;
+        const linkedLegId = isReturnRide ? linkedTripId : returnTripId;
+        const hasLinkedLeg = Boolean(linkedLegId);
         const luggageType = tripMeta.luggageType ? String(tripMeta.luggageType) : 'Standard';
         const oversizedLuggageNotes = tripMeta.oversizedLuggageNotes ? String(tripMeta.oversizedLuggageNotes) : null;
         const hasOversizedLuggage = Boolean(tripMeta.hasOversizedLuggage);
@@ -5786,16 +6034,20 @@ export default function DispatchRoute() {
                     📋
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-extrabold tracking-tight">Review Web Booking</h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider animate-pulse">
                         Pending Review
                       </span>
-                      {isReturnRide && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-400 text-indigo-950 uppercase tracking-wider">
-                          🔁 Return Leg #{linkedTripId ? `(${linkedTripId})` : ''}
+                      {isReturnRide ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                          🔁 Return Leg {linkedTripId ? `(#${linkedTripId})` : ''}
                         </span>
-                      )}
+                      ) : hasReturnTrip ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                          🔁 Outbound Leg {returnTripId ? `(Return #${returnTripId})` : ''}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-xs text-slate-400 font-mono">
                       Trip #{reviewTrip.id} • Created {new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}
@@ -5827,6 +6079,37 @@ export default function DispatchRoute() {
 
               {/* Modal Content */}
               <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+                {/* Linked Round-Trip Banner Card */}
+                {hasLinkedLeg && (
+                  <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        🔁
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-xs text-indigo-900 flex items-center gap-1.5">
+                          <span>{isReturnRide ? 'Round-Trip Return Leg' : 'Round-Trip Outbound Leg'}</span>
+                          <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                            Linked Leg #{linkedLegId}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-indigo-700">
+                          {isReturnRide
+                            ? 'This ride was booked together with an outbound leg.'
+                            : 'This ride has a linked return leg booked in the same reservation.'}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/dispatch?tripId=${linkedLegId}`, '_blank')}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>↗ Open {isReturnRide ? 'Outbound Leg' : 'Return Leg'} in New Tab</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Customer & Route Overview */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Passenger Card */}
@@ -5883,19 +6166,40 @@ export default function DispatchRoute() {
                         </span>{' '}
                         <span className="text-[10px] text-slate-500 uppercase">({reviewTrip.payment?.method || 'Cash'})</span>
                       </div>
-                      {(flightNumber || airline) && (
-                        <div className="p-2 bg-blue-50/80 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-0.5">
-                          <div className="font-bold flex items-center gap-1 text-blue-900">
-                            ✈️ Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}
-                          </div>
-                          {flightOrigin && (
-                            <div className="text-blue-800">
-                              Departing From: <span className="font-semibold">{flightOrigin}</span>
-                            </div>
+                      {(flightNumber || airline || tailNumber || fboFacility) && (
+                        <div className="p-2.5 bg-blue-50/90 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-1">
+                          {isPrivateAviation ? (
+                            <>
+                              <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                                <span>🛩️ Private Aviation / FBO:</span>
+                                <span className="font-extrabold text-blue-950">{fboFacility || 'Private Aviation'}</span>
+                              </div>
+                              {tailNumber && (
+                                <div className="text-blue-800">
+                                  Tail Number: <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-blue-200">{tailNumber}</span>
+                                </div>
+                              )}
+                              {flightOrigin && (
+                                <div className="text-blue-800">
+                                  Origin / FBO Base: <span className="font-semibold">{flightOrigin}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-bold flex items-center gap-1 text-blue-900">
+                                ✈️ Commercial Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}
+                              </div>
+                              {flightOrigin && (
+                                <div className="text-blue-800">
+                                  Departing From: <span className="font-semibold">{flightOrigin}</span>
+                                </div>
+                              )}
+                              <div>
+                                Checked Luggage: <span className="font-semibold">{hasCheckedLuggage ? 'Yes (Baggage Claim)' : 'No'}</span>
+                              </div>
+                            </>
                           )}
-                          <div>
-                            Checked Luggage: <span className="font-semibold">{hasCheckedLuggage ? 'Yes (Baggage Claim)' : 'No'}</span>
-                          </div>
                         </div>
                       )}
                     </div>
@@ -5992,19 +6296,68 @@ export default function DispatchRoute() {
                   )}
                 </div>
 
+                {/* Round-Trip Scope Option when Confirming */}
+                {hasLinkedLeg && !reviewDeclineMode && !reviewClarifyMode && (
+                  <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 space-y-2">
+                    <div className="font-bold text-indigo-950 text-xs flex items-center justify-between">
+                      <span>Round-Trip Confirmation Scope:</span>
+                      <span className="text-[10px] text-indigo-700">Choose which legs to confirm</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <label
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-xs transition-colors ${
+                          confirmScope === 'both'
+                            ? 'bg-white border-indigo-500 font-bold text-indigo-950 shadow-2xs'
+                            : 'bg-white/50 border-indigo-100 text-indigo-800 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="confirmScope"
+                          value="both"
+                          checked={confirmScope === 'both'}
+                          onChange={() => setConfirmScope('both')}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Confirm Both Legs (Round Trip)</span>
+                      </label>
+                      <label
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-xs transition-colors ${
+                          confirmScope === 'leg'
+                            ? 'bg-white border-indigo-500 font-bold text-indigo-950 shadow-2xs'
+                            : 'bg-white/50 border-indigo-100 text-indigo-800 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="confirmScope"
+                          value="leg"
+                          checked={confirmScope === 'leg'}
+                          onChange={() => setConfirmScope('leg')}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Confirm This Leg Only (#{reviewTrip.id})</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 {/* Decline View (if toggled) */}
                 {reviewDeclineMode && (
                   <div className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-3 animate-in fade-in duration-100">
                     <div className="font-bold text-red-900 flex items-center justify-between">
                       <span>Select Reason for Declining Booking</span>
-                      <span className="text-[10px] text-red-700">Passenger will receive notification email</span>
+                      <span className="text-[10px] text-red-700">Passenger will receive rejection notification</span>
                     </div>
+
                     <div className="space-y-1.5">
                       {[
-                        'No driver availability',
-                        'Outside service boundary',
+                        'No driver availability for requested time',
+                        'Outside standard operating service area',
                         'Vehicle class unavailable',
-                        'Custom message',
+                        'Insufficient advance notice',
+                        'Customer requested cancellation',
+                        'Custom reason',
                       ].map((reason) => (
                         <label
                           key={reason}
@@ -6027,9 +6380,53 @@ export default function DispatchRoute() {
                       ))}
                     </div>
 
+                    {hasLinkedLeg && (
+                      <div className="pt-2 border-t border-red-200">
+                        <label className="block text-red-900 font-bold mb-1.5 text-xs">
+                          Round-Trip Decline Scope:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
+                              declineScope === 'leg'
+                                ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
+                                : 'bg-red-50/40 border-red-100 text-red-800 hover:bg-white'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="declineScope"
+                              value="leg"
+                              checked={declineScope === 'leg'}
+                              onChange={() => setDeclineScope('leg')}
+                              className="text-red-600 focus:ring-red-500"
+                            />
+                            <span>Decline this leg only (keep #{linkedLegId} active)</span>
+                          </label>
+                          <label
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
+                              declineScope === 'both'
+                                ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
+                                : 'bg-red-50/40 border-red-100 text-red-800 hover:bg-white'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="declineScope"
+                              value="both"
+                              checked={declineScope === 'both'}
+                              onChange={() => setDeclineScope('both')}
+                              className="text-red-600 focus:ring-red-500"
+                            />
+                            <span>Decline entire round trip (cancel both legs)</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1">
-                        {selectedDeclineReason === 'Custom message'
+                        {selectedDeclineReason === 'Custom reason'
                           ? 'Custom Explanation (Required for passenger email):'
                           : 'Additional Notes / Guidance (Optional):'}
                       </label>
@@ -6038,12 +6435,75 @@ export default function DispatchRoute() {
                         value={reviewCustomNotes}
                         onChange={(e) => setReviewCustomNotes(e.target.value)}
                         placeholder={
-                          selectedDeclineReason === 'Custom message'
+                          selectedDeclineReason === 'Custom reason'
                             ? 'Explain why this ride request cannot be serviced...'
                             : 'Optional note to customer...'
                         }
                         className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-red-500 focus:outline-hidden"
                       />
+                    </div>
+                  </div>
+                )}
+
+                {/* Clarification Request View (if toggled) */}
+                {reviewClarifyMode && (
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3 animate-in fade-in duration-100">
+                    <div className="font-bold text-amber-900 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span>❓</span> Request More Information / Clarification
+                      </span>
+                      <span className="text-[10px] text-amber-700">Passenger will receive action-required email</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-700 font-semibold text-xs">
+                        Select Inquiry Topic:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {[
+                          'Pickup or Dropoff location details',
+                          'Flight / FBO / Aircraft tail number',
+                          'Scheduled pickup timing confirmation',
+                          'Passenger count / Luggage capacity',
+                          'Child safety seat requirements',
+                          'Other / Custom inquiry',
+                        ].map((topic) => (
+                          <label
+                            key={topic}
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
+                              clarifyTopic === topic
+                                ? 'bg-white border-amber-400 font-bold text-amber-950 shadow-2xs'
+                                : 'bg-amber-50/50 border-amber-100 text-amber-800 hover:bg-white'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="clarifyTopic"
+                              value={topic}
+                              checked={clarifyTopic === topic}
+                              onChange={(e) => setClarifyTopic(e.target.value)}
+                              className="text-amber-600 focus:ring-amber-500"
+                            />
+                            <span>{topic}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-semibold mb-1">
+                        Message to Passenger (Required):
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={clarifyMessage}
+                        onChange={(e) => setClarifyMessage(e.target.value)}
+                        placeholder={`Please specify what details are needed from ${reviewTrip.passenger.firstName}...`}
+                        className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                      />
+                      <div className="text-[11px] text-amber-700 mt-1">
+                        The passenger will receive an email prompting them to reply or call dispatch directly.
+                      </div>
                     </div>
                   </div>
                 )}
@@ -6061,15 +6521,29 @@ export default function DispatchRoute() {
                 </button>
 
                 <div className="flex items-center gap-2">
-                  {!reviewDeclineMode ? (
+                  {!reviewDeclineMode && !reviewClarifyMode ? (
                     <>
                       <button
                         type="button"
                         disabled={isProcessingReview}
-                        onClick={() => setReviewDeclineMode(true)}
+                        onClick={() => {
+                          setReviewDeclineMode(true);
+                          setReviewClarifyMode(false);
+                        }}
                         className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
                       >
                         Decline...
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview}
+                        onClick={() => {
+                          setReviewClarifyMode(true);
+                          setReviewDeclineMode(false);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <span>❓</span> Request Info...
                       </button>
                       <button
                         type="button"
@@ -6084,12 +6558,16 @@ export default function DispatchRoute() {
                           </>
                         ) : (
                           <>
-                            <span>✓ Confirm & Accept Booking</span>
+                            <span>
+                              {hasLinkedLeg && confirmScope === 'both'
+                                ? '✓ Confirm Round-Trip Bookings'
+                                : '✓ Confirm & Accept Booking'}
+                            </span>
                           </>
                         )}
                       </button>
                     </>
-                  ) : (
+                  ) : reviewDeclineMode ? (
                     <>
                       <button
                         type="button"
@@ -6103,7 +6581,7 @@ export default function DispatchRoute() {
                         type="button"
                         disabled={
                           isProcessingReview ||
-                          (selectedDeclineReason === 'Custom message' && !reviewCustomNotes.trim())
+                          (selectedDeclineReason === 'Custom reason' && !reviewCustomNotes.trim())
                         }
                         onClick={handleDeclineTrip}
                         className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -6116,6 +6594,34 @@ export default function DispatchRoute() {
                         ) : (
                           <>
                             <span>Send Rejection & Decline Trip</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview}
+                        onClick={() => setReviewClarifyMode(false)}
+                        className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessingReview || !clarifyMessage.trim()}
+                        onClick={handleSendClarificationRequest}
+                        className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isProcessingReview ? (
+                          <>
+                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                            <span>Sending Email...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Send Clarification Email</span>
                           </>
                         )}
                       </button>

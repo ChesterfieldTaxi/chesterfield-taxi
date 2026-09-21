@@ -13,6 +13,7 @@ import type {
   AdminDispatchAlertEmailPayload,
   StatusUpdateEmailPayload,
   BookingDeclinedEmailPayload,
+  BookingClarificationRequestEmailPayload,
   EmailDispatchResult,
   EmailDispatchApiRequest,
 } from './types';
@@ -21,6 +22,7 @@ import {
   renderDispatcherAlertEmail,
   renderStatusUpdateEmail,
   renderBookingDeclinedEmail,
+  renderClarificationRequestEmail,
 } from './email-templates';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
@@ -298,6 +300,22 @@ export class ResendEmailService implements IEmailDispatchService {
       rendered.text
     );
   }
+
+  /**
+   * Sends request for information or clarification email to passenger.
+   */
+  public async sendClarificationRequest(
+    payload: BookingClarificationRequestEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderClarificationRequestEmail(payload);
+    return this.dispatch(
+      { type: 'clarification_request', payload },
+      payload.passenger.email,
+      rendered.subject,
+      rendered.html,
+      rendered.text
+    );
+  }
 }
 
 /**
@@ -337,6 +355,23 @@ export class StubEmailDispatchService implements IEmailDispatchService {
     };
     this.dispatchedEmails.push(result);
     console.info(`[StubEmailDispatch] Booking declined email sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
+    return result;
+  }
+
+  public async sendClarificationRequest(
+    payload: BookingClarificationRequestEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderClarificationRequestEmail(payload);
+    const result: EmailDispatchResult = {
+      success: true,
+      simulated: true,
+      messageId: `stub_clarify_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      recipient: payload.passenger.email,
+      subject: rendered.subject,
+      dispatchedAt: new Date().toISOString(),
+    };
+    this.dispatchedEmails.push(result);
+    console.info(`[StubEmailDispatch] Clarification request sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
     return result;
   }
 

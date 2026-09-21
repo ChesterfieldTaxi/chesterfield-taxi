@@ -41,6 +41,8 @@ export interface SpecialPlace {
     lng: number;
   };
   category: SpecialPlaceCategory;
+  /** Airport classification when category === 'airport' */
+  airportType?: 'commercial' | 'private';
   isPopular: boolean; // Shown prominently in initial suggestions
   isActive: boolean;
   notes?: string;
@@ -61,6 +63,7 @@ export const DEFAULT_SPECIAL_PLACES: SpecialPlace[] = [
     zip: '63145',
     coordinates: { lat: 38.7487, lng: -90.3700 },
     category: 'airport',
+    airportType: 'commercial',
     isPopular: true,
     isActive: true,
     aliases: ['STL', 'Lambert', 'Terminal 1', 'T1', 'Terminal 2', 'T2', 'Airport', 'American', 'Delta', 'United', 'Frontier', 'Southwest'],
@@ -76,9 +79,10 @@ export const DEFAULT_SPECIAL_PLACES: SpecialPlace[] = [
     zip: '63005',
     coordinates: { lat: 38.6622, lng: -90.6508 },
     category: 'airport',
+    airportType: 'private',
     isPopular: true,
     isActive: true,
-    aliases: ['SUS', 'Spirit Airport', 'Chesterfield Airport', 'Tac Air', 'Million Air', 'Executive Air'],
+    aliases: ['SUS', 'Spirit Airport', 'Chesterfield Airport', 'Tac Air', 'Million Air', 'Executive Air', 'Signature Flight Support'],
     notes: 'Corporate VIP aviation and private hangar zone in Chesterfield Valley.',
   },
 

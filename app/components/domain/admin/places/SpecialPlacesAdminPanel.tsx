@@ -426,9 +426,14 @@ export function SpecialPlacesAdminPanel() {
               <label className="text-xs font-medium text-slate-700 block mb-1">Category</label>
               <select
                 value={formData.category}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setFormData({ ...formData, category: e.target.value as SpecialPlaceCategory })
-                }
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const newCat = e.target.value as SpecialPlaceCategory;
+                  setFormData({
+                    ...formData,
+                    category: newCat,
+                    airportType: newCat === 'airport' ? (formData.airportType || 'commercial') : undefined,
+                  });
+                }}
                 className="w-full h-8.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
               >
                 {Object.entries(CATEGORY_CONFIG).map(([key, cat]) => (
@@ -438,6 +443,25 @@ export function SpecialPlacesAdminPanel() {
                 ))}
               </select>
             </div>
+
+            {formData.category === 'airport' && (
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">Airport Type</label>
+                <select
+                  value={formData.airportType || 'commercial'}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setFormData({
+                      ...formData,
+                      airportType: e.target.value as 'commercial' | 'private',
+                    })
+                  }
+                  className="w-full h-8.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
+                >
+                  <option value="commercial">✈️ Commercial Airline Terminal (STL)</option>
+                  <option value="private">🛩️ Private Aviation / FBO (SUS, Signature)</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Latitude</label>
@@ -645,6 +669,18 @@ export function SpecialPlacesAdminPanel() {
                         <span>{catConfig.icon}</span>
                         <span>{catConfig.label}</span>
                       </span>
+
+                      {place.category === 'airport' && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                            place.airportType === 'private'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}
+                        >
+                          {place.airportType === 'private' ? '🛩️ Private / FBO' : '✈️ Commercial'}
+                        </span>
+                      )}
 
                       {!place.isActive && (
                         <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 text-[10px]">

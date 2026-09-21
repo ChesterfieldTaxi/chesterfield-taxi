@@ -23,6 +23,8 @@ export interface RegionalAirport {
   shortName: string;
   /** City served */
   city: string;
+  /** Airport classification: commercial airline terminal vs private aviation / FBO */
+  airportType: 'commercial' | 'private';
   /**
    * Lowercase keyword aliases used for fuzzy address matching.
    * Include IATA code, common abbreviations, and partial address strings.
@@ -36,6 +38,7 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
     name: 'Lambert-St. Louis International Airport',
     shortName: 'Lambert Intl (STL)',
     city: 'St. Louis',
+    airportType: 'commercial',
     keywords: [
       'stl',
       'lambert',
@@ -57,6 +60,7 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
     name: 'Spirit of St. Louis Airport',
     shortName: 'Spirit of St. Louis (SUS)',
     city: 'Chesterfield',
+    airportType: 'private',
     keywords: [
       'sus',
       'spirit of st. louis',
@@ -67,6 +71,14 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
       'spirit dr',
       'spirit drive',
       '63005',
+      'million air',
+      'tac air',
+      'premier jet',
+      'signature flight support',
+      'signature aviation',
+      'fbo',
+      'hangar',
+      'executive air',
     ],
   },
   {
@@ -74,6 +86,7 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
     name: 'St. Louis Downtown Airport',
     shortName: 'St. Louis Downtown (CPS)',
     city: 'Cahokia',
+    airportType: 'private',
     keywords: [
       'cps',
       'st. louis downtown airport',
@@ -81,6 +94,8 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
       'cahokia airport',
       'downtown airport',
       'parks airport',
+      'ideal aviation',
+      'jet aviation',
     ],
   },
 ] as const;
@@ -98,6 +113,8 @@ export interface AirportDetectionResult {
   isDropoffAirport: boolean;
   /** The matched airport, if any */
   airport: RegionalAirport | null;
+  /** Whether the matched airport or address corresponds to private/charter aviation */
+  isPrivateAviation: boolean;
 }
 
 /**
@@ -110,21 +127,53 @@ export function detectAirportInAddresses(
   pickupAddress: string,
   dropoffAddress: string
 ): AirportDetectionResult {
-  const pickupLower = pickupAddress.toLowerCase();
-  const dropoffLower = dropoffAddress.toLowerCase();
+  const pickupLower = (pickupAddress || '').toLowerCase();
+  const dropoffLower = (dropoffAddress || '').toLowerCase();
+
+  // Check standalone private aviation keywords across both addresses
+  const privateKeywords = [
+    'signature flight support',
+    'signature aviation',
+    'million air',
+    'tac air',
+    'premier jet',
+    'jet aviation',
+    'hangar',
+    'fbo',
+    'general aviation',
+    'private terminal',
+  ];
+  const hasPrivateKeyword = privateKeywords.some(
+    (kw) => pickupLower.includes(kw) || dropoffLower.includes(kw)
+  );
 
   for (const airport of REGIONAL_AIRPORTS) {
     const matchesPickup = airport.keywords.some((kw) => pickupLower.includes(kw));
     const matchesDropoff = airport.keywords.some((kw) => dropoffLower.includes(kw));
 
     if (matchesPickup || matchesDropoff) {
+      const isPrivate = airport.airportType === 'private' || hasPrivateKeyword;
       return {
         isAirportTrip: true,
         isPickupAirport: matchesPickup,
         isDropoffAirport: matchesDropoff,
         airport,
+        isPrivateAviation: isPrivate,
       };
     }
+  }
+
+  // If address has private aviation keywords even if no formal airport code matched
+  if (hasPrivateKeyword) {
+    const matchesPickup = privateKeywords.some((kw) => pickupLower.includes(kw));
+    const matchesDropoff = privateKeywords.some((kw) => dropoffLower.includes(kw));
+    return {
+      isAirportTrip: true,
+      isPickupAirport: matchesPickup,
+      isDropoffAirport: matchesDropoff,
+      airport: REGIONAL_AIRPORTS[1], // Default to SUS (Spirit of St. Louis)
+      isPrivateAviation: true,
+    };
   }
 
   return {
@@ -132,6 +181,7 @@ export function detectAirportInAddresses(
     isPickupAirport: false,
     isDropoffAirport: false,
     airport: null,
+    isPrivateAviation: false,
   };
 }
 
