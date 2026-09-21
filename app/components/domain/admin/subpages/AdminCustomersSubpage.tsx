@@ -406,7 +406,7 @@ export function AdminCustomersSubpage({
 
           <Button
             type="button"
-            variant="default"
+            variant="primary"
             size="sm"
             onClick={() => {
               handleOpenCustomer({
