@@ -9,20 +9,49 @@
 import { getWorkspaceBus } from '../workspace-bus.service';
 import { SAMPLE_PASSENGER_PROFILES } from '../booking/passenger-lookup.service';
 
+export type PhoneType = 'mobile' | 'home' | 'work' | 'other';
+
+export interface AdditionalPhone {
+  id: string;
+  type: PhoneType;
+  number: string;
+  extension?: string;
+  label?: string;
+}
+
 export interface ContactRecord {
   id: string;
   name: string;
   firstName?: string;
   lastName?: string;
-  phone: string;
+  phone: string; // Primary phone
+  primaryPhoneType?: PhoneType;
+  additionalPhones?: AdditionalPhone[];
   mobilePhone?: string;
   homePhone?: string;
+  workPhone?: string;
+  workExtension?: string;
   email?: string;
+  secondaryEmail?: string;
   corporateAccountId?: string;
+  corporateAccountNumber?: string;
   corporateAccountName?: string;
+  billingDepartment?: string;
+  defaultPoNumber?: string;
   isVip?: boolean;
+  vipReason?: string;
   preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair' | 'executive' | 'suv' | 'van';
+  homeAddress?: string;
+  workAddress?: string;
+  accessibilityNeeds?: {
+    wheelchair?: boolean;
+    walker?: boolean;
+    serviceAnimal?: boolean;
+    extraAssistance?: boolean;
+  };
+  smsNotifications?: boolean;
   notes?: string;
+  internalDispatcherNotes?: string;
   tripCount?: number;
   totalSpend?: number;
   customerScore?: number;
@@ -176,12 +205,14 @@ class ContactService {
     const custom = this.customContacts.get(`phone_${norm}`);
     if (custom) return custom;
 
-    // Check all custom contacts for alternate phone fields
+    // Check all custom contacts for alternate phone fields and additional phones
     for (const record of this.customContacts.values()) {
       if (
         normalizePhone(record.phone) === norm ||
         (record.mobilePhone && normalizePhone(record.mobilePhone) === norm) ||
-        (record.homePhone && normalizePhone(record.homePhone) === norm)
+        (record.homePhone && normalizePhone(record.homePhone) === norm) ||
+        (record.workPhone && normalizePhone(record.workPhone) === norm) ||
+        (record.additionalPhones && record.additionalPhones.some((ap) => normalizePhone(ap.number) === norm))
       ) {
         return record;
       }
@@ -241,13 +272,28 @@ class ContactService {
       firstName,
       lastName,
       phone: profile.phone.trim(),
-      mobilePhone: profile.mobilePhone?.trim() || profile.phone.trim(),
+      primaryPhoneType: profile.primaryPhoneType || existing?.primaryPhoneType || 'mobile',
+      additionalPhones: profile.additionalPhones || existing?.additionalPhones || [],
+      mobilePhone: profile.mobilePhone?.trim() || existing?.mobilePhone || profile.phone.trim(),
+      homePhone: profile.homePhone?.trim() || existing?.homePhone || '',
+      workPhone: profile.workPhone?.trim() || existing?.workPhone || '',
+      workExtension: profile.workExtension?.trim() || existing?.workExtension || '',
       email: profile.email?.trim() || existing?.email || '',
-      isVip: profile.isVip ?? existing?.isVip ?? false,
-      notes: profile.notes !== undefined ? profile.notes : existing?.notes || '',
-      preferredVehicleTier: profile.preferredVehicleTier || existing?.preferredVehicleTier || 'standard',
+      secondaryEmail: profile.secondaryEmail?.trim() || existing?.secondaryEmail || '',
       corporateAccountId: profile.corporateAccountId || existing?.corporateAccountId,
+      corporateAccountNumber: profile.corporateAccountNumber || existing?.corporateAccountNumber,
       corporateAccountName: profile.corporateAccountName || existing?.corporateAccountName,
+      billingDepartment: profile.billingDepartment || existing?.billingDepartment,
+      defaultPoNumber: profile.defaultPoNumber || existing?.defaultPoNumber,
+      isVip: profile.isVip ?? existing?.isVip ?? false,
+      vipReason: profile.vipReason || existing?.vipReason || '',
+      preferredVehicleTier: profile.preferredVehicleTier || existing?.preferredVehicleTier || 'standard',
+      homeAddress: profile.homeAddress || existing?.homeAddress || '',
+      workAddress: profile.workAddress || existing?.workAddress || '',
+      accessibilityNeeds: profile.accessibilityNeeds || existing?.accessibilityNeeds || {},
+      smsNotifications: profile.smsNotifications ?? existing?.smsNotifications ?? true,
+      notes: profile.notes !== undefined ? profile.notes : existing?.notes || '',
+      internalDispatcherNotes: profile.internalDispatcherNotes || existing?.internalDispatcherNotes || '',
       customerScore: profile.customerScore ?? existing?.customerScore ?? 90,
       tripCount: profile.tripCount ?? existing?.tripCount ?? 1,
       totalSpend: profile.totalSpend ?? existing?.totalSpend ?? 0,
@@ -257,6 +303,14 @@ class ContactService {
     this.customContacts.set(id, record);
     if (norm) {
       this.customContacts.set(`phone_${norm}`, record);
+    }
+    if (record.additionalPhones) {
+      for (const ap of record.additionalPhones) {
+        const apNorm = normalizePhone(ap.number);
+        if (apNorm) {
+          this.customContacts.set(`phone_${apNorm}`, record);
+        }
+      }
     }
     this.saveToStorage();
 
