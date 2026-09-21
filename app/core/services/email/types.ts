@@ -27,6 +27,7 @@ export interface BookingConfirmationEmailPayload {
     email: string;
     phone: string;
   };
+  recipientEmailOverride?: string;
   pickupAddress: string;
   pickupNotes?: string;
   intermediateStops?: Array<{ address: string; notes?: string }>;

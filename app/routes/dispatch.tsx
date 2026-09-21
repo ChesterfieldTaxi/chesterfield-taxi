@@ -47,7 +47,7 @@ import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
 import { formatVehicleTier } from '../core/services/email/email-templates';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
-import { TripAuditModal } from '../components/domain/admin/TripAuditModal';
+import { TripAuditModal, TripAuditTimeline } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../components/ui/LayoutToggle';
 import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
@@ -347,19 +347,21 @@ function TripActionDropdown({
               </>
             )}
 
-            {isUnconfirmed && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onReview();
-                }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80 transition-colors cursor-pointer"
-              >
-                <DocumentTextIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>Review Booking</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onReview();
+              }}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                isUnconfirmed
+                  ? 'font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80'
+                  : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+              }`}
+            >
+              <DocumentTextIcon className={`w-3.5 h-3.5 shrink-0 ${isUnconfirmed ? 'text-amber-600' : 'text-blue-500'}`} />
+              <span>{isUnconfirmed ? 'Review Booking' : 'Trip Details & Audit'}</span>
+            </button>
 
             <button
               type="button"
@@ -509,6 +511,10 @@ export default function DispatchRoute() {
   const [clarifyMessage, setClarifyMessage] = useState<string>('');
   const [isProcessingReview, setIsProcessingReview] = useState<boolean>(false);
   const [reviewAlert, setReviewAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [reviewModalTab, setReviewModalTab] = useState<'details' | 'audit'>('details');
+  const [overrideRecipientEmail, setOverrideRecipientEmail] = useState<string>('');
+  const [isOverrideEmailEnabled, setIsOverrideEmailEnabled] = useState<boolean>(false);
+  const [shouldUpdatePassengerEmail, setShouldUpdatePassengerEmail] = useState<boolean>(false);
 
   // Custom DateTime Range Picker State
   const [dateTimeRange, setDateTimeRange] = useState<DateTimeRange>({
@@ -1089,8 +1095,9 @@ export default function DispatchRoute() {
     return unsub;
   }, [activeDraftId, trips]);
 
-  const handleOpenReviewModal = (trip: Trip) => {
+  const handleOpenReviewModal = (trip: Trip, initialTab: 'details' | 'audit' = 'details') => {
     setReviewTrip(trip);
+    setReviewModalTab(initialTab);
     setReviewDeclineMode(false);
     setReviewClarifyMode(false);
     setSelectedDeclineReason('No driver availability for requested time');
@@ -1100,6 +1107,9 @@ export default function DispatchRoute() {
     setClarifyTopic('Pickup or Dropoff location details');
     setClarifyMessage('');
     setReviewAlert(null);
+    setOverrideRecipientEmail('');
+    setIsOverrideEmailEnabled(false);
+    setShouldUpdatePassengerEmail(false);
   };
 
   const handleConfirmTrip = async () => {
@@ -1120,6 +1130,17 @@ export default function DispatchRoute() {
 
       const shouldConfirmBoth = Boolean(confirmScope === 'both' && linkedLegId);
       const linkedTripObj = shouldConfirmBoth ? trips.find((t) => t.id === linkedLegId) : null;
+
+      const targetOverride = (isOverrideEmailEnabled && overrideRecipientEmail.trim()) ? overrideRecipientEmail.trim() : undefined;
+
+      if (targetOverride && shouldUpdatePassengerEmail && bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          passenger: {
+            ...reviewTrip.passenger,
+            email: targetOverride,
+          },
+        });
+      }
 
       if (bookingService.updateTripStatus) {
         await bookingService.updateTripStatus(reviewTrip.id, 'CONFIRMED', {
@@ -1186,9 +1207,10 @@ export default function DispatchRoute() {
         passenger: {
           firstName: reviewTrip.passenger.firstName,
           lastName: reviewTrip.passenger.lastName,
-          email: reviewTrip.passenger.email,
+          email: targetOverride && shouldUpdatePassengerEmail ? targetOverride : reviewTrip.passenger.email,
           phone: reviewTrip.passenger.phone,
         },
+        recipientEmailOverride: targetOverride,
         pickupAddress: reviewTrip.pickupLocation.address,
         dropoffAddress: reviewTrip.dropoffLocation.address,
         pickupTime:
@@ -1227,6 +1249,7 @@ export default function DispatchRoute() {
       const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '2001';
       const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
       const confRef = `CNF-${numPart}`;
+      const effectiveConfirmedEmail = targetOverride || reviewTrip.passenger.email;
 
       const newAuditEvents: TripAuditEvent[] = [
         ...(reviewTrip.auditLog || []),
@@ -1244,7 +1267,7 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'system',
           referenceNumber: emailRef,
-          context: `Dispatched confirmation receipt & live tracking link to ${reviewTrip.passenger.email}`,
+          context: `Dispatched confirmation receipt & live tracking link to ${effectiveConfirmedEmail}${targetOverride ? ' (Alternate Override)' : ''}`,
         },
       ];
 
@@ -1252,6 +1275,9 @@ export default function DispatchRoute() {
         await bookingService.updateTrip(reviewTrip.id, {
           status: 'CONFIRMED',
           auditLog: newAuditEvents,
+          ...(targetOverride && shouldUpdatePassengerEmail
+            ? { passenger: { ...reviewTrip.passenger, email: targetOverride } }
+            : {}),
         });
         if (shouldConfirmBoth && linkedLegId) {
           const linkedAudit: TripAuditEvent[] = [
@@ -1272,10 +1298,19 @@ export default function DispatchRoute() {
       }
 
       // Update local state
+      const updatedConfirmedTrip: Trip = {
+        ...reviewTrip,
+        status: 'CONFIRMED' as TripStatus,
+        auditLog: newAuditEvents,
+        ...(targetOverride && shouldUpdatePassengerEmail
+          ? { passenger: { ...reviewTrip.passenger, email: targetOverride } }
+          : {}),
+      };
+
       setTrips((prev) =>
         prev.map((t) => {
           if (t.id === reviewTrip.id) {
-            return { ...t, status: 'CONFIRMED' as TripStatus, auditLog: newAuditEvents };
+            return updatedConfirmedTrip;
           }
           if (shouldConfirmBoth && t.id === linkedLegId) {
             return { ...t, status: 'CONFIRMED' as TripStatus };
@@ -1283,12 +1318,13 @@ export default function DispatchRoute() {
           return t;
         })
       );
+      setReviewTrip(updatedConfirmedTrip);
 
       setReviewAlert({
         type: 'success',
         message: shouldConfirmBoth
-          ? `Round-trip reservations #${reviewTrip.id} & #${linkedLegId} confirmed! Confirmation dispatched to ${reviewTrip.passenger.email}.`
-          : `Booking #${reviewTrip.id} confirmed! Confirmation email dispatched to ${reviewTrip.passenger.email}.`,
+          ? `Round-trip reservations #${reviewTrip.id} & #${linkedLegId} confirmed! Confirmation dispatched to ${effectiveConfirmedEmail}.`
+          : `Booking #${reviewTrip.id} confirmed! Confirmation email dispatched to ${effectiveConfirmedEmail}.`,
       });
       setTimeout(() => {
         setReviewTrip(null);
@@ -1298,6 +1334,170 @@ export default function DispatchRoute() {
       setReviewAlert({
         type: 'error',
         message: err instanceof Error ? err.message : 'Failed to confirm trip.',
+      });
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!reviewTrip) return;
+    setIsProcessingReview(true);
+    setReviewAlert(null);
+    try {
+      const bookingService = getBookingService();
+      const reviewMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+      const emailService = getEmailDispatchService();
+
+      const linkedLegId =
+        (reviewMeta.hasReturnTrip && reviewMeta.returnTripId) ||
+        (reviewMeta.isReturnRide && reviewMeta.linkedTripId) ||
+        reviewTrip.linkedReturnTripId ||
+        reviewTrip.linkedTripId;
+
+      const shouldIncludeReturn = Boolean(confirmScope === 'both' && linkedLegId);
+      const linkedTripObj = shouldIncludeReturn ? trips.find((t) => t.id === linkedLegId) : null;
+
+      const targetOverride = (isOverrideEmailEnabled && overrideRecipientEmail.trim()) ? overrideRecipientEmail.trim() : undefined;
+
+      if (targetOverride && shouldUpdatePassengerEmail && bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          passenger: {
+            ...reviewTrip.passenger,
+            email: targetOverride,
+          },
+        });
+      }
+
+      // Flight / Aviation details for email
+      const outboundFlightDetails = (reviewMeta.flightNumber || reviewMeta.airline || reviewMeta.airlineName || reviewMeta.tailNumber)
+        ? {
+            flightNumber: reviewMeta.flightNumber ? String(reviewMeta.flightNumber) : undefined,
+            airlineName: (reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) ? String(reviewMeta.airlineName || reviewMeta.airline || reviewMeta.airlineCode) : undefined,
+            departureAirport: reviewMeta.flightOrigin || reviewMeta.departureAirport ? String(reviewMeta.flightOrigin || reviewMeta.departureAirport) : undefined,
+            tailNumber: reviewMeta.tailNumber ? String(reviewMeta.tailNumber) : undefined,
+            fboFacility: reviewMeta.fboFacility ? String(reviewMeta.fboFacility) : undefined,
+            isPrivateAviation: Boolean(reviewMeta.isPrivateAviation || reviewMeta.tailNumber || reviewMeta.fboFacility),
+            hasCheckedLuggage: Boolean(reviewMeta.hasCheckedLuggage),
+            isAirportTrip: Boolean(reviewMeta.isAirportTrip),
+          }
+        : undefined;
+
+      const returnTripPayload = (reviewMeta.hasReturnTrip && linkedTripObj)
+        ? {
+            tripId: linkedTripObj.id,
+            pickupAddress: linkedTripObj.pickupLocation.address,
+            dropoffAddress: linkedTripObj.dropoffLocation.address,
+            pickupTime:
+              linkedTripObj.bookingType === 'scheduled' && linkedTripObj.scheduledPickupTime
+                ? new Date(linkedTripObj.scheduledPickupTime).toLocaleString()
+                : 'Scheduled Return',
+            vehicleTier: linkedTripObj.vehicleTier || 'standard',
+            passengerCount: linkedTripObj.passenger?.passengerCount,
+            luggageCount: linkedTripObj.passenger?.luggageCount,
+            totalFare: linkedTripObj.pricing?.totalFare || 0,
+            flightDetails: ((linkedTripObj.metadata as any)?.flightNumber || (linkedTripObj.metadata as any)?.tailNumber) ? {
+              airlineName: (linkedTripObj.metadata as any)?.airlineName || (linkedTripObj.metadata as any)?.airline,
+              flightNumber: (linkedTripObj.metadata as any)?.flightNumber,
+              departureAirport: (linkedTripObj.metadata as any)?.departureAirport || (linkedTripObj.metadata as any)?.flightOrigin,
+              tailNumber: (linkedTripObj.metadata as any)?.tailNumber,
+              fboFacility: (linkedTripObj.metadata as any)?.fboFacility,
+              isPrivateAviation: Boolean((linkedTripObj.metadata as any)?.isPrivateAviation || (linkedTripObj.metadata as any)?.tailNumber),
+              hasCheckedLuggage: Boolean((linkedTripObj.metadata as any)?.hasCheckedLuggage),
+              isAirportTrip: Boolean((linkedTripObj.metadata as any)?.isAirportTrip),
+            } : undefined,
+          }
+        : undefined;
+
+      const effectiveRecipient = targetOverride || reviewTrip.passenger.email;
+
+      await emailService.sendBookingConfirmation({
+        tripId: reviewTrip.id,
+        status: reviewTrip.status || 'CONFIRMED',
+        passenger: {
+          firstName: reviewTrip.passenger.firstName,
+          lastName: reviewTrip.passenger.lastName,
+          email: targetOverride && shouldUpdatePassengerEmail ? targetOverride : reviewTrip.passenger.email,
+          phone: reviewTrip.passenger.phone,
+        },
+        recipientEmailOverride: targetOverride,
+        pickupAddress: reviewTrip.pickupLocation.address,
+        dropoffAddress: reviewTrip.dropoffLocation.address,
+        pickupTime:
+          reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+            ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+            : 'Immediate Ride (ASAP)',
+        bookingType: reviewTrip.bookingType,
+        vehicleTier: reviewTrip.vehicleTier || (reviewMeta.vehiclePreference as string) || 'any',
+        passengerCount: reviewTrip.passenger.passengerCount,
+        luggageCount: reviewTrip.passenger.luggageCount,
+        contactPerson: reviewMeta.contactPerson
+          ? (reviewMeta.contactPerson as any)
+          : (reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName)
+          ? {
+              isBookerDifferent: Boolean(reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName),
+              contactName: reviewMeta.bookerName || reviewMeta.contactName,
+              contactPhone: reviewMeta.bookerPhone || reviewMeta.contactPhone,
+              contactEmail: reviewMeta.bookerEmail || reviewMeta.contactEmail,
+              contactRole: reviewMeta.bookerRole || reviewMeta.contactRole,
+            }
+          : undefined,
+        carSeatsBreakdown: reviewMeta.carSeatsBreakdown ? (reviewMeta.carSeatsBreakdown as any) : undefined,
+        additionalPassengers: reviewMeta.additionalPassengers ? (reviewMeta.additionalPassengers as any) : undefined,
+        totalFare: reviewTrip.pricing?.totalFare || 0,
+        currency: reviewTrip.pricing?.currency || 'USD',
+        paymentMethod: reviewTrip.payment?.method || 'cash',
+        specialRequests: reviewTrip.passenger.specialRequests,
+        oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
+        oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
+        pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
+        flightDetails: outboundFlightDetails,
+        returnTripDetails: shouldIncludeReturn ? returnTripPayload : undefined,
+      });
+
+      const nowIso = new Date().toISOString();
+      const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '2001';
+      const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
+
+      const newAuditEvents: TripAuditEvent[] = [
+        ...(reviewTrip.auditLog || []),
+        {
+          action: 'EMAIL_LOGGED',
+          timestamp: nowIso,
+          actorRole: 'dispatcher',
+          referenceNumber: emailRef,
+          context: `Resent confirmation email to ${effectiveRecipient}${targetOverride ? ' (Alternate Override)' : ''}`,
+        },
+      ];
+
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(reviewTrip.id, {
+          auditLog: newAuditEvents,
+          ...(targetOverride && shouldUpdatePassengerEmail
+            ? { passenger: { ...reviewTrip.passenger, email: targetOverride } }
+            : {}),
+        });
+      }
+
+      const updatedTripObj: Trip = {
+        ...reviewTrip,
+        auditLog: newAuditEvents,
+        ...(targetOverride && shouldUpdatePassengerEmail
+          ? { passenger: { ...reviewTrip.passenger, email: targetOverride } }
+          : {}),
+      };
+
+      setReviewTrip(updatedTripObj);
+      setTrips((prev) => prev.map((t) => (t.id === reviewTrip.id ? updatedTripObj : t)));
+      setReviewAlert({
+        type: 'success',
+        message: `Confirmation email resent successfully to ${effectiveRecipient}.`,
+      });
+    } catch (err: any) {
+      console.error('[DispatchReview] Failed to resend confirmation email:', err);
+      setReviewAlert({
+        type: 'error',
+        message: err.message || 'Failed to resend confirmation email.',
       });
     } finally {
       setIsProcessingReview(false);
@@ -4742,7 +4942,7 @@ export default function DispatchRoute() {
                             isDesktop={isDesktop}
                             onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
                             onClose={() => setOpenTripActionId(null)}
-                            onReview={() => handleOpenReviewModal(trip)}
+                            onReview={() => handleOpenReviewModal(trip, 'details')}
                             onEdit={() => {
                               setSelectedQueueTripId(trip.id);
                               setSelectedMapTrip(trip);
@@ -4751,7 +4951,7 @@ export default function DispatchRoute() {
                               setActiveMobileTab('booking');
                             }}
                             onFare={() => handleOpenDriverModal(trip)}
-                            onAudit={() => setAuditTrailTrip(trip)}
+                            onAudit={() => handleOpenReviewModal(trip, 'audit')}
                             onClone={() => {
                               handleCloneBooking(trip);
                               setActiveMobileTab('booking');
@@ -4877,7 +5077,7 @@ export default function DispatchRoute() {
                             isDesktop={isDesktop}
                             onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
                             onClose={() => setOpenTripActionId(null)}
-                            onReview={() => handleOpenReviewModal(trip)}
+                            onReview={() => handleOpenReviewModal(trip, 'details')}
                             onEdit={() => {
                               setSelectedQueueTripId(trip.id);
                               setSelectedMapTrip(trip);
@@ -4886,7 +5086,7 @@ export default function DispatchRoute() {
                               setActiveMobileTab('booking');
                             }}
                             onFare={() => handleOpenDriverModal(trip)}
-                            onAudit={() => setAuditTrailTrip(trip)}
+                            onAudit={() => handleOpenReviewModal(trip, 'audit')}
                             onClone={() => {
                               handleCloneBooking(trip);
                               setActiveMobileTab('booking');
@@ -5078,7 +5278,7 @@ export default function DispatchRoute() {
                                    isDesktop={isDesktop}
                                    onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
                                    onClose={() => setOpenTripActionId(null)}
-                                   onReview={() => handleOpenReviewModal(trip)}
+                                   onReview={() => handleOpenReviewModal(trip, 'details')}
                                    onEdit={() => {
                                      setSelectedQueueTripId(trip.id);
                                      setSelectedMapTrip(trip);
@@ -5087,7 +5287,7 @@ export default function DispatchRoute() {
                                      setActiveMobileTab('booking');
                                    }}
                                    onFare={() => handleOpenDriverModal(trip)}
-                                   onAudit={() => setAuditTrailTrip(trip)}
+                                   onAudit={() => handleOpenReviewModal(trip, 'audit')}
                                    onClone={() => {
                                      handleCloneBooking(trip);
                                      setActiveMobileTab('booking');
@@ -6152,6 +6352,7 @@ export default function DispatchRoute() {
           DISPATCHER REVIEW ACTION MODAL (UNCONFIRMED Bookings)
       ───────────────────────────────────────────────────────────── */}
       {reviewTrip && (() => {
+        const isUnconfirmedTrip = reviewTrip.status === 'UNCONFIRMED' || reviewTrip.status === 'unconfirmed';
         const tripMeta = (reviewTrip.metadata || {}) as Record<string, any>;
         const carSeatsBreakdown = (tripMeta.carSeatsBreakdown || {}) as {
           rearFacing?: number;
@@ -6180,18 +6381,30 @@ export default function DispatchRoute() {
 
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               {/* Modal Header */}
-              <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white border-b border-slate-800">
+              <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white border-b border-slate-800 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-bold text-xl flex items-center justify-center shadow-md">
-                    📋
+                  <div className={`w-10 h-10 rounded-xl font-bold text-xl flex items-center justify-center shadow-md ${
+                    isUnconfirmedTrip ? 'bg-amber-500 text-slate-950' : 'bg-blue-600 text-white'
+                  }`}>
+                    {isUnconfirmedTrip ? '📋' : '🛡️'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-extrabold tracking-tight">Review Web Booking</h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider animate-pulse">
-                        Pending Review
+                      <h3 className="text-base font-extrabold tracking-tight">
+                        {isUnconfirmedTrip ? 'Review Web Booking' : 'Trip Details & History'}
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                        isUnconfirmedTrip
+                          ? 'bg-amber-400 text-slate-950 animate-pulse'
+                          : reviewTrip.status === 'confirmed'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : (reviewTrip.status === 'cancelled' || reviewTrip.status === 'declined' || reviewTrip.status === 'DECLINED')
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {reviewTrip.status}
                       </span>
                       {isReturnRide ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
@@ -6217,10 +6430,41 @@ export default function DispatchRoute() {
                 </button>
               </div>
 
+              {/* Navigation Tabs Header */}
+              <div className="bg-slate-900/90 px-6 border-b border-slate-800 flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setReviewModalTab('details')}
+                  className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                    reviewModalTab === 'details'
+                      ? 'border-blue-500 text-white bg-slate-800/60'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                  }`}
+                >
+                  <span>📋</span>
+                  <span>Booking Details</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewModalTab('audit')}
+                  className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                    reviewModalTab === 'audit'
+                      ? 'border-purple-500 text-white bg-slate-800/60'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                  }`}
+                >
+                  <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Audit Trail</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+                    {reviewTrip.auditLog?.length || 0}
+                  </span>
+                </button>
+              </div>
+
               {/* Notification alert banner */}
               {reviewAlert && (
                 <div
-                  className={`px-5 py-3 text-xs font-bold flex items-center gap-2 ${
+                  className={`px-5 py-3 text-xs font-bold flex items-center gap-2 shrink-0 ${
                     reviewAlert.type === 'success'
                       ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-200'
                       : 'bg-red-50 text-red-800 border-b border-red-200'
@@ -6232,37 +6476,49 @@ export default function DispatchRoute() {
               )}
 
               {/* Modal Content */}
-              <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
-                {/* Linked Round-Trip Banner Card */}
-                {hasLinkedLeg && (
-                  <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                        🔁
-                      </div>
-                      <div>
-                        <div className="font-extrabold text-xs text-indigo-900 flex items-center gap-1.5">
-                          <span>{isReturnRide ? 'Round-Trip Return Leg' : 'Round-Trip Outbound Leg'}</span>
-                          <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
-                            Linked Leg #{linkedLegId}
-                          </span>
+              {reviewModalTab === 'audit' ? (
+                <div className="p-6 overflow-y-auto flex-1">
+                  <TripAuditTimeline trip={reviewTrip} hideSummaryBar={false} />
+                </div>
+              ) : (
+                <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+                  {/* Linked Round-Trip Banner Card */}
+                  {hasLinkedLeg && (
+                    <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                          🔁
                         </div>
-                        <div className="text-[11px] text-indigo-700">
-                          {isReturnRide
-                            ? 'This ride was booked together with an outbound leg.'
-                            : 'This ride has a linked return leg booked in the same reservation.'}
+                        <div>
+                          <div className="font-extrabold text-xs text-indigo-900 flex items-center gap-1.5">
+                            <span>{isReturnRide ? 'Round-Trip Return Leg' : 'Round-Trip Outbound Leg'}</span>
+                            <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                              Linked Leg #{linkedLegId}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-indigo-700">
+                            {isReturnRide
+                              ? 'This ride was booked together with an outbound leg.'
+                              : 'This ride has a linked return leg booked in the same reservation.'}
+                          </div>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const linked = trips.find((t) => t.id === linkedLegId);
+                          if (linked) {
+                            handleOpenReviewModal(linked, reviewModalTab);
+                          } else {
+                            window.open(`/dispatch?tripId=${linkedLegId}`, '_blank');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <span>↗ Switch to {isReturnRide ? 'Outbound Leg' : 'Return Leg'} #{linkedLegId}</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => window.open(`/dispatch?tripId=${linkedLegId}`, '_blank')}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <span>↗ Open {isReturnRide ? 'Outbound Leg' : 'Return Leg'} in New Tab</span>
-                    </button>
-                  </div>
-                )}
+                  )}
 
                 {/* Customer & Route Overview */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -6496,6 +6752,65 @@ export default function DispatchRoute() {
                   </div>
                 )}
 
+                {/* Email Delivery & Recipient Override Options */}
+                {!reviewDeclineMode && !reviewClarifyMode && (
+                  <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-blue-900 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                        <span>✉️</span>
+                        <span>Email Delivery &amp; Confirmation</span>
+                      </div>
+                      <span className="text-[11px] text-slate-600 font-medium truncate max-w-[280px]">
+                        Booking Email: <strong className="text-slate-900 font-mono">{reviewTrip.passenger.email}</strong>
+                      </span>
+                    </div>
+
+                    <div className="pt-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={isOverrideEmailEnabled}
+                          onChange={(e) => {
+                            setIsOverrideEmailEnabled(e.target.checked);
+                            if (!e.target.checked) {
+                              setOverrideRecipientEmail('');
+                              setShouldUpdatePassengerEmail(false);
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span>Send confirmation to alternate / additional email address</span>
+                      </label>
+                    </div>
+
+                    {isOverrideEmailEnabled && (
+                      <div className="p-3 bg-white border border-blue-300 rounded-lg space-y-2.5 animate-in fade-in duration-100">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                            Alternate Recipient Email Address:
+                          </label>
+                          <input
+                            type="email"
+                            value={overrideRecipientEmail}
+                            onChange={(e) => setOverrideRecipientEmail(e.target.value)}
+                            placeholder="e.g. assistant@company.com or travel@firm.com"
+                            className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-blue-500 focus:bg-white focus:outline-hidden font-mono"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={shouldUpdatePassengerEmail}
+                            onChange={(e) => setShouldUpdatePassengerEmail(e.target.checked)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span>Permanently update passenger's profile email in booking record</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Decline View (if toggled) */}
                 {reviewDeclineMode && (
                   <div className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-3 animate-in fade-in duration-100">
@@ -6662,9 +6977,10 @@ export default function DispatchRoute() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Modal Actions Footer */}
-              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3">
+              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setReviewTrip(null)}
@@ -6674,114 +6990,167 @@ export default function DispatchRoute() {
                   Close
                 </button>
 
-                <div className="flex items-center gap-2">
-                  {!reviewDeclineMode && !reviewClarifyMode ? (
-                    <>
+                {reviewModalTab === 'audit' ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReviewModalTab('details')}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      View Booking Details
+                    </button>
+                    {!isUnconfirmedTrip && (
                       <button
                         type="button"
                         disabled={isProcessingReview}
-                        onClick={() => {
-                          setReviewDeclineMode(true);
-                          setReviewClarifyMode(false);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        Decline...
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isProcessingReview}
-                        onClick={() => {
-                          setReviewClarifyMode(true);
-                          setReviewDeclineMode(false);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                      >
-                        <span>❓</span> Request Info...
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isProcessingReview}
-                        onClick={handleConfirmTrip}
-                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        onClick={handleResendConfirmation}
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                       >
                         {isProcessingReview ? (
                           <>
                             <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                            <span>Confirming...</span>
+                            <span>Resending...</span>
                           </>
                         ) : (
                           <>
-                            <span>
-                              {hasLinkedLeg && confirmScope === 'both'
-                                ? '✓ Confirm Round-Trip Bookings'
-                                : '✓ Confirm & Accept Booking'}
-                            </span>
+                            <span>✉</span>
+                            <span>Resend Confirmation Email</span>
                           </>
                         )}
                       </button>
-                    </>
-                  ) : reviewDeclineMode ? (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isProcessingReview}
-                        onClick={() => setReviewDeclineMode(false)}
-                        className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          isProcessingReview ||
-                          (selectedDeclineReason === 'Custom reason' && !reviewCustomNotes.trim())
-                        }
-                        onClick={handleDeclineTrip}
-                        className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isProcessingReview ? (
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {!reviewDeclineMode && !reviewClarifyMode ? (
+                      <>
+                        {isUnconfirmedTrip ? (
                           <>
-                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                            <span>Declining...</span>
+                            <button
+                              type="button"
+                              disabled={isProcessingReview}
+                              onClick={() => {
+                                setReviewDeclineMode(true);
+                                setReviewClarifyMode(false);
+                              }}
+                              className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              Decline...
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isProcessingReview}
+                              onClick={() => {
+                                setReviewClarifyMode(true);
+                                setReviewDeclineMode(false);
+                              }}
+                              className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            >
+                              <span>❓</span> Request Info...
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isProcessingReview}
+                              onClick={handleConfirmTrip}
+                              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                              {isProcessingReview ? (
+                                <>
+                                  <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                                  <span>Confirming...</span>
+                                </>
+                              ) : (
+                                <span>
+                                  {hasLinkedLeg && confirmScope === 'both'
+                                    ? '✓ Confirm Round-Trip Bookings'
+                                    : '✓ Confirm & Accept Booking'}
+                                </span>
+                              )}
+                            </button>
                           </>
                         ) : (
-                          <>
+                          <button
+                            type="button"
+                            disabled={isProcessingReview}
+                            onClick={handleResendConfirmation}
+                            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          >
+                            {isProcessingReview ? (
+                              <>
+                                <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                                <span>Resending...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>✉</span>
+                                <span>
+                                  {isOverrideEmailEnabled && overrideRecipientEmail.trim()
+                                    ? `Resend to ${overrideRecipientEmail.trim()}`
+                                    : 'Resend Confirmation Email'}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </>
+                    ) : reviewDeclineMode ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isProcessingReview}
+                          onClick={() => setReviewDeclineMode(false)}
+                          className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            isProcessingReview ||
+                            (selectedDeclineReason === 'Custom reason' && !reviewCustomNotes.trim())
+                          }
+                          onClick={handleDeclineTrip}
+                          className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isProcessingReview ? (
+                            <>
+                              <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                              <span>Declining...</span>
+                            </>
+                          ) : (
                             <span>Send Rejection & Decline Trip</span>
-                          </>
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isProcessingReview}
-                        onClick={() => setReviewClarifyMode(false)}
-                        className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        Back
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isProcessingReview || !clarifyMessage.trim()}
-                        onClick={handleSendClarificationRequest}
-                        className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isProcessingReview ? (
-                          <>
-                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                            <span>Sending Email...</span>
-                          </>
-                        ) : (
-                          <>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isProcessingReview}
+                          onClick={() => setReviewClarifyMode(false)}
+                          className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isProcessingReview || !clarifyMessage.trim()}
+                          onClick={handleSendClarificationRequest}
+                          className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isProcessingReview ? (
+                            <>
+                              <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                              <span>Sending Email...</span>
+                            </>
+                          ) : (
                             <span>Send Clarification Email</span>
-                          </>
-                        )}
-                      </button>
-                    </>
-                  )}
-                </div>
+                          )}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

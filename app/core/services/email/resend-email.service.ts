@@ -244,9 +244,10 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: BookingConfirmationEmailPayload
   ): Promise<EmailDispatchResult> {
     const rendered = renderPassengerConfirmationEmail(payload);
+    const recipient = payload.recipientEmailOverride?.trim() || payload.passenger.email;
     return this.dispatch(
       { type: 'booking_confirmation', payload },
-      payload.passenger.email,
+      recipient,
       rendered.subject,
       rendered.html,
       rendered.text
@@ -328,16 +329,17 @@ export class StubEmailDispatchService implements IEmailDispatchService {
     payload: BookingConfirmationEmailPayload
   ): Promise<EmailDispatchResult> {
     const rendered = renderPassengerConfirmationEmail(payload);
+    const recipient = payload.recipientEmailOverride?.trim() || payload.passenger.email;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_confirm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      recipient: payload.passenger.email,
+      recipient,
       subject: rendered.subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
-    console.info(`[StubEmailDispatch] Confirmation sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
+    console.info(`[StubEmailDispatch] Confirmation sent to ${recipient} (Trip #${payload.tripId})`);
     return result;
   }
 

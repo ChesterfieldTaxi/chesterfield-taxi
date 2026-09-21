@@ -18,7 +18,12 @@ export interface TripAuditModalProps {
   onClose: () => void;
 }
 
-export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
+export interface TripAuditTimelineProps {
+  trip: Trip;
+  hideSummaryBar?: boolean;
+}
+
+export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTimelineProps) {
   const [copied, setCopied] = useState(false);
 
   // Compile full event list: combining auditLog and statusHistory entries seamlessly
@@ -137,39 +142,9 @@ export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <Card className="w-full max-w-3xl bg-white shadow-2xl border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-              <ShieldIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-black tracking-tight">
-                  Trip Audit Trail Inspector
-                </h3>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                  #{trip.id.substring(0, 10)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Complete milestone audit history, change logs &amp; reference tracking
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        {/* Snapshot Summary Bar */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {!hideSummaryBar && (
+        <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shrink-0">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Passenger &amp; Status
@@ -214,105 +189,158 @@ export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
             </button>
           </div>
         </div>
+      )}
 
-        {/* Timeline Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-white">
-          {sortedEntries.length === 0 ? (
-            <div className="p-12 text-center text-slate-400">
-              <HistoryIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-              <p className="font-bold">No Audit Log Entries Recorded</p>
-            </div>
-          ) : (
-            <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-5">
-              {sortedEntries.map((event, idx) => (
-                <div key={idx} className="relative group">
-                  {/* Timeline dot */}
-                  <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
+      {/* Timeline Content */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-white">
+        {hideSummaryBar && (
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-500">
+              {sortedEntries.length} total event(s) recorded
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyJson}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+            >
+              {copied ? '✓ JSON Copied' : '📋 Copy Raw Audit JSON'}
+            </button>
+          </div>
+        )}
 
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
+        {sortedEntries.length === 0 ? (
+          <div className="p-12 text-center text-slate-400">
+            <HistoryIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+            <p className="font-bold">No Audit Log Entries Recorded</p>
+          </div>
+        ) : (
+          <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-5">
+            {sortedEntries.map((event, idx) => (
+              <div key={idx} className="relative group">
+                {/* Timeline dot */}
+                <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[11px] font-extrabold border ${getActionBadgeColor(
+                          event.action
+                        )}`}
+                      >
+                        {event.action}
+                      </span>
+                      {event.actorRole && (
                         <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-extrabold border ${getActionBadgeColor(
-                            event.action
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getActorBadgeColor(
+                            event.actorRole
                           )}`}
                         >
-                          {event.action}
+                          {event.actorRole}
                         </span>
-                        {event.actorRole && (
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getActorBadgeColor(
-                              event.actorRole
-                            )}`}
-                          >
-                            {event.actorRole}
-                          </span>
-                        )}
-                        {event.referenceNumber && (
-                          <span className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-800 border border-slate-300">
-                            Ref: {event.referenceNumber}
-                          </span>
-                        )}
-                        {event.bookingChannel && (
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
-                            Intake: {event.bookingChannel}
-                          </span>
-                        )}
-                        {event.bookedBy?.name && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                            By: {event.bookedBy.name}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-500">
-                        {new Date(event.timestamp).toLocaleString()}
-                      </span>
+                      )}
+                      {event.referenceNumber && (
+                        <span className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-800 border border-slate-300">
+                          Ref: {event.referenceNumber}
+                        </span>
+                      )}
+                      {event.bookingChannel && (
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                          Intake: {event.bookingChannel}
+                        </span>
+                      )}
+                      {event.bookedBy?.name && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                          By: {event.bookedBy.name}
+                        </span>
+                      )}
                     </div>
-
-                    {event.context && (
-                      <p className="text-xs text-slate-700 font-medium leading-relaxed mt-1">
-                        {event.context}
-                      </p>
-                    )}
-
-                    {/* Field Modifications Diff Table */}
-                    {event.fieldChanges && event.fieldChanges.length > 0 && (
-                      <div className="mt-2.5 bg-white border border-slate-200 rounded-lg p-2.5 space-y-1.5 text-xs">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Field Changes Recorded:
-                        </div>
-                        <div className="space-y-1">
-                          {event.fieldChanges.map((change, cIdx) => (
-                            <div key={cIdx} className="flex items-center gap-2 text-[11px] font-mono flex-wrap">
-                              <span className="font-bold text-slate-700">{change.label}:</span>
-                              <span className="text-rose-600 line-through bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-                                {String(change.oldValue ?? 'None')}
-                              </span>
-                              <span className="text-slate-400 font-bold">➔</span>
-                              <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                {String(change.newValue ?? 'None')}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {event.matchedRuleId && (
-                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-mono font-bold border border-blue-200">
-                        Rule Match: {event.matchedRuleId}
-                      </div>
-                    )}
+                    <span className="text-[11px] font-mono text-slate-500">
+                      {new Date(event.timestamp).toLocaleString()}
+                    </span>
                   </div>
+
+                  {event.context && (
+                    <p className="text-xs text-slate-700 font-medium leading-relaxed mt-1">
+                      {event.context}
+                    </p>
+                  )}
+
+                  {/* Field Modifications Diff Table */}
+                  {event.fieldChanges && event.fieldChanges.length > 0 && (
+                    <div className="mt-2.5 bg-white border border-slate-200 rounded-lg p-2.5 space-y-1.5 text-xs">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Field Changes Recorded:
+                      </div>
+                      <div className="space-y-1">
+                        {event.fieldChanges.map((change, cIdx) => (
+                          <div key={cIdx} className="flex items-center gap-2 text-[11px] font-mono flex-wrap">
+                            <span className="font-bold text-slate-700">{change.label}:</span>
+                            <span className="text-rose-600 line-through bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                              {String(change.oldValue ?? 'None')}
+                            </span>
+                            <span className="text-slate-400 font-bold">➔</span>
+                            <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              {String(change.newValue ?? 'None')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {event.matchedRuleId && (
+                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-mono font-bold border border-blue-200">
+                      Rule Match: {event.matchedRuleId}
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+      <Card className="w-full max-w-3xl bg-white shadow-2xl border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+              <ShieldIcon className="w-5 h-5" />
             </div>
-          )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black tracking-tight">
+                  Trip Audit Trail Inspector
+                </h3>
+                <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                  #{trip.id.substring(0, 10)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                Complete milestone audit history, change logs &amp; reference tracking
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer"
+          >
+            &#x2715;
+          </button>
         </div>
 
+        <TripAuditTimeline trip={trip} />
+
         {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
-          <span>{sortedEntries.length} total timeline event(s) recorded</span>
+        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end items-center text-xs text-slate-500">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Close Inspector
           </Button>

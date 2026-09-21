@@ -24,6 +24,7 @@ import {
   type OversizedBagCategory,
 } from '../../core/types/config';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
+import { formatVehicleTier } from '../../core/utils/trip-id.util';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import {
   REGIONAL_AIRPORTS,
@@ -577,6 +578,26 @@ export function BookingEngineV2({
     }
     return map;
   }, [activeVehicleTiers]);
+
+  const getFriendlyVehicleName = useCallback(
+    (choice: string): string => {
+      if (!choice) return 'Standard Fleet';
+      if (vehicleCapacities[choice]?.name) {
+        return vehicleCapacities[choice].name;
+      }
+      const found = activeVehicleTiers.find(
+        (t) =>
+          t.id === choice ||
+          (choice === 'any' && t.id === 'any') ||
+          (choice === 'sedan' && (t.id === 'standard' || t.id === 'sedan')) ||
+          (choice === 'suv' && (t.id === 'xl' || t.id === 'suv')) ||
+          (choice === 'van' && (t.id === 'wheelchair' || t.id === 'van'))
+      );
+      if (found?.name) return found.name;
+      return formatVehicleTier(choice);
+    },
+    [activeVehicleTiers, vehicleCapacities]
+  );
 
   // Fleet capacity based on selected vehicles (multi-vehicle mode) or single vehicle (max based on biggest vehicle in fleet)
   const totalMaxPassengers = useMemo(() => {
@@ -3758,10 +3779,10 @@ export function BookingEngineV2({
                   <CarIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
-                    <span className="font-semibold text-slate-800 capitalize">
+                    <span className="font-semibold text-slate-800">
                       {bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1
-                        ? `${form.selectedVehicles.length} Vehicles (${form.selectedVehicles.map((v) => v.toUpperCase()).join(', ')}) • ${form.passengers} Pax • ${form.bags} Bags`
-                        : `${form.vehicleChoice} • ${form.passengers} Pax • ${form.bags} Bags`}
+                        ? `${form.selectedVehicles.length} Vehicles (${form.selectedVehicles.map((v) => getFriendlyVehicleName(v)).join(', ')}) • ${form.passengers} Pax • ${form.bags} Bags`
+                        : `${getFriendlyVehicleName(form.vehicleChoice)} • ${form.passengers} Pax • ${form.bags} Bags`}
                     </span>
                   </div>
                 </div>
