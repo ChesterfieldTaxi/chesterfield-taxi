@@ -6,26 +6,27 @@ import { EmailDock } from '../components/domain/dispatch/EmailDock';
 import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
+import { getOperatorService, type DriverRosterItem } from '../core/services/operator.service';
 
 export function meta() {
   return [{ title: 'Dispatch Window Pop-Out – Chesterfield Taxi' }];
 }
 
-const INITIAL_DRIVERS = [
-  { id: 'drv-101', name: 'Driver 101 (Mike T.)', status: 'available', vehicle: 'Toyota Camry (#204)', tier: 'Sedan', phone: '(314) 555-0101', zone: 'Chesterfield Valley', driverScore: 98 },
-  { id: 'drv-104', name: 'Driver 104 (Sarah K.)', status: 'on_trip', vehicle: 'Chevy Suburban (#301)', tier: 'SUV', phone: '(314) 555-0104', zone: 'Lambert Airport (STL)', driverScore: 95 },
-  { id: 'drv-108', name: 'Driver 108 (David R.)', status: 'available', vehicle: 'Toyota Sienna (#14)', tier: 'Minivan', phone: '(314) 555-0108', zone: 'Town & Country', driverScore: 99 },
-  { id: 'drv-112', name: 'Driver 112 (Alex M.)', status: 'offline', vehicle: 'Ford Explorer (#402)', tier: 'SUV', phone: '(314) 555-0112', zone: 'Ballwin / Manchester', driverScore: 91 },
-];
-
 export default function DispatchPopoutRoute() {
   const [searchParams] = useSearchParams();
   const moduleKey = (searchParams.get('module') || 'comms') as WorkspaceModuleKey;
 
-  const [drivers] = useState(INITIAL_DRIVERS);
+  const [drivers, setDrivers] = useState<DriverRosterItem[]>(() => getOperatorService().getDriverRoster());
   const [trips, setTrips] = useState<Trip[]>([]);
 
   const workspaceBus = getWorkspaceBus();
+
+  useEffect(() => {
+    const unsubDrivers = getOperatorService().subscribeToDrivers((roster) => {
+      setDrivers(roster);
+    });
+    return () => unsubDrivers();
+  }, []);
 
   useEffect(() => {
     // Notify main window that this module is active in an external window

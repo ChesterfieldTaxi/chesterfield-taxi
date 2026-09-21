@@ -26,6 +26,7 @@ import {
 } from '../../ui/Icons';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
+import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
 
 export const COMMON_FBO_FACILITIES = [
   'Signature Flight Support (STL - Hangar 2)',
@@ -165,6 +166,7 @@ export interface DispatchBookingEngineProps {
   isActiveDraft?: boolean;
   initialTrip?: Trip | null;
   allTrips?: Trip[];
+  drivers?: DriverRosterItem[];
   onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
@@ -184,13 +186,6 @@ const DEFAULT_CORPORATE_ACCOUNTS = [
   'West County Orthopedics',
   'Custom Direct Bill Account',
 ];
-const DEFAULT_DRIVERS = [
-  { id: 'unassigned', name: 'Unassigned' },
-  { id: 'drv-101', name: 'Driver 101 (Mike T.)' },
-  { id: 'drv-104', name: 'Driver 104 (Sarah K.)' },
-  { id: 'drv-108', name: 'Driver 108 (David R.)' },
-  { id: 'drv-112', name: 'Driver 112 (James W.)' },
-];
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function DispatchBookingEngine({
@@ -198,6 +193,7 @@ export function DispatchBookingEngine({
   isActiveDraft,
   initialTrip,
   allTrips,
+  drivers: propsDrivers,
   onBookingSuccess,
   onValuesChange,
   onClearDraft,
@@ -205,6 +201,23 @@ export function DispatchBookingEngine({
   onCopyBooking,
   onOpenLinkedTrip,
 }: DispatchBookingEngineProps) {
+  const [driverOptions, setDriverOptions] = useState<DriverRosterItem[]>(() => {
+    return propsDrivers && propsDrivers.length > 0
+      ? propsDrivers
+      : getOperatorService().getDriverRoster();
+  });
+
+  useEffect(() => {
+    if (propsDrivers && propsDrivers.length > 0) {
+      setDriverOptions(propsDrivers);
+      return;
+    }
+    const unsub = getOperatorService().subscribeToDrivers((roster) => {
+      setDriverOptions(roster);
+    });
+    return () => unsub();
+  }, [propsDrivers]);
+
   const isEditMode = Boolean(initialTrip?.id);
   const isCompleted = initialTrip?.status === 'completed';
   const isCancelled = initialTrip?.status === 'cancelled';
@@ -3182,9 +3195,14 @@ export function DispatchBookingEngine({
                 onChange={(e) => setDriverId(e.target.value)}
                 className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
               >
-                {DEFAULT_DRIVERS.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
+                <option value="unassigned">⚠️ Unassigned</option>
+                {driverOptions.map((d) => (
+                  <option
+                    key={d.id}
+                    value={d.id}
+                    disabled={d.isBlacklisted || d.zone === 'Suspended'}
+                  >
+                    {d.name} {d.vehicle ? `• ${d.vehicle}` : ''} {d.zone === 'Suspended' ? '(Suspended)' : ''}
                   </option>
                 ))}
               </select>

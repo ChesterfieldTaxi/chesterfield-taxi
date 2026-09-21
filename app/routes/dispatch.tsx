@@ -58,6 +58,9 @@ import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHea
 import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
+import { getOperatorService, type DriverRosterItem } from '../core/services/operator.service';
+
+export type { DriverRosterItem };
 
 export function meta() {
   return [
@@ -73,72 +76,7 @@ interface DraftTab {
   formValues?: DispatchFormValues;
 }
 
-interface DriverRosterItem {
-  id: string;
-  name: string;
-  status: 'available' | 'on_trip' | 'offline';
-  vehicle: string;
-  tier: string;
-  phone: string;
-  zone: string;
-  currentTripId?: string;
-  driverScore?: number;
-  isBlacklisted?: boolean;
-}
-
-const INITIAL_DRIVERS: DriverRosterItem[] = [
-  {
-    id: 'drv-101',
-    name: 'Driver 101 (Mike T.)',
-    status: 'available',
-    vehicle: 'Toyota Camry (#204)',
-    tier: 'Sedan',
-    phone: '(314) 555-0101',
-    zone: 'Chesterfield Valley',
-    driverScore: 98,
-  },
-  {
-    id: 'drv-104',
-    name: 'Driver 104 (Sarah K.)',
-    status: 'on_trip',
-    vehicle: 'Chevy Suburban (#301)',
-    tier: 'SUV',
-    phone: '(314) 555-0104',
-    zone: 'Lambert Airport (STL)',
-    currentTripId: 'tr-8831',
-    driverScore: 95,
-  },
-  {
-    id: 'drv-108',
-    name: 'Driver 108 (David R.)',
-    status: 'available',
-    vehicle: 'Ford Transit (#102)',
-    tier: 'Van',
-    phone: '(314) 555-0108',
-    zone: 'Town and Country',
-    driverScore: 91,
-  },
-  {
-    id: 'drv-112',
-    name: 'Driver 112 (James W.)',
-    status: 'available',
-    vehicle: 'Lincoln Continental (#208)',
-    tier: 'Sedan',
-    phone: '(314) 555-0112',
-    zone: 'Ballwin / Manchester',
-    driverScore: 88,
-  },
-  {
-    id: 'drv-115',
-    name: 'Driver 115 (Alex M.)',
-    status: 'offline',
-    vehicle: 'Toyota Sienna (#105)',
-    tier: 'Van',
-    phone: '(314) 555-0115',
-    zone: 'Off Duty',
-    driverScore: 74,
-  },
-];
+const INITIAL_DRIVERS: DriverRosterItem[] = getOperatorService().getDriverRoster();
 
 interface TripActionDropdownProps {
   trip: Trip;
@@ -606,6 +544,37 @@ export default function DispatchRoute() {
   const [drivers, setDrivers] = useState<DriverRosterItem[]>(INITIAL_DRIVERS);
   const [driverFilter, setDriverFilter] = useState<'all' | 'available' | 'on_trip' | 'offline'>('all');
   const [driverSearch, setDriverSearch] = useState('');
+
+  // Real-time synchronization of driver operators with active trips
+  useEffect(() => {
+    const unsub = getOperatorService().subscribeToDrivers((roster) => {
+      setDrivers(
+        roster.map((drv) => {
+          const activeTrip = trips.find(
+            (t) =>
+              t.assignedDriverId === drv.id &&
+              ['assigned', 'en_route', 'arrived', 'in_progress'].includes(t.status)
+          );
+          if (activeTrip) {
+            return {
+              ...drv,
+              status: 'on_trip',
+              currentTripId: activeTrip.id,
+            };
+          }
+          if (drv.zone === 'Suspended' || drv.status === 'offline') {
+            return drv;
+          }
+          return {
+            ...drv,
+            status: drv.status === 'on_trip' ? 'available' : drv.status,
+            currentTripId: undefined,
+          };
+        })
+      );
+    });
+    return () => unsub();
+  }, [trips]);
 
   // Admin-configurable alert auto-dismiss duration (default: 60 minutes = 1 hour)
   const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(() => {
@@ -4003,6 +3972,7 @@ export default function DispatchRoute() {
                   isActiveDraft={d.id === activeDraftId}
                   initialTrip={d.trip}
                   allTrips={trips}
+                  drivers={drivers}
                   onValuesChange={(vals) => handleDraftValuesChange(d.id, vals)}
                   onBookingSuccess={(savedTrip, isEdit) => {
                     if (isEdit) {
@@ -4252,7 +4222,7 @@ export default function DispatchRoute() {
                               <option value="all">All Drivers ▾</option>
                               {drivers.map((d) => (
                                 <option key={d.id} value={d.id}>
-                                  {d.name}
+                                  {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
                                 </option>
                               ))}
                             </select>
@@ -4664,7 +4634,7 @@ export default function DispatchRoute() {
                       <option value="all">All</option>
                       {drivers.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.name}
+                          {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
                         </option>
                       ))}
                     </select>
@@ -4914,8 +4884,12 @@ export default function DispatchRoute() {
                           >
                             <option value="unassigned">⚠️ Unassigned</option>
                             {drivers.map((drv) => (
-                              <option key={drv.id} value={drv.id}>
-                                {drv.name} ({drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                              <option
+                                key={drv.id}
+                                value={drv.id}
+                                disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                              >
+                                {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
                               </option>
                             ))}
                           </select>
@@ -5047,8 +5021,12 @@ export default function DispatchRoute() {
                         >
                           <option value="unassigned">⚠️ Unassigned</option>
                           {drivers.map((drv) => (
-                            <option key={drv.id} value={drv.id}>
-                              {drv.name} ({drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
+                            <option
+                              key={drv.id}
+                              value={drv.id}
+                              disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                            >
+                              {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Avail' : drv.status === 'on_trip' ? 'Busy' : 'Off'})
                             </option>
                           ))}
                         </select>
@@ -5238,12 +5216,16 @@ export default function DispatchRoute() {
                                 }`}
                                 title="Quick-assign driver to this trip"
                               >
-                                <option value="unassigned">⚠️ Unassigned</option>
-                                {drivers.map((drv) => (
-                                  <option key={drv.id} value={drv.id}>
-                                    {drv.name} ({drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
-                                  </option>
-                                ))}
+                                 <option value="unassigned">⚠️ Unassigned</option>
+                                 {drivers.map((drv) => (
+                                   <option
+                                     key={drv.id}
+                                     value={drv.id}
+                                     disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                                   >
+                                     {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                                   </option>
+                                 ))}
                               </select>
                             </td>
                             <td className="py-2 px-3">
@@ -5969,7 +5951,7 @@ export default function DispatchRoute() {
                           <option value="All Drivers">📢 All Drivers</option>
                           {drivers.map((d) => (
                             <option key={d.id} value={d.name}>
-                              {d.name}
+                              {d.name} {d.vehicle ? `(${d.vehicle})` : ''}
                             </option>
                           ))}
                         </select>
@@ -6704,6 +6686,54 @@ export default function DispatchRoute() {
                       {reviewTrip.passenger.specialRequests}
                     </div>
                   )}
+                </div>
+
+                {/* Driver Operator Assignment */}
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <span>🚖</span>
+                      <span>Assigned Driver Operator</span>
+                    </div>
+                    {reviewTrip.assignedDriverId ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                        Assigned
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                        ⚠️ Unassigned
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={reviewTrip.assignedDriverId || 'unassigned'}
+                      onChange={(e) => {
+                        const newDriverId = e.target.value;
+                        handleQuickAssignDriver(reviewTrip.id, newDriverId);
+                        setReviewTrip((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                assignedDriverId: newDriverId === 'unassigned' ? null : newDriverId,
+                              }
+                            : null
+                        );
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                    >
+                      <option value="unassigned">⚠️ Unassigned (No driver assigned)</option>
+                      {drivers.map((drv) => (
+                        <option
+                          key={drv.id}
+                          value={drv.id}
+                          disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                        >
+                          {drv.name} {drv.vehicle ? `• ${drv.vehicle}` : ''} ({drv.zone === 'Suspended' ? 'Suspended' : drv.status === 'available' ? 'Available' : drv.status === 'on_trip' ? 'On Trip' : 'Offline'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Round-Trip Scope Option when Confirming */}

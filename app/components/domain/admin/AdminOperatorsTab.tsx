@@ -13,78 +13,14 @@ import { SpinnerIcon, ShieldCheckIcon, UserIcon, TrashIcon, LockIcon, PlusIcon, 
 import { getUniversalGovernanceService } from '../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from './UniversalArchiveDrawer';
 import { CheckIcon } from '../../ui/Icons';
+import {
+  type OperatorUser,
+  DEFAULT_OPERATORS,
+  getOperatorService,
+} from '../../../core/services/operator.service';
 
-export interface OperatorUser {
-  uid: string;
-  email: string;
-  displayName?: string;
-  role: UserRole;
-  roles?: UserRole[];
-  phone?: string;
-  driverLicense?: string;
-  assignedUnit?: string;
-  status?: 'active' | 'suspended';
-  createdAt?: string;
-  lastLogin?: string;
-  isBlacklisted?: boolean;
-  blacklistReason?: string;
-  isArchived?: boolean;
-  driverScore?: number;
-}
-
-const DEFAULT_OPERATORS: OperatorUser[] = [
-  {
-    uid: 'demo-admin-01',
-    email: 'admin@chesterfieldtaxi.com',
-    displayName: 'Executive Administrator',
-    role: 'admin',
-    phone: '(314) 738-0100',
-    status: 'active',
-    createdAt: '2026-01-01T00:00:00Z',
-  },
-  {
-    uid: 'demo-dispatch-01',
-    email: 'dispatch@chesterfieldtaxi.com',
-    displayName: 'Lead Night Dispatcher',
-    role: 'dispatcher',
-    phone: '(314) 555-0144',
-    status: 'active',
-    createdAt: '2026-02-15T08:00:00Z',
-  },
-  {
-    uid: 'demo-driver-01',
-    email: 'marcus.vance@chesterfieldtaxi.com',
-    displayName: 'Marcus Vance',
-    role: 'driver',
-    phone: '(314) 555-0182',
-    driverLicense: 'MO-DL-8829104',
-    assignedUnit: 'Unit #101',
-    status: 'active',
-    createdAt: '2026-03-01T10:00:00Z',
-  },
-  {
-    uid: 'demo-driver-02',
-    email: 'sarah.connor@chesterfieldtaxi.com',
-    displayName: 'Sarah Connor',
-    role: 'driver',
-    phone: '(314) 555-0199',
-    driverLicense: 'MO-DL-7734190',
-    assignedUnit: 'Unit #102',
-    status: 'active',
-    createdAt: '2026-03-10T12:00:00Z',
-  },
-  {
-    uid: 'demo-driver-03',
-    email: 'dave.miller@chesterfieldtaxi.com',
-    displayName: 'Dave Miller',
-    role: 'driver',
-    phone: '(314) 555-0128',
-    driverLicense: 'MO-DL-4481023',
-    assignedUnit: 'Unit #103',
-    status: 'suspended',
-    createdAt: '2026-04-01T15:00:00Z',
-  },
-];
+export type { OperatorUser };
+export { DEFAULT_OPERATORS };
 
 import { AdminOnboardingQueue } from './subpages/AdminOnboardingQueue';
 
@@ -134,50 +70,11 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
     setIsLoading(true);
     setError(null);
 
-    if (!isFirebaseConfigured()) {
-      setOperators(DEFAULT_OPERATORS);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const db = getFirestore(getFirebaseApp());
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      if (querySnapshot.empty) {
-        setOperators(DEFAULT_OPERATORS);
-      } else {
-        const fetched: OperatorUser[] = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const roles = (data.roles as UserRole[]) || (data.role ? [data.role as UserRole] : ['customer']);
-          const primaryRole = roles[0] || 'customer';
-          
-          if (!roles.includes('customer') || roles.length > 1) {
-            fetched.push({
-              uid: docSnap.id,
-              email: data.email || 'unknown@chesterfieldtaxi.com',
-              displayName: data.displayName || data.name || '',
-              role: primaryRole,
-              roles,
-              phone: data.phone || data.phoneNumber || '',
-              driverLicense: data.driverLicense || '',
-              assignedUnit: data.assignedUnit || '',
-              status: data.status || 'active',
-              createdAt: data.createdAt,
-              lastLogin: data.lastLogin,
-            });
-          }
-        });
-
-        // Merge default drivers if not present in fresh Firestore
-        const hasDrivers = fetched.some((u) => u.roles?.includes('driver') || u.role === 'driver');
-        if (!hasDrivers) {
-          fetched.push(...DEFAULT_OPERATORS.filter((o) => o.role === 'driver'));
-        }
-        setOperators(fetched);
-      }
+      const fetched = await getOperatorService().getOperators();
+      setOperators(fetched);
     } catch (err: any) {
-      console.warn('[AdminOperatorsTab] Firestore fetch error, using defaults:', err);
+      console.warn('[AdminOperatorsTab] OperatorService fetch error, using defaults:', err);
       setOperators(DEFAULT_OPERATORS);
     } finally {
       setIsLoading(false);
@@ -186,6 +83,12 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
   useEffect(() => {
     fetchUsers();
+    const unsub = getOperatorService().subscribeToOperators((ops) => {
+      if (ops && ops.length > 0) {
+        setOperators(ops);
+      }
+    });
+    return () => unsub();
   }, []);
 
   const handleUpdateRole = async (uid: string, email: string, roles: UserRole[]) => {
@@ -197,6 +100,14 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         const db = getFirestore(getFirebaseApp());
         const userRef = doc(db, 'users', uid);
         await setDoc(userRef, { roles, role: roles[0] || 'customer', email }, { merge: true });
+      }
+      const existing = operators.find((o) => o.uid === uid);
+      if (existing) {
+        await getOperatorService().saveOperator({
+          ...existing,
+          roles,
+          role: roles[0] || 'customer',
+        });
       }
       setOperators((prev) =>
         prev.map((op) => (op.uid === uid ? { ...op, roles, role: roles[0] || 'customer' } : op))
@@ -220,6 +131,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         const userRef = doc(db, 'users', operator.uid);
         await setDoc(userRef, { status: nextStatus }, { merge: true });
       }
+      await getOperatorService().saveOperator({ ...operator, status: nextStatus });
       setOperators((prev) =>
         prev.map((op) => (op.uid === operator.uid ? { ...op, status: nextStatus } : op))
       );
@@ -269,6 +181,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         const db = getFirestore(getFirebaseApp());
         await deleteDoc(doc(db, 'users', uid));
       }
+      await getOperatorService().deleteOperator(uid);
       setOperators((prev) => prev.filter((o) => o.uid !== uid));
       setSuccess(`Operator ${email} has been deleted and access revoked.`);
       setTimeout(() => setSuccess(null), 3500);
@@ -310,8 +223,11 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         }
       }
 
+      const updatedOp: OperatorUser = { ...editingOperator, ...updates };
+      await getOperatorService().saveOperator(updatedOp);
+
       setOperators((prev) =>
-        prev.map((op) => (op.uid === editingOperator.uid ? { ...op, ...updates } : op))
+        prev.map((op) => (op.uid === editingOperator.uid ? updatedOp : op))
       );
       
       setSuccess(`Operator ${editingOperator.email} updated successfully.`);
@@ -385,6 +301,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         createdAt: new Date().toISOString(),
       };
 
+      await getOperatorService().saveOperator(newOp);
       setOperators((prev) => [newOp, ...prev]);
       setSuccess(`Operator ${cleanEmail} provisioned successfully with role ${newRole.toUpperCase()}.`);
       setShowAddModal(false);

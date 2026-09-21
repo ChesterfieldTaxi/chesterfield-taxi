@@ -12,6 +12,7 @@ import { sanitizePayload } from './firestore-sanitizer';
 import type { DriverProfile, DriverDutyStatus, DriverMeterExtra, DriverScheduleConfig, DayOfWeek } from '../types/driver';
 import type { Trip, TripStatus } from '../types/trip';
 import { getBookingService } from './booking';
+import { getOperatorService } from './operator.service';
 
 const DRIVERS_STORAGE_KEY = 'chesterfield_active_driver_profile';
 
@@ -118,9 +119,47 @@ export class DriverService {
         if (snap.exists()) {
           return snap.data() as DriverProfile;
         }
+
+        // Check if driver is in users collection (Admin Operator)
+        const userRef = doc(db, 'users', id);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          return {
+            id,
+            name: uData.displayName || uData.name || id,
+            phone: uData.phone || '(314) 738-0100',
+            dutyStatus: (uData.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
+            vehicleUnit: uData.assignedUnit || 'Unassigned',
+            vehicleTier: 'standard',
+            zone: uData.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
+            schedule: DEFAULT_SCHEDULE,
+            driverScore: uData.driverScore || 95,
+            isBlacklisted: Boolean(uData.isBlacklisted),
+            isArchived: Boolean(uData.isArchived),
+          };
+        }
       } catch (e) {
         console.warn('[DriverService] Error loading driver from Firestore, using fallback:', e);
       }
+    }
+
+    // Check OperatorService cache/defaults
+    const op = getOperatorService().getOperatorById(id);
+    if (op) {
+      return {
+        id: op.uid,
+        name: op.displayName || op.email.split('@')[0],
+        phone: op.phone || '(314) 738-0100',
+        dutyStatus: (op.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
+        vehicleUnit: op.assignedUnit || 'Unassigned',
+        vehicleTier: 'standard',
+        zone: op.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
+        schedule: DEFAULT_SCHEDULE,
+        driverScore: op.driverScore || 95,
+        isBlacklisted: Boolean(op.isBlacklisted),
+        isArchived: Boolean(op.isArchived),
+      };
     }
 
     // Check LocalStorage fallback
