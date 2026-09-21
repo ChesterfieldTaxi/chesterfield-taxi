@@ -21,7 +21,7 @@ export interface ContactRecord {
   corporateAccountId?: string;
   corporateAccountName?: string;
   isVip?: boolean;
-  preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair';
+  preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair' | 'executive' | 'suv' | 'van';
   notes?: string;
   tripCount?: number;
   totalSpend?: number;
@@ -29,6 +29,7 @@ export interface ContactRecord {
   isBlacklisted?: boolean;
   blacklistReason?: string;
   isArchived?: boolean;
+  createdAt?: string | number;
   updatedAt: number;
 }
 

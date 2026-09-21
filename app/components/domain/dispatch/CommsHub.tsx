@@ -30,6 +30,22 @@ import {
   LinkIcon,
   KeypadGridIcon,
 } from '../../ui/Icons';
+import { getContactService, type ContactRecord } from '../../../core/services/customer/contact.service';
+
+const formatMessageTimestamp = (timestampMs?: number, fallbackStr?: string) => {
+  if (!timestampMs) return fallbackStr || '';
+  const d = new Date(timestampMs);
+  if (isNaN(d.getTime())) return fallbackStr || '';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const getStoredTwilioCreds = () => {
+  if (typeof window === 'undefined') return { sid: '', token: '' };
+  return {
+    sid: localStorage.getItem('ct_twilio_sid') || '',
+    token: localStorage.getItem('ct_twilio_token') || '',
+  };
+};
 
 export type CommsTab = 'all' | 'phone' | 'messages' | 'voicemail';
 export type ChannelFilter = 'all' | 'calls' | 'voicemail' | 'messages';
@@ -50,6 +66,7 @@ export interface InteractionEvent {
   isUnread?: boolean;
   hasRecording?: boolean;
   recordingSid?: string;
+  callSid?: string;
   audioUrl?: string;
   audioDuration?: string;
   transcription?: string;
@@ -493,6 +510,15 @@ export function CommsHub({
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 1.5 | 2>(1);
 
+  // Contact Profile & Edit modal in CommsHub
+  const [isContactEditOpen, setIsContactEditOpen] = useState(false);
+  const [contactEditForm, setContactEditForm] = useState<Partial<ContactRecord>>({});
+  const [contactSaveFeedback, setContactSaveFeedback] = useState<string | null>(null);
+  const [activeContactRecord, setActiveContactRecord] = useState<ContactRecord | null>(null);
+
+  // Message activity stream bottom anchor
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
   // Cross-Window Workspace Bus
   const workspaceBus = getWorkspaceBus();
 
@@ -685,95 +711,160 @@ export function CommsHub({
     if (!audioPlayerRef.current) return;
     const player = audioPlayerRef.current;
 
+    const creds = getStoredTwilioCreds();
+    const credParams =
+      creds.sid && creds.token
+        ? `&accountSid=${encodeURIComponent(creds.sid)}&authToken=${encodeURIComponent(creds.token)}`
+        : '';
+
     let targetUrl: string | null = null;
     if (playingVoicemailId) {
       const vm = interactions.find((i) => i.id === playingVoicemailId);
       targetUrl = vm?.recordingSid
-        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(vm.recordingSid)}`
+        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(vm.recordingSid)}${credParams}`
         : (vm as any)?.audioUrl || null;
     } else if (playingCallId) {
       const call = interactions.find((i) => i.id === playingCallId);
       targetUrl = call?.recordingSid
-        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(call.recordingSid)}`
+        ? `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(call.recordingSid)}${credParams}`
         : (call as any)?.audioUrl || null;
     }
 
     if (targetUrl) {
       player.src = targetUrl;
       player.playbackRate = playbackSpeed;
+      player.onended = () => {
+        setPlayingVoicemailId(null);
+        setPlayingCallId(null);
+      };
       player.play().catch(() => {});
     } else {
       player.pause();
     }
   }, [playingVoicemailId, playingCallId, playbackSpeed, interactions]);
 
-  // Fetch live Twilio voicemails and messages on mount
-  useEffect(() => {
-    let isMounted = true;
-    const fetchTelephonyData = async () => {
-      try {
-        const [vmResp, msgResp] = await Promise.all([
-          fetch('/api/telephony?action=list_voicemails'),
-          fetch('/api/telephony?action=list_messages'),
-        ]);
+  // Stable telephony data fetcher (voicemails, messages, call recordings)
+  const fetchTelephonyData = async () => {
+    try {
+      const creds = getStoredTwilioCreds();
+      const credParams =
+        creds.sid && creds.token
+          ? `&accountSid=${encodeURIComponent(creds.sid)}&authToken=${encodeURIComponent(creds.token)}`
+          : '';
 
-        if (vmResp.ok) {
-          const vmData = (await vmResp.json()) as any;
-          if (vmData.success && Array.isArray(vmData.voicemails) && isMounted) {
-            setInteractions((prev) => {
-              const existingIds = new Set(prev.map((p) => p.id));
-              const newVms = vmData.voicemails
-                .filter((v: any) => !existingIds.has(v.id))
-                .map((v: any) => ({
-                  id: v.id,
-                  type: 'voicemail' as const,
-                  contactName: v.contactName,
-                  contactPhone: v.contactPhone,
-                  timestamp: v.timestamp,
-                  timestampMs: v.timestampMs || Date.now(),
-                  durationSeconds: parseInt(v.audioDuration || '30', 10),
-                  audioDuration: v.audioDuration || '0:30',
-                  snippet: `Voicemail: ${v.transcription ? v.transcription.slice(0, 50) + '...' : 'Audio message'}`,
-                  transcription: v.transcription,
-                  recordingSid: v.recordingSid,
-                  suggestedBooking: v.suggestedBooking,
-                  isUnread: v.isUnread ?? true,
-                }));
-              return [...newVms, ...prev];
-            });
-          }
-        }
+      const [vmResp, msgResp, recResp] = await Promise.all([
+        fetch(`/api/telephony?action=list_voicemails${credParams}`),
+        fetch(`/api/telephony?action=list_messages${credParams}`),
+        fetch(`/api/telephony?action=list_recordings${credParams}`),
+      ]);
 
-        if (msgResp.ok) {
-          const msgData = (await msgResp.json()) as any;
-          if (msgData.success && Array.isArray(msgData.messages) && isMounted) {
-            setInteractions((prev) => {
-              const existingIds = new Set(prev.map((p) => p.id));
-              const newMsgs = msgData.messages
-                .filter((m: any) => !existingIds.has(m.id))
-                .map((m: any) => ({
-                  id: m.id,
-                  type: (m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound') as any,
-                  contactName: m.direction === 'inbound' ? m.from : 'Chesterfield Dispatch',
-                  contactPhone: m.direction === 'inbound' ? m.from : m.to,
-                  timestamp: m.timestamp,
-                  timestampMs: m.timestampMs || Date.now(),
-                  snippet: m.body,
-                  isUnread: false,
-                }));
-              return [...newMsgs, ...prev];
-            });
-          }
+      if (vmResp.ok) {
+        const vmData = (await vmResp.json()) as any;
+        if (vmData.success && Array.isArray(vmData.voicemails)) {
+          setInteractions((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newVms = vmData.voicemails
+              .filter((v: any) => !existingIds.has(v.id))
+              .map((v: any) => ({
+                id: v.id,
+                type: 'voicemail' as const,
+                contactName: v.contactName,
+                contactPhone: v.contactPhone,
+                timestamp: v.timestamp,
+                timestampMs: v.timestampMs || Date.now(),
+                durationSeconds: parseInt(v.audioDuration || '30', 10),
+                audioDuration: v.audioDuration || '0:30',
+                snippet: `Voicemail: ${v.transcription ? v.transcription.slice(0, 50) + '...' : 'Audio message'}`,
+                transcription: v.transcription,
+                recordingSid: v.recordingSid,
+                suggestedBooking: v.suggestedBooking,
+                isUnread: v.isUnread ?? true,
+              }));
+            return [...newVms, ...prev];
+          });
         }
-      } catch {
-        // Fallback to initial sample items
       }
-    };
 
+      if (msgResp.ok) {
+        const msgData = (await msgResp.json()) as any;
+        if (msgData.success && Array.isArray(msgData.messages)) {
+          setInteractions((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newMsgs = msgData.messages
+              .filter((m: any) => !existingIds.has(m.id))
+              .map((m: any) => ({
+                id: m.id,
+                type: (m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound') as any,
+                contactName: m.direction === 'inbound' ? m.from : 'Chesterfield Dispatch',
+                contactPhone: m.direction === 'inbound' ? m.from : m.to,
+                timestamp: m.timestamp,
+                timestampMs: m.timestampMs || Date.now(),
+                snippet: m.body,
+                isUnread: false,
+              }));
+            return [...newMsgs, ...prev];
+          });
+        }
+      }
+
+      if (recResp.ok) {
+        const recData = (await recResp.json()) as any;
+        if (recData.success && Array.isArray(recData.recordings)) {
+          setInteractions((prev) => {
+            // Attach recordings to calls
+            const updated = prev.map((item) => {
+              if (item.type.startsWith('call_')) {
+                const match = recData.recordings.find(
+                  (r: any) =>
+                    (item.callSid && r.callSid === item.callSid) ||
+                    (item.recordingSid && r.sid === item.recordingSid)
+                );
+                if (match) {
+                  return {
+                    ...item,
+                    recordingSid: match.sid,
+                    audioDuration: match.duration,
+                    durationSeconds: match.durationSeconds,
+                    audioUrl: match.audioUrl,
+                  };
+                }
+              }
+              return item;
+            });
+
+            // Insert unattached recordings as recent recorded calls
+            const existingRecSids = new Set(updated.map((u) => u.recordingSid).filter(Boolean));
+            const unattached = recData.recordings
+              .filter((r: any) => !existingRecSids.has(r.sid))
+              .map((r: any) => ({
+                id: `rec_${r.sid}`,
+                type: 'call_inbound' as const,
+                contactName: 'Recorded Call',
+                contactPhone: '+13147391800',
+                recordingSid: r.sid,
+                audioDuration: r.duration,
+                durationSeconds: r.durationSeconds,
+                audioUrl: r.audioUrl,
+                timestamp: r.dateCreated
+                  ? new Date(r.dateCreated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                  : 'Recent',
+                timestampMs: r.dateCreated ? new Date(r.dateCreated).getTime() : Date.now(),
+                snippet: `Call Recording (${r.duration})`,
+                isUnread: false,
+              }));
+
+            return [...unattached, ...updated];
+          });
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  // Fetch live Twilio voicemails, messages, and recordings on mount
+  useEffect(() => {
     fetchTelephonyData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // Focus dialpad input when switching to phone tab and keypad sub-tab
@@ -993,23 +1084,26 @@ export function CommsHub({
     }
   };
 
-  // Selected contact thread interactions
+  // Selected contact thread interactions - reversed chain (oldest at top, most recent at bottom)
   const selectedInteractions = selectedContactPhone
-    ? interactions.filter(
-        (i) =>
-          normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
-          (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
-          (i.homePhone && normalizePhone(i.homePhone) === normalizePhone(selectedContactPhone))
-      )
+    ? interactions
+        .filter(
+          (i) =>
+            normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
+            (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
+            (i.homePhone && normalizePhone(i.homePhone) === normalizePhone(selectedContactPhone))
+        )
+        .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0))
     : [];
 
+  // Active contact summary (derives from latest interaction or fallback)
   const activeContactSummary =
-    selectedInteractions[0] ||
+    (selectedInteractions.length > 0 ? selectedInteractions[selectedInteractions.length - 1] : null) ||
     (selectedContactPhone
       ? ({
           id: `contact_${selectedContactPhone}`,
           type: 'call_inbound',
-          contactName: formatDisplayPhone(selectedContactPhone),
+          contactName: activeContactRecord?.name || formatDisplayPhone(selectedContactPhone),
           contactPhone: selectedContactPhone,
           contactType: 'passenger',
           timestamp: 'Recent',
@@ -1017,6 +1111,56 @@ export function CommsHub({
           snippet: 'Direct contact thread',
         } as InteractionEvent)
       : null);
+
+  // Sync activeContactRecord from ContactService whenever contact changes
+  useEffect(() => {
+    if (!selectedContactPhone) {
+      setActiveContactRecord(null);
+      return;
+    }
+    const contactService = getContactService();
+    const found = contactService.getContactByPhone(selectedContactPhone);
+    if (found) {
+      setActiveContactRecord(found);
+    } else {
+      setActiveContactRecord({
+        id: `temp_${Date.now()}`,
+        name: activeContactSummary?.contactName || formatDisplayPhone(selectedContactPhone),
+        phone: selectedContactPhone,
+        email: '',
+        isVip: false,
+        preferredVehicleTier: 'standard',
+        notes: '',
+        customerScore: 90,
+        tripCount: 1,
+        totalSpend: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+      });
+    }
+  }, [selectedContactPhone, activeContactSummary?.contactName]);
+
+  // Listen to CONTACT_UPDATED events across tabs
+  useEffect(() => {
+    const unsub = workspaceBus.subscribe((msg) => {
+      if (msg.type === 'CONTACT_UPDATED') {
+        const contact = msg.payload?.contact;
+        if (contact && selectedContactPhone) {
+          if (normalizePhone(contact.phone) === normalizePhone(selectedContactPhone)) {
+            setActiveContactRecord(contact);
+          }
+        }
+      }
+    });
+    return () => unsub();
+  }, [selectedContactPhone]);
+
+  // Auto-scroll to latest message at the bottom of the conversation thread
+  useEffect(() => {
+    if (selectedContactPhone && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedContactPhone, selectedInteractions.length]);
 
   // Check upcoming bookings for the active contact
   const upcomingBookingsForContact: UpcomingBookingPreview[] = [];
@@ -1393,6 +1537,11 @@ export function CommsHub({
     setShowInCallTrips(false);
     setShowInCallNotes(false);
     activeCallInteractionIdRef.current = null;
+
+    // Refresh telephony recordings after a short delay so Twilio recording callback is fetched
+    setTimeout(() => {
+      fetchTelephonyData();
+    }, 4000);
   };
   handleEndCallRef.current = handleEndCall;
 
@@ -1505,6 +1654,52 @@ export function CommsHub({
     setInCallNoteText('');
     setBookingToast(`Note: ${noteToAdd}`);
     setTimeout(() => setBookingToast(null), 2000);
+  };
+
+  const handleOpenContactEdit = () => {
+    const phone = activeContactSummary?.contactPhone || selectedContactPhone || '';
+    const contactService = getContactService();
+    const existing = (phone ? contactService.getContactByPhone(phone) : null) || activeContactRecord;
+    setContactEditForm({
+      id: existing?.id,
+      name: existing?.name || activeContactSummary?.contactName || formatDisplayPhone(phone),
+      phone: existing?.phone || phone,
+      email: existing?.email || '',
+      corporateAccountName: existing?.corporateAccountName || '',
+      isVip: existing?.isVip || false,
+      preferredVehicleTier: existing?.preferredVehicleTier || 'standard',
+      notes: existing?.notes || '',
+    });
+    setContactSaveFeedback(null);
+    setIsContactEditOpen(true);
+  };
+
+  const handleSaveContactFromHub = () => {
+    const contactService = getContactService();
+    const phone = contactEditForm.phone || activeContactSummary?.contactPhone || selectedContactPhone || '';
+    if (!phone) return;
+
+    const updated = contactService.saveContact({
+      id: contactEditForm.id || activeContactRecord?.id || `cust_${Date.now()}`,
+      name: contactEditForm.name || activeContactSummary?.contactName || formatDisplayPhone(phone),
+      phone: phone,
+      email: contactEditForm.email || '',
+      corporateAccountName: contactEditForm.corporateAccountName || undefined,
+      isVip: !!contactEditForm.isVip,
+      preferredVehicleTier: contactEditForm.preferredVehicleTier || 'standard',
+      notes: contactEditForm.notes || '',
+      customerScore: activeContactRecord?.customerScore ?? 90,
+      tripCount: activeContactRecord?.tripCount ?? 1,
+      totalSpend: activeContactRecord?.totalSpend ?? 0,
+      isBlacklisted: activeContactRecord?.isBlacklisted ?? false,
+    });
+
+    setActiveContactRecord(updated);
+    setContactSaveFeedback('Contact profile updated successfully');
+    setTimeout(() => {
+      setContactSaveFeedback(null);
+      setIsContactEditOpen(false);
+    }, 1200);
   };
 
   const handleSendSms = async () => {
@@ -2132,11 +2327,22 @@ export function CommsHub({
                 >
                   ← Back
                 </button>
-                <div>
+                <button
+                  type="button"
+                  onClick={handleOpenContactEdit}
+                  className="text-left group hover:bg-slate-200/60 p-1.5 -m-1.5 rounded-xl transition-all cursor-pointer"
+                  title="Click to view & edit contact profile"
+                >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-900">
-                      {activeContactSummary.contactName}
+                    <span className="text-xs font-black text-slate-900 group-hover:text-blue-700 transition-colors flex items-center gap-1.5">
+                      <span>{activeContactRecord?.name || activeContactSummary.contactName}</span>
+                      <span className="text-slate-400 group-hover:text-blue-600 text-xs">✎</span>
                     </span>
+                    {activeContactRecord?.isVip && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-black uppercase">
+                        VIP
+                      </span>
+                    )}
                     <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 font-bold">
                       Verified Contact
                     </span>
@@ -2148,12 +2354,25 @@ export function CommsHub({
                         • SMS Cell: {activeContactSummary.mobilePhone}
                       </span>
                     )}
+                    <span className="text-blue-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                      Edit Profile
+                    </span>
                   </div>
-                </div>
+                </button>
               </div>
 
               {/* Quick Actions */}
               <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleOpenContactEdit}
+                  className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                  title="Edit Contact"
+                >
+                  <UserIcon className="w-3 h-3 text-slate-600" />
+                  <span>Edit Contact</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -2171,7 +2390,7 @@ export function CommsHub({
                   type="button"
                   onClick={() => {
                     workspaceBus.publish('POPULATE_BOOKING', {
-                      passengerName: activeContactSummary.contactName,
+                      passengerName: activeContactRecord?.name || activeContactSummary.contactName,
                       passengerPhone:
                         activeContactSummary.mobilePhone || activeContactSummary.contactPhone,
                       callingFromPhone: activeContactSummary.homePhone,
@@ -2209,171 +2428,203 @@ export function CommsHub({
 
             {/* Thread Activity Stream */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
-              {selectedInteractions.map((evt) => (
-                <div key={evt.id} className="flex flex-col">
-                  {/* SMS Inbound Bubble */}
-                  {evt.type === 'sms_inbound' && (
-                    <div className="self-start max-w-[80%] bg-white border border-slate-200 rounded-2xl rounded-tl-sm p-3 shadow-xs">
-                      <span className="text-[10px] font-bold text-slate-500 block mb-1">
-                        {evt.contactName} • {evt.timestamp}
-                      </span>
-                      <p className="text-xs text-slate-800">{evt.snippet}</p>
-                    </div>
-                  )}
+              {selectedInteractions.map((evt, idx) => {
+                const prevEvt = idx > 0 ? selectedInteractions[idx - 1] : null;
+                const curDateStr = evt.timestampMs ? new Date(evt.timestampMs).toDateString() : '';
+                const prevDateStr = prevEvt?.timestampMs ? new Date(prevEvt.timestampMs).toDateString() : '';
+                const showDateSeparator = curDateStr && curDateStr !== prevDateStr;
 
-                  {/* SMS Outbound Bubble */}
-                  {evt.type === 'sms_outbound' && (
-                    <div className="self-end max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 shadow-xs">
-                      <span className="text-[10px] text-blue-200 block mb-1 font-semibold">
-                        Chesterfield Dispatch • {evt.timestamp}
-                      </span>
-                      <p className="text-xs">{evt.snippet}</p>
-                    </div>
-                  )}
+                return (
+                  <div key={evt.id} className="flex flex-col">
+                    {/* Optional Date Header Separator */}
+                    {showDateSeparator && (
+                      <div className="flex justify-center my-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/80 text-slate-600">
+                          {new Date(evt.timestampMs!).toLocaleDateString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    )}
 
-                  {/* Call Event with Recording Playback (Just like voicemail) */}
-                  {evt.type.startsWith('call_') && (
-                    <div className="self-start w-full max-w-[85%] bg-emerald-50/70 border border-emerald-200/90 rounded-2xl rounded-tl-sm p-3 shadow-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
-                            <PhoneIcon className="w-3 h-3" />
-                          </div>
-                          <span className="text-[11px] font-black text-emerald-950">
-                            {evt.type === 'call_inbound'
-                              ? 'Inbound Call'
-                              : evt.type === 'call_outbound'
-                              ? 'Outbound Call'
-                              : 'Missed Call'}{' '}
-                            • {evt.timestamp}
+                    {/* SMS Inbound Bubble */}
+                    {evt.type === 'sms_inbound' && (
+                      <div className="self-start max-w-[80%] bg-white border border-slate-200 rounded-2xl rounded-tl-sm p-3 shadow-xs">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className="text-[10px] font-bold text-slate-600">
+                            {evt.contactName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
                           </span>
                         </div>
-                        <span className="text-[10px] font-mono text-emerald-800 font-bold">
-                          {evt.audioDuration ||
-                            `${Math.floor((evt.durationSeconds || 60) / 60)}:${((evt.durationSeconds || 60) % 60)
-                              .toString()
-                              .padStart(2, '0')}`}
-                        </span>
+                        <p className="text-xs text-slate-800 leading-relaxed">{evt.snippet}</p>
                       </div>
+                    )}
 
-                      {/* Call Recording Audio Scrubber */}
-                      <div className="flex items-center justify-between pt-0.5 flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlayingCallId(playingCallId === evt.id ? null : evt.id)
-                            }
-                            className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
-                          >
-                            {playingCallId === evt.id ? '⏸' : '▶'}
-                          </button>
-                          <div className="h-2 w-24 bg-emerald-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full bg-emerald-600 ${
-                                playingCallId === evt.id ? 'w-2/3 animate-pulse' : 'w-0'
-                              }`}
-                            />
+                    {/* SMS Outbound Bubble */}
+                    {evt.type === 'sms_outbound' && (
+                      <div className="self-end max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 shadow-xs">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className="text-[10px] text-blue-100 font-semibold">
+                            Chesterfield Dispatch
+                          </span>
+                          <span className="text-[10px] text-blue-200 font-mono">
+                            {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                          </span>
+                        </div>
+                        <p className="text-xs leading-relaxed">{evt.snippet}</p>
+                      </div>
+                    )}
+
+                    {/* Call Event with Recording Playback */}
+                    {evt.type.startsWith('call_') && (
+                      <div className="self-start w-full max-w-[85%] bg-emerald-50/70 border border-emerald-200/90 rounded-2xl rounded-tl-sm p-3 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
+                              <PhoneIcon className="w-3 h-3" />
+                            </div>
+                            <span className="text-[11px] font-black text-emerald-950">
+                              {evt.type === 'call_inbound'
+                                ? 'Inbound Call'
+                                : evt.type === 'call_outbound'
+                                ? 'Outbound Call'
+                                : 'Missed Call'}{' '}
+                              • {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                            </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))
-                            }
-                            className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-bold border border-emerald-300 transition-colors cursor-pointer"
-                            title="Playback speed"
-                          >
-                            {playbackSpeed}x
-                          </button>
+                          <span className="text-[10px] font-mono text-emerald-800 font-bold">
+                            {evt.audioDuration ||
+                              `${Math.floor((evt.durationSeconds || 60) / 60)}:${((evt.durationSeconds || 60) % 60)
+                                .toString()
+                                .padStart(2, '0')}`}
+                          </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleStartCall(evt.contactPhone, evt.contactName)}
-                          className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
-                        >
-                          <PhoneIcon className="w-2.5 h-2.5" />
-                          <span>Call</span>
-                        </button>
-                      </div>
-
-                      {evt.transcription && (
-                        <p className="text-[11px] text-slate-700 italic border-l-2 border-emerald-400 pl-2">
-                          "{evt.transcription}"
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Voicemail Bubble with Audio Scrubber & Actions */}
-                  {evt.type === 'voicemail' && (
-                    <div className="self-start max-w-[85%] bg-amber-50 border border-amber-200 rounded-2xl rounded-tl-sm p-3 shadow-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-amber-900">
-                          🎙️ Voicemail • {evt.timestamp}
-                        </span>
-                        <span className="text-[10px] font-mono text-amber-700 font-bold">{evt.audioDuration}</span>
-                      </div>
-
-                      {/* Voicemail Audio Scrubber */}
-                      <div className="flex items-center justify-between pt-0.5 flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlayingVoicemailId(playingVoicemailId === evt.id ? null : evt.id)
-                            }
-                            className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
-                          >
-                            {playingVoicemailId === evt.id ? '⏸' : '▶'}
-                          </button>
-                          <div className="h-2 w-24 bg-amber-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full bg-amber-600 ${
-                                playingVoicemailId === evt.id ? 'w-2/3 animate-pulse' : 'w-0'
-                              }`}
-                            />
+                        {/* Call Recording Audio Scrubber */}
+                        <div className="flex items-center justify-between pt-0.5 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPlayingCallId(playingCallId === evt.id ? null : evt.id)
+                              }
+                              className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
+                            >
+                              {playingCallId === evt.id ? '⏸' : '▶'}
+                            </button>
+                            <div className="h-2 w-24 bg-emerald-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full bg-emerald-600 ${
+                                  playingCallId === evt.id ? 'w-2/3 animate-pulse' : 'w-0'
+                                }`}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-bold border border-emerald-300 transition-colors cursor-pointer"
+                              title="Playback speed"
+                            >
+                              {playbackSpeed}x
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))
-                            }
-                            className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300 transition-colors cursor-pointer"
-                            title="Playback speed"
-                          >
-                            {playbackSpeed}x
-                          </button>
-                        </div>
 
-                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleStartCall(evt.contactPhone, evt.contactName)}
-                            className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                            className="px-2 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <PhoneIcon className="w-2.5 h-2.5" />
                             <span>Call</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleConvertVoicemailToBooking(evt.suggestedBooking)}
-                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
-                          >
-                            <span>Book</span>
-                          </button>
                         </div>
-                      </div>
 
-                      {evt.transcription && (
-                        <p className="text-xs text-slate-800 italic border-l-2 border-amber-400 pl-2">
-                          "{evt.transcription}"
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                        {evt.transcription && (
+                          <p className="text-[11px] text-slate-700 italic border-l-2 border-emerald-400 pl-2">
+                            "{evt.transcription}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Voicemail Bubble with Audio Scrubber & Actions */}
+                    {evt.type === 'voicemail' && (
+                      <div className="self-start max-w-[85%] bg-amber-50 border border-amber-200 rounded-2xl rounded-tl-sm p-3 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-900">
+                            🎙️ Voicemail • {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-700 font-bold">{evt.audioDuration}</span>
+                        </div>
+
+                        {/* Voicemail Audio Scrubber */}
+                        <div className="flex items-center justify-between pt-0.5 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPlayingVoicemailId(playingVoicemailId === evt.id ? null : evt.id)
+                              }
+                              className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
+                            >
+                              {playingVoicemailId === evt.id ? '⏸' : '▶'}
+                            </button>
+                            <div className="h-2 w-24 bg-amber-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full bg-amber-600 ${
+                                  playingVoicemailId === evt.id ? 'w-2/3 animate-pulse' : 'w-0'
+                                }`}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPlaybackSpeed((s) => (s === 1 ? 1.5 : s === 1.5 ? 2 : 1))
+                              }
+                              className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300 transition-colors cursor-pointer"
+                              title="Playback speed"
+                            >
+                              {playbackSpeed}x
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleStartCall(evt.contactPhone, evt.contactName)}
+                              className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                            >
+                              <PhoneIcon className="w-2.5 h-2.5" />
+                              <span>Call</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConvertVoicemailToBooking(evt.suggestedBooking)}
+                              className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                            >
+                              <span>Book</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {evt.transcription && (
+                          <p className="text-xs text-slate-800 italic border-l-2 border-amber-400 pl-2">
+                            "{evt.transcription}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Auto-scroll anchor to stick to the bottom of the thread */}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Quick Response Templates & SMS Composer */}
@@ -3760,6 +4011,202 @@ export function CommsHub({
                 <PhoneIcon className="w-3.5 h-3.5" />
                 <span>Save & Call Now</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Profile & Edit Modal */}
+      {isContactEditOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setIsContactEditOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <UserIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Edit Contact Profile</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Customer record • Synced across dispatch &amp; admin
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsContactEditOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Save Toast */}
+            {contactSaveFeedback && (
+              <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
+                <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{contactSaveFeedback}</span>
+              </div>
+            )}
+
+            {/* Form Fields */}
+            <div className="mt-4 overflow-y-auto space-y-3.5 pr-1 flex-1 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={contactEditForm.name || ''}
+                  onChange={(e) =>
+                    setContactEditForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="e.g. Eleanor Vance"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Primary Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={contactEditForm.phone || ''}
+                    onChange={(e) =>
+                      setContactEditForm((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    placeholder="+1 (314) 555-0199"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={contactEditForm.email || ''}
+                    onChange={(e) =>
+                      setContactEditForm((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    placeholder="client@example.com"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Corporate Account
+                  </label>
+                  <input
+                    type="text"
+                    value={contactEditForm.corporateAccountName || ''}
+                    onChange={(e) =>
+                      setContactEditForm((prev) => ({
+                        ...prev,
+                        corporateAccountName: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. Centene Health"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Vehicle Class
+                  </label>
+                  <select
+                    value={contactEditForm.preferredVehicleTier || 'standard'}
+                    onChange={(e) =>
+                      setContactEditForm((prev) => ({
+                        ...prev,
+                        preferredVehicleTier: e.target.value as any,
+                      }))
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500 cursor-pointer"
+                  >
+                    <option value="standard">Standard Sedan</option>
+                    <option value="executive">Executive Black Car</option>
+                    <option value="suv">Luxury SUV</option>
+                    <option value="van">Passenger Van</option>
+                    <option value="wheelchair">WAV Wheelchair Accessible</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!contactEditForm.isVip}
+                  onChange={(e) =>
+                    setContactEditForm((prev) => ({ ...prev, isVip: e.target.checked }))
+                  }
+                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-slate-900 text-xs">VIP Priority Client</span>
+                  <span className="text-[10px] text-slate-500">
+                    Prioritizes dispatch allocation and marks VIP badge in thread
+                  </span>
+                </div>
+              </label>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Dispatcher Notes &amp; Special Needs
+                </label>
+                <textarea
+                  rows={2}
+                  value={contactEditForm.notes || ''}
+                  onChange={(e) =>
+                    setContactEditForm((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  placeholder="Gate code, airport pickup preference, mobility notes..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <a
+                href={`/admin?tab=customers&phone=${encodeURIComponent(
+                  contactEditForm.phone || activeContactSummary?.contactPhone || ''
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <ExternalLinkIcon className="w-3.5 h-3.5" />
+                <span>Open in Admin</span>
+              </a>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsContactEditOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveContactFromHub}
+                  className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckIcon className="w-3.5 h-3.5" />
+                  <span>Save Contact</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -27,6 +27,7 @@ export interface TelephonyApiRequest {
     | 'list_voicemails'
     | 'list_recordings'
     | 'list_messages'
+    | 'call_recording_status'
     | 'audio_proxy';
   to?: string;
   from?: string;
@@ -85,10 +86,12 @@ const telephonyStore: {
   voicemails: StoredVoicemail[];
   messages: StoredSms[];
   callStatuses: Record<string, { status: string; timestamp: number }>;
+  recordings: any[];
 } = ((globalThis as any).__ct_telephony_store ||= {
   voicemails: [],
   messages: [],
   callStatuses: {},
+  recordings: [],
 });
 
 import { sanitizeToE164, validatePhoneNumber, formatDisplayPhone } from '../core/utils/phone';
@@ -162,7 +165,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!recordingSid) {
       return new Response('Recording SID is required', { status: 400 });
     }
-    const { accountSid, authToken } = await resolveCredentials();
+    const clientAccountSid = url.searchParams.get('accountSid');
+    const clientAuthToken = url.searchParams.get('authToken');
+    const resolved = await resolveCredentials();
+    const accountSid = clientAccountSid || resolved.accountSid;
+    const authToken = clientAuthToken || resolved.authToken;
+
     if (!accountSid || !authToken) {
       return new Response('Twilio credentials not configured', { status: 401 });
     }
@@ -333,6 +341,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const dial = response.dial({
         callerId: callerId ? sanitizeToE164(callerId) : undefined,
         record: 'record-from-answer',
+        recordingStatusCallback: '/api/telephony?action=call_recording_status',
+        recordingStatusCallbackEvent: ['completed'],
         timeout: 30,
       });
       dial.number(sanitizeToE164(to));
@@ -357,6 +367,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const dial = response.dial({
       timeout: 30,
       record: 'record-from-answer',
+      recordingStatusCallback: '/api/telephony?action=call_recording_status',
+      recordingStatusCallbackEvent: ['completed'],
       action: '/api/telephony?action=handle_unanswered',
     });
     // Ring the WebRTC in-browser softphone
@@ -407,21 +419,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // ─── LIST RECORDINGS DIRECTLY FROM TWILIO ───
   if (action === 'list_recordings') {
-    const { accountSid, authToken } = await resolveCredentials();
+    const clientAccountSid = url.searchParams.get('accountSid');
+    const clientAuthToken = url.searchParams.get('authToken');
+    const resolved = await resolveCredentials();
+    const accountSid = clientAccountSid || resolved.accountSid;
+    const authToken = clientAuthToken || resolved.authToken;
+
+    const inMemoryRecordings = telephonyStore.recordings || [];
+
     if (!accountSid || !authToken || !accountSid.startsWith('AC')) {
-      return Response.json({ success: true, recordings: [] });
+      return Response.json({ success: true, recordings: inMemoryRecordings });
     }
 
     try {
       const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
       const recResp = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings.json?PageSize=30`,
+        `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings.json?PageSize=50`,
         { headers: { Authorization: authHeader } }
       );
       const recData = (await recResp.json()) as any;
 
       if (recResp.ok && Array.isArray(recData.recordings)) {
-        const recordings = recData.recordings.map((r: any) => {
+        const twilioRecordings = recData.recordings.map((r: any) => {
           const durSec = parseInt(r.duration || '30', 10);
           return {
             sid: r.sid,
@@ -429,14 +448,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
             duration: `${Math.floor(durSec / 60)}:${(durSec % 60).toString().padStart(2, '0')}`,
             durationSeconds: durSec,
             dateCreated: r.date_created,
-            audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}`,
+            audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}&accountSid=${encodeURIComponent(accountSid)}&authToken=${encodeURIComponent(authToken)}`,
           };
         });
-        return Response.json({ success: true, recordings });
+
+        const seenSids = new Set<string>();
+        const combined = [];
+        for (const r of [...inMemoryRecordings, ...twilioRecordings]) {
+          if (!seenSids.has(r.sid)) {
+            seenSids.add(r.sid);
+            combined.push(r);
+          }
+        }
+        return Response.json({ success: true, recordings: combined });
       }
-      return Response.json({ success: true, recordings: [] });
+      return Response.json({ success: true, recordings: inMemoryRecordings });
     } catch {
-      return Response.json({ success: true, recordings: [] });
+      return Response.json({ success: true, recordings: inMemoryRecordings });
     }
   }
 
@@ -605,6 +633,8 @@ export async function action({ request }: ActionFunctionArgs) {
         const dial = response.dial({
           callerId: callerId ? sanitizeToE164(callerId) : undefined,
           record: 'record-from-answer',
+          recordingStatusCallback: '/api/telephony?action=call_recording_status',
+          recordingStatusCallbackEvent: ['completed'],
           timeout: 30,
         });
         dial.number(sanitizeToE164(to));
@@ -615,6 +645,34 @@ export async function action({ request }: ActionFunctionArgs) {
       return new Response(response.toString(), {
         headers: { 'Content-Type': 'text/xml' },
       });
+    }
+
+    // ─── CALL RECORDING STATUS WEBHOOK CALLBACK (POST) ───
+    if (data.action === 'call_recording_status' || queryAction === 'call_recording_status') {
+      const recordingSid = (data as any).RecordingSid || data.recordingSid || url.searchParams.get('RecordingSid');
+      const callSid = (data as any).CallSid || data.callSid || url.searchParams.get('CallSid');
+      const recordingDuration = (data as any).RecordingDuration || (data as any).recordingDuration || '30';
+      const recordingStatus = (data as any).RecordingStatus || (data as any).recordingStatus || 'completed';
+
+      if (recordingSid) {
+        const durSec = parseInt(recordingDuration || '30', 10);
+        const formattedDur = `${Math.floor(durSec / 60)}:${(durSec % 60).toString().padStart(2, '0')}`;
+        const newRecord = {
+          sid: recordingSid,
+          callSid: callSid || '',
+          duration: formattedDur,
+          durationSeconds: durSec,
+          dateCreated: new Date().toISOString(),
+          audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${recordingSid}`,
+          status: recordingStatus,
+        };
+        if (!telephonyStore.recordings) {
+          telephonyStore.recordings = [];
+        }
+        telephonyStore.recordings = telephonyStore.recordings.filter((r: any) => r.sid !== recordingSid);
+        telephonyStore.recordings.unshift(newRecord);
+      }
+      return Response.json({ success: true, recordingSid });
     }
 
     // ─── TWILIO CALL STATUS WEBHOOK CALLBACK (POST) ───
@@ -719,6 +777,8 @@ export async function action({ request }: ActionFunctionArgs) {
       const dial = response.dial({
         timeout: 30,
         record: 'record-from-answer',
+        recordingStatusCallback: '/api/telephony?action=call_recording_status',
+        recordingStatusCallbackEvent: ['completed'],
         action: '/api/telephony?action=handle_unanswered',
       });
       // Ring the WebRTC in-browser softphone
@@ -1267,17 +1327,18 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // ─── LIST RECORDINGS VIA POST ───
     if (data.action === 'list_recordings') {
-      if (!isConfigured) {
-        return Response.json({ success: true, recordings: [] });
+      const inMemoryRecordings = telephonyStore.recordings || [];
+      if (!accountSid || !authToken || !accountSid.startsWith('AC')) {
+        return Response.json({ success: true, recordings: inMemoryRecordings });
       }
       try {
         const recResp = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings.json?PageSize=30`,
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Recordings.json?PageSize=50`,
           { headers: { Authorization: authHeader } }
         );
         const recData = (await recResp.json()) as any;
         if (recResp.ok && Array.isArray(recData.recordings)) {
-          const recordings = recData.recordings.map((r: any) => {
+          const twilioRecordings = recData.recordings.map((r: any) => {
             const durSec = parseInt(r.duration || '30', 10);
             return {
               sid: r.sid,
@@ -1285,14 +1346,23 @@ export async function action({ request }: ActionFunctionArgs) {
               duration: `${Math.floor(durSec / 60)}:${(durSec % 60).toString().padStart(2, '0')}`,
               durationSeconds: durSec,
               dateCreated: r.date_created,
-              audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}`,
+              audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}&accountSid=${encodeURIComponent(accountSid)}&authToken=${encodeURIComponent(authToken)}`,
             };
           });
-          return Response.json({ success: true, recordings });
+
+          const seenSids = new Set<string>();
+          const combined = [];
+          for (const r of [...inMemoryRecordings, ...twilioRecordings]) {
+            if (!seenSids.has(r.sid)) {
+              seenSids.add(r.sid);
+              combined.push(r);
+            }
+          }
+          return Response.json({ success: true, recordings: combined });
         }
-        return Response.json({ success: true, recordings: [] });
+        return Response.json({ success: true, recordings: inMemoryRecordings });
       } catch {
-        return Response.json({ success: true, recordings: [] });
+        return Response.json({ success: true, recordings: inMemoryRecordings });
       }
     }
 
