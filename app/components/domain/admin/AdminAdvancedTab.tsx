@@ -77,12 +77,21 @@ export function AdminAdvancedTab({
   const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(
     settings.fleetAlertsConfig?.autoDismissMinutes ?? 60
   );
+  const [realtimeRouting, setRealtimeRouting] = useState<boolean>(
+    settings.enableRealtimeRouting ?? COMPANY_CONFIG.enableRealtimeRouting ?? false
+  );
 
   useEffect(() => {
     if (settings.constructionMode !== undefined) {
       setMaintenanceMode(settings.constructionMode);
     }
   }, [settings.constructionMode]);
+
+  useEffect(() => {
+    if (settings.enableRealtimeRouting !== undefined) {
+      setRealtimeRouting(settings.enableRealtimeRouting);
+    }
+  }, [settings.enableRealtimeRouting]);
 
   useEffect(() => {
     if (settings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
@@ -528,6 +537,68 @@ export function AdminAdvancedTab({
               </div>
             </Card>
           </div>
+
+          {/* Routing Engine & Google Maps Realtime Routing */}
+          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900">
+                    Routing Engine &amp; Google Road Navigation
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Switch between development cost-saving mock routing and live Google Directions road calculations.
+                  </CardDescription>
+                </div>
+                {realtimeRouting ? (
+                  <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px] px-2.5 py-1">
+                    Live Google Directions Active
+                  </Badge>
+                ) : (
+                  <Badge variant="warning" className="bg-amber-50 text-amber-700 border-amber-200 font-bold text-[11px] px-2.5 py-1">
+                    Mock Mode Active (Zero API Cost)
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-start justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">Enable Live Google Road Routing</h4>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                      Directions API
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    <strong>When disabled (Current / Development):</strong> The system uses an offline straight-line curvature calculation (Haversine &times; 1.25&times;) with straight polyline rendering to avoid incurring Google Directions API fees during development.
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    <strong>When enabled (Production):</strong> Routes, travel times, and taximeter prices are calculated using live turn-by-turn road mileage and real-time traffic conditions via the Google Directions service.
+                  </p>
+                </div>
+                <div className="pt-1">
+                  <input
+                    type="checkbox"
+                    checked={realtimeRouting}
+                    onChange={async (e) => {
+                      const nextVal = e.target.checked;
+                      setRealtimeRouting(nextVal);
+                      try {
+                        await onSave({
+                          enableRealtimeRouting: nextVal,
+                          updatedAt: new Date().toISOString(),
+                        });
+                      } catch (err) {
+                        console.error('Failed to update realtime routing setting:', err);
+                      }
+                    }}
+                    className="w-5 h-5 rounded text-blue-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Maintenance Lock & Cache Operations */}
           <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">

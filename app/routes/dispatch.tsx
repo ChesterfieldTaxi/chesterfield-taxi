@@ -10,6 +10,7 @@ import type { Trip, TripStatus, TripAuditEvent } from '../core/types/trip';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { getPricingRulesService } from '../core/services/pricing';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { isRealtimeRoutingEnabled } from '../core/services/config/admin-config.service';
 import { DispatchBookingEngine, type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
 import { CustomDateTimePicker, type DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
@@ -7474,7 +7475,7 @@ function LiveDispatchMap({
     }
 
     // Offline / Developer Mock Mode: Zero Google Directions API cost
-    if (!COMPANY_CONFIG.enableRealtimeRouting) {
+    if (!isRealtimeRoutingEnabled()) {
       try {
         directionsRendererRef.current?.setDirections({ routes: [] } as any);
       } catch {}

@@ -13,6 +13,7 @@
 
 import type { GeoPoint } from '../../types';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { isRealtimeRoutingEnabled } from '../config/admin-config.service';
 import { encodePolyline } from './mock-routing';
 import type {
   IServerRouteService,
@@ -152,7 +153,7 @@ export class ServerRouteService implements IServerRouteService {
       }
 
       // Check if realtime routing is enabled and server API key is configured
-      if (COMPANY_CONFIG.enableRealtimeRouting) {
+      if (isRealtimeRoutingEnabled()) {
         const serverApiKey = this.getServerApiKey();
         if (serverApiKey) {
           const liveResult = await this.queryGoogleDirectionsApi(request, serverApiKey);

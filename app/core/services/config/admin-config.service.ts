@@ -422,6 +422,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     payments: {},
   },
   constructionMode: COMPANY_CONFIG.constructionMode ?? true,
+  enableRealtimeRouting: COMPANY_CONFIG.enableRealtimeRouting ?? false,
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
 };
 
@@ -756,4 +757,21 @@ export function getAdminConfigService(): AdminConfigService {
     serviceInstance = new AdminConfigService();
   }
   return serviceInstance;
+}
+
+/**
+ * Returns whether real-time Google road routing is currently active.
+ * Checks dynamic Firestore/local settings first, then falls back to COMPANY_CONFIG.
+ */
+export function isRealtimeRoutingEnabled(): boolean {
+  try {
+    const service = getAdminConfigService();
+    const settings = service.getCachedSettings();
+    if (typeof settings.enableRealtimeRouting === 'boolean') {
+      return settings.enableRealtimeRouting;
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  return COMPANY_CONFIG.enableRealtimeRouting ?? false;
 }

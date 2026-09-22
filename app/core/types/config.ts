@@ -470,6 +470,7 @@ export interface AppSettings {
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
   integrations?: IntegrationsConfig;
   constructionMode?: boolean;
+  enableRealtimeRouting?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 }

@@ -15,6 +15,7 @@
 
 import { isGoogleMapsReady, loadGoogleMaps } from './google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { isRealtimeRoutingEnabled } from '../config/admin-config.service';
 import { routeCache } from './route-cache';
 import { calculateMockRoute } from './mock-routing';
 import { hasValidRoutingEndpoint } from '../../hooks/useDebounceRoute';
@@ -114,8 +115,8 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
     return null;
   }
 
-  // 1. Developer & Offline Mock Mode: Check companyConfig toggle
-  if (!COMPANY_CONFIG.enableRealtimeRouting) {
+  // 1. Developer & Offline Mock Mode: Check dynamic Admin Settings / companyConfig toggle
+  if (!isRealtimeRoutingEnabled()) {
     console.log('[LiveRoutingService] Developer mock routing active (enableRealtimeRouting: false). Returning Haversine 1.25x curvature route for zero API cost.');
     return calculateMockRoute(request);
   }
