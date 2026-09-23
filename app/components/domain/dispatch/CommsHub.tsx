@@ -338,12 +338,24 @@ function getInitialInteractions(): InteractionEvent[] {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((p: any) => !p?.snippet?.includes('Thank you for contacting our dispatch desk'));
+          return parsed.filter(
+            (p: any) =>
+              !p?.snippet?.includes('Thank you for contacting our dispatch desk') &&
+              !p?.id?.startsWith('sms_seed_') &&
+              !p?.id?.startsWith('int-') &&
+              p?.contactPhone !== '+13145551234'
+          );
         }
       }
     } catch {}
   }
-  return INITIAL_INTERACTIONS.filter((p: any) => !p?.snippet?.includes('Thank you for contacting our dispatch desk'));
+  return INITIAL_INTERACTIONS.filter(
+    (p: any) =>
+      !p?.snippet?.includes('Thank you for contacting our dispatch desk') &&
+      !p?.id?.startsWith('sms_seed_') &&
+      !p?.id?.startsWith('int-') &&
+      p?.contactPhone !== '+13145551234'
+  );
 }
 
 let ringtoneAudioCtx: any = null;
@@ -473,6 +485,7 @@ export function CommsHub({
 
   // Selected thread state
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
+  const [threadTab, setThreadTab] = useState<'all' | 'sms' | 'calls'>('all');
   const [smsReplyText, setSmsReplyText] = useState('');
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [smsStatusMessage, setSmsStatusMessage] = useState<string | null>(null);
@@ -621,11 +634,6 @@ export function CommsHub({
     };
 
     setInteractions((prev) => [newEvt, ...prev]);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
-      const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify([newEvt, ...parsed]));
-    } catch {}
 
     try {
       const creds = getClientTelephonyCredentials();
@@ -633,7 +641,7 @@ export function CommsHub({
       const twilioToken = creds.authToken;
       const twilioPhone = creds.phoneNumber || '+13142281454';
 
-      await fetch('/api/telephony', {
+      const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -643,6 +651,23 @@ export function CommsHub({
           credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: sanitizeToE164(twilioPhone) },
         }),
       });
+
+      const resData = (await resp.json()) as any;
+      if (resData.messageSid || resData.status) {
+        setInteractions((prev) =>
+          prev.map((i) =>
+            i.id === newEvt.id
+              ? {
+                  ...i,
+                  id: resData.messageSid || i.id,
+                  deliveryStatus: resData.status || (resData.success ? 'sent' : 'failed'),
+                  errorCode: resData.code || resData.errorCode,
+                  errorMessage: resData.error || resData.errorMessage,
+                }
+              : i
+          )
+        );
+      }
       setTimeout(fetchTelephonyData, 1000);
     } catch {}
 
@@ -942,6 +967,8 @@ export function CommsHub({
             const existingIds = new Set(prev.map((p) => p.id));
             const newMsgs: InteractionEvent[] = [];
             let hasNewInbound = false;
+            let hasStateUpdates = false;
+            const updatedPrev = [...prev];
 
             msgData.messages.forEach((m: any) => {
               if (m.body?.includes('Thank you for contacting our dispatch desk')) {
@@ -950,25 +977,44 @@ export function CommsHub({
 
               const phone = m.direction === 'inbound' ? m.from : m.to;
 
-              // Check if already in state
-              if (existingIds.has(m.id)) {
+              // Check if already in state by Twilio SID - update status & error info if changed
+              const existingIdx = updatedPrev.findIndex((p) => p.id === m.id);
+              if (existingIdx !== -1) {
+                const existing = updatedPrev[existingIdx];
+                if (
+                  (m.status && existing.deliveryStatus !== m.status) ||
+                  (m.errorCode !== undefined && existing.errorCode !== m.errorCode) ||
+                  (m.errorMessage !== undefined && existing.errorMessage !== m.errorMessage)
+                ) {
+                  hasStateUpdates = true;
+                  updatedPrev[existingIdx] = {
+                    ...existing,
+                    deliveryStatus: m.status || existing.deliveryStatus,
+                    errorCode: m.errorCode !== undefined ? m.errorCode : existing.errorCode,
+                    errorMessage: m.errorMessage !== undefined ? m.errorMessage : existing.errorMessage,
+                  };
+                }
                 return;
               }
 
               // Reconcile optimistic outbound messages
-              const matchingOptimistic = prev.find(
+              const optimisticIdx = updatedPrev.findIndex(
                 (p) =>
                   p.id.startsWith('sms_out_') &&
                   normalizePhone(p.contactPhone) === normalizePhone(phone) &&
                   p.snippet === m.body &&
-                  Math.abs(p.timestampMs - (m.timestampMs || 0)) < 120000
+                  Math.abs((p.timestampMs || 0) - (m.timestampMs || 0)) < 120000
               );
 
-              if (matchingOptimistic) {
-                matchingOptimistic.id = m.id;
-                matchingOptimistic.deliveryStatus = m.status;
-                matchingOptimistic.errorCode = m.errorCode;
-                matchingOptimistic.errorMessage = m.errorMessage;
+              if (optimisticIdx !== -1) {
+                hasStateUpdates = true;
+                updatedPrev[optimisticIdx] = {
+                  ...updatedPrev[optimisticIdx],
+                  id: m.id,
+                  deliveryStatus: m.status || updatedPrev[optimisticIdx].deliveryStatus,
+                  errorCode: m.errorCode !== undefined ? m.errorCode : updatedPrev[optimisticIdx].errorCode,
+                  errorMessage: m.errorMessage !== undefined ? m.errorMessage : updatedPrev[optimisticIdx].errorMessage,
+                };
                 existingIds.add(m.id);
                 return;
               }
@@ -996,7 +1042,7 @@ export function CommsHub({
               });
             });
 
-            if (newMsgs.length === 0) return prev;
+            if (newMsgs.length === 0 && !hasStateUpdates) return prev;
 
             // Trigger gentle chime for new inbound SMS if supported
             if (hasNewInbound && typeof window !== 'undefined') {
@@ -1019,7 +1065,7 @@ export function CommsHub({
               } catch {}
             }
 
-            return [...newMsgs, ...prev];
+            return [...newMsgs, ...updatedPrev].sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
           });
         }
       }
@@ -1355,34 +1401,95 @@ export function CommsHub({
     }
   };
 
-  // Selected contact thread interactions - reversed chain (oldest at top, most recent at bottom)
-  const selectedInteractions = selectedContactPhone
-    ? interactions
-        .filter(
-          (i) =>
-            !i.snippet?.includes('Thank you for contacting our dispatch desk') &&
-            (normalizePhone(i.contactPhone) === normalizePhone(selectedContactPhone) ||
-              (i.mobilePhone && normalizePhone(i.mobilePhone) === normalizePhone(selectedContactPhone)) ||
-              (i.homePhone && normalizePhone(i.homePhone) === normalizePhone(selectedContactPhone)))
-        )
-        .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0))
-    : [];
+  // Sync threadTab when activeTab changes or new contact selected
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      setThreadTab('sms');
+    } else if (activeTab === 'phone') {
+      setThreadTab('calls');
+    } else {
+      setThreadTab('all');
+    }
+  }, [activeTab, selectedContactPhone]);
 
-  // Active contact summary (derives from latest interaction or fallback)
-  const activeContactSummary =
-    (selectedInteractions.length > 0 ? selectedInteractions[selectedInteractions.length - 1] : null) ||
-    (selectedContactPhone
-      ? ({
-          id: `contact_${selectedContactPhone}`,
-          type: 'call_inbound',
-          contactName: activeContactRecord?.name || formatDisplayPhone(selectedContactPhone),
-          contactPhone: selectedContactPhone,
-          contactType: 'passenger',
-          timestamp: 'Recent',
-          timestampMs: Date.now(),
-          snippet: 'Direct contact thread',
-        } as InteractionEvent)
-      : null);
+  // Selected contact thread all interactions
+  const allSelectedContactInteractions = useMemo(() => {
+    if (!selectedContactPhone) return [];
+    const normTarget = normalizePhone(selectedContactPhone);
+    return interactions
+      .filter((i) => {
+        if (i.snippet?.includes('Thank you for contacting our dispatch desk')) return false;
+        const normContact = normalizePhone(i.contactPhone);
+        const normMobile = i.mobilePhone ? normalizePhone(i.mobilePhone) : '';
+        const normHome = i.homePhone ? normalizePhone(i.homePhone) : '';
+        return (
+          (normContact && normContact === normTarget) ||
+          (normMobile && normMobile === normTarget) ||
+          (normHome && normHome === normTarget)
+        );
+      })
+      .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+  }, [interactions, selectedContactPhone]);
+
+  // Filtered interactions according to the thread's active sub-tab ('sms', 'calls', or 'all')
+  const selectedInteractions = useMemo(() => {
+    if (threadTab === 'sms') {
+      return allSelectedContactInteractions.filter((i) => i.type.startsWith('sms_'));
+    }
+    if (threadTab === 'calls') {
+      return allSelectedContactInteractions.filter((i) => i.type.startsWith('call_') || i.type === 'voicemail');
+    }
+    return allSelectedContactInteractions;
+  }, [allSelectedContactInteractions, threadTab]);
+
+  const threadSmsCount = useMemo(
+    () => allSelectedContactInteractions.filter((i) => i.type.startsWith('sms_')).length,
+    [allSelectedContactInteractions]
+  );
+  const threadCallCount = useMemo(
+    () => allSelectedContactInteractions.filter((i) => i.type.startsWith('call_') || i.type === 'voicemail').length,
+    [allSelectedContactInteractions]
+  );
+  const has10DlcBlockedMessages = useMemo(
+    () =>
+      allSelectedContactInteractions.some(
+        (i) =>
+          i.type === 'sms_outbound' &&
+          (i.errorCode === 30034 || i.errorCode === '30034' || i.deliveryStatus === 'undelivered')
+      ),
+    [allSelectedContactInteractions]
+  );
+
+  // Active contact summary (derives from latest contact interaction or fallback)
+  const activeContactSummary = useMemo(() => {
+    const lastEvt = allSelectedContactInteractions[allSelectedContactInteractions.length - 1];
+    const contactRec = selectedContactPhone ? getContactService().getContactByPhone(selectedContactPhone) : null;
+    const resolvedName =
+      activeContactRecord?.name ||
+      contactRec?.name ||
+      lastEvt?.contactName ||
+      (selectedContactPhone ? formatDisplayPhone(selectedContactPhone) : 'Contact');
+
+    if (lastEvt) {
+      return {
+        ...lastEvt,
+        contactName: resolvedName,
+      };
+    }
+    if (selectedContactPhone) {
+      return {
+        id: `contact_${selectedContactPhone}`,
+        type: 'call_inbound' as const,
+        contactName: resolvedName,
+        contactPhone: selectedContactPhone,
+        contactType: 'passenger' as const,
+        timestamp: 'Recent',
+        timestampMs: Date.now(),
+        snippet: 'Direct contact thread',
+      } as InteractionEvent;
+    }
+    return null;
+  }, [allSelectedContactInteractions, selectedContactPhone, activeContactRecord]);
 
   // Sync activeContactRecord from ContactService whenever contact changes
   useEffect(() => {
@@ -2072,13 +2179,8 @@ export function CommsHub({
       isUnread: false,
     };
 
-    // Optimistically prepend sent message to local interaction thread and persist
+    // Optimistically prepend sent message to local interaction thread
     setInteractions((prev) => [newInteraction, ...prev]);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
-      const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify([newInteraction, ...parsed]));
-    } catch {}
 
     setSmsReplyText('');
 
@@ -2106,7 +2208,13 @@ export function CommsHub({
           setInteractions((prev) =>
             prev.map((i) =>
               i.id === newInteraction.id
-                ? { ...i, id: resData.messageSid || i.id, deliveryStatus: resData.status || 'sent' }
+                ? {
+                    ...i,
+                    id: resData.messageSid || i.id,
+                    deliveryStatus: resData.status || 'sent',
+                    errorCode: resData.code || resData.errorCode,
+                    errorMessage: resData.error || resData.errorMessage,
+                  }
                 : i
             )
           );
@@ -2803,6 +2911,63 @@ export function CommsHub({
               </div>
             </div>
 
+            {/* Thread Channel Filter Sub-Bar & 10DLC Notice Banner */}
+            <div className="bg-slate-100/90 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1 bg-white border border-slate-200/90 p-0.5 rounded-lg text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setThreadTab('all')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    threadTab === 'all'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({allSelectedContactInteractions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThreadTab('sms')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                    threadTab === 'sms'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <MailIcon className="w-3 h-3" />
+                  <span>SMS ({threadSmsCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThreadTab('calls')}
+                  className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                    threadTab === 'calls'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <PhoneIcon className="w-3 h-3" />
+                  <span>Calls ({threadCallCount})</span>
+                </button>
+              </div>
+
+              {has10DlcBlockedMessages && (
+                <div className="flex items-center gap-1 text-[10px] text-amber-800 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md font-medium">
+                  <span className="font-bold text-amber-700">⚠ 10DLC Notice:</span>
+                  <span className="hidden sm:inline">Carrier requires A2P 10DLC campaign registration.</span>
+                </div>
+              )}
+            </div>
+
+            {has10DlcBlockedMessages && (
+              <div className="bg-amber-50/95 border-b border-amber-200 px-3 py-1.5 flex items-start gap-2 text-[11px] text-amber-900 shrink-0">
+                <span className="font-bold text-amber-700 shrink-0">Carrier Alert:</span>
+                <span className="leading-tight">
+                  Outbound SMS to US mobile networks (Verizon/AT&T/T-Mobile) is blocked by carriers until A2P 10DLC Campaign registration is approved in Twilio Console. Inbound texts and VoIP delivery (e.g. 314-738-0100) are working normally.
+                </span>
+              </div>
+            )}
+
             {/* Upcoming / Past Bookings Banner for Contact */}
             {upcomingBookingsForContact.length > 0 && (
               <div className="bg-blue-50/70 border-b border-blue-100 px-3 py-2 flex items-center justify-between text-xs">
@@ -3060,6 +3225,19 @@ export function CommsHub({
                   </div>
                 );
               })}
+              {selectedInteractions.length === 0 && (
+                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-slate-400">
+                  <MailIcon className="w-8 h-8 mb-2 opacity-30 text-slate-500" />
+                  <p className="text-xs font-bold text-slate-600">
+                    {threadTab === 'sms'
+                      ? 'No SMS text messages for this contact yet.'
+                      : threadTab === 'calls'
+                      ? 'No calls or voicemails recorded for this contact yet.'
+                      : 'No interactions recorded for this contact yet.'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">Use the composer below to send an SMS text message.</p>
+                </div>
+              )}
               {/* Auto-scroll anchor to stick to the bottom of the thread */}
               <div ref={messagesEndRef} />
             </div>

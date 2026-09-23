@@ -535,7 +535,8 @@ export function getPassengerService(): PassengerService {
 /**
  * Normalizes phone numbers to 10 standard digits for cross-system comparisons.
  */
-export function normalizePhone(raw: string): string {
+export function normalizePhone(raw?: string | null): string {
+  if (!raw || typeof raw !== 'string') return '';
   const digits = raw.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) {
     return digits.substring(1);

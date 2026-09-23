@@ -92,28 +92,7 @@ const telephonyStore: {
   recordings: any[];
 } = ((globalThis as any).__ct_telephony_store ||= {
   voicemails: [],
-  messages: [
-    {
-      id: 'sms_seed_1',
-      sid: 'SM_seed_1',
-      from: '+13145551234',
-      to: '+13147380100',
-      body: 'Hi, I need a ride from Chesterfield Mall to Lambert Airport at 2 PM today.',
-      direction: 'inbound',
-      timestamp: '10:15 AM',
-      timestampMs: Date.now() - 3600000,
-    },
-    {
-      id: 'sms_seed_2',
-      sid: 'SM_seed_2',
-      from: '+13147380100',
-      to: '+13145551234',
-      body: 'Chesterfield Taxi: Received! We have assigned Driver 104 in Sedan #12. Fare estimate is $48.50.',
-      direction: 'outbound',
-      timestamp: '10:18 AM',
-      timestampMs: Date.now() - 3400000,
-    },
-  ],
+  messages: [],
   callStatuses: {},
   recordings: [],
 });
@@ -531,7 +510,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
             timestamp: new Date(m.date_sent || m.date_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             timestampMs: new Date(m.date_sent || m.date_created).getTime(),
           }));
-        return Response.json({ success: true, messages: liveMessages });
+        const seenSids = new Set(liveMessages.map((m: any) => m.sid || m.id));
+        const pendingLocal = filterOutThankYou(telephonyStore.messages).filter(
+          (m: any) => !seenSids.has(m.sid || m.id)
+        );
+        const combined = [...pendingLocal, ...liveMessages].sort(
+          (a: any, b: any) => (b.timestampMs || 0) - (a.timestampMs || 0)
+        );
+        return Response.json({ success: true, messages: combined });
       }
       return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
     } catch {
