@@ -3,6 +3,7 @@ import type { Trip, TripAuditEvent } from '../../../core/types/trip';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Badge } from '../../ui/Badge';
+import { FloatingWindow } from '../../ui/FloatingWindow';
 import {
   HistoryIcon,
   CheckIcon,
@@ -306,46 +307,30 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
 
 export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <Card className="w-full max-w-3xl bg-white shadow-2xl border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-              <ShieldIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-black tracking-tight">
-                  Trip Audit Trail Inspector
-                </h3>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                  #{trip.id.substring(0, 10)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Complete milestone audit history, change logs &amp; reference tracking
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        <TripAuditTimeline trip={trip} />
-
-        {/* Footer */}
+    <FloatingWindow
+      id={`trip_audit_${trip.id}`}
+      isOpen={true}
+      onClose={onClose}
+      title={`Trip Audit Inspector #${trip.id.substring(0, 10)}`}
+      subtitle="Complete milestone audit history, change logs & reference tracking"
+      icon={<ShieldIcon className="w-4 h-4 text-blue-400" />}
+      initialSize={{ width: 780, height: 680 }}
+      minWidth={460}
+      minHeight={340}
+      hasBackdrop={false}
+      isDraggable={true}
+      isResizable={true}
+      isMinimizable={true}
+      isMaximizable={true}
+      footer={
         <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end items-center text-xs text-slate-500">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} className="cursor-pointer">
             Close Inspector
           </Button>
         </div>
-      </Card>
-    </div>
+      }
+    >
+      <TripAuditTimeline trip={trip} />
+    </FloatingWindow>
   );
 }

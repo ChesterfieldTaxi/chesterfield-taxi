@@ -60,6 +60,8 @@ import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/d
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../core/services/operator.service';
+import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
+import { FloatingWindow } from '../components/ui/FloatingWindow';
 
 export type { DriverRosterItem };
 
@@ -454,6 +456,7 @@ export default function DispatchRoute() {
   const [overrideRecipientEmail, setOverrideRecipientEmail] = useState<string>('');
   const [isOverrideEmailEnabled, setIsOverrideEmailEnabled] = useState<boolean>(false);
   const [shouldUpdatePassengerEmail, setShouldUpdatePassengerEmail] = useState<boolean>(false);
+  const [queueDriver, setQueueDriver] = useState<DriverRosterItem | null>(null);
 
   // Custom DateTime Range Picker State
   const [dateTimeRange, setDateTimeRange] = useState<DateTimeRange>({
@@ -2376,6 +2379,60 @@ export default function DispatchRoute() {
         return d;
       })
     );
+    setDrafts((prev) =>
+      prev.map((draft) => {
+        if (draft.id === activeDraftId) {
+          return {
+            ...draft,
+            formValues: {
+              ...(draft.formValues || {}),
+              driverId: driver.id,
+            } as any,
+          };
+        }
+        return draft;
+      })
+    );
+  };
+
+  // Re-order trips in driver queue
+  const handleReorderDriverQueue = async (driverId: string, reorderedTripIds: string[]) => {
+    const bookingService = getBookingService();
+    const updatePromises = reorderedTripIds.map((id, index) => {
+      const order = index + 1;
+      const existing = trips.find((t) => t.id === id);
+      const updates: Partial<Trip> = {
+        queueOrder: order,
+        metadata: {
+          ...(existing?.metadata || {}),
+          driverQueueOrder: order,
+        },
+      };
+      return bookingService.updateTrip ? bookingService.updateTrip(id, updates) : Promise.resolve(null as any);
+    });
+
+    setTrips((prev) =>
+      prev.map((t) => {
+        const idx = reorderedTripIds.indexOf(t.id);
+        if (idx !== -1) {
+          return {
+            ...t,
+            queueOrder: idx + 1,
+            metadata: {
+              ...(t.metadata || {}),
+              driverQueueOrder: idx + 1,
+            },
+          };
+        }
+        return t;
+      })
+    );
+
+    try {
+      await Promise.all(updatePromises);
+    } catch (err) {
+      console.error('Failed to persist reordered driver queue:', err);
+    }
   };
 
   // Send dispatch message
@@ -5504,13 +5561,23 @@ export default function DispatchRoute() {
                       <div className="grid grid-cols-2 gap-2 pt-0.5">
                         <button
                           type="button"
-                          onClick={() => {
-                            handleAssignDriverToDraft(driver);
-                            setActiveMobileTab('booking');
-                          }}
-                          className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          onClick={() => setQueueDriver(driver)}
+                          className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          title="Open driver's full assigned schedule & queue"
                         >
-                          <span>Assign to Draft</span>
+                          <span>Open Queue</span>
+                          {(() => {
+                            const count = trips.filter(
+                              (t) =>
+                                t.assignedDriverId === driver.id &&
+                                !['completed', 'cancelled', 'declined', 'DECLINED'].includes(t.status)
+                            ).length;
+                            return count > 0 ? (
+                              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-blue-700 font-black">
+                                {count}
+                              </span>
+                            ) : null;
+                          })()}
                         </button>
                         <button
                           type="button"
@@ -5856,10 +5923,23 @@ export default function DispatchRoute() {
                             <div className="flex items-center gap-2 pt-1">
                               <button
                                 type="button"
-                                onClick={() => handleAssignDriverToDraft(driver)}
-                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                                onClick={() => setQueueDriver(driver)}
+                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                title="Open driver's full assigned schedule & queue"
                               >
-                                Assign to Active Draft
+                                <span>📋 Open Queue</span>
+                                {(() => {
+                                  const count = trips.filter(
+                                    (t) =>
+                                      t.assignedDriverId === driver.id &&
+                                      !['completed', 'cancelled', 'declined', 'DECLINED'].includes(t.status)
+                                  ).length;
+                                  return count > 0 ? (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-600 text-white font-black">
+                                      {count}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </button>
                               <button
                                 type="button"
@@ -6396,58 +6476,48 @@ export default function DispatchRoute() {
         const hasOversizedLuggage = Boolean(tripMeta.hasOversizedLuggage);
 
         return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              {/* Modal Header */}
-              <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white border-b border-slate-800 shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl font-bold text-xl flex items-center justify-center shadow-md ${
-                    isUnconfirmedTrip ? 'bg-amber-500 text-slate-950' : 'bg-blue-600 text-white'
-                  }`}>
-                    {isUnconfirmedTrip ? '📋' : '🛡️'}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-extrabold tracking-tight">
-                        {isUnconfirmedTrip ? 'Review Web Booking' : 'Trip Details & History'}
-                      </h3>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        isUnconfirmedTrip
-                          ? 'bg-amber-400 text-slate-950 animate-pulse'
-                          : reviewTrip.status === 'confirmed'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : (reviewTrip.status === 'cancelled' || reviewTrip.status === 'declined' || reviewTrip.status === 'DECLINED')
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                          : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      }`}>
-                        {reviewTrip.status}
-                      </span>
-                      {isReturnRide ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
-                          🔁 Return Leg {linkedTripId ? `(#${linkedTripId})` : ''}
-                        </span>
-                      ) : hasReturnTrip ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
-                          🔁 Outbound Leg {returnTripId ? `(Return #${returnTripId})` : ''}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="text-xs text-slate-400 font-mono">
-                      Trip #{reviewTrip.id} • Created {new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setReviewTrip(null)}
-                  className="text-slate-400 hover:text-white text-lg w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  ✕
-                </button>
+          <FloatingWindow
+            id={`trip_review_details_${reviewTrip.id}`}
+            isOpen={Boolean(reviewTrip)}
+            onClose={() => setReviewTrip(null)}
+            title={isUnconfirmedTrip ? 'Review Web Booking' : 'Trip Details & History'}
+            subtitle={`Trip #${reviewTrip.id} • Created ${new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}`}
+            icon={<span className="text-sm">{isUnconfirmedTrip ? '📋' : '🛡️'}</span>}
+            headerExtra={
+              <div className="flex items-center gap-1.5 flex-wrap mr-1">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                  isUnconfirmedTrip
+                    ? 'bg-amber-400 text-slate-950 animate-pulse'
+                    : reviewTrip.status === 'confirmed'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : (reviewTrip.status === 'cancelled' || reviewTrip.status === 'declined' || reviewTrip.status === 'DECLINED')
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                }`}>
+                  {reviewTrip.status}
+                </span>
+                {isReturnRide ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                    🔁 Return Leg {linkedTripId ? `(#${linkedTripId})` : ''}
+                  </span>
+                ) : hasReturnTrip ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                    🔁 Outbound Leg {returnTripId ? `(Return #${returnTripId})` : ''}
+                  </span>
+                ) : null}
               </div>
-
-              {/* Navigation Tabs Header */}
-              <div className="bg-slate-900/90 px-6 border-b border-slate-800 flex items-center gap-2 shrink-0">
+            }
+            initialSize={{ width: 840, height: 740 }}
+            minWidth={520}
+            minHeight={420}
+            hasBackdrop={false}
+            isDraggable={true}
+            isResizable={true}
+            isMinimizable={true}
+            isMaximizable={true}
+          >
+            {/* Navigation Tabs Header */}
+            <div className="bg-slate-900/95 px-6 border-b border-slate-800 flex items-center gap-2 shrink-0 sticky top-0 z-10">
                 <button
                   type="button"
                   onClick={() => setReviewModalTab('details')}
@@ -7044,7 +7114,7 @@ export default function DispatchRoute() {
               )}
 
               {/* Modal Actions Footer */}
-              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3 shrink-0">
+              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3 shrink-0 sticky bottom-0 z-10">
                 <button
                   type="button"
                   onClick={() => setReviewTrip(null)}
@@ -7216,8 +7286,7 @@ export default function DispatchRoute() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+            </FloatingWindow>
         );
       })()}
 
@@ -7240,6 +7309,39 @@ export default function DispatchRoute() {
         onConfirm={confirmModalConfig.onConfirm}
         onCancel={() => setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Universal Modeless Driver Queue Window */}
+      {queueDriver && (
+        <DriverQueueWindow
+          driver={queueDriver}
+          isOpen={Boolean(queueDriver)}
+          onClose={() => setQueueDriver(null)}
+          trips={trips}
+          onReorderQueue={handleReorderDriverQueue}
+          onUnassignTrip={async (tripId) => {
+            await handleQuickAssignDriver(tripId, 'unassigned');
+          }}
+          onOpenEditTrip={(tripId) => {
+            const found = trips.find((t) => t.id === tripId);
+            if (found) handleOpenEditTrip(found);
+          }}
+          onFocusTripOnMap={(tripId) => {
+            const found = trips.find((t) => t.id === tripId);
+            if (found) {
+              setSelectedMapTrip(found);
+              setSelectedQueueTripId(found.id);
+              setShouldZoomMap(true);
+            }
+          }}
+          onCallPassenger={(phone, name) => {
+            handleStartCall(phone, name);
+            setActiveDockTab('phone');
+          }}
+          onAssignActiveDraft={(driver) => {
+            handleAssignDriverToDraft(driver);
+          }}
+        />
+      )}
 
 
       {/* ─────────────────────────────────────────────────────────────

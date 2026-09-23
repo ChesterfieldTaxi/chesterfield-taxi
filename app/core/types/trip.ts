@@ -336,6 +336,9 @@ export interface Trip {
 
   /** Extensible metadata */
   metadata?: Record<string, unknown>;
+
+  /** Driver trip queue sequence order */
+  queueOrder?: number;
 }
 
 /**
