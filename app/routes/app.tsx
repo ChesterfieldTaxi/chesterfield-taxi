@@ -67,7 +67,7 @@ export default function PassengerAppRoute() {
         return cached.constructionMode;
       }
     } catch {}
-    return COMPANY_CONFIG.constructionMode ?? true;
+    return COMPANY_CONFIG.constructionMode ?? false;
   });
 
   useEffect(() => {

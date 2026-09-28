@@ -421,7 +421,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     payments: {},
   },
-  constructionMode: COMPANY_CONFIG.constructionMode ?? true,
+  constructionMode: COMPANY_CONFIG.constructionMode ?? false,
   enableRealtimeRouting: COMPANY_CONFIG.enableRealtimeRouting ?? false,
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
 };
@@ -535,7 +535,7 @@ export class AdminConfigService implements IAdminConfigService {
       },
       constructionMode: incoming.constructionMode !== undefined
         ? incoming.constructionMode
-        : (DEFAULT_APP_SETTINGS.constructionMode ?? true),
+        : (DEFAULT_APP_SETTINGS.constructionMode ?? false),
       bookingRulesConfig: incoming.bookingRulesConfig
         ? {
             ...DEFAULT_BOOKING_RULES_CONFIG,
