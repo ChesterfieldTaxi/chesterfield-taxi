@@ -1028,7 +1028,7 @@ export function BookingEngine({
           title: 'Vehicle Fleet Standards',
           icon: <CarIcon className="w-4 h-4 text-amber-500" />,
           content:
-            'Standard Sedans seat up to 4 with 2 suitcases. Premium Executive offers luxury black car styling. XL accommodates 6 passengers with 5 bags. WAV features certified motorized wheelchair ramps.',
+            'Standard Sedans seat up to 4 with 2 suitcases. Premium Executive offers luxury black car styling. XL accommodates 6 passengers with 5 bags.',
         };
       case 'passengerCount':
       case 'luggageCount':

@@ -5276,7 +5276,7 @@ export function CommsHub({
                           }
                           className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                         />
-                        <span className="text-[11px] text-slate-700 font-medium">Folding Walker / Wheelchair Trunk Storage</span>
+                        <span className="text-[11px] text-slate-700 font-medium">Folding Walker / Mobility Trunk Storage</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input

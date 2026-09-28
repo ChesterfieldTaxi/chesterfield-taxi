@@ -282,11 +282,6 @@ export const bookingFormConfig: FormSchema = {
               value: 'xl',
               description: 'Spacious vehicle for families or groups. Accommodates up to 6 passengers and 5 luggage bags.',
             },
-            {
-              label: 'Wheelchair Accessible (WAV)',
-              value: 'wheelchair',
-              description: 'Equipped with wheelchair ramp, secure tie-downs, and trained drivers for accessibility needs.',
-            },
           ],
         },
       ],

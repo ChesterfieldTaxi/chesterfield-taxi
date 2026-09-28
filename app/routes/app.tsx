@@ -235,7 +235,7 @@ export default function PassengerAppRoute() {
       pickupAddress: trip.pickupLocation?.address || '',
       dropoffAddress: trip.dropoffLocation?.address || '',
       driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' ? 'suv' : trip.vehicleTier === 'wheelchair' ? 'van' : 'sedan',
+      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
       passengers: trip.passenger?.passengerCount || 1,
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -251,7 +251,7 @@ export default function PassengerAppRoute() {
       pickupAddress: trip.dropoffLocation?.address || '',
       dropoffAddress: trip.pickupLocation?.address || '',
       driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' ? 'suv' : trip.vehicleTier === 'wheelchair' ? 'van' : 'sedan',
+      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
       passengers: trip.passenger?.passengerCount || 1,
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -269,7 +269,7 @@ export default function PassengerAppRoute() {
       pickupAddress: trip.pickupLocation?.address || '',
       dropoffAddress: trip.dropoffLocation?.address || '',
       driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' ? 'suv' : trip.vehicleTier === 'wheelchair' ? 'van' : 'sedan',
+      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
       passengers: trip.passenger?.passengerCount || 1,
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -1082,7 +1082,6 @@ export default function PassengerAppRoute() {
                   <option value="standard">Standard Sedan (Toyota Camry / Fusion)</option>
                   <option value="premium">Executive SUV (Chevy Suburban / Lincoln)</option>
                   <option value="xl">XL Group Transport (7 Passengers)</option>
-                  <option value="wheelchair">Transit WAV Wheelchair Accessible</option>
                 </select>
               </div>
 

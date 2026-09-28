@@ -91,7 +91,7 @@ export const DEFAULT_OVERSIZED_BAG_CATEGORIES: OversizedBagCategory[] = [
   { id: 'golf_bag', label: 'Golf Clubs / Bag', fee: 10, requiresUpgrade: true, maxCount: 4 },
   { id: 'skis', label: 'Skis / Snowboard Bag', fee: 15, requiresUpgrade: true, maxCount: 4 },
   { id: 'large_box', label: 'Large Cargo Box / Heavy Trunk', fee: 15, requiresUpgrade: true, maxCount: 4 },
-  { id: 'folding_wheelchair', label: 'Folding Wheelchair / Walker', fee: 0, requiresUpgrade: false, maxCount: 2 },
+  { id: 'folding_walker', label: 'Folding Walker / Mobility Cart', fee: 0, requiresUpgrade: false, maxCount: 2 },
   { id: 'bicycle_sports', label: 'Bicycle Box / Surfboard / Large Gear', fee: 25, requiresUpgrade: true, maxCount: 2 },
 ];
 

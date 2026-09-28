@@ -5,7 +5,6 @@ import {
   CarIcon,
   ClockIcon,
   CheckIcon,
-  AccessibilityIcon,
   SparklesIcon,
   PhoneIcon,
   ChevronRightIcon,
@@ -19,7 +18,7 @@ export function meta() {
     {
       name: 'description',
       content:
-        `Learn about ${COMPANY_CONFIG.name}, our commitment to passenger safety, professional driver vetting, and wheelchair accessible fleet across West St. Louis County.`,
+        `Learn about ${COMPANY_CONFIG.name}, our commitment to passenger safety, professional driver vetting, and modern executive fleet across West St. Louis County.`,
     },
   ];
 }
@@ -51,10 +50,10 @@ const PILLARS = [
       'We reject predatory surge algorithms. When bad weather strikes or flights arrive late, our rates remain transparent and predictable. What you are quoted in our booking system is what you pay.',
   },
   {
-    icon: <AccessibilityIcon className="w-6 h-6 text-blue-600" />,
-    title: 'Wheelchair & Mobility Accessibility (WAV)',
+    icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
+    title: 'Executive & Group Transportation',
     description:
-      'Transportation is an essential public service. We maintain dedicated wheelchair-accessible vans operated by drivers trained in certified four-point tie-down securement protocols and compassionate mobility assistance.',
+      'From single-passenger airport transfers to group travel in spacious SUVs, our fleet accommodates all personal, family, and corporate transit needs with distinction.',
   },
 ];
 

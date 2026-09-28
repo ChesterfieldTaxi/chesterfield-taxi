@@ -29,7 +29,7 @@ const GUARANTEES = [
   },
   {
     icon: <CarIcon className="w-4 h-4 text-blue-600" />,
-    text: 'Premium Sedans, Executive SUVs, and WAV Wheelchair Accessible fleet',
+    text: 'Premium Sedans and Executive SUVs',
   },
 ];
 
@@ -63,7 +63,7 @@ export default function BookRoute() {
               </div>
               <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-2xs">
                 <CarIcon className="w-4 h-4 text-blue-600" />
-                <span className="font-medium">Sedans, SUVs & WAV</span>
+                <span className="font-medium">Sedans & Executive SUVs</span>
               </div>
             </div>
           </div>

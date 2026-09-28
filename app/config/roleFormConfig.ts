@@ -86,7 +86,7 @@ const BASE_SECTIONS: Record<BookingSectionId, BookingSectionConfig> = {
   'vehicle-selection': {
     id: 'vehicle-selection',
     title: 'Select Vehicle Class',
-    subtitle: 'Choose from our premium sedans, executive SUVs, or WAV accessible fleet',
+    subtitle: 'Choose from our premium sedans or executive SUVs',
     order: 4,
     enabled: true,
   },

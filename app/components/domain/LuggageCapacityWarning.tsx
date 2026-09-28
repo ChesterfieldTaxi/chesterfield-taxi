@@ -11,11 +11,10 @@ export interface LuggageCapacityWarningProps {
   className?: string;
 }
 
-const VEHICLE_NAMES: Record<VehicleTier, string> = {
+const VEHICLE_NAMES: Partial<Record<VehicleTier, string>> = {
   standard: 'Standard Sedan',
   premium: 'Premium Executive Sedan',
   xl: 'XL Minivan / SUV',
-  wheelchair: 'Wheelchair Accessible Vehicle (WAV)',
 };
 
 export function LuggageCapacityWarning({

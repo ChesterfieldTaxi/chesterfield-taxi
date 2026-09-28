@@ -46,7 +46,7 @@ export default function PrivacyPage() {
             <li><strong>Contact Details:</strong> Your name, phone number, and email address used for booking confirmations, chauffeur arrival notices, and digital receipts.</li>
             <li><strong>Trip & Routing Data:</strong> Pickup addresses, destinations, intermediate waypoints, flight numbers for airport tracking, and date/time schedules.</li>
             <li><strong>Payment & Billing Data:</strong> Payment card tokens, transaction IDs, or corporate account numbers processed securely through encrypted, PCI-compliant payment gateways. We never store raw credit card CVV codes.</li>
-            <li><strong>Special Transit Notes:</strong> Child safety seat requirements, mobility/wheelchair assistance instructions, gate access codes, and luggage notes.</li>
+            <li><strong>Special Transit Notes:</strong> Child safety seat requirements, gate access codes, and luggage notes.</li>
           </ul>
         </section>
 

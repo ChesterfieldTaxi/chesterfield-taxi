@@ -6,7 +6,6 @@ import {
   SparklesIcon,
   ClockIcon,
   CarIcon,
-  AccessibilityIcon,
   CheckIcon,
   ChevronRightIcon,
   ShieldCheckIcon,
@@ -22,16 +21,13 @@ export function meta() {
     {
       name: 'description',
       content:
-        `Comprehensive transportation services including Lambert STL airport transfers, corporate accounts, hourly charters, and WAV handicap accessible taxi service in ${COMPANY_CONFIG.name}, MO.`,
+        `Comprehensive transportation services including Lambert STL airport transfers, corporate accounts, hourly charters, and executive taxi service in ${COMPANY_CONFIG.name}, MO.`,
     },
   ];
 }
 
 function getVehicleIcon(iconType?: string, id?: string) {
   const type = (iconType || id || '').toLowerCase();
-  if (type.includes('wheelchair') || type.includes('wav')) {
-    return <AccessibilityIcon className="w-6 h-6 text-blue-600" />;
-  }
   if (type.includes('suv') || type.includes('xl') || type.includes('luxury')) {
     return <SparklesIcon className="w-6 h-6 text-blue-600" />;
   }

@@ -5,7 +5,6 @@ import {
   SparklesIcon,
   LuggageIcon,
   UserIcon,
-  AccessibilityIcon,
   CheckIcon,
 } from '../ui/Icons';
 import { Badge } from '../ui/Badge';
@@ -18,7 +17,7 @@ export interface VehicleTierOption {
   badge?: string;
   maxPassengers: number;
   maxLuggage: number;
-  iconType: 'standard' | 'premium' | 'xl' | 'wheelchair';
+  iconType: 'standard' | 'premium' | 'xl';
 }
 
 export interface VehicleTierSelectorProps {
@@ -58,14 +57,6 @@ const DEFAULT_FALLBACK_TIERS: VehicleTierOption[] = [
     maxPassengers: 6,
     maxLuggage: 5,
     iconType: 'xl',
-  },
-  {
-    value: 'wheelchair',
-    label: 'Wheelchair Accessible (WAV)',
-    description: 'Equipped with certified motorized ramps, secure floor tie-downs, and trained drivers.',
-    maxPassengers: 4,
-    maxLuggage: 2,
-    iconType: 'wheelchair',
   },
 ];
 
@@ -136,8 +127,6 @@ export function VehicleTierSelector({
         return <SparklesIcon className="w-5 h-5 text-amber-500" />;
       case 'xl':
         return <CarIcon className="w-5 h-5 text-indigo-500" />;
-      case 'wheelchair':
-        return <AccessibilityIcon className="w-5 h-5 text-blue-500" />;
       default:
         return <CarIcon className="w-5 h-5 text-slate-600" />;
     }

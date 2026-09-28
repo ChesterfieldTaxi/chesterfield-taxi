@@ -8,7 +8,6 @@ import {
   CheckIcon,
   PlaneIcon,
   BuildingIcon,
-  AccessibilityIcon,
   SparklesIcon,
   MapPinIcon,
   ChevronRightIcon,
@@ -89,7 +88,7 @@ const VALUE_PROPOSITIONS = [
     icon: <CarIcon className="w-6 h-6 text-blue-600" />,
     title: 'Modern & Clean Fleet',
     description:
-      'From executive sedans to spacious SUVs and wheelchair-accessible vans, all vehicles undergo daily cleaning and safety inspections.',
+      'From executive sedans to spacious SUVs, all vehicles undergo daily cleaning and safety inspections.',
   },
   {
     icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
@@ -130,7 +129,7 @@ const HIGHLIGHTS = [
   'Instant dispatch or scheduled future bookings',
   'Lambert STL flight delay monitoring included',
   'Executive accounts with monthly invoicing',
-  'Wheelchair Accessible Vehicles (WAV) available',
+  'Local and regional door-to-door transportation',
 ];
 
 export default function IndexRoute() {
@@ -251,7 +250,7 @@ export default function IndexRoute() {
                       </div>
                       <div>
                         <span className="text-xs font-bold text-slate-800 block">Select Vehicle Tier</span>
-                        <span className="text-xs text-slate-500">Standard Sedan, Executive SUV, or WAV Van</span>
+                        <span className="text-xs text-slate-500">Standard Sedan or Executive SUV</span>
                       </div>
                     </div>
 

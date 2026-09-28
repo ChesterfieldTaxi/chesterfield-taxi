@@ -71,7 +71,6 @@ import {
   BuildingIcon,
   HistoryIcon,
   PawPrintIcon,
-  WheelchairIcon,
   VolumeXIcon,
   MusicNoteIcon,
   DevicePhoneMobileIcon,
@@ -102,7 +101,7 @@ export interface BookingEngineV2Props {
   hideDispatchBanner?: boolean;
 }
 
-export type SpecialRequestKey = 'petFriendly' | 'wheelchair' | 'quietRide' | 'musicOk';
+export type SpecialRequestKey = 'petFriendly' | 'quietRide' | 'musicOk';
 export type CustomerVehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});
 
 export function formatTime12h(time24: string): string {
@@ -338,7 +337,6 @@ export function BookingEngineV2({
 
     specialRequests: {
       petFriendly: false,
-      wheelchair: false,
       quietRide: false,
       musicOk: false,
     },
@@ -550,16 +548,6 @@ export function BookingEngineV2({
         description: 'Full-size Chevy Suburban / Tahoe',
         iconType: 'xl',
       },
-      {
-        id: 'wheelchair',
-        name: 'Van / WAV',
-        badge: 'Accessible',
-        baseMultiplier: 1.5,
-        maxPassengers: 7,
-        maxLuggage: 6,
-        description: 'Transit / Wheelchair Ramp',
-        iconType: 'wheelchair',
-      },
     ];
 
     if (!baseTiers.some((t) => t.id === 'any')) {
@@ -576,7 +564,7 @@ export function BookingEngineV2({
     const map: Record<string, { maxPassengers: number; maxBags: number; name?: string }> = {
       sedan: { maxPassengers: 4, maxBags: 3, name: 'Sedan' },
       suv: { maxPassengers: 6, maxBags: 5, name: 'SUV' },
-      van: { maxPassengers: 7, maxBags: 6, name: 'Van / WAV' },
+      van: { maxPassengers: 7, maxBags: 6, name: 'Passenger Van' },
       any: { maxPassengers: 4, maxBags: 3, name: 'Any Available' },
     };
 
@@ -602,7 +590,7 @@ export function BookingEngineV2({
           (choice === 'any' && t.id === 'any') ||
           (choice === 'sedan' && (t.id === 'standard' || t.id === 'sedan')) ||
           (choice === 'suv' && (t.id === 'xl' || t.id === 'suv')) ||
-          (choice === 'van' && (t.id === 'wheelchair' || t.id === 'van'))
+          (choice === 'van' && (t.id === 'xl' || t.id === 'van'))
       );
       if (found?.name) return found.name;
       return formatVehicleTier(choice);
@@ -731,8 +719,7 @@ export function BookingEngineV2({
   // Map vehicle choice to vehicleTier
   const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
     if (choice === 'any') return 'any';
-    if (choice === 'suv') return 'xl';
-    if (choice === 'van') return 'wheelchair';
+    if (choice === 'suv' || choice === 'van') return 'xl';
     if (choice === 'sedan') return 'standard';
     return choice as VehicleTier;
   }, []);
@@ -744,16 +731,12 @@ export function BookingEngineV2({
     if (!bookingConfig.allowMultiVehicle && activeVehicleTiers.length > 0) {
       const totalLuggage = form.carryOnBags + form.checkedBags;
       const requiresUpgradedVehicle = totalCarSeats > 0 || returnTotalCarSeats > 0 || oversizedRequiresUpgrade;
-      const requiresWheelchair = !!form.specialRequests.wheelchair;
 
       // Find capable vehicles sorted by price multiplier ascending
       const capableTiers = [...activeVehicleTiers]
         .filter((tier) => {
           if (form.passengers > tier.maxPassengers) return false;
           if (totalLuggage > tier.maxLuggage) return false;
-          if (requiresWheelchair && tier.id !== 'wheelchair' && tier.iconType !== 'wheelchair' && tier.id !== 'van') {
-            return false;
-          }
           if (requiresUpgradedVehicle && (tier.id === 'sedan' || tier.id === 'standard' || tier.maxPassengers <= 4)) {
             return false;
           }
@@ -773,8 +756,7 @@ export function BookingEngineV2({
       const canFitCurrent =
         form.passengers <= currentCap.maxPassengers &&
         totalLuggage <= currentCap.maxBags &&
-        !hasCarSeatConstraint &&
-        (!requiresWheelchair || form.vehicleChoice === 'van' || form.vehicleChoice === 'wheelchair' || form.vehicleChoice === bestTier.id);
+        !hasCarSeatConstraint;
 
       if (!canFitCurrent) {
         setForm((prev) => ({
@@ -796,7 +778,6 @@ export function BookingEngineV2({
     form.passengers,
     form.carryOnBags,
     form.checkedBags,
-    form.specialRequests.wheelchair,
     form.isVehicleAutoAssigned,
     form.vehicleChoice,
     totalCarSeats,
@@ -805,21 +786,6 @@ export function BookingEngineV2({
     vehicleCapacities,
     activeVehicleTiers,
   ]);
-
-  // If wheelchair requested, auto-select Van (WAV)
-  useEffect(() => {
-    if (form.specialRequests.wheelchair) {
-      const wavTier = activeVehicleTiers.find((v) => v.id === 'wheelchair' || v.iconType === 'wheelchair' || v.id === 'van');
-      const wavId = (wavTier?.id || 'wheelchair') as CustomerVehicleChoice;
-      if (form.vehicleChoice !== wavId && form.vehicleChoice !== 'van' && form.vehicleChoice !== 'wheelchair') {
-        setForm((prev) => ({
-          ...prev,
-          vehicleChoice: wavId,
-          selectedVehicles: prev.selectedVehicles.map((v, i) => (i === 0 ? wavId : v)),
-        }));
-      }
-    }
-  }, [form.specialRequests.wheelchair, form.vehicleChoice, activeVehicleTiers]);
 
   // Ensure selected payment method is allowed by admin configuration
   useEffect(() => {
@@ -1470,7 +1436,6 @@ export function BookingEngineV2({
         .filter(([, active]) => active)
         .map(([k]) => {
           if (k === 'petFriendly') return 'Pet-friendly';
-          if (k === 'wheelchair') return 'Wheelchair accessible (WAV)';
           if (k === 'quietRide') return 'Quiet ride';
           if (k === 'musicOk') return 'Music OK';
           return k;
@@ -2019,8 +1984,8 @@ export function BookingEngineV2({
           />
         </div>
 
-        {/* Live Dispatch Header & Step Flow */}
-        <div className="mb-5 space-y-3">
+        {/* Live Dispatch Header */}
+        <div className="mb-5">
           <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xs text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -2032,41 +1997,6 @@ export function BookingEngineV2({
               <span className="hidden sm:flex items-center gap-1">✈️ Free Flight Monitoring</span>
               <span className="hidden sm:inline text-slate-600">•</span>
               <span className="hidden md:flex items-center gap-1">⏰ Free Cancellation (2h+)</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-semibold">
-            <div className={`py-2 px-3 rounded-lg border transition-all ${
-              form.pickupAddress && form.dropoffAddress
-                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600'
-            }`}>
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 1</span>
-              <span>Schedule & Route</span>
-            </div>
-            <div className={`py-2 px-3 rounded-lg border transition-all ${
-              form.vehicleChoice !== 'any' || form.passengers > 0
-                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600'
-            }`}>
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 2</span>
-              <span>Vehicle & Luggage</span>
-            </div>
-            <div className={`py-2 px-3 rounded-lg border transition-all ${
-              form.passengerName && form.passengerPhone
-                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600'
-            }`}>
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 3</span>
-              <span>Passenger Details</span>
-            </div>
-            <div className={`py-2 px-3 rounded-lg border transition-all ${
-              form.paymentMethod
-                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
-                : 'bg-white border-slate-200 text-slate-600'
-            }`}>
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 4</span>
-              <span>Review & Confirm</span>
             </div>
           </div>
         </div>
@@ -2820,7 +2750,7 @@ export function BookingEngineV2({
                           }}
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="font-semibold text-slate-800">Oversized / Special Cargo (Golf Bags, Skis, Wheelchairs)</span>
+                        <span className="font-semibold text-slate-800">Oversized / Special Cargo (Golf Bags, Skis, Large Sports Equipment)</span>
                       </label>
                       {form.hasOversizedLuggage && totalOversizedCount > 0 && (
                         <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
@@ -3097,7 +3027,7 @@ export function BookingEngineV2({
                             (vChoice === 'any' && tier.id === 'any') ||
                             (vChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
                             (vChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                            (vChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));
+                            (vChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
                           const multiplierDiff =
                             tier.baseMultiplier > 1.0
                               ? `+${Math.round((tier.baseMultiplier - 1.0) * 100)}%`
@@ -3164,16 +3094,11 @@ export function BookingEngineV2({
                         (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
                       const isPaxRestricted = form.passengers > tier.maxPassengers;
                       const isLuggageRestricted = (form.carryOnBags + form.checkedBags) > tier.maxLuggage;
-                      const isWheelchairRestricted =
-                        form.specialRequests.wheelchair &&
-                        (tier.id !== 'wheelchair' && tier.iconType !== 'wheelchair' && tier.id !== 'van');
                       const isRestricted =
-                        isCarSeatRestricted || isOversizedRestricted || isPaxRestricted || isLuggageRestricted || isWheelchairRestricted;
+                        isCarSeatRestricted || isOversizedRestricted || isPaxRestricted || isLuggageRestricted;
 
                       let restrictionReason = '';
-                      if (isWheelchairRestricted) {
-                        restrictionReason = 'Requires Wheelchair WAV';
-                      } else if (isOversizedRestricted) {
+                      if (isOversizedRestricted) {
                         restrictionReason = 'Requires SUV/Van (Oversized cargo)';
                       } else if (isCarSeatRestricted) {
                         restrictionReason = 'Requires SUV or Van (Car seats)';
@@ -3188,7 +3113,7 @@ export function BookingEngineV2({
                         (form.vehicleChoice === 'any' && tier.id === 'any') ||
                         (form.vehicleChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
                         (form.vehicleChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                        (form.vehicleChoice === 'van' && (tier.id === 'wheelchair' || tier.id === 'van'));
+                        (form.vehicleChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
 
                       const multiplierDiff =
                         tier.baseMultiplier > 1.0
@@ -3651,10 +3576,9 @@ export function BookingEngineV2({
               </div>
 
               {/* Special Requests Chips */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { key: 'petFriendly', label: 'Pet-Friendly', Icon: PawPrintIcon },
-                  { key: 'wheelchair', label: 'WAV Ramp', Icon: WheelchairIcon },
                   { key: 'quietRide', label: 'Quiet Ride', Icon: VolumeXIcon },
                   { key: 'musicOk', label: 'Music OK', Icon: MusicNoteIcon },
                 ].map((item) => (
