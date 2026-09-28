@@ -39,13 +39,23 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
+    // Security Guard: For actual transaction processing, strictly enforce server environment keys
+    // Do NOT permit untrusted client overrides for live charges
+    const isVerifyAction = data.action === 'verify_processor';
+    const adminSecret = process.env.ADMIN_API_SECRET;
+    const authHeader = request.headers.get('authorization') || request.headers.get('x-admin-secret');
+    const isAdmin = adminSecret ? authHeader === adminSecret || authHeader === `Bearer ${adminSecret}` : false;
+
+    // Only allow custom credentials for verification if admin is authenticated or in development
+    const allowCustomCredentials = isVerifyAction && (!process.env.NODE_ENV || process.env.NODE_ENV !== 'production' || isAdmin);
+
     const stripeSecretKey =
       process.env.STRIPE_SECRET_KEY ||
-      data.credentials?.stripeSecretKey?.trim() ||
+      (allowCustomCredentials ? data.credentials?.stripeSecretKey?.trim() : '') ||
       '';
     const squareAccessToken =
       process.env.SQUARE_ACCESS_TOKEN ||
-      data.credentials?.squareAccessToken?.trim() ||
+      (allowCustomCredentials ? data.credentials?.squareAccessToken?.trim() : '') ||
       '';
 
     // ─── 1. Verify Processor Connectivity ───

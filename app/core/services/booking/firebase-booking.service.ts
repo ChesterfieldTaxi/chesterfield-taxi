@@ -652,7 +652,14 @@ export class FirebaseBookingService implements IBookingService {
       try {
         const stored = window.localStorage.getItem('chesterfield_taxi_mock_trips');
         if (stored) {
-          return JSON.parse(stored) as Trip[];
+          const parsed = JSON.parse(stored) as Trip[];
+          return parsed.filter(
+            (t) =>
+              !(t.passenger?.lastName === 'User' && (t.passenger?.firstName || '').startsWith('Test')) &&
+              t.pickupLocation?.address !== '123 Test St' &&
+              !t.id.startsWith('MOCK-') &&
+              !t.id.startsWith('stress_')
+          );
         }
       } catch (err) {
         console.warn('[FirebaseBookingService] Failed to read local trips:', err);

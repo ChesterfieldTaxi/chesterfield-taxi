@@ -7,6 +7,7 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "test:e2e": "npx --yes tsx scripts/test-e2e-simulation.ts",
+    "test:stress": "npx tsx scripts/stress-test-web-booking.ts",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {

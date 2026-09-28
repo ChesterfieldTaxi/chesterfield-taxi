@@ -71,6 +71,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           }
           return <link rel="manifest" href="/manifest.json" />;
         })()}
+        <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
+        <link rel="apple-touch-icon" href="/icon-192.svg" />
         <Meta />
         <Links />
         {COMPANY_CONFIG.cms?.customCss && (
@@ -178,4 +180,57 @@ function useDynamicBrandingSync() {
 export default function App() {
   useDynamicBrandingSync();
   return <Outlet />;
+}
+
+export function ErrorBoundary({ error }: { error?: unknown }) {
+  let message = "We're sorry, but an unexpected error occurred.";
+  let details = "";
+  let is404 = false;
+
+  if (error && typeof error === 'object') {
+    if ('status' in error && (error as Record<string, unknown>).status === 404) {
+      is404 = true;
+      message = "Page Not Found";
+      details = "The page you are looking for might have been moved, removed, or is temporarily unavailable.";
+    } else if ('message' in error) {
+      details = String((error as Record<string, unknown>).message);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center px-4 py-12 text-center">
+      <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+        <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center text-3xl">
+          {is404 ? '📍' : '⚠️'}
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {is404 ? '404 - Destination Not Found' : 'Service Temporarily Interrupted'}
+          </h1>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            {message}
+          </p>
+          {details && !is404 && (
+            <p className="text-xs text-slate-500 font-mono bg-slate-950 p-2.5 rounded-lg text-left overflow-x-auto">
+              {details}
+            </p>
+          )}
+        </div>
+        <div className="pt-2 flex flex-col sm:flex-row gap-3">
+          <a
+            href="/"
+            className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors inline-flex items-center justify-center gap-1.5"
+          >
+            <span>Return to Home</span>
+          </a>
+          <a
+            href={`tel:${COMPANY_CONFIG.phone.dispatch.replace(/[^0-9+]/g, '')}`}
+            className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-colors inline-flex items-center justify-center gap-1.5"
+          >
+            <span>Call Dispatch</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
 }

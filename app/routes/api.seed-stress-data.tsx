@@ -6,6 +6,25 @@ export async function action({ request }: ActionFunctionArgs) {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
+  // Security Guard: Prevent unauthenticated database seeding in production
+  const adminSecret = process.env.ADMIN_API_SECRET;
+  const providedSecret = request.headers.get('x-admin-secret') || request.headers.get('authorization')?.replace('Bearer ', '');
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && (!adminSecret || providedSecret !== adminSecret)) {
+    return Response.json(
+      { success: false, error: 'Forbidden: Seeding stress data is disabled in production.' },
+      { status: 403 }
+    );
+  }
+
+  if (adminSecret && providedSecret !== adminSecret) {
+    return Response.json(
+      { success: false, error: 'Unauthorized: Invalid admin secret header.' },
+      { status: 401 }
+    );
+  }
+
   // Use a background operation instead of blocking the response
   // so the UI doesn't hang.
   (async () => {

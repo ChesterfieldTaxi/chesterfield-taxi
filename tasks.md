@@ -413,4 +413,24 @@
   - [x] 31.6.4 Update `AdminIntegrationsSubpage.tsx` with Content-Type validation safeguard before `response.json()`, live "Connected" (Green Badge) rendering, and local persistence.
   - [x] 31.6.5 Verify with `npm run typecheck` (0 errors) and `npm run build` (clean SSR build).
 
+## Phase 32: Production Launch, Web Booking Stress Testing, Security Standards & UI/UX Hardening
+- [x] 32.1 Production Cutover & Maintenance Mode Transition:
+  - [x] 32.1.1 Update `app/config/companyConfig.ts` to default `constructionMode: false`.
+  - [x] 32.1.2 Ensure `app/routes/layout.tsx` seamlessly synchronizes with live admin toggle without SSR hydration mismatch.
+- [x] 32.2 Defensive Security Hardening:
+  - [x] 32.2.1 Secure `app/routes/api.seed-stress-data.tsx` behind authorization / environment guards.
+  - [x] 32.2.2 Secure `app/routes/api.send-email.ts` preventing open arbitrary HTML relay.
+  - [x] 32.2.3 Secure `app/routes/api.payments.ts` by removing client credential overrides and enforcing server environment keys.
+  - [x] 32.2.4 Harden `firestore.rules` against unauthenticated guest data exposure and unauthorized status transitions.
+  - [x] 32.2.5 Implement invisible honeypot bot trap and XSS input sanitization in `BookingEngineV2.tsx`.
+- [x] 32.3 Web Booking UI/UX Polish:
+  - [x] 32.3.1 Add step indicators, inline phone formatting, capacity badges, and Missouri child seat rules.
+  - [x] 32.3.2 Implement mobile-first sticky fare action bar for uninterrupted conversion.
+  - [x] 32.3.3 Enhance `BookingConfirmation.tsx` with copyable booking ID, "What Happens Next?" timeline, calendar export (.ics), and print receipt.
+- [x] 32.4 Automated Stress Testing Suite:
+  - [x] 32.4.1 Create `scripts/stress-test-web-booking.ts` covering Concurrency (50+ parallel bookings), Fuzzing (XSS, extreme lengths, emojis), Anti-Tamper Pricing, and Bot Honeypots.
+  - [x] 32.4.2 Add `"test:stress"` script to `package.json`.
+  - [x] 32.4.3 Execute stress test suite, verify assertions pass, and confirm zero regressions.
+
+
 

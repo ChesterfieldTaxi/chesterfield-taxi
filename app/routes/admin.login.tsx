@@ -210,29 +210,31 @@ export default function AdminLogin() {
                 Sign In to Console
               </Button>
 
-              {/* Quick Demo Access buttons for offline / unconfigured mode */}
-              <div className="flex flex-col gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('admin')}
-                  disabled={isLoading}
-                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-                >
-                  {isConfigured
-                    ? 'Quick Access: Admin Demo Credentials'
-                    : 'Offline Dev Mode: Admin Demo Login'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('dispatcher')}
-                  disabled={isLoading}
-                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-                >
-                  {isConfigured
-                    ? 'Quick Access: Dispatcher Demo Credentials'
-                    : 'Offline Dev Mode: Dispatcher Demo Login'}
-                </button>
-              </div>
+              {/* Quick Demo Access buttons (Suppressed in live production when Firebase is configured) */}
+              {(!isConfigured || process.env.NODE_ENV !== 'production') && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('admin')}
+                    disabled={isLoading}
+                    className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                  >
+                    {isConfigured
+                      ? 'Quick Access: Admin Demo Credentials'
+                      : 'Offline Dev Mode: Admin Demo Login'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('dispatcher')}
+                    disabled={isLoading}
+                    className="w-full text-center text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                  >
+                    {isConfigured
+                      ? 'Quick Access: Dispatcher Demo Credentials'
+                      : 'Offline Dev Mode: Dispatcher Demo Login'}
+                  </button>
+                </div>
+              )}
             </CardFooter>
           </form>
         </Card>

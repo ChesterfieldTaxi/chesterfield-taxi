@@ -39,50 +39,40 @@ export const DEFAULT_SCHEDULE: DriverScheduleConfig = {
 
 export const DEFAULT_DRIVERS: DriverProfile[] = [
   {
-    id: 'drv-101',
-    name: 'Driver 101 (Mike T.)',
-    phone: '(314) 555-0101',
+    id: 'Cc5jehhcxuWxUx7Z3WyXNBXZjCy1',
+    name: 'Zakharya Rakhmanov',
+    phone: '(314) 915-1800',
     dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #204 (Camry)',
+    vehicleUnit: 'Cab #947',
     vehicleTier: 'standard',
     zone: 'Chesterfield Valley',
     schedule: DEFAULT_SCHEDULE,
   },
   {
-    id: 'drv-104',
-    name: 'Driver 104 (Sarah K.)',
-    phone: '(314) 555-0104',
+    id: 'ClUoGzOahXcnsIuNZ3kmP1wJ4aC3',
+    name: 'Michael Vinnik',
+    phone: '(314) 683-0585',
     dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #301 (Suburban)',
-    vehicleTier: 'xl',
-    zone: 'Lambert Airport (STL)',
+    vehicleUnit: 'Cab #982',
+    vehicleTier: 'standard',
+    zone: 'Chesterfield Valley',
     schedule: DEFAULT_SCHEDULE,
   },
   {
-    id: 'drv-108',
-    name: 'Driver 108 (David R.)',
-    phone: '(314) 555-0108',
+    id: 'xo56ECpoXcT83x6GRyzjzHqA0mc2',
+    name: 'Wagnehu Mekonnen',
+    phone: '(314) 224-0008',
     dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #102 (Transit WAV)',
-    vehicleTier: 'wheelchair',
-    zone: 'Town and Country',
-    schedule: DEFAULT_SCHEDULE,
-  },
-  {
-    id: 'drv-112',
-    name: 'Driver 112 (James W.)',
-    phone: '(314) 555-0112',
-    dutyStatus: 'off_duty',
-    vehicleUnit: 'Cab #208 (Lincoln)',
-    vehicleTier: 'premium',
-    zone: 'Ballwin / Manchester',
+    vehicleUnit: 'Cab #47',
+    vehicleTier: 'standard',
+    zone: 'Chesterfield Valley',
     schedule: DEFAULT_SCHEDULE,
   },
 ];
 
 
 export class DriverService {
-  private activeDriverId: string = 'drv-101';
+  private activeDriverId: string = 'Cc5jehhcxuWxUx7Z3WyXNBXZjCy1';
   private driverListeners = new Set<(driver: DriverProfile) => void>();
 
   constructor() {

@@ -58,7 +58,14 @@ export class MockBookingService implements IBookingService {
         if (data) {
           const parsed = JSON.parse(data) as Trip[];
           for (const trip of parsed) {
-            this.trips.set(trip.id, trip);
+            const isMock =
+              (trip.passenger?.lastName === 'User' && (trip.passenger?.firstName || '').startsWith('Test')) ||
+              trip.pickupLocation?.address === '123 Test St' ||
+              trip.id.startsWith('MOCK-') ||
+              trip.id.startsWith('stress_');
+            if (!isMock) {
+              this.trips.set(trip.id, trip);
+            }
           }
         }
       } catch (err) {

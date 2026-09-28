@@ -111,7 +111,7 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   primaryColor: '#2563eb',
   secondaryColor: '#0f172a',
   enableRealtimeRouting: false,
-  constructionMode: true,
+  constructionMode: false,
   headingFont: 'Inter',
   bodyFont: 'Inter',
   headingColor: '#0f172a',

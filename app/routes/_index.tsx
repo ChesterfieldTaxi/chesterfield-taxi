@@ -25,8 +25,52 @@ export function meta() {
       content:
         'West St. Louis County premier licensed taxi & car service. Airport transfers to Lambert STL & Spirit SUS, corporate accounts, 24/7 dispatch with upfront guaranteed fares.',
     },
+    { property: 'og:title', content: `${COMPANY_CONFIG.name} – ${COMPANY_CONFIG.tagline}` },
+    {
+      property: 'og:description',
+      content:
+        'West St. Louis County premier licensed taxi & car service. Airport transfers to Lambert STL & Spirit SUS, corporate accounts, 24/7 dispatch with upfront guaranteed fares.',
+    },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://chesterfieldtaxi.com/' },
+    { property: 'og:image', content: 'https://chesterfieldtaxi.com/icon-512.svg' },
+    { name: 'twitter:card', content: 'summary_large_image' },
   ];
 }
+
+const LOCAL_BUSINESS_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'TaxiService',
+  name: COMPANY_CONFIG.name,
+  legalName: COMPANY_CONFIG.legalName,
+  telephone: COMPANY_CONFIG.phone.dispatch,
+  email: COMPANY_CONFIG.email.dispatch,
+  url: 'https://chesterfieldtaxi.com',
+  logo: 'https://chesterfieldtaxi.com/icon-512.svg',
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: COMPANY_CONFIG.address.street,
+    addressLocality: COMPANY_CONFIG.address.city,
+    addressRegion: COMPANY_CONFIG.address.state,
+    postalCode: COMPANY_CONFIG.address.zip,
+    addressCountry: 'US',
+  },
+  geo: {
+    '@type': 'GeoCoordinates',
+    latitude: 38.6531,
+    longitude: -90.5732,
+  },
+  openingHoursSpecification: [
+    {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      opens: '00:00',
+      closes: '23:59',
+    },
+  ],
+  priceRange: '$$',
+  areaServed: COMPANY_CONFIG.serviceAreas,
+};
 
 const VALUE_PROPOSITIONS = [
   {
@@ -92,6 +136,10 @@ const HIGHLIGHTS = [
 export default function IndexRoute() {
   return (
     <div className="flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(LOCAL_BUSINESS_SCHEMA) }}
+      />
       {/* ─── Hero Section ─── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/40 via-white to-slate-50 py-16 sm:py-24 border-b border-slate-200/80">
         <div className="absolute inset-0 pointer-events-none opacity-20 [background-image:radial-gradient(var(--brand-primary,#2563eb)_1px,transparent_1px)] [background-size:24px_24px]" />

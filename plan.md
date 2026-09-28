@@ -608,4 +608,29 @@ export interface PassengerAccount {
   - Full-featured browser softphone interface integrated into tactical dispatch workspace.
   - Connects to WebRTC audio session state machine (`idle` -> `connecting` -> `in_call` -> `ended`) with live duration timer, mute toggle, DTMF keypad tone generation, and click-to-call hooks on driver roster and active trip rows.
 
+## 21. Phase 32: Production Launch, Web Booking Stress Testing, Security Standards & UI/UX Hardening
+
+### 21.1 Live Production Cutover
+- Transition `app/config/companyConfig.ts` to `constructionMode: false`.
+- Synchronize dynamic Firestore runtime setting overrides (`config/appSettings`) so dispatchers can switch between Live and Maintenance mode in real-time from the Admin Console.
+
+### 21.2 Defensive Security & OWASP Hardening
+- **Seed API Protection (`/api/seed-stress-data`)**: Restrict mass trip seeding behind authorization token (`x-admin-secret`) and block execution in production environments.
+- **Email Gateway Lockdown (`/api/send-email`)**: Disable open mail relay functionality by restricting raw HTML sending to authenticated admin roles, while strictly whitelisting verified transactional trip events.
+- **Payment Gateway Isolation (`/api/payments`)**: Deprecate client-supplied secret key overrides; enforce server-side environment variables (`STRIPE_SECRET_KEY`) exclusively.
+- **Firestore Least Privilege (`firestore.rules`)**: Harden `/trips/{tripId}` rules to prevent unauthorized state transitions (`COMPLETED`, `IN_PROGRESS`) and restrict public trip read access to valid tokens or authenticated owners.
+- **Bot Mitigation & XSS Sanitization**: Deploy hidden honeypot fields (`faxNumber`, `websiteUrl`) on public web forms and enforce HTML/script tag stripping before Firestore ingestion.
+
+### 21.3 Web Booking UI/UX Design System
+- **Progressive Disclosure Flow**: Multi-step indicator (`1. Route & Time`, `2. Vehicle`, `3. Passenger & Options`, `4. Confirmation`) with inline validation states.
+- **Mobile Touch Ergonomics**: Persistent mobile sticky summary bar displaying real-time fare calculation and primary CTA.
+- **Post-Booking Experience (`BookingConfirmation.tsx`)**: High-fidelity reservation card with copyable reference ID `#CT-XXXXX`, 3-phase dispatch lifecycle timeline, Google/Apple calendar export (`.ics`), PDF receipt generation, and direct 24/7 dispatch phone link.
+
+### 21.4 Web Booking Automated Stress Testing Suite (`scripts/stress-test-web-booking.ts`)
+- **Concurrency Load (50+ simultaneous bookings)**: Multi-threaded async bookings verifying ID uniqueness, Firestore batch writing resilience, and atomic sequence integrity.
+- **Fuzzing & Malformed Input Injection**: Fuzzing tests evaluating XSS strings, Unicode/emojis, 10,000-character strings, edge-case temporal values, and abnormal vehicle capacity requests.
+- **Anti-Tamper Pricing Verification**: Verifying that client attempts to manipulate fares (e.g. `$0.01` or negative sums) are rejected and re-calculated deterministically by the server/core pricing engine.
+- **Bot Honeypot Validation**: Testing automated rejection of spam payloads containing populated honeypot values.
+
+
 

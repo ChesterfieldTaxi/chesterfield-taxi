@@ -30,6 +30,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
     let result;
     if (body.subject && body.html && body.recipient) {
+      // Security Guard: Prevent open mail relay - arbitrary HTML sending requires admin authorization
+      const adminSecret = process.env.ADMIN_API_SECRET;
+      const authHeader = request.headers.get('authorization') || request.headers.get('x-admin-secret');
+      const isAuthorized = adminSecret ? authHeader === adminSecret || authHeader === `Bearer ${adminSecret}` : false;
+
+      // In production or when admin secret configured, reject unauthenticated arbitrary emails
+      if (process.env.NODE_ENV === 'production' && !isAuthorized) {
+        return Response.json(
+          { success: false, error: 'Unauthorized: Arbitrary direct email dispatch requires administrator authorization.' },
+          { status: 403 }
+        );
+      }
+
       result = await emailService.sendDirect({
         recipient: body.recipient,
         subject: body.subject,

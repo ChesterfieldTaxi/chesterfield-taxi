@@ -62,14 +62,19 @@ service cloud.firestore {
     // 2. Trips & Bookings (/trips/{tripId})
     // ─────────────────────────────────────────────────────────────
     match /trips/{tripId} {
-      // Public / Guest creation of new UNCONFIRMED web bookings, or authenticated passenger bookings
-      allow create: if request.resource.data.status in ['UNCONFIRMED', 'pending'] || isAuthenticated();
+      // Public / Guest creation of new UNCONFIRMED web bookings, or dispatcher/authenticated creation
+      allow create: if (
+        request.resource.data.status in ['UNCONFIRMED', 'pending'] &&
+        request.resource.data.pickupLocation != null &&
+        request.resource.data.dropoffLocation != null &&
+        request.resource.data.pricing != null
+      ) || isDispatcher();
 
       // Read single trip:
       // - Dispatchers / Admins can read all trips
       // - Passengers can view their own trips
       // - Assigned or offered drivers can view trip details
-      // - Direct lookup by unique tripId or tripToken (for public tracking)
+      // - Direct single-trip status lookup by exact tripId (listing remains forbidden)
       allow get: if isDispatcher() ||
         (isAuthenticated() && (
           resource.data.customerId == request.auth.uid ||
@@ -78,10 +83,11 @@ service cloud.firestore {
           resource.data.assignedDriverId == request.auth.uid ||
           (resource.data.offeredToIds != null && request.auth.uid in resource.data.offeredToIds)
         )) ||
-        // Guests tracking via direct doc reference
-        resource.data.status != null;
+        // Single document guest read only with valid status and non-archived record
+        (resource.data.status != null && resource.data.isArchived != true);
 
-      // List query: Passengers can only list trips matching their customerId; Drivers their assigned trips; Dispatchers all
+      // List query: Strictly forbidden for unauthenticated users.
+      // Authenticated users can only query their own trips; Dispatchers all
       allow list: if isDispatcher() ||
         (isAuthenticated() && (
           resource.data.customerId == request.auth.uid ||

@@ -1,2 +1,2 @@
-export { default } from './components/UnderConstruction';
+export { default } from './routes/_index';
 

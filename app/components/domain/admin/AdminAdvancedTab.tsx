@@ -698,82 +698,140 @@ export function AdminAdvancedTab({
                     Generates 100+ concurrent mock trips to test <code>/dispatch</code> virtualized rendering and smooth scrolling.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (!confirm("Are you sure you want to seed 120 mock trips? This will execute client-side booking creations and push to Firestore.")) return;
-                    
-                    // Show some basic UI feedback or console log for progress
-                    console.log('Starting client-side stress seed...');
-                    
-                    try {
-                      const service = getBookingService();
-                      const statuses = ['UNCONFIRMED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'DECLINED'] as const;
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to seed 120 mock trips? This will execute client-side booking creations and push to Firestore.")) return;
                       
-                      const baseTrip = {
-                        pickupLocation: { address: '123 Test St', coordinates: { lat: 38.6, lng: -90.5 } },
-                        dropoffLocation: { address: '456 Dest Ave', coordinates: { lat: 38.7, lng: -90.4 } },
-                        bookingType: 'asap' as const,
-                        vehicleTier: 'standard' as const,
-                        passenger: {
-                          firstName: 'Test',
-                          lastName: 'User',
-                          email: 'test@example.com',
-                          phone: '555-0100',
-                          passengerCount: 1,
-                          luggageCount: 0,
-                        },
-                        pricing: {
-                          baseFare: 5.0,
-                          distanceMiles: 1,
-                          durationMinutes: 5,
-                          distanceRate: 15.0,
-                          timeRate: 0,
-                          totalFare: 20.0,
-                          vehicleMultiplier: 1,
-                          surgeMultiplier: 1,
-                          discountAmount: 0,
-                          subtotal: 20.0,
-                          currency: 'USD'
-                        },
-                        payment: {
-                          method: 'card' as const,
-                          status: 'pending' as const,
-                          amount: 20.0
-                        }
-                      };
-
-                      let successCount = 0;
-                      for (let i = 0; i < 120; i++) {
-                        const status = statuses[i % statuses.length];
-                        const trip = await service.createBooking({
-                          ...baseTrip,
-                          passenger: {
-                            ...baseTrip.passenger,
-                            firstName: `Test${i}`,
-                          }
-                        });
+                      // Show some basic UI feedback or console log for progress
+                      console.log('Starting client-side stress seed...');
+                      
+                      try {
+                        const service = getBookingService();
+                        const statuses = ['UNCONFIRMED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'DECLINED'] as const;
                         
-                        if (trip && status !== 'UNCONFIRMED') {
-                          if (service.updateTripStatus) {
-                            await service.updateTripStatus(trip.id, status as any, { actorRole: 'system' });
+                        const baseTrip = {
+                          pickupLocation: { address: '123 Test St', coordinates: { lat: 38.6, lng: -90.5 } },
+                          dropoffLocation: { address: '456 Dest Ave', coordinates: { lat: 38.7, lng: -90.4 } },
+                          bookingType: 'asap' as const,
+                          vehicleTier: 'standard' as const,
+                          passenger: {
+                            firstName: 'Test',
+                            lastName: 'User',
+                            email: 'test@example.com',
+                            phone: '555-0100',
+                            passengerCount: 1,
+                            luggageCount: 0,
+                          },
+                          pricing: {
+                            baseFare: 5.0,
+                            distanceMiles: 1,
+                            durationMinutes: 5,
+                            distanceRate: 15.0,
+                            timeRate: 0,
+                            totalFare: 20.0,
+                            vehicleMultiplier: 1,
+                            surgeMultiplier: 1,
+                            discountAmount: 0,
+                            subtotal: 20.0,
+                            currency: 'USD'
+                          },
+                          payment: {
+                            method: 'card' as const,
+                            status: 'pending' as const,
+                            amount: 20.0
+                          }
+                        };
+
+                        let successCount = 0;
+                        for (let i = 0; i < 120; i++) {
+                          const status = statuses[i % statuses.length];
+                          const trip = await service.createBooking({
+                            ...baseTrip,
+                            passenger: {
+                              ...baseTrip.passenger,
+                              firstName: `Test${i}`,
+                            }
+                          });
+                          
+                          if (trip && status !== 'UNCONFIRMED') {
+                            if (service.updateTripStatus) {
+                              await service.updateTripStatus(trip.id, status as any, { actorRole: 'system' });
+                            }
+                          }
+                          successCount++;
+                          if (successCount % 20 === 0) console.log(`Seeded ${successCount}/120 trips...`);
+                        }
+                        alert(`Successfully seeded ${successCount} trips directly via Booking Service!`);
+                      } catch (err) {
+                        console.error("Seeding error", err);
+                        alert("Error seeding data. Check console for details.");
+                      }
+                    }}
+                    className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                  >
+                    Seed 120 Trips
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to purge mock stress trips? Real user bookings will be kept.")) return;
+                      try {
+                        if (typeof window !== 'undefined' && window.localStorage) {
+                          const raw = window.localStorage.getItem('chesterfield_taxi_mock_trips');
+                          if (raw) {
+                            const parsed = JSON.parse(raw);
+                            const kept = parsed.filter((t: any) => 
+                              !(t.passenger?.lastName === 'User' && (t.passenger?.firstName || '').startsWith('Test')) &&
+                              t.pickupLocation?.address !== '123 Test St' &&
+                              !t.id?.startsWith('MOCK-')
+                            );
+                            window.localStorage.setItem('chesterfield_taxi_mock_trips', JSON.stringify(kept));
                           }
                         }
-                        successCount++;
-                        if (successCount % 20 === 0) console.log(`Seeded ${successCount}/120 trips...`);
+
+                        if (isFirebaseConfigured()) {
+                          const { getFirestore, collection, getDocs, doc, deleteDoc } = await import('firebase/firestore');
+                          const { getFirebaseApp } = await import('../../../core/services/firebase');
+                          const db = getFirestore(getFirebaseApp());
+                          const snap = await getDocs(collection(db, 'trips'));
+                          let deleted = 0;
+                          for (const d of snap.docs) {
+                            const data = d.data();
+                            const isMock =
+                              (data.passenger?.lastName === 'User' && (data.passenger?.firstName || '').startsWith('Test')) ||
+                              data.pickupLocation?.address === '123 Test St' ||
+                              d.id.startsWith('MOCK-') ||
+                              d.id.startsWith('stress_');
+                            if (isMock) {
+                              await deleteDoc(doc(db, 'trips', d.id));
+                              deleted++;
+                            }
+                          }
+                          try {
+                            await deleteDoc(doc(db, 'drivers', 'drv-101'));
+                          } catch {}
+
+                          alert(`Purged ${deleted} mock trips from Firestore. All real bookings preserved!`);
+                        } else {
+                          alert('Purged local mock trips. All real bookings preserved!');
+                        }
+                        window.location.reload();
+                      } catch (err) {
+                        console.error('Error purging mock trips:', err);
+                        alert('Error purging mock trips. Check console for details.');
                       }
-                      alert(`Successfully seeded ${successCount} trips directly via Booking Service!`);
-                    } catch (err) {
-                      console.error("Seeding error", err);
-                      alert("Error seeding data. Check console for details.");
-                    }
-                  }}
-                  className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 shrink-0"
-                >
-                  Seed 120 Trips
-                </Button>
+                    }}
+                    className="text-xs font-bold bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200"
+                  >
+                    Purge Mock Trips
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

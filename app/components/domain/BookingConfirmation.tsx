@@ -89,6 +89,64 @@ export function BookingConfirmation({
     bookingConfig?.lambertPickupInstructions ||
     'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.';
 
+  const [copiedId, setCopiedId] = React.useState(false);
+
+  const handleCopyId = () => {
+    navigator.clipboard?.writeText(trip.id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleDownloadCalendar = () => {
+    try {
+      const pickupTime = trip.bookingType === 'scheduled' && trip.scheduledPickupTime
+        ? new Date(trip.scheduledPickupTime)
+        : new Date(Date.now() + 15 * 60 * 1000);
+      const endTime = new Date(pickupTime.getTime() + (trip.pricing.durationMinutes || 30) * 60 * 1000);
+
+      const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+      const formatIcsDate = (d: Date) =>
+        `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
+
+      const summary = `Chesterfield Taxi - Ride #${trip.id}`;
+      const description = `Pickup: ${trip.pickupLocation.address}\\nDropoff: ${trip.dropoffLocation.address}\\nTotal Fare: $${trip.pricing.totalFare.toFixed(2)}\\nDispatch Support: (314) 738-9921`;
+      const locationStr = trip.pickupLocation.address.replace(/,/g, '\\,');
+
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Chesterfield Taxi//EN',
+        'BEGIN:VEVENT',
+        `UID:${trip.id}@chesterfieldtaxi.com`,
+        `DTSTAMP:${formatIcsDate(new Date())}`,
+        `DTSTART:${formatIcsDate(pickupTime)}`,
+        `DTEND:${formatIcsDate(endTime)}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${description}`,
+        `LOCATION:${locationStr}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `chesterfield-taxi-${trip.id}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn('Failed to download calendar .ics:', e);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-blue-200/80 shadow-lg'} ${className}`}>
       {/* Top Banner */}
@@ -105,43 +163,81 @@ export function BookingConfirmation({
             : `Your reservation has entered the ${companyConfig?.name || COMPANY_CONFIG.name} 24/7 dispatch system.`}
         </p>
 
-        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-amber-600' : 'bg-blue-800/70 border border-blue-400/30'} px-4 py-1.5 rounded-full text-xs font-mono`}>
-          <span className={isUnconfirmed ? 'text-amber-100' : 'text-blue-200'}>Trip Reference:</span>
+        <div className={`mt-4 inline-flex items-center gap-2 ${isUnconfirmed ? 'bg-amber-700/80' : 'bg-blue-800/80 border border-blue-400/30'} px-3.5 py-1.5 rounded-full text-xs font-mono shadow-xs`}>
+          <span className={isUnconfirmed ? 'text-amber-200' : 'text-blue-200'}>Trip Reference:</span>
           <span className="font-bold text-white tracking-wider">{trip.id}</span>
+          <button
+            type="button"
+            onClick={handleCopyId}
+            className="ml-1 p-1 hover:bg-white/20 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+            title="Copy Trip Reference ID"
+          >
+            {copiedId ? '✓ Copied' : '📋 Copy'}
+          </button>
         </div>
       </div>
 
       <CardContent className="p-6 sm:p-8 space-y-6">
-        {/* Reservation Status Pill */}
-        <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/80">
-          <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-              Reservation Status
-            </span>
-            <span className="text-sm font-bold text-slate-900 uppercase flex items-center gap-1.5 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full ${isUnconfirmed ? 'bg-amber-500 animate-pulse' : 'bg-blue-600'}`} />
-              Status: {isUnconfirmed ? 'Pending Review' : 'Confirmed'}
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-            {isUnconfirmed && (
-              <button type="button" className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-300 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1">
-                Modify
-              </button>
-            )}
-            {isUnconfirmed && (
-              <button type="button" className="text-[10px] font-semibold text-red-600 hover:text-red-800 underline bg-white border border-red-200 px-2 py-1 rounded hover:bg-red-50 flex items-center gap-1">
-                Cancel Request
-              </button>
-            )}
-            {!isUnconfirmed && isScheduled && (
-              <button type="button" className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-300 px-2 py-1 rounded hover:bg-slate-50 flex items-center gap-1">
-                <CalendarIcon className="w-3 h-3" /> Add to Calendar
-              </button>
-            )}
-            <Badge variant={isUnconfirmed ? 'warning' : 'info'} size="md">
+        {/* Quick Action Bar (Print, Calendar, Copy) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status:</span>
+            <Badge variant={isUnconfirmed ? 'warning' : 'info'} size="sm">
               {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
             </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadCalendar}
+              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span>Add to Calendar</span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <span>🖨️ Print Receipt</span>
+            </button>
+          </div>
+        </div>
+
+        {/* "What Happens Next?" 3-Step Lifecycle Timeline */}
+        <div className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 rounded-xl border border-blue-100 space-y-3">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <span>✨ What Happens Next?</span>
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">1</span>
+                <span>Dispatch Review</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-tight">
+                Our 24/7 team inspects the route and verifies driver allocation.
+              </p>
+            </div>
+            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">2</span>
+                <span>Chauffeur Assigned</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-tight">
+                You receive an SMS alert with driver details and vehicle info.
+              </p>
+            </div>
+            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">3</span>
+                <span>Ride Day Tracking</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-tight">
+                Live driver telemetry map activates 30 mins before your ride.
+              </p>
+            </div>
           </div>
         </div>
 

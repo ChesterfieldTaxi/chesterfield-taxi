@@ -417,26 +417,8 @@ export class PassengerService {
       console.warn('[PassengerService] Error reading live trips from booking service:', err);
     }
 
-    // Merge live trips with sample past trips, avoiding duplicate IDs
-    const seenIds = new Set<string>();
-    const combined: Trip[] = [];
-
-    for (const trip of liveTrips) {
-      if (!seenIds.has(trip.id)) {
-        seenIds.add(trip.id);
-        combined.push(trip);
-      }
-    }
-
-    for (const trip of SAMPLE_PASSENGER_PAST_TRIPS) {
-      if (!seenIds.has(trip.id)) {
-        seenIds.add(trip.id);
-        combined.push(trip);
-      }
-    }
-
     // Sort by scheduledPickupTime or createdAt descending (newest first)
-    return combined.sort((a, b) => {
+    return liveTrips.sort((a, b) => {
       const timeA = new Date(a.scheduledPickupTime || a.createdAt).getTime();
       const timeB = new Date(b.scheduledPickupTime || b.createdAt).getTime();
       return timeB - timeA;

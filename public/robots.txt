@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Allow: /book
+Allow: /services
+Allow: /about
+Allow: /contact
+Allow: /apply
+Allow: /terms
+Allow: /privacy
+
+# Disallow internal operational consoles and customer-private links
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dispatch
+Disallow: /dispatch/
+Disallow: /driver
+Disallow: /track/
+Disallow: /booking/status/
+Disallow: /api/
+
+Sitemap: https://chesterfieldtaxi.com/sitemap.xml

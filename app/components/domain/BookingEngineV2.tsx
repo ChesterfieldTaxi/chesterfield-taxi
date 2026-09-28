@@ -41,8 +41,17 @@ export const COMMON_FBO_FACILITIES = [
   'Private Hangar / Other FBO',
 ];
 
+import { sanitizeTextInput, isBotHoneypotTriggered } from '../../core/utils/security-sanitizer.util';
 import { DispatchLocationInput, type PlaceSelectedDetails } from './dispatch/DispatchLocationInput';
 import { BookingConfirmation, type EmailDeliveryFeedback } from './BookingConfirmation';
+
+export function formatUsPhone(val: string): string {
+  const digits = val.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
 import {
   SpinnerIcon,
   ShieldCheckIcon,
@@ -228,6 +237,7 @@ interface FormState {
   billingPo: string;
   authorizedBy: string;
   invoicingTerms: string;
+  botTrapField?: string;
 }
 
 const DEFAULT_BOOKER_ROLES = [
@@ -352,6 +362,7 @@ export function BookingEngineV2({
     billingPo: '',
     authorizedBy: '',
     invoicingTerms: 'Net 30 Direct Bill',
+    botTrapField: '',
   });
 
   // Validation errors
@@ -1389,6 +1400,44 @@ export function BookingEngineV2({
     if (isSubmittingRef.current || isSubmitting) return;
     if (!validateForm()) return;
 
+    // Security Guard: Invisible Honeypot Anti-Bot Trap
+    if (isBotHoneypotTriggered(form.botTrapField)) {
+      console.warn('[BookingEngineV2] Bot honeypot triggered. Suppressing automated spam submission.');
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      const fakeTripId = `CT-${Math.floor(10000 + Math.random() * 90000)}`;
+      setConfirmedTrip({
+        id: fakeTripId,
+        status: 'UNCONFIRMED',
+        bookingType: form.timingType === 'later' ? 'scheduled' : 'asap',
+        pickupLocation: { address: sanitizeTextInput(form.pickupAddress) },
+        dropoffLocation: { address: sanitizeTextInput(form.dropoffAddress) },
+        passenger: {
+          firstName: sanitizeTextInput(form.passengerName).split(/\s+/)[0] || 'Guest',
+          lastName: sanitizeTextInput(form.passengerName).split(/\s+/).slice(1).join(' ') || '',
+          email: sanitizeTextInput(form.passengerEmail),
+          phone: sanitizeTextInput(form.passengerPhone),
+          passengerCount: form.passengers,
+          luggageCount: form.bags,
+        },
+        pricing: {
+          baseFare: 5.0,
+          distanceMiles: 10,
+          durationMinutes: 20,
+          distanceRate: 2.5,
+          timeRate: 0,
+          totalFare: 45.0,
+          subtotal: 45.0,
+          currency: 'USD',
+          vehicleMultiplier: 1,
+          surgeMultiplier: 1,
+          discountAmount: 0,
+        },
+        payment: { method: 'card', status: 'pending', amount: 45.0 },
+      } as Trip);
+      return;
+    }
+
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
@@ -1397,13 +1446,13 @@ export function BookingEngineV2({
       const bookingService = getBookingService();
 
       const pickupLocation: TripLocation = {
-        address: form.pickupAddress,
+        address: sanitizeTextInput(form.pickupAddress, 300),
         placeId: form.pickupPlaceId,
         coordinates: form.pickupCoordinates || { lat: 38.6631, lng: -90.5771 },
       };
 
       const dropoffLocation: TripLocation = {
-        address: form.dropoffAddress,
+        address: sanitizeTextInput(form.dropoffAddress, 300),
         placeId: form.dropoffPlaceId,
         coordinates: form.dropoffCoordinates || { lat: 38.627, lng: -90.1994 },
       };
@@ -1546,10 +1595,10 @@ export function BookingEngineV2({
         vehicleTier: mapChoiceToTier(form.vehicleChoice),
         status: 'UNCONFIRMED',
         passenger: {
-          firstName: form.passengerName.trim().split(/\s+/)[0] || form.passengerName,
-          lastName: form.passengerName.trim().split(/\s+/).slice(1).join(' ') || '',
-          email: form.passengerEmail.trim(),
-          phone: form.passengerPhone.trim(),
+          firstName: sanitizeTextInput(form.passengerName.trim().split(/\s+/)[0] || form.passengerName, 50),
+          lastName: sanitizeTextInput(form.passengerName.trim().split(/\s+/).slice(1).join(' ') || '', 50),
+          email: sanitizeTextInput(form.passengerEmail.trim(), 120),
+          phone: sanitizeTextInput(form.passengerPhone.trim(), 30),
           passengerCount: form.passengers,
           luggageCount: form.bags,
           specialRequests: activeSpecialRequests.join(', '),
@@ -1564,30 +1613,30 @@ export function BookingEngineV2({
           cardBrand,
           preAuthHoldAmount: paymentIntentId ? effectivePricing.totalFare : undefined,
         },
-        driverNotes: combinedNotes,
+        driverNotes: sanitizeTextInput(combinedNotes, 1500),
         metadata: {
           isBookingForSomeoneElse: form.isBookerDifferent,
-          bookerName: form.isBookerDifferent ? form.contactName : undefined,
-          bookerPhone: form.isBookerDifferent ? form.contactPhone : undefined,
-          bookerEmail: form.isBookerDifferent ? form.contactEmail : undefined,
-          bookerRole: form.isBookerDifferent ? form.contactRole : undefined,
-          corporateOrgName: form.paymentMethod === 'account' ? form.corporateOrgName : undefined,
-          corporateAccountNumber: form.paymentMethod === 'account' ? form.corporateAccountNumber : undefined,
-          billingPo: form.paymentMethod === 'account' ? form.billingPo : undefined,
-          authorizedBy: form.paymentMethod === 'account' ? form.authorizedBy : undefined,
-          invoicingTerms: form.paymentMethod === 'account' ? form.invoicingTerms : undefined,
+          bookerName: form.isBookerDifferent ? sanitizeTextInput(form.contactName, 100) : undefined,
+          bookerPhone: form.isBookerDifferent ? sanitizeTextInput(form.contactPhone, 30) : undefined,
+          bookerEmail: form.isBookerDifferent ? sanitizeTextInput(form.contactEmail, 120) : undefined,
+          bookerRole: form.isBookerDifferent ? sanitizeTextInput(form.contactRole, 60) : undefined,
+          corporateOrgName: form.paymentMethod === 'account' ? sanitizeTextInput(form.corporateOrgName, 100) : undefined,
+          corporateAccountNumber: form.paymentMethod === 'account' ? sanitizeTextInput(form.corporateAccountNumber, 50) : undefined,
+          billingPo: form.paymentMethod === 'account' ? sanitizeTextInput(form.billingPo, 50) : undefined,
+          authorizedBy: form.paymentMethod === 'account' ? sanitizeTextInput(form.authorizedBy, 100) : undefined,
+          invoicingTerms: form.paymentMethod === 'account' ? sanitizeTextInput(form.invoicingTerms, 50) : undefined,
           additionalPassengers: form.additionalPassengers,
           provideFlightInfo: form.provideFlightInfo,
-          airline: form.provideFlightInfo ? form.airline : undefined,
-          airlineName: form.provideFlightInfo ? form.airline : undefined,
-          flightNumber: form.provideFlightInfo ? form.flightNumber : undefined,
-          flightOrigin: form.provideFlightInfo ? form.flightOrigin : undefined,
-          departureAirport: form.provideFlightInfo ? form.flightOrigin : undefined,
-          tailNumber: form.provideFlightInfo ? form.tailNumber : undefined,
-          fboFacility: form.provideFlightInfo ? form.fboFacility : undefined,
+          airline: form.provideFlightInfo ? sanitizeTextInput(form.airline, 80) : undefined,
+          airlineName: form.provideFlightInfo ? sanitizeTextInput(form.airline, 80) : undefined,
+          flightNumber: form.provideFlightInfo ? sanitizeTextInput(form.flightNumber, 30) : undefined,
+          flightOrigin: form.provideFlightInfo ? sanitizeTextInput(form.flightOrigin, 80) : undefined,
+          departureAirport: form.provideFlightInfo ? sanitizeTextInput(form.flightOrigin, 80) : undefined,
+          tailNumber: form.provideFlightInfo ? sanitizeTextInput(form.tailNumber, 50) : undefined,
+          fboFacility: form.provideFlightInfo ? sanitizeTextInput(form.fboFacility, 80) : undefined,
           isPrivateAviation: Boolean(airportDetection.isPrivateAviation),
           hasCheckedLuggage: form.provideFlightInfo ? form.hasCheckedLuggage : false,
-          gateCode: form.gateCode,
+          gateCode: sanitizeTextInput(form.gateCode, 30),
           smsConsent: form.smsConsent,
           isAirportTrip: Boolean(airportDetection.isAirportTrip),
           airportIataCode: airportDetection.airport?.iataCode,
@@ -1956,6 +2005,72 @@ export function BookingEngineV2({
   return (
     <div className={`relative max-w-6xl mx-auto ${className}`}>
       <form onSubmit={handleBookRide} className="select-none">
+        {/* Invisible Honeypot Anti-Bot Trap */}
+        <div style={{ display: 'none', position: 'absolute', left: '-9999px', opacity: 0 }} aria-hidden="true" tabIndex={-1}>
+          <label htmlFor="hp_company_sec_field">Leave this field blank</label>
+          <input
+            id="hp_company_sec_field"
+            type="text"
+            name="hp_company_sec_field"
+            value={form.botTrapField || ''}
+            onChange={(e) => setForm((prev) => ({ ...prev, botTrapField: e.target.value }))}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
+
+        {/* Live Dispatch Header & Step Flow */}
+        <div className="mb-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xs text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="font-bold tracking-wide">Live Dispatch Desk Operating (24/7)</span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] text-slate-300">
+              <span className="flex items-center gap-1">🛡️ Upfront Price Lock</span>
+              <span className="hidden sm:inline text-slate-600">•</span>
+              <span className="hidden sm:flex items-center gap-1">✈️ Free Flight Monitoring</span>
+              <span className="hidden sm:inline text-slate-600">•</span>
+              <span className="hidden md:flex items-center gap-1">⏰ Free Cancellation (2h+)</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-semibold">
+            <div className={`py-2 px-3 rounded-lg border transition-all ${
+              form.pickupAddress && form.dropoffAddress
+                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600'
+            }`}>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 1</span>
+              <span>Schedule & Route</span>
+            </div>
+            <div className={`py-2 px-3 rounded-lg border transition-all ${
+              form.vehicleChoice !== 'any' || form.passengers > 0
+                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600'
+            }`}>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 2</span>
+              <span>Vehicle & Luggage</span>
+            </div>
+            <div className={`py-2 px-3 rounded-lg border transition-all ${
+              form.passengerName && form.passengerPhone
+                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600'
+            }`}>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 3</span>
+              <span>Passenger Details</span>
+            </div>
+            <div className={`py-2 px-3 rounded-lg border transition-all ${
+              form.paymentMethod
+                ? 'bg-blue-50/90 border-blue-300 text-blue-900 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600'
+            }`}>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Step 4</span>
+              <span>Review & Confirm</span>
+            </div>
+          </div>
+        </div>
+
         {/* Grid: Left Main Stack (Col 8), Right Sticky Summary (Col 4) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-20">
           {/* Left Column: Form Section Cards */}
@@ -2432,8 +2547,10 @@ export function BookingEngineV2({
                       name="passengerPhone"
                       placeholder="Mobile Phone (SMS updates)"
                       value={form.passengerPhone}
-                      onChange={(e) => setForm((prev) => ({ ...prev, passengerPhone: e.target.value }))}
+                      onChange={(e) => setForm((prev) => ({ ...prev, passengerPhone: formatUsPhone(e.target.value) }))}
                       required
+                      inputMode="tel"
+                      autoComplete="tel"
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     />
                     {errors.passengerPhone && (
@@ -2449,8 +2566,10 @@ export function BookingEngineV2({
                       name="passengerEmail"
                       placeholder="Email Address (Receipts)"
                       value={form.passengerEmail}
-                      onChange={(e) => setForm((prev) => ({ ...prev, passengerEmail: e.target.value }))}
+                      onChange={(e) => setForm((prev) => ({ ...prev, passengerEmail: e.target.value.trim() }))}
                       required
+                      inputMode="email"
+                      autoComplete="email"
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                     />
                     {errors.passengerEmail && (
@@ -2538,8 +2657,10 @@ export function BookingEngineV2({
                         name="contactPhone"
                         placeholder="Booker Phone Number"
                         value={form.contactPhone}
-                        onChange={(e) => setForm((prev) => ({ ...prev, contactPhone: e.target.value }))}
+                        onChange={(e) => setForm((prev) => ({ ...prev, contactPhone: formatUsPhone(e.target.value) }))}
                         required={form.isBookerDifferent}
+                        inputMode="tel"
+                        autoComplete="tel"
                         className="w-full px-2.5 py-1.5 bg-white border border-blue-200 rounded-lg text-xs"
                       />
                       <input
@@ -2809,7 +2930,13 @@ export function BookingEngineV2({
                     </div>
 
                     {form.carSeats && (
-                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2 animate-in fade-in duration-150">
+                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                        {/* Missouri Child Restraint Statutory Notice */}
+                        <div className="p-2 bg-amber-100/70 border border-amber-300/80 rounded text-[11px] text-amber-950 leading-snug flex items-start gap-1.5 shadow-2xs">
+                          <span className="font-bold shrink-0">⚖️ MO Law (RSMo § 307.179):</span>
+                          <span>Children under 4 or under 40 lbs must be secured in a child safety seat. Children ages 4–7 and 40+ lbs must ride in a booster seat until 80 lbs or 4&apos;9&quot; tall. Chauffeurs can provide sanitized seats or install your personal seat.</span>
+                        </div>
+
                         {/* Rear-Facing (Infant) */}
                         <div className="flex items-center justify-between text-xs">
                           <div>
@@ -3589,8 +3716,8 @@ export function BookingEngineV2({
                     ? bookingConfig.acceptedPaymentMethods
                     : ['card', 'cash', 'account'];
                 const allMethods = [
-                  { key: 'card' as const, label: 'Credit Card', Icon: CreditCardIcon },
-                  { key: 'cash' as const, label: 'Cash in Cab', Icon: DollarSignIcon },
+                  { key: 'card' as const, label: 'Card in Vehicle', Icon: CreditCardIcon },
+                  { key: 'cash' as const, label: 'Cash to Driver', Icon: DollarSignIcon },
                   { key: 'account' as const, label: 'Corporate Direct', Icon: BuildingIcon },
                 ];
                 const methodsToRender = allMethods.filter((m) => allowed.includes(m.key));
@@ -3607,7 +3734,7 @@ export function BookingEngineV2({
                       <button
                         key={m.key}
                         type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, paymentMethod: m.key }))}
+                        onClick={() => setForm((prev) => ({ ...prev, paymentMethod: m.key, cardPaymentType: 'terminal' }))}
                         className={`py-2 text-center rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
                           form.paymentMethod === m.key
                             ? 'bg-blue-600 text-white shadow-xs'
@@ -3625,53 +3752,20 @@ export function BookingEngineV2({
               {/* Credit Card Sub-panel */}
               {form.paymentMethod === 'card' && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2 p-1 bg-slate-200/60 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setForm((prev) => ({ ...prev, cardPaymentType: 'terminal' }))}
-                      className={`flex-1 py-1.5 px-2 text-center rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        form.cardPaymentType === 'terminal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <CreditCardIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>Pay in Vehicle (Contactless / Chip Terminal)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm((prev) => ({ ...prev, cardPaymentType: 'manual' }))}
-                      className={`flex-1 py-1.5 px-2 text-center rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        form.cardPaymentType === 'manual' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <ShieldCheckIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                      <span>Pre-authorize Card</span>
-                    </button>
+                  <div className="text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-200 flex items-start gap-2.5 shadow-xs">
+                    <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                        <span>Pay Driver in Vehicle (Contactless / Chip / Tap / Square)</span>
+                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                          No Upfront Charge
+                        </span>
+                      </div>
+                      <div className="text-slate-600 text-[11px] leading-relaxed">
+                        Pay securely inside the vehicle upon arrival using Apple Pay, Google Pay, or any major credit/debit card (Square reader / contactless chip terminal). No payment is charged upfront.
+                      </div>
+                    </div>
                   </div>
-
-                  {form.cardPaymentType === 'terminal' ? (
-                    <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded border border-slate-200 flex items-center gap-2">
-                      <ShieldCheckIcon className="w-4 h-4 text-blue-600 shrink-0" />
-                      <span>Pay securely inside the vehicle upon arrival using Apple Pay, Google Pay, or any major credit/debit card. No payment is charged upfront.</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 pt-1">
-                      <StripePaymentInput
-                        amount={totalDisplayFare || 25}
-                        currency="usd"
-                        saveCardOnFile={form.saveCardOnFile}
-                        onSaveCardChange={(save: boolean) => setForm((prev) => ({ ...prev, saveCardOnFile: save }))}
-                        onCardChange={(cardDetails) => {
-                          setForm((prev) => ({
-                            ...prev,
-                            cardNumber: cardDetails.token ? '•••• •••• •••• ' + cardDetails.last4 : prev.cardNumber,
-                            cardLast4: cardDetails.last4,
-                            cardBrand: cardDetails.brand,
-                            paymentToken: cardDetails.token,
-                          }));
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -3685,15 +3779,33 @@ export function BookingEngineV2({
 
               {/* Corporate Account Sub-panel */}
               {form.paymentMethod === 'account' && (
-                <div className="p-3 bg-amber-50/80 border border-amber-300 rounded-lg space-y-2 animate-in fade-in duration-150">
-                  <div className="text-[10px] font-bold text-amber-900 uppercase">
-                    Corporate Account Direct Billing
+                <div className="p-3 bg-amber-50/80 border border-amber-300 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wide">
+                      Corporate Account Direct Billing
+                    </span>
                   </div>
+
+                  {/* Dispatch Callout Note */}
+                  <div className="text-[11px] bg-white p-2.5 rounded-lg border border-amber-200 text-amber-900 flex items-start gap-2 shadow-xs">
+                    <PhoneIcon className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <span className="font-semibold">Need account assistance?</span> If you do not know your corporate account number or billing PO, please call 24/7 Dispatch at{' '}
+                      <a
+                        href={`tel:${(COMPANY_CONFIG.phone?.primaryRaw || '+13147380100').replace(/[^\d+]/g, '')}`}
+                        className="font-bold underline text-amber-950 hover:text-blue-700"
+                      >
+                        {COMPANY_CONFIG.phone?.dispatch || COMPANY_CONFIG.phone?.primary || '(314) 738-0100'}
+                      </a>{' '}
+                      to verify or set up your direct billing arrangement before departure.
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input
                       type="text"
                       name="corporateOrgName"
-                      placeholder="Organization / Company Name"
+                      placeholder="Organization / Company Name *"
                       value={form.corporateOrgName}
                       onChange={(e) => setForm((prev) => ({ ...prev, corporateOrgName: e.target.value }))}
                       required={form.paymentMethod === 'account'}
@@ -3702,10 +3814,9 @@ export function BookingEngineV2({
                     <input
                       type="text"
                       name="corporateAccountNumber"
-                      placeholder="Corporate Account # (e.g. ACCT-8040)"
+                      placeholder="Corporate Account # (or write 'Pending Dispatch')"
                       value={form.corporateAccountNumber}
                       onChange={(e) => setForm((prev) => ({ ...prev, corporateAccountNumber: e.target.value }))}
-                      required={form.paymentMethod === 'account'}
                       className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded text-xs"
                     />
                   </div>
@@ -3918,6 +4029,41 @@ export function BookingEngineV2({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Mobile Sticky Quick-Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 shadow-2xl flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              {form.returnTrip ? 'Roundtrip Fare' : 'Guaranteed Upfront Fare'}
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-base font-black text-slate-900">
+                {totalDisplayFare !== null ? `$${totalDisplayFare.toFixed(2)}` : 'Calculating...'}
+              </span>
+              {totalDisplayFare !== null && (
+                <span className="text-[10px] text-slate-500 font-medium">all-inclusive</span>
+              )}
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              backgroundColor: 'var(--brand-primary)',
+              color: 'var(--btn-primary-text)',
+            }}
+            className="px-4 py-2 hover:opacity-95 active:opacity-90 font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+          >
+            {isSubmitting ? (
+              <>
+                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                <span>Booking...</span>
+              </>
+            ) : (
+              <span>Book Ride Now</span>
+            )}
+          </button>
         </div>
       </form>
     </div>
