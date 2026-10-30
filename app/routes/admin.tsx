@@ -455,6 +455,42 @@ export default function AdminLayout() {
 
             {/* Right: Maintenance Mode Quick Toggle, Quick Launch Dispatch, Public Link, Status Badge */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* Quick Sitewide "Get App" Buttons Switch */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const currentEnabled = settings.enableGetAppButtons === true;
+                  await handleSaveSettings({
+                    enableGetAppButtons: !currentEnabled,
+                    updatedAt: new Date().toISOString(),
+                  });
+                }}
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  settings.enableGetAppButtons === true
+                    ? 'bg-blue-500/15 border-blue-500/40 text-blue-900 shadow-xs hover:bg-blue-500/25'
+                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                }`}
+                title={
+                  settings.enableGetAppButtons === true
+                    ? '"Get App" buttons are currently ENABLED sitewide. Click to disable and hide them.'
+                    : '"Get App" buttons are currently DISABLED (hidden) sitewide. Click to enable them.'
+                }
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    settings.enableGetAppButtons === true
+                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+                      : 'bg-slate-400'
+                  }`}
+                />
+                <span className="hidden sm:inline font-bold text-slate-700">Get App:</span>
+                <span className={`text-[11px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  settings.enableGetAppButtons === true ? 'bg-blue-600 text-white font-black' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {settings.enableGetAppButtons === true ? 'ON' : 'OFF'}
+                </span>
+              </button>
+
               {/* Prominent Maintenance / Construction Mode Switch */}
               <button
                 type="button"

@@ -435,6 +435,25 @@ export class AdminConfigService implements IAdminConfigService {
       }
     }
     this.loadFromLocalStorage();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key === LOCAL_STORAGE_KEY && event.newValue) {
+          try {
+            const parsed = JSON.parse(event.newValue) as Partial<AppSettings>;
+            this.cachedSettings = this.mergeWithDefaults(parsed);
+            this.listeners.forEach((listener) => {
+              try {
+                listener(this.cachedSettings);
+              } catch (err) {
+                console.warn('[AdminConfigService] Storage listener error:', err);
+              }
+            });
+          } catch (err) {
+            console.warn('[AdminConfigService] Failed to parse storage update:', err);
+          }
+        }
+      });
+    }
   }
 
   private loadFromLocalStorage(): void {
@@ -555,10 +574,24 @@ export class AdminConfigService implements IAdminConfigService {
     };
   }
 
-  public getCachedSettings(): AppSettings {
-    if (!this.initialized) {
-      this.loadFromLocalStorage();
+  private resolveNewestSettings(firestoreData: Partial<AppSettings>): AppSettings {
+    const fromFirestore = this.mergeWithDefaults(firestoreData);
+    this.loadFromLocalStorage();
+    const localUpdatedAt = this.cachedSettings?.updatedAt
+      ? Date.parse(this.cachedSettings.updatedAt)
+      : 0;
+    const remoteUpdatedAt = fromFirestore.updatedAt
+      ? Date.parse(fromFirestore.updatedAt)
+      : 0;
+
+    if (localUpdatedAt > remoteUpdatedAt) {
+      return this.cachedSettings;
     }
+    return fromFirestore;
+  }
+
+  public getCachedSettings(): AppSettings {
+    this.loadFromLocalStorage();
     return this.cachedSettings;
   }
 
@@ -573,7 +606,7 @@ export class AdminConfigService implements IAdminConfigService {
 
       if (snapshot.exists()) {
         const data = snapshot.data() as Partial<AppSettings>;
-        this.cachedSettings = this.mergeWithDefaults(data);
+        this.cachedSettings = this.resolveNewestSettings(data);
         this.saveToLocalStorage(this.cachedSettings);
       }
       this.initialized = true;
@@ -672,8 +705,8 @@ export class AdminConfigService implements IAdminConfigService {
         const sanitizedSettings = sanitizePayload(merged);
         await setDoc(docRef, sanitizedSettings, { merge: true });
       } catch (err) {
-        console.error('[AdminConfigService] Failed to persist updates to Firestore:', err);
-        throw err;
+        console.warn('[AdminConfigService] Could not persist updates to Firestore (saved locally):', err);
+        // Keep local settings saved in localStorage and memory even if Firestore rejects write
       }
     }
 
@@ -685,9 +718,7 @@ export class AdminConfigService implements IAdminConfigService {
     onError?: (error: Error) => void
   ): () => void {
     // Refresh from localStorage if available on client and send current cached value immediately
-    if (!this.initialized) {
-      this.loadFromLocalStorage();
-    }
+    this.loadFromLocalStorage();
     this.listeners.add(onUpdate);
     onUpdate(this.cachedSettings);
 
@@ -704,7 +735,7 @@ export class AdminConfigService implements IAdminConfigService {
         (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data() as Partial<AppSettings>;
-            this.cachedSettings = this.mergeWithDefaults(data);
+            this.cachedSettings = this.resolveNewestSettings(data);
             this.saveToLocalStorage(this.cachedSettings);
             onUpdate(this.cachedSettings);
           }

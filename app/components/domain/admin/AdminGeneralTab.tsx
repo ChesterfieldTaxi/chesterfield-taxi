@@ -256,6 +256,9 @@ export function AdminGeneralTab({
 
       await onSave({
         branding: draftBranding,
+        company,
+        localization,
+        publicFormVersion,
       });
 
       setPublishedBranding({ ...draftBranding });
@@ -270,8 +273,9 @@ export function AdminGeneralTab({
   };
 
   // Save General Profile and Localization settings
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = async (e?: React.SyntheticEvent) => {
+    if (e) e.preventDefault();
+
     try {
       setIsSaving(true);
       setSaveSuccess(null);
@@ -365,6 +369,53 @@ export function AdminGeneralTab({
         </div>
       </div>
 
+      {/* ─── Sitewide "Get App" Buttons & Download Modal Quick Control ─── */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+        settings.enableGetAppButtons === true
+          ? 'bg-blue-500/10 border-blue-500/30'
+          : 'bg-white border-slate-200/80 shadow-xs'
+      }`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              settings.enableGetAppButtons === true ? 'bg-blue-600 text-white font-black' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <CarIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900">Sitewide &quot;Get App&quot; Buttons &amp; Download Modal</h3>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  settings.enableGetAppButtons === true ? 'bg-emerald-500 text-slate-950' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {settings.enableGetAppButtons === true ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Show or hide the &quot;Get App&quot; download buttons and mobile app modal across the public navigation header and mobile menu while the mobile app is in preparation.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const currentEnabled = settings.enableGetAppButtons === true;
+              await onSave({
+                enableGetAppButtons: !currentEnabled,
+                updatedAt: new Date().toISOString(),
+              });
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+              settings.enableGetAppButtons === true
+                ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                : 'bg-blue-600 hover:bg-blue-500 text-white font-black'
+            }`}
+          >
+            {settings.enableGetAppButtons === true ? 'Disable "Get App" Buttons' : 'Enable "Get App" Buttons'}
+          </button>
+        </div>
+      </div>
+
       {/* Contextual Action Bar */}
       {activeSubTab === 'studio' && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -403,6 +454,18 @@ export function AdminGeneralTab({
           <div className="flex items-center gap-2 px-2">
             <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-xs font-bold text-slate-700">Business Profile &amp; Localization Settings</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              isLoading={isSaving || isLoading}
+              onClick={handleSaveProfile}
+              leftIcon={<CheckIcon className="w-4 h-4" />}
+            >
+              Save Business Profile
+            </Button>
           </div>
         </div>
       )}
@@ -1147,10 +1210,23 @@ export function AdminGeneralTab({
                     value={company.address}
                     onChange={(e) => setCompany((prev) => ({ ...prev, address: e.target.value }))}
                     placeholder={COMPANY_CONFIG.address.formatted}
+                    helperText="Displayed on the Contact & Support page (Dispatch Headquarters), footer, and receipts"
                     required
                   />
                 </CardContent>
               </Card>
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={isSaving || isLoading}
+                  leftIcon={<CheckIcon className="w-4 h-4" />}
+                >
+                  Save Company Details &amp; Address
+                </Button>
+              </div>
 
               {/* Operating Hours */}
               <Card variant="elevated" className="border-slate-200 shadow-xs">
