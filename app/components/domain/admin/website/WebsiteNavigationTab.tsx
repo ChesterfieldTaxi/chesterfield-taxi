@@ -147,6 +147,52 @@ export function WebsiteNavigationTab({
         </Alert>
       )}
 
+      {/* 0. Site-Wide "Get App" Buttons & Download Modal */}
+      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+        <CardHeader className="p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-extrabold text-slate-900">
+                  Site-Wide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
+                </CardTitle>
+                <Badge
+                  variant={enableGetAppButtons ? 'success' : 'default'}
+                  size="sm"
+                >
+                  {enableGetAppButtons ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
+                </Badge>
+              </div>
+              <CardDescription className="text-xs text-slate-500 mt-1">
+                Show or hide the &ldquo;Get App&rdquo; download buttons and mobile app modal across the public navigation header and mobile menu while the app is in preparation.
+              </CardDescription>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={enableGetAppButtons}
+                onChange={async (e) => {
+                  const nextVal = e.target.checked;
+                  setEnableGetAppButtons(nextVal);
+                  try {
+                    await onSave({
+                      enableGetAppButtons: nextVal,
+                      updatedAt: new Date().toISOString(),
+                    });
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3500);
+                  } catch (err) {
+                    console.error('Failed to update enableGetAppButtons setting:', err);
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+            </label>
+          </div>
+        </CardHeader>
+      </Card>
+
       {/* 1. Top Announcement Bar Manager */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">

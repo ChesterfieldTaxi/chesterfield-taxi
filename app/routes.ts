@@ -34,6 +34,7 @@ export default [
   route("dispatch/popout", "routes/dispatch.popout.tsx"),
 
   // Serverless API Routes
+  route("api/public-config", "routes/api.public-config.ts"),
   route("api/send-email", "routes/api.send-email.ts"),
   route("api/seed-stress-data", "routes/api.seed-stress-data.tsx"),
   route("api/payments", "routes/api.payments.ts"),

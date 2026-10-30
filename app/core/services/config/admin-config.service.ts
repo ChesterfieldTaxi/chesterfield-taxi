@@ -612,7 +612,8 @@ export class AdminConfigService implements IAdminConfigService {
       this.initialized = true;
       return this.cachedSettings;
     } catch (err) {
-      console.warn('[AdminConfigService] Error fetching from Firestore, using cache/defaults:', err);
+      console.warn('[AdminConfigService] Error fetching from Firestore, trying /api/public-config fallback:', err);
+      await this.fetchPublicConfigFallback();
       return this.cachedSettings;
     }
   }
@@ -741,7 +742,8 @@ export class AdminConfigService implements IAdminConfigService {
           }
         },
         (err) => {
-          console.warn('[AdminConfigService] onSnapshot error:', err);
+          console.warn('[AdminConfigService] onSnapshot error, trying /api/public-config fallback:', err);
+          this.fetchPublicConfigFallback().catch(() => {});
           if (onError) onError(err);
         }
       );
@@ -754,6 +756,26 @@ export class AdminConfigService implements IAdminConfigService {
       return () => {
         this.listeners.delete(onUpdate);
       };
+    }
+  }
+
+  private async fetchPublicConfigFallback(): Promise<void> {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    try {
+      const resp = await fetch('/api/public-config', { cache: 'no-store' });
+      if (!resp.ok) return;
+      const json = await resp.json();
+      if (json && json.settings) {
+        this.cachedSettings = this.resolveNewestSettings(json.settings);
+        this.saveToLocalStorage(this.cachedSettings);
+        this.listeners.forEach((listener) => {
+          try {
+            listener(this.cachedSettings);
+          } catch {}
+        });
+      }
+    } catch {
+      // Ignore fallback fetch error
     }
   }
 
