@@ -186,6 +186,12 @@ export function AdminGeneralTab({
 
   // Company and Localization State
   const [company, setCompany] = useState<CompanyConfig>({ ...settings.company });
+
+  useEffect(() => {
+    if (settings.company) {
+      setCompany({ ...settings.company });
+    }
+  }, [settings.company]);
   const [localization, setLocalization] = useState<LocalizationConfig>({
     currency: settings.localization?.currency || 'USD',
     currencySymbol: settings.localization?.currencySymbol || '$',

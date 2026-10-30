@@ -66,6 +66,11 @@ export interface CompanyBrandConfig {
    * When true, customer-facing booking routes display the UnderConstruction screen.
    */
   constructionMode?: boolean;
+  /**
+   * Sitewide "Get App" Button & Download Modal Toggle.
+   * When false, hides "Get App" buttons across the public header and mobile menu.
+   */
+  enableGetAppButtons?: boolean;
   // Phase 19: Granular Branding Studio Tokens
   headingFont?: string;
   bodyFont?: string;
@@ -112,6 +117,7 @@ export const COMPANY_CONFIG: CompanyBrandConfig = {
   secondaryColor: '#0f172a',
   enableRealtimeRouting: false,
   constructionMode: false,
+  enableGetAppButtons: false,
   headingFont: 'Inter',
   bodyFont: 'Inter',
   headingColor: '#0f172a',

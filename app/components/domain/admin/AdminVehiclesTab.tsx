@@ -43,6 +43,27 @@ export function AdminVehiclesTab({
   const [vehicles, setVehicles] = useState<VehicleTierConfig[]>([...settings.vehicles]);
   const [vehicleFilter, setVehicleFilter] = useState<'active' | 'archived' | 'all'>('active');
 
+  useEffect(() => {
+    if (settings.vehicles && settings.vehicles.length > 0) {
+      setVehicles([...settings.vehicles]);
+    }
+  }, [settings.vehicles]);
+
+  const persistVehicles = async (nextVehicles: VehicleTierConfig[]) => {
+    try {
+      setIsSaving(true);
+      setSaveSuccess(false);
+      setSaveError(null);
+      await onSave({ vehicles: nextVehicles });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save vehicle types configuration.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Edit vehicle type modal state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<VehicleTierConfig | null>(null);
@@ -57,7 +78,7 @@ export function AdminVehiclesTab({
     setEditForm(null);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingIndex === null || !editForm) return;
 
@@ -66,34 +87,31 @@ export function AdminVehiclesTab({
       return;
     }
 
-    setVehicles((prev) => {
-      const next = [...prev];
-      next[editingIndex] = {
-        ...editForm,
-        name: editForm.name.trim(),
-        baseMultiplier: Number(editForm.baseMultiplier) || 1.0,
-        maxPassengers: Number(editForm.maxPassengers) || 1,
-        maxLuggage: Number(editForm.maxLuggage) || 0,
-      };
-      return next;
-    });
-
+    const next = [...vehicles];
+    next[editingIndex] = {
+      ...editForm,
+      name: editForm.name.trim(),
+      baseMultiplier: Number(editForm.baseMultiplier) || 1.0,
+      maxPassengers: Number(editForm.maxPassengers) || 1,
+      maxLuggage: Number(editForm.maxLuggage) || 0,
+    };
+    setVehicles(next);
     handleCloseEdit();
+    await persistVehicles(next);
   };
 
-  const handleToggleArchive = (index: number) => {
-    setVehicles((prev) => {
-      const next = [...prev];
-      const cur = next[index];
-      const isArchiving = !cur.isArchived;
-      next[index] = {
-        ...cur,
-        isArchived: isArchiving,
-        archivedAt: isArchiving ? new Date().toISOString() : undefined,
-        archiveReason: isArchiving ? 'Archived by administrator' : undefined,
-      };
-      return next;
-    });
+  const handleToggleArchive = async (index: number) => {
+    const next = [...vehicles];
+    const cur = next[index];
+    const isArchiving = !cur.isArchived;
+    next[index] = {
+      ...cur,
+      isArchived: isArchiving,
+      archivedAt: isArchiving ? new Date().toISOString() : undefined,
+      archiveReason: isArchiving ? 'Archived by administrator' : undefined,
+    };
+    setVehicles(next);
+    await persistVehicles(next);
   };
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -121,15 +139,17 @@ export function AdminVehiclesTab({
     });
   };
 
-  const handleDeleteVehicle = (index: number) => {
+  const handleDeleteVehicle = async (index: number) => {
     if (vehicles.length <= 1) {
       alert('You must have at least one active vehicle type in service.');
       return;
     }
-    setVehicles((prev) => prev.filter((_, i) => i !== index));
+    const next = vehicles.filter((_, i) => i !== index);
+    setVehicles(next);
+    await persistVehicles(next);
   };
 
-  const handleAddNewTier = (e: React.FormEvent) => {
+  const handleAddNewTier = async (e: React.FormEvent) => {
     e.preventDefault();
     const idSlug = newTier.id.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
     if (!idSlug || !newTier.name.trim()) {
@@ -151,7 +171,8 @@ export function AdminVehiclesTab({
       maxLuggage: Number(newTier.maxLuggage) || 2,
     };
 
-    setVehicles((prev) => [...prev, tierToAdd]);
+    const next = [...vehicles, tierToAdd];
+    setVehicles(next);
     setShowAddForm(false);
     setNewTier({
       id: '',
@@ -164,6 +185,7 @@ export function AdminVehiclesTab({
       iconType: 'standard',
       imageUrl: '',
     });
+    await persistVehicles(next);
   };
 
   const handleResetDefaults = () => {

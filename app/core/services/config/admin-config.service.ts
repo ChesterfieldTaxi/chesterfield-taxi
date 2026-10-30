@@ -411,6 +411,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   },
   constructionMode: COMPANY_CONFIG.constructionMode ?? false,
   enableRealtimeRouting: COMPANY_CONFIG.enableRealtimeRouting ?? false,
+  enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
 };
 
@@ -422,6 +423,7 @@ export class AdminConfigService implements IAdminConfigService {
   private initialized = false;
   private isConfigured = false;
   private activeUnsubscribe: (() => void) | null = null;
+  private listeners = new Set<(settings: AppSettings) => void>();
 
   constructor() {
     this.isConfigured = isFirebaseConfigured();
@@ -524,6 +526,12 @@ export class AdminConfigService implements IAdminConfigService {
       constructionMode: incoming.constructionMode !== undefined
         ? incoming.constructionMode
         : (DEFAULT_APP_SETTINGS.constructionMode ?? false),
+      enableRealtimeRouting: incoming.enableRealtimeRouting !== undefined
+        ? incoming.enableRealtimeRouting
+        : (DEFAULT_APP_SETTINGS.enableRealtimeRouting ?? false),
+      enableGetAppButtons: incoming.enableGetAppButtons !== undefined
+        ? incoming.enableGetAppButtons
+        : (DEFAULT_APP_SETTINGS.enableGetAppButtons ?? false),
       bookingRulesConfig: incoming.bookingRulesConfig
         ? {
             ...DEFAULT_BOOKING_RULES_CONFIG,
@@ -548,6 +556,9 @@ export class AdminConfigService implements IAdminConfigService {
   }
 
   public getCachedSettings(): AppSettings {
+    if (!this.initialized) {
+      this.loadFromLocalStorage();
+    }
     return this.cachedSettings;
   }
 
@@ -647,6 +658,13 @@ export class AdminConfigService implements IAdminConfigService {
 
     this.cachedSettings = merged;
     this.saveToLocalStorage(merged);
+    this.listeners.forEach((listener) => {
+      try {
+        listener(merged);
+      } catch (err) {
+        console.warn('[AdminConfigService] Listener callback error:', err);
+      }
+    });
 
     if (this.db && this.isConfigured) {
       try {
@@ -666,11 +684,17 @@ export class AdminConfigService implements IAdminConfigService {
     onUpdate: (settings: AppSettings) => void,
     onError?: (error: Error) => void
   ): () => void {
-    // Send current cached value immediately
+    // Refresh from localStorage if available on client and send current cached value immediately
+    if (!this.initialized) {
+      this.loadFromLocalStorage();
+    }
+    this.listeners.add(onUpdate);
     onUpdate(this.cachedSettings);
 
     if (!this.db || !this.isConfigured) {
-      return () => {};
+      return () => {
+        this.listeners.delete(onUpdate);
+      };
     }
 
     try {
@@ -690,10 +714,15 @@ export class AdminConfigService implements IAdminConfigService {
           if (onError) onError(err);
         }
       );
-      return unsubscribe;
+      return () => {
+        this.listeners.delete(onUpdate);
+        unsubscribe();
+      };
     } catch (err) {
       console.warn('[AdminConfigService] Failed to establish snapshot listener:', err);
-      return () => {};
+      return () => {
+        this.listeners.delete(onUpdate);
+      };
     }
   }
 
@@ -762,4 +791,21 @@ export function isRealtimeRoutingEnabled(): boolean {
     // Ignore and fallback
   }
   return COMPANY_CONFIG.enableRealtimeRouting ?? false;
+}
+
+/**
+ * Returns whether the sitewide "Get App" buttons and download modal are currently enabled.
+ * Checks dynamic Firestore/local settings first, then falls back to COMPANY_CONFIG.
+ */
+export function isGetAppButtonsEnabled(): boolean {
+  try {
+    const service = getAdminConfigService();
+    const settings = service.getCachedSettings();
+    if (typeof settings.enableGetAppButtons === 'boolean') {
+      return settings.enableGetAppButtons;
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  return COMPANY_CONFIG.enableGetAppButtons ?? false;
 }

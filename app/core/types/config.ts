@@ -471,6 +471,7 @@ export interface AppSettings {
   integrations?: IntegrationsConfig;
   constructionMode?: boolean;
   enableRealtimeRouting?: boolean;
+  enableGetAppButtons?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 }

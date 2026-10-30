@@ -93,6 +93,16 @@ export function AdminAdvancedTab({
     }
   }, [settings.enableRealtimeRouting]);
 
+  const [enableGetAppButtons, setEnableGetAppButtons] = useState<boolean>(
+    settings.enableGetAppButtons ?? COMPANY_CONFIG.enableGetAppButtons ?? false
+  );
+
+  useEffect(() => {
+    if (settings.enableGetAppButtons !== undefined) {
+      setEnableGetAppButtons(settings.enableGetAppButtons);
+    }
+  }, [settings.enableGetAppButtons]);
+
   useEffect(() => {
     if (settings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
       setAlertDismissMinutes(settings.fleetAlertsConfig.autoDismissMinutes);
@@ -228,6 +238,57 @@ export function AdminAdvancedTab({
             }`}
           >
             {settings.constructionMode !== false ? 'Turn Maintenance Mode OFF' : 'Turn Maintenance Mode ON'}
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Sitewide "Get App" Buttons Quick Control ─── */}
+      <div className="p-4 sm:p-5 rounded-2xl border bg-white border-slate-200/80 shadow-xs transition-all">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              enableGetAppButtons ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900">Sitewide &ldquo;Get App&rdquo; Buttons &amp; Download Modal</h3>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  enableGetAppButtons ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {enableGetAppButtons ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Controls whether the &ldquo;Get App&rdquo; CTA buttons and passenger app download modal are displayed in the desktop header and mobile navigation menu across all pages.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const nextVal = !enableGetAppButtons;
+              setEnableGetAppButtons(nextVal);
+              try {
+                await onSave({
+                  enableGetAppButtons: nextVal,
+                  updatedAt: new Date().toISOString(),
+                });
+              } catch (err) {
+                console.error('Failed to update Get App buttons setting:', err);
+              }
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+              enableGetAppButtons
+                ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            {enableGetAppButtons ? 'Disable Get App Buttons' : 'Enable Get App Buttons'}
           </button>
         </div>
       </div>

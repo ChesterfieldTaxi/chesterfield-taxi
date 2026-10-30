@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../ui/Card';
@@ -37,6 +37,15 @@ export function WebsiteNavigationTab({
   const [headerCtaLabel, setHeaderCtaLabel] = useState('Book Online');
   const [headerCtaPath, setHeaderCtaPath] = useState('/book');
   const [showPhoneBadge, setShowPhoneBadge] = useState(true);
+  const [enableGetAppButtons, setEnableGetAppButtons] = useState<boolean>(
+    settings.enableGetAppButtons ?? COMPANY_CONFIG.enableGetAppButtons ?? false
+  );
+
+  useEffect(() => {
+    if (settings.enableGetAppButtons !== undefined) {
+      setEnableGetAppButtons(settings.enableGetAppButtons);
+    }
+  }, [settings.enableGetAppButtons]);
 
   // Global Announcement Bar
   const [announcementEnabled, setAnnouncementEnabled] = useState(false);
@@ -75,6 +84,7 @@ export function WebsiteNavigationTab({
   const handleSaveAll = async () => {
     const existingCms = (settings as any).cms || {};
     await onSave({
+      enableGetAppButtons,
       cms: {
         ...existingCms,
         navigation: {
@@ -300,6 +310,46 @@ export function WebsiteNavigationTab({
                 <span className="text-xs text-slate-600 font-medium">Show {COMPANY_CONFIG.phone.dispatch}</span>
               </div>
             </div>
+          </div>
+
+          {/* Sitewide "Get App" Buttons Toggle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 mt-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900">
+                  Sitewide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
+                </span>
+                <Badge
+                  variant={enableGetAppButtons ? 'success' : 'default'}
+                  size="sm"
+                >
+                  {enableGetAppButtons ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Show or hide the &ldquo;Get App&rdquo; CTA buttons in the desktop header bar and mobile navigation menu across all pages. Keep disabled while the passenger mobile app is not yet ready.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={enableGetAppButtons}
+                onChange={async (e) => {
+                  const nextVal = e.target.checked;
+                  setEnableGetAppButtons(nextVal);
+                  try {
+                    await onSave({
+                      enableGetAppButtons: nextVal,
+                      updatedAt: new Date().toISOString(),
+                    });
+                  } catch (err) {
+                    console.error('Failed to update enableGetAppButtons setting:', err);
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+            </label>
           </div>
         </CardContent>
       </Card>

@@ -25,6 +25,9 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
   };
 
   const [formConfig, setFormConfig] = useState<CustomerBookingConfig>(initialConfig);
+  const [enableGetAppButtons, setEnableGetAppButtons] = useState<boolean>(
+    settings.enableGetAppButtons ?? false
+  );
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
 
       await onSave({
         customerBookingConfig: formConfig,
+        enableGetAppButtons,
         updatedAt: new Date().toISOString(),
       });
 
@@ -388,6 +392,40 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3"
                   />
                 </div>
+              </div>
+
+              {/* Sitewide "Get App" Buttons Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-900 block">
+                      Sitewide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
+                    </label>
+                    <Badge variant={enableGetAppButtons ? 'success' : 'default'} size="sm">
+                      {enableGetAppButtons ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Show or hide the &ldquo;Get App&rdquo; buttons in the top navigation bar and mobile menu across the entire site.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={enableGetAppButtons}
+                  onChange={async (e) => {
+                    const nextVal = e.target.checked;
+                    setEnableGetAppButtons(nextVal);
+                    try {
+                      await onSave({
+                        enableGetAppButtons: nextVal,
+                        updatedAt: new Date().toISOString(),
+                      });
+                    } catch (err) {
+                      console.error('Failed to update enableGetAppButtons:', err);
+                    }
+                  }}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3 cursor-pointer"
+                />
               </div>
 
               {/* Accepted Public Payment Methods */}

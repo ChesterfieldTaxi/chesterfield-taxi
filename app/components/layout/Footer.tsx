@@ -9,6 +9,8 @@ import {
   ShieldCheckIcon,
 } from '../ui/Icons';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
+import { getAdminConfigService } from '../../core/services/config/admin-config.service';
+import type { AppSettings, CompanyConfig } from '../../core/types/config';
 
 const QUICK_LINKS = [
   { label: 'Home', path: '/' },
@@ -21,6 +23,48 @@ const QUICK_LINKS = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [company, setCompany] = React.useState<CompanyConfig>(() => {
+    try {
+      return getAdminConfigService().getCachedSettings().company;
+    } catch {
+      return {
+        name: COMPANY_CONFIG.name,
+        phone: COMPANY_CONFIG.phone.dispatch,
+        email: COMPANY_CONFIG.email.dispatch,
+        address: COMPANY_CONFIG.address.formatted,
+      };
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      const configService = getAdminConfigService();
+      const applySettings = (settings: AppSettings) => {
+        if (settings?.company) {
+          setCompany(settings.company);
+        }
+      };
+      const unsub =
+        typeof configService.subscribeToSettings === 'function'
+          ? configService.subscribeToSettings(applySettings)
+          : undefined;
+      if (typeof configService.getSettings === 'function') {
+        configService.getSettings().then(applySettings).catch(() => {});
+      }
+      return () => {
+        if (typeof unsub === 'function') unsub();
+      };
+    } catch {
+      // Ignore errors
+    }
+  }, []);
+
+  const companyName = company?.name?.trim() || COMPANY_CONFIG.name;
+  const phoneDisplay = company?.phone?.trim() || COMPANY_CONFIG.phone.dispatch;
+  const phoneRaw =
+    (company?.phone || COMPANY_CONFIG.phone.primaryRaw).replace(/[^\d+]/g, '') ||
+    COMPANY_CONFIG.phone.primaryRaw;
+  const emailDisplay = company?.email?.trim() || COMPANY_CONFIG.email.dispatch;
 
   return (
     <footer className="bg-slate-950 text-slate-300 border-t border-slate-800">
@@ -41,7 +85,7 @@ export function Footer() {
               </div>
               <div>
                 <span className="text-lg font-extrabold tracking-tight text-white block leading-none">
-                  {COMPANY_CONFIG.name}
+                  {companyName}
                 </span>
                 <span className="text-[10px] font-bold tracking-widest text-blue-400 uppercase leading-none mt-1 block">
                   {COMPANY_CONFIG.tagline}
@@ -103,7 +147,7 @@ export function Footer() {
 
             <div className="space-y-3">
               <a
-                href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+                href={`tel:${phoneRaw}`}
                 className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -112,13 +156,13 @@ export function Footer() {
                 <div>
                   <span className="text-[11px] text-slate-400 block">Instant Phone Dispatch</span>
                   <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
-                    {COMPANY_CONFIG.phone.dispatch}
+                    {phoneDisplay}
                   </span>
                 </div>
               </a>
 
               <a
-                href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
+                href={`mailto:${emailDisplay}`}
                 className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -127,7 +171,7 @@ export function Footer() {
                 <div>
                   <span className="text-[11px] text-slate-400 block">Support &amp; Accounts</span>
                   <span className="text-xs font-medium text-white truncate group-hover:text-blue-400 transition-colors">
-                    {COMPANY_CONFIG.email.dispatch}
+                    {emailDisplay}
                   </span>
                 </div>
               </a>

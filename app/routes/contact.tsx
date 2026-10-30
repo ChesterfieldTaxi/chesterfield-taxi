@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import {
   PhoneIcon,
@@ -15,6 +15,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import type { AppSettings, CompanyConfig } from '../core/types/config';
 
 export function meta() {
   return [
@@ -29,6 +31,59 @@ export function meta() {
 
 
 export default function ContactRoute() {
+  const [company, setCompany] = useState<CompanyConfig>(() => {
+    try {
+      return getAdminConfigService().getCachedSettings().company;
+    } catch {
+      return {
+        name: COMPANY_CONFIG.name,
+        phone: COMPANY_CONFIG.phone.dispatch,
+        email: COMPANY_CONFIG.email.dispatch,
+        address: COMPANY_CONFIG.address.formatted,
+      };
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const configService = getAdminConfigService();
+      const applySettings = (settings: AppSettings) => {
+        if (settings?.company) {
+          setCompany(settings.company);
+        }
+      };
+
+      const unsub =
+        typeof configService.subscribeToSettings === 'function'
+          ? configService.subscribeToSettings(applySettings)
+          : undefined;
+
+      if (typeof configService.getSettings === 'function') {
+        configService.getSettings().then(applySettings).catch(() => {});
+      }
+
+      return () => {
+        if (typeof unsub === 'function') unsub();
+      };
+    } catch (err) {
+      console.warn('Error subscribing to company profile in ContactRoute:', err);
+    }
+  }, []);
+
+  const companyName = company?.name?.trim() || COMPANY_CONFIG.name;
+  const phoneDisplay = company?.phone?.trim() || COMPANY_CONFIG.phone.dispatch;
+  const phoneRaw =
+    (company?.phone || COMPANY_CONFIG.phone.primaryRaw).replace(/[^\d+]/g, '') ||
+    COMPANY_CONFIG.phone.primaryRaw;
+  const emailDisplay = company?.email?.trim() || COMPANY_CONFIG.email.dispatch;
+  const addressRaw = company?.address?.trim() || COMPANY_CONFIG.address.formatted;
+
+  const firstCommaIdx = addressRaw.indexOf(',');
+  const streetLine =
+    firstCommaIdx !== -1 ? addressRaw.slice(0, firstCommaIdx).trim() : addressRaw;
+  const cityStateZipLine =
+    firstCommaIdx !== -1 ? addressRaw.slice(firstCommaIdx + 1).trim() : '';
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -92,11 +147,11 @@ export default function ContactRoute() {
               </p>
             </div>
             <a
-              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+              href={`tel:${phoneRaw}`}
               className="inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-900 text-blue-400 font-extrabold text-sm py-3 px-4 rounded-xl transition-colors shadow-xs"
             >
               <PhoneIcon className="w-4 h-4" />
-              <span>{COMPANY_CONFIG.phone.dispatch}</span>
+              <span>{phoneDisplay}</span>
             </a>
           </div>
 
@@ -115,11 +170,11 @@ export default function ContactRoute() {
               </p>
             </div>
             <a
-              href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
+              href={`mailto:${emailDisplay}`}
               className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-3 px-4 rounded-xl transition-colors truncate"
             >
               <MailIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="truncate">{COMPANY_CONFIG.email.dispatch}</span>
+              <span className="truncate">{emailDisplay}</span>
             </a>
           </div>
 
@@ -134,8 +189,8 @@ export default function ContactRoute() {
                 <p className="text-xs text-slate-500 mt-0.5">West County Operations Hub</p>
               </div>
               <div className="text-xs text-slate-600 space-y-1">
-                <p className="font-semibold text-slate-800">{COMPANY_CONFIG.address.street}</p>
-                <p>{COMPANY_CONFIG.address.city}, {COMPANY_CONFIG.address.state} {COMPANY_CONFIG.address.zip}</p>
+                <p className="font-semibold text-slate-800">{streetLine}</p>
+                {cityStateZipLine ? <p>{cityStateZipLine}</p> : null}
                 <div className="flex items-center gap-1.5 pt-2 text-blue-700 font-bold">
                   <ClockIcon className="w-3.5 h-3.5" />
                   <span>{COMPANY_CONFIG.operatingHours}</span>
@@ -179,7 +234,7 @@ export default function ContactRoute() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900">Message Received!</h3>
                   <p className="text-sm text-slate-600 max-w-md mx-auto">
-                    Thank you for reaching out. A {COMPANY_CONFIG.name} dispatch representative has received
+                    Thank you for reaching out. A {companyName} dispatch representative has received
                     your inquiry and will respond within 1 business hour.
                   </p>
                   <Button
@@ -303,7 +358,7 @@ export default function ContactRoute() {
             <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                  Careers at Chesterfield Taxi
+                  Careers at {companyName}
                 </span>
                 <h3 className="text-xl font-extrabold text-slate-950 tracking-tight mt-1">
                   Join Our Professional Team
