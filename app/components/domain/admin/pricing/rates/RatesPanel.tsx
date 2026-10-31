@@ -68,11 +68,8 @@ export function RatesPanel({
     }
     return FALLBACK_VEHICLE_TYPES;
   }, [vehicles]);
-  // Strictly show only the 2 primary rates (Airport Flat Rate and METER)
-  const primaryTariffs = tariffs.filter(
-    (t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter'
-  );
-  const visibleTariffs = primaryTariffs.length > 0 ? primaryTariffs : DEFAULT_TARIFF_PROFILES;
+  const activeTariffs = tariffs.filter((t) => !t.isArchived);
+  const visibleTariffs = activeTariffs.length > 0 ? activeTariffs : DEFAULT_TARIFF_PROFILES;
 
   const [selectedTariffId, setSelectedTariffId] = useState<string>(
     visibleTariffs[0]?.id || 'tariff-airport-flat'
@@ -114,17 +111,32 @@ export function RatesPanel({
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
-  const handleAddNewTariff = () => {
+  const handleDeleteCurrentTariff = async () => {
+    if (!workingCopy || !onDeleteTariff) return;
+    if (visibleTariffs.length <= 1) return;
+    const deletedName = workingCopy.name;
+    const deletedId = workingCopy.id;
+    const nextTariff = visibleTariffs.find((t) => t.id !== deletedId);
+    await onDeleteTariff(deletedId);
+    if (nextTariff) {
+      setSelectedTariffId(nextTariff.id);
+      setWorkingCopy(JSON.parse(JSON.stringify(nextTariff)));
+    }
+    setSaveSuccessMsg(`Deleted tariff "${deletedName}"`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleAddNewTariff = async () => {
     const newId = `tariff-custom-${Date.now()}`;
     const taximeterConfig: TariffTaximeterRate = {
       startPrice: 4.50,
-      initialDistanceIncluded: 0.1,
+      initialDistanceIncluded: 0.2,
       initialTimeIncluded: 0,
-      primaryDistanceLimit: 999,
-      primaryDistanceStep: 0.1,
-      primaryDistanceRate: 0.300,
-      thenDistanceStep: 0.1,
-      thenDistanceRate: 0.300,
+      primaryDistanceLimit: 20,
+      primaryDistanceStep: 0.2,
+      primaryDistanceRate: 0.60,
+      thenDistanceStep: 0.2,
+      thenDistanceRate: 0.50,
       freeTrafficMinutes: 0,
       waitingStepSeconds: 60,
       waitingRatePerStep: 0.667,
@@ -133,8 +145,8 @@ export function RatesPanel({
 
     const newTariff: TariffProfile = {
       id: newId,
-      name: 'New Custom Rate',
-      description: 'Custom tariff rate profile',
+      name: `Custom Rate #${visibleTariffs.length + 1}`,
+      description: 'Custom admin-created tariff rate profile',
       rateModel: 'taximeter',
       currency: 'USD',
       units: 'imperial',
@@ -161,6 +173,7 @@ export function RatesPanel({
 
     setWorkingCopy(newTariff);
     setSelectedTariffId(newId);
+    await onSaveTariff(newTariff);
   };
 
   const toggleVehicleType = (vt: VehicleType) => {
@@ -260,10 +273,21 @@ export function RatesPanel({
                 </div>
 
                 <div className="text-[11px] font-mono font-medium text-slate-600 mb-2">
-                  {t.id === 'tariff-airport-flat' ? (
-                    <span>$0.00 base · $28.00 min · $0.255/0.1 mi</span>
+                  {t.rateModel === 'hourly' ? (
+                    <span>
+                      ${(t.hourlyRate?.ratePerHour ?? t.hourlyConfig?.ratePerHour ?? 75).toFixed(2)}/hr · min{' '}
+                      {t.hourlyRate?.minimumHours ?? t.hourlyConfig?.minimumHours ?? 2} hrs
+                    </span>
+                  ) : t.rateModel === 'zip_matrix' ? (
+                    <span>
+                      {(t.zipMatrixRates || t.zipMatrix || []).length} zip codes configured
+                    </span>
                   ) : (
-                    <span>$4.50 first 0.1 mi · $0.300/0.1 mi</span>
+                    <span>
+                      ${(t.taximeter?.startPrice ?? 0).toFixed(2)} base · ${(t.taximeter?.minimumPrice ?? 0).toFixed(2)} min · $
+                      {(t.taximeter?.primaryDistanceRate ?? 0.255).toFixed(3)}/
+                      {(t.taximeter?.primaryDistanceStep ?? 0.1).toFixed(1)} mi
+                    </span>
                   )}
                 </div>
 
@@ -322,6 +346,19 @@ export function RatesPanel({
               </div>
 
               <div className="flex items-center gap-2">
+                {onDeleteTariff && visibleTariffs.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteCurrentTariff}
+                    disabled={isSaving}
+                    className="text-xs border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-2xs"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5 mr-1" />
+                    Delete
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"

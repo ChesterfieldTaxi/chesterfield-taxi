@@ -36,9 +36,8 @@ export function PersistentFareSimulator({
   className = '',
 }: PersistentFareSimulatorProps) {
   // Simulator input state
-  const [simulationTariffMode, setSimulationTariffMode] = useState<
-    'auto' | 'tariff-airport-flat' | 'tariff-point-to-point-meter'
-  >('tariff-airport-flat');
+  const activeTariffs = useMemo(() => tariffs.filter((t) => !t.isArchived), [tariffs]);
+  const [simulationTariffMode, setSimulationTariffMode] = useState<string>('tariff-airport-flat');
   const [distanceMiles, setDistanceMiles] = useState<number>(20.0);
   const [durationMinutes, setDurationMinutes] = useState<number>(28);
   const [passengers, setPassengers] = useState<number>(1);
@@ -221,47 +220,43 @@ export function PersistentFareSimulator({
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
               Active Tariff Target
             </label>
-            <span className="text-[10px] text-emerald-700 font-semibold">
-              {simulationTariffMode === 'tariff-airport-flat'
-                ? 'Airport Flat ($51 @ 20mi)'
-                : simulationTariffMode === 'tariff-point-to-point-meter'
-                ? 'Statutory METER'
-                : 'Smart Auto Match'}
+            <span className="text-[10px] text-emerald-700 font-semibold truncate max-w-[160px]">
+              {simulationTariffMode === 'auto'
+                ? 'Smart Auto Match'
+                : activeTariffs.find((t) => t.id === simulationTariffMode)?.name || simulationTariffMode}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => {
-                setSimulationTariffMode('tariff-airport-flat');
-                setIsAirportPickup(true);
-              }}
-              className={`py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
-                simulationTariffMode === 'tariff-airport-flat'
-                  ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-slate-900 font-medium'
-              }`}
-            >
-              ✈️ Airport
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSimulationTariffMode('tariff-point-to-point-meter');
-                setIsAirportPickup(false);
-              }}
-              className={`py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
-                simulationTariffMode === 'tariff-point-to-point-meter'
-                  ? 'bg-blue-600 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-slate-900 font-medium'
-              }`}
-            >
-              ⏱️ METER
-            </button>
+          <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
+            {activeTariffs.map((t) => {
+              const isSelected = simulationTariffMode === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setSimulationTariffMode(t.id);
+                    if (t.id === 'tariff-airport-flat' || t.name.toLowerCase().includes('airport')) {
+                      setIsAirportPickup(true);
+                    } else if (t.id === 'tariff-point-to-point-meter') {
+                      setIsAirportPickup(false);
+                    }
+                  }}
+                  className={`flex-1 min-w-[78px] py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
+                    isSelected
+                      ? t.id === 'tariff-airport-flat' || t.name.toLowerCase().includes('airport')
+                        ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                        : 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-slate-900 font-medium'
+                  }`}
+                >
+                  {t.name}
+                </button>
+              );
+            })}
             <button
               type="button"
               onClick={() => setSimulationTariffMode('auto')}
-              className={`py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
+              className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
                 simulationTariffMode === 'auto'
                   ? 'bg-slate-800 text-white shadow-xs font-bold'
                   : 'text-slate-700 hover:text-slate-900 font-medium'

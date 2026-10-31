@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { SurchargesConfig, CustomSurchargeItem, CustomSurchargeTrigger, VehicleTierConfig } from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
 import { getAdminConfigService } from '~/core/services/config/admin-config.service';
+import { getTariffService, DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -40,6 +41,18 @@ export function SurchargesPanel({
   onSave,
   isSaving = false,
 }: SurchargesPanelProps) {
+  const activeTariffs = useMemo(() => {
+    const fromProps = (tariffs || []).filter((t) => !t.isArchived);
+    if (fromProps.length > 0) return fromProps;
+    try {
+      const fromSvc = getTariffService().getAllTariffProfiles().filter((t) => !t.isArchived);
+      if (fromSvc.length > 0) return fromSvc;
+    } catch {
+      // Ignore fallback errors
+    }
+    return DEFAULT_TARIFF_PROFILES;
+  }, [tariffs]);
+
   const activeVehicles = useMemo(() => {
     let source = vehicles;
     if (!source || source.length === 0) {
@@ -59,15 +72,34 @@ export function SurchargesPanel({
     }
     return FALLBACK_VEHICLES;
   }, [vehicles]);
+
   const normalizeConfig = (cfg: SurchargesConfig): SurchargesConfig => {
     const copy = JSON.parse(JSON.stringify(cfg));
+    const validIds = new Set(activeTariffs.map((t) => t.id));
+    const filterToActiveTariffs = (ids: string[] | undefined, fallbackIds: string[]) => {
+      const source = Array.isArray(ids) ? ids : fallbackIds;
+      const cleaned = source.filter((id) => validIds.has(id));
+      return cleaned;
+    };
+
     copy.airportGateFee = copy.airportGateFee ?? copy.airportCommercialGateFee ?? 4.0;
     copy.airportCommercialGateFee = copy.airportGateFee;
+    copy.airportFeeApplicableTariffs = filterToActiveTariffs(copy.airportFeeApplicableTariffs, [
+      'tariff-airport-flat',
+    ]);
     copy.peakSurgeMultiplier = copy.peakSurgeMultiplier ?? 1.25;
+    copy.surgeApplicableTariffs = filterToActiveTariffs(
+      copy.surgeApplicableTariffs,
+      activeTariffs.map((t) => t.id)
+    );
     copy.outOfAreaRemoteFee = copy.outOfAreaRemoteFee ?? copy.remoteServiceFlatFee ?? 15.0;
     copy.remoteServiceFlatFee = copy.outOfAreaRemoteFee;
     copy.outOfAreaThresholdMiles = copy.outOfAreaThresholdMiles ?? copy.remoteBoundaryDistanceMiles ?? 15.0;
     copy.remoteBoundaryDistanceMiles = copy.outOfAreaThresholdMiles;
+    copy.remoteFeeApplicableTariffs = filterToActiveTariffs(
+      copy.remoteFeeApplicableTariffs,
+      activeTariffs.map((t) => t.id)
+    );
     copy.cancellationFeeWithinOneHour = copy.cancellationFeeWithinOneHour ?? copy.cancellationFee ?? 28.0;
     copy.cancellationFee = copy.cancellationFeeWithinOneHour;
     copy.cancellationWindowMinutes = copy.cancellationWindowMinutes ?? 60;
@@ -75,10 +107,10 @@ export function SurchargesPanel({
     copy.isFuelSurchargeActive = copy.isFuelSurchargeActive ?? false;
     copy.fuelSurchargeType = copy.fuelSurchargeType ?? 'flat';
     copy.fuelSurchargeAmount = copy.fuelSurchargeAmount ?? 2.5;
-    copy.fuelSurchargeApplicableTariffs = copy.fuelSurchargeApplicableTariffs ?? [
-      'tariff-airport-flat',
-      'tariff-point-to-point-meter',
-    ];
+    copy.fuelSurchargeApplicableTariffs = filterToActiveTariffs(
+      copy.fuelSurchargeApplicableTariffs,
+      activeTariffs.map((t) => t.id)
+    );
     return copy;
   };
 
@@ -88,7 +120,7 @@ export function SurchargesPanel({
 
   useEffect(() => {
     setWorkingCopy(normalizeConfig(surcharges));
-  }, [surcharges]);
+  }, [surcharges, activeTariffs]);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Custom Surcharge Editor Modal State
@@ -114,7 +146,7 @@ export function SurchargesPanel({
     setFormAmount(5.0);
     setFormType('flat');
     setFormIsActive(true);
-    setFormTariffs(tariffs.map((t) => t.id));
+    setFormTariffs(activeTariffs.map((t) => t.id));
     setFormVehicleTiers([]); // Empty = Applies to ALL Vehicle Tiers by default
     setFormMinDistance('');
     setFormMaxDistance('');
@@ -131,7 +163,9 @@ export function SurchargesPanel({
     setFormAmount(item.amount);
     setFormType(item.type);
     setFormIsActive(item.isActive);
-    setFormTariffs(item.applicableTariffIds || tariffs.map((t) => t.id));
+    const activeIds = activeTariffs.map((t) => t.id);
+    const itemTariffs = (item.applicableTariffIds || activeIds).filter((id) => activeIds.includes(id));
+    setFormTariffs(itemTariffs.length > 0 ? itemTariffs : activeIds);
     setFormVehicleTiers(item.triggers?.vehicleTiers || item.applicableVehicleTypes || []);
     setFormMinDistance(item.triggers?.minDistanceMiles !== undefined ? String(item.triggers.minDistanceMiles) : '');
     setFormMaxDistance(item.triggers?.maxDistanceMiles !== undefined ? String(item.triggers.maxDistanceMiles) : '');
@@ -355,8 +389,8 @@ export function SurchargesPanel({
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
               <div className="flex flex-wrap gap-2">
-                {tariffs.map((t) => {
-                  const isChecked = (workingCopy.airportFeeApplicableTariffs || ['tariff-airport-flat']).includes(t.id);
+                {activeTariffs.map((t) => {
+                  const isChecked = (workingCopy.airportFeeApplicableTariffs || []).includes(t.id);
                   return (
                     <button
                       key={t.id}
@@ -468,13 +502,8 @@ export function SurchargesPanel({
           <div className="pt-2 border-t border-slate-100">
             <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
             <div className="flex flex-wrap gap-2">
-              {tariffs.map((t) => {
-                const isChecked = (
-                  workingCopy.fuelSurchargeApplicableTariffs || [
-                    'tariff-point-to-point-meter',
-                    'tariff-airport-flat',
-                  ]
-                ).includes(t.id);
+              {activeTariffs.map((t) => {
+                const isChecked = (workingCopy.fuelSurchargeApplicableTariffs || []).includes(t.id);
                 return (
                   <button
                     key={t.id}
@@ -557,11 +586,8 @@ export function SurchargesPanel({
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
               <div className="flex flex-wrap gap-2">
-                {tariffs.map((t) => {
-                  const isChecked = (workingCopy.surgeApplicableTariffs || [
-                    'tariff-airport-flat',
-                    'tariff-point-to-point-meter',
-                  ]).includes(t.id);
+                {activeTariffs.map((t) => {
+                  const isChecked = (workingCopy.surgeApplicableTariffs || []).includes(t.id);
                   return (
                     <button
                       key={t.id}
@@ -648,11 +674,8 @@ export function SurchargesPanel({
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
               <div className="flex flex-wrap gap-2">
-                {tariffs.map((t) => {
-                  const isChecked = (workingCopy.remoteFeeApplicableTariffs || [
-                    'tariff-airport-flat',
-                    'tariff-point-to-point-meter',
-                  ]).includes(t.id);
+                {activeTariffs.map((t) => {
+                  const isChecked = (workingCopy.remoteFeeApplicableTariffs || []).includes(t.id);
                   return (
                     <button
                       key={t.id}
@@ -843,7 +866,15 @@ export function SurchargesPanel({
                       )}
                       {item.applicableTariffIds && item.applicableTariffIds.length > 0 && (
                         <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-200 font-medium">
-                          {item.applicableTariffIds.length} Tariff{item.applicableTariffIds.length > 1 ? 's' : ''}
+                          Tariffs:{' '}
+                          {(() => {
+                            const matchedNames = activeTariffs
+                              .filter((t) => item.applicableTariffIds?.includes(t.id))
+                              .map((t) => t.name);
+                            return matchedNames.length > 0
+                              ? matchedNames.join(', ')
+                              : activeTariffs.map((t) => t.name).join(', ');
+                          })()}
                         </Badge>
                       )}
                     </div>
@@ -1058,7 +1089,7 @@ export function SurchargesPanel({
               <div className="pt-2 border-t border-slate-100 space-y-1.5">
                 <label className="text-xs font-bold text-slate-800 block">Applicable Tariffs:</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {tariffs.map((t) => {
+                  {activeTariffs.map((t) => {
                     const isSelected = formTariffs.includes(t.id);
                     return (
                       <button

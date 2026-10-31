@@ -64,9 +64,17 @@ export function PricingAdminWorkspace({
     }
   }, [initialTab]);
 
-  // Hydrate all 4 pricing pillars from Firestore on mount
+  // Hydrate all 4 pricing pillars from Firestore on mount & subscribe to live tariff updates
   React.useEffect(() => {
     let mounted = true;
+    const unsubscribeTariffs = getTariffService().subscribeToTariffs((liveTariffs) => {
+      if (!mounted) return;
+      const activeList = liveTariffs.filter((t) => !t.isArchived);
+      if (activeList.length > 0) {
+        setTariffs(activeList);
+      }
+    });
+
     (async () => {
       try {
         const [cloudTariffs, cloudExtras, cloudSurcharges, cloudRules] = await Promise.all([
@@ -77,10 +85,8 @@ export function PricingAdminWorkspace({
         ]);
         if (!mounted) return;
         if (cloudTariffs && cloudTariffs.length > 0) {
-          const filtered = cloudTariffs.filter(
-            (t) => t.id !== 'tariff-smoke-house-rates' && t.id !== 'tariff-hourly-charter'
-          );
-          if (filtered.length > 0) setTariffs(filtered);
+          const activeList = cloudTariffs.filter((t) => !t.isArchived);
+          if (activeList.length > 0) setTariffs(activeList);
         }
         if (cloudExtras) setUniversalExtras(cloudExtras);
         if (cloudSurcharges) setSurcharges(cloudSurcharges);
@@ -91,17 +97,16 @@ export function PricingAdminWorkspace({
     })();
     return () => {
       mounted = false;
+      unsubscribeTariffs();
     };
   }, []);
 
-  // Pillar 1: Tariffs (strictly the 2 primary rates)
+  // Pillar 1: Tariffs (all active admin-created tariffs)
   const [tariffs, setTariffs] = useState<TariffProfile[]>(() => {
     try {
       const svc = getTariffService();
-      const list = svc
-        .getAllTariffProfiles()
-        .filter((t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter');
-      return list && list.length === 2 ? list : DEFAULT_TARIFF_PROFILES;
+      const list = svc.getAllTariffProfiles().filter((t) => !t.isArchived);
+      return list && list.length > 0 ? list : DEFAULT_TARIFF_PROFILES;
     } catch {
       return DEFAULT_TARIFF_PROFILES;
     }
@@ -140,27 +145,22 @@ export function PricingAdminWorkspace({
   const handleSaveTariff = async (updated: TariffProfile) => {
     try {
       const svc = getTariffService();
-      svc.saveTariffProfile(updated);
-      setTariffs([
-        ...svc
-          .getAllTariffProfiles()
-          .filter((t) => t.id !== 'tariff-smoke-house-rates' && t.id !== 'tariff-hourly-charter'),
-      ]);
+      await svc.saveTariff(updated);
+      setTariffs([...svc.getAllTariffProfiles().filter((t) => !t.isArchived)]);
     } catch (e) {
       console.error('Error saving tariff profile:', e);
-      setTariffs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setTariffs((prev) => {
+        const exists = prev.some((t) => t.id === updated.id);
+        return exists ? prev.map((t) => (t.id === updated.id ? updated : t)) : [...prev, updated];
+      });
     }
   };
 
   const handleDeleteTariff = async (id: string) => {
     try {
       const svc = getTariffService();
-      svc.deleteTariffProfile(id);
-      setTariffs([
-        ...svc
-          .getAllTariffProfiles()
-          .filter((t) => t.id !== 'tariff-smoke-house-rates' && t.id !== 'tariff-hourly-charter'),
-      ]);
+      await svc.deleteTariff(id);
+      setTariffs([...svc.getAllTariffProfiles().filter((t) => !t.isArchived)]);
     } catch (e) {
       console.error('Error deleting tariff profile:', e);
       setTariffs((prev) => prev.filter((t) => t.id !== id));
@@ -209,162 +209,47 @@ export function PricingAdminWorkspace({
     }
   };
 
-  const activeCustomSurchargesCount = (surcharges.customSurcharges || []).filter((s) => s.isActive).length;
-  const activeRulesCount = rules.filter((r) => r.isActive).length;
-
   return (
     <div className="space-y-4">
-      {/* Structured 4-Stage Pricing Pipeline Navigation Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {/* Pillar 1: Base Tariffs & Stepped Meter */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('rates')}
-            className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-              activeTab === 'rates'
-                ? 'bg-emerald-50/90 border-emerald-500 shadow-2xs ring-1 ring-emerald-500/30'
-                : 'bg-slate-50/60 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1">
-                <DollarSignIcon className="w-3.5 h-3.5" />
-                1. Tariffs &amp; Meter Tiers
-              </span>
-              <Badge variant="outline" className="text-[10px] bg-white border-slate-200 text-slate-700">
-                {tariffs.length} Models
-              </Badge>
-            </div>
-            <p className="text-xs font-bold text-slate-900">Stepped Increments &amp; Flat Rates</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              Flag drop, stepped distance brackets (0.2 mi), &amp; STL flat matrix
-            </p>
-          </button>
-
-          {/* Pillar 2: Surcharges & Fuel Recovery */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('surcharges')}
-            className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-              activeTab === 'surcharges'
-                ? 'bg-amber-50/90 border-amber-500 shadow-2xs ring-1 ring-amber-500/30'
-                : 'bg-slate-50/60 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1">
-                <ZapIcon className="w-3.5 h-3.5" />
-                2. Surcharges &amp; Gas Fee
-              </span>
-              <div className="flex items-center gap-1">
-                {surcharges.isFuelSurchargeActive && (
-                  <Badge variant="outline" className="text-[9px] bg-orange-100 border-orange-300 text-orange-800">
-                    Fuel ON
-                  </Badge>
-                )}
-                <Badge variant="outline" className="text-[10px] bg-white border-slate-200 text-slate-700">
-                  {activeCustomSurchargesCount} Custom
-                </Badge>
-              </div>
-            </div>
-            <p className="text-xs font-bold text-slate-900">Built-In Fuel, Airport &amp; Surge</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              Gas surcharge, ${(surcharges.airportGateFee ?? 4).toFixed(2)} STL gate, surge &amp; custom rules
-            </p>
-          </button>
-
-          {/* Pillar 3: Universal Fleet Extras */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('extras')}
-            className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-              activeTab === 'extras'
-                ? 'bg-blue-50/90 border-blue-500 shadow-2xs ring-1 ring-blue-500/30'
-                : 'bg-slate-50/60 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1">
-                <SparklesIcon className="w-3.5 h-3.5" />
-                3. Universal Fleet Extras
-              </span>
-              <Badge variant="outline" className="text-[10px] bg-white border-slate-200 text-slate-700">
-                5 Add-ons
-              </Badge>
-            </div>
-            <p className="text-xs font-bold text-slate-900">Seats, Extra Pax &amp; Stops</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              ${universalExtras.carSeatFeePerUnit}/seat, +${universalExtras.extraPassengerFeePerHead}/pax, ${universalExtras.intermediateStopFee}/stop
-            </p>
-          </button>
-
-          {/* Pillar 4: Connective Rules & Zone Routing */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('rules')}
-            className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-              activeTab === 'rules'
-                ? 'bg-purple-50/90 border-purple-500 shadow-2xs ring-1 ring-purple-500/30'
-                : 'bg-slate-50/60 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1">
-                <ShieldCheckIcon className="w-3.5 h-3.5" />
-                4. Rules &amp; Conditions
-              </span>
-              <Badge variant="outline" className="text-[10px] bg-white border-slate-200 text-slate-700">
-                {activeRulesCount} Active
-              </Badge>
-            </div>
-            <p className="text-xs font-bold text-slate-900">Conditions, Zones &amp; Actions</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-              Bidirectional zone triggers, corporate overrides &amp; waivers
-            </p>
-          </button>
+      {/* Compact Context & Utility Toolbar (no duplicate sub-navigation cards) */}
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+          <span className="font-semibold text-slate-800">
+            {activeTab === 'rates' && 'Tariffs & Stepped Distance Rate Tiers:'}
+            {activeTab === 'surcharges' && 'Built-In Fuel Surcharge, Operational & Conditional Surcharges:'}
+            {activeTab === 'extras' && 'Universal Passenger & Equipment Add-Ons:'}
+            {activeTab === 'rules' && 'Rule Conditions, Zone Triggers & Tariff Actions:'}
+          </span>
+          <span>
+            {activeTab === 'rates' && 'Configure stepped distance increments (e.g. first 1/5 mi + stepped mileage tiers) and flat airport matrices.'}
+            {activeTab === 'surcharges' && 'Manage built-in gas/fuel surcharge, airport gate fee, peak demand multiplier, and custom vehicle/distance surcharges.'}
+            {activeTab === 'extras' && 'Configure car seats, extra passenger headcount fees, intermediate stops, and curb waiting time.'}
+            {activeTab === 'rules' && 'Connect service zones, vehicle classes, and corporate accounts to target tariffs and fee waivers.'}
+          </span>
         </div>
 
-        {/* Action sub-bar with context & simulator toggle */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 px-1">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-            <span className="font-semibold text-slate-800">
-              {activeTab === 'rates' && 'Tariffs & Stepped Distance Rate Tiers:'}
-              {activeTab === 'surcharges' && 'Built-In Fuel Surcharge, Operational & Conditional Surcharges:'}
-              {activeTab === 'extras' && 'Universal Passenger & Equipment Add-Ons:'}
-              {activeTab === 'rules' && 'Rule Conditions, Zone Triggers & Tariff Actions:'}
-            </span>
-            <span>
-              {activeTab === 'rates' && 'Configure stepped distance increments (e.g. first 1/5 mi + stepped mileage tiers) and flat airport matrices.'}
-              {activeTab === 'surcharges' && 'Manage built-in gas/fuel surcharge, airport gate fee, peak demand multiplier, and custom vehicle/distance surcharges.'}
-              {activeTab === 'extras' && 'Configure car seats, extra passenger headcount fees, intermediate stops, and curb waiting time.'}
-              {activeTab === 'rules' && 'Connect service zones, vehicle classes, and corporate accounts to target tariffs and fee waivers.'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {(activeTab === 'surcharges' || activeTab === 'extras') && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCombineFeesAndExtras(!combineFeesAndExtras)}
-                className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
-              >
-                {combineFeesAndExtras ? 'Single Pillar View' : 'Show Surcharges + Extras Together'}
-              </Button>
-            )}
+        <div className="flex items-center gap-2 shrink-0">
+          {(activeTab === 'surcharges' || activeTab === 'extras') && (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsSimulatorCollapsed(!isSimulatorCollapsed)}
+              onClick={() => setCombineFeesAndExtras(!combineFeesAndExtras)}
               className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
             >
-              <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-              {isSimulatorCollapsed ? 'Show Fare Simulator' : 'Hide Simulator'}
+              {combineFeesAndExtras ? 'Single Pillar View' : 'Show Surcharges + Extras Together'}
             </Button>
-          </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsSimulatorCollapsed(!isSimulatorCollapsed)}
+            className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+          >
+            <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+            {isSimulatorCollapsed ? 'Show Fare Simulator' : 'Hide Simulator'}
+          </Button>
         </div>
       </div>
 

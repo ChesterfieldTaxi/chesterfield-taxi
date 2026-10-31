@@ -20,7 +20,16 @@ import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { SMOKE_HOUSE_2023_RATES } from './smoke-house-rates.data';
 
-const TARIFFS_STORAGE_KEY = 'chesterfield_taxi_tariff_profiles_v5';
+const TARIFFS_STORAGE_KEY = 'chesterfield_taxi_tariff_profiles_v6';
+
+const RETIRED_LEGACY_TARIFF_IDS = new Set([
+  'tariff-standard-flat',
+  'tariff-minivan-flat',
+  'tariff-meter-standard',
+  'tariff-meter-minivan',
+  'tariff-smoke-house-rates',
+  'tariff-hourly-charter',
+]);
 
 
 export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
@@ -142,6 +151,30 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
 export class TariffService {
   private cache: TariffProfile[] | null = null;
 
+  private cleanLegacyTariffs(rawList: TariffProfile[], db?: any): TariffProfile[] {
+    const retiredDocs = rawList.filter((t) => RETIRED_LEGACY_TARIFF_IDS.has(t.id));
+    if (retiredDocs.length > 0 && db) {
+      for (const retired of retiredDocs) {
+        deleteDoc(doc(db, 'tariffs', retired.id)).catch(() => {});
+      }
+    }
+
+    const validList = rawList.filter((t) => !RETIRED_LEGACY_TARIFF_IDS.has(t.id));
+
+    if (retiredDocs.length > 0 || validList.length === 0) {
+      for (const def of DEFAULT_TARIFF_PROFILES) {
+        if (!validList.some((t) => t.id === def.id)) {
+          validList.push({ ...def });
+          if (db) {
+            setDoc(doc(db, 'tariffs', def.id), sanitizePayload(def)).catch(() => {});
+          }
+        }
+      }
+    }
+
+    return validList;
+  }
+
   public async getTariffs(): Promise<TariffProfile[]> {
     if (this.cache && this.cache.length > 0) {
       return [...this.cache];
@@ -158,10 +191,15 @@ export class TariffService {
         if (db) {
           const snap = await getDocs(collection(db, 'tariffs'));
           if (!snap.empty) {
-            const list = snap.docs.map((d) => d.data() as TariffProfile);
-            this.cache = list;
-            this.saveToLocalStorage(list);
-            return list;
+            const rawList = snap.docs.map((d) => d.data() as TariffProfile);
+            const cleaned = this.cleanLegacyTariffs(rawList, db);
+            this.cache = cleaned;
+            this.saveToLocalStorage(cleaned);
+            return [...cleaned];
+          } else {
+            for (const def of DEFAULT_TARIFF_PROFILES) {
+              setDoc(doc(db, 'tariffs', def.id), sanitizePayload(def)).catch(() => {});
+            }
           }
         }
       } catch (err) {
@@ -174,13 +212,19 @@ export class TariffService {
       this.saveToLocalStorage(this.cache);
     }
 
-    return this.cache.filter((t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter');
+    return [...this.cache];
   }
 
   public getAllTariffProfiles(): TariffProfile[] {
+    if (this.cache && this.cache.length > 0) {
+      return [...this.cache];
+    }
     const local = this.loadFromLocalStorage();
-    const source = local && local.length > 0 ? local : this.cache && this.cache.length > 0 ? this.cache : DEFAULT_TARIFF_PROFILES;
-    return source.filter((t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter');
+    if (local && local.length > 0) {
+      this.cache = local;
+      return [...local];
+    }
+    return [...DEFAULT_TARIFF_PROFILES];
   }
 
   public saveTariffProfile(tariff: TariffProfile): void {
@@ -286,10 +330,11 @@ export class TariffService {
         q,
         (snap) => {
           if (!snap.empty) {
-            const list = snap.docs.map((d) => d.data() as TariffProfile);
-            this.cache = list;
-            this.saveToLocalStorage(list);
-            onUpdate(list);
+            const rawList = snap.docs.map((d) => d.data() as TariffProfile);
+            const cleaned = this.cleanLegacyTariffs(rawList, db);
+            this.cache = cleaned;
+            this.saveToLocalStorage(cleaned);
+            onUpdate(cleaned);
           } else {
             this.getTariffs().then(onUpdate);
           }
@@ -316,20 +361,15 @@ export class TariffService {
       window.localStorage.removeItem('chesterfield_taxi_pricing_tariffs_v2');
       window.localStorage.removeItem('chesterfield_taxi_tariff_profiles_v3');
       window.localStorage.removeItem('chesterfield_taxi_tariff_profiles_v4');
+      window.localStorage.removeItem('chesterfield_taxi_tariff_profiles_v5');
 
       const stored = window.localStorage.getItem(TARIFFS_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as TariffProfile[];
-        // Filter strictly to the 2 primary tariffs
-        const filtered = parsed.filter(
-          (t) => t.id === 'tariff-airport-flat' || t.id === 'tariff-point-to-point-meter'
-        );
-        // If legacy tariffs were present or missing required profiles, reseed defaults
-        if (filtered.length !== 2) {
-          this.saveToLocalStorage(DEFAULT_TARIFF_PROFILES);
-          return [...DEFAULT_TARIFF_PROFILES];
+        const cleaned = parsed.filter((t) => !RETIRED_LEGACY_TARIFF_IDS.has(t.id));
+        if (cleaned.length > 0) {
+          return cleaned;
         }
-        return filtered;
       }
     } catch {
       // Ignore JSON parse errors
