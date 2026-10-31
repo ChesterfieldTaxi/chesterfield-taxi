@@ -472,6 +472,7 @@ export interface AppSettings {
   constructionMode?: boolean;
   enableRealtimeRouting?: boolean;
   enableGetAppButtons?: boolean;
+  cms?: Record<string, any>;
   updatedAt?: string;
   updatedBy?: string;
 }

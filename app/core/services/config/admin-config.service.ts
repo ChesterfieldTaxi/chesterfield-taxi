@@ -551,6 +551,9 @@ export class AdminConfigService implements IAdminConfigService {
       enableGetAppButtons: incoming.enableGetAppButtons !== undefined
         ? incoming.enableGetAppButtons
         : (DEFAULT_APP_SETTINGS.enableGetAppButtons ?? false),
+      cms: incoming.cms
+        ? { ...(this.cachedSettings?.cms || {}), ...incoming.cms }
+        : this.cachedSettings?.cms,
       bookingRulesConfig: incoming.bookingRulesConfig
         ? {
             ...DEFAULT_BOOKING_RULES_CONFIG,
@@ -669,6 +672,12 @@ export class AdminConfigService implements IAdminConfigService {
       configAuditTrail: updatedAuditTrail,
       vehicles: updates.vehicles || this.cachedSettings.vehicles,
       fleet: updates.fleet || this.cachedSettings.fleet,
+      cms: updates.cms
+        ? {
+            ...(this.cachedSettings.cms || {}),
+            ...updates.cms,
+          }
+        : this.cachedSettings.cms,
       bookingRulesConfig: updates.bookingRulesConfig
         ? {
             ...(this.cachedSettings.bookingRulesConfig || DEFAULT_BOOKING_RULES_CONFIG),

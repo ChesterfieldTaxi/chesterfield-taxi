@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../ui/Card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
-import { CheckIcon, SparklesIcon, SettingsIcon, ShieldCheckIcon, HistoryIcon } from '../../../ui/Icons';
+import { SparklesIcon } from '../../../ui/Icons';
 
 export interface WebsiteNavigationTabProps {
   settings: AppSettings;
@@ -21,25 +21,66 @@ export interface NavLinkItem {
   isExternal?: boolean;
 }
 
+export const DEFAULT_NAV_LINKS: NavLinkItem[] = [
+  { id: '1', label: 'Home', path: '/' },
+  { id: '2', label: 'Services', path: '/services' },
+  { id: '3', label: 'About', path: '/about' },
+  { id: '4', label: 'Contact', path: '/contact' },
+];
+
 export function WebsiteNavigationTab({
   settings,
   onSave,
   isLoading,
 }: WebsiteNavigationTabProps) {
-  const [navLinks, setNavLinks] = useState<NavLinkItem[]>([
-    { id: '1', label: 'Services', path: '/services' },
-    { id: '2', label: 'About', path: '/about' },
-    { id: '3', label: 'Track Ride', path: '/track' },
-    { id: '4', label: 'Contact', path: '/contact' },
-    { id: '5', label: 'Passenger Portal', path: '/app' },
-  ]);
+  const savedNav = (settings as any).cms?.navigation;
 
-  const [headerCtaLabel, setHeaderCtaLabel] = useState('Book Online');
-  const [headerCtaPath, setHeaderCtaPath] = useState('/book');
-  const [showPhoneBadge, setShowPhoneBadge] = useState(true);
+  const [navLinks, setNavLinks] = useState<NavLinkItem[]>(
+    savedNav?.navLinks?.length ? savedNav.navLinks : DEFAULT_NAV_LINKS
+  );
+
+  const [headerCtaLabel, setHeaderCtaLabel] = useState<string>(
+    savedNav?.headerCtaLabel || 'Book Now'
+  );
+  const [headerCtaPath, setHeaderCtaPath] = useState<string>(
+    savedNav?.headerCtaPath || '/book'
+  );
+  const [showPhoneBadge, setShowPhoneBadge] = useState<boolean>(
+    savedNav?.showPhoneBadge !== undefined ? Boolean(savedNav.showPhoneBadge) : true
+  );
   const [enableGetAppButtons, setEnableGetAppButtons] = useState<boolean>(
     settings.enableGetAppButtons ?? COMPANY_CONFIG.enableGetAppButtons ?? false
   );
+
+  // Global Announcement Bar
+  const [announcementEnabled, setAnnouncementEnabled] = useState<boolean>(
+    savedNav?.announcement?.enabled !== undefined ? Boolean(savedNav.announcement.enabled) : false
+  );
+  const [announcementText, setAnnouncementText] = useState<string>(
+    savedNav?.announcement?.text ||
+      'Winter Storm Alert: Advance reservations recommended. Drivers operating with standard snow protocol.'
+  );
+  const [announcementType, setAnnouncementType] = useState<'info' | 'warning' | 'alert'>(
+    savedNav?.announcement?.type || 'warning'
+  );
+
+  // Footer Config
+  const [footerCopyright, setFooterCopyright] = useState<string>(
+    savedNav?.footer?.copyright ||
+      `© ${new Date().getFullYear()} ${COMPANY_CONFIG.name}. All rights reserved.`
+  );
+  const [licensingText, setLicensingText] = useState<string>(
+    savedNav?.footer?.licensing ||
+      'Licensed Metropolitan Taxicab & Executive Livery Provider. STL Regional Permit #4029.'
+  );
+  const [facebookUrl, setFacebookUrl] = useState<string>(
+    savedNav?.footer?.socials?.facebook || 'https://facebook.com/chesterfieldtaxi'
+  );
+  const [linkedinUrl, setLinkedinUrl] = useState<string>(
+    savedNav?.footer?.socials?.linkedin || 'https://linkedin.com/company/chesterfield-taxi'
+  );
+
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     if (settings.enableGetAppButtons !== undefined) {
@@ -47,24 +88,49 @@ export function WebsiteNavigationTab({
     }
   }, [settings.enableGetAppButtons]);
 
-  // Global Announcement Bar
-  const [announcementEnabled, setAnnouncementEnabled] = useState(false);
-  const [announcementText, setAnnouncementText] = useState(
-    'Winter Storm Alert: Advance reservations recommended. Drivers operating with standard snow protocol.'
-  );
-  const [announcementType, setAnnouncementType] = useState<'info' | 'warning' | 'alert'>('warning');
-
-  // Footer Config
-  const [footerCopyright, setFooterCopyright] = useState(
-    `© ${new Date().getFullYear()} ${COMPANY_CONFIG.name}. All rights reserved.`
-  );
-  const [licensingText, setLicensingText] = useState(
-    'Licensed Metropolitan Taxicab & Executive Livery Provider. STL Regional Permit #4029.'
-  );
-  const [facebookUrl, setFacebookUrl] = useState('https://facebook.com/chesterfieldtaxi');
-  const [linkedinUrl, setLinkedinUrl] = useState('https://linkedin.com/company/chesterfield-taxi');
-
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  useEffect(() => {
+    const nav = (settings as any).cms?.navigation;
+    if (!nav) return;
+    if (Array.isArray(nav.navLinks) && nav.navLinks.length > 0) {
+      setNavLinks(nav.navLinks);
+    }
+    if (typeof nav.headerCtaLabel === 'string') {
+      setHeaderCtaLabel(nav.headerCtaLabel);
+    }
+    if (typeof nav.headerCtaPath === 'string') {
+      setHeaderCtaPath(nav.headerCtaPath);
+    }
+    if (typeof nav.showPhoneBadge === 'boolean') {
+      setShowPhoneBadge(nav.showPhoneBadge);
+    }
+    if (nav.announcement) {
+      if (typeof nav.announcement.enabled === 'boolean') {
+        setAnnouncementEnabled(nav.announcement.enabled);
+      }
+      if (typeof nav.announcement.text === 'string') {
+        setAnnouncementText(nav.announcement.text);
+      }
+      if (nav.announcement.type) {
+        setAnnouncementType(nav.announcement.type);
+      }
+    }
+    if (nav.footer) {
+      if (typeof nav.footer.copyright === 'string') {
+        setFooterCopyright(nav.footer.copyright);
+      }
+      if (typeof nav.footer.licensing === 'string') {
+        setLicensingText(nav.footer.licensing);
+      }
+      if (nav.footer.socials) {
+        if (typeof nav.footer.socials.facebook === 'string') {
+          setFacebookUrl(nav.footer.socials.facebook);
+        }
+        if (typeof nav.footer.socials.linkedin === 'string') {
+          setLinkedinUrl(nav.footer.socials.linkedin);
+        }
+      }
+    }
+  }, [(settings as any).cms?.navigation]);
 
   const handleAddLink = () => {
     const newId = String(Date.now());
@@ -81,19 +147,23 @@ export function WebsiteNavigationTab({
     );
   };
 
-  const handleSaveAll = async () => {
+  const buildNavigationPayload = (overrides?: {
+    showPhoneBadge?: boolean;
+    announcementEnabled?: boolean;
+    enableGetAppButtons?: boolean;
+  }) => {
     const existingCms = (settings as any).cms || {};
-    await onSave({
-      enableGetAppButtons,
+    return {
+      enableGetAppButtons: overrides?.enableGetAppButtons ?? enableGetAppButtons,
       cms: {
         ...existingCms,
         navigation: {
           navLinks,
           headerCtaLabel,
           headerCtaPath,
-          showPhoneBadge,
+          showPhoneBadge: overrides?.showPhoneBadge ?? showPhoneBadge,
           announcement: {
-            enabled: announcementEnabled,
+            enabled: overrides?.announcementEnabled ?? announcementEnabled,
             text: announcementText,
             type: announcementType,
           },
@@ -108,8 +178,11 @@ export function WebsiteNavigationTab({
         },
       },
       updatedAt: new Date().toISOString(),
-    } as any);
+    };
+  };
 
+  const handleSaveAll = async () => {
+    await onSave(buildNavigationPayload() as any);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3500);
   };
@@ -175,10 +248,7 @@ export function WebsiteNavigationTab({
                   const nextVal = e.target.checked;
                   setEnableGetAppButtons(nextVal);
                   try {
-                    await onSave({
-                      enableGetAppButtons: nextVal,
-                      updatedAt: new Date().toISOString(),
-                    });
+                    await onSave(buildNavigationPayload({ enableGetAppButtons: nextVal }) as any);
                     setSaveSuccess(true);
                     setTimeout(() => setSaveSuccess(false), 3500);
                   } catch (err) {
@@ -209,7 +279,17 @@ export function WebsiteNavigationTab({
               <input
                 type="checkbox"
                 checked={announcementEnabled}
-                onChange={(e) => setAnnouncementEnabled(e.target.checked)}
+                onChange={async (e) => {
+                  const nextVal = e.target.checked;
+                  setAnnouncementEnabled(nextVal);
+                  try {
+                    await onSave(buildNavigationPayload({ announcementEnabled: nextVal }) as any);
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3500);
+                  } catch (err) {
+                    console.error('Failed to update announcementEnabled setting:', err);
+                  }
+                }}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
@@ -346,15 +426,27 @@ export function WebsiteNavigationTab({
             </div>
             <div className="flex flex-col justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-xs font-bold text-slate-800">Phone Badge in Header</span>
-              <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer mt-1">
                 <input
                   type="checkbox"
                   checked={showPhoneBadge}
-                  onChange={(e) => setShowPhoneBadge(e.target.checked)}
+                  onChange={async (e) => {
+                    const nextVal = e.target.checked;
+                    setShowPhoneBadge(nextVal);
+                    try {
+                      await onSave(buildNavigationPayload({ showPhoneBadge: nextVal }) as any);
+                      setSaveSuccess(true);
+                      setTimeout(() => setSaveSuccess(false), 3500);
+                    } catch (err) {
+                      console.error('Failed to update showPhoneBadge setting:', err);
+                    }
+                  }}
                   className="w-4 h-4 rounded text-blue-600 cursor-pointer"
                 />
-                <span className="text-xs text-slate-600 font-medium">Show {COMPANY_CONFIG.phone.dispatch}</span>
-              </div>
+                <span className="text-xs text-slate-600 font-medium">
+                  Show {settings.company?.phone || COMPANY_CONFIG.phone.dispatch}
+                </span>
+              </label>
             </div>
           </div>
 
@@ -384,10 +476,9 @@ export function WebsiteNavigationTab({
                   const nextVal = e.target.checked;
                   setEnableGetAppButtons(nextVal);
                   try {
-                    await onSave({
-                      enableGetAppButtons: nextVal,
-                      updatedAt: new Date().toISOString(),
-                    });
+                    await onSave(buildNavigationPayload({ enableGetAppButtons: nextVal }) as any);
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3500);
                   } catch (err) {
                     console.error('Failed to update enableGetAppButtons setting:', err);
                   }
