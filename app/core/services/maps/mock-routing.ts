@@ -61,6 +61,15 @@ function encodeSignedNumber(num: number): string {
 }
 
 /**
+ * Quantizes any positive route distance up to the next 0.5 statute mile increment.
+ * Example: 14.01 mi -> 14.5 mi, 14.50 mi -> 14.5 mi, 14.59 mi -> 15.0 mi.
+ */
+export function ceilToHalfMile(miles: number): number {
+  if (!miles || miles <= 0 || isNaN(miles)) return 0;
+  return Math.ceil((miles - 1e-9) * 2) / 2;
+}
+
+/**
  * Calculates straight-line distance in statute miles using the Haversine formula.
  */
 export function calculateHaversineDistance(c1: GeoCoordinate, c2: GeoCoordinate): number {
@@ -164,7 +173,7 @@ export function calculateMockRoute(request: LiveRouteRequest): LiveRouteResult {
     const straightSegmentMiles = calculateHaversineDistance(p1, p2);
     totalStraightMiles += straightSegmentMiles;
 
-    const legRoadMiles = Math.max(0.1, Math.round(straightSegmentMiles * ROAD_CURVATURE_FACTOR * 100) / 100);
+    const legRoadMiles = Math.max(0.5, ceilToHalfMile(straightSegmentMiles * ROAD_CURVATURE_FACTOR));
     const legMeters = Math.round(legRoadMiles * 1609.344);
     const legMinutes = Math.max(1, Math.ceil((legRoadMiles / AVERAGE_SPEED_MPH) * 60));
 
@@ -181,7 +190,7 @@ export function calculateMockRoute(request: LiveRouteRequest): LiveRouteResult {
     });
   }
 
-  const distanceMiles = Math.max(0.5, Math.round(totalStraightMiles * ROAD_CURVATURE_FACTOR * 100) / 100);
+  const distanceMiles = Math.max(0.5, ceilToHalfMile(totalStraightMiles * ROAD_CURVATURE_FACTOR));
   const distanceMeters = Math.round(distanceMiles * 1609.344);
   const durationMinutes = Math.max(2, Math.ceil((distanceMiles / AVERAGE_SPEED_MPH) * 60));
   const overviewPolyline = encodePolyline(allPoints);

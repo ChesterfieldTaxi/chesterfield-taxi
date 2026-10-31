@@ -203,8 +203,8 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'fleet', label: 'Fleet Inventory' },
   ],
   zones: [
+    { key: 'zones', label: 'Operational Geofences & Polygons' },
     { key: 'places', label: 'Special Places & Landmarks' },
-    { key: 'zones', label: 'Operational Geofences' },
     { key: 'groups', label: 'Zone Groups' },
     { key: 'blacklists', label: 'Exclusion Zones' },
   ],

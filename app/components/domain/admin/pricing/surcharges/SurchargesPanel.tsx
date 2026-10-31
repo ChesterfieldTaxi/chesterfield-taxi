@@ -72,6 +72,13 @@ export function SurchargesPanel({
     copy.cancellationFee = copy.cancellationFeeWithinOneHour;
     copy.cancellationWindowMinutes = copy.cancellationWindowMinutes ?? 60;
     copy.noShowFee = copy.noShowFee ?? 28.0;
+    copy.isFuelSurchargeActive = copy.isFuelSurchargeActive ?? false;
+    copy.fuelSurchargeType = copy.fuelSurchargeType ?? 'flat';
+    copy.fuelSurchargeAmount = copy.fuelSurchargeAmount ?? 2.5;
+    copy.fuelSurchargeApplicableTariffs = copy.fuelSurchargeApplicableTariffs ?? [
+      'tariff-airport-flat',
+      'tariff-point-to-point-meter',
+    ];
     return copy;
   };
 
@@ -90,7 +97,7 @@ export function SurchargesPanel({
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formAmount, setFormAmount] = useState<number>(10.0);
-  const [formType, setFormType] = useState<'flat' | 'percent'>('flat');
+  const [formType, setFormType] = useState<'flat' | 'percent' | 'per_mile'>('flat');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formTariffs, setFormTariffs] = useState<string[]>([]);
   const [formVehicleTiers, setFormVehicleTiers] = useState<string[]>([]);
@@ -104,11 +111,11 @@ export function SurchargesPanel({
     setEditingId(null);
     setFormName('');
     setFormDescription('');
-    setFormAmount(10.0);
+    setFormAmount(5.0);
     setFormType('flat');
     setFormIsActive(true);
     setFormTariffs(tariffs.map((t) => t.id));
-    setFormVehicleTiers(['suv', 'minivan', 'van', 'wheelchair']);
+    setFormVehicleTiers([]); // Empty = Applies to ALL Vehicle Tiers by default
     setFormMinDistance('');
     setFormMaxDistance('');
     setFormHasTimeWindow(false);
@@ -140,15 +147,34 @@ export function SurchargesPanel({
     setIsModalOpen(true);
   };
 
-  const handleSaveModal = (e: React.FormEvent) => {
+  const persistImmediately = async (nextConfig: SurchargesConfig) => {
+    const normalized = normalizeConfig(nextConfig);
+    setWorkingCopy(normalized);
+    await onSave(normalized);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
     const triggers: CustomSurchargeTrigger = {};
     if (formVehicleTiers.length > 0) {
-      triggers.vehicleTiers = [...formVehicleTiers];
-      if (formVehicleTiers.includes('suv')) triggers.vehicleTiers.push('xl');
-      if (formVehicleTiers.includes('wheelchair')) triggers.vehicleTiers.push('wheelchair_wav');
+      const expanded = new Set<string>(formVehicleTiers);
+      if (expanded.has('sedan') || expanded.has('standard')) {
+        expanded.add('sedan');
+        expanded.add('standard');
+        expanded.add('any');
+      }
+      if (expanded.has('suv') || expanded.has('xl')) {
+        expanded.add('suv');
+        expanded.add('xl');
+      }
+      if (expanded.has('wheelchair') || expanded.has('van') || expanded.has('minivan')) {
+        if (expanded.has('wheelchair')) expanded.add('wheelchair_wav');
+      }
+      triggers.vehicleTiers = Array.from(expanded);
     }
     if (formMinDistance.trim() !== '') {
       triggers.minDistanceMiles = parseFloat(formMinDistance);
@@ -179,23 +205,23 @@ export function SurchargesPanel({
       ? currentList.map((item) => (item.id === editingId ? newItem : item))
       : [...currentList, newItem];
 
-    setWorkingCopy({
+    setIsModalOpen(false);
+    await persistImmediately({
       ...workingCopy,
       customSurcharges: nextList,
     });
-    setIsModalOpen(false);
   };
 
-  const handleToggleSurchargeActive = (id: string) => {
+  const handleToggleSurchargeActive = async (id: string) => {
     const nextList = (workingCopy.customSurcharges || []).map((item) =>
       item.id === id ? { ...item, isActive: !item.isActive } : item
     );
-    setWorkingCopy({ ...workingCopy, customSurcharges: nextList });
+    await persistImmediately({ ...workingCopy, customSurcharges: nextList });
   };
 
-  const handleDeleteSurcharge = (id: string) => {
+  const handleDeleteSurcharge = async (id: string) => {
     const nextList = (workingCopy.customSurcharges || []).filter((item) => item.id !== id);
-    setWorkingCopy({ ...workingCopy, customSurcharges: nextList });
+    await persistImmediately({ ...workingCopy, customSurcharges: nextList });
   };
 
   const updateField = <K extends keyof SurchargesConfig>(field: K, val: any) => {
@@ -226,10 +252,12 @@ export function SurchargesPanel({
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const toggleApplicableTariff = (surchargeKey: 'airport' | 'surge' | 'remote', tariffId: string) => {
+  const toggleApplicableTariff = (surchargeKey: 'airport' | 'fuel' | 'surge' | 'remote', tariffId: string) => {
     const listKey =
       surchargeKey === 'airport'
         ? 'airportFeeApplicableTariffs'
+        : surchargeKey === 'fuel'
+        ? 'fuelSurchargeApplicableTariffs'
         : surchargeKey === 'surge'
         ? 'surgeApplicableTariffs'
         : 'remoteFeeApplicableTariffs';
@@ -346,6 +374,123 @@ export function SurchargesPanel({
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 1B. Built-In Fuel / Gas Surcharge */}
+        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200">
+                <ZapIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">Built-In Fuel / Gas Surcharge</h3>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-300 text-[10px]">
+                    Fleet Fuel Recovery
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Automatic fleet-wide gas surcharge applied as a flat fee, per-mile rate, or percentage of fare
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold text-orange-700">
+                {(workingCopy.fuelSurchargeType || 'flat') === 'percent'
+                  ? `+${(workingCopy.fuelSurchargeAmount ?? 2.5).toFixed(1)}%`
+                  : (workingCopy.fuelSurchargeType || 'flat') === 'per_mile'
+                  ? `+$${(workingCopy.fuelSurchargeAmount ?? 0.25).toFixed(2)}/mi`
+                  : `+$${(workingCopy.fuelSurchargeAmount ?? 2.5).toFixed(2)} flat`}
+              </span>
+              <span
+                className={`inline-block w-2.5 h-2.5 rounded-full ${
+                  workingCopy.isFuelSurchargeActive ? 'bg-emerald-500' : 'bg-slate-300'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <label className="text-xs font-medium text-slate-700 block mb-1">Calculation Mode</label>
+              <select
+                value={workingCopy.fuelSurchargeType || 'flat'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  updateField('fuelSurchargeType', e.target.value as 'flat' | 'per_mile' | 'percent')
+                }
+                className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-semibold"
+              >
+                <option value="flat">Flat Fee Per Trip ($)</option>
+                <option value="per_mile">Per Mile Rate ($/mi)</option>
+                <option value="percent">Percentage of Fare (%)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-700 block mb-1">
+                {(workingCopy.fuelSurchargeType || 'flat') === 'percent'
+                  ? 'Fuel Surcharge (%)'
+                  : (workingCopy.fuelSurchargeType || 'flat') === 'per_mile'
+                  ? 'Fuel Rate Per Mile ($/mi)'
+                  : 'Fuel Surcharge Amount ($)'}
+              </label>
+              <Input
+                type="number"
+                step={(workingCopy.fuelSurchargeType || 'flat') === 'per_mile' ? '0.05' : '0.25'}
+                min="0"
+                value={workingCopy.fuelSurchargeAmount ?? 2.5}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  updateField('fuelSurchargeAmount', parseFloat(e.target.value) || 0)
+                }
+                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
+              />
+            </div>
+
+            <div className="flex items-center pt-4">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+                <input
+                  type="checkbox"
+                  checked={workingCopy.isFuelSurchargeActive || false}
+                  onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const checked = e.target.checked;
+                    await persistImmediately({ ...workingCopy, isFuelSurchargeActive: checked });
+                  }}
+                  className="rounded border-slate-300 text-orange-600 focus:ring-0"
+                />
+                <span>Enable Fuel / Gas Surcharge Now</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
+            <div className="flex flex-wrap gap-2">
+              {tariffs.map((t) => {
+                const isChecked = (
+                  workingCopy.fuelSurchargeApplicableTariffs || [
+                    'tariff-point-to-point-meter',
+                    'tariff-airport-flat',
+                  ]
+                ).includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleApplicableTariff('fuel', t.id)}
+                    className={`px-2.5 py-1 rounded-md text-xs border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                      isChecked
+                        ? 'bg-orange-50 border-orange-400 text-orange-900 font-medium'
+                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-orange-600' : 'bg-slate-300'}`} />
+                    {t.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -649,7 +794,11 @@ export function SurchargesPanel({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-900">{item.name}</span>
                       <span className="text-xs font-bold text-emerald-700">
-                        {item.type === 'percent' ? `+${item.amount}%` : `+$${item.amount.toFixed(2)}`}
+                        {item.type === 'percent'
+                          ? `+${item.amount}%`
+                          : item.type === 'per_mile'
+                          ? `+$${item.amount.toFixed(2)}/mi`
+                          : `+$${item.amount.toFixed(2)}`}
                       </span>
                       <button
                         type="button"
@@ -670,12 +819,16 @@ export function SurchargesPanel({
 
                     {/* Condition Badges */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {item.triggers?.vehicleTiers && item.triggers.vehicleTiers.length > 0 && (
+                      {item.triggers?.vehicleTiers && item.triggers.vehicleTiers.length > 0 ? (
                         <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-medium">
                           Vehicles: {item.triggers.vehicleTiers.map((tId) => {
                             const found = activeVehicles.find((av) => av.id.toLowerCase() === tId.toLowerCase());
                             return found ? found.label : tId.toUpperCase();
                           }).join(', ')}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+                          All Vehicles
                         </Badge>
                       )}
                       {item.triggers?.minDistanceMiles !== undefined && (
@@ -784,6 +937,7 @@ export function SurchargesPanel({
                     className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                   >
                     <option value="flat">Flat Dollar ($)</option>
+                    <option value="per_mile">Per Mile ($/mi)</option>
                     <option value="percent">Percentage (%)</option>
                   </select>
                 </div>
@@ -792,9 +946,20 @@ export function SurchargesPanel({
               {/* Vehicle Conditions */}
               <div className="pt-2 border-t border-slate-100 space-y-1.5">
                 <label className="text-xs font-bold text-slate-800 block">
-                  Trigger on Vehicle Types (Leave empty for all vehicles):
+                  Trigger on Vehicle Types (Default: All Vehicles):
                 </label>
                 <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFormVehicleTiers([])}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                      formVehicleTiers.length === 0
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    All Vehicles
+                  </button>
                   {activeVehicles.map((v) => {
                     const isSelected = formVehicleTiers.some((id) => id.toLowerCase() === v.id.toLowerCase());
                     return (

@@ -988,10 +988,18 @@ export function createSurchargesAndDiscountsStep(
     const airportFeeRate = overrules.airportGateFee ?? surchargesCatalog.airportGateFee ?? 4.00;
     const isAirport =
       context.input.isAirportPickup ||
+      context.input.isAirportDropoff ||
+      context.input.isAirportTrip ||
       (context.input.originZoneId && surchargesCatalog.airportTargetZoneIds?.includes(context.input.originZoneId)) ||
       (context.input.destinationZoneId && surchargesCatalog.airportTargetZoneIds?.includes(context.input.destinationZoneId));
+    const airportTariffs = surchargesCatalog.airportFeeApplicableTariffs;
+    const matchesAirportTariff =
+      !airportTariffs ||
+      airportTariffs.length === 0 ||
+      !context.tariffProfileId ||
+      airportTariffs.includes(context.tariffProfileId);
 
-    if (isAirport && airportFeeRate > 0 && allowOperationalSurcharges) {
+    if (isAirport && airportFeeRate > 0 && matchesAirportTariff && !overrules.waiveAirportFee && !surchargesCatalog.waiveAirportFee) {
       if (context.input.waiveAirportFee) {
         newSurcharges.push({
           name: 'Airport Terminal Access Fee (Waived)',
@@ -1009,11 +1017,61 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 2. Out-of-Area Remote Service Surcharge ($15.00)
+    // 2. Built-in Fuel / Gas Surcharge (Flat $, $/Mile, or % of base fare)
+    const isFuelActive = overrules.isFuelSurchargeActive ?? surchargesCatalog.isFuelSurchargeActive ?? false;
+    const waiveFuel = overrules.waiveFuelSurcharge ?? surchargesCatalog.waiveFuelSurcharge ?? false;
+    const fuelAmount = overrules.fuelSurchargeAmount ?? surchargesCatalog.fuelSurchargeAmount ?? 0;
+    const fuelType = overrules.fuelSurchargeType ?? surchargesCatalog.fuelSurchargeType ?? 'flat';
+    const fuelTariffs = surchargesCatalog.fuelSurchargeApplicableTariffs;
+    const matchesFuelTariff =
+      !fuelTariffs ||
+      fuelTariffs.length === 0 ||
+      !context.tariffProfileId ||
+      fuelTariffs.includes(context.tariffProfileId);
+
+    if (isFuelActive && !waiveFuel && fuelAmount > 0 && matchesFuelTariff) {
+      const fuelFee =
+        fuelType === 'per_mile'
+          ? roundCurrency(fuelAmount * context.input.distanceMiles)
+          : fuelType === 'percent'
+            ? roundCurrency(currentSubtotal * (fuelAmount / 100))
+            : roundCurrency(fuelAmount);
+
+      if (fuelFee > 0) {
+        const fuelDesc =
+          fuelType === 'per_mile'
+            ? `Fuel & gas surcharge ($${fuelAmount.toFixed(2)}/mi × ${context.input.distanceMiles.toFixed(1)} mi)`
+            : fuelType === 'percent'
+              ? `Fuel & gas surcharge (${fuelAmount}% of fare)`
+              : `Flat operational fuel & gas surcharge (+$${fuelFee.toFixed(2)})`;
+        newSurcharges.push({
+          name: 'Fuel / Gas Surcharge',
+          amount: fuelFee,
+          description: fuelDesc,
+        });
+        currentSubtotal = roundCurrency(currentSubtotal + fuelFee);
+      }
+    }
+
+    // 3. Out-of-Area Remote Service Surcharge ($15.00)
     const remoteThreshold = surchargesCatalog.outOfAreaThresholdMiles ?? 15.0;
     const remoteFeeRate = overrules.outOfAreaRemoteFee ?? surchargesCatalog.outOfAreaRemoteFee ?? 0;
     const isAirportTrip = isAirport || context.tariffProfileId === 'tariff-airport-flat';
-    if (context.input.distanceMiles > remoteThreshold && remoteFeeRate > 0 && allowOperationalSurcharges && !isAirportTrip) {
+    const remoteTariffs = surchargesCatalog.remoteFeeApplicableTariffs;
+    const matchesRemoteTariff =
+      !remoteTariffs ||
+      remoteTariffs.length === 0 ||
+      !context.tariffProfileId ||
+      remoteTariffs.includes(context.tariffProfileId);
+    if (
+      context.input.distanceMiles > remoteThreshold &&
+      remoteFeeRate > 0 &&
+      allowOperationalSurcharges &&
+      matchesRemoteTariff &&
+      !isAirportTrip &&
+      !overrules.waiveRemoteFee &&
+      !surchargesCatalog.waiveRemoteFee
+    ) {
       const remoteFee = roundCurrency(remoteFeeRate);
       newSurcharges.push({
         name: 'Out-of-Area Remote Service Fee',
@@ -1024,7 +1082,7 @@ export function createSurchargesAndDiscountsStep(
     }
 
 
-    // 3. Tolls & highway surcharge
+    // 4. Tolls & highway surcharge
     const tollAmount =
       context.input.tolls ??
       context.input.customTollsOrFees ??
@@ -1040,7 +1098,7 @@ export function createSurchargesAndDiscountsStep(
       currentSubtotal = roundCurrency(currentSubtotal + tollFee);
     }
 
-    // 4. Custom Conditional Surcharges (e.g. SUV / Minivan $10 fee, Late Night fee, etc.)
+    // 5. Custom Conditional Surcharges (e.g. SUV / Minivan $10 fee, Custom Gas / Late Night fee, etc.)
     if (surchargesCatalog.customSurcharges && surchargesCatalog.customSurcharges.length > 0) {
       for (const custom of surchargesCatalog.customSurcharges) {
         if (!custom.isActive) continue;
@@ -1064,18 +1122,21 @@ export function createSurchargesAndDiscountsStep(
             ...(custom.applicableVehicleClasses || []),
           ].map((v) => v.toLowerCase());
 
-          if (allowedVehicles.length > 0) {
-            const currentTier = (context.input.vehicleTier || '').toLowerCase();
+          if (allowedVehicles.length > 0 && !allowedVehicles.includes('all') && !allowedVehicles.includes('any')) {
+            const currentTier = (context.input.vehicleTier || 'standard').toLowerCase();
             const currentType = (context.input.vehicleType || '').toLowerCase();
             const currentClass = (context.input.vehicleClass || '').toLowerCase();
             const matchesVehicle =
               allowedVehicles.includes(currentTier) ||
               allowedVehicles.includes(currentType) ||
               allowedVehicles.includes(currentClass) ||
+              (allowedVehicles.includes('sedan') && (currentTier === 'standard' || currentTier === 'sedan' || currentTier === 'any' || currentTier === 'premium')) ||
+              (allowedVehicles.includes('standard') && (currentTier === 'standard' || currentTier === 'sedan' || currentTier === 'any')) ||
               (allowedVehicles.includes('xl') && (currentTier === 'suv' || currentTier === 'xl')) ||
               (allowedVehicles.includes('suv') && (currentTier === 'suv' || currentTier === 'xl')) ||
               (allowedVehicles.includes('van') && (currentTier === 'van' || currentTier === 'wheelchair' || currentTier === 'wheelchair_wav')) ||
-              (allowedVehicles.includes('minivan') && (currentTier === 'van' || currentTier === 'minivan' || currentTier === 'wheelchair' || currentTier === 'wheelchair_wav'));
+              (allowedVehicles.includes('minivan') && (currentTier === 'van' || currentTier === 'minivan' || currentTier === 'wheelchair' || currentTier === 'wheelchair_wav')) ||
+              (allowedVehicles.includes('wheelchair') && (currentTier === 'wheelchair' || currentTier === 'wheelchair_wav' || currentTier === 'van'));
 
             if (!matchesVehicle) {
               continue;
@@ -1119,10 +1180,13 @@ export function createSurchargesAndDiscountsStep(
           }
         }
 
-        // Calculate fee
-        const fee = custom.type === 'percent'
-          ? roundCurrency(currentSubtotal * (custom.amount / 100))
-          : roundCurrency(custom.amount);
+        // Calculate fee (supports flat $, % of subtotal, or $/mile)
+        const fee =
+          custom.type === 'percent'
+            ? roundCurrency(currentSubtotal * (custom.amount / 100))
+            : custom.type === 'per_mile'
+              ? roundCurrency(custom.amount * context.input.distanceMiles)
+              : roundCurrency(custom.amount);
 
         if (fee > 0) {
           newSurcharges.push({

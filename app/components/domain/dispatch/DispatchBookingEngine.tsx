@@ -1166,6 +1166,19 @@ export function DispatchBookingEngine({
                   distanceMiles: res.distanceMiles,
                   durationMinutes: res.durationMinutes,
                   vehicleTier: tier,
+                  isAirportPickup: airportDetection.isPickupAirport,
+                  isAirportDropoff: airportDetection.isDropoffAirport,
+                  isAirportTrip: airportDetection.isAirportTrip,
+                  originZoneId: airportDetection.isPickupAirport
+                    ? airportDetection.airport?.iataCode === 'SUS'
+                      ? 'zone-spirit-airport'
+                      : 'zone-lambert-airport'
+                    : undefined,
+                  destinationZoneId: airportDetection.isDropoffAirport
+                    ? airportDetection.airport?.iataCode === 'SUS'
+                      ? 'zone-spirit-airport'
+                      : 'zone-lambert-airport'
+                    : undefined,
                   pickupDateTime:
                     timingType === 'later' && scheduledDate && scheduledTime
                       ? new Date(`${scheduledDate}T${scheduledTime}:00`)
@@ -1269,6 +1282,19 @@ export function DispatchBookingEngine({
                 distanceMiles: res.distanceMiles,
                 durationMinutes: res.durationMinutes,
                 vehicleTier: tier,
+                isAirportPickup: returnAirportDetection.isPickupAirport,
+                isAirportDropoff: returnAirportDetection.isDropoffAirport,
+                isAirportTrip: returnAirportDetection.isAirportTrip,
+                originZoneId: returnAirportDetection.isPickupAirport
+                  ? returnAirportDetection.airport?.iataCode === 'SUS'
+                    ? 'zone-spirit-airport'
+                    : 'zone-lambert-airport'
+                  : undefined,
+                destinationZoneId: returnAirportDetection.isDropoffAirport
+                  ? returnAirportDetection.airport?.iataCode === 'SUS'
+                    ? 'zone-spirit-airport'
+                    : 'zone-lambert-airport'
+                  : undefined,
                 pickupDateTime:
                   returnDate && returnTime
                     ? new Date(`${returnDate}T${returnTime}:00`)

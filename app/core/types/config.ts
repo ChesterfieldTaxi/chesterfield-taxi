@@ -135,6 +135,12 @@ export interface SurchargesConfig {
   cancellationFee?: number; // alias
   cancellationWindowMinutes?: number; // 60 min
   noShowFee: number; // e.g. $28.00
+  // Built-in Fuel / Gas Surcharge
+  isFuelSurchargeActive?: boolean;
+  fuelSurchargeType?: 'flat' | 'per_mile' | 'percent';
+  fuelSurchargeAmount?: number; // e.g. $2.50 flat, $0.15/mi, or 5%
+  fuelSurchargeApplicableTariffs?: string[];
+  waiveFuelSurcharge?: boolean;
   airportFeeApplicableTariffs?: string[];
   surgeApplicableTariffs?: string[];
   remoteFeeApplicableTariffs?: string[];
@@ -162,7 +168,7 @@ export interface CustomSurchargeItem {
   name: string;
   description?: string;
   amount: number;
-  type: 'flat' | 'percent';
+  type: 'flat' | 'percent' | 'per_mile';
   isActive: boolean;
   applicableTariffIds?: string[];
   applicableRateIds?: string[];

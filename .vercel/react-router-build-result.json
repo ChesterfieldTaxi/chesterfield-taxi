@@ -31,6 +31,7 @@
       "routes/admin.settings": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dispatch": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/dispatch.popout": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.public-config": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.send-email": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.seed-stress-data": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.payments": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -190,6 +191,13 @@
         "parentId": "root",
         "file": "app/routes/dispatch.popout.tsx",
         "path": "dispatch/popout",
+        "config": {}
+      },
+      "routes/api.public-config": {
+        "id": "routes/api.public-config",
+        "parentId": "root",
+        "file": "app/routes/api.public-config.ts",
+        "path": "api/public-config",
         "config": {}
       },
       "routes/api.send-email": {
@@ -373,6 +381,12 @@
         "file": "routes/dispatch.popout.tsx",
         "path": "dispatch/popout"
       },
+      "routes/api.public-config": {
+        "id": "routes/api.public-config",
+        "parentId": "root",
+        "file": "routes/api.public-config.ts",
+        "path": "api/public-config"
+      },
       "routes/api.send-email": {
         "id": "routes/api.send-email",
         "parentId": "root",
@@ -503,6 +517,10 @@
           {
             "file": "routes/dispatch.popout.tsx",
             "path": "dispatch/popout"
+          },
+          {
+            "file": "routes/api.public-config.ts",
+            "path": "api/public-config"
           },
           {
             "file": "routes/api.send-email.ts",

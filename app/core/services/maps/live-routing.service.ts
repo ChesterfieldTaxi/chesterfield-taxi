@@ -17,7 +17,7 @@ import { isGoogleMapsReady, loadGoogleMaps } from './google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { isRealtimeRoutingEnabled } from '../config/admin-config.service';
 import { routeCache } from './route-cache';
-import { calculateMockRoute } from './mock-routing';
+import { calculateMockRoute, ceilToHalfMile } from './mock-routing';
 import { hasValidRoutingEndpoint } from '../../hooks/useDebounceRoute';
 
 export type RouteEndpointInput = string | google.maps.LatLngLiteral | { lat: number; lng: number };
@@ -181,10 +181,24 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
         return Boolean(wp.location);
       });
 
+    // Symmetric Route Calculation (Option 1: A -> [...stops] -> B -> [...reverseStops] -> A in 1 API call)
+    // Computes both forward and reverse driving legs in a single Google Directions request,
+    // takes Math.max(forwardDistance, reverseDistance), and rounds up to the next 0.5 mi.
+    const forwardLegCount = googleWaypoints.length + 1;
+    const useSymmetricLoop = googleWaypoints.length * 2 + 1 <= 23;
+
+    const requestWaypoints: google.maps.DirectionsWaypoint[] = useSymmetricLoop
+      ? [
+          ...googleWaypoints,
+          { location: googleDestination, stopover: true },
+          ...[...googleWaypoints].reverse(),
+        ]
+      : googleWaypoints;
+
     const directionsRequest: google.maps.DirectionsRequest = {
       origin: googleOrigin,
-      destination: googleDestination,
-      waypoints: googleWaypoints,
+      destination: useSymmetricLoop ? googleOrigin : googleDestination,
+      waypoints: requestWaypoints,
       travelMode: google.maps.TravelMode.DRIVING,
       avoidTolls,
       avoidHighways,
@@ -199,26 +213,32 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       return null;
     }
 
-    let totalMeters = 0;
-    let totalSeconds = 0;
-    let totalTrafficSeconds = 0;
+    const forwardRawLegs = useSymmetricLoop
+      ? route.legs.slice(0, forwardLegCount)
+      : route.legs;
+    const reverseRawLegs = useSymmetricLoop
+      ? route.legs.slice(forwardLegCount)
+      : [];
+
+    let forwardMeters = 0;
+    let forwardSeconds = 0;
+    let forwardTrafficSeconds = 0;
     let hasTraffic = false;
 
-    const legs = route.legs.map((leg: google.maps.DirectionsLeg) => {
+    const legs = forwardRawLegs.map((leg: google.maps.DirectionsLeg) => {
       const legMeters = leg.distance?.value ?? 0;
       const legSeconds = leg.duration?.value ?? 0;
-      totalMeters += legMeters;
-      totalSeconds += legSeconds;
+      forwardMeters += legMeters;
+      forwardSeconds += legSeconds;
 
       if (leg.duration_in_traffic?.value) {
         hasTraffic = true;
-        totalTrafficSeconds += leg.duration_in_traffic.value;
+        forwardTrafficSeconds += leg.duration_in_traffic.value;
       } else {
-        totalTrafficSeconds += legSeconds;
+        forwardTrafficSeconds += legSeconds;
       }
 
-      // Convert leg meters to statute miles with float precision: totalMeters / 1609.344
-      const legMiles = Math.round((legMeters / 1609.344) * 100) / 100;
+      const legMiles = Math.max(0.5, ceilToHalfMile(legMeters / 1609.344));
       const legMinutes = Math.max(1, Math.ceil(legSeconds / 60));
 
       return {
@@ -231,18 +251,54 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       };
     });
 
-    // Statute miles float precision with 2 decimal places: Math.round((totalMeters / 1609.344) * 100) / 100
-    // 1 statute mile = 1609.344 meters exactly
-    const distanceMiles = Math.max(0.1, Math.round((totalMeters / 1609.344) * 100) / 100);
+    let reverseMeters = 0;
+    let reverseSeconds = 0;
+    let reverseTrafficSeconds = 0;
+
+    for (const rLeg of reverseRawLegs) {
+      const rMeters = rLeg.distance?.value ?? 0;
+      const rSeconds = rLeg.duration?.value ?? 0;
+      reverseMeters += rMeters;
+      reverseSeconds += rSeconds;
+      if (rLeg.duration_in_traffic?.value) {
+        hasTraffic = true;
+        reverseTrafficSeconds += rLeg.duration_in_traffic.value;
+      } else {
+        reverseTrafficSeconds += rSeconds;
+      }
+    }
+
+    const totalMeters = Math.max(forwardMeters, reverseMeters);
+    const totalSeconds = Math.max(forwardSeconds, reverseSeconds);
+    const totalTrafficSeconds = Math.max(forwardTrafficSeconds, reverseTrafficSeconds);
+
+    // Ceiling to next 0.5 statute mile on top of max(forward, reverse)
+    // 1 statute mile = 1609.344 meters
+    const rawMaxMiles = totalMeters / 1609.344;
+    const distanceMiles = Math.max(0.5, ceilToHalfMile(rawMaxMiles));
     const durationMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
     const durationInTrafficMinutes = hasTraffic
       ? Math.max(durationMinutes, Math.ceil(totalTrafficSeconds / 60))
       : undefined;
 
+    // For single-leg trips, ensure the leg reflects the symmetric quantized distance
+    if (legs.length === 1) {
+      legs[0].distanceMiles = distanceMiles;
+      legs[0].distanceMeters = totalMeters;
+      legs[0].durationMinutes = durationMinutes;
+      legs[0].durationSeconds = totalSeconds;
+    }
+
+    const resolvedStartAddress =
+      forwardRawLegs[0]?.start_address ?? endpointToString(origin);
+    const resolvedEndAddress =
+      forwardRawLegs[forwardRawLegs.length - 1]?.end_address ?? endpointToString(destination);
+
     // Output debugging logs to browser console for verification
-    console.log('[LiveRoute]', {
-      totalMeters,
-      miles: distanceMiles,
+    console.log('[LiveRoute Symmetric]', {
+      forwardMiles: Math.round((forwardMeters / 1609.344) * 100) / 100,
+      reverseMiles: Math.round((reverseMeters / 1609.344) * 100) / 100,
+      ceiledSymmetricMiles: distanceMiles,
       minutes: durationMinutes,
       legs,
     });
@@ -253,16 +309,32 @@ export async function calculateLiveRoute(request: LiveRouteRequest): Promise<Liv
       durationMinutes,
       durationSeconds: totalSeconds,
       durationInTrafficMinutes,
-      startAddress: route.legs[0].start_address ?? endpointToString(origin),
-      endAddress: route.legs[route.legs.length - 1].end_address ?? endpointToString(destination),
+      startAddress: resolvedStartAddress,
+      endAddress: resolvedEndAddress,
       overviewPolyline: route.overview_polyline,
       warnings: route.warnings ?? [],
       isLiveGoogleResult: true,
       legs,
     };
 
-    // Client-Side Route Caching: Save to RouteCache
+    // Client-Side Route Caching: Save forward route AND symmetric reverse route to RouteCache
     routeCache.set(cacheKey, liveResult);
+
+    const reverseCacheKey = routeCache.buildKey(
+      destination,
+      origin,
+      [...waypoints].reverse(),
+      request.destinationPlaceId,
+      request.originPlaceId,
+      request.waypointPlaceIds ? [...request.waypointPlaceIds].reverse() : undefined
+    );
+    if (reverseCacheKey !== cacheKey) {
+      routeCache.set(reverseCacheKey, {
+        ...liveResult,
+        startAddress: resolvedEndAddress,
+        endAddress: resolvedStartAddress,
+      });
+    }
 
     return liveResult;
   } catch (err: unknown) {
@@ -324,7 +396,7 @@ export async function calculateLiveDistanceMatrix(
           elements.push({
             originIndex: oIdx,
             destinationIndex: dIdx,
-            distanceMiles: Math.max(0.1, Math.round((meters / 1609.344) * 100) / 100),
+            distanceMiles: Math.max(0.5, ceilToHalfMile(meters / 1609.344)),
             durationMinutes: Math.max(1, Math.ceil(seconds / 60)),
           });
         }

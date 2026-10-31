@@ -36,7 +36,7 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
     isActive: true,
     isDefault: false,
     allowSurgeMultiplier: false,
-    allowOperationalSurcharges: false,
+    allowOperationalSurcharges: true,
     triggers: {
 
       zoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],

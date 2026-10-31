@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { NamedPricingRule, VehicleType, VehicleClass } from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
+import type { ZoneGeofence } from '~/core/types/zone';
+import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -49,6 +51,24 @@ export function PricingRulesPanel({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [availableZones, setAvailableZones] = useState<ZoneGeofence[]>(() => {
+    try {
+      return getZoneService().getActiveZones();
+    } catch {
+      return DEFAULT_ZONES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const unsub = getZoneService().subscribeToZones((zones) => {
+        setAvailableZones(zones.filter((z) => z.isActive && !z.isArchived));
+      });
+      return () => unsub();
+    } catch {
+      // fallback
+    }
+  }, []);
 
   const selectedRule = rules.find((r) => r.id === selectedRuleId) || rules[0];
   const [workingCopy, setWorkingCopy] = useState<NamedPricingRule | null>(
@@ -405,6 +425,44 @@ export function PricingRulesPanel({
                     }
                     className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
                   />
+                  {availableZones.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {availableZones.map((z) => {
+                        const currentZones = workingCopy.triggers.zoneIds || [];
+                        const isSelected = currentZones.includes(z.id);
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => {
+                              const nextZones = isSelected
+                                ? currentZones.filter((id) => id !== z.id)
+                                : [...currentZones, z.id];
+                              setWorkingCopy({
+                                ...workingCopy,
+                                triggers: {
+                                  ...workingCopy.triggers,
+                                  zoneIds: nextZones,
+                                },
+                              });
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer flex items-center gap-1 ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+                            }`}
+                            title={`${z.name} (${z.id})`}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: isSelected ? '#ffffff' : z.color || '#3b82f6' }}
+                            />
+                            {z.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -621,6 +679,27 @@ export function PricingRulesPanel({
                       className="rounded border-slate-300 text-purple-600 focus:ring-0"
                     />
                     <span>Waive Remote Service Radius Fee</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={workingCopy.modifier.overruleSurcharges?.waiveFuelSurcharge || false}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setWorkingCopy({
+                          ...workingCopy,
+                          modifier: {
+                            ...workingCopy.modifier,
+                            overruleSurcharges: {
+                              ...workingCopy.modifier.overruleSurcharges,
+                              waiveFuelSurcharge: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="rounded border-slate-300 text-purple-600 focus:ring-0"
+                    />
+                    <span>Waive Built-In Fuel / Gas Surcharge</span>
                   </label>
                 </div>
               </div>

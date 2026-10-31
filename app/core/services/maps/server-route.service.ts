@@ -14,7 +14,7 @@
 import type { GeoPoint } from '../../types';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { isRealtimeRoutingEnabled } from '../config/admin-config.service';
-import { encodePolyline } from './mock-routing';
+import { encodePolyline, ceilToHalfMile } from './mock-routing';
 import type {
   IServerRouteService,
   RouteRequest,
@@ -178,10 +178,10 @@ export class ServerRouteService implements IServerRouteService {
         totalStraightMiles += isNaN(segMiles) ? 5 : segMiles;
       }
 
-      // Scale by 1.25x road curvature factor
+      // Scale by 1.25x road curvature factor and ceil to next 0.5 mi
       const roadNetworkFactor = 1.25;
-      const distanceMiles = Math.max(0.5, Math.round(totalStraightMiles * roadNetworkFactor * 10) / 10);
-      const distanceMeters = Math.round(distanceMiles * 1609.34);
+      const distanceMiles = Math.max(0.5, ceilToHalfMile(totalStraightMiles * roadNetworkFactor));
+      const distanceMeters = Math.round(distanceMiles * 1609.344);
 
       // Average urban/suburban driving speed (~32 mph average for West County corridors)
       const averageSpeedMph = 32;
@@ -219,12 +219,24 @@ export class ServerRouteService implements IServerRouteService {
     apiKey: string
   ): Promise<RouteResponse | null> {
     try {
-      const originStr = encodeURIComponent(endpointToString(request.origin));
-      const destStr = encodeURIComponent(endpointToString(request.destination));
-      let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originStr}&destination=${destStr}&key=${apiKey}`;
+      const originRaw = endpointToString(request.origin);
+      const destRaw = endpointToString(request.destination);
+      const waypointsRaw = (request.waypoints || []).map((w) => endpointToString(w)).filter(Boolean);
 
-      if (request.waypoints && request.waypoints.length > 0) {
-        const wpStr = request.waypoints.map((w) => endpointToString(w)).join('|');
+      // Symmetric Loop (Option 1: A -> [...stops] -> B -> [...reverseStops] -> A in 1 API call)
+      const forwardLegCount = waypointsRaw.length + 1;
+      const useSymmetricLoop = waypointsRaw.length * 2 + 1 <= 23;
+
+      const originStr = encodeURIComponent(originRaw);
+      const finalDestStr = encodeURIComponent(useSymmetricLoop ? originRaw : destRaw);
+      let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originStr}&destination=${finalDestStr}&key=${apiKey}`;
+
+      const loopWaypoints = useSymmetricLoop
+        ? [...waypointsRaw, destRaw, ...[...waypointsRaw].reverse()]
+        : waypointsRaw;
+
+      if (loopWaypoints.length > 0) {
+        const wpStr = loopWaypoints.join('|');
         url += `&waypoints=${encodeURIComponent(wpStr)}`;
       }
 
@@ -243,29 +255,41 @@ export class ServerRouteService implements IServerRouteService {
       }
 
       const route = data.routes[0];
-      let totalMeters = 0;
-      let totalSeconds = 0;
+      const forwardLegs = useSymmetricLoop ? route.legs.slice(0, forwardLegCount) : route.legs;
+      const reverseLegs = useSymmetricLoop ? route.legs.slice(forwardLegCount) : [];
 
-      for (const leg of route.legs) {
-        totalMeters += leg.distance?.value ?? 0;
-        totalSeconds += leg.duration?.value ?? 0;
+      let forwardMeters = 0;
+      let forwardSeconds = 0;
+      for (const leg of forwardLegs) {
+        forwardMeters += leg.distance?.value ?? 0;
+        forwardSeconds += leg.duration?.value ?? 0;
       }
 
-      const distanceMiles = Math.max(0.1, Math.round((totalMeters / 1609.344) * 100) / 100);
+      let reverseMeters = 0;
+      let reverseSeconds = 0;
+      for (const leg of reverseLegs) {
+        reverseMeters += leg.distance?.value ?? 0;
+        reverseSeconds += leg.duration?.value ?? 0;
+      }
+
+      const totalMeters = Math.max(forwardMeters, reverseMeters);
+      const totalSeconds = Math.max(forwardSeconds, reverseSeconds);
+
+      const distanceMiles = Math.max(0.5, ceilToHalfMile(totalMeters / 1609.344));
       const durationMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
-      const firstLeg = route.legs[0];
-      const lastLeg = route.legs[route.legs.length - 1];
+      const firstLeg = forwardLegs[0] || route.legs[0];
+      const lastForwardLeg = forwardLegs[forwardLegs.length - 1] || route.legs[route.legs.length - 1];
 
       return {
         distanceMiles,
         distanceMeters: totalMeters,
         durationMinutes,
         durationSeconds: totalSeconds,
-        startAddress: firstLeg.start_address ?? resolveEndpointAddress(request.origin, 'Chesterfield, MO'),
-        endAddress: lastLeg.end_address ?? resolveEndpointAddress(request.destination, 'St. Louis, MO'),
-        startLocation: firstLeg.start_location ?? CHESTERFIELD_MO_COORDINATES,
-        endLocation: lastLeg.end_location ?? STL_LAMBERT_COORDINATES,
+        startAddress: firstLeg?.start_address ?? resolveEndpointAddress(request.origin, 'Chesterfield, MO'),
+        endAddress: lastForwardLeg?.end_address ?? resolveEndpointAddress(request.destination, 'St. Louis, MO'),
+        startLocation: firstLeg?.start_location ?? CHESTERFIELD_MO_COORDINATES,
+        endLocation: lastForwardLeg?.end_location ?? STL_LAMBERT_COORDINATES,
         overviewPolyline: route.overview_polyline?.points,
         warnings: route.warnings ?? [],
         isLiveGoogleResult: true,

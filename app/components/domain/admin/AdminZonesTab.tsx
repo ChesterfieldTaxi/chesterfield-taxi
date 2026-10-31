@@ -21,6 +21,7 @@ import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
 import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon, AlertTriangleIcon, ZapIcon } from '../../ui/Icons';
 import { SpecialPlacesAdminPanel } from './places/SpecialPlacesAdminPanel';
+import { InteractiveZoneGoogleMap } from './zones/InteractiveZoneGoogleMap';
 
 type AdminZonesSubTab = 'places' | 'zones' | 'groups' | 'collections' | 'blacklists';
 
@@ -28,8 +29,9 @@ export interface AdminZonesTabProps {
   initialSubTab?: AdminZonesSubTab;
 }
 
-export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>(initialSubTab || 'places');
+export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
+  const [activeSubTab, setActiveSubTab] = useState<AdminZonesSubTab>(initialSubTab || 'zones');
+  const [mapMode, setMapMode] = useState<'google' | 'schematic'>('google');
 
   useEffect(() => {
     if (initialSubTab) {
@@ -263,6 +265,22 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
     };
   };
 
+  const unprojectFromMap = (xPct: number, yPct: number): ZoneCoordinate => {
+    const lng = mapCenter.lng - lngSpan / 2 + (xPct / 100) * lngSpan;
+    const lat = mapCenter.lat + latSpan / 2 - (yPct / 100) * latSpan;
+    return {
+      lat: Number(lat.toFixed(5)),
+      lng: Number(lng.toFixed(5)),
+    };
+  };
+
+  const generateBoxVertices = (center: ZoneCoordinate = { lat: 38.6631, lng: -90.5771 }): ZoneCoordinate[] => [
+    { lat: Number((center.lat + 0.035).toFixed(5)), lng: Number((center.lng - 0.05).toFixed(5)) },
+    { lat: Number((center.lat + 0.035).toFixed(5)), lng: Number((center.lng + 0.05).toFixed(5)) },
+    { lat: Number((center.lat - 0.035).toFixed(5)), lng: Number((center.lng + 0.05).toFixed(5)) },
+    { lat: Number((center.lat - 0.035).toFixed(5)), lng: Number((center.lng - 0.05).toFixed(5)) },
+  ];
+
   // --------------------------------------------------------------------------
   // Zones Handlers
   // --------------------------------------------------------------------------
@@ -274,6 +292,7 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
       type: 'radius',
       center: { lat: 38.6631, lng: -90.5771 },
       radiusMiles: 3.5,
+      vertices: [],
       color: '#3b82f6',
       surchargeMultiplier: 1.0,
       flatFee: 0,
@@ -282,8 +301,28 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
     setIsEditingZone(true);
   };
 
+  const handleStartDrawPolygonZone = () => {
+    setZoneFormData({
+      id: '',
+      name: '',
+      description: '',
+      type: 'polygon',
+      center: { lat: 38.6631, lng: -90.5771 },
+      vertices: [],
+      color: '#8b5cf6',
+      surchargeMultiplier: 1.0,
+      flatFee: 0,
+      isActive: true,
+    });
+    setIsEditingZone(true);
+  };
+
   const handleStartEditZone = (zone: ZoneGeofence) => {
-    setZoneFormData({ ...zone });
+    setZoneFormData({
+      ...zone,
+      center: zone.center || { lat: 38.6631, lng: -90.5771 },
+      vertices: zone.vertices ? [...zone.vertices] : [],
+    });
     setSelectedZoneId(zone.id);
     setIsEditingZone(true);
   };
@@ -291,6 +330,11 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
   const handleSaveZone = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!zoneFormData.name.trim()) return;
+
+    if (zoneFormData.type === 'polygon' && (!zoneFormData.vertices || zoneFormData.vertices.length < 3)) {
+      setSaveError('A polygon geofence requires at least 3 boundary points. Click on the map to add vertices.');
+      return;
+    }
 
     try {
       setSaveError(null);
@@ -687,13 +731,22 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
               </Button>
               <Button
                 type="button"
-                variant="primary"
+                variant="outline"
                 size="sm"
                 onClick={handleStartCreateZone}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+                className="text-xs font-bold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
-                Create Zone
+                Create Radius Zone
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleStartDrawPolygonZone}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+              >
+                ✏️ Draw Polygon Zone
               </Button>
             </>
           )}
@@ -1336,12 +1389,18 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                       <select
                         className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                         value={zoneFormData.type}
-                        onChange={(e) =>
-                          setZoneFormData((prev) => ({ ...prev, type: e.target.value as any }))
-                        }
+                        onChange={(e) => {
+                          const nextType = e.target.value as 'radius' | 'polygon';
+                          setZoneFormData((prev) => ({
+                            ...prev,
+                            type: nextType,
+                            center: prev.center || { lat: 38.6631, lng: -90.5771 },
+                            vertices: prev.vertices || [],
+                          }));
+                        }}
                       >
                         <option value="radius">Radius Circle (Center + Miles)</option>
-                        <option value="polygon">Custom Polygon Geofence</option>
+                        <option value="polygon">Custom Polygon Geofence (Draw on Map)</option>
                       </select>
                     </div>
                   </div>
@@ -1355,25 +1414,218 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                     }
                   />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {zoneFormData.type === 'radius' && (
-                      <Input
-                        label="Radius (Miles)"
-                        type="number"
-                        step="0.5"
-                        min="0.5"
-                        max="50"
-                        value={zoneFormData.radiusMiles || 3.0}
-                        onChange={(e) =>
-                          setZoneFormData((prev) => ({
-                            ...prev,
-                            radiusMiles: parseFloat(e.target.value) || 3.0,
-                          }))
-                        }
-                        required
-                      />
-                    )}
+                  {/* RADIUS GEOFENCE CONTROLS */}
+                  {zoneFormData.type === 'radius' && (
+                    <div className="p-3 rounded-xl bg-white border border-blue-200 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800">
+                          ⭕ Radius Center &amp; Perimeter
+                        </span>
+                        <span className="text-[10px] font-medium text-slate-500">
+                          Click map or drag circle to reposition
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        <Input
+                          label="Center Lat"
+                          type="number"
+                          step="0.0001"
+                          value={zoneFormData.center?.lat ?? 38.6631}
+                          onChange={(e) =>
+                            setZoneFormData((prev) => ({
+                              ...prev,
+                              center: {
+                                lat: parseFloat(e.target.value) || 38.6631,
+                                lng: prev.center?.lng ?? -90.5771,
+                              },
+                            }))
+                          }
+                        />
+                        <Input
+                          label="Center Lng"
+                          type="number"
+                          step="0.0001"
+                          value={zoneFormData.center?.lng ?? -90.5771}
+                          onChange={(e) =>
+                            setZoneFormData((prev) => ({
+                              ...prev,
+                              center: {
+                                lat: prev.center?.lat ?? 38.6631,
+                                lng: parseFloat(e.target.value) || -90.5771,
+                              },
+                            }))
+                          }
+                        />
+                        <Input
+                          label="Radius (Miles)"
+                          type="number"
+                          step="0.5"
+                          min="0.25"
+                          max="50"
+                          value={zoneFormData.radiusMiles || 3.0}
+                          onChange={(e) =>
+                            setZoneFormData((prev) => ({
+                              ...prev,
+                              radiusMiles: parseFloat(e.target.value) || 3.0,
+                            }))
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
 
+                  {/* POLYGON GEOFENCE DRAWING & VERTEX EDITOR */}
+                  {zoneFormData.type === 'polygon' && (
+                    <div className="p-3 rounded-xl bg-white border border-indigo-200 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                            <span>📐 Polygon Boundary Vertices</span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                (zoneFormData.vertices?.length || 0) >= 3
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {zoneFormData.vertices?.length || 0} pts (min 3)
+                            </span>
+                          </span>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Click anywhere on the map on the right to drop polygon corner points.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setZoneFormData((prev) => ({
+                                ...prev,
+                                vertices: (prev.vertices || []).slice(0, -1),
+                              }))
+                            }
+                            disabled={(zoneFormData.vertices?.length || 0) === 0}
+                            className="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-[10px] font-bold text-slate-700"
+                          >
+                            Undo Point
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setZoneFormData((prev) => ({
+                                ...prev,
+                                vertices: generateBoxVertices(prev.center || { lat: 38.6631, lng: -90.5771 }),
+                              }))
+                            }
+                            className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[10px] font-bold text-indigo-700"
+                          >
+                            4-Pt Box Preset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setZoneFormData((prev) => ({
+                                ...prev,
+                                vertices: [],
+                              }))
+                            }
+                            disabled={(zoneFormData.vertices?.length || 0) === 0}
+                            className="px-2 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-[10px] font-bold text-rose-700"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setZoneFormData((prev) => {
+                                const pts = prev.vertices || [];
+                                const last = pts[pts.length - 1] || prev.center || { lat: 38.6631, lng: -90.5771 };
+                                return {
+                                  ...prev,
+                                  vertices: [
+                                    ...pts,
+                                    {
+                                      lat: Number((last.lat + 0.008).toFixed(5)),
+                                      lng: Number((last.lng + 0.008).toFixed(5)),
+                                    },
+                                  ],
+                                };
+                              })
+                            }
+                            className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-white"
+                          >
+                            + Add Coord
+                          </button>
+                        </div>
+                      </div>
+
+                      {(zoneFormData.vertices?.length || 0) === 0 ? (
+                        <div className="p-3 rounded-lg bg-indigo-50/70 border border-dashed border-indigo-200 text-center text-[11px] font-semibold text-indigo-800">
+                          Click on the interactive map canvas to place your first polygon vertex, or click &ldquo;4-Pt Box Preset&rdquo; to start with a rectangle and drag its corners.
+                        </div>
+                      ) : (
+                        <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                          {(zoneFormData.vertices || []).map((v, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-xs"
+                            >
+                              <span className="w-6 text-[10px] font-extrabold text-indigo-700">
+                                #{idx + 1}
+                              </span>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={v.lat}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setZoneFormData((prev) => {
+                                    const next = [...(prev.vertices || [])];
+                                    next[idx] = { ...next[idx], lat: val };
+                                    return { ...prev, vertices: next };
+                                  });
+                                }}
+                                className="w-full h-7 px-2 rounded border border-slate-300 bg-white font-mono text-[11px] text-slate-800"
+                                title="Latitude"
+                              />
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={v.lng}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setZoneFormData((prev) => {
+                                    const next = [...(prev.vertices || [])];
+                                    next[idx] = { ...next[idx], lng: val };
+                                    return { ...prev, vertices: next };
+                                  });
+                                }}
+                                className="w-full h-7 px-2 rounded border border-slate-300 bg-white font-mono text-[11px] text-slate-800"
+                                title="Longitude"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setZoneFormData((prev) => ({
+                                    ...prev,
+                                    vertices: (prev.vertices || []).filter((_, i) => i !== idx),
+                                  }))
+                                }
+                                className="px-1.5 py-0.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-bold"
+                                title="Remove Vertex"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input
                       label="Flat Surcharge ($)"
                       type="number"
@@ -2238,138 +2490,572 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
         {/* Right Column (7 cols): Interactive Regional Canvas */}
         <div className="lg:col-span-7 space-y-4">
           <Card variant="elevated" className="border-slate-200 bg-white shadow-xs overflow-hidden">
-            <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-900 text-white flex flex-row items-center justify-between">
+            <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-900 text-white flex flex-row flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
                   <span>🗺️</span>
-                  <span>Chesterfield &amp; St. Louis Regional Canvas</span>
+                  <span>Chesterfield &amp; St. Louis Regional Geofence Map</span>
                 </CardTitle>
                 <CardDescription className="text-[10px] text-slate-400">
-                  {activeSubTab === 'zones' && 'Spatial visualization of geofences & radius perimeters'}
+                  {activeSubTab === 'zones' &&
+                    (isEditingZone
+                      ? zoneFormData.type === 'polygon'
+                        ? 'POLYGON DRAW MODE: Click anywhere on the map to add vertices, or drag existing handles'
+                        : 'RADIUS EDIT MODE: Click on the map or drag center to position radius circle'
+                      : 'Spatial visualization of polygon geofences & radius perimeters')}
                   {activeSubTab === 'groups' && 'Cluster visualization of unified Zone Groups'}
                   {activeSubTab === 'collections' && 'Points of Interest with interactive proximity buffers'}
+                  {activeSubTab === 'blacklists' && 'Restricted & blacklisted security zones'}
                 </CardDescription>
               </div>
 
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setMapZoom((z) => Math.max(0.8, z - 0.2))}
-                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold"
-                >
-                  -
-                </button>
-                <span className="text-[11px] font-mono text-slate-400">{Math.round(mapZoom * 100)}%</span>
-                <button
-                  type="button"
-                  onClick={() => setMapZoom((z) => Math.min(1.6, z + 0.2))}
-                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMapZoom(1)}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300"
-                >
-                  Reset
-                </button>
+              <div className="flex items-center gap-2">
+                {/* Map Engine Toggle: Live Google Map vs Schematic Grid */}
+                <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setMapMode('google')}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors ${
+                      mapMode === 'google'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    🌎 Live Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapMode('schematic')}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors ${
+                      mapMode === 'schematic'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    📐 Schematic
+                  </button>
+                </div>
+
+                {/* Zoom Controls for Schematic Mode */}
+                {mapMode === 'schematic' && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMapZoom((z) => Math.max(0.8, z - 0.2))}
+                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold"
+                    >
+                      -
+                    </button>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {Math.round(mapZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMapZoom((z) => Math.min(1.6, z + 0.2))}
+                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapZoom(1)}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                )}
               </div>
             </CardHeader>
 
-            <CardContent className="p-0 relative bg-slate-950 h-[480px] overflow-hidden">
-              {/* Scale container */}
-              <div
-                className="w-full h-full relative select-none transition-transform duration-200"
-                style={{ transform: `scale(${mapZoom})`, transformOrigin: 'center center' }}
-              >
-                {/* SVG Base Road / River Grid */}
-                <svg className="w-full h-full absolute inset-0 pointer-events-none opacity-20">
-                  <defs>
-                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#38bdf8" strokeWidth="0.5" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#grid)" />
-                  <path
-                    d="M 10 10 Q 40 40 60 20 T 100 30"
-                    fill="none"
-                    stroke="#0284c7"
-                    strokeWidth="4"
-                    opacity="0.4"
-                  />
-                  <line
-                    x1="10"
-                    y1="60"
-                    x2="90"
-                    y2="55"
-                    stroke="#94a3b8"
-                    strokeWidth="3"
-                    strokeDasharray="4 2"
-                    opacity="0.6"
-                  />
-                  <line
-                    x1="55"
-                    y1="10"
-                    x2="55"
-                    y2="90"
-                    stroke="#94a3b8"
-                    strokeWidth="2"
-                    strokeDasharray="4 2"
-                    opacity="0.4"
-                  />
-                </svg>
-
-                {/* Regional Landmark Badges */}
-                <div className="absolute left-[20%] top-[48%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                    ✈️ Spirit of St. Louis
+            {/* Active Polygon / Radius Drawing Floating Toolbar */}
+            {activeSubTab === 'zones' && isEditingZone && (
+              <div className="bg-indigo-950/95 border-b border-indigo-800 px-3.5 py-2 text-white flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-bold text-indigo-100">
+                    {zoneFormData.type === 'polygon'
+                      ? `Drawing Polygon "${zoneFormData.name || 'New Zone'}" (${zoneFormData.vertices?.length || 0} vertices)`
+                      : `Positioning Radius "${zoneFormData.name || 'New Zone'}" (${zoneFormData.radiusMiles || 3} mi)`}
                   </span>
-                </div>
-                <div className="absolute left-[38%] top-[52%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                    🏢 Chesterfield Valley
-                  </span>
-                </div>
-                <div className="absolute left-[70%] top-[25%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                    🛫 STL Lambert Int'l
-                  </span>
-                </div>
-                <div className="absolute left-[88%] top-[65%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                    🏛️ Gateway Arch &amp; Busch Stadium
+                  <span className="text-[11px] text-indigo-300 hidden sm:inline">
+                    {zoneFormData.type === 'polygon'
+                      ? '— Click map to add points • Drag points to reshape • Right-click vertex on Live Map to delete'
+                      : '— Click map to move center'}
                   </span>
                 </div>
 
-                {/* Dynamic SVG Entities */}
-                <svg className="w-full h-full absolute inset-0 pointer-events-auto">
-                  {/* Render Zones (both in 'zones' and 'groups' sub-tab) */}
-                  {(activeSubTab === 'zones' || activeSubTab === 'groups') &&
-                    zones.map((zone) => {
-                      const isSelectedZone = activeSubTab === 'zones' && selectedZoneId === zone.id;
-                      const isGroupMember =
-                        activeSubTab === 'groups' && selectedGroup?.zoneIds.includes(zone.id);
+                {zoneFormData.type === 'polygon' && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setZoneFormData((prev) => ({
+                          ...prev,
+                          vertices: (prev.vertices || []).slice(0, -1),
+                        }))
+                      }
+                      disabled={(zoneFormData.vertices?.length || 0) === 0}
+                      className="px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 text-[11px] font-bold text-indigo-100 border border-indigo-700"
+                    >
+                      ↩ Undo Last Point
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setZoneFormData((prev) => ({
+                          ...prev,
+                          vertices: generateBoxVertices(
+                            prev.center || { lat: 38.6631, lng: -90.5771 }
+                          ),
+                        }))
+                      }
+                      className="px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-[11px] font-bold text-white"
+                    >
+                      ⬛ 4-Point Box
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoneFormData((prev) => ({ ...prev, vertices: [] }))}
+                      disabled={(zoneFormData.vertices?.length || 0) === 0}
+                      className="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 disabled:opacity-40 text-[11px] font-bold text-rose-100 border border-rose-700"
+                    >
+                      ✕ Clear Points
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
-                      const strokeColor = isGroupMember
-                        ? selectedGroup?.color || '#6366f1'
-                        : zone.color || '#3b82f6';
+            <CardContent className="p-0 relative bg-slate-950 h-[520px] overflow-hidden">
+              {mapMode === 'google' ? (
+                <InteractiveZoneGoogleMap
+                  zones={zones}
+                  selectedZoneId={selectedZoneId}
+                  onSelectZone={(id) => {
+                    if (activeSubTab === 'zones') setSelectedZoneId(id);
+                  }}
+                  isEditingZone={activeSubTab === 'zones' && isEditingZone}
+                  zoneFormData={zoneFormData}
+                  onChangeZoneFormData={setZoneFormData}
+                  activeSubTab={activeSubTab}
+                  selectedGroup={selectedGroup}
+                  locationCollections={locationCollections}
+                  selectedCollectionId={selectedCollectionId}
+                  selectedPoiId={selectedPoiId}
+                  onSelectPoi={(poiId, collId) => {
+                    setSelectedPoiId(poiId);
+                    setSelectedCollectionId(collId);
+                  }}
+                  blacklistedLocations={blacklistedLocations}
+                  selectedBlacklistId={selectedBlacklistId}
+                  onSelectBlacklist={(id) => setSelectedBlacklistId(id)}
+                  onFallbackToSchematic={() => setMapMode('schematic')}
+                />
+              ) : (
+                /* Scale container for Schematic Fallback */
+                <div
+                  className={`w-full h-full relative select-none transition-transform duration-200 ${
+                    activeSubTab === 'zones' && isEditingZone ? 'cursor-crosshair' : ''
+                  }`}
+                  style={{ transform: `scale(${mapZoom})`, transformOrigin: 'center center' }}
+                  onClick={(e) => {
+                    if (!(activeSubTab === 'zones' && isEditingZone)) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+                    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+                    const coord = unprojectFromMap(xPct, yPct);
+                    if (zoneFormData.type === 'polygon') {
+                      setZoneFormData((prev) => ({
+                        ...prev,
+                        vertices: [...(prev.vertices || []), coord],
+                      }));
+                    } else {
+                      setZoneFormData((prev) => ({
+                        ...prev,
+                        center: coord,
+                      }));
+                    }
+                  }}
+                >
+                  {/* SVG Base Road / River Grid */}
+                  <svg className="w-full h-full absolute inset-0 pointer-events-none opacity-20">
+                    <defs>
+                      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#38bdf8" strokeWidth="0.5" />
+                      </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                    <path
+                      d="M 10 10 Q 40 40 60 20 T 100 30"
+                      fill="none"
+                      stroke="#0284c7"
+                      strokeWidth="4"
+                      opacity="0.4"
+                    />
+                    <line
+                      x1="10"
+                      y1="60"
+                      x2="90"
+                      y2="55"
+                      stroke="#94a3b8"
+                      strokeWidth="3"
+                      strokeDasharray="4 2"
+                      opacity="0.6"
+                    />
+                    <line
+                      x1="55"
+                      y1="10"
+                      x2="55"
+                      y2="90"
+                      stroke="#94a3b8"
+                      strokeWidth="2"
+                      strokeDasharray="4 2"
+                      opacity="0.4"
+                    />
+                  </svg>
 
-                      const fillOpacity = isSelectedZone || isGroupMember ? 0.35 : 0.15;
-                      const strokeWidth = isSelectedZone || isGroupMember ? 3 : 1.5;
+                  {/* Regional Landmark Badges */}
+                  <div className="absolute left-[20%] top-[48%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
+                      ✈️ Spirit of St. Louis
+                    </span>
+                  </div>
+                  <div className="absolute left-[38%] top-[52%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
+                      🏢 Chesterfield Valley
+                    </span>
+                  </div>
+                  <div className="absolute left-[70%] top-[25%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
+                      🛫 STL Lambert Int&apos;l
+                    </span>
+                  </div>
+                  <div className="absolute left-[88%] top-[65%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
+                      🏛️ Gateway Arch &amp; Busch Stadium
+                    </span>
+                  </div>
 
-                      if (zone.type === 'radius' && zone.center) {
-                        const pt = projectToMap(zone.center);
-                        const radiusPx = (zone.radiusMiles || 3) * 14;
+                  {/* Normalized 0..100 SVG for Polygon Rendering */}
+                  <svg
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                    className="w-full h-full absolute inset-0 pointer-events-none"
+                  >
+                    {(activeSubTab === 'zones' || activeSubTab === 'groups') &&
+                      zones.map((zone) => {
+                        if (isEditingZone && zoneFormData.id === zone.id) return null;
+                        if (zone.type !== 'polygon' || !zone.vertices || zone.vertices.length < 3) {
+                          return null;
+                        }
+                        const isSelectedZone = activeSubTab === 'zones' && selectedZoneId === zone.id;
+                        const isGroupMember =
+                          activeSubTab === 'groups' && selectedGroup?.zoneIds.includes(zone.id);
+                        const strokeColor = isGroupMember
+                          ? selectedGroup?.color || '#6366f1'
+                          : zone.color || '#3b82f6';
+                        const fillOpacity = isSelectedZone || isGroupMember ? 0.35 : 0.15;
+                        const pointsStr = zone.vertices
+                          .map((v) => {
+                            const pt = projectToMap(v);
+                            return `${pt.x},${pt.y}`;
+                          })
+                          .join(' ');
+                        return (
+                          <polygon
+                            key={zone.id}
+                            points={pointsStr}
+                            fill={strokeColor}
+                            fillOpacity={fillOpacity}
+                            stroke={strokeColor}
+                            strokeWidth={isSelectedZone || isGroupMember ? 1.2 : 0.6}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        );
+                      })}
+
+                    {/* Draft Polygon Preview in Schematic Mode */}
+                    {activeSubTab === 'zones' &&
+                      isEditingZone &&
+                      zoneFormData.type === 'polygon' &&
+                      (zoneFormData.vertices?.length || 0) >= 2 && (
+                        <polygon
+                          points={(zoneFormData.vertices || [])
+                            .map((v) => {
+                              const pt = projectToMap(v);
+                              return `${pt.x},${pt.y}`;
+                            })
+                            .join(' ')}
+                          fill={zoneFormData.color || '#4f46e5'}
+                          fillOpacity={0.35}
+                          stroke={zoneFormData.color || '#4f46e5'}
+                          strokeWidth={1.5}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )}
+                  </svg>
+
+                  {/* Dynamic SVG Entities */}
+                  <svg className="w-full h-full absolute inset-0 pointer-events-auto">
+                    {/* Render Zones (both in 'zones' and 'groups' sub-tab) */}
+                    {(activeSubTab === 'zones' || activeSubTab === 'groups') &&
+                      zones.map((zone) => {
+                        if (isEditingZone && zoneFormData.id === zone.id) return null;
+                        const isSelectedZone = activeSubTab === 'zones' && selectedZoneId === zone.id;
+                        const isGroupMember =
+                          activeSubTab === 'groups' && selectedGroup?.zoneIds.includes(zone.id);
+
+                        const strokeColor = isGroupMember
+                          ? selectedGroup?.color || '#6366f1'
+                          : zone.color || '#3b82f6';
+
+                        const fillOpacity = isSelectedZone || isGroupMember ? 0.35 : 0.15;
+                        const strokeWidth = isSelectedZone || isGroupMember ? 3 : 1.5;
+
+                        if (zone.type === 'radius' && zone.center) {
+                          const pt = projectToMap(zone.center);
+                          const radiusPx = (zone.radiusMiles || 3) * 14;
+
+                          return (
+                            <g
+                              key={zone.id}
+                              onClick={(ev) => {
+                                if (isEditingZone) return;
+                                ev.stopPropagation();
+                                if (activeSubTab === 'zones') setSelectedZoneId(zone.id);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <circle
+                                cx={`${pt.x}%`}
+                                cy={`${pt.y}%`}
+                                r={radiusPx}
+                                fill={strokeColor}
+                                fillOpacity={fillOpacity}
+                                stroke={strokeColor}
+                                strokeWidth={strokeWidth}
+                                strokeDasharray={zone.isActive ? undefined : '4 4'}
+                              />
+                              <circle
+                                cx={`${pt.x}%`}
+                                cy={`${pt.y}%`}
+                                r={4}
+                                fill={strokeColor}
+                                stroke="#ffffff"
+                                strokeWidth={1.5}
+                              />
+                              <text
+                                x={`${pt.x}%`}
+                                y={`${pt.y}%`}
+                                dy={radiusPx + 12}
+                                textAnchor="middle"
+                                fill="#ffffff"
+                                fontSize="9"
+                                fontWeight="bold"
+                                className="select-none shadow-xs"
+                              >
+                                {zone.name}
+                              </text>
+                            </g>
+                          );
+                        } else if (zone.type === 'polygon' && zone.vertices && zone.vertices.length > 2) {
+                          const avgLat =
+                            zone.vertices.reduce((acc, v) => acc + v.lat, 0) / zone.vertices.length;
+                          const avgLng =
+                            zone.vertices.reduce((acc, v) => acc + v.lng, 0) / zone.vertices.length;
+                          const centerPt = projectToMap({ lat: avgLat, lng: avgLng });
+
+                          return (
+                            <g
+                              key={zone.id}
+                              onClick={(ev) => {
+                                if (isEditingZone) return;
+                                ev.stopPropagation();
+                                if (activeSubTab === 'zones') setSelectedZoneId(zone.id);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              {zone.vertices.map((v, vIdx) => {
+                                const vPt = projectToMap(v);
+                                return (
+                                  <circle
+                                    key={vIdx}
+                                    cx={`${vPt.x}%`}
+                                    cy={`${vPt.y}%`}
+                                    r={3.5}
+                                    fill={strokeColor}
+                                    stroke="#ffffff"
+                                    strokeWidth={1}
+                                  />
+                                );
+                              })}
+                              <text
+                                x={`${centerPt.x}%`}
+                                y={`${centerPt.y}%`}
+                                textAnchor="middle"
+                                fill="#ffffff"
+                                fontSize="9"
+                                fontWeight="bold"
+                                className="select-none"
+                              >
+                                {zone.name}
+                              </text>
+                            </g>
+                          );
+                        }
+                        return null;
+                      })}
+
+                    {/* Render Active Draft Zone in Schematic Mode */}
+                    {activeSubTab === 'zones' &&
+                      isEditingZone &&
+                      zoneFormData.type === 'radius' &&
+                      zoneFormData.center && (
+                        <g className="pointer-events-none">
+                          {(() => {
+                            const pt = projectToMap(zoneFormData.center);
+                            const radiusPx = (zoneFormData.radiusMiles || 3) * 14;
+                            const color = zoneFormData.color || '#2563eb';
+                            return (
+                              <>
+                                <circle
+                                  cx={`${pt.x}%`}
+                                  cy={`${pt.y}%`}
+                                  r={radiusPx}
+                                  fill={color}
+                                  fillOpacity={0.35}
+                                  stroke={color}
+                                  strokeWidth={3}
+                                />
+                                <circle
+                                  cx={`${pt.x}%`}
+                                  cy={`${pt.y}%`}
+                                  r={6}
+                                  fill={color}
+                                  stroke="#ffffff"
+                                  strokeWidth={2}
+                                />
+                              </>
+                            );
+                          })()}
+                        </g>
+                      )}
+
+                    {activeSubTab === 'zones' &&
+                      isEditingZone &&
+                      zoneFormData.type === 'polygon' &&
+                      (zoneFormData.vertices || []).map((v, idx) => {
+                        const pt = projectToMap(v);
+                        return (
+                          <g
+                            key={idx}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              // Clicking an existing vertex in schematic mode removes it
+                              setZoneFormData((prev) => ({
+                                ...prev,
+                                vertices: (prev.vertices || []).filter((_, i) => i !== idx),
+                              }));
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <circle
+                              cx={`${pt.x}%`}
+                              cy={`${pt.y}%`}
+                              r={7}
+                              fill={zoneFormData.color || '#4f46e5'}
+                              stroke="#ffffff"
+                              strokeWidth={2}
+                            />
+                            <text
+                              x={`${pt.x}%`}
+                              y={`${pt.y}%`}
+                              dy={3}
+                              textAnchor="middle"
+                              fill="#ffffff"
+                              fontSize="8"
+                              fontWeight="bold"
+                              className="select-none"
+                            >
+                              {idx + 1}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                    {/* Render Location Collections (POIs + Proximity Rings) */}
+                    {activeSubTab === 'collections' &&
+                      locationCollections.map((coll) => {
+                        const isCollSelected = selectedCollectionId === coll.id;
+                        if (!coll.locations) return null;
+
+                        return coll.locations.map((loc) => {
+                          const pt = projectToMap(loc.coordinates);
+                          const isPoiSelected = selectedPoiId === loc.id;
+                          const bufferMiles = coll.proximityRadiusMiles ?? 0.5;
+                          const bufferPx = Math.max(12, bufferMiles * 22);
+
+                          return (
+                            <g
+                              key={loc.id}
+                              onClick={() => {
+                                setSelectedPoiId(loc.id);
+                                setSelectedCollectionId(coll.id);
+                              }}
+                              className="cursor-pointer group"
+                            >
+                              <circle
+                                cx={`${pt.x}%`}
+                                cy={`${pt.y}%`}
+                                r={bufferPx}
+                                fill="#10b981"
+                                fillOpacity={isCollSelected || isPoiSelected ? 0.25 : 0.1}
+                                stroke="#10b981"
+                                strokeWidth={isPoiSelected ? 2.5 : 1}
+                                strokeDasharray={isPoiSelected ? undefined : '3 3'}
+                              />
+                              <circle
+                                cx={`${pt.x}%`}
+                                cy={`${pt.y}%`}
+                                r={isPoiSelected ? 8 : 6}
+                                fill={isPoiSelected ? '#059669' : '#10b981'}
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              />
+                              <text
+                                x={`${pt.x}%`}
+                                y={`${pt.y}%`}
+                                dy={bufferPx + 11}
+                                textAnchor="middle"
+                                fill="#ffffff"
+                                fontSize="9"
+                                fontWeight="bold"
+                                className="select-none"
+                              >
+                                {loc.name}
+                              </text>
+                            </g>
+                          );
+                        });
+                      })}
+
+                    {/* Render Blacklisted Locations */}
+                    {activeSubTab === 'blacklists' &&
+                      blacklistedLocations.map((loc) => {
+                        if (!loc.coordinates) return null;
+                        const pt = projectToMap(loc.coordinates);
+                        const isSelected = selectedBlacklistId === loc.id;
+                        const radiusPx = Math.max(12, (loc.radiusMiles || 0.1) * 22);
+                        const strokeColor =
+                          loc.action === 'BLACKLIST_BLOCK' ? '#ef4444' : '#f59e0b';
+                        const fillOpacity = isSelected ? 0.4 : 0.2;
 
                         return (
                           <g
-                            key={zone.id}
-                            onClick={() => {
-                              if (activeSubTab === 'zones') setSelectedZoneId(zone.id);
-                            }}
-                            className="cursor-pointer"
+                            key={loc.id}
+                            onClick={() => setSelectedBlacklistId(loc.id)}
+                            className="cursor-pointer group"
                           >
                             <circle
                               cx={`${pt.x}%`}
@@ -2378,8 +3064,9 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                               fill={strokeColor}
                               fillOpacity={fillOpacity}
                               stroke={strokeColor}
-                              strokeWidth={strokeWidth}
-                              strokeDasharray={zone.isActive ? undefined : '4 4'}
+                              strokeWidth={isSelected ? 3 : 1.5}
+                              strokeDasharray={loc.isActive ? undefined : '4 4'}
+                              className="transition-all duration-300 group-hover:fill-opacity-50"
                             />
                             <circle
                               cx={`${pt.x}%`}
@@ -2392,106 +3079,7 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                             <text
                               x={`${pt.x}%`}
                               y={`${pt.y}%`}
-                              dy={radiusPx + 12}
-                              textAnchor="middle"
-                              fill="#ffffff"
-                              fontSize="9"
-                              fontWeight="bold"
-                              className="select-none shadow-xs"
-                            >
-                              {zone.name}
-                            </text>
-                          </g>
-                        );
-                      } else if (zone.type === 'polygon' && zone.vertices && zone.vertices.length > 2) {
-                        const pointsStr = zone.vertices
-                          .map((v) => {
-                            const pt = projectToMap(v);
-                            return `${pt.x * 4},${pt.y * 3.8}`;
-                          })
-                          .join(' ');
-
-                        return (
-                          <g
-                            key={zone.id}
-                            onClick={() => {
-                              if (activeSubTab === 'zones') setSelectedZoneId(zone.id);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <polygon
-                              points={pointsStr}
-                              fill={strokeColor}
-                              fillOpacity={fillOpacity}
-                              stroke={strokeColor}
-                              strokeWidth={strokeWidth}
-                              strokeDasharray={zone.isActive ? undefined : '4 4'}
-                            />
-                            <text
-                              x="50%"
-                              y="75%"
-                              textAnchor="middle"
-                              fill="#ffffff"
-                              fontSize="9"
-                              fontWeight="bold"
-                              className="select-none"
-                            >
-                              {zone.name}
-                            </text>
-                          </g>
-                        );
-                      }
-                      return null;
-                    })}
-
-                  {/* Render Location Collections (POIs + Proximity Rings) */}
-                  {activeSubTab === 'collections' &&
-                    locationCollections.map((coll) => {
-                      const isCollSelected = selectedCollectionId === coll.id;
-                      if (!coll.locations) return null;
-
-                      return coll.locations.map((loc) => {
-                        const pt = projectToMap(loc.coordinates);
-                        const isPoiSelected = selectedPoiId === loc.id;
-                        const bufferMiles = coll.proximityRadiusMiles ?? 0.5;
-                        const bufferPx = Math.max(12, bufferMiles * 22);
-
-                        return (
-                          <g
-                            key={loc.id}
-                            onClick={() => {
-                              setSelectedPoiId(loc.id);
-                              setSelectedCollectionId(coll.id);
-                            }}
-                            className="cursor-pointer group"
-                          >
-                            {/* Proximity Radius Circle */}
-                            <circle
-                              cx={`${pt.x}%`}
-                              cy={`${pt.y}%`}
-                              r={bufferPx}
-                              fill="#10b981"
-                              fillOpacity={isCollSelected || isPoiSelected ? 0.25 : 0.10}
-                              stroke="#10b981"
-                              strokeWidth={isPoiSelected ? 2.5 : 1}
-                              strokeDasharray={isPoiSelected ? undefined : '3 3'}
-                            />
-
-                            {/* POI Marker Pin */}
-                            <circle
-                              cx={`${pt.x}%`}
-                              cy={`${pt.y}%`}
-                              r={isPoiSelected ? 8 : 6}
-                              fill={isPoiSelected ? '#059669' : '#10b981'}
-                              stroke="#ffffff"
-                              strokeWidth={2}
-                            />
-
-                            {/* Label */}
-                            <text
-                              x={`${pt.x}%`}
-                              y={`${pt.y}%`}
-                              dy={bufferPx + 11}
+                              dy={radiusPx + 11}
                               textAnchor="middle"
                               fill="#ffffff"
                               fontSize="9"
@@ -2502,66 +3090,25 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                             </text>
                           </g>
                         );
-                      });
-                    })}
-
-                  {/* Render Blacklisted Locations */}
-                  {activeSubTab === 'blacklists' &&
-                    blacklistedLocations.map((loc) => {
-                      if (!loc.coordinates) return null;
-                      const pt = projectToMap(loc.coordinates);
-                      const isSelected = selectedBlacklistId === loc.id;
-                      const radiusPx = Math.max(12, (loc.radiusMiles || 0.1) * 22);
-                      const strokeColor = loc.action === 'BLACKLIST_BLOCK' ? '#ef4444' : '#f59e0b';
-                      const fillOpacity = isSelected ? 0.4 : 0.2;
-
-                      return (
-                        <g
-                          key={loc.id}
-                          onClick={() => setSelectedBlacklistId(loc.id)}
-                          className="cursor-pointer group"
-                        >
-                          <circle
-                            cx={`${pt.x}%`}
-                            cy={`${pt.y}%`}
-                            r={radiusPx}
-                            fill={strokeColor}
-                            fillOpacity={fillOpacity}
-                            stroke={strokeColor}
-                            strokeWidth={isSelected ? 3 : 1.5}
-                            strokeDasharray={loc.isActive ? undefined : '4 4'}
-                            className="transition-all duration-300 group-hover:fill-opacity-50"
-                          />
-                          <circle cx={`${pt.x}%`} cy={`${pt.y}%`} r={4} fill={strokeColor} stroke="#ffffff" strokeWidth={1.5} />
-                          <text
-                            x={`${pt.x}%`}
-                            y={`${pt.y}%`}
-                            dy={radiusPx + 11}
-                            textAnchor="middle"
-                            fill="#ffffff"
-                            fontSize="9"
-                            fontWeight="bold"
-                            className="select-none"
-                          >
-                            {loc.name}
-                          </text>
-                        </g>
-                      );
-                    })}
-                </svg>
-              </div>
+                      })}
+                  </svg>
+                </div>
+              )}
 
               {/* Bottom Canvas Overlay Legend */}
-              <div className="absolute bottom-2 left-2 right-2 bg-slate-900/90 backdrop-blur-xs p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+              <div className="absolute bottom-2 left-2 right-2 z-10 bg-slate-900/90 backdrop-blur-xs p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between pointer-events-none">
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-white">
-                    {activeSubTab === 'zones' && 'Active Zone:'}
+                    {activeSubTab === 'zones' && (isEditingZone ? 'Editing Geofence:' : 'Active Zone:')}
                     {activeSubTab === 'groups' && 'Active Zone Group:'}
                     {activeSubTab === 'collections' && 'Active POI / Collection:'}
                     {activeSubTab === 'blacklists' && 'Active Exclusion Zone:'}
                   </span>
                   <span className="text-blue-400 font-semibold">
-                    {activeSubTab === 'zones' && (selectedZone?.name || 'None')}
+                    {activeSubTab === 'zones' &&
+                      (isEditingZone
+                        ? `${zoneFormData.name || 'Untitled'} (${zoneFormData.type === 'polygon' ? `${zoneFormData.vertices?.length || 0} polygon vertices` : `${zoneFormData.radiusMiles || 3} mi radius`})`
+                        : selectedZone?.name || 'None')}
                     {activeSubTab === 'groups' && (selectedGroup?.name || 'None')}
                     {activeSubTab === 'collections' && (selectedCollection?.name || 'None')}
                     {activeSubTab === 'blacklists' && (selectedBlacklist?.name || 'None')}
@@ -2569,7 +3116,12 @@ export function AdminZonesTab({ initialSubTab = 'places' }: AdminZonesTabProps) 
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">
-                    {activeSubTab === 'zones' && 'Click a zone to view perimeter'}
+                    {activeSubTab === 'zones' &&
+                      (isEditingZone
+                        ? zoneFormData.type === 'polygon'
+                          ? 'Click map to add vertices • Drag vertices to adjust'
+                          : 'Click map to reposition radius center'
+                        : 'Click a zone to inspect or click "Draw Polygon Zone"')}
                     {activeSubTab === 'groups' && `${selectedGroup?.zoneIds.length || 0} zones in cluster`}
                     {activeSubTab === 'collections' && `${selectedCollection?.locations?.length || 0} POIs in collection`}
                     {activeSubTab === 'blacklists' && 'Click an exclusion zone to view radius'}

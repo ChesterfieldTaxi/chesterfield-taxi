@@ -26,6 +26,13 @@ export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
   outOfAreaThresholdMiles: 15.0,
   cancellationFeeWithinOneHour: 28.00,
   noShowFee: 28.00,
+  isFuelSurchargeActive: false,
+  fuelSurchargeType: 'flat',
+  fuelSurchargeAmount: 2.50,
+  fuelSurchargeApplicableTariffs: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
+  airportFeeApplicableTariffs: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
+  surgeApplicableTariffs: ['tariff-point-to-point-meter'],
+  remoteFeeApplicableTariffs: ['tariff-point-to-point-meter'],
   customSurcharges: [
     {
       id: 'surcharge-suv-minivan-fee',

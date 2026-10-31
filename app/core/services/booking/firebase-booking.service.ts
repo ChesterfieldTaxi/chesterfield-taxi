@@ -53,8 +53,8 @@ import {
 } from '../zones/zone.service';
 import { getPricingRulesService } from '../pricing/pricing-rules.service';
 import { getTariffService } from '../pricing/tariff.service';
-import { getUniversalExtrasConfig } from '../pricing/extras.service';
-import { getSurchargesConfig } from '../pricing/surcharges.service';
+import { getUniversalExtrasConfig, getUniversalExtrasService } from '../pricing/extras.service';
+import { getSurchargesConfig, getSurchargesService } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
 import { generateTripId } from '../../utils/trip-id.util';
 
@@ -163,7 +163,7 @@ export class FirebaseBookingService implements IBookingService {
     // 4-Pillar Config Hydration: Tariffs, Rules, Universal Extras, and Surcharges
     try {
       const tariffService = getTariffService();
-      const allTariffs = await tariffService.getAllTariffProfiles();
+      const allTariffs = await tariffService.getTariffs();
       if (allTariffs && allTariffs.length > 0) {
         dynamicPricingConfig.tariffs = allTariffs;
       }
@@ -180,21 +180,23 @@ export class FirebaseBookingService implements IBookingService {
     }
 
     try {
-      const extras = await getUniversalExtrasConfig();
+      const extras = await getUniversalExtrasService().getExtras();
       if (extras) {
         dynamicPricingConfig.universalExtras = extras;
       }
     } catch (extrasErr) {
       console.warn('[FirebaseBookingService] Could not load universal extras:', extrasErr);
+      dynamicPricingConfig.universalExtras = getUniversalExtrasConfig();
     }
 
     try {
-      const surcharges = await getSurchargesConfig();
+      const surcharges = await getSurchargesService().getSurcharges();
       if (surcharges) {
         dynamicPricingConfig.surchargesCatalog = surcharges;
       }
     } catch (surchargesErr) {
       console.warn('[FirebaseBookingService] Could not load surcharges:', surchargesErr);
+      dynamicPricingConfig.surchargesCatalog = getSurchargesConfig();
     }
 
     const validIntermediateStops = (request.intermediateStops ?? []).filter((s) => {
