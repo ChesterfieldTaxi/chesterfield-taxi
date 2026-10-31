@@ -111,13 +111,19 @@ export class ResendEmailService implements IEmailDispatchService {
     // 1. Browser client environment -> delegate to serverless API route
     if (isBrowser) {
       try {
-        const requestPayload = {
-          ...request,
-          recipient,
-          subject,
-          html,
-          text,
-        };
+        const isDirect =
+          (request.type as string) === 'direct' ||
+          !request.payload ||
+          Object.keys(request.payload).length === 0;
+        const requestPayload = isDirect
+          ? {
+              ...request,
+              recipient,
+              subject,
+              html,
+              text,
+            }
+          : request;
         const response = await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -126,6 +132,9 @@ export class ResendEmailService implements IEmailDispatchService {
 
         if (response.ok) {
           const result = (await response.json()) as EmailDispatchResult;
+          if (!result.success && result.error) {
+            console.error('[ResendEmailService] /api/send-email reported dispatch failure:', result.error);
+          }
           return result;
         }
 
@@ -229,7 +238,7 @@ export class ResendEmailService implements IEmailDispatchService {
     text?: string;
   }): Promise<EmailDispatchResult> {
     return this.dispatch(
-      { type: 'booking_confirmation' as any, payload: {} as any },
+      { type: 'direct' as any, payload: {} as any },
       params.recipient,
       params.subject,
       params.html,

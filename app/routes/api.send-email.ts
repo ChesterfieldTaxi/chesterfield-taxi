@@ -9,6 +9,14 @@ import type { ActionFunctionArgs } from 'react-router';
 import { ResendEmailService } from '../core/services/email/resend-email.service';
 import type { EmailDispatchApiRequest } from '../core/services/email/types';
 
+const STRUCTURED_EMAIL_TYPES = new Set([
+  'booking_confirmation',
+  'dispatcher_alert',
+  'status_update',
+  'booking_declined',
+  'clarification_request',
+]);
+
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
     return Response.json(
@@ -28,28 +36,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const emailService = new ResendEmailService();
 
+    const isStructuredDispatch =
+      STRUCTURED_EMAIL_TYPES.has(body.type) &&
+      typeof body.payload === 'object' &&
+      body.payload !== null &&
+      Object.keys(body.payload).length > 0;
+
     let result;
-    if (body.subject && body.html && body.recipient) {
-      // Security Guard: Prevent open mail relay - arbitrary HTML sending requires admin authorization
-      const adminSecret = process.env.ADMIN_API_SECRET;
-      const authHeader = request.headers.get('authorization') || request.headers.get('x-admin-secret');
-      const isAuthorized = adminSecret ? authHeader === adminSecret || authHeader === `Bearer ${adminSecret}` : false;
-
-      // In production or when admin secret configured, reject unauthenticated arbitrary emails
-      if (process.env.NODE_ENV === 'production' && !isAuthorized) {
-        return Response.json(
-          { success: false, error: 'Unauthorized: Arbitrary direct email dispatch requires administrator authorization.' },
-          { status: 403 }
-        );
-      }
-
-      result = await emailService.sendDirect({
-        recipient: body.recipient,
-        subject: body.subject,
-        html: body.html,
-        text: body.text,
-      });
-    } else {
+    if (isStructuredDispatch) {
       switch (body.type) {
         case 'booking_confirmation':
           result = await emailService.sendBookingConfirmation(body.payload);
@@ -72,6 +66,31 @@ export async function action({ request }: ActionFunctionArgs) {
             { status: 400 }
           );
       }
+    } else if (body.subject && body.html && body.recipient) {
+      // Security Guard: Prevent open mail relay - arbitrary HTML sending requires admin authorization
+      const adminSecret = process.env.ADMIN_API_SECRET;
+      const authHeader = request.headers.get('authorization') || request.headers.get('x-admin-secret');
+      const isAuthorized = adminSecret ? authHeader === adminSecret || authHeader === `Bearer ${adminSecret}` : false;
+
+      // In production or when admin secret configured, reject unauthenticated arbitrary emails
+      if (process.env.NODE_ENV === 'production' && !isAuthorized) {
+        return Response.json(
+          { success: false, error: 'Unauthorized: Arbitrary direct email dispatch requires administrator authorization.' },
+          { status: 403 }
+        );
+      }
+
+      result = await emailService.sendDirect({
+        recipient: body.recipient,
+        subject: body.subject,
+        html: body.html,
+        text: body.text,
+      });
+    } else {
+      return Response.json(
+        { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },
+        { status: 400 }
+      );
     }
 
     return Response.json(result);

@@ -1174,7 +1174,7 @@ export default function DispatchRoute() {
         : undefined;
 
       // Dispatch confirmation email to passenger
-      await emailService.sendBookingConfirmation({
+      const emailResult = await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
         status: 'CONFIRMED',
         passenger: {
@@ -1240,7 +1240,9 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'system',
           referenceNumber: emailRef,
-          context: `Dispatched confirmation receipt & live tracking link to ${effectiveConfirmedEmail}${targetOverride ? ' (Alternate Override)' : ''}`,
+          context: emailResult.success
+            ? `Dispatched confirmation receipt & live tracking link to ${effectiveConfirmedEmail}${targetOverride ? ' (Alternate Override)' : ''}`
+            : `Confirmation email delivery failed for ${effectiveConfirmedEmail}: ${emailResult.error || 'Email service error'}`,
         },
       ];
 
@@ -1292,6 +1294,13 @@ export default function DispatchRoute() {
         })
       );
       setReviewTrip(updatedConfirmedTrip);
+      if (!emailResult.success) {
+        setReviewAlert({
+          type: 'error',
+          message: `Booking #${reviewTrip.id} confirmed, but email delivery failed: ${emailResult.error || 'Email service error'}`,
+        });
+        return;
+      }
 
       setReviewAlert({
         type: 'success',
@@ -1384,7 +1393,7 @@ export default function DispatchRoute() {
 
       const effectiveRecipient = targetOverride || reviewTrip.passenger.email;
 
-      await emailService.sendBookingConfirmation({
+      const emailResult = await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
         status: reviewTrip.status || 'CONFIRMED',
         passenger: {
@@ -1439,7 +1448,12 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: emailRef,
-          context: `Resent confirmation email to ${effectiveRecipient}${targetOverride ? ' (Alternate Override)' : ''}`,
+          context: (() => {
+            if (!emailResult.success) {
+              throw new Error(emailResult.error || 'Failed to resend confirmation email.');
+            }
+            return `Resent confirmation email to ${effectiveRecipient}${targetOverride ? ' (Alternate Override)' : ''}`;
+          })(),
         },
       ];
 
@@ -1523,7 +1537,7 @@ export default function DispatchRoute() {
 
       // Dispatch decline notification email to passenger
       const emailService = getEmailDispatchService();
-      await emailService.sendBookingDeclined({
+      const declineEmailResult = await emailService.sendBookingDeclined({
         tripId: reviewTrip.id,
         passenger: {
           firstName: reviewTrip.passenger.firstName,
@@ -1563,7 +1577,9 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'system',
           referenceNumber: emailRef,
-          context: `Sent decline notice email to ${reviewTrip.passenger.email}`,
+          context: declineEmailResult.success
+            ? `Sent decline notice email to ${reviewTrip.passenger.email}`
+            : `Decline notice email failed for ${reviewTrip.passenger.email}: ${declineEmailResult.error || 'Email service error'}`,
         },
       ];
 
@@ -1642,7 +1658,7 @@ export default function DispatchRoute() {
         ? (isReturn ? 'return' : 'outbound')
         : undefined;
 
-      await emailService.sendClarificationRequest({
+      const clarifyEmailResult = await emailService.sendClarificationRequest({
         tripId: reviewTrip.id,
         passenger: {
           firstName: reviewTrip.passenger.firstName,
@@ -1668,6 +1684,9 @@ export default function DispatchRoute() {
 
       const nowIso = new Date().toISOString();
       const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '4001';
+      if (!clarifyEmailResult.success) {
+        throw new Error(clarifyEmailResult.error || 'Failed to send clarification request email.');
+      }
       const reqRef = `REQ-${numPart}`;
       const newAuditEvents: TripAuditEvent[] = [
         ...(reviewTrip.auditLog || []),
