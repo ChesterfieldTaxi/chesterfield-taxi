@@ -206,8 +206,8 @@ export function Footer() {
             <Link to="/privacy" className="hover:text-blue-400 transition-colors">
               Privacy Policy
             </Link>
-            <Link to="/admin" className="hover:text-blue-400 transition-colors">
-              Staff Portal
+            <Link to="/track" className="hover:text-blue-400 transition-colors">
+              Track Ride
             </Link>
           </div>
         </div>

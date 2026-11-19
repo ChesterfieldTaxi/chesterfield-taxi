@@ -109,19 +109,15 @@ export function AdminInvoicingSubpage({
   const [surchargePercent, setSurchargePercent] = useState(3.0);
   const [autoEmailReceipts, setAutoEmailReceipts] = useState(true);
 
-  // Stripe Gateway Credentials
+  // Stripe Gateway Credentials (Secrets managed strictly on server)
   const [stripeMode, setStripeMode] = useState<'test' | 'live'>(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_mode') === 'live') ? 'live' : 'test';
   });
   const [stripePk, setStripePk] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_pk')) || '';
   });
-  const [stripeSk, setStripeSk] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_sk')) || '';
-  });
-  const [stripeWebhookSecret, setStripeWebhookSecret] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_webhook')) || '';
-  });
+  const [stripeSk, setStripeSk] = useState('');
+  const [stripeWebhookSecret, setStripeWebhookSecret] = useState('');
   const [stripeStatus, setStripeStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [stripeStatusMsg, setStripeStatusMsg] = useState<string | null>(null);
 
@@ -129,9 +125,7 @@ export function AdminInvoicingSubpage({
   const [squareAppId, setSquareAppId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_square_appid')) || '';
   });
-  const [squareToken, setSquareToken] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_square_token')) || '';
-  });
+  const [squareToken, setSquareToken] = useState('');
   const [squareLocId, setSquareLocId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_square_locid')) || '';
   });
@@ -142,11 +136,9 @@ export function AdminInvoicingSubpage({
   const [twilioSid, setTwilioSid] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_sid')) || '';
   });
-  const [twilioToken, setTwilioToken] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_token')) || '';
-  });
+  const [twilioToken, setTwilioToken] = useState('');
   const [twilioPhone, setTwilioPhone] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) || '+13145550199';
+    return (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) || '+13147380100';
   });
   const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(null);
@@ -166,9 +158,7 @@ export function AdminInvoicingSubpage({
   const [qbClientId, setQbClientId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_qb_client_id')) || '';
   });
-  const [qbClientSecret, setQbClientSecret] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_qb_client_secret')) || '';
-  });
+  const [qbClientSecret, setQbClientSecret] = useState('');
   const [qbRealmId, setQbRealmId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_qb_realm_id')) || '';
   });
@@ -248,26 +238,44 @@ export function AdminInvoicingSubpage({
     try {
       setIsSaving(true);
       const invoicingService = getInvoicingService();
-      const batchInvoice = await invoicingService.generateBatchInvoiceForCorporate(corp.id, [
-        {
-          id: `tr-${Date.now().toString().slice(-4)}`,
-          pickupLocation: { address: 'Chesterfield Mall Transit Hub, Chesterfield, MO' },
-          dropoffLocation: { address: 'Lambert St. Louis International Airport (STL)' },
-          passenger: { firstName: corp.companyName, lastName: 'Executive', phone: '314-555-0199', email: corp.billingContactEmail },
-          vehicleTier: 'standard',
-          pricing: { baseFare: 15, distanceCost: 45, timeCost: 10, totalFare: 70 },
-          payment: { method: 'corporate', status: 'pending', amount: 70 },
-          status: 'completed',
-          statusHistory: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any,
-      ]);
+      const accountUnbilled = unbilledTransactions.filter(
+        (tx) =>
+          (tx.corporateAccountId === corp.id || tx.corporateAccountName === corp.companyName) &&
+          (tx.status === 'unbilled' || tx.status === 'pending_invoice')
+      );
+
+      if (accountUnbilled.length === 0) {
+        setSaveSuccessMessage(`No unbilled corporate transactions found for ${corp.companyName}.`);
+        setTimeout(() => setSaveSuccessMessage(null), 3500);
+        return;
+      }
+
+      const tripsToBill = accountUnbilled.map((tx) => ({
+        id: tx.tripId,
+        pickupLocation: { address: tx.pickupAddress },
+        dropoffLocation: { address: tx.dropoffAddress },
+        passenger: {
+          firstName: tx.passengerName.split(' ')[0] || corp.companyName,
+          lastName: tx.passengerName.split(' ').slice(1).join(' ') || '',
+          phone: tx.passengerPhone || corp.billingContactPhone || '',
+          email: corp.billingContactEmail,
+        },
+        vehicleTier: 'standard',
+        pricing: { baseFare: tx.baseFare, distanceCost: 0, timeCost: 0, totalFare: tx.totalAmount },
+        payment: { method: 'corporate', status: 'pending', amount: tx.totalAmount },
+        status: 'completed',
+        statusHistory: [],
+        createdAt: tx.pickupDate,
+        updatedAt: tx.pickupDate,
+      }));
+
+      const batchInvoice = await invoicingService.generateBatchInvoiceForCorporate(corp.id, tripsToBill as any);
 
       if (batchInvoice) {
         const updatedInvoices = [batchInvoice, ...invoices];
         await onSave({ invoices: updatedInvoices });
-        setSaveSuccessMessage(`Generated batch statement ${batchInvoice.invoiceNumber} for ${corp.companyName}`);
+        await fetchUnbilled();
+        setSaveSuccessMessage(`Generated batch statement ${batchInvoice.invoiceNumber} (${tripsToBill.length} trips) for ${corp.companyName}`);
         setTimeout(() => setSaveSuccessMessage(null), 3500);
       }
     } catch (err) {
@@ -587,19 +595,27 @@ export function AdminInvoicingSubpage({
     if (typeof window !== 'undefined') {
       localStorage.setItem('ct_stripe_mode', stripeMode);
       localStorage.setItem('ct_stripe_pk', stripePk.trim());
-      localStorage.setItem('ct_stripe_sk', stripeSk.trim());
-      localStorage.setItem('ct_stripe_webhook', stripeWebhookSecret.trim());
       localStorage.setItem('ct_square_appid', squareAppId.trim());
-      localStorage.setItem('ct_square_token', squareToken.trim());
       localStorage.setItem('ct_square_locid', squareLocId.trim());
       localStorage.setItem('ct_twilio_sid', twilioSid.trim());
-      localStorage.setItem('ct_twilio_token', twilioToken.trim());
       localStorage.setItem('ct_twilio_phone', twilioPhone.trim());
       localStorage.setItem('ct_qb_client_id', qbClientId.trim());
-      localStorage.setItem('ct_qb_client_secret', qbClientSecret.trim());
       localStorage.setItem('ct_qb_realm_id', qbRealmId.trim());
+      // Purge any legacy plaintext secrets from localStorage
+      [
+        'ct_stripe_sk',
+        'ct_stripe_webhook',
+        'ct_square_token',
+        'ct_twilio_token',
+        'ct_qb_client_secret',
+      ].forEach((k) => localStorage.removeItem(k));
     }
-    setSaveSuccessMessage(`${category} credentials and configurations saved successfully!`);
+    setStripeSk('');
+    setStripeWebhookSecret('');
+    setSquareToken('');
+    setTwilioToken('');
+    setQbClientSecret('');
+    setSaveSuccessMessage(`${category} public identifiers saved. Secret keys remain managed via server environment variables.`);
     setTimeout(() => setSaveSuccessMessage(null), 3500);
   };
 

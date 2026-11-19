@@ -1,7 +1,7 @@
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
-  // Public Customer-Facing Layout & Routes
+  // Public Customer-Facing Layout & Routes (Open Guest Checkout & Info)
   layout("routes/layout.tsx", [
     index("routes/_index.tsx"),
     route("book", "routes/book.tsx"),
@@ -15,23 +15,28 @@ export default [
     route("privacy", "routes/privacy.tsx"),
   ]),
 
-  // Dedicated Passenger App Shell (Suppresses public marketing header/footer)
-  route("app", "routes/app.tsx"),
+  // Unified Application Shell & Role-Based Workspaces (PWA Scope: /app)
+  route("app", "routes/app.hub.tsx"),
+  route("app/login", "routes/app.login.tsx"),
+  route("app/register", "routes/app.register.tsx"),
+  route("app/passenger", "routes/app.tsx"),
+  route("app/driver", "routes/driver.tsx"),
+  route("app/dispatch", "routes/dispatch.tsx"),
+  route("app/dispatch/popout", "routes/dispatch.popout.tsx"),
+  route("app/admin", "routes/admin.tsx"),
+  route("app/admin/settings", "routes/admin.settings.tsx"),
+
   route("construction", "routes/construction.tsx"),
 
-  // Mobile-Optimized Driver PWA Console
-  route("driver", "routes/driver.tsx"),
-
-  // Authentication Routes
+  // Backward-Compatible Legacy Redirects -> /app/*
   route("signin", "routes/signin.tsx"),
   route("register", "routes/register.tsx"),
-
-  // Operator & Admin Console (Isolated Layout)
   route("admin/login", "routes/admin.login.tsx"),
-  route("admin", "routes/admin.tsx"),
-  route("admin/settings", "routes/admin.settings.tsx"),
-  route("dispatch", "routes/dispatch.tsx"),
-  route("dispatch/popout", "routes/dispatch.popout.tsx"),
+  route("driver", "routes/legacy.redirect.tsx", { id: "legacy-driver-redirect" }),
+  route("dispatch", "routes/legacy.redirect.tsx", { id: "legacy-dispatch-redirect" }),
+  route("dispatch/popout", "routes/legacy.redirect.tsx", { id: "legacy-dispatch-popout-redirect" }),
+  route("admin", "routes/legacy.redirect.tsx", { id: "legacy-admin-redirect" }),
+  route("admin/settings", "routes/legacy.redirect.tsx", { id: "legacy-admin-settings-redirect" }),
 
   // Serverless API Routes
   route("api/public-config", "routes/api.public-config.ts"),
@@ -41,4 +46,3 @@ export default [
   route("api/telephony", "routes/api.telephony.ts"),
   route("api/telephony/verify", "routes/api.telephony.verify.ts"),
 ] satisfies RouteConfig;
-

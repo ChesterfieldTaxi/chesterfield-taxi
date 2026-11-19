@@ -853,12 +853,12 @@ export default function DispatchRoute() {
   useEffect(() => {
     const unsubscribe = getAdminAuthService().onAuthStateChanged((currentUser) => {
       if (!currentUser) {
-        navigate('/signin?message=unauthenticated&redirect=/dispatch', { replace: true });
+        navigate('/app/login?message=unauthenticated&redirect=/app/dispatch', { replace: true });
       } else if (
         !(currentUser.roles && (currentUser.roles.includes('admin') || currentUser.roles.includes('dispatcher'))) &&
         currentUser.role !== 'admin' && currentUser.role !== 'dispatcher'
       ) {
-        navigate('/signin?message=unauthorized', { replace: true });
+        navigate('/app/login?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
         setIsAuthChecking(false);
@@ -2493,29 +2493,20 @@ export default function DispatchRoute() {
     }
 
     try {
-      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
-      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
-      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '' : '';
-
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'make_call',
           to: sanitizePhoneNumber(numToCall),
-          credentials: {
-            accountSid: twilioSid,
-            authToken: twilioToken,
-            phoneNumber: sanitizePhoneNumber(twilioPhone),
-          },
         }),
       });
 
       const data = (await resp.json()) as any;
       if (data.success && data.callSid) {
         setSoftphoneNotice(`Twilio Call Live (SID: ${data.callSid.slice(0, 10)}...). Ringing target phone!`);
-      } else if (data.status === 'simulated' || !twilioSid) {
-        setSoftphoneNotice('Simulated WebRTC Call. Add Twilio keys in Admin > Financials to ring your physical cell phone.');
+      } else if (data.status === 'simulated') {
+        setSoftphoneNotice('Simulated WebRTC Call. Configure TWILIO_ACCOUNT_SID & TWILIO_AUTH_TOKEN on the server to place live PSTN calls.');
       } else {
         setSoftphoneNotice(data.message || data.error || 'Simulated call connected.');
       }
@@ -3890,7 +3881,7 @@ export default function DispatchRoute() {
                 System &amp; Platform
               </span>
               <Link
-                to="/admin"
+                to="/app/admin"
                 className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
                 onClick={() => setIsMobileDrawerOpen(false)}
               >
@@ -4140,6 +4131,8 @@ export default function DispatchRoute() {
               activeTrip={activeDraft?.trip}
               selectedTrip={selectedMapTrip}
               shouldZoom={shouldZoomMap}
+              drivers={drivers}
+              trips={trips}
             />
           </div>
 
@@ -7491,6 +7484,8 @@ interface LiveDispatchMapProps {
   activeTrip?: Trip | null;
   selectedTrip?: Trip | null;
   shouldZoom?: boolean;
+  drivers?: DriverRosterItem[];
+  trips?: Trip[];
 }
 
 function LiveDispatchMap({
@@ -7498,11 +7493,14 @@ function LiveDispatchMap({
   activeTrip,
   selectedTrip,
   shouldZoom = false,
+  drivers = [],
+  trips = [],
 }: LiveDispatchMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
   const mockPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const driverMarkersRef = useRef<google.maps.Marker[]>([]);
 
   // Initialize Map
   useEffect(() => {
@@ -7549,6 +7547,14 @@ function LiveDispatchMap({
           mockPolylineRef.current.setMap(null);
         } catch {}
         mockPolylineRef.current = null;
+      }
+      if (driverMarkersRef.current.length > 0) {
+        driverMarkersRef.current.forEach((m) => {
+          try {
+            m.setMap(null);
+          } catch {}
+        });
+        driverMarkersRef.current = [];
       }
       if (mapInstanceRef.current && typeof google !== 'undefined' && google?.maps?.event) {
         try {
@@ -7676,6 +7682,55 @@ function LiveDispatchMap({
       clearTimeout(timer);
     };
   }, [activeFormValues, activeTrip, selectedTrip, shouldZoom]);
+
+  // Render live fleet driver markers on the dispatch map
+  useEffect(() => {
+    if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps?.Marker) {
+      return;
+    }
+
+    driverMarkersRef.current.forEach((m) => {
+      try {
+        m.setMap(null);
+      } catch {}
+    });
+    driverMarkersRef.current = [];
+
+    const activeDrivers = drivers.filter((d) => d.status !== 'offline' && !d.isBlacklisted);
+    activeDrivers.forEach((drv, idx) => {
+      const assignedTrip = trips.find(
+        (t) =>
+          t.assignedDriverId === drv.id &&
+          ['assigned', 'en_route', 'arrived', 'in_progress'].includes(t.status)
+      );
+      const telemetryCoords =
+        assignedTrip?.driverTelemetry?.coordinates ||
+        assignedTrip?.currentLocation?.coordinates ||
+        (drv as any).coordinates;
+
+      const fallbackPosition = resolveMockCoordinates(drv.zone || 'Chesterfield, MO');
+      const position =
+        telemetryCoords?.lat && telemetryCoords?.lng
+          ? telemetryCoords
+          : {
+              lat: fallbackPosition.lat + (idx % 3) * 0.004,
+              lng: fallbackPosition.lng + Math.floor(idx / 3) * 0.004,
+            };
+
+      const marker = new window.google.maps.Marker({
+        position,
+        map: mapInstanceRef.current,
+        title: `${drv.name} (${drv.vehicle}) • ${drv.status === 'on_trip' ? 'On Trip' : 'Available'}`,
+        label: {
+          text: drv.vehicle.replace(/[^0-9]/g, '').slice(-3) || 'CAB',
+          color: '#ffffff',
+          fontSize: '10px',
+          fontWeight: 'bold',
+        },
+      });
+      driverMarkersRef.current.push(marker);
+    });
+  }, [drivers, trips]);
 
   return <div ref={mapContainerRef} className="w-full h-full" />;
 }

@@ -27,7 +27,7 @@ export default function TermsPage() {
           Terms and Conditions
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl mx-auto">
-          Last updated: September 2026. Please review the service terms governing your reservations, rides, and accounts with {COMPANY_CONFIG.name}.
+          Last updated: March 2026. Please review the service terms governing your reservations, rides, and accounts with {COMPANY_CONFIG.name}.
         </p>
       </div>
 
@@ -61,7 +61,7 @@ export default function TermsPage() {
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
             <li>Unscheduled intermediate stops requested during the trip.</li>
-            <li>Excessive passenger wait times beyond the complimentary grace period (10 minutes for standard pickups; 45 minutes for flight-monitored domestic airport arrivals).</li>
+            <li>Excessive passenger wait times at standard residential or commercial pickups beyond the complimentary 10-minute grace period (for flight-monitored airport arrivals, we track your flight in real time and wait as long as it takes as a general policy, handling exceptional cases individually).</li>
             <li>Special cleaning or sanitization fees necessitated by severe vehicle interior damage or contamination.</li>
           </ul>
         </section>

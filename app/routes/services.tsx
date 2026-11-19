@@ -57,7 +57,7 @@ const SERVICES: ServiceItem[] = [
       'Eliminate the stress of airport parking and unreliable rideshare surges. We provide guaranteed curb-to-curb departures and scheduled arrivals with live flight number tracking.',
     features: [
       'Automated flight arrival tracking (delays monitored automatically)',
-      'Complimentary 30-minute grace period for domestic flights',
+      'We wait as long as it takes when your flight is delayed (exceptions handled individually)',
       'Curbside pickup or inside terminal baggage claim meet-and-greet',
       'Generous luggage capacity with executive SUV options',
     ],

@@ -217,7 +217,7 @@ class WorkspaceBusService {
 
   public popOutModule(moduleKey: WorkspaceModuleKey): Window | null {
     if (typeof window === 'undefined') return null;
-    const url = `/dispatch/popout?module=${moduleKey}`;
+    const url = `/app/dispatch/popout?module=${moduleKey}`;
     const windowName = `ct_popout_${moduleKey}`;
     const features = 'width=980,height=820,menubar=no,toolbar=no,location=no,status=no,resizable=yes';
     

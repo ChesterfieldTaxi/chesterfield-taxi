@@ -35,62 +35,62 @@ const INITIAL_EMAILS: EmailMessage[] = [
   {
     id: 'em-1',
     fromName: 'Amanda Vance',
-    fromEmail: 'amanda.vance@capitalone.com',
+    fromEmail: 'amanda.vance@bayer.com',
     toEmail: 'dispatch@chesterfieldtaxi.com',
-    subject: 'Executive Transfer Request - RIC Airport to Capital One Campus (Tomorrow 8:30 AM)',
+    subject: 'Executive Transfer Request - STL Airport to Bayer Campus Chesterfield (Tomorrow 8:30 AM)',
     timestamp: 'Today, 4:15 PM',
     folder: 'bookings',
     isUnread: true,
     suggestedBooking: {
       passengerName: 'Amanda Vance',
-      passengerPhone: '(804) 555-0199',
-      passengerEmail: 'amanda.vance@capitalone.com',
-      pickupLocation: 'Richmond International Airport (RIC) Terminal South Baggage Claim',
-      dropoffLocation: 'Capital One West Creek Campus, 15000 Capital One Dr, Richmond, VA 23238',
-      notes: 'Flight DL 1492 from ATL arriving 8:15 AM. Bill to Corporate Account #CP-8821.',
+      passengerPhone: '(314) 555-0199',
+      passengerEmail: 'amanda.vance@bayer.com',
+      pickupLocation: 'St. Louis Lambert International Airport (STL) Terminal 1 Exit 6',
+      dropoffLocation: 'Bayer Crop Science Campus, 700 Chesterfield Pkwy W, Chesterfield, MO 63017',
+      notes: 'Flight DL 1492 from ATL arriving 8:15 AM. Bill to Corporate Account #BY-8821.',
     },
     body: `Hello Chesterfield Taxi Dispatch,
 
-We would like to request an executive sedan transfer for our VP tomorrow morning, September 18th at 8:30 AM.
+We would like to request an executive sedan transfer for our VP tomorrow morning at 8:30 AM.
 
 Details:
 • Passenger: Amanda Vance
-• Phone: (804) 555-0199
-• Pickup: Richmond International Airport (RIC) South Baggage Claim
-• Destination: Capital One West Creek Campus, 15000 Capital One Dr, Richmond, VA 23238
+• Phone: (314) 555-0199
+• Pickup: St. Louis Lambert International Airport (STL) Terminal 1 Exit 6
+• Destination: Bayer Crop Science Campus, 700 Chesterfield Pkwy W, Chesterfield, MO 63017
 • Arriving on Delta DL 1492 from ATL (scheduled 8:15 AM)
-• Account: Capital One Corporate #CP-8821
+• Account: Bayer Corporate #BY-8821
 
 Please reply with confirmation and assigned driver when available.
 
 Best regards,
 Amanda Vance
-Corporate Travel Coordinator | Capital One`,
+Corporate Travel Coordinator | Bayer Chesterfield`,
   },
   {
     id: 'em-2',
     fromName: 'Dr. Elena Rossi',
-    fromEmail: 'elena.rossi@vcuhealth.org',
+    fromEmail: 'elena.rossi@bjc.org',
     toEmail: 'dispatch@chesterfieldtaxi.com',
-    subject: 'Transport Booking & Wheelchair Assistance - Gateway Building',
+    subject: 'Transport Booking & Wheelchair Assistance - Barnes-Jewish West County',
     timestamp: 'Today, 2:40 PM',
     folder: 'bookings',
     isUnread: true,
     suggestedBooking: {
       passengerName: 'Elena Rossi',
-      passengerPhone: '(804) 555-0144',
-      passengerEmail: 'elena.rossi@vcuhealth.org',
-      pickupLocation: 'VCU Health Gateway Building, 1200 E Marshall St, Richmond, VA 23298',
-      dropoffLocation: '8401 Patterson Ave, Henrico, VA 23229',
+      passengerPhone: '(314) 555-0144',
+      passengerEmail: 'elena.rossi@bjc.org',
+      pickupLocation: 'Barnes-Jewish West County Hospital, 12634 Olive Blvd, Creve Coeur, MO 63141',
+      dropoffLocation: '14848 Conway Rd, Chesterfield, MO 63017',
       notes: 'Passenger requires assistance with folding wheelchair trunk storage.',
     },
     body: `Good afternoon,
 
 I need to pre-arrange safe transport for an outpatient discharge scheduled for tomorrow at 11:00 AM.
 
-Pickup Location: VCU Health Gateway Building, 1200 E Marshall St, Richmond, VA 23298
-Drop-off Location: 8401 Patterson Ave, Henrico, VA 23229
-Passenger: Elena Rossi (Phone: 804-555-0144)
+Pickup Location: Barnes-Jewish West County Hospital, 12634 Olive Blvd, Creve Coeur, MO 63141
+Drop-off Location: 14848 Conway Rd, Chesterfield, MO 63017
+Passenger: Elena Rossi (Phone: 314-555-0144)
 
 Special requirement: The passenger uses a folding wheelchair that easily fits into a standard sedan trunk. Driver assistance to load wheelchair into trunk is appreciated.
 
@@ -102,37 +102,37 @@ Dr. Elena Rossi`,
     fromName: 'Marcus Sterling',
     fromEmail: 'marcus.sterling@gmail.com',
     toEmail: 'dispatch@chesterfieldtaxi.com',
-    subject: 'Trip Receipt Copy Request - Ride from Short Pump to Downtown (Sep 15)',
+    subject: 'Trip Receipt Copy Request - Ride from Chesterfield Commons to Clayton',
     timestamp: 'Yesterday, 6:12 PM',
     folder: 'receipts',
     isUnread: false,
     body: `Hi Chesterfield Taxi Support,
 
-Could you please resend my itemized PDF receipt for trip taken on Sunday, September 15th from Short Pump Town Center to The Jefferson Hotel ($48.50)?
+Could you please resend my itemized PDF receipt for the trip taken from Chesterfield Commons to The Ritz-Carlton St. Louis in Clayton ($48.50)?
 
 Payment was made with Visa ending in 4242. I need this to submit my weekly expense report by Friday morning.
 
 Thank you,
 Marcus Sterling
-Mobile: (804) 555-0112`,
+Mobile: (636) 555-0112`,
   },
   {
     id: 'em-4',
     fromName: 'Sarah Jenkins',
-    fromEmail: 'sjenkins@richmondair.com',
+    fromEmail: 'sjenkins@spiritaviation.com',
     toEmail: 'dispatch@chesterfieldtaxi.com',
-    subject: 'Lost Item Inquiry - Grey iPad in Vehicle #12',
+    subject: 'Lost Item Inquiry - Grey iPad in Vehicle #104',
     timestamp: 'Yesterday, 3:30 PM',
     folder: 'inbox',
     isUnread: false,
     body: `Hello Dispatch,
 
-My husband took Cab #12 yesterday afternoon from Midlothian Turnpike to RIC Airport (dropped off around 2:15 PM).
+My husband took Cab #104 yesterday afternoon from Clarkson Rd to Spirit of St. Louis Airport (SUS) (dropped off around 2:15 PM).
 
-He believes he left his grey iPad in a charcoal magnetic folio case in the back seat. The driver was very helpful (we believe his name was David or Marcus).
+He believes he left his grey iPad in a charcoal magnetic folio case in the back seat.
 
 Could you please check with the driver and let us know if it was recovered?
-Contact phone: (804) 555-0178.
+Contact phone: (636) 555-0178.
 
 Thank you so much!
 Sarah Jenkins`,
@@ -205,17 +205,27 @@ export function EmailDock({
       return;
     }
     if (onPopulateBooking) {
+      const passengerEmail = email.suggestedBooking.passengerEmail || email.fromEmail;
+      const notes = email.suggestedBooking.notes || `Extracted from email: ${email.subject}`;
       onPopulateBooking({
         passenger: {
+          name: email.suggestedBooking.passengerName,
           fullName: email.suggestedBooking.passengerName,
           phone: email.suggestedBooking.passengerPhone,
-          email: email.suggestedBooking.passengerEmail || email.fromEmail,
+          email: passengerEmail,
         },
+        passengerName: email.suggestedBooking.passengerName,
+        phone: email.suggestedBooking.passengerPhone,
+        email: passengerEmail,
         pickupAddress: email.suggestedBooking.pickupLocation,
         dropoffAddress: email.suggestedBooking.dropoffLocation,
-        notes: email.suggestedBooking.notes || `Extracted from email: ${email.subject}`,
+        pickupLocation: { address: email.suggestedBooking.pickupLocation },
+        dropoffLocation: { address: email.suggestedBooking.dropoffLocation },
+        pickup: email.suggestedBooking.pickupLocation,
+        dropoff: email.suggestedBooking.dropoffLocation,
+        notes,
       });
-      showToast('Populated booking draft in Dispatch Console! 🚖');
+      showToast('Populated booking draft in Dispatch Console!');
     }
   };
 

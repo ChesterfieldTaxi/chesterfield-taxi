@@ -189,46 +189,8 @@ export function AdminCustomersSubpage({
     }
   }, []);
 
-  // Synthesize customer profiles from trips
+  // Synthesize customer profiles from real trips and saved contacts
   const customerMap = new Map<string, CustomerProfile>();
-
-  // Mock baseline loyal customers
-  customerMap.set('john.miller@example.com', {
-    id: 'cust-1',
-    name: 'John Miller',
-    email: 'john.miller@example.com',
-    phone: '(314) 555-0199',
-    tripCount: 14,
-    totalSpend: 624.50,
-    lastRideDate: '2026-09-12',
-    isVip: true,
-    preferredVehicle: 'Standard Sedan',
-  });
-
-  customerMap.set('sarah.connor@bayer.example.com', {
-    id: 'cust-2',
-    name: 'Sarah Connor',
-    email: 'sarah.connor@bayer.example.com',
-    phone: '(314) 694-8821',
-    tripCount: 8,
-    totalSpend: 480.00,
-    lastRideDate: '2026-09-10',
-    isVip: true,
-    corporateAccountName: 'Bayer Crop Science',
-    preferredVehicle: 'Premium Executive',
-  });
-
-  customerMap.set('emily.davis@example.com', {
-    id: 'cust-3',
-    name: 'Emily Davis',
-    email: 'emily.davis@example.com',
-    phone: '(636) 532-9011',
-    tripCount: 4,
-    totalSpend: 156.00,
-    lastRideDate: '2026-09-08',
-    isVip: false,
-    preferredVehicle: 'XL Minivan / SUV',
-  });
 
   // Aggregate dynamically from real trips
   trips.forEach((t) => {

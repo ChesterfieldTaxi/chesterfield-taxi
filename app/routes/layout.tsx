@@ -3,13 +3,24 @@ import { Outlet, useLocation } from 'react-router';
 import { Navbar, Footer } from '../components/layout';
 import UnderConstruction from '../components/UnderConstruction';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import type { BrandingConfig } from '../core/types/config';
 
 export default function PublicLayout() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const isPreview = searchParams.get('preview') === 'true';
+  const previewParam = searchParams.get('preview') === 'true';
+  const [isStaffUser, setIsStaffUser] = useState(false);
+
+  useEffect(() => {
+    const unsub = getAdminAuthService().onAuthStateChanged((user) => {
+      setIsStaffUser(Boolean(user && (user.role === 'admin' || user.role === 'dispatcher')));
+    });
+    return unsub;
+  }, []);
+
+  const isPreview = previewParam && isStaffUser;
 
   const [constructionMode, setConstructionMode] = useState<boolean>(() => {
     try {

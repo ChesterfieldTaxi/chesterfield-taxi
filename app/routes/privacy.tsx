@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl mx-auto">
-          Last updated: September 2026. This policy outlines how {COMPANY_CONFIG.name} gathers, processes, and protects your personal information when utilizing our website, dispatch services, and passenger applications.
+          Last updated: March 2026. This policy outlines how {COMPANY_CONFIG.name} gathers, processes, and protects your personal information when utilizing our website, dispatch services, and passenger applications.
         </p>
       </div>
 

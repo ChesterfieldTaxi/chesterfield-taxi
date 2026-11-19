@@ -344,7 +344,7 @@ export function AdminGeneralTab({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-9921). Dispatch and admin console remain 100% operational.
+                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-0100). Dispatch and admin console remain 100% operational.
               </p>
             </div>
           </div>

@@ -142,7 +142,12 @@ export function AdminOnboardingQueue() {
     if (!selectedApplicant) return;
     setIsProvisioning(true);
     setError(null);
-    let tempPass = Math.random().toString(36).slice(-8);
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    const randomBytes = new Uint8Array(12);
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      crypto.getRandomValues(randomBytes);
+    }
+    const tempPass = Array.from(randomBytes, (b) => alphabet[b % alphabet.length]).join('');
     let createdUid = `user-${Date.now().toString(36)}`;
 
     try {
@@ -160,8 +165,8 @@ export function AdminOnboardingQueue() {
           );
           createdUid = userCredential.user.uid;
         } finally {
-          await signOut(secondaryAuth);
-          await deleteApp(secondaryApp);
+          await signOut(secondaryAuth).catch(() => {});
+          await deleteApp(secondaryApp).catch(() => {});
         }
 
         const db = getFirestore(getFirebaseApp());

@@ -617,27 +617,33 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     {/* Role Dropdown */}
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-1">
-                        {['driver', 'dispatcher', 'admin'].map(r => (
+                        {(['customer', 'driver', 'dispatcher', 'admin'] as UserRole[]).map((r) => (
                           <label key={r} className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
                             <input
                               type="checkbox"
                               disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
-                              checked={(op.roles || [op.role]).includes(r as UserRole)}
+                              checked={(op.roles || [op.role]).includes(r)}
                               onChange={(e) => {
                                 const currentRoles = op.roles || [op.role];
                                 let newRoles = currentRoles;
                                 if (e.target.checked) {
-                                  if (!currentRoles.includes(r as UserRole)) {
-                                    newRoles = [...currentRoles, r as UserRole];
+                                  if (!currentRoles.includes(r)) {
+                                    newRoles = [...currentRoles, r];
                                   }
                                 } else {
-                                  newRoles = currentRoles.filter(cr => cr !== r);
+                                  newRoles = currentRoles.filter((cr) => cr !== r);
                                 }
                                 if (newRoles.length === 0) newRoles = ['customer'];
                                 handleUpdateRole(op.uid, op.email, newRoles);
                               }}
                             />
-                            {r === 'driver' ? '🚕 Driver' : r === 'dispatcher' ? '🎧 Dispatcher' : '🛡️ Admin'}
+                            {r === 'customer'
+                              ? '📱 Passenger'
+                              : r === 'driver'
+                              ? '🚕 Driver'
+                              : r === 'dispatcher'
+                              ? '🎧 Dispatcher'
+                              : '🛡️ Admin'}
                           </label>
                         ))}
                       </div>

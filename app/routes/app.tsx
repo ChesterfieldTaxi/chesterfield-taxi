@@ -98,23 +98,22 @@ export default function PassengerAppRoute() {
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoadingTrips, setIsLoadingTrips] = useState(true);
-
-  if (constructionMode && !isPreview) {
-    return <UnderConstruction />;
-  }
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>(['customer']);
 
   // Auth guard
   useEffect(() => {
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
-        navigate('/signin?message=unauthenticated&redirect=/app', { replace: true });
+        navigate('/app/login?message=unauthenticated&redirect=/app/passenger', { replace: true });
       } else {
-        const roles = currentUser.roles || [currentUser.role];
-        // If they are strictly a dispatcher or driver (and not a customer), boot them out of customer app
-        // However, if they have customer AND driver roles, let them stay.
-        // Usually, default redirect goes to highest privilege, but if they explicitly navigate to /app, we let them if they have the customer role or if we don't strictly ban admins.
-        // For now, allow anyone into the customer portal, as multi-role drivers might want to book a ride.
+        const roles: string[] = currentUser.roles || (currentUser.role ? [currentUser.role] : ['customer']);
+        if (!roles.includes('customer') && !roles.includes('admin')) {
+          navigate('/app', { replace: true });
+          return;
+        }
+        setUserRoles(roles);
       }
     });
     return unsubscribe;
@@ -229,8 +228,16 @@ export default function PassengerAppRoute() {
     vehicleChoice: 'sedan',
   }));
 
+  const isStaff = userRoles.includes('admin') || userRoles.includes('dispatcher');
+  const hasAnyStaffOrDriverRole = isStaff || userRoles.includes('driver');
+
+  if (constructionMode && !(isPreview && isStaff)) {
+    return <UnderConstruction />;
+  }
+
   // Rebook an existing trip inside /app
   const handleRebookTrip = (trip: Trip) => {
+    setEditingTripId(null);
     setBookingInitialValues({
       pickupAddress: trip.pickupLocation?.address || '',
       dropoffAddress: trip.dropoffLocation?.address || '',
@@ -247,6 +254,7 @@ export default function PassengerAppRoute() {
 
   // Book return ride (swapping pickup and dropoff) inside /app
   const handleBookReturnTrip = (trip: Trip) => {
+    setEditingTripId(null);
     setBookingInitialValues({
       pickupAddress: trip.dropoffLocation?.address || '',
       dropoffAddress: trip.pickupLocation?.address || '',
@@ -265,6 +273,7 @@ export default function PassengerAppRoute() {
 
   // Edit upcoming trip in booking form
   const handleEditTrip = (trip: Trip) => {
+    setEditingTripId(trip.id);
     setBookingInitialValues({
       pickupAddress: trip.pickupLocation?.address || '',
       dropoffAddress: trip.dropoffLocation?.address || '',
@@ -278,7 +287,7 @@ export default function PassengerAppRoute() {
       scheduledTime: trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).toTimeString().slice(0, 5) : '',
     });
     setActiveTab('book');
-    showToast(`Loaded Trip #${trip.id} into booking form to edit.`);
+    showToast(`Editing Trip #${trip.id} — save your changes below.`);
   };
 
   // Cancel reservation
@@ -309,7 +318,7 @@ export default function PassengerAppRoute() {
       await getAdminAuthService().signOut();
     } catch {}
     showToast('Signed out of Passenger Portal.');
-    setTimeout(() => navigate('/signin'), 600);
+    setTimeout(() => navigate('/app/login?message=logged_out'), 600);
   };
 
   // Quick 1-tap chip destination select
@@ -679,10 +688,26 @@ export default function PassengerAppRoute() {
               <BookingEngineV2
                 hideDispatchBanner={true}
                 initialValues={bookingInitialValues}
-                onBookingSuccess={(createdTrip) => {
-                  setActiveTrip(createdTrip);
-                  setTrips((prev) => [createdTrip, ...prev]);
-                  showToast('Ride reservation confirmed and queued with dispatch!');
+                editingTripId={editingTripId || undefined}
+                onCancelEdit={() => {
+                  setEditingTripId(null);
+                  showToast('Cancelled editing reservation.');
+                }}
+                onBookingSuccess={(savedTrip) => {
+                  if (editingTripId) {
+                    setTrips((prev) =>
+                      prev.map((t) => (t.id === savedTrip.id ? savedTrip : t))
+                    );
+                    if (activeTrip?.id === savedTrip.id) {
+                      setActiveTrip(savedTrip);
+                    }
+                    setEditingTripId(null);
+                    showToast(`Reservation #${savedTrip.id} updated successfully!`);
+                  } else {
+                    setActiveTrip(savedTrip);
+                    setTrips((prev) => [savedTrip, ...prev]);
+                    showToast('Ride reservation confirmed and queued with dispatch!');
+                  }
                 }}
               />
             </div>
@@ -831,9 +856,9 @@ export default function PassengerAppRoute() {
                         {/* Driver & Unit Details */}
                         {Boolean(trip.metadata?.driverName || trip.assignedDriverId) && (
                           <div className="text-[11px] bg-slate-50 px-3 py-1.5 rounded-xl text-slate-600 flex items-center justify-between">
-                            <span>Driver: {String(trip.metadata?.driverName || 'Mike T.')}</span>
+                            <span>Driver: {String(trip.metadata?.driverName || 'Assigned Driver')}</span>
                             <span className="font-semibold text-slate-700">
-                              {String(trip.metadata?.vehicleUnit || 'Cab #204')}
+                              {String(trip.metadata?.vehicleUnit || 'Assigned Fleet Unit')}
                             </span>
                           </div>
                         )}
@@ -1155,73 +1180,81 @@ export default function PassengerAppRoute() {
               </div>
             </form>
 
-            {/* Workspace Switcher */}
-            <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
-              <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
-                Switch Workspace
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Link
-                  to="/dispatch"
-                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                      <RadioIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">
-                        Dispatch Console
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">
-                        Operations & Booking
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+            {/* Workspace Switcher (Restricted to Staff & Drivers) */}
+            {hasAnyStaffOrDriverRole && (
+              <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+                <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
+                  Switch Workspace
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {(userRoles.includes('dispatcher') || userRoles.includes('admin')) && (
+                    <Link
+                      to="/app/dispatch"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                          <RadioIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">
+                            Dispatch Console
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            Operations &amp; Booking
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  )}
 
-                <Link
-                  to="/driver"
-                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                      <CarIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 block">
-                        Driver Portal
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">
-                        Shifts & Navigation
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                  {(userRoles.includes('driver') || userRoles.includes('admin')) && (
+                    <Link
+                      to="/app/driver"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <CarIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 block">
+                            Driver Portal
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            Shifts &amp; Navigation
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  )}
 
-                <Link
-                  to="/admin"
-                  className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-                      <ShieldCheckIcon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 group-hover:text-purple-700 block">
-                        Admin Console
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">
-                        System Configuration
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                  {userRoles.includes('admin') && (
+                    <Link
+                      to="/app/admin"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                          <ShieldCheckIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-purple-700 block">
+                            Admin Console
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            System Configuration
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Portal Account Actions */}
             <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
@@ -1237,7 +1270,7 @@ export default function PassengerAppRoute() {
                         await getAdminAuthService().signOut();
                       } catch {}
                       showToast('Signed out of Passenger Portal.');
-                      setTimeout(() => navigate('/signin'), 600);
+                      setTimeout(() => navigate('/app/login?message=logged_out'), 600);
                     }}
                   className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-50 hover:border-rose-300 text-rose-800 transition-all group text-left"
                 >
@@ -1412,10 +1445,10 @@ export default function PassengerAppRoute() {
               <div className="text-right">
                 <span className="text-slate-400 font-semibold block">VEHICLE &amp; DRIVER</span>
                 <span className="font-bold text-slate-800">
-                  {String(selectedReceiptTrip.metadata?.driverName || 'Mike T.')}
+                  {String(selectedReceiptTrip.metadata?.driverName || (selectedReceiptTrip.assignedDriverId ? 'Assigned Driver' : 'Pending Assignment'))}
                 </span>
                 <span className="text-slate-500 block">
-                  {String(selectedReceiptTrip.metadata?.vehicleUnit || 'Cab #204')} (
+                  {String(selectedReceiptTrip.metadata?.vehicleUnit || 'Fleet Unit')} (
                   <span>{formatVehicleTierDisplay(selectedReceiptTrip.vehicleTier)}</span>)
                 </span>
               </div>
@@ -1701,7 +1734,7 @@ export default function PassengerAppRoute() {
                         await getAdminAuthService().signOut();
                       } catch {}
                       showToast('Signed out of Passenger Portal.');
-                      setTimeout(() => navigate('/signin'), 800);
+                      setTimeout(() => navigate('/app/login?message=logged_out'), 800);
                     }}
                   className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors"
                 >
@@ -1761,7 +1794,7 @@ export default function PassengerAppRoute() {
                   <span>Airport Pickups &amp; Flight Monitoring (STL)</span>
                 </h4>
                 <p className="text-slate-600 leading-relaxed">
-                  We monitor all scheduled domestic and international arrivals into St. Louis Lambert Airport in real time. We automatically adjust pickup times for delays with a complimentary 45-minute grace period after flight wheel-stop.
+                  We monitor all scheduled domestic and international arrivals into St. Louis Lambert Airport in real time and automatically adjust pickup times for flight delays. As a general policy, we wait as long as it takes so your driver is ready when you land.
                 </p>
               </div>
 

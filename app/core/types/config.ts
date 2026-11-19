@@ -426,7 +426,7 @@ export interface FleetAlertsConfig {
 export interface TelephonyIntegrationConfig {
   provider: 'twilio';
   accountSid: string;
-  authToken: string;
+  authToken?: string;
   phoneNumber: string;
   apiKeySid?: string;
   apiKeySecret?: string;

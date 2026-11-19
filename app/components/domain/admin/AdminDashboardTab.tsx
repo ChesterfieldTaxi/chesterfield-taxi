@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import { getBookingService } from '../../../core/services/booking';
+import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
 import type { AppSettings } from '../../../core/types/config';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
@@ -44,6 +45,7 @@ export function AdminDashboardTab({
 }: AdminDashboardTabProps) {
   const [activeSub, setActiveSub] = useState<DashboardSubTab>(initialSubTab);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -51,6 +53,14 @@ export function AdminDashboardTab({
   }, [initialSubTab]);
 
   const firebaseStatus = isFirebaseConfigured();
+
+  // Subscribe to real-time drivers
+  useEffect(() => {
+    const opService = getOperatorService();
+    return opService.subscribeToDrivers((updatedDrivers) => {
+      setDrivers(updatedDrivers);
+    });
+  }, []);
 
   // Subscribe to real-time trips
   useEffect(() => {
@@ -87,15 +97,21 @@ export function AdminDashboardTab({
   // Compute metrics
   const totalTripsCount = trips.length;
   const activeDispatchedCount = trips.filter(
-    (t) => t.status === 'assigned' || t.status === 'offered'
+    (t) =>
+      t.status === 'assigned' ||
+      t.status === 'offered' ||
+      t.status === 'accepted' ||
+      t.status === 'en_route' ||
+      t.status === 'arrived' ||
+      t.status === 'in_progress'
   ).length;
-  const pendingTrips = trips.filter((t) => t.status === 'pending');
+  const pendingTrips = trips.filter((t) => t.status === 'pending' || t.status === 'unconfirmed');
   const pendingCount = pendingTrips.length;
   const completedCount = trips.filter((t) => t.status === 'completed').length;
-  const cancelledCount = trips.filter((t) => t.status === 'cancelled').length;
+  const cancelledCount = trips.filter((t) => t.status === 'cancelled' || t.status === 'declined').length;
 
   const totalRevenue = trips.reduce((acc, t) => {
-    if (t.status !== 'cancelled') {
+    if (t.status !== 'cancelled' && t.status !== 'declined') {
       const fare = Number(t.pricing?.totalFare || t.payment?.amount || 0);
       return acc + (isNaN(fare) ? 0 : fare);
     }
@@ -109,24 +125,38 @@ export function AdminDashboardTab({
     .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
     .slice(0, 6);
 
-  // Driver Roster Stats
-  const totalDrivers = 6;
-  const onTripDrivers = activeDispatchedCount > 0 ? Math.min(activeDispatchedCount, totalDrivers) : 1;
-  const availableDrivers = Math.max(0, totalDrivers - onTripDrivers);
-  const utilizationPercent = Math.round((onTripDrivers / totalDrivers) * 100);
+  // Driver Roster Stats from live operator roster
+  const totalDrivers = drivers.length;
+  const onTripDrivers = drivers.filter((d) => d.status === 'on_trip').length || activeDispatchedCount;
+  const availableDrivers = drivers.filter((d) => d.status === 'available').length;
+  const utilizationPercent = totalDrivers > 0 ? Math.min(100, Math.round((onTripDrivers / totalDrivers) * 100)) : 0;
 
-  // Weekly Revenue Simulation bars (Monday to Sunday)
+  // Weekly Revenue aggregation from real trips (Monday to Sunday)
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const simulatedWeeklyData = [
-    { day: 'Mon', revenue: Math.round(totalRevenue * 0.12) || 450, trips: 8 },
-    { day: 'Tue', revenue: Math.round(totalRevenue * 0.14) || 520, trips: 10 },
-    { day: 'Wed', revenue: Math.round(totalRevenue * 0.15) || 580, trips: 11 },
-    { day: 'Thu', revenue: Math.round(totalRevenue * 0.18) || 690, trips: 14 },
-    { day: 'Fri', revenue: Math.round(totalRevenue * 0.22) || 840, trips: 18 },
-    { day: 'Sat', revenue: Math.round(totalRevenue * 0.11) || 410, trips: 9 },
-    { day: 'Sun', revenue: Math.round(totalRevenue * 0.08) || 310, trips: 6 },
-  ];
-  const maxDayRevenue = Math.max(...simulatedWeeklyData.map((d) => d.revenue), 1000);
+  const dayBuckets = new Map<string, { revenue: number; trips: number }>(
+    daysOfWeek.map((day) => [day, { revenue: 0, trips: 0 }])
+  );
+  trips.forEach((t) => {
+    if (t.status === 'cancelled' || t.status === 'declined') return;
+    const rawDate = t.scheduledPickupTime || t.createdAt;
+    const parsed = rawDate ? new Date(rawDate) : null;
+    if (!parsed || isNaN(parsed.getTime())) return;
+    // JS getDay(): 0 = Sun, 1 = Mon ... 6 = Sat
+    const dayIndex = (parsed.getDay() + 6) % 7;
+    const dayLabel = daysOfWeek[dayIndex];
+    const bucket = dayBuckets.get(dayLabel);
+    if (bucket) {
+      const fare = Number(t.pricing?.totalFare || t.payment?.amount || 0);
+      bucket.revenue += isNaN(fare) ? 0 : Math.round(fare);
+      bucket.trips += 1;
+    }
+  });
+  const simulatedWeeklyData = daysOfWeek.map((day) => ({
+    day,
+    revenue: dayBuckets.get(day)?.revenue || 0,
+    trips: dayBuckets.get(day)?.trips || 0,
+  }));
+  const maxDayRevenue = Math.max(...simulatedWeeklyData.map((d) => d.revenue), 100);
 
   return (
     <div className="space-y-6">
@@ -296,7 +326,7 @@ export function AdminDashboardTab({
             </div>
             <div className="text-right">
               <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                +14.2% vs Last Week
+                Live Firestore Ledger
               </span>
             </div>
           </CardHeader>
@@ -304,7 +334,7 @@ export function AdminDashboardTab({
             {/* Visual Bar Chart */}
             <div className="h-44 flex items-end gap-3 pt-6 pb-2 px-2 border-b border-slate-100">
               {simulatedWeeklyData.map((d) => {
-                const barHeightPercent = Math.max(15, Math.round((d.revenue / maxDayRevenue) * 100));
+                const barHeightPercent = d.revenue > 0 ? Math.max(12, Math.round((d.revenue / maxDayRevenue) * 100)) : 4;
                 return (
                   <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5 group">
                     <span className="text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -328,7 +358,7 @@ export function AdminDashboardTab({
                 <span className="w-2.5 h-2.5 rounded-sm bg-blue-600" />
                 <span>Gross Fares</span>
               </span>
-              <span>7-Day Average: <strong>${Math.round(totalRevenue / 7 || 500)}/day</strong></span>
+              <span>7-Day Average: <strong>${Math.round(totalRevenue / 7)}/day</strong></span>
             </div>
           </CardContent>
         </Card>
@@ -580,105 +610,135 @@ export function AdminDashboardTab({
       )}
 
       {/* ─── Sub-View: Analytics ─── */}
-      {activeSub === 'analytics' && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
-              <CardTitle className="text-sm font-bold text-slate-900 mb-1">Top Trip Corridors</CardTitle>
-              <CardDescription className="text-xs text-slate-500 mb-4">Most frequent origination &amp; destination pairs</CardDescription>
-              <div className="space-y-3 text-xs">
-                <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-slate-800 block">Chesterfield Valley ⇄ STL Lambert</span>
-                    <span className="text-[11px] text-slate-500">Airport Executive Transfer</span>
-                  </div>
-                  <span className="font-black text-blue-600">42%</span>
-                </div>
-                <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-slate-800 block">Spirit Airport ⇄ Downtown St. Louis</span>
-                    <span className="text-[11px] text-slate-500">Corporate &amp; Private Aviation</span>
-                  </div>
-                  <span className="font-black text-blue-600">28%</span>
-                </div>
-                <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-slate-800 block">Chesterfield Mall ⇄ Clarkson / Manchester</span>
-                    <span className="text-[11px] text-slate-500">Local Chesterfield Rides</span>
-                  </div>
-                  <span className="font-black text-blue-600">18%</span>
-                </div>
-              </div>
-            </Card>
+      {activeSub === 'analytics' && (() => {
+        const tierCounts = {
+          standard: trips.filter((t) => !t.vehicleTier || t.vehicleTier === 'standard').length,
+          executive: trips.filter((t) => t.vehicleTier === 'executive').length,
+          xl: trips.filter((t) => t.vehicleTier === 'xl' || t.vehicleTier === 'suv' || t.vehicleTier === 'minivan').length,
+          wav: trips.filter((t) => t.vehicleTier === 'wav' || t.vehicleTier === 'accessible').length,
+        };
+        const tierTotal = Math.max(totalTripsCount, 1);
+        const stdPct = totalTripsCount > 0 ? Math.round((tierCounts.standard / tierTotal) * 100) : 0;
+        const execPct = totalTripsCount > 0 ? Math.round((tierCounts.executive / tierTotal) * 100) : 0;
+        const xlPct = totalTripsCount > 0 ? Math.round((tierCounts.xl / tierTotal) * 100) : 0;
+        const wavPct = totalTripsCount > 0 ? Math.round((tierCounts.wav / tierTotal) * 100) : 0;
 
-            <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
-              <CardTitle className="text-sm font-bold text-slate-900 mb-1">Vehicle Class Demand</CardTitle>
-              <CardDescription className="text-xs text-slate-500 mb-4">Bookings by passenger fleet preference</CardDescription>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-bold text-slate-700">Standard Sedan (4-Pax)</span>
-                    <span className="font-black text-slate-900">55%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600 rounded-full" style={{ width: '55%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-bold text-slate-700">Premium Executive Sedan</span>
-                    <span className="font-black text-slate-900">25%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full" style={{ width: '25%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-bold text-slate-700">XL Minivan / SUV (6-Pax)</span>
-                    <span className="font-black text-slate-900">15%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full" style={{ width: '15%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="font-bold text-slate-700">Wheelchair Accessible (WAV)</span>
-                    <span className="font-black text-slate-900">5%</span>
-                  </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-600 rounded-full" style={{ width: '5%' }} />
-                  </div>
-                </div>
-              </div>
-            </Card>
+        const stlAirportCount = trips.filter((t) => {
+          const text = `${t.pickupLocation?.address || ''} ${t.dropoffLocation?.address || ''}`.toLowerCase();
+          return text.includes('lambert') || text.includes('stl') || text.includes('airport');
+        }).length;
+        const spiritCount = trips.filter((t) => {
+          const text = `${t.pickupLocation?.address || ''} ${t.dropoffLocation?.address || ''}`.toLowerCase();
+          return text.includes('spirit') || text.includes('sus') || text.includes('edison');
+        }).length;
+        const localCount = Math.max(0, totalTripsCount - stlAirportCount - spiritCount);
 
-            <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
-              <CardTitle className="text-sm font-bold text-slate-900 mb-1">Peak Dispatch Hours</CardTitle>
-              <CardDescription className="text-xs text-slate-500 mb-4">Hourly volume distribution across 24h</CardDescription>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600">04:30 AM - 07:00 AM (Early Flights)</span>
-                  <span className="font-black text-emerald-600">High Surge (1.2x)</span>
+        return (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
+                <CardTitle className="text-sm font-bold text-slate-900 mb-1">Top Trip Corridors</CardTitle>
+                <CardDescription className="text-xs text-slate-500 mb-4">Most frequent origination &amp; destination pairs</CardDescription>
+                <div className="space-y-3 text-xs">
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Chesterfield Valley ⇄ STL Lambert</span>
+                      <span className="text-[11px] text-slate-500">{stlAirportCount} trips recorded</span>
+                    </div>
+                    <span className="font-black text-blue-600">
+                      {totalTripsCount > 0 ? `${Math.round((stlAirportCount / tierTotal) * 100)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Spirit Airport (SUS) ⇄ St. Louis Metro</span>
+                      <span className="text-[11px] text-slate-500">{spiritCount} trips recorded</span>
+                    </div>
+                    <span className="font-black text-blue-600">
+                      {totalTripsCount > 0 ? `${Math.round((spiritCount / tierTotal) * 100)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Local Chesterfield &amp; West County</span>
+                      <span className="text-[11px] text-slate-500">{localCount} trips recorded</span>
+                    </div>
+                    <span className="font-black text-blue-600">
+                      {totalTripsCount > 0 ? `${Math.round((localCount / tierTotal) * 100)}%` : '0%'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600">08:00 AM - 10:00 AM (Morning Commute)</span>
-                  <span className="font-bold text-blue-600">Steady Volume</span>
+              </Card>
+
+              <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
+                <CardTitle className="text-sm font-bold text-slate-900 mb-1">Vehicle Class Demand</CardTitle>
+                <CardDescription className="text-xs text-slate-500 mb-4">Bookings by passenger fleet preference</CardDescription>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-bold text-slate-700">Standard Sedan (4-Pax)</span>
+                      <span className="font-black text-slate-900">{stdPct}% ({tierCounts.standard})</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-600 rounded-full" style={{ width: `${stdPct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-bold text-slate-700">Premium Executive Sedan</span>
+                      <span className="font-black text-slate-900">{execPct}% ({tierCounts.executive})</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${execPct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-bold text-slate-700">XL Minivan / SUV (6-Pax)</span>
+                      <span className="font-black text-slate-900">{xlPct}% ({tierCounts.xl})</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${xlPct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="font-bold text-slate-700">Wheelchair Accessible (WAV)</span>
+                      <span className="font-black text-slate-900">{wavPct}% ({tierCounts.wav})</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-purple-600 rounded-full" style={{ width: `${wavPct}%` }} />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-600">04:30 PM - 07:00 PM (Evening Return)</span>
-                  <span className="font-bold text-blue-600">Steady Volume</span>
+              </Card>
+
+              <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
+                <CardTitle className="text-sm font-bold text-slate-900 mb-1">Peak Dispatch Windows</CardTitle>
+                <CardDescription className="text-xs text-slate-500 mb-4">Operational shift planning reference</CardDescription>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">04:30 AM - 07:00 AM (Early Flights)</span>
+                    <span className="font-black text-emerald-600">Surge ({settings.pricing.surgeMultiplier}x)</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">08:00 AM - 10:00 AM (Morning Commute)</span>
+                    <span className="font-bold text-blue-600">Steady Volume</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">04:30 PM - 07:00 PM (Evening Return)</span>
+                    <span className="font-bold text-blue-600">Steady Volume</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-600">09:30 PM - 01:00 AM (Late Arrivals)</span>
+                    <span className="font-bold text-amber-600">Airport Queues</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-600">09:30 PM - 01:00 AM (Late Arrivals)</span>
-                  <span className="font-bold text-amber-600">Airport Queues</span>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

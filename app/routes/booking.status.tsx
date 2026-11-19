@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router';
 import { getBookingService } from '../core/services/booking';
 import type { Trip, TripStatus } from '../core/types/trip';
 import { COMPANY_CONFIG } from '../config/companyConfig';
@@ -8,6 +8,7 @@ import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { verifyTripPhoneMatch } from '../core/utils/trip-id.util';
 
 export function meta() {
   return [
@@ -28,20 +29,50 @@ const LIFECYCLE_STEPS: Array<{ key: TripStatus; label: string; desc: string }> =
 
 export default function BookingStatusRoute() {
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const tripId = params.tripId || params.tripToken;
+  const tripId = params.tripId || params.tripToken || searchParams.get('id') || undefined;
 
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(Boolean(tripId));
   const [error, setError] = useState<string | null>(null);
-  const [searchRef, setSearchRef] = useState('');
+  const [searchRef, setSearchRef] = useState(tripId || '');
+  const [phoneInput, setPhoneInput] = useState(searchParams.get('phone') || '');
+  const [phoneVerifyError, setPhoneVerifyError] = useState<string | null>(null);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = searchRef.trim().replace(/^#/, '');
-    if (clean) {
-      navigate(`/booking/status/${encodeURIComponent(clean)}`);
+    setPhoneVerifyError(null);
+    const cleanId = searchRef.trim().replace(/^#/, '');
+    const cleanPhone = phoneInput.trim();
+    if (!cleanId) {
+      setPhoneVerifyError('Please enter your Trip ID (e.g., CT-1234-5678).');
+      return;
+    }
+    if (cleanPhone.replace(/\D/g, '').length < 7) {
+      setPhoneVerifyError('Please enter the passenger phone number used for this booking.');
+      return;
+    }
+    try {
+      sessionStorage.setItem(`ct_verified_phone_${cleanId.toUpperCase()}`, cleanPhone);
+      sessionStorage.setItem(`ct_verified_phone_${cleanId}`, cleanPhone);
+    } catch {}
+    navigate(`/booking/status/${encodeURIComponent(cleanId)}`);
+  };
+
+  const handleVerifyExistingTripPhone = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhoneVerifyError(null);
+    if (!trip) return;
+    if (verifyTripPhoneMatch(trip.passenger?.phone, phoneInput)) {
+      try {
+        sessionStorage.setItem(`ct_verified_phone_${trip.id}`, phoneInput.trim());
+      } catch {}
+      setIsPhoneVerified(true);
+    } else {
+      setPhoneVerifyError('The phone number entered does not match the passenger phone number on this reservation.');
     }
   };
 
@@ -54,12 +85,51 @@ export default function BookingStatusRoute() {
   }, []);
 
   useEffect(() => {
+    if (!trip) return;
+    // Check if authenticated user owns this trip or is staff
+    if (currentUser) {
+      const isStaff = ['admin', 'dispatcher', 'driver'].includes(currentUser.role);
+      const isOwner =
+        (trip.customerId && currentUser.uid === trip.customerId) ||
+        (trip.passenger?.email &&
+          currentUser.email &&
+          trip.passenger.email.toLowerCase() === currentUser.email.toLowerCase());
+      if (isStaff || isOwner) {
+        setIsPhoneVerified(true);
+        return;
+      }
+    }
+
+    // Check sessionStorage or URL query parameter for matching phone
+    let storedPhone = searchParams.get('phone') || '';
+    if (!storedPhone && typeof window !== 'undefined') {
+      try {
+        storedPhone =
+          sessionStorage.getItem(`ct_verified_phone_${trip.id}`) ||
+          sessionStorage.getItem(`ct_verified_phone_${trip.id.toUpperCase()}`) ||
+          '';
+      } catch {}
+    }
+
+    if (storedPhone && verifyTripPhoneMatch(trip.passenger?.phone, storedPhone)) {
+      setIsPhoneVerified(true);
+    } else {
+      setIsPhoneVerified(false);
+      if (storedPhone) {
+        setPhoneVerifyError('The phone number provided does not match this Trip ID. Please verify and try again.');
+      }
+    }
+  }, [trip, currentUser, searchParams]);
+
+  useEffect(() => {
     if (!tripId) {
-      setError('Trip ID is missing.');
+      setTrip(null);
+      setError(null);
       setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
     const bookingService = getBookingService();
 
     bookingService
@@ -69,7 +139,7 @@ export default function BookingStatusRoute() {
           setTrip(res.trip);
           setError(null);
         } else {
-          setError('Booking reference "' + tripId + '" not found in live system.');
+          setError('Booking reference "' + tripId + '" was not found. Please check your Trip ID and try again.');
         }
       })
       .catch((err) => {
@@ -134,36 +204,69 @@ export default function BookingStatusRoute() {
     );
   }
 
-  if (error || !trip) {
+  // Case 1: Lookup Landing (/track with no tripId yet, or trip lookup error)
+  if (!tripId || error || !trip) {
     return (
-      <div className="max-w-md mx-auto my-12 p-6 bg-white rounded-2xl border border-slate-200 text-center shadow-lg">
-        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 text-xl font-bold">
-          !
+      <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white rounded-3xl border border-slate-200 text-center shadow-xl">
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl font-bold ${
+            error ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-blue-600'
+          }`}
+        >
+          {error ? '!' : <SearchIcon className="w-6 h-6" />}
         </div>
-        <h3 className="text-lg font-bold text-slate-900">Trip Not Found</h3>
-        <p className="text-xs text-slate-600 mt-2 mb-5">
-          {error || 'Unable to locate this reservation. Please verify your trip reference or phone number.'}
+        <h1 className="text-xl font-black text-slate-900">
+          {error ? 'Trip Not Found' : 'Track Your Ride'}
+        </h1>
+        <p className="text-xs text-slate-600 mt-2 mb-6 leading-relaxed">
+          {error ||
+            'Enter your Trip Confirmation ID and the passenger phone number used during booking to view real-time dispatch status.'}
         </p>
 
-        <form onSubmit={handleSearchSubmit} className="mb-6">
-          <div className="flex gap-2">
+        {phoneVerifyError && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 text-left">
+            {phoneVerifyError}
+          </div>
+        )}
+
+        <form onSubmit={handleSearchSubmit} className="mb-6 space-y-3 text-left">
+          <div>
+            <label htmlFor="track-trip-id" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Confirmation Code / Trip ID
+            </label>
             <input
+              id="track-trip-id"
               type="text"
+              required
               value={searchRef}
               onChange={(e) => setSearchRef(e.target.value)}
-              placeholder="Enter Trip ID or Phone #"
-              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              placeholder="e.g. CT-4821-9034"
+              className="w-full px-3.5 py-2.5 text-sm font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-slate-900 text-white font-semibold text-sm rounded-xl hover:bg-slate-800 transition-colors"
-            >
-              Search
-            </button>
           </div>
+          <div>
+            <label htmlFor="track-phone" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Passenger Phone Number
+            </label>
+            <input
+              id="track-phone"
+              type="tel"
+              required
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="(314) 555-0199"
+              className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-colors shadow-sm"
+          >
+            Track Live Status
+          </button>
         </form>
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-100">
           <Link
             to="/book"
             className="px-4 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
@@ -171,10 +274,61 @@ export default function BookingStatusRoute() {
             Book a Ride
           </Link>
           <a
-            href={`tel:${COMPANY_CONFIG.phone}`}
+            href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
             className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-colors"
           >
             Call Dispatch
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Case 2: Trip exists, but guest has not verified passenger phone number yet
+  if (!isPhoneVerified) {
+    return (
+      <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white rounded-3xl border border-slate-200 text-center shadow-xl">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+          <PhoneIcon className="w-6 h-6" />
+        </div>
+        <h1 className="text-xl font-black text-slate-900">Verify Passenger Phone</h1>
+        <p className="text-xs text-slate-600 mt-2 mb-6 leading-relaxed">
+          To protect passenger privacy for reservation <strong className="font-mono text-slate-900">{trip.id}</strong>, please confirm the phone number associated with this booking.
+        </p>
+
+        {phoneVerifyError && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 text-left">
+            {phoneVerifyError}
+          </div>
+        )}
+
+        <form onSubmit={handleVerifyExistingTripPhone} className="space-y-4 text-left mb-6">
+          <div>
+            <label htmlFor="verify-trip-phone" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Passenger Phone Number
+            </label>
+            <input
+              id="verify-trip-phone"
+              type="tel"
+              required
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              placeholder="(314) 555-0199"
+              className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            Verify & View Trip Status
+          </button>
+        </form>
+
+        <div className="text-xs text-slate-500 pt-4 border-t border-slate-100">
+          Need assistance? Call Dispatch at{' '}
+          <a href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`} className="font-bold text-slate-800 underline">
+            {COMPANY_CONFIG.phone.primary}
           </a>
         </div>
       </div>
@@ -321,7 +475,7 @@ export default function BookingStatusRoute() {
               Register now using your booking email or phone to seamlessly attach this and previous guest bookings to your passenger profile.
             </p>
             <Link
-              to={`/register?role=customer&claimTrip=${tripId}`}
+              to={`/app/register?claimTrip=${tripId}`}
               className="inline-block px-5 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-xl shadow hover:bg-blue-700 transition-colors"
             >
               Create Account
@@ -333,7 +487,7 @@ export default function BookingStatusRoute() {
         <div className="text-center text-xs text-slate-500 space-y-2">
           <p>Questions about your trip? Call 24/7 Chesterfield Dispatch Desk:</p>
           <a
-            href={'tel:' + COMPANY_CONFIG.phone.dispatch}
+            href={'tel:' + COMPANY_CONFIG.phone.primaryRaw}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs shadow hover:bg-slate-800 transition-colors"
           >
             <PhoneIcon className="w-3.5 h-3.5 text-amber-400" />

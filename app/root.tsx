@@ -12,11 +12,27 @@ import { getAdminConfigService } from "./core/services/config/admin-config.servi
 import type { BrandingConfig } from "./core/types/config";
 import "./app.css";
 
+function getAccessibleContrastColor(hexColor?: string): string {
+  if (!hexColor) return "#ffffff";
+  const clean = hexColor.replace("#", "").trim();
+  if (clean.length !== 6) return "#ffffff";
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  return luminance > 0.35 ? "#020617" : "#ffffff";
+}
+
+function sanitizeCustomCss(css?: string): string {
+  if (!css) return "";
+  return css.replace(/<\/?style[^>]*>/gi, "").replace(/<\/?script[^>]*>/gi, "");
+}
+
 export async function loader() {
   const clientMapsApiKey =
     process.env.VITE_GOOGLE_MAPS_API_KEY ||
     process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.GOOGLE_MAPS_SERVER_API_KEY ||
     DEFAULT_GOOGLE_MAPS_KEY;
 
   return {
@@ -28,23 +44,27 @@ export async function loader() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const clientMapsKey =
-    (typeof process !== 'undefined' && (process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_SERVER_API_KEY)) ||
+    (typeof process !== 'undefined' && (process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY)) ||
     DEFAULT_GOOGLE_MAPS_KEY;
+
+  const primaryHex = COMPANY_CONFIG.primaryColor || "#2563eb";
+  const primaryFg = getAccessibleContrastColor(primaryHex);
 
   return (
     <html
       lang="en"
       style={
         {
-          "--color-primary": COMPANY_CONFIG.primaryColor || "#2563eb",
+          "--color-primary": primaryHex,
+          "--color-primary-fg": primaryFg,
           "--color-secondary": COMPANY_CONFIG.secondaryColor || "#0f172a",
-          "--brand-primary": COMPANY_CONFIG.primaryColor || "#2563eb",
+          "--brand-primary": primaryHex,
           "--brand-secondary": COMPANY_CONFIG.secondaryColor || "#0f172a",
           "--color-heading": COMPANY_CONFIG.headingColor || "#0f172a",
           "--color-text-main": COMPANY_CONFIG.bodyTextColor || "#334155",
           "--color-text-muted": COMPANY_CONFIG.mutedTextColor || "#64748b",
-          "--btn-primary-bg": COMPANY_CONFIG.btnPrimaryBg || "#2563eb",
-          "--btn-primary-text": COMPANY_CONFIG.btnPrimaryText || "#ffffff",
+          "--btn-primary-bg": COMPANY_CONFIG.btnPrimaryBg || primaryHex,
+          "--btn-primary-text": COMPANY_CONFIG.btnPrimaryText || primaryFg,
           "--btn-secondary-bg": COMPANY_CONFIG.btnSecondaryBg || "#0f172a",
           "--btn-secondary-text": COMPANY_CONFIG.btnSecondaryText || "#ffffff",
           "--btn-radius": COMPANY_CONFIG.btnBorderRadius || "8px",
@@ -57,29 +77,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
     >
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#2563eb" />
-        {/* Safely get location inside ErrorBoundary as well if needed, but since we are in head we just use a safe try-catch wrapper for useLocation if it fails, or simpler: just use generic manifest and let specific routes override with 'links' export. Actually we can just use useLocation here. */}
-        {(() => {
-          try {
-            const loc = useLocation();
-            if (loc.pathname.startsWith('/driver')) {
-              return <link rel="manifest" href="/manifest-driver.json" />;
-            }
-          } catch (e) {
-            // fallback if useLocation throws
-          }
-          return <link rel="manifest" href="/manifest.json" />;
-        })()}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+        />
+        <link rel="manifest" href="/manifest.json" />
         <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
         <link rel="apple-touch-icon" href="/icon-192.svg" />
         <Meta />
         <Links />
         {COMPANY_CONFIG.cms?.customCss && (
-          <style dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.customCss }} />
-        )}
-        {COMPANY_CONFIG.cms?.scripts?.head && (
-          <script dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.scripts.head }} />
+          <style dangerouslySetInnerHTML={{ __html: sanitizeCustomCss(COMPANY_CONFIG.cms.customCss) }} />
         )}
         <script
           dangerouslySetInnerHTML={{
@@ -98,9 +110,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
-        {COMPANY_CONFIG.cms?.scripts?.footer && (
-          <script dangerouslySetInnerHTML={{ __html: COMPANY_CONFIG.cms.scripts.footer }} />
-        )}
       </body>
     </html>
   );
@@ -114,6 +123,7 @@ function useDynamicBrandingSync() {
       if (branding.primaryColor) {
         root.style.setProperty('--color-primary', branding.primaryColor);
         root.style.setProperty('--brand-primary', branding.primaryColor);
+        root.style.setProperty('--color-primary-fg', getAccessibleContrastColor(branding.primaryColor));
       }
       if (branding.secondaryColor) {
         root.style.setProperty('--color-secondary', branding.secondaryColor);

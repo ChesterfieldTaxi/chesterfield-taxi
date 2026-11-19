@@ -205,6 +205,7 @@ export type EmailDispatchApiRequest = (
   | { type: 'status_update'; payload: StatusUpdateEmailPayload }
   | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload }
   | { type: 'clarification_request'; payload: BookingClarificationRequestEmailPayload }
+  | { type: 'contact_inquiry'; payload: Record<string, any> }
 ) & {
   subject?: string;
   html?: string;

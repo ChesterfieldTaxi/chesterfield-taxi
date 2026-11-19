@@ -10,7 +10,11 @@ import {
   CarIcon,
   UserIcon,
 } from '../../ui/Icons';
-import { getAdminAuthService, type UserRole } from '../../../core/services/auth/admin-auth.service';
+import { getAdminAuthService, type AdminUser } from '../../../core/services/auth/admin-auth.service';
+import {
+  getAccessibleWorkspaces,
+  getEffectiveRoles,
+} from '../../../core/utils/workspace-routing.util';
 
 export interface UserDropdownProps {
   email?: string | null;
@@ -85,32 +89,40 @@ export function UserDropdown({
     }
   }, []);
 
-  // Determine user accessible role views
-  const authService = getAdminAuthService();
-  const currentUser = authService.getCurrentUser();
-  const effectiveRoles = (
-    currentUser?.roles?.length
-      ? currentUser.roles
-      : currentUser?.role
-      ? [currentUser.role]
-      : ['customer']
-  ) as UserRole[];
-  const isDemo = currentUser?.isDemo ?? true;
-  const isAdmin = effectiveRoles.includes('admin') || isDemo;
-  const isDispatcher = isAdmin || effectiveRoles.includes('dispatcher');
-  const isDriver = isDispatcher || effectiveRoles.includes('driver');
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() =>
+    getAdminAuthService().getCurrentUser()
+  );
+
+  useEffect(() => {
+    const authService = getAdminAuthService();
+    const unsub = authService.onAuthStateChanged((u) => {
+      setCurrentUser(u);
+    });
+    return unsub;
+  }, []);
+
+  const effectiveRoles = getEffectiveRoles(currentUser);
+  const accessibleWorkspaces = getAccessibleWorkspaces(currentUser);
+  const hasMultipleWorkspaces = accessibleWorkspaces.length > 1;
+  const singleWorkspace = accessibleWorkspaces[0] || null;
+  const roleBadgeLabel =
+    effectiveRoles.length === 1 && effectiveRoles[0] === 'customer'
+      ? 'Passenger'
+      : effectiveRoles.join(', ');
 
   const currentPath =
     currentView ||
     (typeof window !== 'undefined'
-      ? window.location.pathname.startsWith('/admin')
+      ? window.location.pathname.startsWith('/app/admin') || window.location.pathname.startsWith('/admin')
         ? 'admin'
-        : window.location.pathname.startsWith('/dispatch')
+        : window.location.pathname.startsWith('/app/dispatch') || window.location.pathname.startsWith('/dispatch')
         ? 'dispatch'
-        : window.location.pathname.startsWith('/driver')
+        : window.location.pathname.startsWith('/app/driver') || window.location.pathname.startsWith('/driver')
         ? 'driver'
-        : 'app'
-      : 'admin');
+        : window.location.pathname.startsWith('/app/passenger')
+        ? 'app'
+        : 'public'
+      : 'app');
 
   const handleToggleTheme = () => {
     const nextDark = !isDark;
@@ -149,7 +161,11 @@ export function UserDropdown({
             ? 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 text-slate-100 hover:text-white'
             : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs'
         }`}
-        title={`Account: ${displayEmail} (Click to switch workspace)`}
+        title={
+          hasMultipleWorkspaces
+            ? `Account: ${displayEmail} (Click to switch workspace)`
+            : `Account: ${displayEmail}`
+        }
       >
         <div className="flex items-center gap-2 min-w-0 overflow-hidden">
           <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
@@ -180,10 +196,10 @@ export function UserDropdown({
           <div className="px-4 py-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                Active Operator
+                {hasMultipleWorkspaces ? 'Signed In Account' : 'Account'}
               </span>
               <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 capitalize">
-                {effectiveRoles.join(', ')}
+                {roleBadgeLabel}
               </span>
             </div>
             <span className="text-xs font-bold text-slate-900 truncate block mt-0.5" title={displayEmail}>
@@ -191,115 +207,144 @@ export function UserDropdown({
             </span>
           </div>
 
-          {/* Multi-Role View Switcher Section */}
-          <div className="p-1">
-            <span className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
-              Switch Workspace View
-            </span>
-            <div className="space-y-0.5">
-              {isAdmin && (
+          {/* Multi-Role Workspace Switcher (Shown ONLY when the user has 2+ workspaces) */}
+          {hasMultipleWorkspaces ? (
+            <div className="p-1">
+              <div className="px-3 py-1 flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Switch Workspace
+                </span>
                 <button
                   type="button"
-                  onClick={() => handleNavigateView('/admin')}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
-                    currentPath === 'admin'
-                      ? 'bg-purple-50 text-purple-900 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
+                  onClick={() => handleNavigateView('/app?choose=1')}
+                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
-                      <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-700" />
-                    </div>
-                    <span>Admin Console</span>
-                  </div>
-                  {currentPath === 'admin' ? (
-                    <span className="text-[9px] font-black uppercase text-purple-600">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-mono">/admin</span>
-                  )}
+                  Hub
                 </button>
-              )}
-
-              {isDispatcher && (
-                <button
-                  type="button"
-                  onClick={() => handleNavigateView('/dispatch')}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
-                    currentPath === 'dispatch'
-                      ? 'bg-blue-50 text-blue-900 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
-                      <RadioIcon className="w-3.5 h-3.5 text-blue-700" />
+              </div>
+              <div className="space-y-0.5">
+                {accessibleWorkspaces.some((w) => w.id === 'admin') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateView('/app/admin')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+                      currentPath === 'admin'
+                        ? 'bg-purple-50 text-purple-900 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
+                        <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-700" />
+                      </div>
+                      <span>Admin Console</span>
                     </div>
-                    <span>Dispatch Console</span>
-                  </div>
-                  {currentPath === 'dispatch' ? (
-                    <span className="text-[9px] font-black uppercase text-blue-600">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-mono">/dispatch</span>
-                  )}
-                </button>
-              )}
+                    {currentPath === 'admin' ? (
+                      <span className="text-[9px] font-black uppercase text-purple-600">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono">/app/admin</span>
+                    )}
+                  </button>
+                )}
 
-              {isDriver && (
-                <button
-                  type="button"
-                  onClick={() => handleNavigateView('/driver')}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
-                    currentPath === 'driver'
-                      ? 'bg-amber-50 text-amber-900 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
-                      <CarIcon className="w-3.5 h-3.5 text-amber-700" />
+                {accessibleWorkspaces.some((w) => w.id === 'dispatch') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateView('/app/dispatch')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+                      currentPath === 'dispatch'
+                        ? 'bg-blue-50 text-blue-900 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                        <RadioIcon className="w-3.5 h-3.5 text-blue-700" />
+                      </div>
+                      <span>Dispatch Console</span>
                     </div>
-                    <span>Driver Console</span>
-                  </div>
-                  {currentPath === 'driver' ? (
-                    <span className="text-[9px] font-black uppercase text-amber-600">
-                      Active
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 font-mono">/driver</span>
-                  )}
-                </button>
-              )}
+                    {currentPath === 'dispatch' ? (
+                      <span className="text-[9px] font-black uppercase text-blue-600">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono">/app/dispatch</span>
+                    )}
+                  </button>
+                )}
 
+                {accessibleWorkspaces.some((w) => w.id === 'driver') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateView('/app/driver')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+                      currentPath === 'driver'
+                        ? 'bg-amber-50 text-amber-900 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0">
+                        <CarIcon className="w-3.5 h-3.5 text-amber-700" />
+                      </div>
+                      <span>Driver Console</span>
+                    </div>
+                    {currentPath === 'driver' ? (
+                      <span className="text-[9px] font-black uppercase text-amber-600">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono">/app/driver</span>
+                    )}
+                  </button>
+                )}
+
+                {accessibleWorkspaces.some((w) => w.id === 'passenger') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateView('/app/passenger')}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+                      currentPath === 'app' || currentPath === 'customer'
+                        ? 'bg-emerald-50 text-emerald-900 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
+                        <UserIcon className="w-3.5 h-3.5 text-emerald-700" />
+                      </div>
+                      <span>Passenger Portal</span>
+                    </div>
+                    {currentPath === 'app' || currentPath === 'customer' ? (
+                      <span className="text-[9px] font-black uppercase text-emerald-600">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono">/app/passenger</span>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : currentPath === 'public' && singleWorkspace ? (
+            <div className="p-1">
               <button
                 type="button"
-                onClick={() => handleNavigateView('/app')}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
-                  currentPath === 'app' || currentPath === 'customer'
-                    ? 'bg-emerald-50 text-emerald-900 font-bold'
-                    : 'text-slate-700 hover:bg-slate-50'
-                }`}
+                onClick={() => handleNavigateView(singleWorkspace.path)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center shrink-0">
-                    <UserIcon className="w-3.5 h-3.5 text-emerald-700" />
+                  <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center shrink-0">
+                    <UserIcon className="w-3.5 h-3.5 text-blue-600" />
                   </div>
-                  <span>Passenger Portal</span>
+                  <span>Open {singleWorkspace.label}</span>
                 </div>
-                {currentPath === 'app' || currentPath === 'customer' ? (
-                  <span className="text-[9px] font-black uppercase text-emerald-600">
-                    Active
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-mono">/app</span>
-                )}
+                <span className="text-[10px] text-blue-600 font-bold">&rarr;</span>
               </button>
             </div>
-          </div>
+          ) : null}
 
           {/* Theme Toggle (Light / Dark) */}
           <div className="p-1">

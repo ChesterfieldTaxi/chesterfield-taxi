@@ -16,6 +16,8 @@ import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import { isFirebaseConfigured, getFirebaseApp } from '../core/services/firebase';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import type { AppSettings, CompanyConfig } from '../core/types/config';
 
 export function meta() {
@@ -93,14 +95,52 @@ export default function ContactRoute() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    // Simulate sending inquiry to dispatch
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // 1. Persist inquiry in Firestore if configured
+      if (isFirebaseConfigured()) {
+        try {
+          const db = getFirestore(getFirebaseApp());
+          await addDoc(collection(db, 'inquiries'), {
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            inquiryType: formData.inquiryType,
+            message: formData.message.trim(),
+            status: 'new',
+            createdAt: new Date().toISOString(),
+          });
+        } catch (firestoreErr) {
+          console.warn('[ContactRoute] Firestore inquiry write warning:', firestoreErr);
+        }
+      }
+
+      // 2. Dispatch email notification via server API
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'contact_inquiry',
+          to: emailDisplay,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          inquiryType: formData.inquiryType,
+          message: formData.message.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errPayload = await response.json().catch(() => ({}));
+        throw new Error(errPayload.error || 'Could not transmit inquiry. Please call dispatch directly.');
+      }
+
       setSubmitted(true);
       setFormData({
         name: '',
@@ -109,7 +149,15 @@ export default function ContactRoute() {
         inquiryType: 'general',
         message: '',
       });
-    }, 800);
+    } catch (err: unknown) {
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : `Unable to submit inquiry right now. Please call ${phoneDisplay} directly.`
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -249,6 +297,11 @@ export default function ContactRoute() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="pt-6 space-y-4">
+                  {submitError && (
+                    <Alert variant="error" title="Transmission Error">
+                      {submitError}
+                    </Alert>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">

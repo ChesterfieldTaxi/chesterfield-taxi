@@ -45,7 +45,13 @@ export function BookingConfirmation({
 }: BookingConfirmationProps) {
   React.useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+    if (trip?.id && trip?.passenger?.phone) {
+      try {
+        sessionStorage.setItem(`ct_verified_phone_${trip.id}`, trip.passenger.phone);
+        sessionStorage.setItem(`ct_verified_phone_${trip.id.toUpperCase()}`, trip.passenger.phone);
+      } catch {}
+    }
+  }, [trip?.id, trip?.passenger?.phone]);
 
   const [companyConfig, setCompanyConfig] = React.useState(() => {
     return getAdminConfigService().getCachedSettings().company;
@@ -109,7 +115,7 @@ export function BookingConfirmation({
         `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
 
       const summary = `Chesterfield Taxi - Ride #${trip.id}`;
-      const description = `Pickup: ${trip.pickupLocation.address}\\nDropoff: ${trip.dropoffLocation.address}\\nTotal Fare: $${trip.pricing.totalFare.toFixed(2)}\\nDispatch Support: (314) 738-9921`;
+      const description = `Pickup: ${trip.pickupLocation.address}\\nDropoff: ${trip.dropoffLocation.address}\\nTotal Fare: $${trip.pricing.totalFare.toFixed(2)}\\nDispatch Support: ${companyConfig?.phone || COMPANY_CONFIG.phone.dispatch}`;
       const locationStr = trip.pickupLocation.address.replace(/,/g, '\\,');
 
       const icsContent = [

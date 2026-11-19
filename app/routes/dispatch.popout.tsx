@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, useNavigate } from 'react-router';
 import { getWorkspaceBus, type WorkspaceModuleKey } from '../core/services/workspace-bus.service';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
 import { EmailDock } from '../components/domain/dispatch/EmailDock';
@@ -7,6 +7,8 @@ import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
 import { getOperatorService, type DriverRosterItem } from '../core/services/operator.service';
+import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { SpinnerIcon } from '../components/ui/Icons';
 
 export function meta() {
   return [{ title: 'Dispatch Window Pop-Out – Chesterfield Taxi' }];
@@ -14,21 +16,41 @@ export function meta() {
 
 export default function DispatchPopoutRoute() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const moduleKey = (searchParams.get('module') || 'comms') as WorkspaceModuleKey;
 
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>(() => getOperatorService().getDriverRoster());
   const [trips, setTrips] = useState<Trip[]>([]);
 
   const workspaceBus = getWorkspaceBus();
 
   useEffect(() => {
+    const authService = getAdminAuthService();
+    const unsub = authService.onAuthStateChanged((user) => {
+      if (!user || (user.role !== 'admin' && user.role !== 'dispatcher')) {
+        setIsAuthorized(false);
+        setIsCheckingAuth(false);
+        navigate('/app/login?redirect=/app/dispatch', { replace: true });
+      } else {
+        setIsAuthorized(true);
+        setIsCheckingAuth(false);
+      }
+    });
+    return unsub;
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!isAuthorized) return;
     const unsubDrivers = getOperatorService().subscribeToDrivers((roster) => {
       setDrivers(roster);
     });
     return () => unsubDrivers();
-  }, []);
+  }, [isAuthorized]);
 
   useEffect(() => {
+    if (!isAuthorized) return;
     // Notify main window that this module is active in an external window
     workspaceBus.publish('WINDOW_REGISTER', { moduleKey, timestamp: Date.now() });
 
@@ -51,7 +73,16 @@ export default function DispatchPopoutRoute() {
       handleBeforeUnload();
       if (typeof unsubTrips === 'function') unsubTrips();
     };
-  }, [moduleKey, workspaceBus]);
+  }, [isAuthorized, moduleKey, workspaceBus]);
+
+  if (isCheckingAuth || !isAuthorized) {
+    return (
+      <div className="flex flex-col h-screen w-screen items-center justify-center bg-slate-950 text-white gap-3">
+        <SpinnerIcon className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-xs font-semibold text-slate-400">Verifying dispatcher authorization...</p>
+      </div>
+    );
+  }
 
   const getModuleTitle = (key: WorkspaceModuleKey) => {
     switch (key) {

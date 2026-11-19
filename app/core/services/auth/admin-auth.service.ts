@@ -8,6 +8,7 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   FacebookAuthProvider,
   signInWithPopup,
@@ -39,6 +40,7 @@ const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
 
 export class AdminAuthService {
   private isConfigured: boolean;
+  private cachedUser: AdminUser | null = null;
 
   constructor() {
     this.isConfigured = isFirebaseConfigured();
@@ -74,27 +76,6 @@ export class AdminAuthService {
           roles = ['customer'];
         }
 
-        // Self-healing: if a test driver account got stuck as 'customer', force upgrade it
-        if (roles.includes('customer') && user.email && user.email.toLowerCase().includes('driver')) {
-          roles = roles.filter(r => r !== 'customer');
-          if (!roles.includes('driver')) roles.push('driver');
-          await setDoc(userRef, { roles, role: 'driver' }, { merge: true });
-          
-          // Ensure a driver profile exists too
-          try {
-            const driverRef = doc(db, 'drivers', user.uid);
-            await setDoc(driverRef, {
-              id: user.uid,
-              name: user.displayName || user.email.split('@')[0],
-              phone: '(314) 738-0100',
-              dutyStatus: 'off_duty',
-              vehicleUnit: 'Unassigned',
-              vehicleTier: 'standard',
-              zone: 'Chesterfield'
-            }, { merge: true });
-          } catch (e) {}
-        }
-
         return {
           roles,
           status: data?.status,
@@ -105,43 +86,7 @@ export class AdminAuthService {
         };
       }
 
-      // Auto-provision primary admin or dispatcher if using operational emails
-      if (user.email === 'admin@chesterfieldtaxi.com') {
-        const adminRoles: UserRole[] = ['admin'];
-        await setDoc(userRef, { roles: adminRoles, role: 'admin', email: user.email }, { merge: true });
-        return { roles: adminRoles, status: 'active' };
-      }
-
-      if (user.email === 'dispatch@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('dispatch'))) {
-        const dispatchRoles: UserRole[] = ['dispatcher'];
-        await setDoc(userRef, { roles: dispatchRoles, role: 'dispatcher', email: user.email }, { merge: true });
-        return { roles: dispatchRoles, status: 'active' };
-      }
-
-      if (user.email === 'driver1@chesterfieldtaxi.com' || (user.email && user.email.toLowerCase().includes('driver'))) {
-        const driverRoles: UserRole[] = ['driver'];
-        await setDoc(userRef, { roles: driverRoles, role: 'driver', email: user.email }, { merge: true });
-        
-        // Ensure a driver profile exists in the drivers collection
-        try {
-          const driverRef = doc(db, 'drivers', user.uid);
-          await setDoc(driverRef, {
-            id: user.uid,
-            name: user.displayName || user.email.split('@')[0],
-            phone: '(314) 738-0100',
-            dutyStatus: 'off_duty',
-            vehicleUnit: 'Unassigned',
-            vehicleTier: 'standard',
-            zone: 'Chesterfield'
-          }, { merge: true });
-        } catch (e) {
-          console.warn('[AdminAuthService] Error provisioning driver profile:', e);
-        }
-        
-        return { roles: driverRoles, status: 'active' };
-      }
-
-      // Default to customer
+      // Default to customer for any user without an explicit Firestore role document
       return { roles: ['customer'] };
     } catch (err) {
       console.warn('[AdminAuthService] Error fetching user roles from Firestore:', err);
@@ -162,13 +107,14 @@ export class AdminAuthService {
       return null;
     }
 
+    if (this.cachedUser) {
+      return this.cachedUser;
+    }
+
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();
         if (auth.currentUser) {
-          // Sync check won't have Firestore role.
-          // Returning null forces consumers to rely on onAuthStateChanged which is async and safe.
-          // However, to satisfy the signature and not break existing sync checks, we return customer default.
           return {
             uid: auth.currentUser.uid,
             email: auth.currentUser.email,
@@ -186,7 +132,9 @@ export class AdminAuthService {
     try {
       const demoUserJson = window.sessionStorage.getItem(DEMO_SESSION_KEY);
       if (demoUserJson) {
-        return JSON.parse(demoUserJson) as AdminUser;
+        const parsed = JSON.parse(demoUserJson) as AdminUser;
+        this.cachedUser = parsed;
+        return parsed;
       }
     } catch {
       // Ignore storage errors
@@ -196,6 +144,7 @@ export class AdminAuthService {
   }
 
   public clearCurrentUser(): void {
+    this.cachedUser = null;
     if (typeof window !== 'undefined') {
       try {
         window.sessionStorage.removeItem(DEMO_SESSION_KEY);
@@ -217,13 +166,14 @@ export class AdminAuthService {
             const profile = await this.fetchUserProfileData(user);
             if (profile.isBlacklisted || profile.status === 'suspended') {
               console.warn(`[AdminAuthService] Access revoked: user ${user.uid} is blacklisted or suspended.`);
+              this.cachedUser = null;
               try {
                 await firebaseSignOut(auth);
               } catch (_) {}
               callback(null);
               return;
             }
-            callback({
+            const hydrated: AdminUser = {
               uid: user.uid,
               email: user.email,
               displayName: user.displayName,
@@ -234,8 +184,11 @@ export class AdminAuthService {
               isBlacklisted: profile.isBlacklisted,
               blacklistReason: profile.blacklistReason,
               assignedVehicleUnit: profile.assignedVehicleUnit,
-            });
+            };
+            this.cachedUser = hydrated;
+            callback(hydrated);
           } else {
+            this.cachedUser = null;
             // Check if demo user is in storage
             const demoUser = this.getCurrentUser();
             if (demoUser?.isBlacklisted || demoUser?.status === 'suspended') {
@@ -280,7 +233,7 @@ export class AdminAuthService {
           );
         }
 
-        return {
+        const signedInUser: AdminUser = {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName,
@@ -292,6 +245,8 @@ export class AdminAuthService {
           blacklistReason: profile.blacklistReason,
           assignedVehicleUnit: profile.assignedVehicleUnit,
         };
+        this.cachedUser = signedInUser;
+        return signedInUser;
       } catch (err: unknown) {
         console.warn('[AdminAuthService] Firebase Auth sign-in error:', err);
         throw err;
@@ -329,6 +284,7 @@ export class AdminAuthService {
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
       }
+      this.cachedUser = demoUser;
       return demoUser;
     }
 
@@ -337,7 +293,7 @@ export class AdminAuthService {
     );
   }
 
-  public async registerWithEmail(email: string, password: string, role: UserRole = 'customer', displayName?: string): Promise<AdminUser> {
+  public async registerWithEmail(email: string, password: string, _role: UserRole = 'customer', displayName?: string): Promise<AdminUser> {
     const trimmedEmail = email.trim().toLowerCase();
     
     if (this.isConfigured) {
@@ -345,33 +301,10 @@ export class AdminAuthService {
         const auth = getFirebaseAuth();
         const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
         
-        // Write role to Firestore
+        // Self-registration always provisions a 'customer' role (staff accounts are provisioned via Admin Onboarding)
         const db = getFirestore(getFirebaseApp());
         const userRef = doc(db, 'users', cred.user.uid);
-        let actualRole = role;
-        
-        // Auto-provision driver role based on email on creation as well
-        if (trimmedEmail === 'driver1@chesterfieldtaxi.com' || trimmedEmail.includes('driver')) {
-          actualRole = 'driver';
-          try {
-            const driverRef = doc(db, 'drivers', cred.user.uid);
-            await setDoc(driverRef, {
-              id: cred.user.uid,
-              name: displayName || trimmedEmail.split('@')[0],
-              phone: '(314) 738-0100',
-              dutyStatus: 'off_duty',
-              vehicleUnit: 'Unassigned',
-              vehicleTier: 'standard',
-              zone: 'Chesterfield'
-            }, { merge: true });
-          } catch (e) {
-            console.warn('[AdminAuthService] Error provisioning driver profile:', e);
-          }
-        } else if (trimmedEmail === 'admin@chesterfieldtaxi.com' || trimmedEmail.includes('admin')) {
-          actualRole = 'admin';
-        } else if (trimmedEmail === 'dispatch@chesterfieldtaxi.com' || trimmedEmail.includes('dispatch')) {
-          actualRole = 'dispatcher';
-        }
+        const actualRole: UserRole = 'customer';
 
         await setDoc(userRef, { 
           role: actualRole,
@@ -395,6 +328,19 @@ export class AdminAuthService {
     }
     
     return this.signIn(email, password);
+  }
+
+  public async sendPasswordReset(email: string): Promise<void> {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      throw new Error('Please enter your email address first.');
+    }
+    if (this.isConfigured) {
+      const auth = getFirebaseAuth();
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      return;
+    }
+    throw new Error('Password reset requires Firebase Authentication to be configured.');
   }
 
   public async signInWithGoogle(role: UserRole = 'customer'): Promise<AdminUser> {
@@ -448,6 +394,7 @@ export class AdminAuthService {
   }
 
   public async signOut(): Promise<void> {
+    this.cachedUser = null;
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();

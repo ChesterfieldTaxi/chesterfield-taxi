@@ -212,7 +212,7 @@ export function AdminAdvancedTab({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-9921). Dispatch and admin console remain 100% operational.
+                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-0100). Dispatch and admin console remain 100% operational.
               </p>
             </div>
           </div>
@@ -772,7 +772,7 @@ export function AdminAdvancedTab({
                       
                       try {
                         const service = getBookingService();
-                        const statuses = ['UNCONFIRMED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'DECLINED'] as const;
+                        const statuses = ['unconfirmed', 'confirmed', 'assigned', 'in_progress', 'completed', 'declined'] as const;
                         
                         const baseTrip = {
                           pickupLocation: { address: '123 Test St', coordinates: { lat: 38.6, lng: -90.5 } },
@@ -818,7 +818,7 @@ export function AdminAdvancedTab({
                             }
                           });
                           
-                          if (trip && status !== 'UNCONFIRMED') {
+                          if (trip && status !== 'unconfirmed') {
                             if (service.updateTripStatus) {
                               await service.updateTripStatus(trip.id, status as any, { actorRole: 'system' });
                             }

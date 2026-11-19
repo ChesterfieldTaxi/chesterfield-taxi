@@ -6,7 +6,7 @@ import {
   type UserRole,
 } from '../../../core/services/auth/admin-auth.service';
 
-export type WorkspaceViewKey = 'admin' | 'dispatch' | 'driver' | 'app';
+export type WorkspaceViewKey = 'admin' | 'dispatch' | 'driver' | 'app' | 'passenger';
 
 export interface RoleViewSwitcherProps {
   currentView: WorkspaceViewKey;
@@ -34,7 +34,7 @@ const WORKSPACES: WorkspaceDefinition[] = [
     label: 'Admin Console',
     shortLabel: 'Admin',
     description: 'Fleet, Pricing, Roster & System Settings',
-    path: '/admin',
+    path: '/app/admin',
     icon: '👑',
     badge: 'Admin',
     badgeColor: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -45,7 +45,7 @@ const WORKSPACES: WorkspaceDefinition[] = [
     label: 'Dispatch Console',
     shortLabel: 'Dispatch',
     description: 'Live Queue, Maps, Auto-Dispatch & Softphone',
-    path: '/dispatch',
+    path: '/app/dispatch',
     icon: '📻',
     badge: 'Dispatcher',
     badgeColor: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -56,7 +56,7 @@ const WORKSPACES: WorkspaceDefinition[] = [
     label: 'Driver App & Meter',
     shortLabel: 'Driver',
     description: 'Active Trips, Taximeter, Shifts & Extras',
-    path: '/driver',
+    path: '/app/driver',
     icon: '🚕',
     badge: 'Driver',
     badgeColor: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -65,9 +65,9 @@ const WORKSPACES: WorkspaceDefinition[] = [
   {
     id: 'app',
     label: 'Passenger Portal',
-    shortLabel: 'Customer',
+    shortLabel: 'Passenger',
     description: 'Direct Ride Booking, Receipts & Saved Places',
-    path: '/app',
+    path: '/app/passenger',
     icon: '📱',
     badge: 'Passenger',
     badgeColor: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -126,7 +126,7 @@ export function RoleViewSwitcher({
     };
   }, [isOpen]);
 
-  // Determine which workspaces the user can access
+  // Strictly determine workspaces from the account's assigned roles
   const effectiveRoles = (
     currentUser?.roles && currentUser.roles.length > 0
       ? currentUser.roles
@@ -135,27 +135,26 @@ export function RoleViewSwitcher({
       : ['customer']
   ) as UserRole[];
 
-  const isDemo = currentUser?.isDemo ?? true; // In test/demo or local mode, unlock switcher
-  const isAdmin = effectiveRoles.includes('admin') || isDemo;
-  const isDispatcher = isAdmin || effectiveRoles.includes('dispatcher');
-  const isDriver = isDispatcher || effectiveRoles.includes('driver');
+  const isAdmin = effectiveRoles.includes('admin');
 
   const accessibleWorkspaces = WORKSPACES.filter((ws) => {
     if (isAdmin) return true;
-    if (ws.requiredRole === 'admin') return isAdmin;
-    if (ws.requiredRole === 'dispatcher') return isDispatcher;
-    if (ws.requiredRole === 'driver') return isDriver;
-    return true; // customer is accessible to everyone
+    return effectiveRoles.includes(ws.requiredRole);
   });
 
-  const activeWorkspace = WORKSPACES.find((ws) => ws.id === currentView) || WORKSPACES[0];
+  const normalizedView: WorkspaceViewKey = currentView === 'passenger' ? 'app' : currentView;
+  const activeWorkspace = WORKSPACES.find((ws) => ws.id === normalizedView) || WORKSPACES[0];
+
+  if (accessibleWorkspaces.length <= 1) {
+    return null;
+  }
 
   const handleSelectWorkspace = (ws: WorkspaceDefinition) => {
     setIsOpen(false);
     if (onNavigate) {
       onNavigate();
     }
-    if (ws.id !== currentView) {
+    if (ws.id !== normalizedView) {
       navigate(ws.path);
     }
   };
@@ -325,9 +324,18 @@ export function RoleViewSwitcher({
           </div>
 
           {/* Footer Info */}
-          <div className="px-3.5 py-1.5 bg-slate-50/80 text-[10px] text-slate-500 flex items-center justify-between">
-            <span>Role Claims:</span>
-            <span className="font-mono font-bold text-slate-700 capitalize">
+          <div className="px-3.5 py-2 bg-slate-50/80 text-[10px] text-slate-500 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/app?choose=1');
+              }}
+              className="font-bold text-blue-600 hover:underline cursor-pointer"
+            >
+              Workspace Hub &rarr;
+            </button>
+            <span className="font-mono font-bold text-slate-700 capitalize truncate">
               {effectiveRoles.join(', ')}
             </span>
           </div>

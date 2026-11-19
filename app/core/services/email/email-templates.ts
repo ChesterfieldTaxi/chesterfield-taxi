@@ -709,7 +709,7 @@ export function renderBookingConfirmedEmail(
     ? `✓ Round-Trip Booking Confirmed: #${payload.tripId} & #${payload.returnTripDetails?.tripId} | ${companyName}`
     : `✓ Booking Confirmed: #${payload.tripId} | ${companyName}`;
 
-  const registerUrl = `https://chesterfieldtaxi.com/register?email=${encodeURIComponent(
+  const registerUrl = `https://chesterfieldtaxi.com/app/register?email=${encodeURIComponent(
     payload.passenger.email
   )}&name=${encodeURIComponent(
     payload.passenger.firstName + ' ' + payload.passenger.lastName

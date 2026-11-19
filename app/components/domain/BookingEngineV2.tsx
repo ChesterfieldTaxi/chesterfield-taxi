@@ -98,6 +98,8 @@ export interface BookingEngineV2Props {
   onBookingSuccess?: (trip: Trip) => void;
   onConfirmedChange?: (isConfirmed: boolean) => void;
   initialValues?: BookingEngineV2InitialValues;
+  editingTripId?: string;
+  onCancelEdit?: () => void;
   hideDispatchBanner?: boolean;
 }
 
@@ -253,6 +255,8 @@ export function BookingEngineV2({
   onBookingSuccess,
   onConfirmedChange,
   initialValues,
+  editingTripId,
+  onCancelEdit,
   hideDispatchBanner = false,
 }: BookingEngineV2Props) {
   const location = useLocation();
@@ -1509,45 +1513,30 @@ export function BookingEngineV2({
       if (form.paymentMethod === 'card') paymentMethodType = 'card';
       if (form.paymentMethod === 'account') paymentMethodType = 'corporate';
 
-      // Phase 31: Card Tokenization, Vaulting & Pre-authorization Hold
+      // Phase 31: PCI-Compliant Stripe Pre-authorization Hold (or In-Cab Payment Fallback)
       let paymentIntentId: string | undefined;
       let cardLast4: string | undefined;
       let cardBrand: 'visa' | 'mastercard' | 'amex' | 'discover' = 'visa';
 
-      if (form.paymentMethod === 'card' && form.cardPaymentType === 'manual' && (form.cardNumber || form.paymentToken)) {
-        try {
-          const paymentService = getPaymentService();
-          const cleanNum = form.cardNumber.replace(/\s+/g, '');
-          cardLast4 = form.cardLast4 || cleanNum.slice(-4) || '4242';
-          if (form.cardBrand) cardBrand = form.cardBrand as any;
-          else if (cleanNum.startsWith('5')) cardBrand = 'mastercard';
-          else if (cleanNum.startsWith('3')) cardBrand = 'amex';
-          else if (cleanNum.startsWith('6')) cardBrand = 'discover';
-
-          const customerId = form.passengerEmail.trim() || `cust_${Date.now().toString(36)}`;
-          let vaultedCardId: string | undefined;
-
-          if (form.saveCardOnFile) {
-            const vaulted = await paymentService.vaultCard(customerId, {
-              cardNumber: form.paymentToken ? `tok_${form.cardLast4 || 'stripe'}` : form.cardNumber,
-              cardholderName: form.cardholderName || form.passengerName,
-              cardExp: form.cardExp || '12/28',
-              cardCvc: form.cardCvc || '123',
-              isDefault: true,
-            });
-            vaultedCardId = vaulted.id;
-          }
-
-          const holdIntent = await paymentService.createPreAuthorization(
-            `trip_init_${Date.now().toString(36)}`,
-            effectivePricing.totalFare,
-            customerId,
-            vaultedCardId
-          );
-          paymentIntentId = holdIntent.id;
-        } catch (cardErr) {
-          console.warn('[BookingEngineV2] Card vaulting/pre-auth warning:', cardErr);
+      if (
+        form.paymentMethod === 'card' &&
+        form.cardPaymentType === 'manual' &&
+        form.paymentToken &&
+        form.paymentToken !== 'pay_in_cab'
+      ) {
+        const paymentService = getPaymentService();
+        cardLast4 = form.cardLast4 || '••••';
+        if (form.cardBrand && ['visa', 'mastercard', 'amex', 'discover'].includes(form.cardBrand)) {
+          cardBrand = form.cardBrand as 'visa' | 'mastercard' | 'amex' | 'discover';
         }
+        const customerId = form.passengerEmail.trim() || `cust_${Date.now().toString(36)}`;
+        const holdIntent = await paymentService.createPreAuthorization(
+          `trip_init_${Date.now().toString(36)}`,
+          effectivePricing.totalFare,
+          customerId,
+          form.paymentToken
+        );
+        paymentIntentId = holdIntent.id;
       }
 
       // Customer web submissions strictly default to 'UNCONFIRMED'
@@ -1621,6 +1610,25 @@ export function BookingEngineV2({
           selectedVehicles: bookingConfig.allowMultiVehicle ? form.selectedVehicles : [form.vehicleChoice],
         },
       };
+
+      // If editing an existing reservation, update it in place rather than creating a duplicate
+      if (editingTripId && bookingService.updateTrip) {
+        const updatedTrip = await bookingService.updateTrip(editingTripId, {
+          pickupLocation: inputPayload.pickupLocation,
+          dropoffLocation: inputPayload.dropoffLocation,
+          intermediateStops: inputPayload.intermediateStops,
+          bookingType: inputPayload.bookingType,
+          scheduledPickupTime: inputPayload.scheduledPickupTime,
+          vehicleTier: inputPayload.vehicleTier,
+          passenger: inputPayload.passenger,
+          pricing: inputPayload.pricing,
+          driverNotes: inputPayload.driverNotes,
+          metadata: inputPayload.metadata,
+        });
+        setConfirmedTrip(updatedTrip);
+        onBookingSuccess?.(updatedTrip);
+        return;
+      }
 
       const createdTrip = await bookingService.createBooking(inputPayload);
       let createdReturnTripObj: any = null;
@@ -2005,6 +2013,20 @@ export function BookingEngineV2({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start pb-20">
           {/* Left Column: Form Section Cards */}
           <div className="lg:col-span-8 space-y-4">
+            {editingTripId && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs font-semibold flex items-center justify-between gap-2">
+                <span>✏️ Editing Existing Reservation #{editingTripId}</span>
+                {onCancelEdit && (
+                  <button
+                    type="button"
+                    onClick={onCancelEdit}
+                    className="px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+            )}
             {submitError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2">
                 <span className="text-base">⚠</span>
@@ -3640,8 +3662,8 @@ export function BookingEngineV2({
                     ? bookingConfig.acceptedPaymentMethods
                     : ['card', 'cash', 'account'];
                 const allMethods = [
-                  { key: 'card' as const, label: 'Card in Vehicle', Icon: CreditCardIcon },
-                  { key: 'cash' as const, label: 'Cash to Driver', Icon: DollarSignIcon },
+                  { key: 'card' as const, label: 'Pay Driver in Cab (Terminal)', Icon: CreditCardIcon },
+                  { key: 'cash' as const, label: 'Pay Driver in Cab (Cash)', Icon: DollarSignIcon },
                   { key: 'account' as const, label: 'Corporate Direct', Icon: BuildingIcon },
                 ];
                 const methodsToRender = allMethods.filter((m) => allowed.includes(m.key));
@@ -3945,10 +3967,10 @@ export function BookingEngineV2({
                 {isSubmitting ? (
                   <>
                     <SpinnerIcon className="w-4 h-4 animate-spin" />
-                    <span>Submitting Request...</span>
+                    <span>{editingTripId ? 'Saving Updates...' : 'Submitting Request...'}</span>
                   </>
                 ) : (
-                  <span>Request Ride • Awaiting Review</span>
+                  <span>{editingTripId ? 'Save Trip Updates' : 'Request Ride • Awaiting Review'}</span>
                 )}
               </button>
             </div>

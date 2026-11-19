@@ -5337,7 +5337,7 @@ export function CommsHub({
             {/* Modal Footer Actions */}
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
               <a
-                href={`/admin?tab=customers&phone=${encodeURIComponent(
+                href={`/app/admin?tab=customers&phone=${encodeURIComponent(
                   contactEditForm.phone || activeContactSummary?.contactPhone || ''
                 )}`}
                 target="_blank"

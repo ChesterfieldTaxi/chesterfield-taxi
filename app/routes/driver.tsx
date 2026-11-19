@@ -83,19 +83,21 @@ export default function DriverAppRoute() {
 
   // Auth guard
   const navigate = useNavigate();
+  const [driverRoles, setDriverRoles] = useState<string[]>(['driver']);
   useEffect(() => {
     
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
-        navigate('/signin?message=unauthenticated&redirect=/driver', { replace: true });
-      } else if (
-        !(currentUser.roles && (currentUser.roles.includes('driver') || currentUser.roles.includes('admin') || currentUser.roles.includes('dispatcher'))) &&
-        currentUser.role !== 'driver' && currentUser.role !== 'admin' && currentUser.role !== 'dispatcher'
-      ) {
-        navigate('/signin?message=unauthorized', { replace: true });
+        navigate('/app/login?message=unauthenticated&redirect=/app/driver', { replace: true });
       } else {
-        setIsAuthChecking(false);
+        const roles: string[] = currentUser.roles || (currentUser.role ? [currentUser.role] : ['customer']);
+        if (!roles.includes('driver') && !roles.includes('admin')) {
+          navigate('/app', { replace: true });
+        } else {
+          setDriverRoles(roles);
+          setIsAuthChecking(false);
+        }
       }
     });
     return unsubscribe;
@@ -266,7 +268,14 @@ export default function DriverAppRoute() {
     if (activeTrip?.status === 'in_progress') {
       interval = setInterval(() => {
         setMeterSeconds((prev) => prev + 1);
-        setMeterDistance((prev) => Number((prev + 0.007).toFixed(2)));
+        setMeterDistance((prev) => {
+          const currentSpeedMph = telemetry?.currentTelemetry?.speedMph || 0;
+          // Only accrue mileage when vehicle is genuinely moving (> 1.5 mph); 0 when stationary
+          if (currentSpeedMph > 1.5 && currentSpeedMph < 100) {
+            return Number((prev + currentSpeedMph / 3600).toFixed(3));
+          }
+          return prev;
+        });
       }, 1000);
     } else {
       if (activeTrip?.status === 'assigned' || activeTrip?.status === 'accepted') {
@@ -596,10 +605,6 @@ export default function DriverAppRoute() {
     setIsSendingTwilioSms(true);
     setTwilioSmsFeedback('Sending via Twilio SMS gateway...');
     try {
-      const twilioSid = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_sid') || '' : '';
-      const twilioToken = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_token') || '' : '';
-      const twilioPhone = typeof window !== 'undefined' ? localStorage.getItem('ct_twilio_phone') || '' : '';
-
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -607,11 +612,6 @@ export default function DriverAppRoute() {
           action: 'send_sms',
           to: phoneValidation.e164,
           body: customSmsText.trim(),
-          credentials: {
-            accountSid: twilioSid,
-            authToken: twilioToken,
-            phoneNumber: sanitizeToE164(twilioPhone),
-          },
         }),
       });
 
@@ -700,63 +700,85 @@ export default function DriverAppRoute() {
                 </button>
               </div>
 
-              <div className="p-2 border-b border-slate-800">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-2 py-1">
-                  Switch Workspace
-                </span>
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/dispatch');
-                    }}
-                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-blue-900/60 flex items-center justify-center shrink-0">
-                        <RadioIcon className="w-3.5 h-3.5 text-blue-400" />
-                      </div>
-                      <span>Dispatch Console</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">/dispatch</span>
-                  </button>
+              {(driverRoles.includes('admin') ||
+                driverRoles.includes('dispatcher') ||
+                driverRoles.includes('customer')) && (
+                <div className="p-2 border-b border-slate-800">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Switch Workspace
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/app?choose=1');
+                      }}
+                      className="text-[10px] font-bold text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Hub
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {(driverRoles.includes('dispatcher') || driverRoles.includes('admin')) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate('/app/dispatch');
+                        }}
+                        className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-md bg-blue-900/60 flex items-center justify-center shrink-0">
+                            <RadioIcon className="w-3.5 h-3.5 text-blue-400" />
+                          </div>
+                          <span>Dispatch Console</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">/app/dispatch</span>
+                      </button>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/app');
-                    }}
-                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-emerald-900/60 flex items-center justify-center shrink-0">
-                        <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
-                      </div>
-                      <span>Passenger Portal</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">/app</span>
-                  </button>
+                    {(driverRoles.includes('customer') || driverRoles.includes('admin')) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate('/app/passenger');
+                        }}
+                        className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-md bg-emerald-900/60 flex items-center justify-center shrink-0">
+                            <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
+                          </div>
+                          <span>Passenger Portal</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">/app/passenger</span>
+                      </button>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/admin');
-                    }}
-                    className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-md bg-purple-900/60 flex items-center justify-center shrink-0">
-                        <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
-                      </div>
-                      <span>Admin Console</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">/admin</span>
-                  </button>
+                    {driverRoles.includes('admin') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate('/app/admin');
+                        }}
+                        className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-md bg-purple-900/60 flex items-center justify-center shrink-0">
+                            <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
+                          </div>
+                          <span>Admin Console</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">/app/admin</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="p-2">
                 <button
@@ -1461,9 +1483,9 @@ export default function DriverAppRoute() {
                         </div>
                         {trip.passenger?.phone && (
                           <a
-                            href={'tel:' + trip.passenger.phone}
+                            href={'tel:' + COMPANY_CONFIG.phone.primaryRaw}
                             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 flex items-center justify-center border border-slate-700"
-                            title="Call Passenger"
+                            title="Call Dispatch Masked Bridge"
                           >
                             <PhoneIcon className="w-4 h-4" />
                           </a>
@@ -1537,16 +1559,38 @@ export default function DriverAppRoute() {
               <h2 className="text-base font-bold text-white leading-tight">Messages</h2>
             </div>
             
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col items-center justify-center text-center space-y-3 min-h-[300px]">
-              <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col items-center justify-center text-center space-y-4 min-h-[300px]">
+              <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-blue-400 mb-1">
                 <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
               </div>
-              <h3 className="font-bold text-white text-sm">No Messages</h3>
+              <h3 className="font-bold text-white text-sm">Dispatch &amp; Passenger Communications</h3>
               <p className="text-xs text-slate-400 max-w-xs">
-                You have no active messages with dispatch or passengers.
+                Need route assistance or passenger coordination? Contact 24/7 Chesterfield Dispatch or send a quick status text to your active passenger.
               </p>
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full max-w-xs pt-2">
+                <a
+                  href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md"
+                >
+                  <PhoneIcon className="w-3.5 h-3.5" />
+                  <span>Call Dispatch Desk</span>
+                </a>
+                {activeTrip?.passenger?.phone && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomSmsText('Chesterfield Taxi: Your driver is en route to your pickup location.');
+                      setShowSmsModal(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <MailIcon className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Text Active Passenger</span>
+                  </button>
+                )}
+              </div>
             </div>
           </section>
         )}

@@ -41,13 +41,19 @@ export async function loader() {
       );
     }
   } catch (err: any) {
-    // If live Firestore rules block unauthenticated reads, authenticate on the server
-    if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
+    // If live Firestore rules block unauthenticated reads, only authenticate if server env vars are explicitly provided
+    if (
+      (err?.code === 'permission-denied' || err?.message?.includes('permission')) &&
+      process.env.ADMIN_SETUP_EMAIL &&
+      process.env.ADMIN_SETUP_PASSWORD
+    ) {
       try {
         const auth = getFirebaseAuth();
-        const email = process.env.ADMIN_SETUP_EMAIL || 'admin_setup@chesterfieldtaxi.com';
-        const password = process.env.ADMIN_SETUP_PASSWORD || 'AdminSecret2026!';
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(
+          auth,
+          process.env.ADMIN_SETUP_EMAIL,
+          process.env.ADMIN_SETUP_PASSWORD
+        );
         const authSnap = await getDoc(docRef);
         if (authSnap.exists()) {
           return Response.json(

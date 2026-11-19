@@ -22,6 +22,23 @@ export interface PaymentApiRequest {
   };
 }
 
+export async function loader() {
+  const stripeConfigured = Boolean(
+    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
+  );
+  const stripeWebhookConfigured = Boolean(
+    process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_')
+  );
+  const squareConfigured = Boolean(process.env.SQUARE_ACCESS_TOKEN);
+
+  return Response.json({
+    success: true,
+    stripeConfigured,
+    stripeWebhookConfigured,
+    squareConfigured,
+  });
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
     return Response.json(
@@ -156,21 +173,27 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // ─── 2. Create Payment Intent (Stripe) ───
     if (data.action === 'create_intent') {
-      const amountInCents = Math.round((data.amount || 0) * 100);
+      const rawAmount = Number(data.amount || 0);
+      if (!Number.isFinite(rawAmount) || rawAmount < 5 || rawAmount > 10000) {
+        return Response.json(
+          { success: false, error: 'Invalid fare amount for payment intent ($5.00 - $10,000.00).' },
+          { status: 400 }
+        );
+      }
+      const amountInCents = Math.round(rawAmount * 100);
       const currency = data.currency || 'usd';
 
       if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
-        // Fallback to simulated client-side intent
-        const mockIntentId = `pi_mock_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        return Response.json({
-          success: true,
-          simulated: true,
-          clientSecret: `${mockIntentId}_secret_test`,
-          paymentIntentId: mockIntentId,
-          amount: data.amount,
-          currency,
-          message: 'Payment pre-authorization recorded in sandbox test mode.',
-        });
+        return Response.json(
+          {
+            success: false,
+            stripeDisabled: true,
+            fallback: 'pay_in_cab',
+            error:
+              'Online card pre-authorization is currently disabled. Please select "Pay Driver in Cab (Cash / Terminal)".',
+          },
+          { status: 503 }
+        );
       }
 
       const params = new URLSearchParams();

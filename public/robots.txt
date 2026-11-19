@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Allow: /book
+Allow: /track
 Allow: /services
 Allow: /about
 Allow: /contact
@@ -14,7 +15,8 @@ Disallow: /admin/
 Disallow: /dispatch
 Disallow: /dispatch/
 Disallow: /driver
-Disallow: /track/
+Disallow: /app
+Disallow: /booking/status
 Disallow: /booking/status/
 Disallow: /api/
 

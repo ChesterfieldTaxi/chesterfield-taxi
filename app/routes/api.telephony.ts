@@ -451,7 +451,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             duration: `${Math.floor(durSec / 60)}:${(durSec % 60).toString().padStart(2, '0')}`,
             durationSeconds: durSec,
             dateCreated: r.date_created,
-            audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}&accountSid=${encodeURIComponent(accountSid)}&authToken=${encodeURIComponent(authToken)}`,
+            audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(r.sid)}`,
           };
         });
 
@@ -950,38 +950,10 @@ export async function action({ request }: ActionFunctionArgs) {
           }, { status: 401 });
         }
 
-        // Set in-memory environment variables
+        // Set in-memory environment variables for current server process
         process.env.TWILIO_ACCOUNT_SID = candidateSid;
         process.env.TWILIO_AUTH_TOKEN = candidateToken;
         process.env.TWILIO_PHONE_NUMBER = phoneValidation.e164;
-
-        // Persist to .env.local on filesystem
-        try {
-          const fs = await import('node:fs');
-          const path = await import('node:path');
-          const envLocalPath = path.resolve(process.cwd(), '.env.local');
-
-          let envContent = '';
-          if (fs.existsSync(envLocalPath)) {
-            envContent = fs.readFileSync(envLocalPath, 'utf8');
-          }
-
-          const upsertEnv = (content: string, key: string, val: string) => {
-            const re = new RegExp(`^${key}=.*$`, 'm');
-            if (re.test(content)) {
-              return content.replace(re, `${key}=${val}`);
-            }
-            return content.trim() ? `${content.trim()}\n${key}=${val}\n` : `${key}=${val}\n`;
-          };
-
-          envContent = upsertEnv(envContent, 'TWILIO_ACCOUNT_SID', candidateSid);
-          envContent = upsertEnv(envContent, 'TWILIO_AUTH_TOKEN', candidateToken);
-          envContent = upsertEnv(envContent, 'TWILIO_PHONE_NUMBER', phoneValidation.e164);
-
-          fs.writeFileSync(envLocalPath, envContent, 'utf8');
-        } catch (fsErr) {
-          console.warn('[api.telephony] File persistence warning:', fsErr);
-        }
 
         return Response.json({
           success: true,
@@ -1131,9 +1103,7 @@ export async function action({ request }: ActionFunctionArgs) {
       ).trim();
 
       let twiml: string;
-      if (data.customTwiml) {
-        twiml = data.customTwiml;
-      } else if (dispatchBridgePhone) {
+      if (dispatchBridgePhone) {
         const formattedForwarding = sanitizeToE164(dispatchBridgePhone);
         twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial timeout="25" record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial><Say voice="alice">Our dispatch agent was unable to connect. We will call you back shortly. Thank you.</Say><Hangup/></Response>`;
       } else {
@@ -1406,7 +1376,7 @@ export async function action({ request }: ActionFunctionArgs) {
               duration: `${Math.floor(durSec / 60)}:${(durSec % 60).toString().padStart(2, '0')}`,
               durationSeconds: durSec,
               dateCreated: r.date_created,
-              audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${r.sid}&accountSid=${encodeURIComponent(accountSid)}&authToken=${encodeURIComponent(authToken)}`,
+              audioUrl: `/api/telephony?action=audio_proxy&recordingSid=${encodeURIComponent(r.sid)}`,
             };
           });
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps/google-maps-loader';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon } from '../../ui/Icons';
 
 interface CustomerTelemetryMapProps {
@@ -16,7 +18,6 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
   const markerVehicleRef = useRef<google.maps.Marker | null>(null);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const [mapsLoaded, setMapsLoaded] = useState<boolean>(false);
-  const [simulatedProgress, setSimulatedProgress] = useState<number>(0.35);
 
   const pickupCoord = trip.pickupLocation?.coordinates || {
     lat: CHESTERFIELD_CENTER.lat - 0.015,
@@ -28,7 +29,12 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     lng: CHESTERFIELD_CENTER.lng + 0.035,
   };
 
-  // Calculate vehicle coordinates: Prefer live GPS telemetry if broadcasted, fallback to interpolation
+  const hasLiveGps = Boolean(
+    (trip.driverTelemetry?.coordinates?.lat && trip.driverTelemetry?.coordinates?.lng) ||
+    (trip.currentLocation?.coordinates?.lat && trip.currentLocation?.coordinates?.lng)
+  );
+
+  // Calculate vehicle coordinates: Prefer live GPS telemetry if broadcasted, fallback to status waypoint
   const getVehicleCoordinates = () => {
     if (trip.driverTelemetry?.coordinates?.lat && trip.driverTelemetry?.coordinates?.lng) {
       return trip.driverTelemetry.coordinates;
@@ -38,7 +44,6 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     }
 
     if (trip.status === 'en_route') {
-      // Driver approaching pickup
       return {
         lat: pickupCoord.lat - 0.008,
         lng: pickupCoord.lng - 0.006,
@@ -46,15 +51,13 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     } else if (trip.status === 'arrived') {
       return { lat: pickupCoord.lat, lng: pickupCoord.lng };
     } else if (trip.status === 'in_progress') {
-      // Vehicle en route from pickup to dropoff
       return {
-        lat: pickupCoord.lat + (dropoffCoord.lat - pickupCoord.lat) * simulatedProgress,
-        lng: pickupCoord.lng + (dropoffCoord.lng - pickupCoord.lng) * simulatedProgress,
+        lat: pickupCoord.lat + (dropoffCoord.lat - pickupCoord.lat) * 0.5,
+        lng: pickupCoord.lng + (dropoffCoord.lng - pickupCoord.lng) * 0.5,
       };
     } else if (trip.status === 'completed') {
       return { lat: dropoffCoord.lat, lng: dropoffCoord.lng };
     }
-    // Default near pickup
     return {
       lat: pickupCoord.lat - 0.005,
       lng: pickupCoord.lng - 0.005,
@@ -62,15 +65,6 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
   };
 
   const vehicleCoord = getVehicleCoordinates();
-
-  // Pulse simulated progress when in_progress and no live GPS telemetry is streaming
-  useEffect(() => {
-    if (trip.status !== 'in_progress' || trip.driverTelemetry?.coordinates) return;
-    const interval = setInterval(() => {
-      setSimulatedProgress((prev) => (prev >= 0.9 ? 0.2 : prev + 0.05));
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [trip.status, trip.driverTelemetry?.coordinates]);
 
   // Initialize and update Google Maps with comprehensive memory leak cleanup
   useEffect(() => {
@@ -156,9 +150,19 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     };
   }, [pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng, vehicleCoord.lat, vehicleCoord.lng]);
 
-  const assignedUnit = trip.assignedVehicle?.vehicleNumber || 'Cab #204';
-  const assignedModel = trip.assignedVehicle?.model || 'Toyota Camry Hybrid';
-  const licensePlate = trip.assignedVehicle?.licensePlate || 'MO-7TX91';
+  const assignedUnit =
+    trip.assignedVehicle?.vehicleNumber ||
+    (trip.metadata?.vehicleUnit ? String(trip.metadata.vehicleUnit) : 'Assigned Fleet Unit');
+  const assignedModel =
+    trip.assignedVehicle?.model ||
+    `${formatVehicleTierDisplay(trip.vehicleTier)} Class`;
+  const licensePlate = trip.assignedVehicle?.licensePlate || '';
+  const liveSpeedDisplay =
+    typeof trip.driverTelemetry?.speedMph === 'number'
+      ? `${Math.round(trip.driverTelemetry.speedMph)} mph`
+      : hasLiveGps
+      ? 'Live GPS'
+      : 'Awaiting GPS Ping';
 
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-xl ${className}`}>
@@ -190,7 +194,9 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
             </div>
             <div>
               <div className="text-xs font-black text-slate-100">{assignedUnit}</div>
-              <div className="text-[10px] text-slate-400">{assignedModel} • {licensePlate}</div>
+              <div className="text-[10px] text-slate-400">
+                {assignedModel}{licensePlate ? ` • ${licensePlate}` : ''}
+              </div>
             </div>
           </div>
         )}
@@ -217,7 +223,7 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
                     : trip.status === 'arrived'
                     ? '16%'
                     : trip.status === 'in_progress'
-                    ? `${20 + simulatedProgress * 60}%`
+                    ? '52%'
                     : trip.status === 'completed'
                     ? '84%'
                     : '50%',
@@ -253,7 +259,11 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
 
             <div className="mt-2 text-[11px] text-slate-400 z-10 flex items-center gap-1.5 font-mono">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400" />
-              <span>GPS: {vehicleCoord.lat.toFixed(4)}, {vehicleCoord.lng.toFixed(4)} • Speed: {trip.status === 'in_progress' ? '32 mph' : '0 mph'}</span>
+              <span>
+                {hasLiveGps
+                  ? `GPS: ${vehicleCoord.lat.toFixed(4)}, ${vehicleCoord.lng.toFixed(4)} • ${liveSpeedDisplay}`
+                  : `Route Corridor Active • ${liveSpeedDisplay}`}
+              </span>
             </div>
           </div>
         )}
@@ -268,12 +278,20 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
         
         {trip.assignedDriverId && ['assigned', 'en_route', 'arrived', 'in_progress'].includes(trip.status) && (
           <div className="flex items-center gap-2">
-            <button type="button" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700">
+            <a
+              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
+              title="Call Dispatch Bridge to connect with your assigned driver"
+            >
               <span className="w-3 h-3 block">📞</span> Call Driver
-            </button>
-            <button type="button" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700">
+            </a>
+            <a
+              href={`sms:${COMPANY_CONFIG.phone.primaryRaw}?body=${encodeURIComponent(`Trip #${trip.id}: `)}`}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
+              title="Send SMS regarding your active trip"
+            >
               💬 Text
-            </button>
+            </a>
           </div>
         )}
         

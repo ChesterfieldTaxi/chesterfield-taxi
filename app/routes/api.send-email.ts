@@ -15,7 +15,17 @@ const STRUCTURED_EMAIL_TYPES = new Set([
   'status_update',
   'booking_declined',
   'clarification_request',
+  'contact_inquiry',
 ]);
+
+function escapeHtml(str: unknown): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -60,6 +70,36 @@ export async function action({ request }: ActionFunctionArgs) {
         case 'clarification_request':
           result = await emailService.sendClarificationRequest(body.payload);
           break;
+        case 'contact_inquiry': {
+          const p = body.payload as Record<string, any>;
+          const dispatchEmail =
+            process.env.DISPATCH_ALERT_EMAIL ||
+            process.env.ADMIN_ALERT_EMAIL ||
+            'dispatch@chesterfieldtaxi.com';
+          const name = escapeHtml(p.name || 'Website Visitor');
+          const email = escapeHtml(p.email || 'Not provided');
+          const phone = escapeHtml(p.phone || 'Not provided');
+          const subjectCategory = escapeHtml(p.subject || 'General Inquiry');
+          const tripRef = escapeHtml(p.tripId || 'N/A');
+          const message = escapeHtml(p.message || '');
+
+          result = await emailService.sendDirect({
+            recipient: dispatchEmail,
+            subject: `[Website Inquiry - ${subjectCategory}] From ${name}`,
+            html: `<div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:12px;">
+              <h2 style="margin:0 0 16px;color:#0f172a;">New Chesterfield Taxi Website Inquiry</h2>
+              <p style="margin:4px 0;"><strong>Category:</strong> ${subjectCategory}</p>
+              <p style="margin:4px 0;"><strong>Name:</strong> ${name}</p>
+              <p style="margin:4px 0;"><strong>Phone:</strong> ${phone}</p>
+              <p style="margin:4px 0;"><strong>Email:</strong> ${email}</p>
+              <p style="margin:4px 0;"><strong>Trip Reference:</strong> ${tripRef}</p>
+              <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0;" />
+              <p style="white-space:pre-wrap;color:#334155;">${message}</p>
+            </div>`,
+            text: `New Website Inquiry (${subjectCategory})\nName: ${name}\nPhone: ${phone}\nEmail: ${email}\nTrip Ref: ${tripRef}\n\n${message}`,
+          });
+          break;
+        }
         default:
           return Response.json(
             { success: false, error: `Unsupported dispatch type: ${(body as { type: string }).type}` },
@@ -128,7 +168,6 @@ export async function loader() {
     timestamp: new Date().toISOString(),
     environment: {
       hasResendApiKey: Boolean(apiKey),
-      apiKeyPrefix: apiKey ? `${apiKey.substring(0, 7)}...` : 'MISSING (Check Vercel Environment Variables)',
       configuredFromEmail: fromEmail || 'Chesterfield Taxi <onboarding@resend.dev> (Sandbox Default)',
       configuredAdminAlert: adminEmail || 'dispatch@chesterfieldtaxi.com (Default)',
     },

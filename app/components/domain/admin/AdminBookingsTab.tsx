@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Trip, TripStatus } from '../../../core/types/trip';
 import { getBookingService } from '../../../core/services/booking';
+import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
 import { getEmailDispatchService } from '../../../core/services/email';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
@@ -20,6 +21,7 @@ import { BookingEngine } from '../BookingEngine';
 
 export function AdminBookingsTab() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -29,6 +31,13 @@ export function AdminBookingsTab() {
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [isNewBookingModalOpen, setIsNewBookingModalOpen] = useState(false);
   const [auditTrailTrip, setAuditTrailTrip] = useState<Trip | null>(null);
+
+  useEffect(() => {
+    const opService = getOperatorService();
+    return opService.subscribeToDrivers((updatedDrivers) => {
+      setDrivers(updatedDrivers);
+    });
+  }, []);
 
   // Subscribe to real-time trips
   useEffect(() => {
@@ -401,12 +410,19 @@ export function AdminBookingsTab() {
                             size="sm"
                             variant="outline"
                             isLoading={isActioning}
-                            onClick={() =>
+                            onClick={() => {
+                              const availableIds = drivers
+                                .filter((d) => d.status === 'available')
+                                .map((d) => d.id);
+                              const targetIds =
+                                availableIds.length > 0
+                                  ? availableIds
+                                  : drivers.map((d) => d.id);
                               handleStatusTransition(trip.id, 'offered', {
-                                offeredToIds: ['driver_101', 'driver_102'],
+                                offeredToIds: targetIds,
                                 reason: 'Broadcasted to area drivers',
-                              })
-                            }
+                              });
+                            }}
                             className="text-blue-600 hover:bg-blue-50 border-blue-200"
                           >
                             Broadcast Offer
@@ -419,12 +435,18 @@ export function AdminBookingsTab() {
                             size="sm"
                             variant="outline"
                             isLoading={isActioning}
-                            onClick={() =>
+                            onClick={() => {
+                              const nextAvailable =
+                                drivers.find((d) => d.status === 'available') || drivers[0];
+                              if (!nextAvailable) {
+                                alert('No active drivers found in roster to assign.');
+                                return;
+                              }
                               handleStatusTransition(trip.id, 'assigned', {
-                                assignedDriverId: 'driver_chesterfield_01',
-                                reason: 'Driver assigned by dispatch operator',
-                              })
-                            }
+                                assignedDriverId: nextAvailable.id,
+                                reason: `Driver ${nextAvailable.name} (${nextAvailable.cabNumber}) assigned by dispatch operator`,
+                              });
+                            }}
                             className="text-indigo-600 hover:bg-indigo-50 border-indigo-200"
                           >
                             Assign Driver

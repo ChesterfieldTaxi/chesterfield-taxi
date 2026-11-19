@@ -25,12 +25,14 @@ export default function AdminSettingsRoute() {
   );
   const [isSaving, setIsSaving] = useState(false);
 
-  // Auth Guard
+  // Auth Guard (Strictly require admin role)
   useEffect(() => {
     const authService = getAdminAuthService();
     const unsub = authService.onAuthStateChanged((currentUser) => {
       if (!currentUser) {
-        navigate('/admin/login', { replace: true });
+        navigate('/app/login?message=unauthenticated&redirect=/app/admin/settings', { replace: true });
+      } else if (currentUser.role !== 'admin') {
+        navigate('/app/login?message=unauthorized', { replace: true });
       } else {
         setUser(currentUser);
         setIsAuthChecking(false);
@@ -80,7 +82,7 @@ export default function AdminSettingsRoute() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              to="/admin"
+              to="/app/admin"
               style={{
                 backgroundColor: 'var(--brand-primary, #2563eb)',
                 color: 'var(--btn-primary-text, #ffffff)',
@@ -135,7 +137,7 @@ export default function AdminSettingsRoute() {
             </button>
 
             <Link
-              to="/admin"
+              to="/app/admin"
               className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
             >
               ← Back to Admin Console

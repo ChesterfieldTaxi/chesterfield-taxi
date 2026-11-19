@@ -109,7 +109,9 @@ service cloud.firestore {
           resource.data.userId == request.auth.uid ||
           (resource.data.passenger != null && resource.data.passenger.email == request.auth.token.email)
         ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'cancellationReason', 'cancelledAt', 'cancelledBy', 'passengerNotes', 'specialInstructions'
+          'status', 'cancellationReason', 'cancelledAt', 'cancelledBy', 'passengerNotes', 'specialInstructions',
+          'pickupLocation', 'dropoffLocation', 'intermediateStops', 'bookingType', 'scheduledPickupTime',
+          'vehicleTier', 'passenger', 'pricing', 'driverNotes', 'metadata', 'updatedAt', 'customerId'
         ]));
 
       // Deletes: Admins and Dispatchers only
@@ -128,12 +130,20 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 4. Job Applications & Driver Onboarding (/applications)
+    // 4. Job Applications & Public Inquiries (/applications, /inquiries)
     // ─────────────────────────────────────────────────────────────
     match /applications/{applicationId} {
-      // Public candidates can submit applications, but CANNOT read or list the queue
-      allow create: if true;
+      // Public candidates can submit applications with required fields, but CANNOT read or list the queue
+      allow create: if request.resource.data.firstName is string &&
+                       request.resource.data.lastName is string &&
+                       request.resource.data.phone is string;
       // Only Dispatchers and Admins can view, review, or mutate applicant submissions
+      allow read, update, delete: if isDispatcher();
+    }
+
+    match /inquiries/{inquiryId} {
+      allow create: if request.resource.data.name is string &&
+                       request.resource.data.message is string;
       allow read, update, delete: if isDispatcher();
     }
 
@@ -141,7 +151,8 @@ service cloud.firestore {
     // 5. Driver Profiles & Roster (/drivers/{driverId})
     // ─────────────────────────────────────────────────────────────
     match /drivers/{driverId} {
-      allow read: if isAuthenticated();
+      allow get: if isAuthenticated();
+      allow list: if isDispatcher() || isDriver();
       allow update: if isDispatcher() || (isDriver() && request.auth.uid == driverId);
       allow create, delete: if isDispatcher();
     }
@@ -178,7 +189,7 @@ service cloud.firestore {
       allow write: if isDispatcher();
     }
     match /corporateAccounts/{document=**} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow write: if isDispatcher();
     }
     match /fleet/{document=**} {

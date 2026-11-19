@@ -47,7 +47,7 @@ export function AdminIntegrationsSubpage({
   const [surchargePercent, setSurchargePercent] = useState(3.0);
   const [autoEmailReceipts, setAutoEmailReceipts] = useState(true);
 
-  // Stripe Gateway Credentials
+  // Stripe Gateway Credentials (Secrets managed strictly via Server Environment Variables)
   const [stripeMode, setStripeMode] = useState<'test' | 'live'>(() => {
     return typeof window !== 'undefined' && localStorage.getItem('ct_stripe_mode') === 'live'
       ? 'live'
@@ -56,29 +56,23 @@ export function AdminIntegrationsSubpage({
   const [stripePk, setStripePk] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_pk')) || '';
   });
-  const [stripeSk, setStripeSk] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_sk')) || '';
-  });
-  const [stripeWebhookSecret, setStripeWebhookSecret] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_stripe_webhook')) || '';
-  });
+  const [stripeSk, setStripeSk] = useState('');
+  const [stripeWebhookSecret, setStripeWebhookSecret] = useState('');
   const [stripeStatus, setStripeStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [stripeStatusMsg, setStripeStatusMsg] = useState<string | null>(null);
 
-  // Square Gateway Credentials
+  // Square Gateway Credentials (Public IDs only; Access Token in Server Environment)
   const [squareAppId, setSquareAppId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_square_appid')) || '';
   });
-  const [squareToken, setSquareToken] = useState(() => {
-    return (typeof window !== 'undefined' && localStorage.getItem('ct_square_token')) || '';
-  });
+  const [squareToken, setSquareToken] = useState('');
   const [squareLocId, setSquareLocId] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('ct_square_locid')) || '';
   });
   const [squareStatus, setSquareStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [squareStatusMsg, setSquareStatusMsg] = useState<string | null>(null);
 
-  // Twilio Telephony Credentials
+  // Twilio Telephony Credentials (Secrets never stored in localStorage or public Firestore)
   const [twilioSid, setTwilioSid] = useState(() => {
     return (
       settings.integrations?.telephony?.accountSid ||
@@ -86,18 +80,12 @@ export function AdminIntegrationsSubpage({
       ''
     );
   });
-  const [twilioToken, setTwilioToken] = useState(() => {
-    return (
-      settings.integrations?.telephony?.authToken ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_token')) ||
-      ''
-    );
-  });
+  const [twilioToken, setTwilioToken] = useState('');
   const [twilioPhone, setTwilioPhone] = useState(() => {
     return (
       settings.integrations?.telephony?.phoneNumber ||
       (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) ||
-      '+13145550199'
+      '+13147380100'
     );
   });
   const [twilioApiKey, setTwilioApiKey] = useState(() => {
@@ -107,13 +95,7 @@ export function AdminIntegrationsSubpage({
       ''
     );
   });
-  const [twilioApiSecret, setTwilioApiSecret] = useState(() => {
-    return (
-      settings.integrations?.telephony?.apiKeySecret ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_api_secret')) ||
-      ''
-    );
-  });
+  const [twilioApiSecret, setTwilioApiSecret] = useState('');
   const [twilioTwimlAppSid, setTwilioTwimlAppSid] = useState(() => {
     return (
       settings.integrations?.telephony?.twimlAppSid ||
@@ -134,14 +116,39 @@ export function AdminIntegrationsSubpage({
       : null;
   });
 
+  // Purge any legacy plaintext secrets from browser localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      [
+        'ct_stripe_sk',
+        'ct_stripe_webhook',
+        'ct_square_token',
+        'ct_twilio_token',
+        'ct_twilio_api_secret',
+        'ct_qb_client_secret',
+      ].forEach((secretKey) => localStorage.removeItem(secretKey));
+    }
+    fetch('/api/payments')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.stripeConfigured) {
+          setStripeStatus('connected');
+          setStripeStatusMsg('Server environment STRIPE_SECRET_KEY configured');
+        }
+        if (data?.squareConfigured) {
+          setSquareStatus('connected');
+          setSquareStatusMsg('Server environment SQUARE_ACCESS_TOKEN configured');
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (settings.integrations?.telephony) {
       const tel = settings.integrations.telephony;
       if (tel.accountSid && !twilioSid) setTwilioSid(tel.accountSid);
-      if (tel.authToken && !twilioToken) setTwilioToken(tel.authToken);
       if (tel.phoneNumber && (!twilioPhone || twilioPhone === '+13145550199')) setTwilioPhone(tel.phoneNumber);
       if (tel.apiKeySid && !twilioApiKey) setTwilioApiKey(tel.apiKeySid);
-      if (tel.apiKeySecret && !twilioApiSecret) setTwilioApiSecret(tel.apiKeySecret);
       if (tel.twimlAppSid && !twilioTwimlAppSid) setTwilioTwimlAppSid(tel.twimlAppSid);
       if (tel.status === 'connected') setTwilioStatus('connected');
       if (tel.statusMessage) setTwilioStatusMsg(tel.statusMessage);
@@ -159,21 +166,24 @@ export function AdminIntegrationsSubpage({
   const [testSmsStatus, setTestSmsStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [testSmsMsg, setTestSmsMsg] = useState<string | null>(null);
 
-  // Save Gateways Handler
+  // Save Gateways Handler (Only persists public/non-secret identifiers; secrets live in server env)
   const handleSaveGateways = async () => {
     setIsSaving(true);
     try {
       if (typeof window !== 'undefined') {
         localStorage.setItem('ct_stripe_mode', stripeMode);
         localStorage.setItem('ct_stripe_pk', stripePk.trim());
-        localStorage.setItem('ct_stripe_sk', stripeSk.trim());
-        localStorage.setItem('ct_stripe_webhook', stripeWebhookSecret.trim());
         localStorage.setItem('ct_square_appid', squareAppId.trim());
-        localStorage.setItem('ct_square_token', squareToken.trim());
         localStorage.setItem('ct_square_locid', squareLocId.trim());
+        localStorage.removeItem('ct_stripe_sk');
+        localStorage.removeItem('ct_stripe_webhook');
+        localStorage.removeItem('ct_square_token');
       }
-      setSaveSuccessMessage('Payment gateway configurations successfully saved.');
-      setTimeout(() => setSaveSuccessMessage(null), 3000);
+      setStripeSk('');
+      setStripeWebhookSecret('');
+      setSquareToken('');
+      setSaveSuccessMessage('Public payment gateway identifiers saved. Secret keys remain managed via server environment variables.');
+      setTimeout(() => setSaveSuccessMessage(null), 3500);
     } catch (e: any) {
       console.error('Failed to save gateway config:', e);
     } finally {
@@ -181,7 +191,7 @@ export function AdminIntegrationsSubpage({
     }
   };
 
-  // Save Telephony Handler with live validation and persistence to server & AppSettings
+  // Save Telephony Handler with live validation; never writes authToken or apiKeySecret to public Firestore or localStorage
   const handleSaveTelephony = async () => {
     setIsSaving(true);
     setTwilioStatusMsg(null);
@@ -190,9 +200,9 @@ export function AdminIntegrationsSubpage({
       const trimmedToken = twilioToken.trim();
       const trimmedPhone = twilioPhone.trim();
 
-      if (!trimmedSid || !trimmedToken) {
+      if (!trimmedSid) {
         setTwilioStatus('error');
-        setTwilioStatusMsg('Twilio Account SID and Auth Token are required.');
+        setTwilioStatusMsg('Twilio Account SID is required.');
         setIsSaving(false);
         return;
       }
@@ -213,9 +223,9 @@ export function AdminIntegrationsSubpage({
       }
 
       setTwilioStatus('checking');
-      setTwilioStatusMsg('Verifying credentials with Twilio REST API & saving...');
+      setTwilioStatusMsg('Verifying credentials with Twilio REST API & saving public metadata...');
 
-      // 1. Call server API to verify credentials and write to server-side .env.local
+      // 1. Call server API to verify credentials
       const resp = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -223,7 +233,7 @@ export function AdminIntegrationsSubpage({
           action: 'save_credentials',
           credentials: {
             accountSid: trimmedSid,
-            authToken: trimmedToken,
+            authToken: trimmedToken || undefined,
             phoneNumber: phoneValidation.e164,
           },
         }),
@@ -233,22 +243,20 @@ export function AdminIntegrationsSubpage({
 
       if (!resp.ok || !data.success) {
         setTwilioStatus('error');
-        setTwilioStatusMsg(data.error || 'Twilio verification failed. Check SID and Auth Token.');
+        setTwilioStatusMsg(data.error || 'Twilio verification failed. Check SID and server environment TWILIO_AUTH_TOKEN.');
         setIsSaving(false);
         return;
       }
 
-      // 2. Persist to AppSettings in Firestore
+      // 2. Persist ONLY non-secret public metadata to AppSettings in Firestore (never authToken or apiKeySecret!)
       await onSave({
         integrations: {
           ...settings.integrations,
           telephony: {
             provider: 'twilio',
             accountSid: trimmedSid,
-            authToken: trimmedToken,
             phoneNumber: phoneValidation.e164,
             apiKeySid: twilioApiKey.trim() || undefined,
-            apiKeySecret: twilioApiSecret.trim() || undefined,
             twimlAppSid: twilioTwimlAppSid.trim() || undefined,
             status: 'connected',
             statusMessage: `Connected: ${data.friendlyName || trimmedSid}`,
@@ -257,20 +265,22 @@ export function AdminIntegrationsSubpage({
         },
       });
 
-      // 3. Save to localStorage for instant client fallback
+      // 3. Save only non-secret identifiers to localStorage; purge any legacy tokens
       if (typeof window !== 'undefined') {
         localStorage.setItem('ct_twilio_sid', trimmedSid);
-        localStorage.setItem('ct_twilio_token', trimmedToken);
         localStorage.setItem('ct_twilio_phone', phoneValidation.e164);
         localStorage.setItem('ct_twilio_api_key', twilioApiKey.trim());
-        localStorage.setItem('ct_twilio_api_secret', twilioApiSecret.trim());
         localStorage.setItem('ct_twilio_twiml_app_sid', twilioTwimlAppSid.trim());
         localStorage.setItem('ct_twilio_status', 'connected');
+        localStorage.removeItem('ct_twilio_token');
+        localStorage.removeItem('ct_twilio_api_secret');
       }
 
+      setTwilioToken('');
+      setTwilioApiSecret('');
       setTwilioStatus('connected');
       setTwilioStatusMsg(`Connected (${data.friendlyName || 'Active Account'})`);
-      setSaveSuccessMessage('Twilio telephony gateway verified and saved! Live calling and messaging are now active.');
+      setSaveSuccessMessage('Twilio telephony metadata verified and saved! Secret tokens are protected on the server.');
       setTimeout(() => setSaveSuccessMessage(null), 5000);
     } catch (e: any) {
       console.error('Failed to save telephony config:', e);
@@ -388,8 +398,8 @@ export function AdminIntegrationsSubpage({
         if (typeof window !== 'undefined') {
           localStorage.setItem('ct_twilio_status', 'connected');
           localStorage.setItem('ct_twilio_sid', twilioSid.trim());
-          localStorage.setItem('ct_twilio_token', twilioToken.trim());
           localStorage.setItem('ct_twilio_phone', twilioPhone.trim());
+          localStorage.removeItem('ct_twilio_token');
         }
       } else {
         setTwilioStatus('error');

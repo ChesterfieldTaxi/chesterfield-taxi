@@ -85,40 +85,35 @@ export function hashStringTo4Digits(input: string): string {
 }
 
 /**
- * Extracts a 4-digit customer anchor from phone number or email/name.
+ * Generates a cryptographically random integer between min (inclusive) and max (exclusive).
  */
-export function extractCustomerAnchorFromContact(phone?: string, email?: string, name?: string): string {
-  if (phone) {
-    const digitsOnly = phone.replace(/\D/g, '');
-    if (digitsOnly.length >= 4) {
-      return digitsOnly.slice(-4);
-    }
-    if (digitsOnly.length > 0) {
-      return digitsOnly.padStart(4, '0');
-    }
+function secureRandomInt(min: number, max: number): number {
+  const range = max - min;
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(arr);
+    return min + (arr[0] % range);
   }
+  return Math.floor(min + Math.random() * range);
+}
 
-  if (email) {
-    return hashStringTo4Digits(email);
-  }
-
-  if (name) {
-    return hashStringTo4Digits(name);
-  }
-
-  // Fallback random 4 digits
-  return Math.floor(1000 + Math.random() * 9000).toString();
+/**
+ * Generates a non-PII 4-digit reservation prefix segment (1000-9999).
+ * Does NOT embed raw phone digits so public Trip IDs never leak passenger phone numbers.
+ */
+export function extractCustomerAnchorFromContact(_phone?: string, _email?: string, _name?: string): string {
+  return secureRandomInt(1000, 10000).toString();
 }
 
 /**
  * Generates a full mathematical Trip ID / Reservation Number in `CT-XXXX-XXXX` format.
  */
 export function generateTripId(phone?: string, email?: string, name?: string): string {
-  // 1. Customer Anchor (4 digits)
+  // 1. Random 4-digit prefix segment (1000-9999) — never leaks phone digits
   const customerAnchor = extractCustomerAnchorFromContact(phone, email, name);
 
-  // 2. Trip Sequence / Entropy (3 digits: 000-999)
-  const entropy = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  // 2. Cryptographic Trip Entropy (3 digits: 000-999)
+  const entropy = secureRandomInt(0, 1000).toString().padStart(3, '0');
 
   // 3. Payload for Luhn computation (7 digits total)
   const payload7 = `${customerAnchor}${entropy}`;
@@ -129,6 +124,29 @@ export function generateTripId(phone?: string, email?: string, name?: string): s
   // 5. Full 8-digit body formatted as CT-XXXX-XXXX
   const fullDigits = `${payload7}${checkDigit}`;
   return `CT-${fullDigits.slice(0, 4)}-${fullDigits.slice(4, 8)}`;
+}
+
+/**
+ * Normalizes a phone string to its last 10 numeric digits (stripping country code +1).
+ */
+export function normalizePhoneDigits(phone?: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits.slice(-10);
+}
+
+/**
+ * Verifies that a user-entered phone number matches the passenger phone on a Trip record.
+ * Requires at least 7 digits and exact match of normalized phone numbers.
+ */
+export function verifyTripPhoneMatch(tripPassengerPhone?: string, inputPhone?: string): boolean {
+  const cleanTrip = normalizePhoneDigits(tripPassengerPhone);
+  const cleanInput = normalizePhoneDigits(inputPhone);
+  if (!cleanTrip || cleanInput.length < 7) return false;
+  return cleanTrip === cleanInput || (cleanInput.length >= 10 && cleanTrip.endsWith(cleanInput));
 }
 
 export interface TripIdValidationResult {
