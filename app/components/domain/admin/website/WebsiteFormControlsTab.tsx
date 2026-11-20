@@ -507,23 +507,12 @@ export function WebsiteFormControlsTab({
                 />
               </div>
               {formConfig.allowChildSafetySeats && (
-                <div className="mt-2 pt-2 border-t border-slate-200">
-                  <span className="text-[10px] text-slate-500 block">Fee per unit:</span>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-xs font-bold">$</span>
-                    <input
-                      type="number"
-                      value={formConfig.carSeatRentalFeePerUnit || 10}
-                      onChange={(e) =>
-                        setFormConfig((prev) => ({
-                          ...prev,
-                          carSeatRentalFeePerUnit: Number(e.target.value),
-                        }))
-                      }
-                      className="w-16 px-1.5 py-0.5 border border-slate-200 rounded text-xs font-bold"
-                    />
-                  </div>
-                </div>
+                <p className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500">
+                  Per-seat fee is managed in{' '}
+                  <a href="/app/admin?tab=rates&sub=extras" className="text-blue-600 font-semibold hover:underline">
+                    Rates &amp; Tariffs → Extras
+                  </a>.
+                </p>
               )}
             </div>
 
@@ -543,44 +532,22 @@ export function WebsiteFormControlsTab({
                 />
               </div>
               {formConfig.allowRoundTrip && (
-                <div className="mt-2 pt-2 border-t border-slate-200">
-                  <span className="text-[10px] text-slate-500 block">Return discount (%):</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="25"
-                    value={formConfig.roundTripDiscountPercent || 5}
-                    onChange={(e) =>
-                      setFormConfig((prev) => ({
-                        ...prev,
-                        roundTripDiscountPercent: Number(e.target.value),
-                      }))
-                    }
-                    className="w-16 px-1.5 py-0.5 border border-slate-200 rounded text-xs font-bold mt-0.5"
-                  />
-                </div>
+                <p className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500">
+                  Shows the return-trip toggle on <code>/book</code>.
+                </p>
               )}
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-xs font-bold text-slate-800 block mb-1">
-                Free Cancellation (Mins)
+                No-Show &amp; Cancellation Policy
               </label>
-              <input
-                type="number"
-                min="30"
-                max="1440"
-                step="30"
-                value={formConfig.freeCancellationWindowMinutes || 120}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    freeCancellationWindowMinutes: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Full refund window</span>
+              <p className="text-[11px] text-slate-500 leading-snug">
+                Managed per Service Rate in{' '}
+                <a href="/app/admin?tab=rates&sub=rates" className="text-blue-600 font-semibold hover:underline">
+                  Rates &amp; Tariffs → Rates
+                </a>.
+              </p>
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">

@@ -1,25 +1,95 @@
 /**
- * Surcharges Catalog Service
+ * Surcharges Catalog Service (v2 Firewall Architecture)
  *
- * Manages operational, geographic, temporal, vehicle-conditional, and cancellation charges:
- * - Lambert & Spirit Airport Commercial Access Fee ($4.00)
- * - Built-In Fuel / Gas Surcharge (Flat $, $/Mile, or %)
- * - Opt-In Peak Demand Surge Multiplier (only active when explicitly enabled)
- * - Out-of-Area Remote Service Fee ($15.00 outside 15-mile radius)
- * - Custom Conditional Surcharges (Vehicle Types, Distance, Time Window, Days, Zones)
- * - Late Cancellation & Passenger No-Show Protection
+ * Manages a clean, uniform catalog of named surcharges stored in Firestore
+ * `/pricingConfig/surcharges` with LocalStorage + cross-tab caching.
  *
- * Stored in Firestore `/pricingConfig/surcharges` with LocalStorage caching.
+ * Firewall Policy Model:
+ * - Each surcharge has a master kill switch (`enabled: true | false`).
+ * - When enabled, `defaultPolicy` determines baseline behavior:
+ *   - `'universal'` (Allow by Default): applies to all rides unless a Rule WAIVEs it.
+ *   - `'rule_only'` (Deny by Default): applies only when a Rule APPLY/OVERRIDEs it.
+ *
+ * Pre-v2 Firestore documents are normalized losslessly on read so live production
+ * fares keep working seamlessly with zero downtime.
  */
 
 import { doc, getDoc, setDoc, onSnapshot, type Firestore } from 'firebase/firestore';
-import type { SurchargesConfig } from '../../types/config';
+import type {
+  SurchargesConfig,
+  SurchargeCatalogItem,
+  SurchargeCalcMode,
+  SurchargeDefaultPolicy,
+} from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 
 const SURCHARGES_STORAGE_KEY = 'chesterfield_taxi_surcharges_config_v2';
 
+export const BUILTIN_SURCHARGE_IDS = {
+  FUEL: 'surcharge-fuel',
+  PEAK_SURGE: 'surcharge-peak-surge',
+  AIRPORT_ACCESS: 'surcharge-airport-access',
+  REMOTE_AREA: 'surcharge-remote-area',
+  SUV_MINIVAN_UPGRADE: 'surcharge-suv-minivan-fee',
+} as const;
+
+export const DEFAULT_SURCHARGE_ITEMS: SurchargeCatalogItem[] = [
+  {
+    id: BUILTIN_SURCHARGE_IDS.FUEL,
+    name: 'Fuel / Gas Surcharge',
+    description: 'Adjustable fuel offset applied per trip, per mile, or as a percentage of base fare.',
+    enabled: false,
+    defaultPolicy: 'universal',
+    mode: 'flat',
+    amount: 2.5,
+    isBuiltIn: true,
+  },
+  {
+    id: BUILTIN_SURCHARGE_IDS.PEAK_SURGE,
+    name: 'Peak Demand Surge',
+    description: 'Opt-in fare multiplier during high-demand weather or event windows.',
+    enabled: false,
+    defaultPolicy: 'universal',
+    mode: 'multiplier',
+    amount: 1.25,
+    isBuiltIn: true,
+  },
+  {
+    id: BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS,
+    name: 'Airport Commercial Access Fee',
+    description: 'Airport commercial terminal pass-through access fee.',
+    enabled: true,
+    defaultPolicy: 'rule_only',
+    mode: 'flat',
+    amount: 4.0,
+    isBuiltIn: true,
+  },
+  {
+    id: BUILTIN_SURCHARGE_IDS.REMOTE_AREA,
+    name: 'Out-of-Area Remote Service Fee',
+    description: 'Extended pickup/dropoff radius surcharge outside standard metro coverage.',
+    enabled: true,
+    defaultPolicy: 'rule_only',
+    mode: 'flat',
+    amount: 15.0,
+    isBuiltIn: true,
+  },
+  {
+    id: BUILTIN_SURCHARGE_IDS.SUV_MINIVAN_UPGRADE,
+    name: 'SUV / Minivan Upgrade Fee',
+    description: 'Vehicle size & luggage capacity upgrade for SUV, Minivan, and WAV requests.',
+    enabled: true,
+    defaultPolicy: 'rule_only',
+    mode: 'flat',
+    amount: 10.0,
+    isBuiltIn: false,
+  },
+];
+
 export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
+  catalogVersion: 2,
+  items: DEFAULT_SURCHARGE_ITEMS.map((item) => ({ ...item })),
   airportGateFee: 4.0,
   airportTargetZoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],
   peakSurgeMultiplier: 1.25,
@@ -35,42 +105,200 @@ export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
   airportFeeApplicableTariffs: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
   surgeApplicableTariffs: ['tariff-point-to-point-meter'],
   remoteFeeApplicableTariffs: ['tariff-point-to-point-meter'],
-  customSurcharges: [
-    {
-      id: 'surcharge-suv-minivan-fee',
-      name: 'SUV / Minivan Upgrade Fee',
-      description: 'Vehicle size & luggage capacity upgrade for SUV and Minivan/WAV',
-      amount: 10.0,
-      type: 'flat',
-      isActive: true,
-      applicableTariffIds: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
-      triggers: {
-        vehicleTiers: ['xl', 'suv', 'van', 'minivan', 'wheelchair', 'wheelchair_wav'],
-      },
-    },
-  ],
+  customSurcharges: [],
 };
 
-function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesConfig {
-  const merged = { ...DEFAULT_SURCHARGES_CONFIG, ...raw };
-  const airportGateFee =
+function sanitizeCalcMode(mode: unknown, fallback: SurchargeCalcMode = 'flat'): SurchargeCalcMode {
+  if (mode === 'flat' || mode === 'per_mile' || mode === 'percent' || mode === 'multiplier') {
+    return mode;
+  }
+  return fallback;
+}
+
+function sanitizePolicy(
+  policy: unknown,
+  fallback: SurchargeDefaultPolicy = 'rule_only'
+): SurchargeDefaultPolicy {
+  return policy === 'universal' || policy === 'rule_only' ? policy : fallback;
+}
+
+/**
+ * Converts a pre-v2 SurchargesConfig document into a clean v2 `SurchargeCatalogItem[]`
+ * list while preserving legacy auto-condition metadata for zero-downtime rollout.
+ */
+function buildItemsFromLegacy(raw: Partial<SurchargesConfig>): SurchargeCatalogItem[] {
+  const airportFee =
     typeof raw.airportGateFee === 'number'
       ? raw.airportGateFee
       : typeof raw.airportCommercialGateFee === 'number'
       ? raw.airportCommercialGateFee
       : DEFAULT_SURCHARGES_CONFIG.airportGateFee;
-  const outOfAreaRemoteFee =
+
+  const remoteFee =
     typeof raw.outOfAreaRemoteFee === 'number'
       ? raw.outOfAreaRemoteFee
       : typeof raw.remoteServiceFlatFee === 'number'
       ? raw.remoteServiceFlatFee
       : DEFAULT_SURCHARGES_CONFIG.outOfAreaRemoteFee;
+
+  const remoteThreshold =
+    typeof raw.outOfAreaThresholdMiles === 'number'
+      ? raw.outOfAreaThresholdMiles
+      : typeof raw.remoteBoundaryDistanceMiles === 'number'
+      ? raw.remoteBoundaryDistanceMiles
+      : 15.0;
+
+  const fuelAmount =
+    typeof raw.fuelSurchargeAmount === 'number'
+      ? raw.fuelSurchargeAmount
+      : DEFAULT_SURCHARGES_CONFIG.fuelSurchargeAmount ?? 2.5;
+
+  const peakMultiplier =
+    typeof raw.peakSurgeMultiplier === 'number'
+      ? raw.peakSurgeMultiplier
+      : DEFAULT_SURCHARGES_CONFIG.peakSurgeMultiplier;
+
+  const items: SurchargeCatalogItem[] = [
+    {
+      id: BUILTIN_SURCHARGE_IDS.FUEL,
+      name: 'Fuel / Gas Surcharge',
+      description: 'Adjustable fuel offset applied per trip, per mile, or as a percentage of base fare.',
+      enabled: Boolean(raw.isFuelSurchargeActive),
+      defaultPolicy: 'universal',
+      mode: sanitizeCalcMode(raw.fuelSurchargeType, 'flat'),
+      amount: fuelAmount,
+      isBuiltIn: true,
+    },
+    {
+      id: BUILTIN_SURCHARGE_IDS.PEAK_SURGE,
+      name: 'Peak Demand Surge',
+      description: 'Opt-in fare multiplier during high-demand weather or event windows.',
+      enabled: Boolean(raw.isPeakSurgeActive),
+      defaultPolicy: 'universal',
+      mode: 'multiplier',
+      amount: peakMultiplier,
+      isBuiltIn: true,
+    },
+    {
+      id: BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS,
+      name: 'Airport Commercial Access Fee',
+      description: 'Airport commercial terminal pass-through access fee.',
+      enabled: airportFee > 0 && !raw.waiveAirportFee,
+      defaultPolicy: 'rule_only',
+      mode: 'flat',
+      amount: airportFee,
+      isBuiltIn: true,
+      legacyAutoCondition: {
+        kind: 'airport',
+        airportZoneIds: raw.airportTargetZoneIds || ['zone-lambert-airport', 'zone-spirit-airport'],
+      },
+    },
+    {
+      id: BUILTIN_SURCHARGE_IDS.REMOTE_AREA,
+      name: 'Out-of-Area Remote Service Fee',
+      description: `Extended pickup/dropoff surcharge beyond ${remoteThreshold} mi regional boundary.`,
+      enabled: remoteFee > 0 && !raw.waiveRemoteFee,
+      defaultPolicy: 'rule_only',
+      mode: 'flat',
+      amount: remoteFee,
+      isBuiltIn: true,
+      legacyAutoCondition: {
+        kind: 'remote_distance',
+        remoteThresholdMiles: remoteThreshold,
+      },
+    },
+  ];
+
+  const legacyCustom = Array.isArray(raw.customSurcharges) ? raw.customSurcharges : [];
+  for (const cs of legacyCustom) {
+    if (!cs || !cs.id || items.some((existing) => existing.id === cs.id)) continue;
+    const hasTriggers = Boolean(
+      cs.triggers &&
+        ((cs.triggers.vehicleTiers && cs.triggers.vehicleTiers.length > 0) ||
+          (cs.triggers.vehicleTypes && cs.triggers.vehicleTypes.length > 0) ||
+          (cs.triggers.zoneIds && cs.triggers.zoneIds.length > 0) ||
+          (cs.triggers.daysOfWeek && cs.triggers.daysOfWeek.length > 0) ||
+          cs.triggers.timeWindow ||
+          cs.triggers.minDistanceMiles !== undefined ||
+          cs.triggers.maxDistanceMiles !== undefined)
+    );
+    items.push({
+      id: cs.id,
+      name: cs.name,
+      description: cs.description,
+      enabled: cs.isActive !== false,
+      defaultPolicy: hasTriggers ? 'rule_only' : 'universal',
+      mode: sanitizeCalcMode(cs.type, 'flat'),
+      amount: typeof cs.amount === 'number' ? cs.amount : 0,
+      isBuiltIn: false,
+      ...(hasTriggers
+        ? {
+            legacyAutoCondition: {
+              kind: 'custom_triggers' as const,
+              customTriggers: cs.triggers,
+            },
+          }
+        : {}),
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Returns the canonical v2 `SurchargeCatalogItem[]` array from any `SurchargesConfig`.
+ */
+export function getSurchargeCatalogItems(cfg?: Partial<SurchargesConfig> | null): SurchargeCatalogItem[] {
+  if (!cfg) return DEFAULT_SURCHARGE_ITEMS.map((item) => ({ ...item }));
+  if (Array.isArray(cfg.items) && cfg.items.length > 0) {
+    return cfg.items.map((item) => ({
+      ...item,
+      enabled: Boolean(item.enabled),
+      defaultPolicy: sanitizePolicy(item.defaultPolicy, 'rule_only'),
+      mode: sanitizeCalcMode(item.mode, 'flat'),
+      amount: typeof item.amount === 'number' && !isNaN(item.amount) ? item.amount : 0,
+    }));
+  }
+  return buildItemsFromLegacy(cfg);
+}
+
+function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesConfig {
+  const isV2 = raw.catalogVersion === 2 && Array.isArray(raw.items) && raw.items.length > 0;
+  const items: SurchargeCatalogItem[] = isV2
+    ? raw.items!.map((item) => ({
+        ...item,
+        enabled: Boolean(item.enabled),
+        defaultPolicy: sanitizePolicy(item.defaultPolicy, 'rule_only'),
+        mode: sanitizeCalcMode(item.mode, 'flat'),
+        amount: typeof item.amount === 'number' && !isNaN(item.amount) ? item.amount : 0,
+      }))
+    : buildItemsFromLegacy(raw);
+
+  // Mirror built-in catalog items back to legacy flat fields for seamless read compatibility
+  const fuelItem = items.find((i) => i.id === BUILTIN_SURCHARGE_IDS.FUEL);
+  const surgeItem = items.find((i) => i.id === BUILTIN_SURCHARGE_IDS.PEAK_SURGE);
+  const airportItem = items.find((i) => i.id === BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS);
+  const remoteItem = items.find((i) => i.id === BUILTIN_SURCHARGE_IDS.REMOTE_AREA);
+
+  const airportGateFee = airportItem
+    ? airportItem.amount
+    : typeof raw.airportGateFee === 'number'
+    ? raw.airportGateFee
+    : DEFAULT_SURCHARGES_CONFIG.airportGateFee;
+
+  const outOfAreaRemoteFee = remoteItem
+    ? remoteItem.amount
+    : typeof raw.outOfAreaRemoteFee === 'number'
+    ? raw.outOfAreaRemoteFee
+    : DEFAULT_SURCHARGES_CONFIG.outOfAreaRemoteFee;
+
   const outOfAreaThresholdMiles =
     typeof raw.outOfAreaThresholdMiles === 'number'
       ? raw.outOfAreaThresholdMiles
       : typeof raw.remoteBoundaryDistanceMiles === 'number'
       ? raw.remoteBoundaryDistanceMiles
-      : DEFAULT_SURCHARGES_CONFIG.outOfAreaThresholdMiles;
+      : 15.0;
+
   const cancellationFeeWithinOneHour =
     typeof raw.cancellationFeeWithinOneHour === 'number'
       ? raw.cancellationFeeWithinOneHour
@@ -79,7 +307,10 @@ function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesCo
       : DEFAULT_SURCHARGES_CONFIG.cancellationFeeWithinOneHour;
 
   return {
-    ...merged,
+    ...DEFAULT_SURCHARGES_CONFIG,
+    ...raw,
+    catalogVersion: isV2 ? 2 : raw.catalogVersion,
+    items,
     airportGateFee,
     airportCommercialGateFee: airportGateFee,
     outOfAreaRemoteFee,
@@ -88,14 +319,15 @@ function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesCo
     remoteBoundaryDistanceMiles: outOfAreaThresholdMiles,
     cancellationFeeWithinOneHour,
     cancellationFee: cancellationFeeWithinOneHour,
-    isPeakSurgeActive: Boolean(merged.isPeakSurgeActive),
-    isFuelSurchargeActive: Boolean(merged.isFuelSurchargeActive),
-    fuelSurchargeType: merged.fuelSurchargeType || 'flat',
-    fuelSurchargeAmount:
-      typeof merged.fuelSurchargeAmount === 'number'
-        ? merged.fuelSurchargeAmount
-        : DEFAULT_SURCHARGES_CONFIG.fuelSurchargeAmount,
-    customSurcharges: Array.isArray(merged.customSurcharges) ? merged.customSurcharges : [],
+    isPeakSurgeActive: surgeItem ? surgeItem.enabled : Boolean(raw.isPeakSurgeActive),
+    peakSurgeMultiplier: surgeItem ? surgeItem.amount : raw.peakSurgeMultiplier ?? 1.25,
+    isFuelSurchargeActive: fuelItem ? fuelItem.enabled : Boolean(raw.isFuelSurchargeActive),
+    fuelSurchargeType:
+      fuelItem && fuelItem.mode !== 'multiplier'
+        ? fuelItem.mode
+        : raw.fuelSurchargeType || 'flat',
+    fuelSurchargeAmount: fuelItem ? fuelItem.amount : raw.fuelSurchargeAmount ?? 2.5,
+    customSurcharges: Array.isArray(raw.customSurcharges) ? raw.customSurcharges : [],
   };
 }
 
@@ -124,14 +356,14 @@ export class SurchargesService {
 
   public getCached(): SurchargesConfig {
     if (this.cache) {
-      return { ...this.cache };
+      return { ...this.cache, items: this.cache.items ? this.cache.items.map((i) => ({ ...i })) : undefined };
     }
     if (typeof window === 'undefined') return DEFAULT_SURCHARGES_CONFIG;
     try {
       const raw = localStorage.getItem(SURCHARGES_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.airportGateFee === 'number') {
+        if (parsed && (Array.isArray(parsed.items) || typeof parsed.airportGateFee === 'number')) {
           const normalized = normalizeSurchargesConfig(parsed);
           this.cache = normalized;
           return { ...normalized };
@@ -222,7 +454,15 @@ export class SurchargesService {
   }
 
   public async saveSurcharges(cfg: SurchargesConfig): Promise<void> {
-    const normalized = normalizeSurchargesConfig(cfg);
+    const normalized = normalizeSurchargesConfig({
+      ...cfg,
+      catalogVersion: 2,
+      items: getSurchargeCatalogItems(cfg).map((item) => {
+        // Strip legacyAutoCondition once admin explicitly saves v2 catalog
+        const { legacyAutoCondition: _legacy, ...clean } = item;
+        return clean;
+      }),
+    });
     this.setCached(normalized);
 
     if (this.isConfigured && this.db) {
@@ -256,4 +496,4 @@ export async function saveSurchargesConfig(cfg: SurchargesConfig): Promise<void>
   await svc.saveSurcharges(cfg);
 }
 
-export type { SurchargesConfig };
+export type { SurchargesConfig, SurchargeCatalogItem };

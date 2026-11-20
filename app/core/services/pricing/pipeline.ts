@@ -33,28 +33,25 @@ import {
   applySurchargesAndDiscounts,
   roundCurrency,
 } from './rules';
-import { getSurchargesConfig } from './surcharges.service';
+import { getSurchargesConfig, BUILTIN_SURCHARGE_IDS } from './surcharges.service';
 import { getUniversalExtrasConfig } from './extras.service';
 import { getTariffService } from './tariff.service';
-
-/**
- * Quantizes any positive route distance up to the next 0.5 statute mile increment.
- */
-function quantizeHalfMile(miles: number): number {
-  if (!miles || miles <= 0 || isNaN(miles)) return 0;
-  return Math.ceil((miles - 1e-9) * 2) / 2;
-}
+import { getPricingRulesService } from './pricing-rules.service';
 
 /**
  * Creates the initial immutable PricingContext from input and config.
+ * Distance rounding is governed per-Rate inside Step 2 (never silently pre-rounded).
  */
 export function createInitialContext(
   input: PricingInput,
   config: PricingConfig = DEFAULT_PRICING_CONFIG
 ): PricingContext {
-  const quantizedDistanceMiles = quantizeHalfMile(input.distanceMiles);
+  const safeDistance =
+    !input.distanceMiles || input.distanceMiles <= 0 || isNaN(input.distanceMiles)
+      ? 0
+      : input.distanceMiles;
   return {
-    input: Object.freeze({ ...input, distanceMiles: quantizedDistanceMiles }),
+    input: Object.freeze({ ...input, distanceMiles: safeDistance }),
     config: Object.freeze({ ...config }),
     baseFare: 0,
     distanceFare: 0,
@@ -104,9 +101,11 @@ export function toTripPricing(context: PricingContext): TripPricing {
     context.discounts.reduce((sum, d) => sum + d.amount, 0)
   );
 
-  const multiStopItem = context.surcharges.find((s) => s.name.toLowerCase().includes('stop'));
-  const tollsItem = context.surcharges.find((s) => s.name.toLowerCase().includes('toll'));
-  const airportItem = context.surcharges.find((s) => s.name.toLowerCase().includes('airport'));
+  const multiStopLine = context.lineItems.find((li) => li.id === 'extra-stops');
+  const tollsLine = context.lineItems.find((li) => li.id === 'surcharge-tolls');
+  const airportLine = context.lineItems.find(
+    (li) => li.id === BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS || li.id === 'surcharge-airport'
+  );
 
   const tariffBase = roundCurrency(context.tariffBaseSubtotal ?? context.baseFare);
 
@@ -121,13 +120,13 @@ export function toTripPricing(context: PricingContext): TripPricing {
     surgeMultiplier: context.surgeMultiplier,
     discountAmount,
     subtotal: tariffBase,
-    totalFare: Math.ceil(context.totalFare),
+    totalFare: roundCurrency(context.totalFare),
     currency: context.currency,
     breakdown: [...context.lineItems],
     intermediateStopsCount: context.input.intermediateStopsCount || 0,
-    multiStopSurcharge: multiStopItem ? multiStopItem.amount : 0,
-    tollsFee: tollsItem ? tollsItem.amount : 0,
-    airportSurcharge: airportItem ? airportItem.amount : 0,
+    multiStopSurcharge: multiStopLine ? multiStopLine.amount : 0,
+    tollsFee: tollsLine ? tollsLine.amount : 0,
+    airportSurcharge: airportLine ? airportLine.amount : 0,
     carSeatFee: context.carSeatFee || 0,
     passengerSurcharge: context.passengerSurcharge || 0,
     oversizedLuggageFee: context.oversizedLuggageFee || 0,
@@ -179,6 +178,7 @@ export function calculateTripPricing(
     tariffs: configOverride?.tariffs ?? getTariffService().getAllTariffProfiles(),
     universalExtras: configOverride?.universalExtras ?? getUniversalExtrasConfig(),
     surchargesCatalog: configOverride?.surchargesCatalog ?? getSurchargesConfig(),
+    namedPricingRules: configOverride?.namedPricingRules ?? getPricingRulesService().getAllRules(),
     ...configOverride,
     vehicleMultipliers: {
       ...DEFAULT_PRICING_CONFIG.vehicleMultipliers,

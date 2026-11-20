@@ -1,268 +1,251 @@
-import React, { useState, useMemo } from 'react';
-import type { TariffProfile, TariffRateModel, TariffTaximeterRate } from '~/core/types/tariff';
-import type { VehicleType, VehicleClass, VehicleTierConfig } from '~/core/types/config';
-import { getAdminConfigService } from '~/core/services/config/admin-config.service';
+import React, { useState, useEffect, useMemo } from 'react';
+import type {
+  TariffProfile,
+  TariffRateModel,
+  DistanceRoundingMode,
+  FareRoundingMode,
+} from '~/core/types/tariff';
+import type { NamedPricingRule } from '~/core/types/config';
+import {
+  DEFAULT_RATE_ROUNDING,
+  DEFAULT_RATE_CANCELLATION_POLICY,
+} from '~/core/services/pricing/tariff.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
 import {
-  DollarSignIcon,
   PlusIcon,
   TrashIcon,
-  CheckIcon,
   SearchIcon,
+  CheckIcon,
+  DollarSignIcon,
+  ShieldCheckIcon,
   SlidersIcon,
   ClockIcon,
+  AlertTriangleIcon,
 } from '~/components/ui/Icons';
 import { TaximeterEditor } from './TaximeterEditor';
 import { ZipRateMatrixEditor } from './ZipRateMatrixEditor';
 import { HourlyRateEditor } from './HourlyRateEditor';
 import { CorridorEditor } from './CorridorEditor';
-import { DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
 
 export interface RatesPanelProps {
   tariffs: TariffProfile[];
-  vehicles?: VehicleTierConfig[];
-  onSaveTariff: (tariff: TariffProfile) => Promise<void>;
+  rules?: NamedPricingRule[];
+  onSaveTariff: (updated: TariffProfile) => Promise<void>;
   onDeleteTariff?: (id: string) => Promise<void>;
+  onDraftChange?: (draft: TariffProfile | null) => void;
+  onNavigateToRule?: (ruleId: string) => void;
   isSaving?: boolean;
 }
 
-const FALLBACK_VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
-  { id: 'sedan', label: 'Executive Sedan' },
-  { id: 'suv', label: 'SUV (XL)' },
-  { id: 'minivan', label: 'Minivan' },
-  { id: 'van', label: 'Van / Shuttle' },
-  { id: 'wheelchair_wav', label: 'WAV Wheelchair' },
-];
-
-const VEHICLE_CLASSES: { id: VehicleClass; label: string }[] = [
-  { id: 'standard', label: 'Standard' },
-  { id: 'executive', label: 'Executive' },
-  { id: 'xl', label: 'XL 6-Pax' },
-  { id: 'medical', label: 'Medical Non-Emergency' },
-  { id: 'delivery', label: 'Delivery / Courier' },
-];
+function getRateBadgeLabel(t: TariffProfile): string {
+  if (t.rateModel === 'zip_matrix') return 'ZIP MATRIX';
+  if (t.rateModel === 'hourly') return 'HOURLY';
+  if (t.rateModel === 'corridor') return 'CORRIDOR';
+  const meter = t.taximeter || t.taximeterRate;
+  const isMetered = (meter?.waitingRatePerStep || 0) > 0 || (meter?.startPrice || 0) > 0;
+  return isMetered ? 'METERED' : 'STEPPED FLAT';
+}
 
 export function RatesPanel({
   tariffs,
-  vehicles,
+  rules = [],
   onSaveTariff,
   onDeleteTariff,
+  onDraftChange,
+  onNavigateToRule,
   isSaving = false,
 }: RatesPanelProps) {
-  const activeVehicleTypes = useMemo(() => {
-    let source = vehicles;
-    if (!source || source.length === 0) {
-      try {
-        source = getAdminConfigService().getCachedSettings()?.vehicles;
-      } catch {
-        source = [];
-      }
-    }
-    if (source && source.length > 0) {
-      const active = source.filter((v) => !v.isArchived);
-      return active.map((v) => ({
-        id: v.id as VehicleType,
-        label: v.name || v.id,
-      }));
-    }
-    return FALLBACK_VEHICLE_TYPES;
-  }, [vehicles]);
-  const activeTariffs = tariffs.filter((t) => !t.isArchived);
-  const visibleTariffs = activeTariffs.length > 0 ? activeTariffs : DEFAULT_TARIFF_PROFILES;
-
-  const [selectedTariffId, setSelectedTariffId] = useState<string>(
-    visibleTariffs[0]?.id || 'tariff-airport-flat'
-  );
+  const [selectedTariffId, setSelectedTariffId] = useState<string>(tariffs[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const selectedTariff = visibleTariffs.find((t) => t.id === selectedTariffId) || visibleTariffs[0];
+  const selectedTariff = tariffs.find((t) => t.id === selectedTariffId) || tariffs[0];
   const [workingCopy, setWorkingCopy] = useState<TariffProfile | null>(
     selectedTariff ? JSON.parse(JSON.stringify(selectedTariff)) : null
   );
 
-  // If tariffs change or selectedTariff changes, ensure workingCopy is synchronized
-  React.useEffect(() => {
+  const isDirty = useMemo(() => {
+    if (!workingCopy || !selectedTariff) return false;
+    return JSON.stringify(workingCopy) !== JSON.stringify(selectedTariff);
+  }, [workingCopy, selectedTariff]);
+
+  // Sync workingCopy when tariffs load or selection changes
+  useEffect(() => {
     if (selectedTariff && (!workingCopy || workingCopy.id !== selectedTariff.id)) {
+      setSelectedTariffId(selectedTariff.id);
       setWorkingCopy(JSON.parse(JSON.stringify(selectedTariff)));
+      setConfirmDeleteId(null);
     }
-  }, [selectedTariff]);
+  }, [selectedTariff, workingCopy?.id]);
+
+  // Notify parent workspace of live draft for real-time simulator preview
+  useEffect(() => {
+    onDraftChange?.(isDirty ? workingCopy : null);
+  }, [workingCopy, isDirty, onDraftChange]);
 
   const handleSelectTariff = (id: string) => {
+    if (id === selectedTariffId) return;
+    if (isDirty) {
+      const ok = window.confirm(
+        `You have unsaved changes on "${workingCopy?.name}". Discard them and switch rates?`
+      );
+      if (!ok) return;
+    }
     setSelectedTariffId(id);
-    const target = visibleTariffs.find((t) => t.id === id);
+    setConfirmDeleteId(null);
+    const target = tariffs.find((t) => t.id === id);
     if (target) {
       setWorkingCopy(JSON.parse(JSON.stringify(target)));
     }
   };
 
-  const filteredTariffs = visibleTariffs.filter(
+  const filteredTariffs = tariffs.filter(
     (t) =>
       t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Rules targeting the currently selected Rate
+  const linkedRules = useMemo(() => {
+    if (!workingCopy) return [];
+    return rules.filter((r) => r.modifier?.targetTariffId === workingCopy.id);
+  }, [rules, workingCopy]);
+
   const handleSave = async () => {
     if (!workingCopy) return;
-    await onSaveTariff(workingCopy);
-    setSaveSuccessMsg(`Saved tariff "${workingCopy.name}" successfully!`);
+    // If marking this Rate as Default, clear isDefault on other Rates automatically
+    if (workingCopy.isDefault) {
+      const others = tariffs.filter((t) => t.id !== workingCopy.id && t.isDefault);
+      for (const other of others) {
+        await onSaveTariff({ ...other, isDefault: false });
+      }
+    }
+    // Keep Rate clean of legacy hidden routing triggers & surcharge vetoes
+    const cleaned: TariffProfile = {
+      ...workingCopy,
+      allowOperationalSurcharges: true,
+      allowSurgeMultiplier: true,
+      triggers: {},
+      eligibleVehicleTypes: undefined,
+      eligibleVehicleClasses: undefined,
+      taximeterRate: workingCopy.taximeter,
+      zipMatrixRates: workingCopy.zipMatrix,
+      hourlyRate: workingCopy.hourlyConfig,
+    };
+    await onSaveTariff(cleaned);
+    setWorkingCopy(JSON.parse(JSON.stringify(cleaned)));
+    setSaveSuccessMsg(`Saved "${cleaned.name}"`);
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
   const handleDeleteCurrentTariff = async () => {
     if (!workingCopy || !onDeleteTariff) return;
-    if (visibleTariffs.length <= 1) return;
-    const deletedName = workingCopy.name;
     const deletedId = workingCopy.id;
-    const nextTariff = visibleTariffs.find((t) => t.id !== deletedId);
+    const deletedName = workingCopy.name;
+    const nextTariff = tariffs.find((t) => t.id !== deletedId);
     await onDeleteTariff(deletedId);
+    setConfirmDeleteId(null);
     if (nextTariff) {
       setSelectedTariffId(nextTariff.id);
       setWorkingCopy(JSON.parse(JSON.stringify(nextTariff)));
+    } else {
+      setSelectedTariffId('');
+      setWorkingCopy(null);
     }
-    setSaveSuccessMsg(`Deleted tariff "${deletedName}"`);
+    setSaveSuccessMsg(`Deleted "${deletedName}"`);
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
   const handleAddNewTariff = async () => {
-    const newId = `tariff-custom-${Date.now()}`;
-    const taximeterConfig: TariffTaximeterRate = {
-      startPrice: 4.50,
-      initialDistanceIncluded: 0.2,
-      initialTimeIncluded: 0,
-      primaryDistanceLimit: 20,
-      primaryDistanceStep: 0.2,
-      primaryDistanceRate: 0.60,
-      thenDistanceStep: 0.2,
-      thenDistanceRate: 0.50,
-      freeTrafficMinutes: 0,
-      waitingStepSeconds: 60,
-      waitingRatePerStep: 0.667,
-      minimumPrice: 4.50,
-    };
-
+    const newId = `rate-${Date.now()}`;
     const newTariff: TariffProfile = {
       id: newId,
-      name: `Custom Rate #${visibleTariffs.length + 1}`,
-      description: 'Custom admin-created tariff rate profile',
+      name: `New Service Rate #${tariffs.length + 1}`,
+      description: 'Base service fare calculation model',
       rateModel: 'taximeter',
       currency: 'USD',
       units: 'imperial',
-      isActive: true,
       priority: 50,
-      isDefault: false,
+      isActive: true,
+      isDefault: tariffs.length === 0,
+      rounding: { ...DEFAULT_RATE_ROUNDING },
+      cancellationPolicy: { ...DEFAULT_RATE_CANCELLATION_POLICY },
       allowSurgeMultiplier: true,
       allowOperationalSurcharges: true,
-      eligibleVehicleTypes: [],
-      eligibleVehicleClasses: [],
-      triggers: {
-        vehicleTypes: [],
-        vehicleClasses: [],
+      triggers: {},
+      taximeter: {
+        startPrice: 4.5,
+        initialDistanceIncluded: 0.1,
+        initialTimeIncluded: 0,
+        primaryDistanceStep: 0.1,
+        primaryDistanceRate: 0.3,
+        primaryDistanceLimit: 999,
+        thenDistanceStep: 0.1,
+        thenDistanceRate: 0.3,
+        freeTrafficMinutes: 5,
+        waitingRatePerStep: 0.667,
+        waitingStepSeconds: 60,
+        minimumPrice: 20.0,
       },
-      taximeter: taximeterConfig,
-      taximeterRate: taximeterConfig,
       corridors: [],
       extras: {
-        carSeatFeePerUnit: 10,
+        carSeatFeePerUnit: 10.0,
         passengerBaseAllowance: 1,
-        extraPassengerFeePerHead: 0,
+        extraPassengerFeePerHead: 1.0,
         customSurcharges: [],
       },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
 
-    setWorkingCopy(newTariff);
-    setSelectedTariffId(newId);
     await onSaveTariff(newTariff);
+    setSelectedTariffId(newId);
+    setWorkingCopy(JSON.parse(JSON.stringify(newTariff)));
   };
 
-  const getWorkingVehicleTypes = (t: TariffProfile): string[] => {
-    if (t.triggers?.vehicleTypes && t.triggers.vehicleTypes.length > 0) {
-      return t.triggers.vehicleTypes;
-    }
-    return t.eligibleVehicleTypes || [];
-  };
-
-  const getWorkingVehicleClasses = (t: TariffProfile): string[] => {
-    if (t.triggers?.vehicleClasses && t.triggers.vehicleClasses.length > 0) {
-      return t.triggers.vehicleClasses;
-    }
-    return t.eligibleVehicleClasses || [];
-  };
-
-  const toggleVehicleType = (vt: VehicleType) => {
+  const handleModelChange = (newModel: TariffRateModel) => {
     if (!workingCopy) return;
-    const current = getWorkingVehicleTypes(workingCopy);
-    const next = current.some((x) => x.toLowerCase() === vt.toLowerCase())
-      ? current.filter((x) => x.toLowerCase() !== vt.toLowerCase())
-      : [...current, vt];
-    setWorkingCopy({
-      ...workingCopy,
-      eligibleVehicleTypes: next,
-      triggers: {
-        ...(workingCopy.triggers || {}),
-        vehicleTypes: next,
-        vehicleTiers: undefined,
-      },
-    });
+    const next: TariffProfile = { ...workingCopy, rateModel: newModel };
+    if (newModel === 'hourly' && !next.hourlyConfig) {
+      next.hourlyConfig = {
+        ratePerHour: 75,
+        minimumHours: 2,
+        includedMilesPerHour: 20,
+        excessMileageRate: 2.5,
+      };
+    }
+    if (newModel === 'zip_matrix' && !next.zipMatrix) {
+      next.zipMatrix = [];
+    }
+    setWorkingCopy(next);
   };
 
-  const toggleVehicleClass = (vc: VehicleClass) => {
-    if (!workingCopy) return;
-    const current = getWorkingVehicleClasses(workingCopy);
-    const next = current.includes(vc)
-      ? current.filter((x: string) => x !== vc)
-      : [...current, vc];
-    setWorkingCopy({
-      ...workingCopy,
-      eligibleVehicleClasses: next,
-      triggers: {
-        ...(workingCopy.triggers || {}),
-        vehicleClasses: next,
-      },
-    });
-  };
-
-  // Safe taximeter resolution
-  const resolvedTaximeter: TariffTaximeterRate = (workingCopy?.taximeterRate || workingCopy?.taximeter) ?? {
-    startPrice: 4.50,
-    initialDistanceIncluded: 0.1,
-    initialTimeIncluded: 0,
-    primaryDistanceLimit: 999,
-    primaryDistanceStep: 0.1,
-    primaryDistanceRate: 0.300,
-    thenDistanceStep: 0.1,
-    thenDistanceRate: 0.300,
-    freeTrafficMinutes: 0,
-    waitingStepSeconds: 60,
-    waitingRatePerStep: 0.667,
-    minimumPrice: 4.50,
-  };
+  const currentRounding = workingCopy?.rounding || DEFAULT_RATE_ROUNDING;
+  const currentCancel = workingCopy?.cancellationPolicy || DEFAULT_RATE_CANCELLATION_POLICY;
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-[640px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-      {/* Left Sub-Panel: Tariff List (~280px) */}
+    <div className="flex flex-col lg:flex-row min-h-[620px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+      {/* Left Sidebar: Service Rates List */}
       <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-slate-50/80 shrink-0">
         <div className="p-3.5 border-b border-slate-200 space-y-2.5 bg-white">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <DollarSignIcon className="w-3.5 h-3.5 text-blue-600" />
-              Tariff Rates ({visibleTariffs.length})
+              Service Rates ({tariffs.length})
             </h3>
             <Button
               type="button"
               size="sm"
               onClick={handleAddNewTariff}
-              className="h-7 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 shadow-2xs"
+              className="h-7 text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 shadow-2xs cursor-pointer"
             >
               <PlusIcon className="w-3 h-3 mr-1" />
               New Rate
             </Button>
           </div>
+
           <div className="relative">
             <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
             <Input
@@ -278,6 +261,17 @@ export function RatesPanel({
         <div className="flex-1 overflow-y-auto p-2.5 space-y-2 custom-scrollbar">
           {filteredTariffs.map((t) => {
             const isSelected = t.id === selectedTariffId;
+            const modelBadge = getRateBadgeLabel(t);
+            const meter = t.taximeter || t.taximeterRate;
+            const summaryLine =
+              t.rateModel === 'zip_matrix'
+                ? `${(t.zipMatrix || t.zipMatrixRates || []).length} zip flat rates`
+                : t.rateModel === 'hourly'
+                ? `$${(t.hourlyConfig?.ratePerHour ?? 75).toFixed(0)}/hr · min ${t.hourlyConfig?.minimumHours ?? 2}h`
+                : t.rateModel === 'corridor'
+                ? `${t.corridors?.length || 0} flat corridors`
+                : `$${(meter?.startPrice ?? 0).toFixed(2)} base · $${(meter?.minimumPrice ?? 0).toFixed(0)} min · $${(meter?.primaryDistanceRate ?? 0).toFixed(3)}/${meter?.primaryDistanceStep ?? 0.1} mi`;
+
             return (
               <button
                 key={t.id}
@@ -289,52 +283,37 @@ export function RatesPanel({
                     : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-start justify-between gap-1 mb-1">
-                  <span className="text-xs font-bold text-slate-900 truncate">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span
+                    className={`text-xs font-bold leading-tight ${
+                      isSelected ? 'text-blue-950' : 'text-slate-900'
+                    }`}
+                  >
                     {t.name}
                   </span>
                   <Badge
                     variant="outline"
-                    className={`text-[9px] px-1.5 py-0 font-mono shrink-0 uppercase ${
-                      isSelected
-                        ? 'bg-blue-100 text-blue-800 border-blue-300'
-                        : 'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
+                    className="text-[9px] px-1.5 py-0 border-slate-200 bg-slate-50 text-slate-600 shrink-0 font-bold"
                   >
-                    {t.rateModel === 'hourly'
-                      ? 'HOURLY'
-                      : t.rateModel === 'zip_matrix'
-                      ? 'ZIP MATRIX'
-                      : (t.taximeter?.startPrice ?? 0) === 0
-                      ? 'STEPPED FLAT'
-                      : 'METERED'}
+                    {modelBadge}
                   </Badge>
                 </div>
 
-                <div className="text-[11px] font-mono font-medium text-slate-600 mb-2">
-                  {t.rateModel === 'hourly' ? (
-                    <span>
-                      ${(t.hourlyRate?.ratePerHour ?? t.hourlyConfig?.ratePerHour ?? 75).toFixed(2)}/hr · min{' '}
-                      {t.hourlyRate?.minimumHours ?? t.hourlyConfig?.minimumHours ?? 2} hrs
-                    </span>
-                  ) : t.rateModel === 'zip_matrix' ? (
-                    <span>
-                      {(t.zipMatrixRates || t.zipMatrix || []).length} zip codes configured
-                    </span>
-                  ) : (
-                    <span>
-                      ${(t.taximeter?.startPrice ?? 0).toFixed(2)} base · ${(t.taximeter?.minimumPrice ?? 0).toFixed(2)} min · $
-                      {(t.taximeter?.primaryDistanceRate ?? 0.255).toFixed(3)}/
-                      {(t.taximeter?.primaryDistanceStep ?? 0.1).toFixed(1)} mi
-                    </span>
-                  )}
-                </div>
+                <p className="text-[11px] text-slate-500 font-mono truncate">{summaryLine}</p>
 
-                <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 pt-1.5">
-                  <span className="font-mono">Priority: {t.priority}</span>
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100">
+                  <span className="text-[10px] text-slate-400">
+                    {t.rounding?.fareMode === 'exact_cents'
+                      ? 'Exact cents'
+                      : t.rounding?.fareMode === 'nearest_half_dollar'
+                      ? 'Nearest $0.50'
+                      : t.rounding?.fareMode === 'nearest_dollar'
+                      ? 'Nearest $1'
+                      : 'Round up $1'}
+                  </span>
                   <div className="flex items-center gap-1.5">
                     {t.isDefault && (
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 font-semibold px-1.5 py-0.2 rounded">
+                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
                         Default
                       </span>
                     )}
@@ -351,161 +330,106 @@ export function RatesPanel({
         </div>
       </div>
 
-      {/* Center Sub-Panel: Granular Rate Editor */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto custom-scrollbar">
+      {/* Main Editor Pane */}
+      <div className="flex-1 flex flex-col bg-white overflow-y-auto custom-scrollbar min-w-0">
         {workingCopy ? (
-          <div className="p-6 space-y-6">
-            {/* Save Notification Toast */}
-            {saveSuccessMsg && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-2xs">
-                <span className="flex items-center gap-1.5 font-semibold">
-                  <CheckIcon className="w-4 h-4 text-emerald-600" />
-                  {saveSuccessMsg}
-                </span>
-              </div>
-            )}
-
-            {/* 1. Profile Header Strip */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900">{workingCopy.name}</h2>
-                  <Badge variant="outline" className="text-[10px] font-mono text-slate-600 border-slate-300 bg-white">
-                    ID: {workingCopy.id}
-                  </Badge>
-                  {workingCopy.isDefault && (
-                    <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">
-                      Default Fallback
+          <div className="p-5 space-y-5">
+            {/* Sticky-feeling Header & Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-bold text-slate-950">{workingCopy.name}</h2>
+                  <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    {workingCopy.id}
+                  </span>
+                  {isDirty && (
+                    <Badge
+                      variant="warning"
+                      size="sm"
+                      className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+                    >
+                      Unsaved Draft
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-500">
-                  Base fare, minimum price floor, stepped increments, and waiting delay rates.
+                <p className="text-xs text-slate-500 mt-1">
+                  Pure base-fare calculation formula, rounding behavior, and no-show / cancellation policy. Routing &amp; surcharges are synthesized in <strong>Rules &amp; Routing</strong>.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                {onDeleteTariff && visibleTariffs.length > 1 && (
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                {saveSuccessMsg && (
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
+                    <CheckIcon className="w-3.5 h-3.5" />
+                    {saveSuccessMsg}
+                  </span>
+                )}
+
+                {onDeleteTariff && tariffs.length > 1 && confirmDeleteId !== workingCopy.id && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleDeleteCurrentTariff}
-                    disabled={isSaving}
-                    className="text-xs border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-2xs"
+                    onClick={() => setConfirmDeleteId(workingCopy.id)}
+                    className="h-8 text-xs border-rose-200 text-rose-700 hover:bg-rose-50 bg-white cursor-pointer"
                   >
                     <TrashIcon className="w-3.5 h-3.5 mr-1" />
                     Delete
                   </Button>
                 )}
+
+                {confirmDeleteId === workingCopy.id && (
+                  <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
+                    <span className="text-[11px] font-semibold text-rose-800">Delete rate?</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleDeleteCurrentTariff}
+                      className="h-6 px-2 text-[11px] bg-rose-600 hover:bg-rose-700 text-white"
+                    >
+                      Confirm
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="h-6 px-2 text-[11px] bg-white"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleSelectTariff(workingCopy.id)}
-                  className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+                  disabled={!isDirty}
+                  onClick={() => selectedTariff && setWorkingCopy(JSON.parse(JSON.stringify(selectedTariff)))}
+                  className="h-8 text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
-                  Reset
+                  Discard
                 </Button>
+
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
+                  className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer"
                 >
                   <CheckIcon className="w-3.5 h-3.5 mr-1" />
-                  Save Tariff
+                  {isSaving ? 'Saving...' : 'Save Rate'}
                 </Button>
               </div>
             </div>
 
-            {/* 2. Core Statutory Rates (Base, Min Floor, Steps, Waiting) Front and Center! */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <DollarSignIcon className="w-3.5 h-3.5 text-emerald-600" />
-                  Statutory Rate Configuration & Taximeter Steps
-                </h3>
-                <span className="text-[11px] text-slate-500">
-                  Flag drop, minimum price floor, distance steps & waiting delay
-                </span>
-              </div>
-
-              {workingCopy.rateModel === 'taximeter' && (
-                <div className="space-y-4">
-                  <TaximeterEditor
-                    taximeter={resolvedTaximeter}
-                    onChange={(updated) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        taximeter: updated,
-                        taximeterRate: updated,
-                      })
-                    }
-                  />
-                  <CorridorEditor
-                    corridors={workingCopy.corridors || []}
-                    onChange={(updated) =>
-                      setWorkingCopy({ ...workingCopy, corridors: updated })
-                    }
-                  />
-                </div>
-              )}
-
-              {workingCopy.rateModel === 'corridor' && (
-                <CorridorEditor
-                  corridors={workingCopy.corridors || []}
-                  onChange={(updated) =>
-                    setWorkingCopy({ ...workingCopy, corridors: updated })
-                  }
-                />
-              )}
-
-              {workingCopy.rateModel === 'zip_matrix' && (
-                <ZipRateMatrixEditor
-                  entries={
-                    workingCopy.zipMatrix && workingCopy.zipMatrix.length > 0
-                      ? workingCopy.zipMatrix
-                      : workingCopy.zipMatrixRates || []
-                  }
-                  onChange={(updated) =>
-                    setWorkingCopy({
-                      ...workingCopy,
-                      zipMatrix: updated,
-                      zipMatrixRates: updated,
-                    })
-                  }
-                />
-              )}
-
-              {workingCopy.rateModel === 'hourly' && (
-                <HourlyRateEditor
-                  hourlyConfig={workingCopy.hourlyConfig || workingCopy.hourlyRate}
-                  onChange={(updated) =>
-                    setWorkingCopy({
-                      ...workingCopy,
-                      hourlyConfig: updated,
-                      hourlyRate: updated,
-                    })
-                  }
-                />
-              )}
-            </div>
-
-            {/* 3. Secondary: Vehicle Eligibility & Policies */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Vehicle Eligibility & Tariff Policies
-                </h4>
-                <span className="text-[11px] text-slate-500">Secondary configuration</span>
-              </div>
-
-              {/* General Fields Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                <div className="md:col-span-2">
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Tariff Name</label>
+            {/* 1. Identity, Calculation Model & Default Flag */}
+            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Rate Name</label>
                   <Input
                     type="text"
                     value={workingCopy.name}
@@ -515,193 +439,294 @@ export function RatesPanel({
                     className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
                   />
                 </div>
-
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Calculation Model</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Calculation Model</label>
                   <select
-                    value={workingCopy.rateModel}
+                    value={workingCopy.rateModel || 'taximeter'}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        rateModel: e.target.value as TariffRateModel,
-                      })
+                      handleModelChange(e.target.value as TariffRateModel)
                     }
                     className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                   >
-                    <option value="taximeter">Taximeter (Stepped Miles)</option>
-                    <option value="zip_matrix">Zip Matrix</option>
+                    <option value="taximeter">Stepped Mileage / Taximeter</option>
                     <option value="hourly">Hourly Charter</option>
-                    <option value="corridor">Corridor (Fixed Zones)</option>
+                    <option value="zip_matrix">Zip-Code Flat Matrix</option>
+                    <option value="corridor">Zone-to-Zone Corridors</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Evaluation Priority</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Description</label>
                   <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={workingCopy.priority}
+                    type="text"
+                    value={workingCopy.description || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        priority: parseInt(e.target.value, 10) || 50,
-                      })
+                      setWorkingCopy({ ...workingCopy, description: e.target.value })
                     }
-                    className="bg-white border-slate-300 text-slate-900 h-8 font-mono text-xs"
+                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="text-[11px] font-medium text-slate-700 block mb-1">Description</label>
-                <Input
-                  type="text"
-                  value={workingCopy.description || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setWorkingCopy({ ...workingCopy, description: e.target.value })
-                  }
-                  className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
-                />
-              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200/80">
+                <div className="flex flex-wrap items-center gap-5 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={workingCopy.isActive}
+                      onChange={(e) => setWorkingCopy({ ...workingCopy, isActive: e.target.checked })}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                    />
+                    <span>Active Rate</span>
+                  </label>
 
-              {/* Switches: Active, Default, Surcharges & Surge */}
-              <div className="flex flex-wrap items-center gap-6 pt-3 border-t border-slate-200 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={workingCopy.isActive}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({ ...workingCopy, isActive: e.target.checked })
-                    }
-                    className="rounded border-slate-300 text-blue-600 focus:ring-0"
-                  />
-                  <span>Active Tariff</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={workingCopy.isDefault || false}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({ ...workingCopy, isDefault: e.target.checked })
-                    }
-                    className="rounded border-slate-300 text-emerald-600 focus:ring-0"
-                  />
-                  <span>Default Fallback Tariff</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={workingCopy.allowSurgeMultiplier !== false}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        allowSurgeMultiplier: e.target.checked,
-                      })
-                    }
-                    className="rounded border-slate-300 text-amber-600 focus:ring-0"
-                  />
-                  <span>Allow Surge Multiplier</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={workingCopy.allowOperationalSurcharges !== false}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        allowOperationalSurcharges: e.target.checked,
-                      })
-                    }
-                    className="rounded border-slate-300 text-purple-600 focus:ring-0"
-                  />
-                  <span>Allow Operational Surcharges</span>
-                </label>
-              </div>
-
-              {/* Dual Vehicle Classifications */}
-              <div className="pt-3 border-t border-slate-200 space-y-2 text-xs">
-                <div>
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Eligible Fleet Vehicle Types (Leave empty for All Vehicles):
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          eligibleVehicleTypes: [],
-                          triggers: {
-                            ...(workingCopy.triggers || {}),
-                            vehicleTypes: [],
-                            vehicleTiers: undefined,
-                          },
-                        })
-                      }
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                        getWorkingVehicleTypes(workingCopy).length === 0
-                          ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                      }`}
-                    >
-                      All Vehicles
-                    </button>
-                    {activeVehicleTypes.map((vt) => {
-                      const isChecked = getWorkingVehicleTypes(workingCopy).some(
-                        (t) => t.toLowerCase() === vt.id.toLowerCase()
-                      );
-                      return (
-                        <button
-                          key={vt.id}
-                          type="button"
-                          onClick={() => toggleVehicleType(vt.id)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                            isChecked
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                          }`}
-                        >
-                          {vt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(workingCopy.isDefault)}
+                      onChange={(e) => setWorkingCopy({ ...workingCopy, isDefault: e.target.checked })}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-0"
+                    />
+                    <span>Default Rate (used when no Rule selects another Rate)</span>
+                  </label>
                 </div>
 
-                <div className="pt-1">
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Eligible Service Classes (Optional):
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VEHICLE_CLASSES.map((vc) => {
-                      const isChecked = getWorkingVehicleClasses(workingCopy).includes(vc.id);
-                      return (
-                        <button
-                          key={vc.id}
-                          type="button"
-                          onClick={() => toggleVehicleClass(vc.id)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                            isChecked
-                              ? 'bg-purple-600 text-white border-purple-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                          }`}
-                        >
-                          {vc.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* Linked Rules Cross-Reference */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-semibold text-slate-500">Routed by Rules:</span>
+                  {linkedRules.length > 0 ? (
+                    linkedRules.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => onNavigateToRule?.(r.id)}
+                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+                      >
+                        P{r.priority} · {r.name}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic">
+                      {workingCopy.isDefault ? 'Default fallback for all rides' : 'None yet (assign in Rules tab)'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* 2. Core Rate Model Editor */}
+            <div>
+              {(workingCopy.rateModel === 'taximeter' || !workingCopy.rateModel) && (
+                <TaximeterEditor
+                  taximeter={workingCopy.taximeter}
+                  onChange={(updatedMeter) =>
+                    setWorkingCopy({
+                      ...workingCopy,
+                      taximeter: updatedMeter,
+                      taximeterRate: updatedMeter,
+                    })
+                  }
+                />
+              )}
+
+              {workingCopy.rateModel === 'corridor' && (
+                <CorridorEditor
+                  corridors={workingCopy.corridors || []}
+                  onChange={(updatedCorridors) =>
+                    setWorkingCopy({ ...workingCopy, corridors: updatedCorridors })
+                  }
+                />
+              )}
+
+              {workingCopy.rateModel === 'zip_matrix' && (
+                <ZipRateMatrixEditor
+                  entries={workingCopy.zipMatrix || workingCopy.zipMatrixRates || []}
+                  onChange={(updatedEntries) =>
+                    setWorkingCopy({
+                      ...workingCopy,
+                      zipMatrix: updatedEntries,
+                      zipMatrixRates: updatedEntries,
+                    })
+                  }
+                />
+              )}
+
+              {workingCopy.rateModel === 'hourly' && (
+                <HourlyRateEditor
+                  hourlyConfig={workingCopy.hourlyConfig || workingCopy.hourlyRate}
+                  onChange={(updatedHourly) =>
+                    setWorkingCopy({
+                      ...workingCopy,
+                      hourlyConfig: updatedHourly,
+                      hourlyRate: updatedHourly,
+                    })
+                  }
+                />
+              )}
+            </div>
+
+            {/* 3. Per-Rate Rounding Settings */}
+            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <SlidersIcon className="w-4 h-4 text-blue-600" />
+                  Rounding Settings
+                </h3>
+                <span className="text-[11px] text-slate-500">Applies specifically to trips billed on this Rate</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Distance Rounding</label>
+                  <select
+                    value={currentRounding.distanceMode}
+                    onChange={(e) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        rounding: {
+                          ...currentRounding,
+                          distanceMode: e.target.value as DistanceRoundingMode,
+                        },
+                      })
+                    }
+                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
+                  >
+                    <option value="exact">Exact Mileage (honors 0.1 mi steps)</option>
+                    <option value="half_mile_up">Round Up to Next 0.5 Mile</option>
+                    <option value="whole_mile_up">Round Up to Next Whole Mile (1.0 mi)</option>
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Controls whether route mileage is rounded before applying distance steps.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Final Fare Rounding</label>
+                  <select
+                    value={currentRounding.fareMode}
+                    onChange={(e) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        rounding: {
+                          ...currentRounding,
+                          fareMode: e.target.value as FareRoundingMode,
+                        },
+                      })
+                    }
+                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
+                  >
+                    <option value="ceil_dollar">Round Up to Whole Dollar ($1.00)</option>
+                    <option value="nearest_dollar">Round to Nearest Whole Dollar ($1.00)</option>
+                    <option value="nearest_half_dollar">Round to Nearest $0.50</option>
+                    <option value="exact_cents">Exact Cents ($0.01 — no rounding)</option>
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Applied once at the end of the quote after extras, surcharges, and discounts.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Per-Rate No-Show & Late Cancellation Policy */}
+            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheckIcon className="w-4 h-4 text-rose-600" />
+                  No-Show &amp; Late Cancellation Policy
+                </h3>
+                <span className="text-[11px] text-slate-500">Protection fees tied to this Rate</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Free Cancellation Window (min)
+                  </label>
+                  <Input
+                    type="number"
+                    step="15"
+                    min="0"
+                    value={currentCancel.freeWindowMinutes}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        cancellationPolicy: {
+                          ...currentCancel,
+                          freeWindowMinutes: parseInt(e.target.value, 10) || 0,
+                        },
+                      })
+                    }
+                    className="bg-white border-slate-300 text-slate-900 h-9 text-xs font-semibold"
+                  />
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Minutes before scheduled pickup (e.g., 60 min)
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Late Cancellation Fee ($)
+                  </label>
+                  <Input
+                    type="number"
+                    step="1.00"
+                    min="0"
+                    value={currentCancel.cancellationFee}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        cancellationPolicy: {
+                          ...currentCancel,
+                          cancellationFee: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    className="bg-white border-slate-300 text-rose-800 h-9 text-xs font-bold"
+                  />
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Charged if canceled inside the free window
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                    Passenger No-Show Fee ($)
+                  </label>
+                  <Input
+                    type="number"
+                    step="1.00"
+                    min="0"
+                    value={currentCancel.noShowFee}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        cancellationPolicy: {
+                          ...currentCancel,
+                          noShowFee: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    className="bg-white border-slate-300 text-rose-800 h-9 text-xs font-bold"
+                  />
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Charged when passenger fails to appear at pickup
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {!workingCopy.isDefault && linkedRules.length === 0 && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  This Rate is not set as Default and no Rule currently routes to it. Create a Rule in{' '}
+                  <strong>Rules &amp; Routing</strong> to specify when this Rate should be used.
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm p-12">
-            Select a tariff profile from the left panel to configure rates
+            Select a Rate from the left panel or click &ldquo;+ New Rate&rdquo;
           </div>
         )}
       </div>

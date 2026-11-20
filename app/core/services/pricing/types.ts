@@ -124,6 +124,10 @@ export interface PricingInput {
   accountType?: 'retail' | 'corporate' | 'vip';
   /** Zone IDs matched by pickup/dropoff coordinates */
   zoneIds?: string[];
+  /** Zone IDs specifically containing the pickup location */
+  originZoneIds?: string[];
+  /** Zone IDs specifically containing the dropoff location */
+  destinationZoneIds?: string[];
   /** Specific Origin Zone ID (for corridor matching) */
   originZoneId?: string;
   /** Specific Destination Zone ID (for corridor matching) */
@@ -185,6 +189,31 @@ export interface CalculationAuditStep {
   runningSubtotal: number;
 }
 
+export interface FirewallRuleTraceEntry {
+  ruleId: string;
+  ruleName: string;
+  priority: number;
+  matched: boolean;
+  reason: string;
+  stoppedAfter?: boolean;
+}
+
+export interface FirewallSurchargeTraceEntry {
+  surchargeId: string;
+  surchargeName: string;
+  defaultPolicy: import('../../types/config').SurchargeDefaultPolicy;
+  status: 'applied' | 'waived' | 'skipped' | 'disabled';
+  reason: string;
+  amount: number;
+}
+
+export interface FirewallEvaluationTrace {
+  ruleDecisions: FirewallRuleTraceEntry[];
+  selectedRateSource: 'rule' | 'explicit' | 'default';
+  selectedRateRuleName?: string;
+  surchargeDecisions: FirewallSurchargeTraceEntry[];
+}
+
 /**
  * Immutable state context threaded through every step of the pricing pipeline.
  */
@@ -229,6 +258,20 @@ export interface PricingContext {
   readonly targetTariffId?: string;
   readonly overruleExtras?: Partial<import('../../types/config').UniversalExtrasConfig>;
   readonly overruleSurcharges?: Partial<import('../../types/config').SurchargesConfig>;
+  /** Firewall-resolved highest-priority surcharge directives keyed by surchargeId */
+  readonly resolvedSurchargeActions?: Record<
+    string,
+    import('../../types/config').RuleSurchargeAction & { sourceRuleName: string; sourcePriority: number }
+  >;
+  /** Firewall-resolved highest-priority extra directives keyed by extraKey */
+  readonly resolvedExtraActions?: Record<
+    string,
+    import('../../types/config').RuleExtraAction & { sourceRuleName: string; sourcePriority: number }
+  >;
+  /** Rate-level rounding policy carried into final step */
+  readonly rateRounding?: import('../../types/tariff').RateRoundingPolicy;
+  /** Transparent Firewall Decision Trace for Simulator & Audit */
+  readonly firewallTrace?: FirewallEvaluationTrace;
   readonly layeredZoneFee?: number;
   readonly driverPay?: number;
   readonly evaluatedRuleModifiers?: {
@@ -236,6 +279,8 @@ export interface PricingContext {
     multiplier: number;
     surchargeFlat: number;
     surchargePercent: number;
+    discountFlat?: number;
+    discountPercent?: number;
     surchargeAdders?: import('../../types/config').RuleSurchargeAdder[];
     matchedRuleNames: string[];
     auditDetails: string[];

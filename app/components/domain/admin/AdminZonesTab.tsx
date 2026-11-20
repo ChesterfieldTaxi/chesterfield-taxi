@@ -1625,37 +1625,9 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Flat Surcharge ($)"
-                      type="number"
-                      step="0.50"
-                      min="0"
-                      value={zoneFormData.flatFee || 0}
-                      onChange={(e) =>
-                        setZoneFormData((prev) => ({
-                          ...prev,
-                          flatFee: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      helperText="Added to total fare"
-                    />
-
-                    <Input
-                      label="Rate Multiplier (x)"
-                      type="number"
-                      step="0.05"
-                      min="0.5"
-                      max="3.0"
-                      value={zoneFormData.surchargeMultiplier || 1.0}
-                      onChange={(e) =>
-                        setZoneFormData((prev) => ({
-                          ...prev,
-                          surchargeMultiplier: parseFloat(e.target.value) || 1.0,
-                        }))
-                      }
-                      helperText="1.0 = standard"
-                    />
+                  <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900">
+                    Zone fees, corridor overrides, and rate routing are managed centrally in{' '}
+                    <strong>Rates &amp; Tariffs → Rules &amp; Routing</strong>.
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
@@ -1794,37 +1766,11 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <Input
-                      label="Flat Surcharge ($)"
-                      type="number"
-                      step="0.50"
-                      min="0"
-                      value={groupFormData.flatFee || 0}
-                      onChange={(e) =>
-                        setGroupFormData((prev) => ({
-                          ...prev,
-                          flatFee: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      helperText="Optional group flat fee"
-                    />
-
-                    <Input
-                      label="Rate Multiplier (x)"
-                      type="number"
-                      step="0.05"
-                      min="0.5"
-                      max="3.0"
-                      value={groupFormData.surchargeMultiplier || 1.0}
-                      onChange={(e) =>
-                        setGroupFormData((prev) => ({
-                          ...prev,
-                          surchargeMultiplier: parseFloat(e.target.value) || 1.0,
-                        }))
-                      }
-                      helperText="1.0 = standard"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900">
+                      Zone group pricing &amp; surcharge rules are configured in{' '}
+                      <strong>Rates &amp; Tariffs → Rules &amp; Routing</strong>.
+                    </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1955,37 +1901,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                       helperText="Radius around each point"
                       required
                     />
-
-                    <Input
-                      label="Flat Surcharge ($)"
-                      type="number"
-                      step="0.50"
-                      min="0"
-                      value={collectionFormData.flatFee || 0}
-                      onChange={(e) =>
-                        setCollectionFormData((prev) => ({
-                          ...prev,
-                          flatFee: parseFloat(e.target.value) || 0,
-                        }))
-                      }
-                      helperText="Default surcharge"
-                    />
-
-                    <Input
-                      label="Rate Multiplier (x)"
-                      type="number"
-                      step="0.05"
-                      min="0.5"
-                      max="3.0"
-                      value={collectionFormData.surchargeMultiplier || 1.0}
-                      onChange={(e) =>
-                        setCollectionFormData((prev) => ({
-                          ...prev,
-                          surchargeMultiplier: parseFloat(e.target.value) || 1.0,
-                        }))
-                      }
-                      helperText="1.0 = standard"
-                    />
+                    <div className="sm:col-span-2 p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900 flex items-center">
+                      Location collection surcharges &amp; routing are managed in{' '}
+                      <strong className="ml-1">Rates &amp; Tariffs → Rules &amp; Routing</strong>.
+                    </div>
                   </div>
 
                   {/* Autocomplete Consolidation Settings */}

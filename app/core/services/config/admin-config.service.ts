@@ -913,7 +913,6 @@ export class AdminConfigService implements IAdminConfigService {
       defaultTolls: settings.pricing.defaultTolls ?? 0,
       airportSurcharge: settings.pricing.airportFee,
       currency: 'USD',
-      manualSurgeMultiplier: settings.pricing.surgeMultiplier,
       flagDropIncludedMiles: settings.pricing.flagDropIncludedMiles,
       useStepIncrements: settings.pricing.useStepIncrements,
       stepIncrementTiers: settings.pricing.stepIncrementTiers,

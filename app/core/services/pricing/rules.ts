@@ -21,18 +21,25 @@ import type {
   SurchargeEntry,
   DiscountEntry,
   CalculationAuditStep,
+  FirewallSurchargeTraceEntry,
 } from './types';
 import { evaluateApplicablePricingRules, DEFAULT_NAMED_PRICING_RULES } from './pricing-rules.service';
 import {
   DEFAULT_TARIFF_PROFILES,
+  DEFAULT_RATE_ROUNDING,
   matchTariffProfile,
   matchTariffCorridor,
   evaluateTaximeterFare,
   evaluateZipMatrixFare,
   evaluateHourlyFare,
+  applyFareRounding,
 } from './tariff.service';
 import { DEFAULT_UNIVERSAL_EXTRAS } from './extras.service';
-import { DEFAULT_SURCHARGES_CONFIG } from './surcharges.service';
+import {
+  DEFAULT_SURCHARGES_CONFIG,
+  BUILTIN_SURCHARGE_IDS,
+  getSurchargeCatalogItems,
+} from './surcharges.service';
 import { doesVehicleMatchAllowedList, formatLocalDateStr } from './vehicle-matching';
 
 /**
@@ -158,6 +165,12 @@ export const resolveRoutingRules: PricingPipelineStep = (context) => {
     pickupTimeStr = `${hours}:${mins}`;
   }
 
+  const breakdown = context.input.carSeatsBreakdown;
+  const carSeatsTotal = breakdown
+    ? breakdown.total ??
+      (breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)
+    : context.input.equipment?.carSeats ?? 0;
+
   const evaluationResult = evaluateApplicablePricingRules(
     {
       distanceMiles: context.input.distanceMiles,
@@ -165,11 +178,14 @@ export const resolveRoutingRules: PricingPipelineStep = (context) => {
       pickupDate: pickupDateStr,
       pickupTime: pickupTimeStr,
       zoneIds: context.input.zoneIds,
+      originZoneIds: context.input.originZoneIds,
+      destinationZoneIds: context.input.destinationZoneIds,
       originZoneId: context.input.originZoneId,
       destinationZoneId: context.input.destinationZoneId,
       isAirportPickup: context.input.isAirportPickup,
       isAirportDropoff: context.input.isAirportDropoff,
       isAirportTrip: context.input.isAirportTrip,
+      isHourlyBooking: context.input.isHourlyBooking,
       zoneGroupIds: context.input.zoneGroupIds,
       locationCollectionIds: context.input.locationCollectionIds,
       accountType: context.input.accountType,
@@ -183,13 +199,28 @@ export const resolveRoutingRules: PricingPipelineStep = (context) => {
       dropoffZipCode: context.input.dropoffZipCode,
       selectedRuleId: context.input.selectedRuleId,
       equipment: context.input.equipment,
+      carSeatsTotal,
       passengers: context.input.passengers,
     },
     rules
   );
 
+  const firewallTrace = {
+    ruleDecisions: evaluationResult.ruleDecisions,
+    selectedRateSource: evaluationResult.targetTariffId
+      ? ('rule' as const)
+      : context.config.activeTariffId
+      ? ('explicit' as const)
+      : ('default' as const),
+    selectedRateRuleName: evaluationResult.targetTariffRuleName,
+    surchargeDecisions: [],
+  };
+
   if (evaluationResult.matchedRules.length === 0) {
-    return context;
+    return {
+      ...context,
+      firewallTrace,
+    };
   }
 
   const appliedNames = evaluationResult.matchedRules.map((r) => r.name);
@@ -198,14 +229,19 @@ export const resolveRoutingRules: PricingPipelineStep = (context) => {
     ...context,
     appliedRuleNames: appliedNames,
     targetTariffId: evaluationResult.targetTariffId ?? context.targetTariffId,
+    resolvedSurchargeActions: evaluationResult.resolvedSurchargeActions,
+    resolvedExtraActions: evaluationResult.resolvedExtraActions,
     overruleExtras: evaluationResult.overruleExtras ?? context.overruleExtras,
     overruleSurcharges: evaluationResult.overruleSurcharges ?? context.overruleSurcharges,
     layeredZoneFee: evaluationResult.layeredZoneFee ?? context.layeredZoneFee,
+    firewallTrace,
     evaluatedRuleModifiers: {
       flatOverride: evaluationResult.flatOverride,
       multiplier: evaluationResult.multiplier,
       surchargeFlat: evaluationResult.surchargeFlat,
       surchargePercent: evaluationResult.surchargePercent,
+      discountFlat: evaluationResult.discountFlat,
+      discountPercent: evaluationResult.discountPercent,
       surchargeAdders: evaluationResult.surchargeAdders,
       matchedRuleNames: appliedNames,
       auditDetails: evaluationResult.auditTrail,
@@ -213,8 +249,8 @@ export const resolveRoutingRules: PricingPipelineStep = (context) => {
     auditTrail: appendAudit(
       context.auditTrail,
       1,
-      'Routing & Policy Rules',
-      `Matched rule(s) [${appliedNames.join(', ')}]${evaluationResult.targetTariffId ? ` -> Target Tariff: ${evaluationResult.targetTariffId}` : ''}`,
+      'Pricing Rules (Firewall)',
+      `Matched rule(s) [${appliedNames.join(', ')}]${evaluationResult.targetTariffId ? ` -> Rate: ${evaluationResult.targetTariffId}` : ''}`,
       0,
       context.subtotal
     ),
@@ -233,17 +269,22 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     return context;
   }
 
-  const requestedTariffId = context.targetTariffId || context.config.activeTariffId;
-  const candidateTariffs = requestedTariffId
-    ? tariffs.filter((t) => t.id === requestedTariffId && !t.isArchived)
-    : tariffs;
-  const matchedProfile = matchTariffProfile(
-    context.input,
-    candidateTariffs.length > 0 ? candidateTariffs : tariffs
-  );
+  const requestedTariffId = context.config.activeTariffId || context.targetTariffId;
+  const matchedProfile = matchTariffProfile(context.input, tariffs, requestedTariffId);
   if (!matchedProfile) {
     return context;
   }
+  const rateRounding = matchedProfile.rounding || DEFAULT_RATE_ROUNDING;
+  const nextFirewallTrace = context.firewallTrace
+    ? {
+        ...context.firewallTrace,
+        selectedRateSource: context.config.activeTariffId
+          ? ('explicit' as const)
+          : context.targetTariffId
+          ? ('rule' as const)
+          : ('default' as const),
+      }
+    : undefined;
 
   const newSurcharges: SurchargeEntry[] = [...context.surcharges];
   const newLineItems: PriceLineItem[] = [...context.lineItems];
@@ -306,6 +347,8 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
         ...context,
         tariffProfileId: matchedProfile.id,
         tariffProfileName: matchedProfile.name,
+        rateRounding,
+        firewallTrace: nextFirewallTrace,
         tariffBaseSubtotal: flatFare,
         baseFare: flatFare,
         distanceFare: 0,
@@ -353,6 +396,8 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
       ...context,
       tariffProfileId: matchedProfile.id,
       tariffProfileName: matchedProfile.name,
+      rateRounding,
+      firewallTrace: nextFirewallTrace,
       tariffBaseSubtotal: hourlyFare,
       baseFare: hourlyFare,
       distanceFare: 0,
@@ -394,6 +439,8 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
       ...context,
       tariffProfileId: matchedProfile.id,
       tariffProfileName: matchedProfile.name,
+      rateRounding,
+      firewallTrace: nextFirewallTrace,
       matchedCorridorId: matchedCorridor.id,
       matchedCorridorName: matchedCorridor.name,
       tariffBaseSubtotal: flatFare,
@@ -424,12 +471,13 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
   }
 
   // Only in-transit traffic delay feeds the taximeter waiting clock;
-  // pickup curb waiting (`curbWaitMinutes`) is billed once under Universal Extras.
+  // pickup curb waiting (`curbWaitMinutes`) is billed once under Extras.
   const delayDuration = context.input.delayMinutes ?? 0;
   const meterResult = evaluateTaximeterFare(
     activeTaximeter,
     context.input.distanceMiles,
-    delayDuration
+    delayDuration,
+    rateRounding.distanceMode
   );
 
   const tariffBase = roundCurrency(meterResult.subtotal);
@@ -437,7 +485,7 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     id: 'base-fare',
     category: 'base',
     label: 'Base Fare',
-    detail: `${context.input.distanceMiles.toFixed(1)} mi`,
+    detail: `${meterResult.effectiveDistanceMiles.toFixed(1)} mi`,
     amount: tariffBase,
     sourceType: 'tariff',
     sourceId: matchedProfile.id,
@@ -450,6 +498,8 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
     ...context,
     tariffProfileId: matchedProfile.id,
     tariffProfileName: matchedProfile.name,
+    rateRounding,
+    firewallTrace: nextFirewallTrace,
     tariffBaseSubtotal: tariffBase,
     baseFare: tariffBase,
     distanceFare: meterResult.distanceFare,
@@ -578,6 +628,7 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
   let currentBase = context.tariffBaseSubtotal ?? context.subtotal;
   let lineItems = [...context.lineItems];
   const newSurcharges: SurchargeEntry[] = [];
+  const newDiscounts: DiscountEntry[] = [];
   let deltaTotal = 0;
 
   // 1. Flat Fare Override (replaces the Base Fare line item cleanly)
@@ -604,7 +655,7 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
     }
   }
 
-  // 2. Multiplier Modifier (applied to Base Fare)
+  // 2. Multiplier Modifier (applied to Base Fare; <1.0 goes to discounts, >1.0 goes to surcharges)
   if (mods.multiplier && mods.multiplier !== 1.0) {
     const scaled = roundCurrency(currentBase * mods.multiplier);
     const multDelta = roundCurrency(scaled - currentBase);
@@ -612,11 +663,19 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
       currentTotal = roundCurrency(currentTotal + multDelta);
       deltaTotal = roundCurrency(deltaTotal + multDelta);
       const label = `${mods.matchedRuleNames[0]} (${mods.multiplier.toFixed(2)}×)`;
-      newSurcharges.push({
-        name: label,
-        amount: multDelta,
-        description: mods.auditDetails.join('; '),
-      });
+      if (multDelta < 0) {
+        newDiscounts.push({
+          name: label,
+          code: 'RULE_MULTIPLIER',
+          amount: Math.abs(multDelta),
+        });
+      } else {
+        newSurcharges.push({
+          name: label,
+          amount: multDelta,
+          description: mods.auditDetails.join('; '),
+        });
+      }
       lineItems.push({
         id: 'rule-multiplier',
         category: multDelta < 0 ? 'discount' : 'surcharge',
@@ -624,6 +683,41 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
         amount: multDelta,
         sourceType: 'rule',
       });
+    }
+  }
+
+  // 2b. Direct Rule Percentage / Flat Discounts (from fareAdjustment)
+  if (mods.discountPercent && mods.discountPercent > 0) {
+    const discAmt = Math.min(roundCurrency(currentBase * (mods.discountPercent / 100)), currentTotal);
+    if (discAmt > 0) {
+      const label = `${mods.matchedRuleNames[0]} (-${mods.discountPercent}%)`;
+      newDiscounts.push({ name: label, code: 'RULE_DISCOUNT_PCT', amount: discAmt });
+      lineItems.push({
+        id: 'rule-discount-pct',
+        category: 'discount',
+        label,
+        amount: -discAmt,
+        sourceType: 'rule',
+      });
+      currentTotal = roundCurrency(currentTotal - discAmt);
+      deltaTotal = roundCurrency(deltaTotal - discAmt);
+    }
+  }
+
+  if (mods.discountFlat && mods.discountFlat > 0) {
+    const discAmt = Math.min(roundCurrency(mods.discountFlat), currentTotal);
+    if (discAmt > 0) {
+      const label = `${mods.matchedRuleNames[0]} (-$${discAmt.toFixed(2)})`;
+      newDiscounts.push({ name: label, code: 'RULE_DISCOUNT_FLAT', amount: discAmt });
+      lineItems.push({
+        id: 'rule-discount-flat',
+        category: 'discount',
+        label,
+        amount: -discAmt,
+        sourceType: 'rule',
+      });
+      currentTotal = roundCurrency(currentTotal - discAmt);
+      deltaTotal = roundCurrency(deltaTotal - discAmt);
     }
   }
 
@@ -699,7 +793,7 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
     deltaTotal = roundCurrency(deltaTotal + fee);
   }
 
-  if (deltaTotal === 0 && newSurcharges.length === 0) {
+  if (deltaTotal === 0 && newSurcharges.length === 0 && newDiscounts.length === 0) {
     return context;
   }
 
@@ -709,6 +803,7 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
     baseFare: currentBase,
     subtotal: currentBase,
     surcharges: [...context.surcharges, ...newSurcharges],
+    discounts: [...context.discounts, ...newDiscounts],
     lineItems,
     totalFare: currentTotal,
     auditTrail: appendAudit(
@@ -723,137 +818,68 @@ export const applyRuleModifiers: PricingPipelineStep = (context) => {
 };
 
 // ----------------------------------------------------------------------------
-// STEP 6: Opt-In Admin Peak Demand Surge (Zero Hardcoded Automatic Surge)
+// STEP 6: Caller-Injected Legacy Surge Rules (Admin Peak Surge now runs cleanly in Step 8 Firewall)
 // ----------------------------------------------------------------------------
 export function createSurgeStep(
   rules: readonly SurgeRule[] = DEFAULT_SURGE_RULES
 ): PricingPipelineStep {
   return (context) => {
-    if (context.input.bypassSurge) {
-      return {
-        ...context,
-        surgeMultiplier: 1.0,
-        surgeDescription: 'Surge waived by dispatcher override',
-        auditTrail: appendAudit(
-          context.auditTrail,
-          4,
-          'Peak Demand Surge',
-          'Surge waived by dispatcher override (1.0x)',
-          0,
-          context.totalFare
-        ),
-      };
+    if (context.input.bypassSurge || rules.length === 0) {
+      return context;
     }
-
-    const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
-    if (matchedTariff && matchedTariff.allowSurgeMultiplier === false) {
-      return {
-        ...context,
-        surgeMultiplier: 1.0,
-        surgeDescription: `Surge exempt (${matchedTariff.name})`,
-        auditTrail: appendAudit(
-          context.auditTrail,
-          4,
-          'Peak Demand Surge',
-          `Surge exempt under tariff: ${matchedTariff.name}`,
-          0,
-          context.totalFare
-        ),
-      };
-    }
-
-    const surchargesCatalog = context.config.surchargesCatalog || DEFAULT_SURCHARGES_CONFIG;
-    const surgeTariffs = surchargesCatalog.surgeApplicableTariffs;
-    const matchesSurgeTariff =
-      !surgeTariffs ||
-      surgeTariffs.length === 0 ||
-      !context.tariffProfileId ||
-      surgeTariffs.includes(context.tariffProfileId);
 
     let activeMultiplier = 1.0;
     let surgeName = '';
 
-    // 1. Admin Surcharges Peak Surge Toggle (Primary authoritative switch)
-    if (
-      surchargesCatalog.isPeakSurgeActive &&
-      matchesSurgeTariff &&
-      typeof surchargesCatalog.peakSurgeMultiplier === 'number' &&
-      surchargesCatalog.peakSurgeMultiplier > 1.0
-    ) {
-      activeMultiplier = surchargesCatalog.peakSurgeMultiplier;
-      surgeName = `Peak Demand Surge (${activeMultiplier.toFixed(2)}×)`;
-    }
-
-    // 2. Explicit manual override if passed directly in configOverride
-    if (
-      typeof context.config.manualSurgeMultiplier === 'number' &&
-      context.config.manualSurgeMultiplier > activeMultiplier
-    ) {
-      activeMultiplier = context.config.manualSurgeMultiplier;
-      surgeName = `Active Surge Pricing (${activeMultiplier.toFixed(2)}×)`;
-    }
-
-    // 3. Optional caller-injected custom SurgeRule[] (DEFAULT_SURGE_RULES is empty)
-    if (rules.length > 0) {
-      const rawDate = context.input.pickupDateTime;
-      const pickupDate =
-        typeof rawDate === 'string'
-          ? new Date(rawDate)
-          : rawDate instanceof Date
-          ? rawDate
-          : new Date();
-      for (const rule of rules) {
-        if (rule.matches(pickupDate) && rule.multiplier > activeMultiplier) {
-          activeMultiplier = rule.multiplier;
-          surgeName = `${rule.name} (${activeMultiplier.toFixed(2)}×)`;
-        }
+    const rawDate = context.input.pickupDateTime;
+    const pickupDate =
+      typeof rawDate === 'string'
+        ? new Date(rawDate)
+        : rawDate instanceof Date
+        ? rawDate
+        : new Date();
+    for (const rule of rules) {
+      if (rule.matches(pickupDate) && rule.multiplier > activeMultiplier) {
+        activeMultiplier = rule.multiplier;
+        surgeName = `${rule.name} (${activeMultiplier.toFixed(2)}×)`;
       }
     }
 
     if (activeMultiplier <= 1.0) {
-      return {
-        ...context,
-        surgeMultiplier: 1.0,
-        auditTrail: appendAudit(
-          context.auditTrail,
-          4,
-          'Peak Demand Surge',
-          'No peak surge active (1.0x)',
-          0,
-          context.totalFare
-        ),
-      };
+      return context;
     }
 
     const baseAmount = context.tariffBaseSubtotal ?? context.subtotal;
     const delta = roundCurrency(baseAmount * (activeMultiplier - 1.0));
     const newTotal = roundCurrency(context.totalFare + delta);
 
-    const surgeSurcharge: SurchargeEntry = {
-      name: surgeName,
-      amount: delta,
-      description: `Admin peak demand surge (${activeMultiplier.toFixed(2)}× on $${baseAmount.toFixed(2)} base fare)`,
-    };
-
-    const surgeLineItem: PriceLineItem = {
-      id: 'peak-demand-surge',
-      category: 'surcharge',
-      label: surgeName,
-      amount: delta,
-      sourceType: 'surcharge',
-    };
-
     return {
       ...context,
       surgeMultiplier: activeMultiplier,
       surgeDescription: surgeName,
-      surcharges: [...context.surcharges, surgeSurcharge],
-      lineItems: [...context.lineItems, surgeLineItem],
+      surcharges: [
+        ...context.surcharges,
+        {
+          name: surgeName,
+          amount: delta,
+          description: `Custom surge rule (${activeMultiplier.toFixed(2)}× on $${baseAmount.toFixed(2)})`,
+        },
+      ],
+      lineItems: [
+        ...context.lineItems,
+        {
+          id: 'peak-demand-surge',
+          category: 'surcharge',
+          label: surgeName,
+          amount: delta,
+          sourceType: 'surcharge',
+        },
+      ],
       totalFare: newTotal,
       auditTrail: appendAudit(
         context.auditTrail,
         4,
-        'Peak Demand Surge',
+        'Custom Surge Rule',
         `${surgeName}: +$${delta.toFixed(2)}`,
         delta,
         newTotal
@@ -865,25 +891,25 @@ export function createSurgeStep(
 export const applySurgeMultiplier: PricingPipelineStep = createSurgeStep(DEFAULT_SURGE_RULES);
 
 // ----------------------------------------------------------------------------
-// STEP 7: Universal Customer Extras (Car Seats, Extra Pax, Stops, Oversized Cargo, Curb Wait, Custom Extras)
+// STEP 7: Universal Customer Extras & Curb Wait (Respects Firewall Rule Extra Directives)
 // ----------------------------------------------------------------------------
 export const applyConditionSurcharges: PricingPipelineStep = (context) => {
-  const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
-  if (matchedTariff && (matchedTariff as any).allowCustomerAddons === false) {
-    return context;
-  }
-
   const newSurcharges: SurchargeEntry[] = [];
   const newLineItems: PriceLineItem[] = [];
   const extras = context.config.universalExtras || DEFAULT_UNIVERSAL_EXTRAS;
   const overrules = context.overruleExtras || {};
+  const extraDirectives = context.resolvedExtraActions || {};
   let runningAdditions = 0;
 
   // 1. Child Safety Seats
   let carSeatFee = 0;
-  const carSeatRate = overrules.waiveCarSeatFee
-    ? 0
-    : overrules.carSeatFeePerUnit ?? extras.carSeatFeePerUnit;
+  const carSeatDir = extraDirectives.car_seat;
+  const carSeatRate =
+    carSeatDir?.action === 'waive' || overrules.waiveCarSeatFee
+      ? 0
+      : carSeatDir?.action === 'override' && typeof carSeatDir.overrideAmount === 'number'
+      ? carSeatDir.overrideAmount
+      : overrules.carSeatFeePerUnit ?? extras.carSeatFeePerUnit;
   if (carSeatRate > 0) {
     const breakdown = context.input.carSeatsBreakdown;
     const totalCarSeats = breakdown
@@ -913,10 +939,14 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
 
   // 2. Extra Passenger Allowance Fee
   let passengerSurcharge = 0;
+  const extraPaxDir = extraDirectives.extra_passenger;
   const allowance = overrules.passengerBaseAllowance ?? extras.passengerBaseAllowance;
-  const perHeadFee = overrules.waiveExtraPaxFee
-    ? 0
-    : overrules.extraPassengerFeePerHead ?? extras.extraPassengerFeePerHead;
+  const perHeadFee =
+    extraPaxDir?.action === 'waive' || overrules.waiveExtraPaxFee
+      ? 0
+      : extraPaxDir?.action === 'override' && typeof extraPaxDir.overrideAmount === 'number'
+      ? extraPaxDir.overrideAmount
+      : overrules.extraPassengerFeePerHead ?? extras.extraPassengerFeePerHead;
   const passengers = Math.max(0, context.input.passengers ?? 1);
   if (allowance !== undefined && perHeadFee > 0 && passengers > allowance) {
     const extraHeads = passengers - allowance;
@@ -941,7 +971,13 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
   // 3. Intermediate Waypoints / Stops
   const stopsCount = Math.max(0, context.input.intermediateStopsCount ?? 0);
   if (stopsCount > 0) {
-    const stopFeeRate = overrules.intermediateStopFee ?? extras.intermediateStopFee;
+    const stopDir = extraDirectives.intermediate_stop;
+    const stopFeeRate =
+      stopDir?.action === 'waive'
+        ? 0
+        : stopDir?.action === 'override' && typeof stopDir.overrideAmount === 'number'
+        ? stopDir.overrideAmount
+        : overrules.intermediateStopFee ?? extras.intermediateStopFee;
     if (context.input.waiveMultiStopFees || stopFeeRate === 0) {
       newSurcharges.push({
         name: `Intermediate Stops (${stopsCount} - Waived)`,
@@ -1004,8 +1040,9 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
     }
   }
 
-  // 5. Curb Waiting Delay Fee (reads canonical + legacy alias field names)
+  // 5. Curb Waiting Delay Fee (reads canonical + legacy alias field names + Firewall Extra Directive)
   const curbWaitMins = context.input.curbWaitMinutes ?? 0;
+  const curbDir = extraDirectives.curb_wait;
   const graceMins =
     overrules.curbWaitingGraceMinutes ??
     overrules.pickupGraceMinutes ??
@@ -1013,11 +1050,15 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
     extras.pickupGraceMinutes ??
     10;
   const curbRate =
-    overrules.curbWaitingRatePerMinute ??
-    overrules.waitingRatePerMinute ??
-    extras.curbWaitingRatePerMinute ??
-    extras.waitingRatePerMinute ??
-    0;
+    curbDir?.action === 'waive'
+      ? 0
+      : curbDir?.action === 'override' && typeof curbDir.overrideAmount === 'number'
+      ? curbDir.overrideAmount
+      : overrules.curbWaitingRatePerMinute ??
+        overrules.waitingRatePerMinute ??
+        extras.curbWaitingRatePerMinute ??
+        extras.waitingRatePerMinute ??
+        0;
   if (curbWaitMins > graceMins && curbRate > 0) {
     const billableMins = curbWaitMins - graceMins;
     const curbFee = roundCurrency(billableMins * curbRate);
@@ -1107,7 +1148,7 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
 };
 
 // ----------------------------------------------------------------------------
-// STEP 8: Operational & Conditional Surcharges, Discounts, Overrides & Rounding
+// STEP 8: Firewall Surcharges, Tolls, Discounts, Manual Override & Per-Rate Rounding
 // ----------------------------------------------------------------------------
 export function createSurchargesAndDiscountsStep(
   availableDiscounts: Record<string, DiscountRule> = DEFAULT_DISCOUNTS
@@ -1116,164 +1157,271 @@ export function createSurchargesAndDiscountsStep(
     const newSurcharges: SurchargeEntry[] = [];
     const newDiscounts: DiscountEntry[] = [];
     const newLineItems: PriceLineItem[] = [];
+    const surchargeDecisions: FirewallSurchargeTraceEntry[] = [];
     let currentTotal = context.totalFare;
+    let resolvedSurgeMultiplier = context.surgeMultiplier;
+    let resolvedSurgeDescription = context.surgeDescription;
     const tariffBase = context.tariffBaseSubtotal ?? context.subtotal;
 
-    const matchedTariff = context.config.tariffs?.find((t) => t.id === context.tariffProfileId);
-    const allowOperationalSurcharges = matchedTariff
-      ? matchedTariff.allowOperationalSurcharges !== false
-      : true;
-
     const surchargesCatalog = context.config.surchargesCatalog || DEFAULT_SURCHARGES_CONFIG;
-    const overrules = context.overruleSurcharges || {};
+    const catalogItems = getSurchargeCatalogItems(surchargesCatalog);
+    const directives = context.resolvedSurchargeActions || {};
+    const activeRules = (context.config.namedPricingRules || []).filter((r) => r.isActive);
 
-    // 1. Airport Commercial Access Fee
-    const airportFeeRate = overrules.waiveAirportFee
-      ? 0
-      : overrules.airportGateFee ?? surchargesCatalog.airportGateFee ?? 4.0;
-    const isAirport =
+    const isAirport = Boolean(
       context.input.isAirportPickup ||
-      context.input.isAirportDropoff ||
-      context.input.isAirportTrip ||
-      (context.input.originZoneId &&
-        surchargesCatalog.airportTargetZoneIds?.includes(context.input.originZoneId)) ||
-      (context.input.destinationZoneId &&
-        surchargesCatalog.airportTargetZoneIds?.includes(context.input.destinationZoneId));
-    const airportTariffs = surchargesCatalog.airportFeeApplicableTariffs;
-    const matchesAirportTariff =
-      !airportTariffs ||
-      airportTariffs.length === 0 ||
-      !context.tariffProfileId ||
-      airportTariffs.includes(context.tariffProfileId);
+        context.input.isAirportDropoff ||
+        context.input.isAirportTrip ||
+        (context.input.originZoneId &&
+          surchargesCatalog.airportTargetZoneIds?.includes(context.input.originZoneId)) ||
+        (context.input.destinationZoneId &&
+          surchargesCatalog.airportTargetZoneIds?.includes(context.input.destinationZoneId))
+    );
 
-    if (
-      isAirport &&
-      allowOperationalSurcharges &&
-      airportFeeRate > 0 &&
-      matchesAirportTariff &&
-      !overrules.waiveAirportFee &&
-      !surchargesCatalog.waiveAirportFee
-    ) {
-      if (context.input.waiveAirportFee) {
+    // Helper: check if ANY active rule explicitly manages a surchargeId (if so, legacy auto-conditions stand down)
+    const isManagedByAnyRule = (surchargeId: string): boolean =>
+      activeRules.some((r) =>
+        r.modifier.surchargeActions?.some((a) => a.surchargeId === surchargeId)
+      );
+
+    // Helper: lossless zero-downtime fallback for unmigrated pre-v2 Firestore surcharges
+    const matchesLegacyAutoCondition = (
+      item: (typeof catalogItems)[number]
+    ): boolean => {
+      const legacy = item.legacyAutoCondition;
+      if (!legacy) return false;
+      if (legacy.kind === 'airport') {
+        return isAirport;
+      }
+      if (legacy.kind === 'remote_distance') {
+        const threshold = legacy.remoteThresholdMiles ?? 15.0;
+        return context.input.distanceMiles > threshold && !isAirport;
+      }
+      if (legacy.kind === 'custom_triggers' && legacy.customTriggers) {
+        const triggers = legacy.customTriggers;
+        const allowedVehicles = [
+          ...(triggers.vehicleTiers || []),
+          ...(triggers.vehicleTypes || []),
+        ].filter(Boolean);
+        if (allowedVehicles.length > 0) {
+          const ok = doesVehicleMatchAllowedList(
+            allowedVehicles,
+            {
+              vehicleTypeId: context.input.vehicleTypeId,
+              vehicleType: context.input.vehicleType,
+              vehicleTier: context.input.vehicleTier,
+              vehicleClass: context.input.vehicleClass,
+            },
+            { allowAnyDispatch: false }
+          );
+          if (!ok) return false;
+        }
+        if (
+          triggers.minDistanceMiles !== undefined &&
+          context.input.distanceMiles < triggers.minDistanceMiles
+        ) {
+          return false;
+        }
+        if (
+          triggers.maxDistanceMiles !== undefined &&
+          context.input.distanceMiles > triggers.maxDistanceMiles
+        ) {
+          return false;
+        }
+        if (triggers.timeWindow) {
+          if (!context.input.pickupDateTime) return false;
+          const tripDate = new Date(context.input.pickupDateTime);
+          const hour = tripDate.getHours();
+          const { startHour, endHour } = triggers.timeWindow;
+          if (startHour <= endHour) {
+            if (hour < startHour || hour >= endHour) return false;
+          } else {
+            if (hour < startHour && hour >= endHour) return false;
+          }
+        }
+        if (triggers.daysOfWeek && triggers.daysOfWeek.length > 0) {
+          if (!context.input.pickupDateTime) return false;
+          const tripDate = new Date(context.input.pickupDateTime);
+          if (!triggers.daysOfWeek.includes(tripDate.getDay())) return false;
+        }
+        if (triggers.zoneIds && triggers.zoneIds.length > 0) {
+          const allZones = new Set<string>([
+            ...(context.input.zoneIds || []),
+            ...(context.input.originZoneIds || []),
+            ...(context.input.destinationZoneIds || []),
+            ...(context.input.originZoneId ? [context.input.originZoneId] : []),
+            ...(context.input.destinationZoneId ? [context.input.destinationZoneId] : []),
+          ]);
+          if (!triggers.zoneIds.some((z) => allZones.has(z))) return false;
+        }
+        return true;
+      }
+      return false;
+    };
+
+    // 1. Evaluate every Surcharge in the Firewall Catalog
+    for (const item of catalogItems) {
+      // Master Kill Switch
+      if (!item.enabled) {
+        surchargeDecisions.push({
+          surchargeId: item.id,
+          surchargeName: item.name,
+          defaultPolicy: item.defaultPolicy,
+          status: 'disabled',
+          reason: 'Master switch disabled',
+          amount: 0,
+        });
+        continue;
+      }
+
+      // Explicit Dispatcher Overrides (Surge Bypass / Airport Waiver)
+      if (item.id === BUILTIN_SURCHARGE_IDS.PEAK_SURGE && context.input.bypassSurge) {
+        surchargeDecisions.push({
+          surchargeId: item.id,
+          surchargeName: item.name,
+          defaultPolicy: item.defaultPolicy,
+          status: 'waived',
+          reason: 'Bypassed by dispatcher override',
+          amount: 0,
+        });
+        continue;
+      }
+      if (item.id === BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS && context.input.waiveAirportFee) {
         newSurcharges.push({
-          name: 'Airport Commercial Access Fee (Waived)',
+          name: `${item.name} (Waived)`,
           amount: 0,
           description: 'Dispatcher waived airport access fee',
         });
+        surchargeDecisions.push({
+          surchargeId: item.id,
+          surchargeName: item.name,
+          defaultPolicy: item.defaultPolicy,
+          status: 'waived',
+          reason: 'Waived by dispatcher override',
+          amount: 0,
+        });
+        continue;
+      }
+
+      // Firewall Policy Resolution: Highest-priority Rule Directive -> Default Policy -> Legacy Migration Fallback
+      const directive = directives[item.id];
+      let shouldApply = false;
+      let decisionReason = '';
+      let effectiveMode = item.mode;
+      let effectiveAmount = item.amount;
+
+      if (directive) {
+        if (directive.action === 'waive') {
+          surchargeDecisions.push({
+            surchargeId: item.id,
+            surchargeName: item.name,
+            defaultPolicy: item.defaultPolicy,
+            status: 'waived',
+            reason: `Waived by Rule "${directive.sourceRuleName}" (P${directive.sourcePriority})`,
+            amount: 0,
+          });
+          continue;
+        }
+        shouldApply = true;
+        if (directive.action === 'override') {
+          if (typeof directive.overrideAmount === 'number') {
+            effectiveAmount = directive.overrideAmount;
+          }
+          if (directive.overrideMode) {
+            effectiveMode = directive.overrideMode;
+          }
+          decisionReason = `Overridden by Rule "${directive.sourceRuleName}" (P${directive.sourcePriority})`;
+        } else {
+          decisionReason = `Applied by Rule "${directive.sourceRuleName}" (P${directive.sourcePriority})`;
+        }
+      } else if (item.defaultPolicy === 'universal') {
+        shouldApply = true;
+        decisionReason = 'Universal (Applies to all rides by default)';
       } else {
-        const airportFee = roundCurrency(airportFeeRate);
+        // defaultPolicy === 'rule_only'
+        if (
+          surchargesCatalog.catalogVersion !== 2 &&
+          item.legacyAutoCondition &&
+          !isManagedByAnyRule(item.id) &&
+          matchesLegacyAutoCondition(item)
+        ) {
+          shouldApply = true;
+          decisionReason = 'Legacy auto-condition (unmigrated Firestore doc)';
+        } else {
+          surchargeDecisions.push({
+            surchargeId: item.id,
+            surchargeName: item.name,
+            defaultPolicy: item.defaultPolicy,
+            status: 'skipped',
+            reason: 'Rule-Only (no matching rule applied it)',
+            amount: 0,
+          });
+          continue;
+        }
+      }
+
+      if (!shouldApply) continue;
+
+      let fee = 0;
+      let detail: string | undefined;
+      if (effectiveMode === 'multiplier') {
+        if (effectiveAmount > 1.0) {
+          fee = roundCurrency(tariffBase * (effectiveAmount - 1.0));
+          detail = `${effectiveAmount.toFixed(2)}× of base fare`;
+          if (item.id === BUILTIN_SURCHARGE_IDS.PEAK_SURGE) {
+            resolvedSurgeMultiplier = effectiveAmount;
+            resolvedSurgeDescription = `${item.name} (${effectiveAmount.toFixed(2)}×)`;
+          }
+        }
+      } else if (effectiveMode === 'per_mile') {
+        fee = roundCurrency(effectiveAmount * context.input.distanceMiles);
+        detail = `$${effectiveAmount.toFixed(2)}/mi × ${context.input.distanceMiles.toFixed(1)} mi`;
+      } else if (effectiveMode === 'percent') {
+        fee = roundCurrency(tariffBase * (effectiveAmount / 100));
+        detail = `${effectiveAmount}% of base fare`;
+      } else {
+        fee = roundCurrency(effectiveAmount);
+      }
+
+      if (fee > 0) {
+        const displayLabel =
+          effectiveMode === 'multiplier' ? `${item.name} (${effectiveAmount.toFixed(2)}×)` : item.name;
         newSurcharges.push({
-          name: 'Airport Commercial Access Fee',
-          amount: airportFee,
-          description: 'Airport commercial terminal access pass-through fee',
+          name: displayLabel,
+          amount: fee,
+          description: detail || item.description || decisionReason,
         });
         newLineItems.push({
-          id: 'surcharge-airport',
+          id: item.id,
           category: 'surcharge',
-          label: 'Airport Commercial Access Fee',
-          amount: airportFee,
+          label: displayLabel,
+          detail,
+          amount: fee,
           sourceType: 'surcharge',
+          sourceId: item.id,
         });
-        currentTotal = roundCurrency(currentTotal + airportFee);
+        currentTotal = roundCurrency(currentTotal + fee);
+        surchargeDecisions.push({
+          surchargeId: item.id,
+          surchargeName: item.name,
+          defaultPolicy: item.defaultPolicy,
+          status: 'applied',
+          reason: decisionReason,
+          amount: fee,
+        });
+      } else {
+        surchargeDecisions.push({
+          surchargeId: item.id,
+          surchargeName: item.name,
+          defaultPolicy: item.defaultPolicy,
+          status: 'skipped',
+          reason: `${decisionReason} (amount resolved to $0.00)`,
+          amount: 0,
+        });
       }
     }
 
-    // 2. Built-In Fuel / Gas Surcharge
-    const isFuelActive =
-      overrules.isFuelSurchargeActive ?? surchargesCatalog.isFuelSurchargeActive ?? false;
-    const waiveFuel = overrules.waiveFuelSurcharge ?? surchargesCatalog.waiveFuelSurcharge ?? false;
-    const fuelAmount = overrules.fuelSurchargeAmount ?? surchargesCatalog.fuelSurchargeAmount ?? 0;
-    const fuelType = overrules.fuelSurchargeType ?? surchargesCatalog.fuelSurchargeType ?? 'flat';
-    const fuelTariffs = surchargesCatalog.fuelSurchargeApplicableTariffs;
-    const explicitlyTargetsFuelTariff = Boolean(
-      fuelTariffs &&
-        fuelTariffs.length > 0 &&
-        context.tariffProfileId &&
-        fuelTariffs.includes(context.tariffProfileId)
-    );
-    const matchesFuelTariff =
-      !fuelTariffs ||
-      fuelTariffs.length === 0 ||
-      !context.tariffProfileId ||
-      explicitlyTargetsFuelTariff;
-
-    if (
-      isFuelActive &&
-      !waiveFuel &&
-      (allowOperationalSurcharges || explicitlyTargetsFuelTariff) &&
-      fuelAmount > 0 &&
-      matchesFuelTariff
-    ) {
-      const fuelFee =
-        fuelType === 'per_mile'
-          ? roundCurrency(fuelAmount * context.input.distanceMiles)
-          : fuelType === 'percent'
-          ? roundCurrency(tariffBase * (fuelAmount / 100))
-          : roundCurrency(fuelAmount);
-
-      if (fuelFee > 0) {
-        const fuelDesc =
-          fuelType === 'per_mile'
-            ? `$${fuelAmount.toFixed(2)}/mi × ${context.input.distanceMiles.toFixed(1)} mi`
-            : fuelType === 'percent'
-            ? `${fuelAmount}% of base fare`
-            : 'Flat fuel surcharge';
-        newSurcharges.push({
-          name: 'Fuel / Gas Surcharge',
-          amount: fuelFee,
-          description: fuelDesc,
-        });
-        newLineItems.push({
-          id: 'surcharge-fuel',
-          category: 'surcharge',
-          label: 'Fuel / Gas Surcharge',
-          detail: fuelType !== 'flat' ? fuelDesc : undefined,
-          amount: fuelFee,
-          sourceType: 'surcharge',
-        });
-        currentTotal = roundCurrency(currentTotal + fuelFee);
-      }
-    }
-
-    // 3. Out-of-Area Remote Service Surcharge
-    const remoteThreshold = surchargesCatalog.outOfAreaThresholdMiles ?? 15.0;
-    const remoteFeeRate = overrules.waiveRemoteFee
-      ? 0
-      : overrules.outOfAreaRemoteFee ?? surchargesCatalog.outOfAreaRemoteFee ?? 0;
-    const isAirportTrip = isAirport || context.tariffProfileId === 'tariff-airport-flat';
-    const remoteTariffs = surchargesCatalog.remoteFeeApplicableTariffs;
-    const matchesRemoteTariff =
-      !remoteTariffs ||
-      remoteTariffs.length === 0 ||
-      !context.tariffProfileId ||
-      remoteTariffs.includes(context.tariffProfileId);
-
-    if (
-      context.input.distanceMiles > remoteThreshold &&
-      remoteFeeRate > 0 &&
-      allowOperationalSurcharges &&
-      matchesRemoteTariff &&
-      !isAirportTrip &&
-      !overrules.waiveRemoteFee &&
-      !surchargesCatalog.waiveRemoteFee
-    ) {
-      const remoteFee = roundCurrency(remoteFeeRate);
-      newSurcharges.push({
-        name: 'Out-of-Area Remote Service Fee',
-        amount: remoteFee,
-        description: `Exceeds ${remoteThreshold} mi regional boundary`,
-      });
-      newLineItems.push({
-        id: 'surcharge-remote',
-        category: 'surcharge',
-        label: 'Out-of-Area Service Fee',
-        amount: remoteFee,
-        sourceType: 'surcharge',
-      });
-      currentTotal = roundCurrency(currentTotal + remoteFee);
-    }
-
-    // 4. Tolls & Highway Surcharge
+    // 2. Tolls & Highway Surcharge
     const tollAmount =
       context.input.tolls ?? context.input.customTollsOrFees ?? context.config.defaultTolls ?? 0;
     if (tollAmount > 0) {
@@ -1293,119 +1441,7 @@ export function createSurchargesAndDiscountsStep(
       currentTotal = roundCurrency(currentTotal + tollFee);
     }
 
-    // 5. Custom Conditional Surcharges (Vehicle Tier Upgrades, Time Windows, Distance, Days, Zones)
-    if (surchargesCatalog.customSurcharges && surchargesCatalog.customSurcharges.length > 0) {
-      for (const custom of surchargesCatalog.customSurcharges) {
-        if (!custom.isActive) continue;
-
-        // Applicable tariffs check
-        if (custom.applicableTariffIds && custom.applicableTariffIds.length > 0) {
-          if (context.tariffProfileId && !custom.applicableTariffIds.includes(context.tariffProfileId)) {
-            continue;
-          }
-        }
-
-        const triggers = custom.triggers;
-        const allowedVehicles = [
-          ...(triggers?.vehicleTiers || []),
-          ...(triggers?.vehicleTypes || []),
-          ...(custom.applicableVehicleTypes || []),
-        ].filter(Boolean);
-
-        if (allowedVehicles.length > 0) {
-          const matchesVehicle = doesVehicleMatchAllowedList(
-            allowedVehicles,
-            {
-              vehicleTypeId: context.input.vehicleTypeId,
-              vehicleType: context.input.vehicleType,
-              vehicleTier: context.input.vehicleTier,
-              vehicleClass: context.input.vehicleClass,
-            },
-            { allowAnyDispatch: false }
-          );
-          if (!matchesVehicle) continue;
-        }
-
-        if (triggers) {
-          if (
-            triggers.minDistanceMiles !== undefined &&
-            context.input.distanceMiles < triggers.minDistanceMiles
-          ) {
-            continue;
-          }
-          if (
-            triggers.maxDistanceMiles !== undefined &&
-            context.input.distanceMiles > triggers.maxDistanceMiles
-          ) {
-            continue;
-          }
-
-          if (triggers.timeWindow && context.input.pickupDateTime) {
-            const tripDate = new Date(context.input.pickupDateTime);
-            const hour = tripDate.getHours();
-            const { startHour, endHour } = triggers.timeWindow;
-            if (startHour <= endHour) {
-              if (hour < startHour || hour >= endHour) continue;
-            } else {
-              if (hour < startHour && hour >= endHour) continue;
-            }
-          }
-
-          if (
-            triggers.daysOfWeek &&
-            triggers.daysOfWeek.length > 0 &&
-            context.input.pickupDateTime
-          ) {
-            const tripDate = new Date(context.input.pickupDateTime);
-            const day = tripDate.getDay();
-            if (!triggers.daysOfWeek.includes(day)) continue;
-          }
-
-          if (triggers.zoneIds && triggers.zoneIds.length > 0) {
-            const zoneMatches =
-              (context.input.originZoneId &&
-                triggers.zoneIds.includes(context.input.originZoneId)) ||
-              (context.input.destinationZoneId &&
-                triggers.zoneIds.includes(context.input.destinationZoneId)) ||
-              (context.input.zoneIds &&
-                context.input.zoneIds.some((z) => triggers.zoneIds?.includes(z)));
-            if (!zoneMatches) continue;
-          }
-        }
-
-        const fee =
-          custom.type === 'percent'
-            ? roundCurrency(tariffBase * (custom.amount / 100))
-            : custom.type === 'per_mile'
-            ? roundCurrency(custom.amount * context.input.distanceMiles)
-            : roundCurrency(custom.amount);
-
-        if (fee > 0) {
-          newSurcharges.push({
-            name: custom.name,
-            amount: fee,
-            description: custom.description || `${custom.name}: $${fee.toFixed(2)}`,
-          });
-          newLineItems.push({
-            id: `surcharge-custom-${custom.id}`,
-            category: 'surcharge',
-            label: custom.name,
-            detail:
-              custom.type === 'percent'
-                ? `${custom.amount}%`
-                : custom.type === 'per_mile'
-                ? `$${custom.amount.toFixed(2)}/mi`
-                : undefined,
-            amount: fee,
-            sourceType: 'surcharge',
-            sourceId: custom.id,
-          });
-          currentTotal = roundCurrency(currentTotal + fee);
-        }
-      }
-    }
-
-    // 6. Dispatcher Courtesy / Corporate Percentage Discount
+    // 3. Dispatcher Courtesy / Corporate Percentage Discount
     let totalDiscountAmount = 0;
     if (
       typeof context.input.manualDiscountPercent === 'number' &&
@@ -1454,7 +1490,7 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 7. Promotional Discounts
+    // 4. Promotional Discounts
     if (context.input.promoCode) {
       const codeKey = context.input.promoCode.trim().toUpperCase();
       const discountRule = availableDiscounts[codeKey];
@@ -1487,12 +1523,26 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 8. Manual Fare Override (Dispatcher Override)
+    const updatedFirewallTrace = context.firewallTrace
+      ? {
+          ...context.firewallTrace,
+          surchargeDecisions,
+        }
+      : {
+          ruleDecisions: [],
+          selectedRateSource: context.tariffProfileId ? ('default' as const) : ('default' as const),
+          surchargeDecisions,
+        };
+
+    // 5. Manual Fare Override (Dispatcher Override — clears contradictory itemized surcharges/discounts)
     if (
       typeof context.input.manualFareOverride === 'number' &&
       context.input.manualFareOverride >= 0
     ) {
-      const overrideFare = Math.ceil(context.input.manualFareOverride);
+      const overrideFare = applyFareRounding(
+        context.input.manualFareOverride,
+        context.rateRounding?.fareMode ?? 'ceil_dollar'
+      );
       const overrideLines: PriceLineItem[] = [
         {
           id: 'base-fare',
@@ -1507,11 +1557,12 @@ export function createSurchargesAndDiscountsStep(
         ...context,
         tariffBaseSubtotal: overrideFare,
         baseFare: overrideFare,
-        surcharges: [...context.surcharges, ...newSurcharges],
-        discounts: [...context.discounts, ...newDiscounts],
+        surcharges: [],
+        discounts: [],
         lineItems: overrideLines,
         subtotal: overrideFare,
         totalFare: overrideFare,
+        firewallTrace: updatedFirewallTrace,
         auditTrail: appendAudit(
           context.auditTrail,
           6,
@@ -1523,7 +1574,7 @@ export function createSurchargesAndDiscountsStep(
       };
     }
 
-    // 9. Legacy Minimum Fare Floor (ONLY if no active Tariff Profile priced the trip)
+    // 6. Legacy Minimum Fare Floor (ONLY if no active Rate Profile priced the trip)
     if (!context.tariffProfileId) {
       const minFare = context.config.minimumFare;
       if (currentTotal < minFare) {
@@ -1544,18 +1595,25 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 10. Ceiling Dollar Rounding (only when percentage fees/discounts leave fractional cents)
-    const ceilFare = Math.ceil(currentTotal);
-    if (ceilFare > currentTotal) {
-      const roundingAdj = roundCurrency(ceilFare - currentTotal);
+    // 7. Per-Rate Final Fare Rounding Policy (exact_cents | nearest_half_dollar | nearest_dollar | ceil_dollar)
+    const fareRoundingMode = context.rateRounding?.fareMode ?? 'ceil_dollar';
+    const roundedFare = applyFareRounding(currentTotal, fareRoundingMode);
+    const roundingAdj = roundCurrency(roundedFare - currentTotal);
+    if (roundingAdj !== 0) {
       newLineItems.push({
         id: 'rounding-dollar',
         category: 'rounding',
         label: 'Rounding',
+        detail:
+          fareRoundingMode === 'ceil_dollar'
+            ? 'Round up to whole dollar'
+            : fareRoundingMode === 'nearest_dollar'
+            ? 'Nearest dollar'
+            : 'Nearest $0.50',
         amount: roundingAdj,
         sourceType: 'rounding',
       });
-      currentTotal = ceilFare;
+      currentTotal = roundedFare;
     }
 
     const finalFare = roundCurrency(currentTotal);
@@ -1563,15 +1621,18 @@ export function createSurchargesAndDiscountsStep(
 
     return {
       ...context,
+      surgeMultiplier: resolvedSurgeMultiplier,
+      surgeDescription: resolvedSurgeDescription,
       surcharges: [...context.surcharges, ...newSurcharges],
       discounts: [...context.discounts, ...newDiscounts],
       lineItems: [...context.lineItems, ...newLineItems],
       totalFare: finalFare,
+      firewallTrace: updatedFirewallTrace,
       auditTrail: appendAudit(
         context.auditTrail,
         6,
-        'Surcharges & Discounts',
-        `Applied ${newSurcharges.length} surcharge(s) and ${newDiscounts.length} discount(s) -> Final Total $${finalFare.toFixed(2)}`,
+        'Surcharges, Discounts & Rounding',
+        `Applied ${surchargeDecisions.filter((d) => d.status === 'applied').length} surcharge(s) and ${newDiscounts.length} discount(s) (${fareRoundingMode}) -> Final Total $${finalFare.toFixed(2)}`,
         delta,
         finalFare
       ),

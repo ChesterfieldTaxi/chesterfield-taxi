@@ -122,7 +122,33 @@ export interface UniversalExtrasConfig {
   }>;
 }
 
+export type SurchargeDefaultPolicy = 'universal' | 'rule_only';
+export type SurchargeCalcMode = 'flat' | 'per_mile' | 'percent' | 'multiplier';
+
+export interface SurchargeCatalogItem {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean; // Master kill switch: false = never applies
+  defaultPolicy: SurchargeDefaultPolicy; // 'universal' (Allow by default) | 'rule_only' (Deny by default)
+  mode: SurchargeCalcMode;
+  amount: number; // $ for flat/per_mile, % for percent, multiplier (e.g. 1.25) for multiplier
+  isBuiltIn?: boolean;
+  /** Legacy migration metadata (only used if pre-v2 Firestore doc has no matching Rule yet) */
+  legacyAutoCondition?: {
+    kind: 'airport' | 'remote_distance' | 'custom_triggers';
+    remoteThresholdMiles?: number;
+    airportZoneIds?: string[];
+    customTriggers?: CustomSurchargeTrigger;
+  };
+}
+
 export interface SurchargesConfig {
+  /** Version 2 firewall catalog schema */
+  catalogVersion?: number;
+  items?: SurchargeCatalogItem[];
+
+  // Legacy fields retained for lossless read-time migration & backward compatibility
   airportGateFee: number; // $4.00
   airportCommercialGateFee?: number; // alias
   airportTargetZoneIds?: string[]; // e.g. ['zone-lambert-airport', 'zone-spirit-airport']
@@ -178,7 +204,14 @@ export interface CustomSurchargeItem {
   triggers?: CustomSurchargeTrigger;
 }
 
+export type RuleZoneMatchMode = 'any_end' | 'pickup_only' | 'dropoff_only' | 'corridor';
+
 export interface PricingRuleTrigger {
+  zoneMatchMode?: RuleZoneMatchMode;
+  pickupZoneIds?: string[];
+  dropoffZoneIds?: string[];
+  isAirportOnly?: boolean;
+  isHourlyBooking?: boolean;
   zoneIds?: string[];
   zoneGroupIds?: string[];
   locationCollectionIds?: string[];
@@ -208,17 +241,42 @@ export interface RuleSurchargeAdder {
   type: 'flat' | 'percent';
 }
 
+export interface RuleSurchargeAction {
+  surchargeId: string;
+  action: 'apply' | 'waive' | 'override';
+  overrideAmount?: number;
+  overrideMode?: SurchargeCalcMode;
+}
+
+export type RuleExtraTarget = 'car_seat' | 'extra_passenger' | 'intermediate_stop' | 'curb_wait';
+
+export interface RuleExtraAction {
+  extraKey: RuleExtraTarget;
+  action: 'waive' | 'override';
+  overrideAmount?: number;
+}
+
+export interface RuleFareAdjustment {
+  type: 'flat_override' | 'discount_percent' | 'discount_flat' | 'multiplier';
+  value: number;
+}
+
 export interface PricingRuleModifier {
   type: 'flat_override' | 'multiplier' | 'surcharge_flat' | 'surcharge_percent' | 'base_override' | 'apply_tariff';
   value: number;
-  targetTariffId?: string; // Applied Tariff Profile ID (e.g. Airport Flat Rate)
+  targetTariffId?: string; // Applied Rate Profile ID (e.g. Airport Flat Rate)
+  /** Firewall-style per-surcharge directives (APPLY / WAIVE / OVERRIDE) */
+  surchargeActions?: RuleSurchargeAction[];
+  /** Per-extra directives (WAIVE / OVERRIDE) */
+  extraActions?: RuleExtraAction[];
+  /** Optional direct base-fare adjustment */
+  fareAdjustment?: RuleFareAdjustment;
   baseFareOverride?: number;
   perMileRateOverride?: number;
   perMinuteRateOverride?: number;
   surchargeAdders?: RuleSurchargeAdder[];
-  // Overrule Universal Extras for this rule
+  // Legacy overrules (translated automatically to extraActions / surchargeActions)
   overruleExtras?: Partial<UniversalExtrasConfig>;
-  // Overrule Surcharges for this rule (e.g. Waive airport fee)
   overruleSurcharges?: Partial<SurchargesConfig>;
   // Layering
   layerZoneFee?: number;

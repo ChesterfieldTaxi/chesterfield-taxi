@@ -1,1244 +1,668 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { SurchargesConfig, CustomSurchargeItem, CustomSurchargeTrigger, VehicleTierConfig } from '~/core/types/config';
-import type { TariffProfile } from '~/core/types/tariff';
-import type { ZoneGeofence } from '~/core/types/zone';
-import { getAdminConfigService } from '~/core/services/config/admin-config.service';
-import { getTariffService, DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
-import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
+import type {
+  SurchargesConfig,
+  SurchargeCatalogItem,
+  SurchargeCalcMode,
+  SurchargeDefaultPolicy,
+  NamedPricingRule,
+} from '~/core/types/config';
+import { getSurchargeCatalogItems } from '~/core/services/pricing/surcharges.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
 import {
   ZapIcon,
   ShieldCheckIcon,
-  ClockIcon,
-  MapPinIcon,
   CheckIcon,
   PlusIcon,
   TrashIcon,
   EditIcon,
+  AlertTriangleIcon,
   SlidersIcon,
 } from '~/components/ui/Icons';
 
 export interface SurchargesPanelProps {
   surcharges: SurchargesConfig;
-  tariffs: TariffProfile[];
-  vehicles?: VehicleTierConfig[];
+  rules?: NamedPricingRule[];
   onSave: (updated: SurchargesConfig) => Promise<void>;
+  onDraftChange?: (draft: SurchargesConfig | null) => void;
+  onNavigateToRule?: (ruleId?: string) => void;
+  onMigrateLegacyToFirewall?: () => Promise<void>;
   isSaving?: boolean;
 }
 
-const FALLBACK_VEHICLES = [
-  { id: 'sedan', label: 'Executive Sedan' },
-  { id: 'suv', label: 'SUV (XL)' },
-  { id: 'minivan', label: 'Minivan' },
-  { id: 'van', label: 'Van / Shuttle' },
-  { id: 'wheelchair', label: 'WAV Wheelchair' },
-];
+function formatAmountBadge(item: SurchargeCatalogItem): string {
+  if (item.mode === 'multiplier') return `${item.amount.toFixed(2)}×`;
+  if (item.mode === 'percent') return `+${item.amount}%`;
+  if (item.mode === 'per_mile') return `+$${item.amount.toFixed(2)}/mi`;
+  return `+$${item.amount.toFixed(2)}`;
+}
 
 export function SurchargesPanel({
   surcharges,
-  tariffs,
-  vehicles,
+  rules = [],
   onSave,
+  onDraftChange,
+  onNavigateToRule,
+  onMigrateLegacyToFirewall,
   isSaving = false,
 }: SurchargesPanelProps) {
-  const activeTariffs = useMemo(() => {
-    const fromProps = (tariffs || []).filter((t) => !t.isArchived);
-    if (fromProps.length > 0) return fromProps;
-    try {
-      const fromSvc = getTariffService().getAllTariffProfiles().filter((t) => !t.isArchived);
-      if (fromSvc.length > 0) return fromSvc;
-    } catch {
-      // Ignore fallback errors
-    }
-    return DEFAULT_TARIFF_PROFILES;
-  }, [tariffs]);
-
-  const activeVehicles = useMemo(() => {
-    let source = vehicles;
-    if (!source || source.length === 0) {
-      try {
-        source = getAdminConfigService().getCachedSettings()?.vehicles;
-      } catch {
-        source = [];
-      }
-    }
-    if (source && source.length > 0) {
-      return source
-        .filter((v) => !v.isArchived)
-        .map((v) => ({
-          id: v.id,
-          label: v.name || v.id,
-        }));
-    }
-    return FALLBACK_VEHICLES;
-  }, [vehicles]);
-
-  const normalizeConfig = (cfg: SurchargesConfig): SurchargesConfig => {
-    const copy = JSON.parse(JSON.stringify(cfg));
-    const validIds = new Set(activeTariffs.map((t) => t.id));
-    const filterToActiveTariffs = (ids: string[] | undefined, fallbackIds: string[]) => {
-      const source = Array.isArray(ids) ? ids : fallbackIds;
-      const cleaned = source.filter((id) => validIds.has(id));
-      return cleaned;
-    };
-
-    copy.airportGateFee = copy.airportGateFee ?? copy.airportCommercialGateFee ?? 4.0;
-    copy.airportCommercialGateFee = copy.airportGateFee;
-    copy.airportFeeApplicableTariffs = filterToActiveTariffs(copy.airportFeeApplicableTariffs, [
-      'tariff-airport-flat',
-    ]);
-    copy.peakSurgeMultiplier = copy.peakSurgeMultiplier ?? 1.25;
-    copy.surgeApplicableTariffs = filterToActiveTariffs(
-      copy.surgeApplicableTariffs,
-      activeTariffs.map((t) => t.id)
-    );
-    copy.outOfAreaRemoteFee = copy.outOfAreaRemoteFee ?? copy.remoteServiceFlatFee ?? 15.0;
-    copy.remoteServiceFlatFee = copy.outOfAreaRemoteFee;
-    copy.outOfAreaThresholdMiles = copy.outOfAreaThresholdMiles ?? copy.remoteBoundaryDistanceMiles ?? 15.0;
-    copy.remoteBoundaryDistanceMiles = copy.outOfAreaThresholdMiles;
-    copy.remoteFeeApplicableTariffs = filterToActiveTariffs(
-      copy.remoteFeeApplicableTariffs,
-      activeTariffs.map((t) => t.id)
-    );
-    copy.cancellationFeeWithinOneHour = copy.cancellationFeeWithinOneHour ?? copy.cancellationFee ?? 28.0;
-    copy.cancellationFee = copy.cancellationFeeWithinOneHour;
-    copy.cancellationWindowMinutes = copy.cancellationWindowMinutes ?? 60;
-    copy.noShowFee = copy.noShowFee ?? 28.0;
-    copy.isFuelSurchargeActive = copy.isFuelSurchargeActive ?? false;
-    copy.fuelSurchargeType = copy.fuelSurchargeType ?? 'flat';
-    copy.fuelSurchargeAmount = copy.fuelSurchargeAmount ?? 2.5;
-    copy.fuelSurchargeApplicableTariffs = filterToActiveTariffs(
-      copy.fuelSurchargeApplicableTariffs,
-      activeTariffs.map((t) => t.id)
-    );
-    return copy;
-  };
-
-  const [workingCopy, setWorkingCopy] = useState<SurchargesConfig>(() =>
-    normalizeConfig(surcharges)
+  const initialItems = useMemo(() => getSurchargeCatalogItems(surcharges), [surcharges]);
+  const [items, setItems] = useState<SurchargeCatalogItem[]>(() =>
+    JSON.parse(JSON.stringify(initialItems))
   );
-
-  useEffect(() => {
-    setWorkingCopy(normalizeConfig(surcharges));
-  }, [surcharges, activeTariffs]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Custom Surcharge Editor Modal State
+  // Add / Edit Surcharge Modal State (pure catalog definition — zero triggers/tariffs!)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formAmount, setFormAmount] = useState<number>(10.0);
-  const [formType, setFormType] = useState<'flat' | 'percent' | 'per_mile'>('flat');
-  const [formIsActive, setFormIsActive] = useState(true);
-  const [formTariffs, setFormTariffs] = useState<string[]>([]);
-  const [formVehicleTiers, setFormVehicleTiers] = useState<string[]>([]);
-  const [formDaysOfWeek, setFormDaysOfWeek] = useState<number[]>([]);
-  const [formZoneIds, setFormZoneIds] = useState<string[]>([]);
-  const [formMinDistance, setFormMinDistance] = useState<string>('');
-  const [formMaxDistance, setFormMaxDistance] = useState<string>('');
-  const [formHasTimeWindow, setFormHasTimeWindow] = useState(false);
-  const [formStartHour, setFormStartHour] = useState<number>(22);
-  const [formEndHour, setFormEndHour] = useState<number>(5);
-
-  const [availableZones, setAvailableZones] = useState<ZoneGeofence[]>(() => {
-    try {
-      const z = getZoneService().getActiveZones();
-      return z.length > 0 ? z : DEFAULT_ZONES;
-    } catch {
-      return DEFAULT_ZONES;
-    }
-  });
+  const [formMode, setFormMode] = useState<SurchargeCalcMode>('flat');
+  const [formAmount, setFormAmount] = useState<number>(10);
+  const [formPolicy, setFormPolicy] = useState<SurchargeDefaultPolicy>('rule_only');
+  const [formEnabled, setFormEnabled] = useState<boolean>(true);
 
   useEffect(() => {
-    try {
-      const unsub = getZoneService().subscribeToZones((zones) => {
-        const active = zones.filter((z) => z.isActive && !z.isArchived);
-        if (active.length > 0) setAvailableZones(active);
-      });
-      return () => unsub();
-    } catch {
-      return undefined;
-    }
-  }, []);
+    setItems(JSON.parse(JSON.stringify(getSurchargeCatalogItems(surcharges))));
+  }, [surcharges]);
 
-  const handleOpenCreate = () => {
+  const isDirty = useMemo(
+    () => JSON.stringify(items) !== JSON.stringify(initialItems),
+    [items, initialItems]
+  );
+
+  // Push live unsaved draft to workspace simulator
+  useEffect(() => {
+    if (!isDirty) {
+      onDraftChange?.(null);
+      return;
+    }
+    onDraftChange?.({
+      ...surcharges,
+      catalogVersion: 2,
+      items,
+    });
+  }, [items, isDirty, surcharges, onDraftChange]);
+
+  // Index rule directives per surchargeId for live firewall visibility
+  const ruleRefsBySurcharge = useMemo(() => {
+    const map: Record<
+      string,
+      Array<{ ruleId: string; ruleName: string; priority: number; isActive: boolean; action: string; detail?: string }>
+    > = {};
+
+    for (const rule of rules) {
+      for (const act of rule.modifier?.surchargeActions || []) {
+        if (!map[act.surchargeId]) map[act.surchargeId] = [];
+        let detail: string | undefined;
+        if (act.action === 'override' && typeof act.overrideAmount === 'number') {
+          detail =
+            act.overrideMode === 'multiplier'
+              ? `${act.overrideAmount.toFixed(2)}×`
+              : act.overrideMode === 'percent'
+              ? `${act.overrideAmount}%`
+              : act.overrideMode === 'per_mile'
+              ? `$${act.overrideAmount.toFixed(2)}/mi`
+              : `$${act.overrideAmount.toFixed(2)}`;
+        }
+        map[act.surchargeId].push({
+          ruleId: rule.id,
+          ruleName: rule.name,
+          priority: rule.priority,
+          isActive: rule.isActive,
+          action: act.action,
+          detail,
+        });
+      }
+    }
+    return map;
+  }, [rules]);
+
+  const updateItem = (id: string, patch: Partial<SurchargeCatalogItem>) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  };
+
+  const handleSaveAll = async () => {
+    await onSave({
+      ...surcharges,
+      catalogVersion: 2,
+      items,
+    });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const openAddModal = () => {
     setEditingId(null);
     setFormName('');
     setFormDescription('');
-    setFormAmount(5.0);
-    setFormType('flat');
-    setFormIsActive(true);
-    setFormTariffs(activeTariffs.map((t) => t.id));
-    setFormVehicleTiers([]); // Empty = Applies to ALL Vehicle Tiers by default
-    setFormDaysOfWeek([]);
-    setFormZoneIds([]);
-    setFormMinDistance('');
-    setFormMaxDistance('');
-    setFormHasTimeWindow(false);
-    setFormStartHour(22);
-    setFormEndHour(5);
+    setFormMode('flat');
+    setFormAmount(10);
+    setFormPolicy('rule_only');
+    setFormEnabled(true);
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (item: CustomSurchargeItem) => {
+  const openEditModal = (item: SurchargeCatalogItem) => {
     setEditingId(item.id);
     setFormName(item.name);
     setFormDescription(item.description || '');
+    setFormMode(item.mode);
     setFormAmount(item.amount);
-    setFormType(item.type);
-    setFormIsActive(item.isActive);
-    const activeIds = activeTariffs.map((t) => t.id);
-    const itemTariffs = (item.applicableTariffIds || activeIds).filter((id) => activeIds.includes(id));
-    setFormTariffs(itemTariffs.length > 0 ? itemTariffs : activeIds);
-    setFormVehicleTiers(item.triggers?.vehicleTiers || item.triggers?.vehicleTypes || item.applicableVehicleTypes || []);
-    setFormDaysOfWeek(item.triggers?.daysOfWeek || []);
-    setFormZoneIds(item.triggers?.zoneIds || []);
-    setFormMinDistance(item.triggers?.minDistanceMiles !== undefined ? String(item.triggers.minDistanceMiles) : '');
-    setFormMaxDistance(item.triggers?.maxDistanceMiles !== undefined ? String(item.triggers.maxDistanceMiles) : '');
-    if (item.triggers?.timeWindow) {
-      setFormHasTimeWindow(true);
-      setFormStartHour(item.triggers.timeWindow.startHour);
-      setFormEndHour(item.triggers.timeWindow.endHour);
-    } else {
-      setFormHasTimeWindow(false);
-      setFormStartHour(22);
-      setFormEndHour(5);
-    }
+    setFormPolicy(item.defaultPolicy);
+    setFormEnabled(item.enabled);
     setIsModalOpen(true);
   };
 
-  const persistImmediately = async (nextConfig: SurchargesConfig) => {
-    const normalized = normalizeConfig(nextConfig);
-    setWorkingCopy(normalized);
-    await onSave(normalized);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
-
-  const handleSaveModal = async (e: React.FormEvent) => {
+  const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
-    const triggers: CustomSurchargeTrigger = {};
-    if (formVehicleTiers.length > 0) {
-      // Save exact selected Admin Vehicle IDs with zero alias pollution
-      const exactVehicleIds = Array.from(new Set(formVehicleTiers.map((v) => v.trim()).filter(Boolean)));
-      triggers.vehicleTiers = exactVehicleIds;
-      triggers.vehicleTypes = exactVehicleIds;
-    }
-    if (formDaysOfWeek.length > 0) {
-      triggers.daysOfWeek = [...formDaysOfWeek].sort((a, b) => a - b);
-    }
-    if (formZoneIds.length > 0) {
-      triggers.zoneIds = [...formZoneIds];
-    }
-    if (formMinDistance.trim() !== '') {
-      triggers.minDistanceMiles = parseFloat(formMinDistance);
-    }
-    if (formMaxDistance.trim() !== '') {
-      triggers.maxDistanceMiles = parseFloat(formMaxDistance);
-    }
-    if (formHasTimeWindow) {
-      triggers.timeWindow = {
-        startHour: Number(formStartHour),
-        endHour: Number(formEndHour),
+    if (editingId) {
+      updateItem(editingId, {
+        name: formName.trim(),
+        description: formDescription.trim() || undefined,
+        mode: formMode,
+        amount: Number(formAmount) || 0,
+        defaultPolicy: formPolicy,
+        enabled: formEnabled,
+      });
+    } else {
+      const slug = formName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      const newItem: SurchargeCatalogItem = {
+        id: `surcharge-${slug || Date.now().toString(36)}`,
+        name: formName.trim(),
+        description: formDescription.trim() || undefined,
+        enabled: formEnabled,
+        defaultPolicy: formPolicy,
+        mode: formMode,
+        amount: Number(formAmount) || 0,
+        isBuiltIn: false,
       };
+      setItems((prev) => [...prev, newItem]);
     }
-
-    const newItem: CustomSurchargeItem = {
-      id: editingId || `surcharge-${Date.now()}`,
-      name: formName.trim(),
-      description: formDescription.trim() || undefined,
-      amount: Number(formAmount) || 0,
-      type: formType,
-      isActive: formIsActive,
-      applicableTariffIds: formTariffs.length > 0 ? formTariffs : undefined,
-      triggers: Object.keys(triggers).length > 0 ? triggers : undefined,
-    };
-
-    const currentList = workingCopy.customSurcharges || [];
-    const nextList = editingId
-      ? currentList.map((item) => (item.id === editingId ? newItem : item))
-      : [...currentList, newItem];
-
     setIsModalOpen(false);
-    await persistImmediately({
-      ...workingCopy,
-      customSurcharges: nextList,
-    });
   };
 
-  const handleToggleSurchargeActive = async (id: string) => {
-    const nextList = (workingCopy.customSurcharges || []).map((item) =>
-      item.id === id ? { ...item, isActive: !item.isActive } : item
-    );
-    await persistImmediately({ ...workingCopy, customSurcharges: nextList });
+  const handleDeleteItem = (id: string) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+    setConfirmDeleteId(null);
   };
 
-  const handleDeleteSurcharge = async (id: string) => {
-    const nextList = (workingCopy.customSurcharges || []).filter((item) => item.id !== id);
-    await persistImmediately({ ...workingCopy, customSurcharges: nextList });
-  };
-
-  const updateField = <K extends keyof SurchargesConfig>(field: K, val: any) => {
-    setWorkingCopy({
-      ...workingCopy,
-      [field]: val,
-    });
-  };
-
-  const handleSave = async () => {
-    const payload: SurchargesConfig = {
-      ...workingCopy,
-      airportGateFee: workingCopy.airportGateFee ?? workingCopy.airportCommercialGateFee ?? 4.0,
-      airportCommercialGateFee: workingCopy.airportGateFee ?? workingCopy.airportCommercialGateFee ?? 4.0,
-      peakSurgeMultiplier: workingCopy.peakSurgeMultiplier ?? 1.25,
-      outOfAreaRemoteFee: workingCopy.outOfAreaRemoteFee ?? workingCopy.remoteServiceFlatFee ?? 15.0,
-      remoteServiceFlatFee: workingCopy.outOfAreaRemoteFee ?? workingCopy.remoteServiceFlatFee ?? 15.0,
-      outOfAreaThresholdMiles: workingCopy.outOfAreaThresholdMiles ?? workingCopy.remoteBoundaryDistanceMiles ?? 15.0,
-      remoteBoundaryDistanceMiles: workingCopy.outOfAreaThresholdMiles ?? workingCopy.remoteBoundaryDistanceMiles ?? 15.0,
-      cancellationFeeWithinOneHour: workingCopy.cancellationFeeWithinOneHour ?? workingCopy.cancellationFee ?? 28.0,
-      cancellationFee: workingCopy.cancellationFeeWithinOneHour ?? workingCopy.cancellationFee ?? 28.0,
-      cancellationWindowMinutes: workingCopy.cancellationWindowMinutes ?? 60,
-      noShowFee: workingCopy.noShowFee ?? 28.0,
-    };
-    await onSave(payload);
-    setWorkingCopy(payload);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
-
-  const toggleApplicableTariff = (surchargeKey: 'airport' | 'fuel' | 'surge' | 'remote', tariffId: string) => {
-    const listKey =
-      surchargeKey === 'airport'
-        ? 'airportFeeApplicableTariffs'
-        : surchargeKey === 'fuel'
-        ? 'fuelSurchargeApplicableTariffs'
-        : surchargeKey === 'surge'
-        ? 'surgeApplicableTariffs'
-        : 'remoteFeeApplicableTariffs';
-
-    const currentList = (workingCopy as any)[listKey] || [];
-    const nextList = currentList.includes(tariffId)
-      ? currentList.filter((id: string) => id !== tariffId)
-      : [...currentList, tariffId];
-
-    updateField(listKey as any, nextList);
-  };
+  const needsLegacyUpgrade = surcharges.catalogVersion !== 2;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Top Banner */}
-      <div className="p-4.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+    <div className="space-y-5">
+      {/* Header Save Bar */}
+      <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ZapIcon className="w-4 h-4 text-amber-500" />
-              Surcharges & Operational Fees
-            </h2>
-            <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-[10px]">
-              Surcharges
-            </Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base font-bold text-slate-900">Surcharges Catalog (Firewall Policy)</h2>
+            {isDirty && (
+              <Badge
+                variant="warning"
+                size="sm"
+                className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+              >
+                Unsaved Changes
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Operational gate fees, remote radius fees, temporal surge multipliers, and cancellation protections. Configure which tariffs each surcharge applies to.
+            Each surcharge has a <strong>Master Switch</strong> and a <strong>Default Policy</strong>: either{' '}
+            <strong>Universal (All Rides)</strong> unless waived by a Rule, or{' '}
+            <strong>Rule-Only</strong> (off unless applied by a Rule).
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {saveSuccess && (
-            <span className="text-xs text-emerald-700 flex items-center gap-1 font-semibold mr-2">
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
               <CheckIcon className="w-3.5 h-3.5" />
-              Saved successfully!
+              Saved
             </span>
           )}
           <Button
             type="button"
+            variant="outline"
             size="sm"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
+            onClick={openAddModal}
+            className="h-8 text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 cursor-pointer"
+          >
+            <PlusIcon className="w-3.5 h-3.5 mr-1 text-blue-600" />
+            Add Surcharge
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!isDirty}
+            onClick={() => setItems(JSON.parse(JSON.stringify(initialItems)))}
+            className="h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
+          >
+            Discard
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSaveAll}
+            disabled={isSaving || !isDirty}
+            className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer"
           >
             <CheckIcon className="w-3.5 h-3.5 mr-1" />
-            Save Surcharges
+            {isSaving ? 'Saving...' : 'Save Surcharges'}
           </Button>
         </div>
       </div>
 
-      {/* 4 Core Surcharge Cards */}
-      <div className="space-y-4">
-        {/* 1. Airport Commercial Access Fee */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
-                <MapPinIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Airport Commercial Access Fee</h3>
-                <p className="text-[11px] text-slate-500">Lambert International (STL) airport commercial terminal gate fee</p>
-              </div>
-            </div>
-            <span className="text-base font-bold text-emerald-700">
-              ${(workingCopy.airportGateFee ?? workingCopy.airportCommercialGateFee ?? 4.00).toFixed(2)} flat
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+      {/* Legacy Migration Banner (only if Firestore doc is still pre-v2) */}
+      {needsLegacyUpgrade && onMigrateLegacyToFirewall && (
+        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5 text-xs text-blue-950">
+            <ShieldCheckIcon className="w-4.5 h-4.5 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Gate Fee Amount ($)</label>
-              <Input
-                type="number"
-                step="0.50"
-                min="0"
-                value={workingCopy.airportGateFee ?? workingCopy.airportCommercialGateFee ?? 4.00}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  setWorkingCopy((prev) => ({
-                    ...prev,
-                    airportGateFee: val,
-                    airportCommercialGateFee: val,
-                  }));
-                }}
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Standard STL airport authority pass-through charge (${(workingCopy.airportGateFee ?? workingCopy.airportCommercialGateFee ?? 4.00).toFixed(2)})
+              <span className="font-bold block">Upgrade Existing Surcharges to Firewall Rules</span>
+              <span className="text-blue-800">
+                Your live database is still using legacy surcharge conditions. Click upgrade to save the clean v2 Surcharges Catalog and create matching Rules (Airport Transfer, SUV/Minivan Upgrade, Out-of-Area &gt; 15 mi) in one click.
               </span>
             </div>
-
-            {/* Applicable Tariffs */}
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
-              <div className="flex flex-wrap gap-2">
-                {activeTariffs.map((t) => {
-                  const isChecked = (workingCopy.airportFeeApplicableTariffs || []).includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleApplicableTariff('airport', t.id)}
-                      className={`px-2.5 py-1 rounded-md text-xs border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                        isChecked
-                          ? 'bg-blue-50 border-blue-400 text-blue-900 font-medium'
-                          : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-blue-600' : 'bg-slate-300'}`} />
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={isMigrating}
+            onClick={async () => {
+              setIsMigrating(true);
+              try {
+                await onMigrateLegacyToFirewall();
+              } finally {
+                setIsMigrating(false);
+              }
+            }}
+            className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white shrink-0 cursor-pointer"
+          >
+            {isMigrating ? 'Upgrading...' : 'Upgrade to v2 Now'}
+          </Button>
         </div>
+      )}
 
-        {/* 1B. Built-In Fuel / Gas Surcharge */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200">
-                <ZapIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-900">Built-In Fuel / Gas Surcharge</h3>
-                  <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-300 text-[10px]">
-                    Fleet Fuel Recovery
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Automatic fleet-wide gas surcharge applied as a flat fee, per-mile rate, or percentage of fare
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-orange-700">
-                {(workingCopy.fuelSurchargeType || 'flat') === 'percent'
-                  ? `+${(workingCopy.fuelSurchargeAmount ?? 2.5).toFixed(1)}%`
-                  : (workingCopy.fuelSurchargeType || 'flat') === 'per_mile'
-                  ? `+$${(workingCopy.fuelSurchargeAmount ?? 0.25).toFixed(2)}/mi`
-                  : `+$${(workingCopy.fuelSurchargeAmount ?? 2.5).toFixed(2)} flat`}
-              </span>
-              <span
-                className={`inline-block w-2.5 h-2.5 rounded-full ${
-                  workingCopy.isFuelSurchargeActive ? 'bg-emerald-500' : 'bg-slate-300'
-                }`}
-              />
-            </div>
-          </div>
+      {/* Surcharges Grid */}
+      <div className="grid grid-cols-1 gap-3.5">
+        {items.map((item) => {
+          const refs = ruleRefsBySurcharge[item.id] || [];
+          const hasActiveApplyRule = refs.some((r) => r.isActive && (r.action === 'apply' || r.action === 'override'));
+          const showUnreferencedRuleOnlyHint =
+            item.enabled && item.defaultPolicy === 'rule_only' && !hasActiveApplyRule && !item.legacyAutoCondition;
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Calculation Mode</label>
-              <select
-                value={workingCopy.fuelSurchargeType || 'flat'}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  updateField('fuelSurchargeType', e.target.value as 'flat' | 'per_mile' | 'percent')
-                }
-                className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-semibold"
-              >
-                <option value="flat">Flat Fee Per Trip ($)</option>
-                <option value="per_mile">Per Mile Rate ($/mi)</option>
-                <option value="percent">Percentage of Fare (%)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
-                {(workingCopy.fuelSurchargeType || 'flat') === 'percent'
-                  ? 'Fuel Surcharge (%)'
-                  : (workingCopy.fuelSurchargeType || 'flat') === 'per_mile'
-                  ? 'Fuel Rate Per Mile ($/mi)'
-                  : 'Fuel Surcharge Amount ($)'}
-              </label>
-              <Input
-                type="number"
-                step={(workingCopy.fuelSurchargeType || 'flat') === 'per_mile' ? '0.05' : '0.25'}
-                min="0"
-                value={workingCopy.fuelSurchargeAmount ?? 2.5}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  updateField('fuelSurchargeAmount', parseFloat(e.target.value) || 0)
-                }
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-            </div>
-
-            <div className="flex items-center pt-4">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
-                <input
-                  type="checkbox"
-                  checked={workingCopy.isFuelSurchargeActive || false}
-                  onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
-                    const checked = e.target.checked;
-                    await persistImmediately({ ...workingCopy, isFuelSurchargeActive: checked });
-                  }}
-                  className="rounded border-slate-300 text-orange-600 focus:ring-0"
-                />
-                <span>Enable Fuel / Gas Surcharge Now</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100">
-            <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
-            <div className="flex flex-wrap gap-2">
-              {activeTariffs.map((t) => {
-                const isChecked = (workingCopy.fuelSurchargeApplicableTariffs || []).includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleApplicableTariff('fuel', t.id)}
-                    className={`px-2.5 py-1 rounded-md text-xs border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                      isChecked
-                        ? 'bg-orange-50 border-orange-400 text-orange-900 font-medium'
-                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+          return (
+            <div
+              key={item.id}
+              className={`p-4.5 rounded-xl border transition-all shadow-2xs space-y-3.5 ${
+                item.enabled
+                  ? 'bg-white border-slate-200'
+                  : 'bg-slate-50/70 border-slate-200/80 opacity-85'
+              }`}
+            >
+              {/* Top Row: Identity, Master Toggle, Amount Badge, Edit/Delete */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className={`p-2 rounded-lg border shrink-0 mt-0.5 ${
+                      !item.enabled
+                        ? 'bg-slate-100 text-slate-400 border-slate-200'
+                        : item.defaultPolicy === 'universal'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-orange-600' : 'bg-slate-300'}`} />
-                    {t.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Peak Demand Surge Multiplier */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                <ZapIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Peak Demand Surge Multiplier</h3>
-                <p className="text-[11px] text-slate-500">Dynamic multiplier applied during peak congestion windows</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-amber-700">
-                {(workingCopy.peakSurgeMultiplier ?? 1.25).toFixed(2)}x
-              </span>
-              <span
-                className={`inline-block w-2.5 h-2.5 rounded-full ${
-                  workingCopy.isPeakSurgeActive ? 'bg-emerald-500' : 'bg-slate-300'
-                }`}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Surge Multiplier</label>
-              <Input
-                type="number"
-                step="0.05"
-                min="1.0"
-                max="3.0"
-                value={workingCopy.peakSurgeMultiplier ?? 1.25}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('peakSurgeMultiplier', parseFloat(e.target.value) || 1.0)}
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                {(workingCopy.peakSurgeMultiplier ?? 1.25) > 1
-                  ? `${(workingCopy.peakSurgeMultiplier ?? 1.25).toFixed(2)}x (+${Math.round(((workingCopy.peakSurgeMultiplier ?? 1.25) - 1) * 100)}% peak premium)`
-                  : '1.00x (Standard fare, no surge applied)'}
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-2">Surge State</label>
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-800 font-medium">
-                <input
-                  type="checkbox"
-                  checked={Boolean(workingCopy.isPeakSurgeActive)}
-                  onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
-                    const checked = e.target.checked;
-                    await persistImmediately({ ...workingCopy, isPeakSurgeActive: checked });
-                  }}
-                  className="rounded border-slate-300 text-amber-600 focus:ring-0"
-                />
-                <span>Surge Currently Active</span>
-              </label>
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Opt-in only: zero automatic or hidden surge rules apply when unchecked
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
-              <div className="flex flex-wrap gap-2">
-                {activeTariffs.map((t) => {
-                  const isChecked = (workingCopy.surgeApplicableTariffs || []).includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleApplicableTariff('surge', t.id)}
-                      className={`px-2.5 py-1 rounded-md text-xs border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                        isChecked
-                          ? 'bg-amber-50 border-amber-400 text-amber-900 font-medium'
-                          : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-amber-500' : 'bg-slate-300'}`} />
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Out-of-Area Remote Service Fee */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-purple-50 text-purple-700 border border-purple-200">
-                <ShieldCheckIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Out-of-Area Remote Service Fee</h3>
-                <p className="text-[11px] text-slate-500">Flat operational fee when trip distance exceeds regional service boundary</p>
-              </div>
-            </div>
-            <span className="text-base font-bold text-emerald-700">
-              ${(workingCopy.outOfAreaRemoteFee ?? workingCopy.remoteServiceFlatFee ?? 15.00).toFixed(2)} flat
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Boundary Distance (mi)</label>
-              <Input
-                type="number"
-                step="1.0"
-                min="5"
-                value={workingCopy.outOfAreaThresholdMiles ?? workingCopy.remoteBoundaryDistanceMiles ?? 15}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const val = parseFloat(e.target.value) || 15;
-                  setWorkingCopy((prev) => ({
-                    ...prev,
-                    outOfAreaThresholdMiles: val,
-                    remoteBoundaryDistanceMiles: val,
-                  }));
-                }}
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Triggered when trip distance exceeds {workingCopy.outOfAreaThresholdMiles ?? workingCopy.remoteBoundaryDistanceMiles ?? 15} miles
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Remote Service Fee ($)</label>
-              <Input
-                type="number"
-                step="1.00"
-                min="0"
-                value={workingCopy.outOfAreaRemoteFee ?? workingCopy.remoteServiceFlatFee ?? 15.00}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  setWorkingCopy((prev) => ({
-                    ...prev,
-                    outOfAreaRemoteFee: val,
-                    remoteServiceFlatFee: val,
-                  }));
-                }}
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Standard remote dispatch fee (${(workingCopy.outOfAreaRemoteFee ?? workingCopy.remoteServiceFlatFee ?? 15.00).toFixed(2)})
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1.5">Applicable Tariff Rates:</label>
-              <div className="flex flex-wrap gap-2">
-                {activeTariffs.map((t) => {
-                  const isChecked = (workingCopy.remoteFeeApplicableTariffs || []).includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleApplicableTariff('remote', t.id)}
-                      className={`px-2.5 py-1 rounded-md text-xs border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                        isChecked
-                          ? 'bg-purple-50 border-purple-400 text-purple-900 font-medium'
-                          : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isChecked ? 'bg-purple-500' : 'bg-slate-300'}`} />
-                      {t.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Cancellation & No-Show Protection */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
-                <ClockIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Cancellation & No-Show Protection</h3>
-                <p className="text-[11px] text-slate-500">Driver compensation protections for late cancellations and customer no-shows</p>
-              </div>
-            </div>
-            <span className="text-base font-bold text-rose-700">
-              ${(workingCopy.cancellationFeeWithinOneHour ?? workingCopy.cancellationFee ?? 28.00).toFixed(2)} fee
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Cancellation Window (min)</label>
-              <Input
-                type="number"
-                step="5"
-                min="5"
-                value={workingCopy.cancellationWindowMinutes ?? 60}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('cancellationWindowMinutes', parseInt(e.target.value, 10) || 60)}
-                className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                {workingCopy.cancellationWindowMinutes ?? 60} min (if cancelled within window of pickup)
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Cancellation Fee ($)</label>
-              <Input
-                type="number"
-                step="1.00"
-                min="0"
-                value={workingCopy.cancellationFeeWithinOneHour ?? workingCopy.cancellationFee ?? 28.00}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  setWorkingCopy((prev) => ({
-                    ...prev,
-                    cancellationFeeWithinOneHour: val,
-                    cancellationFee: val,
-                  }));
-                }}
-                className="bg-white border-slate-300 text-rose-700 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                ${(workingCopy.cancellationFeeWithinOneHour ?? workingCopy.cancellationFee ?? 28.00).toFixed(2)} minimum fare floor protection
-              </span>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">No-Show Fee ($)</label>
-              <Input
-                type="number"
-                step="1.00"
-                min="0"
-                value={workingCopy.noShowFee ?? 28.00}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('noShowFee', parseFloat(e.target.value) || 0)}
-                className="bg-white border-slate-300 text-rose-700 h-8 text-xs font-semibold"
-              />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Driver on scene, passenger fails to appear (${(workingCopy.noShowFee ?? 28.00).toFixed(2)})
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 5. Custom & Conditional Surcharges Section */}
-        <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <SlidersIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-slate-900">Custom &amp; Conditional Surcharges</h3>
-                  <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px]">
-                    {(workingCopy.customSurcharges || []).length} Configured
-                  </Badge>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Custom fees triggered by vehicle tier (e.g. SUV/Minivan $10 fee), trip distance, time-of-day, or zones.
-                </p>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleOpenCreate}
-              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs cursor-pointer"
-            >
-              <PlusIcon className="w-3.5 h-3.5 mr-1" />
-              Add Surcharge
-            </Button>
-          </div>
-
-          <div className="space-y-2.5 pt-2 border-t border-slate-100">
-            {(!workingCopy.customSurcharges || workingCopy.customSurcharges.length === 0) ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                No custom surcharges configured. Click &ldquo;+ Add Surcharge&rdquo; to define a conditional fee.
-              </div>
-            ) : (
-              workingCopy.customSurcharges.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-3.5 rounded-lg border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-                    item.isActive ? 'bg-white border-slate-200 shadow-2xs' : 'bg-slate-50 border-slate-200 opacity-60'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900">{item.name}</span>
-                      <span className="text-xs font-bold text-emerald-700">
-                        {item.type === 'percent'
-                          ? `+${item.amount}%`
-                          : item.type === 'per_mile'
-                          ? `+$${item.amount.toFixed(2)}/mi`
-                          : `+$${item.amount.toFixed(2)}`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSurchargeActive(item.id)}
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold cursor-pointer border ${
-                          item.isActive
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                            : 'bg-slate-200 text-slate-600 border-slate-300'
-                        }`}
-                      >
-                        {item.isActive ? 'Active' : 'Disabled'}
-                      </button>
-                    </div>
-
-                    {item.description && (
-                      <p className="text-[11px] text-slate-500">{item.description}</p>
-                    )}
-
-                    {/* Condition Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {item.triggers?.vehicleTiers && item.triggers.vehicleTiers.length > 0 ? (
-                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-medium">
-                          Vehicles: {item.triggers.vehicleTiers.map((tId) => {
-                            const found = activeVehicles.find((av) => av.id.toLowerCase() === tId.toLowerCase());
-                            return found ? found.label : tId.toUpperCase();
-                          }).join(', ')}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
-                          All Vehicles
-                        </Badge>
-                      )}
-                      {item.triggers?.minDistanceMiles !== undefined && (
-                        <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 font-medium">
-                          Min Distance: &gt; {item.triggers.minDistanceMiles} mi
-                        </Badge>
-                      )}
-                      {item.triggers?.timeWindow && (
-                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-medium">
-                          Hours: {item.triggers.timeWindow.startHour}:00 - {item.triggers.timeWindow.endHour}:00
-                        </Badge>
-                      )}
-                      {item.triggers?.daysOfWeek && item.triggers.daysOfWeek.length > 0 && (
-                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200 font-medium">
-                          Days: {item.triggers.daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}
-                        </Badge>
-                      )}
-                      {item.triggers?.zoneIds && item.triggers.zoneIds.length > 0 && (
-                        <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200 font-medium">
-                          Zones: {item.triggers.zoneIds.map((zId) => availableZones.find((z) => z.id === zId)?.name || zId).join(', ')}
-                        </Badge>
-                      )}
-                      {item.applicableTariffIds && item.applicableTariffIds.length > 0 && (
-                        <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-200 font-medium">
-                          Tariffs:{' '}
-                          {(() => {
-                            const matchedNames = activeTariffs
-                              .filter((t) => item.applicableTariffIds?.includes(t.id))
-                              .map((t) => t.name);
-                            return matchedNames.length > 0
-                              ? matchedNames.join(', ')
-                              : activeTariffs.map((t) => t.name).join(', ');
-                          })()}
-                        </Badge>
-                      )}
-                    </div>
+                    <ZapIcon className="w-4.5 h-4.5" />
                   </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-slate-900">{item.name}</h3>
+                      <span className="text-[10px] font-mono text-slate-400">{item.id}</span>
+                      {item.isBuiltIn && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] py-0 px-1.5 bg-slate-50 text-slate-500 border-slate-200"
+                        >
+                          Core
+                        </Badge>
+                      )}
+                    </div>
+                    {item.description && (
+                      <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                    )}
+                  </div>
+                </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                  <span
+                    className={`text-base font-mono font-extrabold px-2.5 py-0.5 rounded-lg border ${
+                      item.enabled
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                    }`}
+                  >
+                    {formatAmountBadge(item)}
+                  </span>
+
+                  {/* Master Kill Switch */}
+                  <button
+                    type="button"
+                    onClick={() => updateItem(item.id, { enabled: !item.enabled })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      item.enabled
+                        ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {item.enabled ? 'Enabled' : 'Disabled'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(item)}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-300 cursor-pointer"
+                    title="Edit name & description"
+                  >
+                    <EditIcon className="w-3.5 h-3.5" />
+                  </button>
+
+                  {!item.isBuiltIn && confirmDeleteId !== item.id && (
                     <button
                       type="button"
-                      onClick={() => handleOpenEdit(item)}
-                      className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
-                      title="Edit Surcharge"
-                    >
-                      <EditIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSurcharge(item.id)}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border border-slate-200"
-                      title="Delete Surcharge"
+                      onClick={() => setConfirmDeleteId(item.id)}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-300 cursor-pointer"
+                      title="Delete surcharge"
                     >
                       <TrashIcon className="w-3.5 h-3.5" />
                     </button>
+                  )}
+
+                  {confirmDeleteId === item.id && (
+                    <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
+                      <span className="text-[11px] font-semibold text-rose-800">Delete?</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="px-2 py-0.5 rounded bg-rose-600 text-white text-[11px] font-bold cursor-pointer"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-[11px] cursor-pointer"
+                      >
+                        No
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Middle Row: Firewall Default Policy + Calculation Mode + Amount */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-3 border-t border-slate-100 items-end">
+                {/* Firewall Default Policy */}
+                <div className="lg:col-span-6">
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Firewall Default Policy (when Enabled)
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200/80">
+                    <button
+                      type="button"
+                      onClick={() => updateItem(item.id, { defaultPolicy: 'universal' })}
+                      className={`py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer text-center ${
+                        item.defaultPolicy === 'universal'
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Universal (All Rides)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(item.id, { defaultPolicy: 'rule_only' })}
+                      className={`py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer text-center ${
+                        item.defaultPolicy === 'rule_only'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Rule-Only (Off by Default)
+                    </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+
+                {/* Calculation Mode */}
+                <div className="lg:col-span-3">
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Calculation Mode
+                  </label>
+                  <select
+                    value={item.mode}
+                    onChange={(e) => {
+                      const nextMode = e.target.value as SurchargeCalcMode;
+                      const nextAmount =
+                        nextMode === 'multiplier' && item.amount < 1
+                          ? 1.25
+                          : nextMode !== 'multiplier' && item.mode === 'multiplier'
+                          ? 5.0
+                          : item.amount;
+                      updateItem(item.id, { mode: nextMode, amount: nextAmount });
+                    }}
+                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
+                  >
+                    <option value="flat">Flat Fee ($)</option>
+                    <option value="per_mile">Per Mile ($/mi)</option>
+                    <option value="percent">% of Base Fare</option>
+                    <option value="multiplier">Multiplier (×)</option>
+                  </select>
+                </div>
+
+                {/* Amount */}
+                <div className="lg:col-span-3">
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    {item.mode === 'multiplier'
+                      ? 'Multiplier (e.g. 1.25)'
+                      : item.mode === 'percent'
+                      ? 'Percentage (%)'
+                      : item.mode === 'per_mile'
+                      ? 'Rate per Mile ($/mi)'
+                      : 'Amount ($)'}
+                  </label>
+                  <Input
+                    type="number"
+                    step={item.mode === 'multiplier' || item.mode === 'per_mile' ? '0.05' : '0.50'}
+                    min={item.mode === 'multiplier' ? '1.0' : '0'}
+                    value={item.amount}
+                    onChange={(e) =>
+                      updateItem(item.id, { amount: parseFloat(e.target.value) || 0 })
+                    }
+                    className="h-9 text-xs font-mono font-bold bg-white border-slate-300 text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Bottom Row: Live Rules Exceptions Summary */}
+              <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                    <SlidersIcon className="w-3 h-3" />
+                    Rule Exceptions:
+                  </span>
+                  {refs.length > 0 ? (
+                    refs.map((ref, idx) => (
+                      <button
+                        key={`${ref.ruleId}-${idx}`}
+                        type="button"
+                        onClick={() => onNavigateToRule?.(ref.ruleId)}
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                          ref.action === 'waive'
+                            ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                            : ref.action === 'override'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        } ${!ref.isActive ? 'opacity-50 line-through' : ''}`}
+                      >
+                        {ref.action.toUpperCase()}
+                        {ref.detail ? ` ${ref.detail}` : ''} · P{ref.priority} {ref.ruleName}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic">
+                      {item.defaultPolicy === 'universal'
+                        ? 'No waiver exceptions (applies to every ride when enabled)'
+                        : item.legacyAutoCondition
+                        ? 'Using legacy auto-condition until upgraded'
+                        : 'No Rules reference this surcharge yet'}
+                    </span>
+                  )}
+                </div>
+
+                {showUnreferencedRuleOnlyHint && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToRule?.()}
+                    className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg hover:bg-amber-100 flex items-center gap-1 cursor-pointer"
+                  >
+                    <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-600" />
+                    Add an APPLY Rule in Rules &amp; Routing →
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Surcharge Editor Modal */}
+      {/* Add / Edit Surcharge Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleModalSubmit}
+            className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+          >
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">
-                {editingId ? 'Edit Surcharge' : 'Create New Surcharge'}
+                {editingId ? 'Edit Surcharge' : 'New Surcharge'}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-lg leading-none cursor-pointer"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            <form onSubmit={handleSaveModal} className="space-y-4 text-xs">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1">Surcharge Name *</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Surcharge Name (shown on customer breakdown)
+                </label>
                 <Input
                   type="text"
                   required
-                  placeholder="e.g. SUV / Minivan Upgrade Fee"
+                  placeholder="e.g., Late-Night Service Fee, Holiday Surcharge"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
+                  className="h-9 text-xs bg-white"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1">Description</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Description (optional)
+                </label>
                 <Input
                   type="text"
-                  placeholder="e.g. $10 fee for SUV and Minivan capacity"
+                  placeholder="Short internal or receipt note"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
+                  className="h-9 text-xs bg-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Fee Amount *</label>
-                  <Input
-                    type="number"
-                    step="0.50"
-                    min="0"
-                    required
-                    value={formAmount}
-                    onChange={(e) => setFormAmount(parseFloat(e.target.value) || 0)}
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Fee Type</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Mode</label>
                   <select
-                    value={formType}
-                    onChange={(e) => setFormType(e.target.value as any)}
-                    className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
+                    value={formMode}
+                    onChange={(e) => setFormMode(e.target.value as SurchargeCalcMode)}
+                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold"
                   >
-                    <option value="flat">Flat Dollar ($)</option>
+                    <option value="flat">Flat Fee ($)</option>
                     <option value="per_mile">Per Mile ($/mi)</option>
-                    <option value="percent">Percentage (%)</option>
+                    <option value="percent">% of Base Fare</option>
+                    <option value="multiplier">Multiplier (×)</option>
                   </select>
                 </div>
-              </div>
-
-              {/* Vehicle Conditions */}
-              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 block">
-                  Trigger on Vehicle Types (Default: All Vehicles):
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setFormVehicleTiers([])}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                      formVehicleTiers.length === 0
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                    }`}
-                  >
-                    All Vehicles
-                  </button>
-                  {activeVehicles.map((v) => {
-                    const isSelected = formVehicleTiers.some((id) => id.toLowerCase() === v.id.toLowerCase());
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          setFormVehicleTiers(
-                            isSelected
-                              ? formVehicleTiers.filter((id) => id.toLowerCase() !== v.id.toLowerCase())
-                              : [...formVehicleTiers, v.id]
-                          );
-                        }}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                        }`}
-                      >
-                        {v.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Distance Conditions */}
-              <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Min Distance (mi)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Amount</label>
                   <Input
                     type="number"
-                    step="1"
-                    min="0"
-                    placeholder="Optional"
-                    value={formMinDistance}
-                    onChange={(e) => setFormMinDistance(e.target.value)}
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Max Distance (mi)</label>
-                  <Input
-                    type="number"
-                    step="1"
-                    min="0"
-                    placeholder="Optional"
-                    value={formMaxDistance}
-                    onChange={(e) => setFormMaxDistance(e.target.value)}
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
+                    step={formMode === 'multiplier' || formMode === 'per_mile' ? '0.05' : '0.50'}
+                    min={formMode === 'multiplier' ? '1.0' : '0'}
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(parseFloat(e.target.value) || 0)}
+                    className="h-9 text-xs font-mono font-bold bg-white"
                   />
                 </div>
               </div>
 
-              {/* Time Window Condition */}
-              <div className="pt-2 border-t border-slate-100 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={formHasTimeWindow}
-                    onChange={(e) => setFormHasTimeWindow(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="font-semibold text-slate-800">Restrict to Time Window (e.g. Late Night)</span>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Default Firewall Policy
                 </label>
-
-                {formHasTimeWindow && (
-                  <div className="grid grid-cols-2 gap-3 pl-5">
-                    <div>
-                      <label className="text-[11px] text-slate-600 block mb-1">Start Hour (0–23)</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="23"
-                        value={formStartHour}
-                        onChange={(e) => setFormStartHour(parseInt(e.target.value, 10) || 0)}
-                        className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-slate-600 block mb-1">End Hour (0–23)</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="23"
-                        value={formEndHour}
-                        onChange={(e) => setFormEndHour(parseInt(e.target.value, 10) || 0)}
-                        className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Days of Week Condition */}
-              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 block">
-                  Days of Week (Optional — leave empty for every day):
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayLabel, dayIdx) => {
-                    const isSelected = formDaysOfWeek.includes(dayIdx);
-                    return (
-                      <button
-                        key={dayLabel}
-                        type="button"
-                        onClick={() =>
-                          setFormDaysOfWeek(
-                            isSelected
-                              ? formDaysOfWeek.filter((d) => d !== dayIdx)
-                              : [...formDaysOfWeek, dayIdx]
-                          )
-                        }
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-amber-600 text-white border-amber-600'
-                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                        }`}
-                      >
-                        {dayLabel}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Zone Condition */}
-              {availableZones.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 block">
-                    Restrict to Service Zones (Optional — leave empty for all zones):
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableZones.map((z) => {
-                      const isSelected = formZoneIds.includes(z.id);
-                      return (
-                        <button
-                          key={z.id}
-                          type="button"
-                          onClick={() =>
-                            setFormZoneIds(
-                              isSelected
-                                ? formZoneIds.filter((id) => id !== z.id)
-                                : [...formZoneIds, z.id]
-                            )
-                          }
-                          className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                          }`}
-                        >
-                          {z.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Applicable Tariffs */}
-              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 block">Applicable Tariffs:</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeTariffs.map((t) => {
-                    const isSelected = formTariffs.includes(t.id);
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setFormTariffs(
-                            isSelected
-                              ? formTariffs.filter((id) => id !== t.id)
-                              : [...formTariffs, t.id]
-                          );
-                        }}
-                        className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                        }`}
-                      >
-                        {t.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-xs border-slate-300 text-slate-700 bg-white cursor-pointer"
+                <select
+                  value={formPolicy}
+                  onChange={(e) => setFormPolicy(e.target.value as SurchargeDefaultPolicy)}
+                  className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold"
                 >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium cursor-pointer"
-                >
-                  {editingId ? 'Update Surcharge' : 'Add Surcharge'}
-                </Button>
+                  <option value="universal">Universal — Applies to ALL rides (unless waived by a Rule)</option>
+                  <option value="rule_only">Rule-Only — OFF by default (applies only when attached by a Rule)</option>
+                </select>
               </div>
-            </form>
-          </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formEnabled}
+                  onChange={(e) => setFormEnabled(e.target.checked)}
+                  className="rounded border-slate-300 text-emerald-600"
+                />
+                <span>Enabled immediately</span>
+              </label>
+            </div>
+
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsModalOpen(false)}
+                className="h-8 text-xs bg-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {editingId ? 'Apply Edits' : 'Add to Catalog'}
+              </Button>
+            </div>
+          </form>
         </div>
       )}
     </div>

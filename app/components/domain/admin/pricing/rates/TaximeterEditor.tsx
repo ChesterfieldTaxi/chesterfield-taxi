@@ -98,7 +98,7 @@ export function TaximeterEditor({
           <span className="text-[11px] text-slate-500">Initial meter start configuration</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-slate-700 block mb-1">Start Price / Flag Drop ($)</label>
             <Input
@@ -110,7 +110,7 @@ export function TaximeterEditor({
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('startPrice', parseFloat(e.target.value) || 0)}
               className="bg-white border-slate-300 text-slate-900 font-semibold"
             />
-            <span className="text-[11px] text-slate-500 mt-1 block">$0.00 for Airport Flat Rate, $4.50 for METER</span>
+            <span className="text-[11px] text-slate-500 mt-1 block">$0.00 for Stepped Flat rates, $4.50 for METER</span>
           </div>
 
           <div>
@@ -125,20 +125,6 @@ export function TaximeterEditor({
               className="bg-white border-slate-300 text-slate-900"
             />
             <span className="text-[11px] text-slate-500 mt-1 block">0.1 mi for METER (covers first 0.1 mi for $4.50)</span>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Initial Included Waiting Time (min)</label>
-            <Input
-              type="number"
-              step="1"
-              min="0"
-              disabled={readOnly}
-              value={taximeter.initialTimeIncluded}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('initialTimeIncluded', parseFloat(e.target.value) || 0)}
-              className="bg-white border-slate-300 text-slate-900"
-            />
-            <span className="text-[11px] text-slate-500 mt-1 block">Free minutes at pickup curb before meter ticks</span>
           </div>
         </div>
       </div>

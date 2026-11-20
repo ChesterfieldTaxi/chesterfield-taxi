@@ -193,7 +193,7 @@ export class MockBookingService implements IBookingService {
     try {
       const pricingRulesService = getPricingRulesService();
       const allRules = await pricingRulesService.getRules();
-      dynamicPricingConfig.namedPricingRules = allRules.filter((r) => r.isActive);
+      dynamicPricingConfig.namedPricingRules = allRules;
     } catch (rulesErr) {
       console.warn('[MockBookingService] Could not load active pricing rules:', rulesErr);
     }
@@ -233,36 +233,48 @@ export class MockBookingService implements IBookingService {
     const isAirportDropoff = Boolean(request.isAirportDropoff ?? airportCheck.isDropoffAirport);
     const isAirportTrip = Boolean(request.isAirportTrip ?? airportCheck.isAirportTrip);
 
-    // Resolve spatial containment (Zones, Zone Groups, Location Collections)
+    // Resolve spatial containment (separate Origin vs Destination zones)
     const matchedZoneIds = new Set<string>(request.zoneIds || []);
+    const originZoneIds = new Set<string>(request.originZoneId ? [request.originZoneId] : []);
+    const destinationZoneIds = new Set<string>(
+      request.destinationZoneId ? [request.destinationZoneId] : []
+    );
     const matchedZoneGroupIds = new Set<string>(request.zoneGroupIds || []);
     const matchedLocationCollectionIds = new Set<string>(request.locationCollectionIds || []);
 
     if (airportCheck.isAirportTrip && airportCheck.airport) {
-      if (airportCheck.airport.iataCode === 'STL' || airportCheck.airport.iataCode === 'CPS') {
-        matchedZoneIds.add('zone-lambert-airport');
-      } else if (airportCheck.airport.iataCode === 'SUS') {
-        matchedZoneIds.add('zone-spirit-airport');
-      }
+      const airportZoneId =
+        airportCheck.airport.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport';
+      matchedZoneIds.add(airportZoneId);
+      if (isAirportPickup) originZoneIds.add(airportZoneId);
+      if (isAirportDropoff) destinationZoneIds.add(airportZoneId);
     }
 
-    const coordsToTest = [
-      request.pickupLocation.coordinates,
-      request.dropoffLocation.coordinates,
-      ...validIntermediateStops.map((s) => s.coordinates),
-    ].filter((c): c is GeoPoint => Boolean(c && typeof c.lat === 'number' && typeof c.lng === 'number'));
+    const pickupCoord = request.pickupLocation.coordinates;
+    const dropoffCoord = request.dropoffLocation.coordinates;
+    const stopCoords = validIntermediateStops
+      .map((s) => s.coordinates)
+      .filter((c): c is GeoPoint => Boolean(c && typeof c.lat === 'number' && typeof c.lng === 'number'));
 
-    if (coordsToTest.length > 0) {
+    const hasAnyCoord =
+      Boolean(pickupCoord && typeof pickupCoord.lat === 'number' && typeof pickupCoord.lng === 'number') ||
+      Boolean(dropoffCoord && typeof dropoffCoord.lat === 'number' && typeof dropoffCoord.lng === 'number') ||
+      stopCoords.length > 0;
+
+    if (hasAnyCoord) {
       try {
         const zoneService = getZoneService();
         const zones = await zoneService.getZones();
         const zoneGroups = await zoneService.getZoneGroups();
         const locationColls = await zoneService.getLocationCollections();
 
-        for (const coord of coordsToTest) {
+        const evaluateCoord = (coord: GeoPoint | undefined, role: 'origin' | 'destination' | 'stop') => {
+          if (!coord || typeof coord.lat !== 'number' || typeof coord.lng !== 'number') return;
           for (const zone of zones) {
             if (isCoordinateInZone(coord, zone)) {
               matchedZoneIds.add(zone.id);
+              if (role === 'origin') originZoneIds.add(zone.id);
+              if (role === 'destination') destinationZoneIds.add(zone.id);
             }
           }
           for (const group of zoneGroups) {
@@ -276,11 +288,18 @@ export class MockBookingService implements IBookingService {
               matchedLocationCollectionIds.add(coll.id);
             }
           }
-        }
+        };
+
+        evaluateCoord(pickupCoord, 'origin');
+        evaluateCoord(dropoffCoord, 'destination');
+        for (const sc of stopCoords) evaluateCoord(sc, 'stop');
       } catch (spatialErr) {
         console.warn('[MockBookingService] Spatial entity evaluation warning:', spatialErr);
       }
     }
+
+    const originZoneList = Array.from(originZoneIds);
+    const destinationZoneList = Array.from(destinationZoneIds);
 
     const basePricingInput = {
       distanceMiles,
@@ -296,8 +315,11 @@ export class MockBookingService implements IBookingService {
       isAirportPickup,
       isAirportDropoff,
       isAirportTrip,
+      originZoneIds: originZoneList,
+      destinationZoneIds: destinationZoneList,
       originZoneId:
         request.originZoneId ||
+        originZoneList[0] ||
         (isAirportPickup
           ? airportCheck.airport?.iataCode === 'SUS'
             ? 'zone-spirit-airport'
@@ -305,6 +327,7 @@ export class MockBookingService implements IBookingService {
           : undefined),
       destinationZoneId:
         request.destinationZoneId ||
+        destinationZoneList[0] ||
         (isAirportDropoff
           ? airportCheck.airport?.iataCode === 'SUS'
             ? 'zone-spirit-airport'

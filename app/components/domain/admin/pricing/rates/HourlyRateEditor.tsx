@@ -140,8 +140,8 @@ export function HourlyRateEditor({
       <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200/80 text-xs text-blue-900 flex items-start gap-2.5">
         <SparklesIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold block mb-0.5">Dedicated Charter Protection</span>
-          Hourly charters reserve dedicated vehicle and driver availability. Meter waiting delays and intermediate stop fees are waived because hourly service directly compensates driver time.
+          <span className="font-semibold block mb-0.5">Dedicated Hourly Charter</span>
+          Hourly charters reserve dedicated vehicle and driver time. To waive stops, curb wait, or universal surcharges on hourly bookings, attach a Rule in <strong>Rules &amp; Routing</strong> targeting Hourly Charters.
         </div>
       </div>
     </div>

@@ -130,7 +130,7 @@ export function ZipRateMatrixEditor({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'smoke_house_matrix_rates.csv');
+    link.setAttribute('download', 'zip_rate_matrix.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -144,14 +144,14 @@ export function ZipRateMatrixEditor({
           <div className="flex items-center gap-2">
             <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
               <ShieldCheckIcon className="w-4 h-4 text-amber-700" />
-              Corporate Agreement: Smoke House Market Chesterfield
+              Postal / Zip Flat-Rate Matrix
             </span>
             <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-[10px]">
-              Single Unified Price (100% Pass-Through)
+              Flat Zip Pricing
             </Badge>
           </div>
           <p className="text-xs text-slate-600">
-            All 78 agreed zip codes define a unified flat rate. Customer charge and driver payout are identical (single agreed price). Contract tariffs are exempt from surge multipliers and operational surcharges.
+            Define fixed customer fares by destination or pickup ZIP code. Route corporate accounts or specific regions to this Rate in <strong>Rules &amp; Routing</strong> (and waive universal surcharges there if contracted).
           </p>
         </div>
 
@@ -347,7 +347,6 @@ export function ZipRateMatrixEditor({
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               const val = parseFloat(e.target.value) || 0;
                               handleUpdateField(row.zip, 'customerCharge', val);
-                              handleUpdateField(row.zip, 'driverPay', val);
                             }}
                             className="h-6 w-24 text-xs bg-white border-slate-300 text-right py-0 ml-auto"
                           />

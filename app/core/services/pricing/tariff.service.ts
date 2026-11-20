@@ -14,7 +14,64 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import type { TariffProfile, TariffCorridor, TariffTaximeterRate } from '../../types/tariff';
+import type {
+  TariffProfile,
+  TariffCorridor,
+  TariffTaximeterRate,
+  DistanceRoundingMode,
+  FareRoundingMode,
+  RateRoundingPolicy,
+  RateCancellationPolicy,
+} from '../../types/tariff';
+
+export const DEFAULT_RATE_ROUNDING: RateRoundingPolicy = {
+  distanceMode: 'exact',
+  fareMode: 'ceil_dollar',
+};
+
+export const DEFAULT_RATE_CANCELLATION_POLICY: RateCancellationPolicy = {
+  freeWindowMinutes: 60,
+  cancellationFee: 28.0,
+  noShowFee: 28.0,
+};
+
+/**
+ * Quantizes route distance according to a Rate's configured distance rounding setting.
+ */
+export function applyDistanceRounding(
+  miles: number,
+  mode: DistanceRoundingMode = 'exact'
+): number {
+  if (!miles || miles <= 0 || isNaN(miles)) return 0;
+  if (mode === 'half_mile_up') {
+    return Math.ceil((miles - 1e-9) * 2) / 2;
+  }
+  if (mode === 'whole_mile_up') {
+    return Math.ceil(miles - 1e-9);
+  }
+  return Number(miles.toFixed(4));
+}
+
+/**
+ * Rounds a final currency fare according to a Rate's configured fare rounding setting.
+ */
+export function applyFareRounding(
+  amount: number,
+  mode: FareRoundingMode = 'ceil_dollar'
+): number {
+  if (!amount || isNaN(amount)) return 0;
+  if (mode === 'exact_cents') {
+    return Math.round((amount + Number.EPSILON) * 100) / 100;
+  }
+  if (mode === 'nearest_half_dollar') {
+    return Math.round(amount * 2) / 2;
+  }
+  if (mode === 'nearest_dollar') {
+    return Math.round(amount);
+  }
+  // Default: 'ceil_dollar'
+  return Math.ceil(amount - 1e-9);
+}
 import type { PricingInput } from './types';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
@@ -44,12 +101,18 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
     priority: 95,
     isActive: true,
     isDefault: false,
-    allowSurgeMultiplier: false,
-    allowOperationalSurcharges: true,
-    triggers: {
-      zoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],
-      zoneGroupIds: ['group-regional-aviation', 'group-airports'],
+    rounding: {
+      distanceMode: 'exact',
+      fareMode: 'ceil_dollar',
     },
+    cancellationPolicy: {
+      freeWindowMinutes: 60,
+      cancellationFee: 30.0,
+      noShowFee: 30.0,
+    },
+    allowSurgeMultiplier: true,
+    allowOperationalSurcharges: true,
+    triggers: {},
     taximeter: {
       startPrice: 0.0,
       initialDistanceIncluded: 0,
@@ -100,6 +163,15 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
     priority: 80,
     isActive: true,
     isDefault: true,
+    rounding: {
+      distanceMode: 'exact',
+      fareMode: 'ceil_dollar',
+    },
+    cancellationPolicy: {
+      freeWindowMinutes: 60,
+      cancellationFee: 20.0,
+      noShowFee: 20.0,
+    },
     allowSurgeMultiplier: true,
     allowOperationalSurcharges: true,
     triggers: {},
@@ -164,8 +236,30 @@ export function normalizeTariffProfile(tariff: TariffProfile): TariffProfile {
       ? tariff.triggers.vehicleClasses
       : tariff.eligibleVehicleClasses;
 
+  const rounding: RateRoundingPolicy = {
+    distanceMode: tariff.rounding?.distanceMode || DEFAULT_RATE_ROUNDING.distanceMode,
+    fareMode: tariff.rounding?.fareMode || DEFAULT_RATE_ROUNDING.fareMode,
+  };
+
+  const cancellationPolicy: RateCancellationPolicy = {
+    freeWindowMinutes:
+      typeof tariff.cancellationPolicy?.freeWindowMinutes === 'number'
+        ? tariff.cancellationPolicy.freeWindowMinutes
+        : DEFAULT_RATE_CANCELLATION_POLICY.freeWindowMinutes,
+    cancellationFee:
+      typeof tariff.cancellationPolicy?.cancellationFee === 'number'
+        ? tariff.cancellationPolicy.cancellationFee
+        : DEFAULT_RATE_CANCELLATION_POLICY.cancellationFee,
+    noShowFee:
+      typeof tariff.cancellationPolicy?.noShowFee === 'number'
+        ? tariff.cancellationPolicy.noShowFee
+        : DEFAULT_RATE_CANCELLATION_POLICY.noShowFee,
+  };
+
   return {
     ...tariff,
+    rounding,
+    cancellationPolicy,
     taximeter,
     taximeterRate: taximeter,
     zipMatrix: zipMatrix.length > 0 ? zipMatrix : undefined,
@@ -434,26 +528,41 @@ export function getTariffService(): TariffService {
 }
 
 /**
- * Pure Functional Matching: Finds the active TariffProfile matching the input trip.
+ * Pure Functional Rate Selection:
+ * In the 4-pillar firewall architecture, Rules (Step 1) choose specialized Rates via
+ * `targetTariffId`. When no Rule or explicit override selects a Rate, this returns
+ * the designated Default Rate (`isDefault: true`), or an Hourly Rate if `isHourlyBooking`
+ * is requested. Hidden zone/vehicle/schedule triggers on Rates are intentionally ignored
+ * so Rules are the single source of truth for conditional routing.
  */
 export function matchTariffProfile(
   input: PricingInput,
-  rawTariffs: TariffProfile[] = DEFAULT_TARIFF_PROFILES
+  rawTariffs: TariffProfile[] = DEFAULT_TARIFF_PROFILES,
+  explicitTariffId?: string
 ): TariffProfile {
   const tariffs = rawTariffs.map(normalizeTariffProfile);
+  const activeTariffs = tariffs.filter((t) => t.isActive && !t.isArchived);
+  const defaultFallback =
+    DEFAULT_TARIFF_PROFILES.find((t) => t.isDefault) ||
+    DEFAULT_TARIFF_PROFILES[DEFAULT_TARIFF_PROFILES.length - 1];
 
-  // If specific tariff ID explicitly requested
+  if (activeTariffs.length === 0) {
+    return normalizeTariffProfile(defaultFallback);
+  }
+
+  // 1. Explicit target Rate from Step 1 Rules or Simulator / Config override
+  if (explicitTariffId) {
+    const targeted = activeTariffs.find((t) => t.id === explicitTariffId);
+    if (targeted) return resolveTariffProfile(targeted, tariffs);
+  }
+
+  // 2. Explicit Rate ID requested via selectedRuleId
   if (input.selectedRuleId) {
-    const explicit = tariffs.find((t) => t.id === input.selectedRuleId && t.isActive && !t.isArchived);
+    const explicit = activeTariffs.find((t) => t.id === input.selectedRuleId);
     if (explicit) return resolveTariffProfile(explicit, tariffs);
   }
 
-  const activeTariffs = tariffs.filter((t) => t.isActive && !t.isArchived);
-  if (activeTariffs.length === 0) {
-    return normalizeTariffProfile(DEFAULT_TARIFF_PROFILES[0]);
-  }
-
-  // If hourly booking requested
+  // 3. Hourly charter booking -> active hourly Rate
   if (input.isHourlyBooking) {
     const hourlyTariff = activeTariffs.find(
       (t) => t.rateModel === 'hourly' || t.id === 'tariff-hourly-charter'
@@ -461,145 +570,12 @@ export function matchTariffProfile(
     if (hourlyTariff) return resolveTariffProfile(hourlyTariff, tariffs);
   }
 
-  // If corporate account requested
-  if (input.corporateAccountId) {
-    const corporateTariff = activeTariffs.find((t) =>
-      t.triggers.accountIds?.includes(input.corporateAccountId!)
-    );
-    if (corporateTariff) return resolveTariffProfile(corporateTariff, tariffs);
-  }
-
-  // Parse pickup day and time (local wall clock)
-  let dayOfWeek: number | undefined;
-  let timeStr: string | undefined;
-  if (input.pickupDateTime) {
-    const dt =
-      typeof input.pickupDateTime === 'string'
-        ? new Date(input.pickupDateTime)
-        : input.pickupDateTime;
-    if (!isNaN(dt.getTime())) {
-      dayOfWeek = dt.getDay();
-      const hh = String(dt.getHours()).padStart(2, '0');
-      const mm = String(dt.getMinutes()).padStart(2, '0');
-      timeStr = `${hh}:${mm}`;
-    }
-  }
-
-  const isAirportIntent = Boolean(
-    input.isAirportPickup || input.isAirportDropoff || input.isAirportTrip
-  );
-  const allTripZones = [
-    ...(input.zoneIds || []),
-    ...(input.originZoneId ? [input.originZoneId] : []),
-    ...(input.destinationZoneId ? [input.destinationZoneId] : []),
-  ];
-
-  // Filter candidates matching geographic, vehicle, account, model, and schedule triggers
-  const candidates = activeTariffs.filter((t) => {
-    // 1. Account ID requirement check
-    if (t.triggers.accountIds && t.triggers.accountIds.length > 0) {
-      if (!input.corporateAccountId || !t.triggers.accountIds.includes(input.corporateAccountId)) {
-        return false;
-      }
-    }
-
-    // 2. Hourly rate model check
-    if (t.rateModel === 'hourly' && !input.isHourlyBooking) {
-      return false;
-    }
-
-    // 3. Zip matrix rate model check: only match if corporateAccountId specified OR zip entry matches
-    if (t.rateModel === 'zip_matrix') {
-      const hasZipMatch = Boolean(evaluateZipMatrixFare(t, input.pickupZipCode, input.dropoffZipCode));
-      if (!input.corporateAccountId && !hasZipMatch) {
-        return false;
-      }
-    }
-
-    // 4. Dedicated Corridor rate model check: only auto-match if an explicit corridor matches
-    if (t.rateModel === 'corridor') {
-      if (!matchTariffCorridor(input, t)) {
-        return false;
-      }
-    }
-
-    // 5. Geographic Zone / Zone Group triggers (OR across zoneIds & zoneGroupIds when both present)
-    const hasZoneTriggers = Boolean(t.triggers.zoneIds && t.triggers.zoneIds.length > 0);
-    const hasGroupTriggers = Boolean(t.triggers.zoneGroupIds && t.triggers.zoneGroupIds.length > 0);
-    if (hasZoneTriggers || hasGroupTriggers) {
-      const matchesZone =
-        hasZoneTriggers && allTripZones.some((zid) => t.triggers.zoneIds!.includes(zid));
-      const matchesGroup =
-        hasGroupTriggers &&
-        Boolean(input.zoneGroupIds?.some((gid) => t.triggers.zoneGroupIds!.includes(gid)));
-      const matchesAirportFallback =
-        isAirportIntent &&
-        (t.id === 'tariff-airport-flat' || t.name.toLowerCase().includes('airport'));
-      if (!matchesZone && !matchesGroup && !matchesAirportFallback) {
-        return false;
-      }
-    }
-
-    // 6. Vehicle Eligibility (checks unified triggers.vehicleTypes, eligibleVehicleTypes, & legacy vehicleTiers)
-    const allowedVehicles = [
-      ...(t.triggers.vehicleTypes || []),
-      ...(t.eligibleVehicleTypes || []),
-      ...(t.triggers.vehicleTiers || []),
-    ].filter(Boolean);
-
-    if (allowedVehicles.length > 0) {
-      const matchesVehicle = doesVehicleMatchAllowedList(
-        allowedVehicles,
-        {
-          vehicleTypeId: input.vehicleTypeId,
-          vehicleType: input.vehicleType,
-          vehicleTier: input.vehicleTier,
-          vehicleClass: input.vehicleClass,
-        },
-        { allowAnyDispatch: true }
-      );
-      if (!matchesVehicle) return false;
-    }
-
-    // 7. Service Class restriction (only enforced when input explicitly carries a vehicleClass)
-    const allowedClasses = [
-      ...(t.triggers.vehicleClasses || []),
-      ...(t.eligibleVehicleClasses || []),
-    ].filter(Boolean);
-    if (allowedClasses.length > 0 && input.vehicleClass) {
-      if (!allowedClasses.includes(input.vehicleClass)) return false;
-    }
-
-    // 8. Day of week check
-    if (dayOfWeek !== undefined && t.triggers.daysOfWeek && t.triggers.daysOfWeek.length > 0) {
-      if (!t.triggers.daysOfWeek.includes(dayOfWeek)) return false;
-    }
-
-    // 9. Time window check
-    if (timeStr && t.triggers.timeWindows && t.triggers.timeWindows.length > 0) {
-      const inWindow = t.triggers.timeWindows.some((w) => timeStr! >= w.start && timeStr! <= w.end);
-      if (!inWindow) return false;
-    }
-
-    return true;
-  });
-
-  let matched: TariffProfile | undefined;
-  if (candidates.length > 0) {
-    // Higher priority wins; if tied, prefer more specific vehicle-restricted tariff over catch-all
-    candidates.sort((a, b) => {
-      if (b.priority !== a.priority) return b.priority - a.priority;
-      const aSpecific = (a.triggers.vehicleTypes?.length || 0) > 0 ? 1 : 0;
-      const bSpecific = (b.triggers.vehicleTypes?.length || 0) > 0 ? 1 : 0;
-      return bSpecific - aSpecific;
-    });
-    matched = candidates[0];
-  } else {
-    matched =
-      activeTariffs.find((t) => t.isDefault) ||
-      activeTariffs[0] ||
-      normalizeTariffProfile(DEFAULT_TARIFF_PROFILES[0]);
-  }
+  // 4. Default Rate fallback (single predictable fallback — zero hidden auto-hijacking)
+  const matched =
+    activeTariffs.find((t) => t.isDefault) ||
+    activeTariffs.find((t) => t.rateModel !== 'hourly' && t.rateModel !== 'zip_matrix') ||
+    activeTariffs[0] ||
+    normalizeTariffProfile(defaultFallback);
 
   return resolveTariffProfile(matched, tariffs);
 }
@@ -657,42 +633,61 @@ export function matchTariffCorridor(
     return undefined;
   }
 
-  const originZone = input.originZoneId || (input.zoneIds && input.zoneIds[0]);
-  const destZone = input.destinationZoneId || (input.zoneIds && input.zoneIds[1]);
-
-  if (
-    !originZone &&
-    !destZone &&
-    (!input.locationCollectionIds || input.locationCollectionIds.length === 0)
-  ) {
-    return undefined;
+  const originZones = new Set<string>([
+    ...(input.originZoneIds || []),
+    ...(input.originZoneId ? [input.originZoneId] : []),
+  ]);
+  const destZones = new Set<string>([
+    ...(input.destinationZoneIds || []),
+    ...(input.destinationZoneId ? [input.destinationZoneId] : []),
+  ]);
+  if (originZones.size === 0 && input.zoneIds && input.zoneIds.length > 0) {
+    originZones.add(input.zoneIds[0]);
+  }
+  if (destZones.size === 0 && input.zoneIds && input.zoneIds.length > 1) {
+    destZones.add(input.zoneIds[1]);
   }
 
   const collectionIds = input.locationCollectionIds || [];
+  if (originZones.size === 0 && destZones.size === 0 && collectionIds.length === 0) {
+    return undefined;
+  }
 
-  for (const corridor of profile.corridors) {
+  const sortedCorridors = [...profile.corridors].sort(
+    (a, b) => (b.priorityRank ?? 0) - (a.priorityRank ?? 0)
+  );
+
+  for (const corridor of sortedCorridors) {
+    const hasFilter = Boolean(
+      corridor.fromZoneId ||
+        corridor.toZoneId ||
+        corridor.fromLocationCollectionId ||
+        corridor.toLocationCollectionId
+    );
+    if (!hasFilter) continue;
+
     const matchesForward =
-      (!corridor.fromZoneId || corridor.fromZoneId === originZone) &&
-      (!corridor.toZoneId || corridor.toZoneId === destZone) &&
+      (!corridor.fromZoneId || originZones.has(corridor.fromZoneId)) &&
+      (!corridor.toZoneId || destZones.has(corridor.toZoneId)) &&
       (!corridor.fromLocationCollectionId ||
         collectionIds.includes(corridor.fromLocationCollectionId)) &&
       (!corridor.toLocationCollectionId ||
         collectionIds.includes(corridor.toLocationCollectionId));
 
-    if (matchesForward && (originZone || destZone || collectionIds.length > 0)) {
+    if (matchesForward) {
       return corridor;
     }
 
     if (corridor.allowReturn) {
       const matchesReturn =
-        (!corridor.fromZoneId || corridor.fromZoneId === destZone) &&
-        (!corridor.toZoneId || corridor.toZoneId === originZone) &&
+        (!corridor.fromZoneId || destZones.has(corridor.fromZoneId)) &&
+        (!corridor.toZoneId || originZones.has(corridor.toZoneId)) &&
         (!corridor.fromLocationCollectionId ||
           collectionIds.includes(corridor.fromLocationCollectionId)) &&
         (!corridor.toLocationCollectionId ||
           collectionIds.includes(corridor.toLocationCollectionId));
 
-      if (matchesReturn && (originZone || destZone || collectionIds.length > 0)) {
+      if (matchesReturn) {
         return corridor;
       }
     }
@@ -706,19 +701,27 @@ export function matchTariffCorridor(
  */
 export function evaluateTaximeterFare(
   taximeter: TariffTaximeterRate,
-  distanceMiles: number,
-  durationMinutes: number
+  rawDistanceMiles: number,
+  durationMinutes: number,
+  distanceRoundingMode: DistanceRoundingMode = 'exact'
 ): {
   baseFare: number;
   distanceFare: number;
   delayFare: number;
   subtotal: number;
+  effectiveDistanceMiles: number;
   effectivePerMileRate: number;
   effectivePerMinuteRate: number;
   isFloorApplied: boolean;
   auditDetails: string[];
 } {
   const auditDetails: string[] = [];
+  const distanceMiles = applyDistanceRounding(rawDistanceMiles, distanceRoundingMode);
+  if (distanceRoundingMode !== 'exact' && distanceMiles !== rawDistanceMiles) {
+    auditDetails.push(
+      `Distance rounding (${distanceRoundingMode}): ${rawDistanceMiles.toFixed(2)} mi -> ${distanceMiles.toFixed(2)} mi`
+    );
+  }
   const baseFare = Number((taximeter.startPrice ?? 0).toFixed(2));
   auditDetails.push(`Start price (flag drop): $${baseFare.toFixed(2)}`);
 
@@ -808,20 +811,12 @@ export function evaluateTaximeterFare(
     isFloorApplied = true;
   }
 
-  // Ceiling dollar rounding on base tariff fare
-  const ceilSubtotal = Math.ceil(calculatedSubtotal);
-  if (ceilSubtotal > calculatedSubtotal) {
-    auditDetails.push(
-      `Ceiling dollar rounding: $${calculatedSubtotal.toFixed(2)} -> $${ceilSubtotal.toFixed(2)}`
-    );
-    calculatedSubtotal = ceilSubtotal;
-  }
-
   return {
     baseFare,
     distanceFare: Number(distanceFare.toFixed(2)),
     delayFare: Number(delayFare.toFixed(2)),
     subtotal: calculatedSubtotal,
+    effectiveDistanceMiles: distanceMiles,
     effectivePerMileRate,
     effectivePerMinuteRate,
     isFloorApplied,

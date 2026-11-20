@@ -75,6 +75,20 @@ export interface TariffGroup {
 
 export type TariffRateModel = 'taximeter' | 'zip_matrix' | 'hourly' | 'corridor';
 
+export type DistanceRoundingMode = 'exact' | 'half_mile_up' | 'whole_mile_up';
+export type FareRoundingMode = 'ceil_dollar' | 'nearest_dollar' | 'nearest_half_dollar' | 'exact_cents';
+
+export interface RateRoundingPolicy {
+  distanceMode: DistanceRoundingMode;
+  fareMode: FareRoundingMode;
+}
+
+export interface RateCancellationPolicy {
+  freeWindowMinutes: number;
+  cancellationFee: number;
+  noShowFee: number;
+}
+
 export interface ZipRateMatrixEntry {
   id?: string; // e.g. "zip-63005"
   zip: string; // "63005"
@@ -115,9 +129,13 @@ export interface TariffProfile {
   // Rate Model
   rateModel?: TariffRateModel; // 'taximeter' | 'zip_matrix' | 'hourly' | 'corridor'
 
-  // Surcharge & Protection Policies
-  allowSurgeMultiplier?: boolean; // When false, surge multipliers (e.g. 1.25x) are locked out
-  allowOperationalSurcharges?: boolean; // When false, airport/toll surcharges are excluded
+  // Per-Rate Rounding & No-Show / Cancellation Policies
+  rounding?: RateRoundingPolicy;
+  cancellationPolicy?: RateCancellationPolicy;
+
+  // Legacy Surcharge & Protection Policies (deprecated — governed by Surcharges & Rules firewall)
+  allowSurgeMultiplier?: boolean;
+  allowOperationalSurcharges?: boolean;
 
   triggers: {
     vehicleTiers?: string[]; // Legacy tiers

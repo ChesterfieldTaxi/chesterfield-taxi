@@ -70,7 +70,6 @@ export const REGIONAL_AIRPORTS: readonly RegionalAirport[] = [
       'spirit st louis',
       'spirit dr',
       'spirit drive',
-      '63005',
       'million air',
       'tac air',
       'premier jet',

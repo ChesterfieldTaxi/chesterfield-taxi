@@ -565,34 +565,14 @@ export function AdminIntegrationsSubpage({
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">Card Processing Surcharge</h4>
-                      <p className="text-xs text-slate-500">Pass non-cash convenience fee to passenger</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={passCardSurcharge}
-                      onChange={(e) => setPassCardSurcharge(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600"
-                    />
-                  </div>
-                  {passCardSurcharge && (
-                    <div className="pt-2 flex items-center gap-2">
-                      <label className="text-xs font-semibold text-slate-600">Surcharge Fee:</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        value={surchargePercent}
-                        onChange={(e) => setSurchargePercent(parseFloat(e.target.value) || 0)}
-                        className="w-20 px-2 py-1 text-xs border border-slate-300 rounded-lg"
-                      />
-                      <span className="text-xs text-slate-500">%</span>
-                    </div>
-                  )}
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
+                  <h4 className="text-sm font-bold text-slate-900">Surcharges &amp; Convenience Fees</h4>
+                  <p className="text-xs text-slate-500">
+                    All customer-facing surcharges are configured centrally in{' '}
+                    <a href="/app/admin?tab=rates&sub=surcharges" className="text-blue-600 font-semibold hover:underline">
+                      Rates &amp; Tariffs → Surcharges
+                    </a>.
+                  </p>
                 </div>
               </div>
 

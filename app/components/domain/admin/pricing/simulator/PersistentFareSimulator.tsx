@@ -12,6 +12,7 @@ import {
 } from '~/components/ui/Icons';
 import { calculateTripPricing } from '~/core/services/pricing/pipeline';
 import { getAdminConfigService } from '~/core/services/config/admin-config.service';
+import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import type { PricingConfig, PricingInput } from '~/core/services/pricing/types';
 import type { TariffProfile } from '~/core/types/tariff';
 import type {
@@ -29,6 +30,7 @@ export interface PersistentFareSimulatorProps {
   surcharges: SurchargesConfig;
   vehicles?: VehicleTierConfig[];
   corporateAccounts?: CorporateAccountConfig[];
+  hasUnsavedDraft?: boolean;
   className?: string;
 }
 
@@ -39,9 +41,18 @@ export function PersistentFareSimulator({
   surcharges,
   vehicles,
   corporateAccounts,
+  hasUnsavedDraft = false,
   className = '',
 }: PersistentFareSimulatorProps) {
   const activeTariffs = useMemo(() => tariffs.filter((t) => !t.isArchived), [tariffs]);
+  const availableZones = useMemo(() => {
+    try {
+      const z = getZoneService().getActiveZones();
+      return z.length > 0 ? z : DEFAULT_ZONES;
+    } catch {
+      return DEFAULT_ZONES;
+    }
+  }, []);
 
   const simulatorVehicles = useMemo(() => {
     let source = vehicles;
@@ -80,6 +91,9 @@ export function PersistentFareSimulator({
   const [intermediateStops, setIntermediateStops] = useState<number>(0);
   const [carSeatsCount, setCarSeatsCount] = useState<number>(0);
   const [curbWaitMinutes, setCurbWaitMinutes] = useState<number>(0);
+  const [delayMinutes, setDelayMinutes] = useState<number>(0);
+  const [pickupDate, setPickupDate] = useState<string>('2026-11-20');
+  const [pickupTime, setPickupTime] = useState<string>('14:00');
   const [isHourly, setIsHourly] = useState<boolean>(false);
   const [hourlyHours, setHourlyHours] = useState<number>(2);
   const [corporateAccountId, setCorporateAccountId] = useState<string>('');
@@ -89,6 +103,7 @@ export function PersistentFareSimulator({
   const [dropoffZip, setDropoffZip] = useState<string>('63005');
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('any');
   const [isAirportPickup, setIsAirportPickup] = useState<boolean>(true);
+  const [showFirewallTrace, setShowFirewallTrace] = useState<boolean>(true);
   const [showAuditTrail, setShowAuditTrail] = useState<boolean>(false);
 
   // Quick Preset Handlers
@@ -169,10 +184,15 @@ export function PersistentFareSimulator({
       intermediateStopsCount: Number(intermediateStops) || 0,
       carSeatsBreakdown: carSeatsCount > 0 ? { booster: carSeatsCount } : undefined,
       curbWaitMinutes: Number(curbWaitMinutes) || 0,
+      delayMinutes: Number(delayMinutes) || 0,
+      pickupDateTime:
+        pickupDate && pickupTime ? `${pickupDate}T${pickupTime}:00` : undefined,
       isHourlyBooking: isHourly,
       hourlyDurationHours: isHourly ? Number(hourlyHours) || 2 : undefined,
       corporateAccountId: corporateAccountId || undefined,
       accountTags: corporateAccountId ? [corporateAccountId] : undefined,
+      originZoneIds: originZoneId ? [originZoneId] : [],
+      destinationZoneIds: destinationZoneId ? [destinationZoneId] : [],
       originZoneId: originZoneId || undefined,
       destinationZoneId: destinationZoneId || undefined,
       zoneIds: [
@@ -194,6 +214,9 @@ export function PersistentFareSimulator({
       intermediateStops,
       carSeatsCount,
       curbWaitMinutes,
+      delayMinutes,
+      pickupDate,
+      pickupTime,
       isHourly,
       hourlyHours,
       corporateAccountId,
@@ -265,8 +288,13 @@ export function PersistentFareSimulator({
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                 LIVE
               </span>
+              {hasUnsavedDraft && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  UNSAVED DRAFT
+                </span>
+              )}
             </h3>
-            <p className="text-[11px] text-slate-500">Real-time 4-pillar audit engine</p>
+            <p className="text-[11px] text-slate-500">Real-time 4-pillar firewall engine</p>
           </div>
         </div>
       </div>
@@ -635,9 +663,139 @@ export function PersistentFareSimulator({
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
+              <div>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Traffic Delay (min)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={delayMinutes}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setDelayMinutes(parseInt(e.target.value, 10) || 0)
+                  }
+                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Date</label>
+                <Input
+                  type="date"
+                  value={pickupDate}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Time</label>
+                <Input
+                  type="time"
+                  value={pickupTime}
+                  onChange={(e) => setPickupTime(e.target.value)}
+                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Zone</label>
+                <select
+                  value={originZoneId}
+                  onChange={(e) => setOriginZoneId(e.target.value)}
+                  className="w-full h-7 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
+                >
+                  <option value="">Any Zone</option>
+                  {availableZones.map((z) => (
+                    <option key={z.id} value={z.id}>{z.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Dropoff Zone</label>
+                <select
+                  value={destinationZoneId}
+                  onChange={(e) => setDestinationZoneId(e.target.value)}
+                  className="w-full h-7 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
+                >
+                  <option value="">Any Zone</option>
+                  {availableZones.map((z) => (
+                    <option key={z.id} value={z.id}>{z.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Firewall Decision Trace (Explain This Fare) */}
+        {ctx?.firewallTrace && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowFirewallTrace(!showFirewallTrace)}
+              className="w-full flex items-center justify-between text-xs text-slate-700 hover:text-slate-950 py-2 px-3 rounded-lg bg-blue-50/70 border border-blue-200 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5 font-bold text-blue-900">
+                <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
+                Firewall Decision Trace ({ctx.firewallTrace.ruleDecisions.filter((r) => r.matched).length} rules matched)
+              </span>
+              <ChevronRightIcon
+                className={`w-3.5 h-3.5 text-blue-600 transform transition-transform ${showFirewallTrace ? 'rotate-90' : ''}`}
+              />
+            </button>
+
+            {showFirewallTrace && (
+              <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-2.5">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Rules Evaluated (Top-Down)
+                  </span>
+                  <div className="space-y-1">
+                    {ctx.firewallTrace.ruleDecisions.map((rd) => (
+                      <div key={rd.ruleId} className="flex items-start justify-between gap-2 text-[10px]">
+                        <span className={rd.matched ? 'font-bold text-emerald-800' : 'text-slate-500'}>
+                          P{rd.priority} {rd.ruleName}
+                        </span>
+                        <span
+                          className={`shrink-0 px-1.5 py-0.5 rounded font-semibold ${
+                            rd.matched
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-200/70 text-slate-500'
+                          }`}
+                        >
+                          {rd.matched ? 'MATCH' : rd.reason}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Surcharges Firewall Status
+                  </span>
+                  <div className="space-y-1">
+                    {ctx.firewallTrace.surchargeDecisions.map((sd) => (
+                      <div key={sd.surchargeId} className="flex items-start justify-between gap-2 text-[10px]">
+                        <div className="min-w-0">
+                          <span className="font-semibold text-slate-800 block truncate">{sd.surchargeName}</span>
+                          <span className="text-[9px] text-slate-500 block">{sd.reason}</span>
+                        </div>
+                        <span
+                          className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase ${
+                            sd.status === 'applied'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : sd.status === 'waived'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-slate-200/70 text-slate-500'
+                          }`}
+                        >
+                          {sd.status === 'applied' ? `+$${sd.amount.toFixed(2)}` : sd.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Audit Trail Accordion */}
         <div className="pt-1">
