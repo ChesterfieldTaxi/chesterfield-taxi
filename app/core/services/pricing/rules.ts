@@ -1185,13 +1185,25 @@ export function createSurchargesAndDiscountsStep(
     const fuelAmount = overrules.fuelSurchargeAmount ?? surchargesCatalog.fuelSurchargeAmount ?? 0;
     const fuelType = overrules.fuelSurchargeType ?? surchargesCatalog.fuelSurchargeType ?? 'flat';
     const fuelTariffs = surchargesCatalog.fuelSurchargeApplicableTariffs;
+    const explicitlyTargetsFuelTariff = Boolean(
+      fuelTariffs &&
+        fuelTariffs.length > 0 &&
+        context.tariffProfileId &&
+        fuelTariffs.includes(context.tariffProfileId)
+    );
     const matchesFuelTariff =
       !fuelTariffs ||
       fuelTariffs.length === 0 ||
       !context.tariffProfileId ||
-      fuelTariffs.includes(context.tariffProfileId);
+      explicitlyTargetsFuelTariff;
 
-    if (isFuelActive && !waiveFuel && allowOperationalSurcharges && fuelAmount > 0 && matchesFuelTariff) {
+    if (
+      isFuelActive &&
+      !waiveFuel &&
+      (allowOperationalSurcharges || explicitlyTargetsFuelTariff) &&
+      fuelAmount > 0 &&
+      matchesFuelTariff
+    ) {
       const fuelFee =
         fuelType === 'per_mile'
           ? roundCurrency(fuelAmount * context.input.distanceMiles)
