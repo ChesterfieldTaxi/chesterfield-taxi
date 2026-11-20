@@ -169,7 +169,7 @@ export function PricingAdminWorkspace({
 
   const handleSaveExtras = async (updated: UniversalExtrasConfig) => {
     try {
-      saveUniversalExtrasConfig(updated);
+      await saveUniversalExtrasConfig(updated);
       setUniversalExtras(updated);
     } catch (e) {
       console.error('Error saving universal extras:', e);
@@ -179,7 +179,7 @@ export function PricingAdminWorkspace({
 
   const handleSaveSurcharges = async (updated: SurchargesConfig) => {
     try {
-      saveSurchargesConfig(updated);
+      await saveSurchargesConfig(updated);
       setSurcharges(updated);
     } catch (e) {
       console.error('Error saving surcharges:', e);
@@ -190,18 +190,21 @@ export function PricingAdminWorkspace({
   const handleSaveRule = async (updated: NamedPricingRule) => {
     try {
       const svc = getPricingRulesService();
-      svc.saveRule(updated);
+      await svc.saveRule(updated);
       setRules([...svc.getAllRules()]);
     } catch (e) {
       console.error('Error saving pricing rule:', e);
-      setRules((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setRules((prev) => {
+        const exists = prev.some((r) => r.id === updated.id);
+        return exists ? prev.map((r) => (r.id === updated.id ? updated : r)) : [updated, ...prev];
+      });
     }
   };
 
   const handleDeleteRule = async (id: string) => {
     try {
       const svc = getPricingRulesService();
-      svc.deleteRule(id);
+      await svc.deleteRule(id);
       setRules([...svc.getAllRules()]);
     } catch (e) {
       console.error('Error deleting pricing rule:', e);
@@ -289,6 +292,8 @@ export function PricingAdminWorkspace({
             <PricingRulesPanel
               rules={rules}
               tariffs={tariffs}
+              vehicles={settings?.vehicles}
+              corporateAccounts={settings?.corporateAccounts}
               onSaveRule={handleSaveRule}
               onDeleteRule={handleDeleteRule}
               isSaving={isLoading}
@@ -304,6 +309,8 @@ export function PricingAdminWorkspace({
               rules={rules}
               universalExtras={universalExtras}
               surcharges={surcharges}
+              vehicles={settings?.vehicles}
+              corporateAccounts={settings?.corporateAccounts}
             />
           </div>
         )}

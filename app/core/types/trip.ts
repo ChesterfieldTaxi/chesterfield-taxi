@@ -121,6 +121,25 @@ export interface TripPassenger {
   specialRequests?: string;
 }
 
+export interface PriceLineItem {
+  id: string;
+  category: 'base' | 'extra' | 'surcharge' | 'discount' | 'rounding';
+  label: string;
+  detail?: string;
+  amount: number; // Positive for charges, negative for discounts
+  sourceType?:
+    | 'tariff'
+    | 'corridor'
+    | 'zip_matrix'
+    | 'hourly'
+    | 'extra'
+    | 'surcharge'
+    | 'rule'
+    | 'discount'
+    | 'rounding';
+  sourceId?: string;
+}
+
 export interface TripPricing {
   baseFare: number;
   distanceMiles: number;
@@ -133,7 +152,10 @@ export interface TripPricing {
   subtotal: number;
   totalFare: number;
   currency: string;
-  // Itemized fee breakdowns
+  // Canonical single-source itemized breakdown (sum of amounts === totalFare)
+  breakdown?: PriceLineItem[];
+  tariffBaseSubtotal?: number;
+  // Itemized fee breakdowns (summary analytics fields)
   intermediateStopsCount?: number;
   multiStopSurcharge?: number;
   tollsFee?: number;
@@ -141,6 +163,8 @@ export interface TripPricing {
   manualAdjustment?: number;
   carSeatFee?: number;
   passengerSurcharge?: number;
+  oversizedLuggageFee?: number;
+  customExtrasFee?: number;
   delayFee?: number;
   appliedRuleNames?: string[];
   tariffProfileId?: string;

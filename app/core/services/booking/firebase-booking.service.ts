@@ -265,46 +265,83 @@ export class FirebaseBookingService implements IBookingService {
       }
     }
 
-    const { pricing } = calculateTripPricing(
-      {
-        distanceMiles,
-        durationMinutes,
-        vehicleTier: request.vehicleTier,
-        pickupDateTime,
-        promoCode: request.promoCode,
-        isAirportPickup,
-        isAirportDropoff,
-        isAirportTrip,
-        originZoneId: request.originZoneId || (isAirportPickup ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
-        destinationZoneId: request.destinationZoneId || (isAirportDropoff ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
-        curbWaitMinutes: request.curbWaitMinutes,
-        delayMinutes: request.delayMinutes,
-        intermediateStopsCount: validIntermediateStops.length,
-        tolls: request.tolls,
-        customTollsOrFees: request.customTollsOrFees,
-        bypassSurge: request.bypassSurge,
-        waiveMultiStopFees: request.waiveMultiStopFees,
-        waiveAirportFee: request.waiveAirportFee,
-        manualDiscount: request.manualDiscount,
-        manualFareOverride: request.manualFareOverride,
-        carSeatsBreakdown: request.carSeatsBreakdown,
-        passengers: request.passengerCount,
-        equipment: {
-          carSeats: request.carSeatsCount || (request.carSeatsBreakdown?.total ?? 0),
-          luggageCount: request.luggageCount,
-          ...request.equipment,
-        },
-        zoneIds: Array.from(matchedZoneIds),
-        zoneGroupIds: Array.from(matchedZoneGroupIds),
-        locationCollectionIds: Array.from(matchedLocationCollectionIds),
+    const basePricingInput = {
+      distanceMiles,
+      durationMinutes,
+      vehicleTypeId: request.vehicleType || request.vehicleTier,
+      vehicleType: request.vehicleType || request.vehicleTier,
+      vehicleTier: request.vehicleTier,
+      vehicleClass: request.vehicleClass,
+      pickupDateTime,
+      promoCode: request.promoCode,
+      corporateAccountId: request.corporateAccountId,
+      accountTags: request.accountTags,
+      isAirportPickup,
+      isAirportDropoff,
+      isAirportTrip,
+      originZoneId:
+        request.originZoneId ||
+        (isAirportPickup
+          ? airportCheck.airport?.iataCode === 'SUS'
+            ? 'zone-spirit-airport'
+            : 'zone-lambert-airport'
+          : undefined),
+      destinationZoneId:
+        request.destinationZoneId ||
+        (isAirportDropoff
+          ? airportCheck.airport?.iataCode === 'SUS'
+            ? 'zone-spirit-airport'
+            : 'zone-lambert-airport'
+          : undefined),
+      curbWaitMinutes: request.curbWaitMinutes,
+      delayMinutes: request.delayMinutes,
+      intermediateStopsCount: validIntermediateStops.length,
+      tolls: request.tolls,
+      customTollsOrFees: request.customTollsOrFees,
+      bypassSurge: request.bypassSurge,
+      waiveMultiStopFees: request.waiveMultiStopFees,
+      waiveAirportFee: request.waiveAirportFee,
+      manualDiscount: request.manualDiscount,
+      manualFareOverride: request.manualFareOverride,
+      carSeatsBreakdown: request.carSeatsBreakdown,
+      passengers: request.passengerCount,
+      oversizedBags: request.oversizedBags,
+      selectedCustomExtras: request.selectedCustomExtras,
+      equipment: {
+        carSeats: request.carSeatsCount || (request.carSeatsBreakdown?.total ?? 0),
+        luggageCount: request.luggageCount,
+        ...request.equipment,
       },
-      dynamicPricingConfig
-    );
+      zoneIds: Array.from(matchedZoneIds),
+      zoneGroupIds: Array.from(matchedZoneGroupIds),
+      locationCollectionIds: Array.from(matchedLocationCollectionIds),
+    };
+
+    const { pricing } = calculateTripPricing(basePricingInput, dynamicPricingConfig);
+
+    let vehicleQuotes: Record<string, typeof pricing> | undefined;
+    if (request.evaluateAllVehicleIds && request.evaluateAllVehicleIds.length > 0) {
+      vehicleQuotes = {};
+      for (const vId of request.evaluateAllVehicleIds) {
+        if (!vId) continue;
+        const vResult = calculateTripPricing(
+          {
+            ...basePricingInput,
+            vehicleTypeId: vId,
+            vehicleType: vId,
+            vehicleTier: vId,
+          },
+          dynamicPricingConfig
+        );
+        vehicleQuotes[vId] = vResult.pricing;
+      }
+    }
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     return {
       pricing,
+      vehicleQuotes,
       estimatedDistanceMiles: distanceMiles,
       estimatedDurationMinutes: durationMinutes,
       currency: pricing.currency,

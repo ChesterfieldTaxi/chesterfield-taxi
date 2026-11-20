@@ -1,15 +1,15 @@
 /**
  * Pure Functional Prioritized Pricing Pipeline
- * 
- * Composes the individual pricing transformation steps into a deterministic,
- * zero-side-effect pipeline.
- * 
- * Pipeline sequence:
- * 1. Base Fare Calculation
- * 2. Distance & Time Rate Application
- * 3. Vehicle Multiplier Application
- * 4. Surge / Time-of-day Multiplier
- * 5. Discounts & Surcharges Deductions
+ *
+ * Composes the deterministic pricing steps into a zero-side-effect pipeline:
+ * 1. Routing & Policy Rules (selects target tariff, collects fee waivers & deferred modifiers)
+ * 2. Unified Tariff Engine (Taximeter / Corridor / Zip Matrix / Hourly -> Base Fare)
+ * 3. Legacy Fallback Base/Distance/Time (only if no Tariff Profiles exist)
+ * 4. Vehicle Pricing (Option A: governed via Tariffs, Surcharges & Rules)
+ * 5. Rule Modifiers (post-tariff flat overrides, multipliers, adders, layered zone fees)
+ * 6. Opt-In Admin Peak Surge (zero hidden hardcoded surge)
+ * 7. Universal Customer Extras (Car Seats, Extra Pax, Stops, Oversized Cargo, Curb Wait, Custom Extras)
+ * 8. Operational & Conditional Surcharges, Discounts, Manual Override & Ceiling Rounding
  */
 
 import type { TripPricing } from '../../types';
@@ -22,13 +22,14 @@ import type {
 } from './types';
 import {
   DEFAULT_PRICING_CONFIG,
+  resolveRoutingRules,
   applyUnifiedTariffEngine,
   applyBaseFare,
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
+  applyRuleModifiers,
   applySurgeMultiplier,
   applyConditionSurcharges,
-  applyNamedPricingRules,
   applySurchargesAndDiscounts,
   roundCurrency,
 } from './rules';
@@ -62,6 +63,7 @@ export function createInitialContext(
     surgeMultiplier: 1.0,
     surcharges: [],
     discounts: [],
+    lineItems: [],
     subtotal: 0,
     totalFare: 0,
     currency: config.currency ?? 'USD',
@@ -71,26 +73,21 @@ export function createInitialContext(
 
 /**
  * Standard prioritized pipeline steps array.
- * Step 1: Named Pricing Rules (Intelligent routing: Airport flat transfer rule, vehicle triggers, overrule flags)
- * Step 2: Unified Tariff Profiles (Taximeter step rates, Smoke House zip-matrix, Hourly charter)
- * Steps 3-4: Fallback Base Fare and Distance/Time Rates (if no tariff profile active)
- * Steps 5-8: Overlays (Vehicle multiplier, Surge, Universal Extras, Surcharges & Discounts)
  */
 export const DEFAULT_PIPELINE_STEPS: readonly PricingPipelineStep[] = [
-  applyNamedPricingRules,
+  resolveRoutingRules,
   applyUnifiedTariffEngine,
   applyBaseFare,
   applyDistanceAndTimeRates,
   applyVehicleMultiplier,
+  applyRuleModifiers,
   applySurgeMultiplier,
   applyConditionSurcharges,
   applySurchargesAndDiscounts,
 ] as const;
 
-
 /**
  * Executes a sequence of pure pricing pipeline steps on a given context.
- * Pure reducer with zero mutations and zero side effects.
  */
 export function pipePricing(
   initialContext: PricingContext,
@@ -100,7 +97,7 @@ export function pipePricing(
 }
 
 /**
- * Maps a completed PricingContext into the TripPricing data model expected by Firestore.
+ * Maps a completed PricingContext into the TripPricing data model expected by Firestore & UI.
  */
 export function toTripPricing(context: PricingContext): TripPricing {
   const discountAmount = roundCurrency(
@@ -111,24 +108,30 @@ export function toTripPricing(context: PricingContext): TripPricing {
   const tollsItem = context.surcharges.find((s) => s.name.toLowerCase().includes('toll'));
   const airportItem = context.surcharges.find((s) => s.name.toLowerCase().includes('airport'));
 
+  const tariffBase = roundCurrency(context.tariffBaseSubtotal ?? context.baseFare);
+
   return {
-    baseFare: context.baseFare,
+    baseFare: tariffBase,
+    tariffBaseSubtotal: tariffBase,
     distanceMiles: context.input.distanceMiles,
     durationMinutes: context.input.durationMinutes,
-    distanceRate: context.config.perMileRate,
-    timeRate: context.config.perMinuteRate,
+    distanceRate: context.effectiveDistanceRate ?? context.config.perMileRate,
+    timeRate: context.effectiveTimeRate ?? context.config.perMinuteRate,
     vehicleMultiplier: context.vehicleMultiplier,
     surgeMultiplier: context.surgeMultiplier,
     discountAmount,
-    subtotal: Math.ceil(context.subtotal),
+    subtotal: tariffBase,
     totalFare: Math.ceil(context.totalFare),
     currency: context.currency,
+    breakdown: [...context.lineItems],
     intermediateStopsCount: context.input.intermediateStopsCount || 0,
     multiStopSurcharge: multiStopItem ? multiStopItem.amount : 0,
     tollsFee: tollsItem ? tollsItem.amount : 0,
     airportSurcharge: airportItem ? airportItem.amount : 0,
     carSeatFee: context.carSeatFee || 0,
     passengerSurcharge: context.passengerSurcharge || 0,
+    oversizedLuggageFee: context.oversizedLuggageFee || 0,
+    customExtrasFee: context.customExtrasFee || 0,
     delayFee: context.delayFee || 0,
     appliedRuleNames: context.appliedRuleNames ? [...context.appliedRuleNames] : undefined,
     tariffProfileId: context.tariffProfileId,
@@ -144,9 +147,8 @@ export function toTripPricing(context: PricingContext): TripPricing {
 }
 
 /**
- * Balances round-trip leg fares so that both the outbound and return legs
- * are priced identically using the higher price of the two legs, rounded up
- * to the ceiling dollar.
+ * Balances round-trip leg fares so that both outbound and return legs are priced identically
+ * using the higher leg price, rounded up to the ceiling dollar.
  */
 export function balanceRoundTripLegFares(
   outboundFare: number,
@@ -166,9 +168,6 @@ export function balanceRoundTripLegFares(
 
 /**
  * Pure Functional Pricing Engine entrypoint.
- * 
- * Takes raw trip routing details and returns a deterministic price breakdown
- * along with the complete step-by-step audit trail.
  */
 export function calculateTripPricing(
   input: PricingInput,
@@ -200,7 +199,7 @@ export function calculateTripPricing(
 }
 
 /**
- * Pricing Engine class wrapper for object-oriented dependency injection if preferred.
+ * Pricing Engine class wrapper for object-oriented dependency injection.
  */
 export class PurePricingEngine {
   constructor(

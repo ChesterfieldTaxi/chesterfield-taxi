@@ -5,7 +5,7 @@
  * prioritized pricing pipeline.
  */
 
-import type { VehicleTier, TripPricing } from '../../types';
+import type { VehicleTier, TripPricing, PriceLineItem } from '../../types';
 
 export interface PricingConfig {
   /** Base fare applied to every trip */
@@ -144,9 +144,15 @@ export interface PricingInput {
   dropoffZipCode?: string;
   /** Corporate Account ID (e.g. 'corp-smoke-house') */
   corporateAccountId?: string;
+  /** Exact admin-configured vehicle type ID (e.g. 'any', 'compact_suv', 'midsize_suv', 'minivan') */
+  vehicleTypeId?: string;
   /** Dual vehicle classifications */
   vehicleType?: import('../../types/config').VehicleType;
   vehicleClass?: import('../../types/config').VehicleClass;
+  /** Oversized cargo category counts (e.g. { golf_bag: 1, skis: 2 }) */
+  oversizedBags?: Record<string, number>;
+  /** Customer-selected custom extras from UniversalExtrasConfig.customExtras (extraId -> qty) */
+  selectedCustomExtras?: Record<string, number>;
   /** Hourly charter bookings */
   isHourlyBooking?: boolean;
   hourlyDurationHours?: number;
@@ -203,12 +209,17 @@ export interface PricingContext {
   // Phase 19: Extended condition totals & audit
   readonly carSeatFee?: number;
   readonly passengerSurcharge?: number;
+  readonly oversizedLuggageFee?: number;
+  readonly customExtrasFee?: number;
   readonly delayFee?: number;
   readonly appliedRuleNames?: ReadonlyArray<string>;
 
   // Phase 22: Unified Tariff Profile tracking
   readonly tariffProfileId?: string;
   readonly tariffProfileName?: string;
+  readonly tariffBaseSubtotal?: number;
+  readonly effectiveDistanceRate?: number;
+  readonly effectiveTimeRate?: number;
   readonly matchedCorridorId?: string;
   readonly matchedCorridorName?: string;
   readonly targetTariffId?: string;
@@ -216,7 +227,16 @@ export interface PricingContext {
   readonly overruleSurcharges?: Partial<import('../../types/config').SurchargesConfig>;
   readonly layeredZoneFee?: number;
   readonly driverPay?: number;
-
+  readonly evaluatedRuleModifiers?: {
+    flatOverride?: number;
+    multiplier: number;
+    surchargeFlat: number;
+    surchargePercent: number;
+    surchargeAdders?: import('../../types/config').RuleSurchargeAdder[];
+    matchedRuleNames: string[];
+    auditDetails: string[];
+  };
+  readonly lineItems: ReadonlyArray<PriceLineItem>;
 
   // Step-by-step calculation trace for transparency and auditing
   readonly auditTrail: ReadonlyArray<CalculationAuditStep>;

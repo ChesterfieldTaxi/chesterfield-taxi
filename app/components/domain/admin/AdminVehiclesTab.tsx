@@ -91,7 +91,7 @@ export function AdminVehiclesTab({
     next[editingIndex] = {
       ...editForm,
       name: editForm.name.trim(),
-      baseMultiplier: Number(editForm.baseMultiplier) || 1.0,
+      baseMultiplier: 1.0,
       maxPassengers: Number(editForm.maxPassengers) || 1,
       maxLuggage: Number(editForm.maxLuggage) || 0,
     };
@@ -122,7 +122,7 @@ export function AdminVehiclesTab({
   const [newTier, setNewTier] = useState<VehicleTierConfig>({
     id: '',
     name: '',
-    baseMultiplier: 1.25,
+    baseMultiplier: 1.0,
     maxPassengers: 4,
     maxLuggage: 3,
     description: '',
@@ -177,7 +177,7 @@ export function AdminVehiclesTab({
     setNewTier({
       id: '',
       name: '',
-      baseMultiplier: 1.25,
+      baseMultiplier: 1.0,
       maxPassengers: 4,
       maxLuggage: 3,
       description: '',
@@ -217,7 +217,7 @@ export function AdminVehiclesTab({
           {subTab === 'types' ? (
             <>
               <TagIcon className="w-4 h-4 text-blue-600" />
-              <span>Service Classes &amp; Multipliers ({vehicles.length} categories)</span>
+              <span>Service Classes &amp; Capacities ({vehicles.length} categories)</span>
             </>
           ) : (
             <>
@@ -259,7 +259,7 @@ export function AdminVehiclesTab({
                 <h3 className="text-base font-extrabold text-slate-900">Vehicle Types (Service Classes)</h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Define vehicle categories in service (e.g. Standard Sedan, SUV, Van, WAV), passenger/luggage capacities, and fare multipliers.
+                Define vehicle categories in service (e.g. Compact SUV, Midsize SUV, Minivan), capacities, and customer photos. Vehicle upgrade fees and tariffs are managed in <strong>Rates &amp; Tariffs</strong>.
               </p>
             </div>
 
@@ -336,24 +336,7 @@ export function AdminVehiclesTab({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Fare Multiplier
-                      </label>
-                      <Input
-                        type="number"
-                        step="0.05"
-                        min="0.5"
-                        max="5.0"
-                        value={newTier.baseMultiplier}
-                        onChange={(e) =>
-                          setNewTier({ ...newTier, baseMultiplier: parseFloat(e.target.value) || 1.0 })
-                        }
-                        required
-                      />
-                    </div>
-
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Max Passengers
@@ -575,25 +558,7 @@ export function AdminVehiclesTab({
                 </CardHeader>
 
                 <CardContent className="p-4 space-y-4 flex-1">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Multiplier</span>
-                      <div className="flex items-center justify-center gap-0.5">
-                        <Input
-                          type="number"
-                          step="0.05"
-                          min="0.5"
-                          max="5.0"
-                          value={v.baseMultiplier}
-                          onChange={(e) =>
-                            handleUpdateVehicle(index, { baseMultiplier: parseFloat(e.target.value) || 1.0 })
-                          }
-                          className="w-18 h-7 text-xs text-center font-bold font-mono"
-                        />
-                        <span className="text-xs font-bold text-slate-600">x</span>
-                      </div>
-                    </div>
-
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                       <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Passengers</span>
                       <div className="flex items-center justify-center gap-1">
@@ -711,23 +676,7 @@ export function AdminVehiclesTab({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Multiplier
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    min="0.5"
-                    max="5.0"
-                    value={editForm.baseMultiplier}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, baseMultiplier: parseFloat(e.target.value) || 1.0 })
-                    }
-                    required
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Max Passengers

@@ -1,6 +1,6 @@
 /**
  * Pricing Rules Service
- * 
+ *
  * Manages named dynamic pricing rules in Firestore collection `/pricingRules`
  * with regional Chesterfield/St. Louis presets, real-time sync, offline caching,
  * and pure condition-based evaluation.
@@ -19,6 +19,7 @@ import {
 import type { NamedPricingRule, PricingRuleTrigger, PricingRuleModifier } from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
+import { doesVehicleMatchAllowedList } from './vehicle-matching';
 
 const PRICING_RULES_STORAGE_KEY = 'chesterfield_taxi_pricing_rules';
 
@@ -26,7 +27,8 @@ export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
   {
     id: 'rule-airport-transfer-flat',
     name: 'Airport Transfer Flat Rate (Lambert & Spirit)',
-    description: 'Directly applies Airport Flat Rate tariff when trip originates or terminates at Lambert (STL) or Spirit (SUS) airports.',
+    description:
+      'Directly applies Airport Flat Rate tariff when trip originates or terminates at Lambert (STL) or Spirit (SUS) airports.',
     priority: 95,
     isActive: true,
     allowDriverSelection: false,
@@ -46,7 +48,7 @@ export const DEFAULT_NAMED_PRICING_RULES: NamedPricingRule[] = [
 export interface RuleEvaluationInput {
   distanceMiles: number;
   durationMinutes?: number;
-  pickupDate?: string; // "YYYY-MM-DD"
+  pickupDate?: string; // "YYYY-MM-DD" (local wall-clock)
   pickupTime?: string; // "HH:MM" 24h
   zoneIds?: string[];
   originZoneId?: string;
@@ -58,6 +60,7 @@ export interface RuleEvaluationInput {
   locationCollectionIds?: string[];
   accountType?: 'retail' | 'corporate' | 'vip';
   accountTags?: string[];
+  vehicleTypeId?: string;
   vehicleTier?: string;
   vehicleType?: import('../../types/config').VehicleType;
   vehicleClass?: import('../../types/config').VehicleClass;
@@ -90,10 +93,10 @@ export interface EvaluatedRulesSummary {
   auditTrail: string[];
 }
 
-
 export class PricingRulesService {
   private isConfigured: boolean;
   private db: Firestore | null = null;
+  private cache: NamedPricingRule[] | null = null;
 
   constructor() {
     this.isConfigured = isFirebaseConfigured();
@@ -107,13 +110,17 @@ export class PricingRulesService {
   }
 
   private getCachedRules(): NamedPricingRule[] {
+    if (this.cache !== null) {
+      return [...this.cache];
+    }
     if (typeof window === 'undefined') return DEFAULT_NAMED_PRICING_RULES;
     try {
       const raw = localStorage.getItem(PRICING_RULES_STORAGE_KEY);
-      if (raw) {
+      if (raw !== null) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          this.cache = parsed;
+          return [...parsed];
         }
       }
     } catch {
@@ -123,6 +130,7 @@ export class PricingRulesService {
   }
 
   private setCachedRules(rules: NamedPricingRule[]): void {
+    this.cache = [...rules];
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(PRICING_RULES_STORAGE_KEY, JSON.stringify(rules));
@@ -171,13 +179,14 @@ export class PricingRulesService {
             snapshot.forEach((snap) => {
               rules.push({ id: snap.id, ...(snap.data() as Omit<NamedPricingRule, 'id'>) });
             });
+            rules.sort((a, b) => b.priority - a.priority);
             if (rules.length > 0) {
-              rules.sort((a, b) => b.priority - a.priority);
               this.setCachedRules(rules);
               onUpdate(rules);
             } else {
-              const cached = this.getCachedRules().sort((a, b) => b.priority - a.priority);
-              onUpdate(cached);
+              // Respect explicit empty cache vs uninitialized first run
+              const existing = this.getCachedRules().sort((a, b) => b.priority - a.priority);
+              onUpdate(existing);
             }
           },
           (err) => {
@@ -207,16 +216,6 @@ export class PricingRulesService {
       createdAt: rule.createdAt || new Date().toISOString(),
     };
 
-    if (this.isConfigured && this.db) {
-      try {
-        const ruleRef = doc(this.db, 'pricingRules', ruleId);
-        const payload = sanitizePayload(sanitizedRule);
-        await setDoc(ruleRef, payload, { merge: true });
-      } catch (err) {
-        console.warn('[PricingRulesService] Firestore save error, saving to cache:', err);
-      }
-    }
-
     const current = this.getCachedRules();
     const existingIndex = current.findIndex((r) => r.id === ruleId);
     let updated: NamedPricingRule[];
@@ -228,10 +227,25 @@ export class PricingRulesService {
     }
     updated.sort((a, b) => b.priority - a.priority);
     this.setCachedRules(updated);
+
+    if (this.isConfigured && this.db) {
+      try {
+        const ruleRef = doc(this.db, 'pricingRules', ruleId);
+        const payload = sanitizePayload(sanitizedRule);
+        await setDoc(ruleRef, payload);
+      } catch (err) {
+        console.warn('[PricingRulesService] Firestore save error, kept in cache:', err);
+      }
+    }
+
     return sanitizedRule;
   }
 
   public async deleteRule(ruleId: string): Promise<void> {
+    const current = this.getCachedRules();
+    const updated = current.filter((r) => r.id !== ruleId);
+    this.setCachedRules(updated);
+
     if (this.isConfigured && this.db) {
       try {
         const ruleRef = doc(this.db, 'pricingRules', ruleId);
@@ -240,10 +254,6 @@ export class PricingRulesService {
         console.warn('[PricingRulesService] Firestore delete error:', err);
       }
     }
-
-    const current = this.getCachedRules();
-    const updated = current.filter((r) => r.id !== ruleId);
-    this.setCachedRules(updated);
   }
 
   public async resetToDefaults(): Promise<NamedPricingRule[]> {
@@ -261,9 +271,6 @@ export class PricingRulesService {
     return DEFAULT_NAMED_PRICING_RULES;
   }
 
-  /**
-   * Adjusts priority ranking of a rule up or down in the prioritized list.
-   */
   public async reorderRule(ruleId: string, direction: 'up' | 'down'): Promise<NamedPricingRule[]> {
     const current = [...this.getCachedRules()].sort((a, b) => b.priority - a.priority);
     const idx = current.findIndex((r) => r.id === ruleId);
@@ -272,12 +279,10 @@ export class PricingRulesService {
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= current.length) return current;
 
-    // Swap priorities
     const tempPriority = current[idx].priority;
     current[idx].priority = current[targetIdx].priority;
     current[targetIdx].priority = tempPriority;
 
-    // Ensure distinct priority ordering if equal
     if (current[idx].priority === current[targetIdx].priority) {
       if (direction === 'up') {
         current[idx].priority += 1;
@@ -304,7 +309,6 @@ export class PricingRulesService {
 
 /**
  * Resolves rule inheritance recursively.
- * Cycles in the parent tree are detected and broken cleanly.
  */
 export function resolveRuleInheritance(
   rule: NamedPricingRule,
@@ -330,43 +334,61 @@ export function resolveRuleInheritance(
 
   const resolvedParent = resolveRuleInheritance(parentRule, allRules, newVisited);
 
-  // Merge triggers: Child takes precedence or merges with parent
   const mergedTriggers: PricingRuleTrigger = {
     ...resolvedParent.triggers,
     ...rule.triggers,
     fromZoneId: rule.triggers.fromZoneId ?? resolvedParent.triggers.fromZoneId,
     toZoneId: rule.triggers.toZoneId ?? resolvedParent.triggers.toZoneId,
     zoneIds: rule.triggers.zoneIds?.length ? rule.triggers.zoneIds : resolvedParent.triggers.zoneIds,
-    zoneGroupIds: rule.triggers.zoneGroupIds?.length ? rule.triggers.zoneGroupIds : resolvedParent.triggers.zoneGroupIds,
+    zoneGroupIds: rule.triggers.zoneGroupIds?.length
+      ? rule.triggers.zoneGroupIds
+      : resolvedParent.triggers.zoneGroupIds,
     locationCollectionIds: rule.triggers.locationCollectionIds?.length
       ? rule.triggers.locationCollectionIds
       : resolvedParent.triggers.locationCollectionIds,
-    timeWindows: rule.triggers.timeWindows?.length ? rule.triggers.timeWindows : resolvedParent.triggers.timeWindows,
-    daysOfWeek: rule.triggers.daysOfWeek?.length ? rule.triggers.daysOfWeek : resolvedParent.triggers.daysOfWeek,
-    holidayDates: rule.triggers.holidayDates?.length ? rule.triggers.holidayDates : resolvedParent.triggers.holidayDates,
-    accountTypes: rule.triggers.accountTypes?.length ? rule.triggers.accountTypes : resolvedParent.triggers.accountTypes,
-    accountTags: rule.triggers.accountTags?.length ? rule.triggers.accountTags : resolvedParent.triggers.accountTags,
-    vehicleTiers: rule.triggers.vehicleTiers?.length ? rule.triggers.vehicleTiers : resolvedParent.triggers.vehicleTiers,
+    timeWindows: rule.triggers.timeWindows?.length
+      ? rule.triggers.timeWindows
+      : resolvedParent.triggers.timeWindows,
+    daysOfWeek: rule.triggers.daysOfWeek?.length
+      ? rule.triggers.daysOfWeek
+      : resolvedParent.triggers.daysOfWeek,
+    holidayDates: rule.triggers.holidayDates?.length
+      ? rule.triggers.holidayDates
+      : resolvedParent.triggers.holidayDates,
+    accountTypes: rule.triggers.accountTypes?.length
+      ? rule.triggers.accountTypes
+      : resolvedParent.triggers.accountTypes,
+    accountTags: rule.triggers.accountTags?.length
+      ? rule.triggers.accountTags
+      : resolvedParent.triggers.accountTags,
+    vehicleTiers: rule.triggers.vehicleTiers?.length
+      ? rule.triggers.vehicleTiers
+      : resolvedParent.triggers.vehicleTiers,
+    vehicleTypes: rule.triggers.vehicleTypes?.length
+      ? rule.triggers.vehicleTypes
+      : resolvedParent.triggers.vehicleTypes,
+    vehicleClasses: rule.triggers.vehicleClasses?.length
+      ? rule.triggers.vehicleClasses
+      : resolvedParent.triggers.vehicleClasses,
     equipment: rule.triggers.equipment ?? resolvedParent.triggers.equipment,
     passengers: rule.triggers.passengers ?? resolvedParent.triggers.passengers,
   };
 
-  // Merge modifiers: Child overrides, and surcharge adders accumulate
   const mergedModifier: PricingRuleModifier = {
     ...resolvedParent.modifier,
     ...rule.modifier,
     baseFareOverride:
       rule.modifier.overrideBaseFare === false
         ? resolvedParent.modifier.baseFareOverride
-        : (rule.modifier.baseFareOverride ?? resolvedParent.modifier.baseFareOverride),
+        : rule.modifier.baseFareOverride ?? resolvedParent.modifier.baseFareOverride,
     perMileRateOverride:
       rule.modifier.overrideRates === false
         ? resolvedParent.modifier.perMileRateOverride
-        : (rule.modifier.perMileRateOverride ?? resolvedParent.modifier.perMileRateOverride),
+        : rule.modifier.perMileRateOverride ?? resolvedParent.modifier.perMileRateOverride,
     perMinuteRateOverride:
       rule.modifier.overrideRates === false
         ? resolvedParent.modifier.perMinuteRateOverride
-        : (rule.modifier.perMinuteRateOverride ?? resolvedParent.modifier.perMinuteRateOverride),
+        : rule.modifier.perMinuteRateOverride ?? resolvedParent.modifier.perMinuteRateOverride,
     surchargeAdders:
       rule.modifier.overrideSurcharges === false
         ? resolvedParent.modifier.surchargeAdders
@@ -388,8 +410,6 @@ export function resolveRuleInheritance(
 
 /**
  * Pure evaluation function for condition-based pricing rules.
- * Supports rule inheritance, execution flow halting, and full condition checks.
- * Runs with 0 side-effects.
  */
 export function evaluateApplicablePricingRules(
   input: RuleEvaluationInput,
@@ -399,9 +419,8 @@ export function evaluateApplicablePricingRules(
   const auditTrail: string[] = [];
   let stoppedProcessingByRule: NamedPricingRule | undefined = undefined;
 
-  // Parse time and day of week
   let dayOfWeek: number | undefined = undefined;
-  let timeStr: string | undefined = input.pickupTime;
+  const timeStr: string | undefined = input.pickupTime;
 
   if (input.pickupDate) {
     try {
@@ -415,7 +434,6 @@ export function evaluateApplicablePricingRules(
     }
   }
 
-  // If a specific rule is selected manually (e.g. by dispatcher or driver)
   if (input.selectedRuleId) {
     const rawRule = rules.find((r) => r.id === input.selectedRuleId && r.isActive);
     if (rawRule) {
@@ -426,44 +444,48 @@ export function evaluateApplicablePricingRules(
       );
     }
   } else {
-    // Dynamic rule evaluation sorted by priority
     const activeRules = rules.filter((r) => r.isActive).sort((a, b) => b.priority - a.priority);
 
     for (const rawRule of activeRules) {
-      // Resolve inheritance from parent rules
       const rule = resolveRuleInheritance(rawRule, rules);
       const { triggers } = rule;
       let matches = true;
 
+      const allTripZoneIds = [
+        ...(input.zoneIds || []),
+        ...(input.originZoneId ? [input.originZoneId] : []),
+        ...(input.destinationZoneId ? [input.destinationZoneId] : []),
+      ];
+
       // 0. Bidirectional Transfer check (e.g. Airport Transfer Rule)
       if (triggers.isBidirectionalTransfer) {
-        let hasTransferMatch = false;
-        const allTripZoneIds = [
-          ...(input.zoneIds || []),
-          ...(input.originZoneId ? [input.originZoneId] : []),
-          ...(input.destinationZoneId ? [input.destinationZoneId] : []),
-        ];
-        if (triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
-          if (input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid))) {
+        const hasAnyZoneFilter =
+          (triggers.zoneIds && triggers.zoneIds.length > 0) ||
+          (triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0);
+        if (hasAnyZoneFilter) {
+          let hasTransferMatch = false;
+          if (triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
+            if (input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid))) {
+              hasTransferMatch = true;
+            }
+          }
+          if (triggers.zoneIds && triggers.zoneIds.length > 0) {
+            if (allTripZoneIds.some((zid) => triggers.zoneIds!.includes(zid))) {
+              hasTransferMatch = true;
+            }
+          }
+          if (
+            (rule.id === 'rule-airport-transfer-flat' ||
+              rule.modifier.targetTariffId === 'tariff-airport-flat') &&
+            (input.isAirportPickup || input.isAirportDropoff || input.isAirportTrip)
+          ) {
             hasTransferMatch = true;
           }
-        }
-        if (triggers.zoneIds && triggers.zoneIds.length > 0) {
-          if (allTripZoneIds.some((zid) => triggers.zoneIds!.includes(zid))) {
-            hasTransferMatch = true;
+          if (!hasTransferMatch) {
+            matches = false;
           }
-        }
-        if (
-          (rule.id === 'rule-airport-transfer-flat' || rule.modifier.targetTariffId === 'tariff-airport-flat') &&
-          (input.isAirportPickup || input.isAirportDropoff || input.isAirportTrip)
-        ) {
-          hasTransferMatch = true;
-        }
-        if (!hasTransferMatch) {
-          matches = false;
         }
       }
-
 
       // 0b. Origin -> Destination Corridor check
       if (matches && triggers.fromZoneId) {
@@ -484,23 +506,29 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 1. Zone Geofence check (if not bidirectional)
-      if (matches && !triggers.isBidirectionalTransfer && triggers.zoneIds && triggers.zoneIds.length > 0) {
-        const allTripZoneIds = [
-          ...(input.zoneIds || []),
-          ...(input.originZoneId ? [input.originZoneId] : []),
-          ...(input.destinationZoneId ? [input.destinationZoneId] : []),
-        ];
+      // 1. Zone Geofence check (non-bidirectional)
+      if (
+        matches &&
+        !triggers.isBidirectionalTransfer &&
+        triggers.zoneIds &&
+        triggers.zoneIds.length > 0
+      ) {
         const hasZoneMatch = allTripZoneIds.some((zid) => triggers.zoneIds!.includes(zid));
         if (!hasZoneMatch) {
           matches = false;
         }
       }
 
-
-      // 2. Zone Group check (if not bidirectional)
-      if (matches && !triggers.isBidirectionalTransfer && triggers.zoneGroupIds && triggers.zoneGroupIds.length > 0) {
-        const hasGroupMatch = input.zoneGroupIds?.some((gid) => triggers.zoneGroupIds!.includes(gid));
+      // 2. Zone Group check (non-bidirectional)
+      if (
+        matches &&
+        !triggers.isBidirectionalTransfer &&
+        triggers.zoneGroupIds &&
+        triggers.zoneGroupIds.length > 0
+      ) {
+        const hasGroupMatch = input.zoneGroupIds?.some((gid) =>
+          triggers.zoneGroupIds!.includes(gid)
+        );
         if (!hasGroupMatch) {
           matches = false;
         }
@@ -508,7 +536,9 @@ export function evaluateApplicablePricingRules(
 
       // 3. Location Collection POI check
       if (matches && triggers.locationCollectionIds && triggers.locationCollectionIds.length > 0) {
-        const hasCollMatch = input.locationCollectionIds?.some((cid) => triggers.locationCollectionIds!.includes(cid));
+        const hasCollMatch = input.locationCollectionIds?.some((cid) =>
+          triggers.locationCollectionIds!.includes(cid)
+        );
         if (!hasCollMatch) {
           matches = false;
         }
@@ -527,12 +557,20 @@ export function evaluateApplicablePricingRules(
       }
 
       // 5. Trip Duration range check
-      if (matches && typeof triggers.minDurationMinutes === 'number' && input.durationMinutes !== undefined) {
+      if (
+        matches &&
+        typeof triggers.minDurationMinutes === 'number' &&
+        input.durationMinutes !== undefined
+      ) {
         if (input.durationMinutes < triggers.minDurationMinutes) {
           matches = false;
         }
       }
-      if (matches && typeof triggers.maxDurationMinutes === 'number' && input.durationMinutes !== undefined) {
+      if (
+        matches &&
+        typeof triggers.maxDurationMinutes === 'number' &&
+        input.durationMinutes !== undefined
+      ) {
         if (input.durationMinutes > triggers.maxDurationMinutes) {
           matches = false;
         }
@@ -550,9 +588,9 @@ export function evaluateApplicablePricingRules(
         if (!timeStr) {
           matches = false;
         } else {
-          const inWindow = triggers.timeWindows.some((w) => {
-            return timeStr! >= w.start && timeStr! <= w.end;
-          });
+          const inWindow = triggers.timeWindows.some(
+            (w) => timeStr >= w.start && timeStr <= w.end
+          );
           if (!inWindow) matches = false;
         }
       }
@@ -571,33 +609,47 @@ export function evaluateApplicablePricingRules(
         }
       }
 
-      // 10. Account tags check
+      // 10. Corporate account / Account tags check
       if (matches && triggers.accountTags && triggers.accountTags.length > 0) {
-        if (!input.accountTags || !input.accountTags.some((tag) => triggers.accountTags!.includes(tag))) {
+        const inputTags = new Set<string>([
+          ...(input.accountTags || []),
+          ...(input.corporateAccountId ? [input.corporateAccountId] : []),
+        ]);
+        const hasTagMatch = triggers.accountTags.some((tag) => inputTags.has(tag));
+        if (!hasTagMatch) {
           matches = false;
         }
       }
 
-      // 11. Vehicle tier check (legacy)
-      if (matches && triggers.vehicleTiers && triggers.vehicleTiers.length > 0) {
-        if (!input.vehicleTier || !triggers.vehicleTiers.includes(input.vehicleTier)) {
+      // 11. Unified Vehicle Match (empty array = matches ALL vehicles)
+      const allowedVehicles = [
+        ...(triggers.vehicleTypes || []),
+        ...(triggers.vehicleTiers || []),
+      ].filter(Boolean);
+      if (matches && allowedVehicles.length > 0) {
+        const vehicleMatched = doesVehicleMatchAllowedList(
+          allowedVehicles,
+          {
+            vehicleTypeId: input.vehicleTypeId,
+            vehicleType: input.vehicleType,
+            vehicleTier: input.vehicleTier,
+            vehicleClass: input.vehicleClass,
+          },
+          { allowAnyDispatch: false }
+        );
+        if (!vehicleMatched) {
           matches = false;
         }
       }
 
-      // 11b. Dual Vehicle classification checks
-      if (matches && triggers.vehicleTypes && triggers.vehicleTypes.length > 0) {
-        if (!input.vehicleType || !triggers.vehicleTypes.includes(input.vehicleType)) {
-          matches = false;
-        }
-      }
-      if (matches && triggers.vehicleClasses && triggers.vehicleClasses.length > 0) {
-        if (!input.vehicleClass || !triggers.vehicleClasses.includes(input.vehicleClass)) {
+      // 11b. Service Class check (only when input explicitly provides vehicleClass)
+      if (matches && triggers.vehicleClasses && triggers.vehicleClasses.length > 0 && input.vehicleClass) {
+        if (!triggers.vehicleClasses.includes(input.vehicleClass)) {
           matches = false;
         }
       }
 
-      // 12. Equipment filters check (car seats, luggage)
+      // 12. Equipment filters check
       if (matches && triggers.equipment) {
         if (
           typeof triggers.equipment.minCarSeats === 'number' &&
@@ -631,7 +683,6 @@ export function evaluateApplicablePricingRules(
           `Triggered Rule: "${rule.name}" (Priority ${rule.priority})${parentNotice} -> ${rule.modifier.type} ${rule.modifier.value}`
         );
 
-        // Rule Execution Control: Halt further processing on match
         if (rule.stopProcessingOnMatch) {
           auditTrail.push(
             `Rule "${rule.name}" has [Stop Processing On Match] active. Skipping remaining lower-priority rules.`
@@ -643,8 +694,6 @@ export function evaluateApplicablePricingRules(
     }
   }
 
-  // Calculate cumulative effects:
-  // Flat override takes precedence (highest priority rule with flat_override)
   let flatOverride: number | undefined = undefined;
   let multiplier = 1.0;
   let surchargeFlat = 0;
@@ -654,8 +703,10 @@ export function evaluateApplicablePricingRules(
   let perMinuteRateOverride: number | undefined = undefined;
   const surchargeAdders: import('../../types/config').RuleSurchargeAdder[] = [];
   let targetTariffId: string | undefined = undefined;
-  let overruleExtras: Partial<import('../../types/config').UniversalExtrasConfig> | undefined = undefined;
-  let overruleSurcharges: Partial<import('../../types/config').SurchargesConfig> | undefined = undefined;
+  let overruleExtras: Partial<import('../../types/config').UniversalExtrasConfig> | undefined =
+    undefined;
+  let overruleSurcharges: Partial<import('../../types/config').SurchargesConfig> | undefined =
+    undefined;
   let layeredZoneFee = 0;
 
   for (const rule of matchedRules) {
@@ -684,20 +735,26 @@ export function evaluateApplicablePricingRules(
       overruleSurcharges = { ...(overruleSurcharges || {}), ...oSurcharges };
     }
 
-    if (typeof lzFee === 'number') {
+    if (typeof lzFee === 'number' && lzFee > 0) {
       layeredZoneFee += lzFee;
     }
 
     if (type === 'flat_override') {
-      if (flatOverride === undefined) {
+      if (flatOverride === undefined && typeof value === 'number' && value > 0) {
         flatOverride = value;
       }
     } else if (type === 'multiplier') {
-      multiplier *= value;
+      if (typeof value === 'number' && value > 0 && value !== 1) {
+        multiplier *= value;
+      }
     } else if (type === 'surcharge_flat') {
-      surchargeFlat += value;
+      if (typeof value === 'number' && value > 0) {
+        surchargeFlat += value;
+      }
     } else if (type === 'surcharge_percent') {
-      surchargePercent += value;
+      if (typeof value === 'number' && value > 0) {
+        surchargePercent += value;
+      }
     }
 
     if (typeof bfo === 'number' && baseFareOverride === undefined) {

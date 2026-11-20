@@ -1,17 +1,18 @@
 /**
  * Surcharges Catalog Service
- * 
- * Manages operational, geographic, temporal, and cancellation charges:
+ *
+ * Manages operational, geographic, temporal, vehicle-conditional, and cancellation charges:
  * - Lambert & Spirit Airport Commercial Access Fee ($4.00)
- * - Peak Demand Surge Multipliers (e.g. 1.25x)
+ * - Built-In Fuel / Gas Surcharge (Flat $, $/Mile, or %)
+ * - Opt-In Peak Demand Surge Multiplier (only active when explicitly enabled)
  * - Out-of-Area Remote Service Fee ($15.00 outside 15-mile radius)
- * - Late Cancellation Fee (within 1 hour of pickup)
- * - Passenger No-Show Fee ($28.00 minimum floor)
- * 
+ * - Custom Conditional Surcharges (Vehicle Types, Distance, Time Window, Days, Zones)
+ * - Late Cancellation & Passenger No-Show Protection
+ *
  * Stored in Firestore `/pricingConfig/surcharges` with LocalStorage caching.
  */
 
-import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, type Firestore } from 'firebase/firestore';
 import type { SurchargesConfig } from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
@@ -19,16 +20,17 @@ import { sanitizePayload } from '../firestore-sanitizer';
 const SURCHARGES_STORAGE_KEY = 'chesterfield_taxi_surcharges_config_v2';
 
 export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
-  airportGateFee: 4.00,
+  airportGateFee: 4.0,
   airportTargetZoneIds: ['zone-lambert-airport', 'zone-spirit-airport'],
   peakSurgeMultiplier: 1.25,
-  outOfAreaRemoteFee: 15.00,
+  isPeakSurgeActive: false,
+  outOfAreaRemoteFee: 15.0,
   outOfAreaThresholdMiles: 15.0,
-  cancellationFeeWithinOneHour: 28.00,
-  noShowFee: 28.00,
+  cancellationFeeWithinOneHour: 28.0,
+  noShowFee: 28.0,
   isFuelSurchargeActive: false,
   fuelSurchargeType: 'flat',
-  fuelSurchargeAmount: 2.50,
+  fuelSurchargeAmount: 2.5,
   fuelSurchargeApplicableTariffs: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
   airportFeeApplicableTariffs: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
   surgeApplicableTariffs: ['tariff-point-to-point-meter'],
@@ -37,8 +39,8 @@ export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
     {
       id: 'surcharge-suv-minivan-fee',
       name: 'SUV / Minivan Upgrade Fee',
-      description: 'Vehicle size & luggage capacity upgrade for SUV and Van/WAV',
-      amount: 10.00,
+      description: 'Vehicle size & luggage capacity upgrade for SUV and Minivan/WAV',
+      amount: 10.0,
       type: 'flat',
       isActive: true,
       applicableTariffIds: ['tariff-airport-flat', 'tariff-point-to-point-meter'],
@@ -48,6 +50,48 @@ export const DEFAULT_SURCHARGES_CONFIG: SurchargesConfig = {
     },
   ],
 };
+
+function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesConfig {
+  const merged = { ...DEFAULT_SURCHARGES_CONFIG, ...raw };
+  const airportGateFee =
+    typeof raw.airportGateFee === 'number'
+      ? raw.airportGateFee
+      : typeof raw.airportCommercialGateFee === 'number'
+      ? raw.airportCommercialGateFee
+      : DEFAULT_SURCHARGES_CONFIG.airportGateFee;
+  const outOfAreaRemoteFee =
+    typeof raw.outOfAreaRemoteFee === 'number'
+      ? raw.outOfAreaRemoteFee
+      : typeof raw.remoteServiceFlatFee === 'number'
+      ? raw.remoteServiceFlatFee
+      : DEFAULT_SURCHARGES_CONFIG.outOfAreaRemoteFee;
+  const outOfAreaThresholdMiles =
+    typeof raw.outOfAreaThresholdMiles === 'number'
+      ? raw.outOfAreaThresholdMiles
+      : typeof raw.remoteBoundaryDistanceMiles === 'number'
+      ? raw.remoteBoundaryDistanceMiles
+      : DEFAULT_SURCHARGES_CONFIG.outOfAreaThresholdMiles;
+  const cancellationFeeWithinOneHour =
+    typeof raw.cancellationFeeWithinOneHour === 'number'
+      ? raw.cancellationFeeWithinOneHour
+      : typeof raw.cancellationFee === 'number'
+      ? raw.cancellationFee
+      : DEFAULT_SURCHARGES_CONFIG.cancellationFeeWithinOneHour;
+
+  return {
+    ...merged,
+    airportGateFee,
+    airportCommercialGateFee: airportGateFee,
+    outOfAreaRemoteFee,
+    remoteServiceFlatFee: outOfAreaRemoteFee,
+    outOfAreaThresholdMiles,
+    remoteBoundaryDistanceMiles: outOfAreaThresholdMiles,
+    cancellationFeeWithinOneHour,
+    cancellationFee: cancellationFeeWithinOneHour,
+    isPeakSurgeActive: Boolean(merged.isPeakSurgeActive),
+    customSurcharges: Array.isArray(merged.customSurcharges) ? merged.customSurcharges : [],
+  };
+}
 
 export class SurchargesService {
   private cache: SurchargesConfig | null = null;
@@ -59,14 +103,19 @@ export class SurchargesService {
     this.db = this.isConfigured ? getFirestoreDb() : null;
   }
 
-  private getCached(): SurchargesConfig {
+  public getCached(): SurchargesConfig {
+    if (this.cache) {
+      return { ...this.cache };
+    }
     if (typeof window === 'undefined') return DEFAULT_SURCHARGES_CONFIG;
     try {
       const raw = localStorage.getItem(SURCHARGES_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed.airportGateFee === 'number') {
-          return { ...DEFAULT_SURCHARGES_CONFIG, ...parsed };
+          const normalized = normalizeSurchargesConfig(parsed);
+          this.cache = normalized;
+          return { ...normalized };
         }
       }
     } catch {
@@ -75,17 +124,19 @@ export class SurchargesService {
     return DEFAULT_SURCHARGES_CONFIG;
   }
 
-  private setCached(cfg: SurchargesConfig): void {
+  public setCached(cfg: SurchargesConfig): void {
+    const normalized = normalizeSurchargesConfig(cfg);
+    this.cache = normalized;
     if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(SURCHARGES_STORAGE_KEY, JSON.stringify(cfg));
+      localStorage.setItem(SURCHARGES_STORAGE_KEY, JSON.stringify(normalized));
     } catch {
       // Ignore storage errors
     }
   }
 
-  public async getSurcharges(): Promise<SurchargesConfig> {
-    if (this.cache) {
+  public async getSurcharges(forceRefresh = false): Promise<SurchargesConfig> {
+    if (this.cache && !forceRefresh) {
       return { ...this.cache };
     }
 
@@ -94,11 +145,9 @@ export class SurchargesService {
         const ref = doc(this.db, 'pricingConfig', 'surcharges');
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          const data = snap.data() as SurchargesConfig;
-          const merged = { ...DEFAULT_SURCHARGES_CONFIG, ...data };
-          this.cache = merged;
-          this.setCached(merged);
-          return merged;
+          const normalized = normalizeSurchargesConfig(snap.data() as Partial<SurchargesConfig>);
+          this.setCached(normalized);
+          return { ...normalized };
         }
       } catch (err) {
         console.warn('[SurchargesService] Firestore fetch error, using cache:', err);
@@ -107,17 +156,50 @@ export class SurchargesService {
 
     const cached = this.getCached();
     this.cache = cached;
-    return cached;
+    return { ...cached };
+  }
+
+  public subscribeToSurcharges(
+    onUpdate: (cfg: SurchargesConfig) => void,
+    onError?: (err: Error) => void
+  ): () => void {
+    onUpdate(this.getCached());
+
+    if (!this.isConfigured || !this.db) {
+      this.getSurcharges().then(onUpdate).catch((err) => onError?.(err));
+      return () => {};
+    }
+
+    try {
+      const ref = doc(this.db, 'pricingConfig', 'surcharges');
+      return onSnapshot(
+        ref,
+        (snap) => {
+          if (snap.exists()) {
+            const normalized = normalizeSurchargesConfig(snap.data() as Partial<SurchargesConfig>);
+            this.setCached(normalized);
+            onUpdate(normalized);
+          }
+        },
+        (err) => {
+          console.warn('[SurchargesService] Snapshot error:', err);
+          onError?.(err);
+        }
+      );
+    } catch (err) {
+      console.warn('[SurchargesService] Snapshot setup failed:', err);
+      return () => {};
+    }
   }
 
   public async saveSurcharges(cfg: SurchargesConfig): Promise<void> {
-    this.cache = { ...cfg };
-    this.setCached(cfg);
+    const normalized = normalizeSurchargesConfig(cfg);
+    this.setCached(normalized);
 
     if (this.isConfigured && this.db) {
       try {
         const ref = doc(this.db, 'pricingConfig', 'surcharges');
-        await setDoc(ref, sanitizePayload(cfg), { merge: true });
+        await setDoc(ref, sanitizePayload(normalized), { merge: true });
       } catch (err) {
         console.error('[SurchargesService] Failed to save to Firestore:', err);
         throw err;
@@ -136,16 +218,13 @@ export function getSurchargesService(): SurchargesService {
 }
 
 export function getSurchargesConfig(): SurchargesConfig {
-  const svc = getSurchargesService();
-  return (svc as any).getCached ? (svc as any).getCached() : DEFAULT_SURCHARGES_CONFIG;
+  return getSurchargesService().getCached();
 }
 
-export function saveSurchargesConfig(cfg: SurchargesConfig): void {
+export async function saveSurchargesConfig(cfg: SurchargesConfig): Promise<void> {
   const svc = getSurchargesService();
-  if ((svc as any).setCached) {
-    (svc as any).setCached(cfg);
-  }
-  svc.saveSurcharges(cfg).catch((e) => console.error(e));
+  svc.setCached(cfg);
+  await svc.saveSurcharges(cfg);
 }
 
 export type { SurchargesConfig };

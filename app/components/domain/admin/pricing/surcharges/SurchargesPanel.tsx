@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { SurchargesConfig, CustomSurchargeItem, CustomSurchargeTrigger, VehicleTierConfig } from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
+import type { ZoneGeofence } from '~/core/types/zone';
 import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { getTariffService, DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
+import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -133,11 +135,34 @@ export function SurchargesPanel({
   const [formIsActive, setFormIsActive] = useState(true);
   const [formTariffs, setFormTariffs] = useState<string[]>([]);
   const [formVehicleTiers, setFormVehicleTiers] = useState<string[]>([]);
+  const [formDaysOfWeek, setFormDaysOfWeek] = useState<number[]>([]);
+  const [formZoneIds, setFormZoneIds] = useState<string[]>([]);
   const [formMinDistance, setFormMinDistance] = useState<string>('');
   const [formMaxDistance, setFormMaxDistance] = useState<string>('');
   const [formHasTimeWindow, setFormHasTimeWindow] = useState(false);
   const [formStartHour, setFormStartHour] = useState<number>(22);
   const [formEndHour, setFormEndHour] = useState<number>(5);
+
+  const [availableZones, setAvailableZones] = useState<ZoneGeofence[]>(() => {
+    try {
+      const z = getZoneService().getActiveZones();
+      return z.length > 0 ? z : DEFAULT_ZONES;
+    } catch {
+      return DEFAULT_ZONES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const unsub = getZoneService().subscribeToZones((zones) => {
+        const active = zones.filter((z) => z.isActive && !z.isArchived);
+        if (active.length > 0) setAvailableZones(active);
+      });
+      return () => unsub();
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   const handleOpenCreate = () => {
     setEditingId(null);
@@ -148,6 +173,8 @@ export function SurchargesPanel({
     setFormIsActive(true);
     setFormTariffs(activeTariffs.map((t) => t.id));
     setFormVehicleTiers([]); // Empty = Applies to ALL Vehicle Tiers by default
+    setFormDaysOfWeek([]);
+    setFormZoneIds([]);
     setFormMinDistance('');
     setFormMaxDistance('');
     setFormHasTimeWindow(false);
@@ -166,7 +193,9 @@ export function SurchargesPanel({
     const activeIds = activeTariffs.map((t) => t.id);
     const itemTariffs = (item.applicableTariffIds || activeIds).filter((id) => activeIds.includes(id));
     setFormTariffs(itemTariffs.length > 0 ? itemTariffs : activeIds);
-    setFormVehicleTiers(item.triggers?.vehicleTiers || item.applicableVehicleTypes || []);
+    setFormVehicleTiers(item.triggers?.vehicleTiers || item.triggers?.vehicleTypes || item.applicableVehicleTypes || []);
+    setFormDaysOfWeek(item.triggers?.daysOfWeek || []);
+    setFormZoneIds(item.triggers?.zoneIds || []);
     setFormMinDistance(item.triggers?.minDistanceMiles !== undefined ? String(item.triggers.minDistanceMiles) : '');
     setFormMaxDistance(item.triggers?.maxDistanceMiles !== undefined ? String(item.triggers.maxDistanceMiles) : '');
     if (item.triggers?.timeWindow) {
@@ -195,20 +224,16 @@ export function SurchargesPanel({
 
     const triggers: CustomSurchargeTrigger = {};
     if (formVehicleTiers.length > 0) {
-      const expanded = new Set<string>(formVehicleTiers);
-      if (expanded.has('sedan') || expanded.has('standard')) {
-        expanded.add('sedan');
-        expanded.add('standard');
-        expanded.add('any');
-      }
-      if (expanded.has('suv') || expanded.has('xl')) {
-        expanded.add('suv');
-        expanded.add('xl');
-      }
-      if (expanded.has('wheelchair') || expanded.has('van') || expanded.has('minivan')) {
-        if (expanded.has('wheelchair')) expanded.add('wheelchair_wav');
-      }
-      triggers.vehicleTiers = Array.from(expanded);
+      // Save exact selected Admin Vehicle IDs with zero alias pollution
+      const exactVehicleIds = Array.from(new Set(formVehicleTiers.map((v) => v.trim()).filter(Boolean)));
+      triggers.vehicleTiers = exactVehicleIds;
+      triggers.vehicleTypes = exactVehicleIds;
+    }
+    if (formDaysOfWeek.length > 0) {
+      triggers.daysOfWeek = [...formDaysOfWeek].sort((a, b) => a - b);
+    }
+    if (formZoneIds.length > 0) {
+      triggers.zoneIds = [...formZoneIds];
     }
     if (formMinDistance.trim() !== '') {
       triggers.minDistanceMiles = parseFloat(formMinDistance);
@@ -572,14 +597,17 @@ export function SurchargesPanel({
               <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-800 font-medium">
                 <input
                   type="checkbox"
-                  checked={workingCopy.isPeakSurgeActive}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('isPeakSurgeActive', e.target.checked)}
+                  checked={Boolean(workingCopy.isPeakSurgeActive)}
+                  onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const checked = e.target.checked;
+                    await persistImmediately({ ...workingCopy, isPeakSurgeActive: checked });
+                  }}
                   className="rounded border-slate-300 text-amber-600 focus:ring-0"
                 />
                 <span>Surge Currently Active</span>
               </label>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Contract rates (Smoke House) are always exempt
+                Opt-in only: zero automatic or hidden surge rules apply when unchecked
               </span>
             </div>
 
@@ -864,6 +892,16 @@ export function SurchargesPanel({
                           Hours: {item.triggers.timeWindow.startHour}:00 - {item.triggers.timeWindow.endHour}:00
                         </Badge>
                       )}
+                      {item.triggers?.daysOfWeek && item.triggers.daysOfWeek.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-200 font-medium">
+                          Days: {item.triggers.daysOfWeek.map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}
+                        </Badge>
+                      )}
+                      {item.triggers?.zoneIds && item.triggers.zoneIds.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-700 border-indigo-200 font-medium">
+                          Zones: {item.triggers.zoneIds.map((zId) => availableZones.find((z) => z.id === zId)?.name || zId).join(', ')}
+                        </Badge>
+                      )}
                       {item.applicableTariffIds && item.applicableTariffIds.length > 0 && (
                         <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-200 font-medium">
                           Tariffs:{' '}
@@ -1084,6 +1122,72 @@ export function SurchargesPanel({
                   </div>
                 )}
               </div>
+
+              {/* Days of Week Condition */}
+              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 block">
+                  Days of Week (Optional — leave empty for every day):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayLabel, dayIdx) => {
+                    const isSelected = formDaysOfWeek.includes(dayIdx);
+                    return (
+                      <button
+                        key={dayLabel}
+                        type="button"
+                        onClick={() =>
+                          setFormDaysOfWeek(
+                            isSelected
+                              ? formDaysOfWeek.filter((d) => d !== dayIdx)
+                              : [...formDaysOfWeek, dayIdx]
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                        }`}
+                      >
+                        {dayLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Zone Condition */}
+              {availableZones.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  <label className="text-xs font-bold text-slate-800 block">
+                    Restrict to Service Zones (Optional — leave empty for all zones):
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableZones.map((z) => {
+                      const isSelected = formZoneIds.includes(z.id);
+                      return (
+                        <button
+                          key={z.id}
+                          type="button"
+                          onClick={() =>
+                            setFormZoneIds(
+                              isSelected
+                                ? formZoneIds.filter((id) => id !== z.id)
+                                : [...formZoneIds, z.id]
+                            )
+                          }
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                          }`}
+                        >
+                          {z.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Applicable Tariffs */}
               <div className="pt-2 border-t border-slate-100 space-y-1.5">

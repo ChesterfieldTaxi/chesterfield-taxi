@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import type { NamedPricingRule, VehicleType, VehicleClass } from '~/core/types/config';
+import React, { useState, useEffect, useMemo } from 'react';
+import type {
+  NamedPricingRule,
+  VehicleType,
+  VehicleTierConfig,
+  CorporateAccountConfig,
+  PricingRuleModifier,
+} from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
 import type { ZoneGeofence } from '~/core/types/zone';
+import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
@@ -13,17 +20,20 @@ import {
   SearchIcon,
   MapPinIcon,
   SlidersIcon,
+  TrashIcon,
 } from '~/components/ui/Icons';
 
 export interface PricingRulesPanelProps {
   rules: NamedPricingRule[];
   tariffs: TariffProfile[];
+  vehicles?: VehicleTierConfig[];
+  corporateAccounts?: CorporateAccountConfig[];
   onSaveRule: (rule: NamedPricingRule) => Promise<void>;
   onDeleteRule?: (id: string) => Promise<void>;
   isSaving?: boolean;
 }
 
-const VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
+const FALLBACK_VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
   { id: 'sedan', label: 'Sedan' },
   { id: 'suv', label: 'SUV' },
   { id: 'minivan', label: 'Minivan' },
@@ -31,29 +41,51 @@ const VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
   { id: 'wheelchair_wav', label: 'WAV Wheelchair' },
 ];
 
-const VEHICLE_CLASSES: { id: VehicleClass; label: string }[] = [
-  { id: 'standard', label: 'Standard' },
-  { id: 'executive', label: 'Executive' },
-  { id: 'xl', label: 'XL 6-Pax' },
-  { id: 'medical', label: 'Medical Non-Emergency' },
-  { id: 'delivery', label: 'Delivery / Courier' },
-];
-
 export function PricingRulesPanel({
   rules,
   tariffs,
+  vehicles,
+  corporateAccounts,
   onSaveRule,
   onDeleteRule,
   isSaving = false,
 }: PricingRulesPanelProps) {
-  const [selectedRuleId, setSelectedRuleId] = useState<string>(
-    rules[0]?.id || 'rule-airport-transfer-flat'
-  );
+  const activeVehicles = useMemo(() => {
+    let source = vehicles;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.vehicles;
+      } catch {
+        source = [];
+      }
+    }
+    if (source && source.length > 0) {
+      return source
+        .filter((v) => !v.isArchived)
+        .map((v) => ({ id: v.id, label: v.name || v.id }));
+    }
+    return FALLBACK_VEHICLE_TYPES;
+  }, [vehicles]);
+
+  const activeCorporateAccounts = useMemo(() => {
+    let source = corporateAccounts;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.corporateAccounts;
+      } catch {
+        source = [];
+      }
+    }
+    return (source || []).filter((c) => c.isActive !== false);
+  }, [corporateAccounts]);
+
+  const [selectedRuleId, setSelectedRuleId] = useState<string>(rules[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [availableZones, setAvailableZones] = useState<ZoneGeofence[]>(() => {
     try {
-      return getZoneService().getActiveZones();
+      const active = getZoneService().getActiveZones();
+      return active.length > 0 ? active : DEFAULT_ZONES;
     } catch {
       return DEFAULT_ZONES;
     }
@@ -62,18 +94,29 @@ export function PricingRulesPanel({
   useEffect(() => {
     try {
       const unsub = getZoneService().subscribeToZones((zones) => {
-        setAvailableZones(zones.filter((z) => z.isActive && !z.isArchived));
+        const active = zones.filter((z) => z.isActive && !z.isArchived);
+        if (active.length > 0) setAvailableZones(active);
       });
       return () => unsub();
     } catch {
-      // fallback
+      return undefined;
     }
   }, []);
 
-  const selectedRule = rules.find((r) => r.id === selectedRuleId) || rules[0];
+  const selectedRule = rules.find((r) => r.id === selectedRuleId) || rules[0] || null;
   const [workingCopy, setWorkingCopy] = useState<NamedPricingRule | null>(
     selectedRule ? JSON.parse(JSON.stringify(selectedRule)) : null
   );
+
+  // Sync workingCopy when Firestore rules hydrate or selection changes
+  useEffect(() => {
+    if (selectedRule && (!workingCopy || workingCopy.id !== selectedRule.id)) {
+      setSelectedRuleId(selectedRule.id);
+      setWorkingCopy(JSON.parse(JSON.stringify(selectedRule)));
+    } else if (!selectedRule && rules.length === 0) {
+      setWorkingCopy(null);
+    }
+  }, [selectedRule, rules.length]);
 
   const handleSelectRule = (id: string) => {
     setSelectedRuleId(id);
@@ -97,20 +140,38 @@ export function PricingRulesPanel({
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
-  const handleAddNewRule = () => {
+  const handleDeleteCurrentRule = async () => {
+    if (!workingCopy || !onDeleteRule) return;
+    const deletedId = workingCopy.id;
+    const deletedName = workingCopy.name;
+    const nextRule = rules.find((r) => r.id !== deletedId);
+    await onDeleteRule(deletedId);
+    if (nextRule) {
+      setSelectedRuleId(nextRule.id);
+      setWorkingCopy(JSON.parse(JSON.stringify(nextRule)));
+    } else {
+      setSelectedRuleId('');
+      setWorkingCopy(null);
+    }
+    setSaveSuccessMsg(`Deleted rule "${deletedName}"`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleAddNewRule = async () => {
     const newId = `rule-${Date.now()}`;
     const newRule: NamedPricingRule = {
       id: newId,
-      name: 'New Pricing Rule',
-      description: 'Routing and modifier rule',
+      name: `New Pricing Rule #${rules.length + 1}`,
+      description: 'Automated tariff routing and fee modifier rule',
       isActive: true,
       priority: 80,
       allowDriverSelection: false,
       stopProcessingOnMatch: false,
       triggers: {
-        isBidirectionalTransfer: true,
-        vehicleTypes: ['sedan', 'suv', 'minivan', 'van', 'wheelchair_wav'],
-        vehicleClasses: ['standard', 'executive', 'xl', 'medical', 'delivery'],
+        isBidirectionalTransfer: false,
+        // Empty vehicle arrays = matches ALL fleet vehicles by default
+        vehicleTypes: [],
+        vehicleClasses: [],
       },
       modifier: {
         type: 'apply_tariff',
@@ -121,35 +182,77 @@ export function PricingRulesPanel({
 
     setWorkingCopy(newRule);
     setSelectedRuleId(newId);
+    await onSaveRule(newRule);
   };
 
-  const toggleTriggerVehicleType = (vt: VehicleType) => {
+  const getWorkingVehicleTypes = (r: NamedPricingRule): string[] => {
+    return Array.from(
+      new Set([...(r.triggers.vehicleTypes || []), ...(r.triggers.vehicleTiers || [])])
+    );
+  };
+
+  const toggleTriggerVehicleType = (vtId: string) => {
     if (!workingCopy) return;
-    const current = workingCopy.triggers.vehicleTypes || [];
-    const next = current.includes(vt)
-      ? current.filter((x: string) => x !== vt)
-      : [...current, vt];
+    const current = getWorkingVehicleTypes(workingCopy);
+    const next = current.some((x) => x.toLowerCase() === vtId.toLowerCase())
+      ? current.filter((x) => x.toLowerCase() !== vtId.toLowerCase())
+      : [...current, vtId];
     setWorkingCopy({
       ...workingCopy,
-      triggers: { ...workingCopy.triggers, vehicleTypes: next },
+      triggers: {
+        ...workingCopy.triggers,
+        vehicleTypes: next,
+        vehicleTiers: undefined,
+      },
     });
   };
 
-  const toggleTriggerVehicleClass = (vc: VehicleClass) => {
+  const toggleExtraWaiver = (field: 'waiveCarSeatFee' | 'waiveExtraPaxFee', checked: boolean) => {
     if (!workingCopy) return;
-    const current = workingCopy.triggers.vehicleClasses || [];
-    const next = current.includes(vc)
-      ? current.filter((x: string) => x !== vc)
-      : [...current, vc];
+    const nextOverrule = { ...(workingCopy.modifier.overruleExtras || {}) };
+    if (checked) {
+      nextOverrule[field] = true;
+    } else {
+      delete nextOverrule[field];
+      if (field === 'waiveCarSeatFee') delete nextOverrule.carSeatFeePerUnit;
+      if (field === 'waiveExtraPaxFee') delete nextOverrule.extraPassengerFeePerHead;
+    }
     setWorkingCopy({
       ...workingCopy,
-      triggers: { ...workingCopy.triggers, vehicleClasses: next },
+      modifier: {
+        ...workingCopy.modifier,
+        overruleExtras: Object.keys(nextOverrule).length > 0 ? nextOverrule : undefined,
+      },
     });
   };
+
+  const toggleSurchargeWaiver = (
+    field: 'waiveAirportFee' | 'waiveRemoteFee' | 'waiveFuelSurcharge',
+    checked: boolean
+  ) => {
+    if (!workingCopy) return;
+    const nextOverrule = { ...(workingCopy.modifier.overruleSurcharges || {}) };
+    if (checked) {
+      nextOverrule[field] = true;
+    } else {
+      delete nextOverrule[field];
+      if (field === 'waiveAirportFee') delete nextOverrule.airportGateFee;
+      if (field === 'waiveRemoteFee') delete nextOverrule.outOfAreaRemoteFee;
+    }
+    setWorkingCopy({
+      ...workingCopy,
+      modifier: {
+        ...workingCopy.modifier,
+        overruleSurcharges: Object.keys(nextOverrule).length > 0 ? nextOverrule : undefined,
+      },
+    });
+  };
+
+  const modifierType = workingCopy?.modifier.type || 'apply_tariff';
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[640px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-      {/* Left Sub-Panel: Rule List (~280px) */}
+      {/* Left Sub-Panel: Rule List */}
       <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-slate-50/80 shrink-0">
         <div className="p-3.5 border-b border-slate-200 space-y-2.5 bg-white">
           <div className="flex items-center justify-between">
@@ -161,7 +264,7 @@ export function PricingRulesPanel({
               type="button"
               size="sm"
               onClick={handleAddNewRule}
-              className="h-7 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2.5 shadow-2xs"
+              className="h-7 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2.5 shadow-2xs cursor-pointer"
             >
               <PlusIcon className="w-3 h-3 mr-1" />
               New Rule
@@ -196,9 +299,7 @@ export function PricingRulesPanel({
                 }`}
               >
                 <div className="flex items-start justify-between gap-1 mb-1">
-                  <span className="text-xs font-bold text-slate-900 truncate">
-                    {rule.name}
-                  </span>
+                  <span className="text-xs font-bold text-slate-900 truncate">{rule.name}</span>
                   <Badge
                     variant="outline"
                     className="text-[9px] px-1.5 py-0 bg-purple-50 text-purple-800 border-purple-300 shrink-0 font-mono"
@@ -214,7 +315,17 @@ export function PricingRulesPanel({
                 <div className="flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-100 pt-1.5">
                   <div className="flex items-center gap-1 text-blue-700 truncate font-medium">
                     <span>↳</span>
-                    <span className="truncate">{targetTariff?.name || 'Tariff Routing'}</span>
+                    <span className="truncate">
+                      {rule.modifier.type === 'flat_override'
+                        ? `Flat $${rule.modifier.value}`
+                        : rule.modifier.type === 'multiplier'
+                        ? `${rule.modifier.value}× Fare`
+                        : rule.modifier.type === 'surcharge_flat'
+                        ? `+$${rule.modifier.value}`
+                        : rule.modifier.type === 'surcharge_percent'
+                        ? `+${rule.modifier.value}%`
+                        : targetTariff?.name || 'Tariff Routing'}
+                    </span>
                   </div>
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${
@@ -225,6 +336,12 @@ export function PricingRulesPanel({
               </button>
             );
           })}
+
+          {filteredRules.length === 0 && (
+            <div className="p-4 text-center text-xs text-slate-400">
+              No pricing rules configured. Click &ldquo;+ New Rule&rdquo; to create one.
+            </div>
+          )}
         </div>
       </div>
 
@@ -232,7 +349,6 @@ export function PricingRulesPanel({
       <div className="flex-1 flex flex-col bg-white overflow-y-auto custom-scrollbar">
         {workingCopy ? (
           <div className="p-6 space-y-6">
-            {/* Save Notification Toast */}
             {saveSuccessMsg && (
               <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-2xs">
                 <span className="flex items-center gap-1.5 font-semibold">
@@ -253,17 +369,30 @@ export function PricingRulesPanel({
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Connective pricing engine: routes trips to target tariffs, overrules extras, and manages rate layering.
+                    IF trip matches conditions below → THEN route to target tariff, apply modifiers, or waive specific fees.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {onDeleteRule && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDeleteCurrentRule}
+                      disabled={isSaving}
+                      className="text-xs border-rose-200 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-300 shadow-2xs cursor-pointer"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5 mr-1" />
+                      Delete
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => handleSelectRule(workingCopy.id)}
-                    className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+                    className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer"
                   >
                     Reset
                   </Button>
@@ -272,7 +401,7 @@ export function PricingRulesPanel({
                     size="sm"
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium shadow-2xs"
+                    className="text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium shadow-2xs cursor-pointer"
                   >
                     <CheckIcon className="w-3.5 h-3.5 mr-1" />
                     Save Pricing Rule
@@ -280,7 +409,6 @@ export function PricingRulesPanel({
                 </div>
               </div>
 
-              {/* General Fields Grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs pt-3 border-t border-slate-200">
                 <div className="md:col-span-3">
                   <label className="text-[11px] font-medium text-slate-700 block mb-1">Rule Name</label>
@@ -295,7 +423,9 @@ export function PricingRulesPanel({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Evaluation Priority (1 - 100)</label>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Evaluation Priority (1 - 100)
+                  </label>
                   <Input
                     type="number"
                     min="1"
@@ -324,7 +454,6 @@ export function PricingRulesPanel({
                 />
               </div>
 
-              {/* Switches: Active, Stop Processing on Match */}
               <div className="flex flex-wrap items-center gap-6 pt-3 border-t border-slate-200 text-xs">
                 <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
                   <input
@@ -355,11 +484,11 @@ export function PricingRulesPanel({
               </div>
             </div>
 
-            {/* Trigger Matrix Section */}
+            {/* 1. Trigger Matrix Section */}
             <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-4 shadow-2xs">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
-                1. Trip Conditions & Triggers
+                1. IF — Trip Conditions &amp; Triggers
               </h3>
 
               {/* Bidirectional Transfer Trigger */}
@@ -379,17 +508,19 @@ export function PricingRulesPanel({
                     }
                     className="rounded border-blue-400 text-blue-600 focus:ring-0"
                   />
-                  <span>Bidirectional Transfer Trigger (Matches either Pickup OR Dropoff in target zones)</span>
+                  <span>Bidirectional Transfer Trigger (Matches either Pickup OR Dropoff in selected zones)</span>
                 </label>
                 <p className="text-[11px] text-blue-700 pl-5">
-                  Allows 1 unified rule to handle inbound & outbound airport transfers simultaneously, replacing 12 separate TaxiCaller rules.
+                  Ideal for airport transfers — 1 unified rule handles both inbound &amp; outbound airport trips.
                 </p>
               </div>
 
-              {/* Target Zones & Accounts */}
+              {/* Target Zones & Corporate Accounts */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Corporate Account Trigger</label>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Corporate Account Trigger
+                  </label>
                   <select
                     value={(workingCopy.triggers.accountTags || [])[0] || ''}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
@@ -404,12 +535,18 @@ export function PricingRulesPanel({
                     className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                   >
                     <option value="">Any / Public Retail Trips</option>
-                    <option value="corp-smoke-house">Smoke House Chesterfield (corp-smoke-house)</option>
+                    {activeCorporateAccounts.map((corp) => (
+                      <option key={corp.id} value={corp.id}>
+                        {corp.companyName} ({corp.accountNumber})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Target Zone / Airport Group</label>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Target Service Zones (Leave empty for all zones)
+                  </label>
                   <Input
                     type="text"
                     placeholder="e.g. zone-lambert-airport, zone-spirit-airport"
@@ -419,7 +556,10 @@ export function PricingRulesPanel({
                         ...workingCopy,
                         triggers: {
                           ...workingCopy.triggers,
-                          zoneIds: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                          zoneIds: e.target.value
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean),
                         },
                       })
                     }
@@ -466,67 +606,141 @@ export function PricingRulesPanel({
                 </div>
               </div>
 
-              {/* Vehicle Eligibility Checkboxes */}
-              <div className="pt-3 border-t border-slate-200 space-y-2 text-xs">
+              {/* Distance Triggers */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-200/80">
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">Vehicle Physical Types:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VEHICLE_TYPES.map((vt) => {
-                      const isChecked = workingCopy.triggers.vehicleTypes?.includes(vt.id);
-                      return (
-                        <button
-                          key={vt.id}
-                          type="button"
-                          onClick={() => toggleTriggerVehicleType(vt.id)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                            isChecked
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                          }`}
-                        >
-                          {vt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Min Trip Distance (miles, optional)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="No minimum"
+                    value={workingCopy.triggers.minDistanceMiles ?? ''}
+                    onChange={(e) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        triggers: {
+                          ...workingCopy.triggers,
+                          minDistanceMiles: e.target.value === '' ? undefined : parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
+                  />
                 </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Max Trip Distance (miles, optional)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="No maximum"
+                    value={workingCopy.triggers.maxDistanceMiles ?? ''}
+                    onChange={(e) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        triggers: {
+                          ...workingCopy.triggers,
+                          maxDistanceMiles: e.target.value === '' ? undefined : parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
+                  />
+                </div>
+              </div>
 
-                <div className="pt-1">
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">Vehicle Service Classes:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {VEHICLE_CLASSES.map((vc) => {
-                      const isChecked = workingCopy.triggers.vehicleClasses?.includes(vc.id);
-                      return (
-                        <button
-                          key={vc.id}
-                          type="button"
-                          onClick={() => toggleTriggerVehicleClass(vc.id)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
-                            isChecked
-                              ? 'bg-purple-600 text-white border-purple-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
-                          }`}
-                        >
-                          {vc.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* Fleet Vehicle Eligibility (Uses REAL Admin Vehicles) */}
+              <div className="pt-3 border-t border-slate-200 space-y-1.5 text-xs">
+                <span className="text-[11px] font-semibold text-slate-600 block">
+                  Restrict to Fleet Vehicle Types (Leave empty for All Vehicles):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        triggers: {
+                          ...workingCopy.triggers,
+                          vehicleTypes: [],
+                          vehicleTiers: undefined,
+                          vehicleClasses: [],
+                        },
+                      })
+                    }
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                      getWorkingVehicleTypes(workingCopy).length === 0
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    All Vehicles
+                  </button>
+                  {activeVehicles.map((vt) => {
+                    const isChecked = getWorkingVehicleTypes(workingCopy).some(
+                      (id) => id.toLowerCase() === vt.id.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={vt.id}
+                        type="button"
+                        onClick={() => toggleTriggerVehicleType(vt.id)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                          isChecked
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                        }`}
+                      >
+                        {vt.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Actions & Modifiers Section */}
+            {/* 2. Actions & Modifiers Section */}
             <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-4 shadow-2xs">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <SlidersIcon className="w-3.5 h-3.5 text-emerald-600" />
-                2. Actions, Target Tariff & Overrules
+                2. THEN — Target Tariff, Fare Modifier &amp; Fee Waivers
               </h3>
 
-              {/* Target Tariff Dropdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">Target Tariff Profile</label>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Primary Rule Action
+                  </label>
+                  <select
+                    value={modifierType}
+                    onChange={(e) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        modifier: {
+                          ...workingCopy.modifier,
+                          type: e.target.value as PricingRuleModifier['type'],
+                        },
+                      })
+                    }
+                    className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-semibold"
+                  >
+                    <option value="apply_tariff">Route to Target Tariff</option>
+                    <option value="flat_override">Flat Base Fare Override ($)</option>
+                    <option value="surcharge_flat">Add Flat Surcharge ($)</option>
+                    <option value="surcharge_percent">Add Percentage Surcharge (%)</option>
+                    <option value="multiplier">Multiply Base Fare (×)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                    Target Tariff Profile
+                  </label>
                   <select
                     value={workingCopy.modifier.targetTariffId || ''}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
@@ -540,120 +754,99 @@ export function PricingRulesPanel({
                     }
                     className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                   >
-                    <option value="">None (Keep Default Meter)</option>
+                    <option value="">Auto-Match Tariff</option>
                     {tariffs.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name} ({t.rateModel?.toUpperCase() || 'TAXIMETER'})
                       </option>
                     ))}
                   </select>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    Routes matched trips directly into this tariff profile
-                  </span>
                 </div>
 
-                {/* Layered Zone Flat Fee */}
-                <div>
-                  <label className="text-[11px] font-medium text-slate-700 block mb-1">
-                    Layered Zone Fee ($) (Optional Add-on)
-                  </label>
-                  <Input
-                    type="number"
-                    step="1.00"
-                    min="0"
-                    value={workingCopy.modifier.layerZoneFee || 0}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWorkingCopy({
-                        ...workingCopy,
-                        modifier: {
-                          ...workingCopy.modifier,
-                          layerZoneFee: parseFloat(e.target.value) || 0,
-                        },
-                      })
-                    }
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    e.g. +$10.00 remote radius fee added on top of mileage
-                  </span>
-                </div>
+                {modifierType !== 'apply_tariff' ? (
+                  <div>
+                    <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                      {modifierType === 'flat_override'
+                        ? 'Flat Override Amount ($)'
+                        : modifierType === 'multiplier'
+                        ? 'Multiplier (e.g. 1.25)'
+                        : modifierType === 'surcharge_percent'
+                        ? 'Percentage (%)'
+                        : 'Flat Surcharge Amount ($)'}
+                    </label>
+                    <Input
+                      type="number"
+                      step={modifierType === 'multiplier' ? '0.05' : '1'}
+                      min="0"
+                      value={workingCopy.modifier.value ?? 0}
+                      onChange={(e) =>
+                        setWorkingCopy({
+                          ...workingCopy,
+                          modifier: {
+                            ...workingCopy.modifier,
+                            value: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-bold"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-[11px] font-medium text-slate-700 block mb-1">
+                      Optional Layered Zone Fee ($)
+                    </label>
+                    <Input
+                      type="number"
+                      step="1.00"
+                      min="0"
+                      value={workingCopy.modifier.layerZoneFee || 0}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setWorkingCopy({
+                          ...workingCopy,
+                          modifier: {
+                            ...workingCopy.modifier,
+                            layerZoneFee: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Overrule Universal Extras Grid */}
+              {/* Clean Fee Waivers (Unchecking removes override rather than hardcoding stale defaults) */}
               <div className="pt-3 border-t border-slate-200 space-y-2">
                 <span className="text-[11px] font-semibold text-slate-700 block">
-                  Overrule Universal Extras (Overrides):
+                  Fee Waivers When This Rule Matches:
                 </span>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                   <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
                     <input
                       type="checkbox"
-                      checked={workingCopy.modifier.overruleExtras?.waiveCarSeatFee || false}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          modifier: {
-                            ...workingCopy.modifier,
-                            overruleExtras: {
-                              ...workingCopy.modifier.overruleExtras,
-                              carSeatFeePerUnit: e.target.checked ? 0 : 10,
-                              waiveCarSeatFee: e.target.checked,
-                            },
-                          },
-                        })
-                      }
+                      checked={Boolean(workingCopy.modifier.overruleExtras?.waiveCarSeatFee)}
+                      onChange={(e) => toggleExtraWaiver('waiveCarSeatFee', e.target.checked)}
                       className="rounded border-slate-300 text-emerald-600 focus:ring-0"
                     />
-                    <span>Waive Child Safety Seat Fees (Free Seats)</span>
+                    <span>Waive Child Safety Seat Fees</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
                     <input
                       type="checkbox"
-                      checked={workingCopy.modifier.overruleExtras?.waiveExtraPaxFee || false}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          modifier: {
-                            ...workingCopy.modifier,
-                            overruleExtras: {
-                              ...workingCopy.modifier.overruleExtras,
-                              extraPassengerFeePerHead: e.target.checked ? 0 : 1,
-                              waiveExtraPaxFee: e.target.checked,
-                            },
-                          },
-                        })
-                      }
+                      checked={Boolean(workingCopy.modifier.overruleExtras?.waiveExtraPaxFee)}
+                      onChange={(e) => toggleExtraWaiver('waiveExtraPaxFee', e.target.checked)}
                       className="rounded border-slate-300 text-emerald-600 focus:ring-0"
                     />
-                    <span>Waive Extra Passenger Headcount Fees</span>
+                    <span>Waive Extra Passenger Fees</span>
                   </label>
-                </div>
-              </div>
 
-              {/* Overrule Surcharges Grid */}
-              <div className="pt-3 border-t border-slate-200 space-y-2">
-                <span className="text-[11px] font-semibold text-slate-700 block">
-                  Overrule Surcharges (Overrides):
-                </span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                   <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
                     <input
                       type="checkbox"
-                      checked={workingCopy.modifier.overruleSurcharges?.waiveAirportFee || false}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          modifier: {
-                            ...workingCopy.modifier,
-                            overruleSurcharges: {
-                              ...workingCopy.modifier.overruleSurcharges,
-                              airportGateFee: e.target.checked ? 0 : 4,
-                              waiveAirportFee: e.target.checked,
-                            },
-                          },
-                        })
-                      }
+                      checked={Boolean(workingCopy.modifier.overruleSurcharges?.waiveAirportFee)}
+                      onChange={(e) => toggleSurchargeWaiver('waiveAirportFee', e.target.checked)}
                       className="rounded border-slate-300 text-purple-600 focus:ring-0"
                     />
                     <span>Waive Airport Commercial Gate Fee</span>
@@ -662,20 +855,8 @@ export function PricingRulesPanel({
                   <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
                     <input
                       type="checkbox"
-                      checked={workingCopy.modifier.overruleSurcharges?.waiveRemoteFee || false}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          modifier: {
-                            ...workingCopy.modifier,
-                            overruleSurcharges: {
-                              ...workingCopy.modifier.overruleSurcharges,
-                              outOfAreaRemoteFee: e.target.checked ? 0 : 15,
-                              waiveRemoteFee: e.target.checked,
-                            },
-                          },
-                        })
-                      }
+                      checked={Boolean(workingCopy.modifier.overruleSurcharges?.waiveRemoteFee)}
+                      onChange={(e) => toggleSurchargeWaiver('waiveRemoteFee', e.target.checked)}
                       className="rounded border-slate-300 text-purple-600 focus:ring-0"
                     />
                     <span>Waive Remote Service Radius Fee</span>
@@ -684,19 +865,8 @@ export function PricingRulesPanel({
                   <label className="flex items-center gap-2 cursor-pointer text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs font-medium">
                     <input
                       type="checkbox"
-                      checked={workingCopy.modifier.overruleSurcharges?.waiveFuelSurcharge || false}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setWorkingCopy({
-                          ...workingCopy,
-                          modifier: {
-                            ...workingCopy.modifier,
-                            overruleSurcharges: {
-                              ...workingCopy.modifier.overruleSurcharges,
-                              waiveFuelSurcharge: e.target.checked,
-                            },
-                          },
-                        })
-                      }
+                      checked={Boolean(workingCopy.modifier.overruleSurcharges?.waiveFuelSurcharge)}
+                      onChange={(e) => toggleSurchargeWaiver('waiveFuelSurcharge', e.target.checked)}
                       className="rounded border-slate-300 text-purple-600 focus:ring-0"
                     />
                     <span>Waive Built-In Fuel / Gas Surcharge</span>
@@ -707,7 +877,7 @@ export function PricingRulesPanel({
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm p-12">
-            Select a pricing rule from the left panel
+            Select a pricing rule from the left panel or click &ldquo;+ New Rule&rdquo;
           </div>
         )}
       </div>

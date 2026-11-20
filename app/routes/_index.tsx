@@ -445,26 +445,32 @@ export default function IndexRoute() {
 
                           {showBreakdown && (
                             <div className="pt-2 border-t border-blue-200/60 space-y-1 text-[11px] text-slate-700">
-                              <div className="flex justify-between">
-                                <span>Base Flag-Drop</span>
-                                <span className="font-mono font-semibold">${quickQuote.pricing.baseFare.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Distance ({quickQuote.pricing.distanceMiles.toFixed(1)} mi)</span>
-                                <span className="font-mono font-semibold">${(quickQuote.pricing.distanceRate * quickQuote.pricing.distanceMiles).toFixed(2)}</span>
-                              </div>
-                              {Boolean(quickQuote.pricing.airportSurcharge) && (
-                                <div className="flex justify-between">
-                                  <span>Airport / Facility Fee</span>
-                                  <span className="font-mono font-semibold">${Number(quickQuote.pricing.airportSurcharge).toFixed(2)}</span>
-                                </div>
-                              )}
-                              {quickQuote.pricing.itemizedSurcharges?.map((s, idx) => (
-                                <div key={idx} className="flex justify-between">
-                                  <span>{s.name}</span>
-                                  <span className="font-mono font-semibold">${s.amount.toFixed(2)}</span>
-                                </div>
-                              ))}
+                              {(quickQuote.pricing.breakdown && quickQuote.pricing.breakdown.length > 0
+                                ? quickQuote.pricing.breakdown
+                                : [
+                                    {
+                                      id: 'base-fare',
+                                      category: 'base' as const,
+                                      label: 'Base Fare',
+                                      amount: quickQuote.pricing.subtotal || quickQuote.pricing.baseFare,
+                                    },
+                                  ]
+                              ).map((item) => {
+                                const isDiscount = item.category === 'discount' || item.amount < 0;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`flex justify-between ${isDiscount ? 'text-emerald-700 font-semibold' : ''}`}
+                                  >
+                                    <span>{item.category === 'base' ? 'Base Fare' : item.label}</span>
+                                    <span className="font-mono font-semibold">
+                                      {isDiscount
+                                        ? `-$${Math.abs(item.amount).toFixed(2)}`
+                                        : `$${item.amount.toFixed(2)}`}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                               <div className="flex justify-between pt-1 border-t border-blue-200/70 font-bold text-slate-900">
                                 <span>Estimated Total</span>
                                 <span className="font-mono">${estimatedTotal?.toFixed(2)}</span>

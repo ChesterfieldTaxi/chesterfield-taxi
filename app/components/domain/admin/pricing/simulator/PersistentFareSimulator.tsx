@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
-import { Badge } from '~/components/ui/Badge';
 import {
   CarIcon,
   SparklesIcon,
@@ -10,14 +8,15 @@ import {
   SlidersIcon,
 } from '~/components/ui/Icons';
 import { calculateTripPricing } from '~/core/services/pricing/pipeline';
+import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import type { PricingConfig, PricingInput } from '~/core/services/pricing/types';
 import type { TariffProfile } from '~/core/types/tariff';
 import type {
   NamedPricingRule,
-  VehicleType,
-  VehicleClass,
   UniversalExtrasConfig,
   SurchargesConfig,
+  VehicleTierConfig,
+  CorporateAccountConfig,
 } from '~/core/types/config';
 
 export interface PersistentFareSimulatorProps {
@@ -25,6 +24,8 @@ export interface PersistentFareSimulatorProps {
   rules: NamedPricingRule[];
   universalExtras: UniversalExtrasConfig;
   surcharges: SurchargesConfig;
+  vehicles?: VehicleTierConfig[];
+  corporateAccounts?: CorporateAccountConfig[];
   className?: string;
 }
 
@@ -33,11 +34,43 @@ export function PersistentFareSimulator({
   rules,
   universalExtras,
   surcharges,
+  vehicles,
+  corporateAccounts,
   className = '',
 }: PersistentFareSimulatorProps) {
-  // Simulator input state
   const activeTariffs = useMemo(() => tariffs.filter((t) => !t.isArchived), [tariffs]);
-  const [simulationTariffMode, setSimulationTariffMode] = useState<string>('tariff-airport-flat');
+
+  const simulatorVehicles = useMemo(() => {
+    let source = vehicles;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.vehicles;
+      } catch {
+        source = [];
+      }
+    }
+    const fleetList = (source || [])
+      .filter((v) => !v.isArchived)
+      .map((v) => ({ id: v.id, label: v.name || v.id }));
+
+    const hasAny = fleetList.some((v) => v.id === 'any');
+    return hasAny ? fleetList : [{ id: 'any', label: 'Any Vehicle' }, ...fleetList];
+  }, [vehicles]);
+
+  const activeCorporateAccounts = useMemo(() => {
+    let source = corporateAccounts;
+    if (!source || source.length === 0) {
+      try {
+        source = getAdminConfigService().getCachedSettings()?.corporateAccounts;
+      } catch {
+        source = [];
+      }
+    }
+    return (source || []).filter((c) => c.isActive !== false);
+  }, [corporateAccounts]);
+
+  // Simulator input state
+  const [simulationTariffMode, setSimulationTariffMode] = useState<string>('auto');
   const [distanceMiles, setDistanceMiles] = useState<number>(20.0);
   const [durationMinutes, setDurationMinutes] = useState<number>(28);
   const [passengers, setPassengers] = useState<number>(1);
@@ -51,8 +84,7 @@ export function PersistentFareSimulator({
   const [destinationZoneId, setDestinationZoneId] = useState<string>('zone-chesterfield-valley');
   const [pickupZip, setPickupZip] = useState<string>('63145');
   const [dropoffZip, setDropoffZip] = useState<string>('63005');
-  const [vehicleType, setVehicleType] = useState<VehicleType>('sedan');
-  const [vehicleClass, setVehicleClass] = useState<VehicleClass>('standard');
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('any');
   const [isAirportPickup, setIsAirportPickup] = useState<boolean>(true);
   const [showAuditTrail, setShowAuditTrail] = useState<boolean>(false);
 
@@ -60,7 +92,7 @@ export function PersistentFareSimulator({
   const applyPreset = (preset: 'airport' | 'meter' | 'spirit' | 'medical') => {
     switch (preset) {
       case 'airport':
-        setSimulationTariffMode('tariff-airport-flat');
+        setSimulationTariffMode('auto');
         setDistanceMiles(20.0);
         setDurationMinutes(28);
         setPassengers(1);
@@ -76,7 +108,7 @@ export function PersistentFareSimulator({
         setIsAirportPickup(true);
         break;
       case 'meter':
-        setSimulationTariffMode('tariff-point-to-point-meter');
+        setSimulationTariffMode('auto');
         setDistanceMiles(10.0);
         setDurationMinutes(18);
         setPassengers(1);
@@ -92,10 +124,10 @@ export function PersistentFareSimulator({
         setIsAirportPickup(false);
         break;
       case 'spirit':
-        setSimulationTariffMode('tariff-airport-flat');
-        setDistanceMiles(6.0);
+        setSimulationTariffMode('auto');
+        setDistanceMiles(5.5);
         setDurationMinutes(12);
-        setPassengers(1);
+        setPassengers(2);
         setIntermediateStops(0);
         setCarSeatsCount(0);
         setCurbWaitMinutes(0);
@@ -108,7 +140,7 @@ export function PersistentFareSimulator({
         setIsAirportPickup(true);
         break;
       case 'medical':
-        setSimulationTariffMode('tariff-point-to-point-meter');
+        setSimulationTariffMode('auto');
         setDistanceMiles(14.0);
         setDurationMinutes(22);
         setPassengers(1);
@@ -126,9 +158,8 @@ export function PersistentFareSimulator({
     }
   };
 
-  // Run live calculation pipeline
-  const calculationResult = useMemo(() => {
-    const input: PricingInput = {
+  const baseInput: PricingInput = useMemo(
+    () => ({
       distanceMiles: Number(distanceMiles) || 0,
       durationMinutes: Number(durationMinutes) || 0,
       passengers: Number(passengers) || 1,
@@ -138,6 +169,7 @@ export function PersistentFareSimulator({
       isHourlyBooking: isHourly,
       hourlyDurationHours: isHourly ? Number(hourlyHours) || 2 : undefined,
       corporateAccountId: corporateAccountId || undefined,
+      accountTags: corporateAccountId ? [corporateAccountId] : undefined,
       originZoneId: originZoneId || undefined,
       destinationZoneId: destinationZoneId || undefined,
       zoneIds: [
@@ -146,52 +178,75 @@ export function PersistentFareSimulator({
       ],
       pickupZipCode: pickupZip || undefined,
       dropoffZipCode: dropoffZip || undefined,
-      vehicleType,
-      vehicleTier: vehicleType === 'suv' ? 'xl' : vehicleType === 'van' ? 'wheelchair' : 'standard',
-      vehicleClass,
+      vehicleTypeId: selectedVehicleId,
+      vehicleType: selectedVehicleId,
+      vehicleTier: selectedVehicleId,
       isAirportPickup,
-    };
+      isAirportTrip: isAirportPickup,
+    }),
+    [
+      distanceMiles,
+      durationMinutes,
+      passengers,
+      intermediateStops,
+      carSeatsCount,
+      curbWaitMinutes,
+      isHourly,
+      hourlyHours,
+      corporateAccountId,
+      originZoneId,
+      destinationZoneId,
+      pickupZip,
+      dropoffZip,
+      selectedVehicleId,
+      isAirportPickup,
+    ]
+  );
 
-    const configOverride: Partial<PricingConfig> = {
+  const configOverride: Partial<PricingConfig> = useMemo(
+    () => ({
       tariffs,
       activeTariffId: simulationTariffMode === 'auto' ? undefined : simulationTariffMode,
       namedPricingRules: rules,
       universalExtras,
       surchargesCatalog: surcharges,
-    };
+    }),
+    [tariffs, simulationTariffMode, rules, universalExtras, surcharges]
+  );
 
+  // Selected vehicle calculation
+  const calculationResult = useMemo(() => {
     try {
-      return calculateTripPricing(input, configOverride);
+      return calculateTripPricing(baseInput, configOverride);
     } catch (err) {
       console.error('Simulator calculation failed:', err);
       return null;
     }
-  }, [
-    simulationTariffMode,
-    distanceMiles,
-    durationMinutes,
-    passengers,
-    intermediateStops,
-    carSeatsCount,
-    curbWaitMinutes,
-    isHourly,
-    hourlyHours,
-    corporateAccountId,
-    originZoneId,
-    destinationZoneId,
-    pickupZip,
-    dropoffZip,
-    vehicleType,
-    vehicleClass,
-    isAirportPickup,
-    tariffs,
-    rules,
-    universalExtras,
-    surcharges,
-  ]);
+  }, [baseInput, configOverride]);
 
+  // All-Vehicle live comparison using exact Admin config
+  const allVehiclePrices = useMemo(() => {
+    return simulatorVehicles.map((v) => {
+      try {
+        const res = calculateTripPricing(
+          {
+            ...baseInput,
+            vehicleTypeId: v.id,
+            vehicleType: v.id,
+            vehicleTier: v.id,
+          },
+          configOverride
+        );
+        return { id: v.id, label: v.label, totalFare: res.pricing.totalFare };
+      } catch {
+        return { id: v.id, label: v.label, totalFare: 0 };
+      }
+    });
+  }, [simulatorVehicles, baseInput, configOverride]);
+
+  const pricing = calculationResult?.pricing;
   const ctx = calculationResult?.context;
-  const isSmokeHouseAccount = corporateAccountId === 'corp-smoke-house' || corporateAccountId === 'smoke-house';
+  const breakdownItems = pricing?.breakdown || [];
 
   return (
     <div className={`flex flex-col h-full bg-white border-l border-slate-200 text-slate-900 ${className}`}>
@@ -227,6 +282,17 @@ export function PersistentFareSimulator({
             </span>
           </div>
           <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setSimulationTariffMode('auto')}
+              className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
+                simulationTariffMode === 'auto'
+                  ? 'bg-slate-800 text-white shadow-xs font-bold'
+                  : 'text-slate-700 hover:text-slate-900 font-medium'
+              }`}
+            >
+              ⚡ Auto
+            </button>
             {activeTariffs.map((t) => {
               const isSelected = simulationTariffMode === t.id;
               return (
@@ -253,17 +319,6 @@ export function PersistentFareSimulator({
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setSimulationTariffMode('auto')}
-              className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer ${
-                simulationTariffMode === 'auto'
-                  ? 'bg-slate-800 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-slate-900 font-medium'
-              }`}
-            >
-              ⚡ Auto
-            </button>
           </div>
         </div>
 
@@ -279,7 +334,7 @@ export function PersistentFareSimulator({
               className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <span>✈️</span>
-              <span className="truncate">Airport STL</span>
+              <span className="truncate">Airport STL (20 mi)</span>
             </button>
             <button
               type="button"
@@ -287,7 +342,7 @@ export function PersistentFareSimulator({
               className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <span>🚕</span>
-              <span className="truncate">City METER</span>
+              <span className="truncate">City METER (10 mi)</span>
             </button>
             <button
               type="button"
@@ -295,7 +350,7 @@ export function PersistentFareSimulator({
               className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <span>🛬</span>
-              <span className="truncate">Spirit SUS</span>
+              <span className="truncate">Airport Floor (5.5 mi)</span>
             </button>
             <button
               type="button"
@@ -314,12 +369,11 @@ export function PersistentFareSimulator({
             <span className="text-xs text-emerald-900 font-bold uppercase tracking-wide">
               Estimated Fare
             </span>
-            <span className="text-2xl font-black tracking-tight text-emerald-900">
-              ${ctx?.totalFare !== undefined ? ctx.totalFare.toFixed(2) : '0.00'}
+            <span className="text-2xl font-black tracking-tight text-emerald-900 font-mono">
+              ${pricing ? pricing.totalFare.toFixed(2) : '0.00'}
             </span>
           </div>
 
-          {/* Matched Profile & Rule tags */}
           <div className="mt-2.5 pt-2 border-t border-emerald-200/60 flex flex-wrap gap-1.5 items-center">
             {ctx?.tariffProfileName ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
@@ -330,17 +384,82 @@ export function PersistentFareSimulator({
               <span className="text-[11px] text-slate-500">No Tariff Profile</span>
             )}
 
-            {ctx?.appliedRuleNames && ctx.appliedRuleNames.map((rName: string, idx: number) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"
-              >
-                <ShieldCheckIcon className="w-2.5 h-2.5" />
-                {rName}
-              </span>
-            ))}
+            {ctx?.appliedRuleNames &&
+              ctx.appliedRuleNames.map((rName: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"
+                >
+                  <ShieldCheckIcon className="w-2.5 h-2.5" />
+                  {rName}
+                </span>
+              ))}
           </div>
         </div>
+
+        {/* Real Admin Fleet Vehicle Comparison & Selector */}
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+            Fleet Vehicle Price Comparison
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {allVehiclePrices.map((v) => {
+              const isSelected = selectedVehicleId === v.id;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setSelectedVehicleId(v.id)}
+                  className={`p-2 rounded-lg text-xs border text-left transition-all cursor-pointer flex items-center justify-between gap-1 ${
+                    isSelected
+                      ? 'bg-blue-50 text-blue-900 border-blue-500 ring-1 ring-blue-500 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
+                >
+                  <span className="truncate">{v.label}</span>
+                  <span className="font-mono font-extrabold text-slate-900 shrink-0">
+                    ${v.totalFare.toFixed(0)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Canonical Customer Price Breakdown (Exact match to /book) */}
+        {pricing && (
+          <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block mb-1">
+              Customer Price Breakdown
+            </span>
+            {breakdownItems.map((item) => {
+              const isDiscount = item.category === 'discount' || item.amount < 0;
+              const isBase = item.category === 'base';
+              return (
+                <div
+                  key={item.id}
+                  className={`flex justify-between gap-2 ${
+                    isDiscount ? 'text-rose-700' : isBase ? 'text-slate-900 font-semibold' : 'text-slate-600'
+                  }`}
+                >
+                  <span className="truncate">{isBase ? 'Base Fare' : item.label}</span>
+                  <span className="font-mono font-semibold shrink-0">
+                    {isDiscount
+                      ? `-$${Math.abs(item.amount).toFixed(2)}`
+                      : `$${item.amount.toFixed(2)}`}
+                  </span>
+                </div>
+              );
+            })}
+
+            <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+              <span>Estimated Total:</span>
+              <span className="text-emerald-800 font-extrabold text-sm font-mono">
+                ${pricing.totalFare.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Granular Trip Parameters */}
         <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 shadow-2xs">
@@ -348,16 +467,17 @@ export function PersistentFareSimulator({
             Trip Inputs
           </span>
 
-          {/* Distance & Duration */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-medium text-slate-600 block mb-1">Distance (mi)</label>
               <Input
                 type="number"
-                step="0.1"
+                step="0.5"
                 min="0"
                 value={distanceMiles}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDistanceMiles(parseFloat(e.target.value) || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setDistanceMiles(parseFloat(e.target.value) || 0)
+                }
                 className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
               />
             </div>
@@ -368,72 +488,14 @@ export function PersistentFareSimulator({
                 step="1"
                 min="0"
                 value={durationMinutes}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDurationMinutes(parseFloat(e.target.value) || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setDurationMinutes(parseFloat(e.target.value) || 0)
+                }
                 className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
               />
             </div>
           </div>
 
-          {/* Quick Distance Presets */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider shrink-0">Preset:</span>
-            {[
-              { label: '10 mi ($28 floor)', miles: 10.0 },
-              { label: '15 mi ($39)', miles: 15.0 },
-              { label: '18.5 mi ($48)', miles: 18.5 },
-              { label: '20 mi ($51)', miles: 20.0 },
-              { label: '25 mi ($63)', miles: 25.0 },
-              { label: '30 mi ($74)', miles: 30.0 },
-            ].map((q) => (
-              <button
-                key={q.miles}
-                type="button"
-                onClick={() => setDistanceMiles(q.miles)}
-                className={`text-[10px] px-2 py-0.5 rounded border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  Math.abs(distanceMiles - q.miles) < 0.05
-                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-2xs'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-medium'
-                }`}
-              >
-                {q.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Vehicle Fleet Type Selector */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-medium text-slate-600 block">Vehicle Fleet Type</label>
-              {vehicleType !== 'sedan' && (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                  +$10 Upgrade Fee
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {[
-                { id: 'sedan', label: 'Sedan', sub: 'Standard' },
-                { id: 'suv', label: 'SUV', sub: '+$10 Fee' },
-                { id: 'van', label: 'Van / WAV', sub: '+$10 Fee' },
-              ].map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setVehicleType(v.id as any)}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-semibold border text-center transition-all cursor-pointer ${
-                    vehicleType === v.id
-                      ? 'bg-blue-50 text-blue-800 border-blue-400 ring-1 ring-blue-400'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div>{v.label}</div>
-                  <div className="text-[9px] font-normal text-slate-500">{v.sub}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Zip Codes (for Smoke House / Matrix matching) */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-medium text-slate-600 block mb-1">Pickup Zip</label>
@@ -457,7 +519,6 @@ export function PersistentFareSimulator({
             </div>
           </div>
 
-          {/* Corporate Account */}
           <div>
             <label className="text-[11px] font-medium text-slate-600 block mb-1">Corporate Account</label>
             <select
@@ -466,11 +527,14 @@ export function PersistentFareSimulator({
               className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
             >
               <option value="">None (Retail / Public)</option>
-              <option value="corp-smoke-house">Smoke House Chesterfield (2023 Agreement)</option>
+              {activeCorporateAccounts.map((corp) => (
+                <option key={corp.id} value={corp.id}>
+                  {corp.companyName}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Hourly Charter Checkbox */}
           <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
             <label className="text-xs text-slate-700 font-medium flex items-center gap-2 cursor-pointer">
               <input
@@ -487,7 +551,9 @@ export function PersistentFareSimulator({
                   type="number"
                   min="1"
                   value={hourlyHours}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHourlyHours(parseInt(e.target.value, 10) || 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setHourlyHours(parseInt(e.target.value, 10) || 1)
+                  }
                   className="w-16 h-7 text-xs bg-white border-slate-300 text-slate-900 text-center font-bold"
                 />
                 <span className="text-[11px] text-slate-500">hrs</span>
@@ -495,7 +561,6 @@ export function PersistentFareSimulator({
             )}
           </div>
 
-          {/* Airport Origin Zone Toggle */}
           <div className="flex items-center justify-between">
             <label className="text-xs text-slate-700 font-medium flex items-center gap-2 cursor-pointer">
               <input
@@ -508,14 +573,13 @@ export function PersistentFareSimulator({
                 }}
                 className="rounded border-slate-300 text-blue-600 focus:ring-0"
               />
-              Lambert Airport Origin (STL)
+              Airport Trip (STL / SUS)
             </label>
           </div>
 
-          {/* Extras: Passengers, Stops, Seats, Curb Wait */}
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-              Universal Add-ons & Extras
+              Universal Extras
             </span>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
@@ -525,27 +589,33 @@ export function PersistentFareSimulator({
                   min="1"
                   max="14"
                   value={passengers}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassengers(parseInt(e.target.value, 10) || 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setPassengers(parseInt(e.target.value, 10) || 1)
+                  }
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Waypoints / Stops</label>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Stops</label>
                 <Input
                   type="number"
                   min="0"
                   value={intermediateStops}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIntermediateStops(parseInt(e.target.value, 10) || 0)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setIntermediateStops(parseInt(e.target.value, 10) || 0)
+                  }
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Child Safety Seats</label>
+                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Child Seats</label>
                 <Input
                   type="number"
                   min="0"
                   value={carSeatsCount}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCarSeatsCount(parseInt(e.target.value, 10) || 0)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setCarSeatsCount(parseInt(e.target.value, 10) || 0)
+                  }
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
@@ -555,45 +625,15 @@ export function PersistentFareSimulator({
                   type="number"
                   min="0"
                   value={curbWaitMinutes}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurbWaitMinutes(parseInt(e.target.value, 10) || 0)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setCurbWaitMinutes(parseInt(e.target.value, 10) || 0)
+                  }
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
             </div>
           </div>
         </div>
-
-        {/* Itemized Breakdown List */}
-        {ctx && (
-          <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5 shadow-2xs">
-            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block mb-1">
-              Price Breakdown
-            </span>
-            <div className="flex justify-between text-slate-600">
-              <span>Base / Tariff Subtotal:</span>
-              <span className="text-slate-900 font-semibold">${ctx.subtotal.toFixed(2)}</span>
-            </div>
-
-            {ctx.surcharges.map((s, idx: number) => (
-              <div key={idx} className="flex justify-between text-slate-600">
-                <span className="truncate pr-2">+ {s.name}:</span>
-                <span className="text-emerald-700 font-semibold">${s.amount.toFixed(2)}</span>
-              </div>
-            ))}
-
-            {ctx.discounts.map((d, idx: number) => (
-              <div key={idx} className="flex justify-between text-slate-600">
-                <span className="truncate pr-2">- {d.name}:</span>
-                <span className="text-rose-700 font-semibold">-${d.amount.toFixed(2)}</span>
-              </div>
-            ))}
-
-            <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
-              <span>Total:</span>
-              <span className="text-emerald-800 font-extrabold text-sm">${ctx.totalFare.toFixed(2)}</span>
-            </div>
-          </div>
-        )}
 
         {/* Audit Trail Accordion */}
         <div className="pt-1">
@@ -620,8 +660,10 @@ export function PersistentFareSimulator({
                   </div>
                   <div className="text-slate-400 whitespace-pre-wrap">{step.description}</div>
                   <div className="text-slate-500 text-[9px] mt-0.5 flex justify-between">
-                    <span>Delta: {step.appliedDelta >= 0 ? `+$${step.appliedDelta.toFixed(2)}` : `-$${Math.abs(step.appliedDelta).toFixed(2)}`}</span>
-                    <span>Subtotal: ${step.runningSubtotal.toFixed(2)}</span>
+                    <span>
+                      Delta: {step.appliedDelta >= 0 ? `+$${step.appliedDelta.toFixed(2)}` : `-$${Math.abs(step.appliedDelta).toFixed(2)}`}
+                    </span>
+                    <span>Total: ${step.runningSubtotal.toFixed(2)}</span>
                   </div>
                 </div>
               ))}

@@ -22,7 +22,12 @@ import {
   type CustomerBookingConfig,
   type VehicleTierConfig,
   type OversizedBagCategory,
+  type UniversalExtrasConfig,
 } from '../../core/types/config';
+import {
+  getUniversalExtrasService,
+  DEFAULT_UNIVERSAL_EXTRAS,
+} from '../../core/services/pricing/extras.service';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { formatVehicleTier } from '../../core/utils/trip-id.util';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
@@ -186,6 +191,7 @@ interface FormState {
   hasOversizedLuggage: boolean;
   oversizedLuggageNotes: string;
   oversizedBags: Record<string, number>;
+  selectedCustomExtras: Record<string, number>;
 
   // Child Safety Seats
   carSeats: boolean;
@@ -319,6 +325,7 @@ export function BookingEngineV2({
     hasOversizedLuggage: false,
     oversizedLuggageNotes: '',
     oversizedBags: {},
+    selectedCustomExtras: {},
 
     carSeats: false,
     rearFacingCount: 0,
@@ -535,6 +542,23 @@ export function BookingEngineV2({
     return [];
   });
 
+  const [universalExtras, setUniversalExtras] = useState<UniversalExtrasConfig>(() => {
+    try {
+      return getUniversalExtrasService().getCached();
+    } catch {
+      return DEFAULT_UNIVERSAL_EXTRAS;
+    }
+  });
+
+  useEffect(() => {
+    const unsubExtras = getUniversalExtrasService().subscribeToExtras((liveExtras) => {
+      setUniversalExtras(liveExtras);
+    });
+    return () => {
+      if (typeof unsubExtras === 'function') unsubExtras();
+    };
+  }, []);
+
   useEffect(() => {
     const configService = getAdminConfigService();
     const unsubscribe = configService.subscribeToSettings((s) => {
@@ -661,10 +685,29 @@ export function BookingEngineV2({
   const returnTotalCarSeats = form.returnCarSeats ? (form.returnRearFacing + form.returnFrontFacing + form.returnBooster) : 0;
 
   const oversizedCategories: OversizedBagCategory[] = useMemo(() => {
+    if (universalExtras.oversizedBagsConfig && universalExtras.oversizedBagsConfig.length > 0) {
+      return universalExtras.oversizedBagsConfig;
+    }
     return bookingConfig.oversizedBags && bookingConfig.oversizedBags.length > 0
       ? bookingConfig.oversizedBags
       : DEFAULT_OVERSIZED_BAG_CATEGORIES;
-  }, [bookingConfig.oversizedBags]);
+  }, [universalExtras.oversizedBagsConfig, bookingConfig.oversizedBags]);
+
+  const bookableCustomExtras = useMemo(() => {
+    return (universalExtras.customExtras || []).filter(
+      (ce) => ce.isActive !== false && ce.showOnBookingForm !== false && ce.fee >= 0
+    );
+  }, [universalExtras.customExtras]);
+
+  const selectedCustomExtrasSummary = useMemo(() => {
+    return Object.entries(form.selectedCustomExtras || {})
+      .filter(([_, qty]) => qty > 0)
+      .map(([id, qty]) => {
+        const extra = bookableCustomExtras.find((ce) => ce.id === id);
+        return qty > 1 ? `${qty}x ${extra?.name || id}` : extra?.name || id;
+      })
+      .join(', ');
+  }, [form.selectedCustomExtras, bookableCustomExtras]);
 
   const totalOversizedCount = useMemo(() => {
     return Object.values(form.oversizedBags || {}).reduce((sum, count) => sum + count, 0);
@@ -911,6 +954,13 @@ export function BookingEngineV2({
           ? new Date(`${form.scheduledDate}T${form.scheduledTime}:00`).toISOString()
           : undefined;
 
+      const allVehicleIds = activeVehicleTiers.map((t) => t.id);
+      const activeOversizedBags = form.hasOversizedLuggage ? form.oversizedBags : undefined;
+      const activeCustomExtras =
+        Object.values(form.selectedCustomExtras || {}).some((q) => q > 0)
+          ? form.selectedCustomExtras
+          : undefined;
+
       if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1) {
         const vehicleQuotes = await Promise.all(
           form.selectedVehicles.map((vChoice) =>
@@ -927,10 +977,14 @@ export function BookingEngineV2({
               },
               intermediateStops: validStops.length > 0 ? validStops : undefined,
               vehicleTier: mapChoiceToTier(vChoice),
+              vehicleType: vChoice,
               bookingType: form.timingType === 'later' ? 'scheduled' : 'asap',
               scheduledPickupTime,
               passengerCount: Math.max(1, Math.ceil(form.passengers / form.selectedVehicles.length)),
               luggageCount: Math.max(0, Math.ceil(form.bags / form.selectedVehicles.length)),
+              oversizedBags: activeOversizedBags,
+              selectedCustomExtras: activeCustomExtras,
+              evaluateAllVehicleIds: allVehicleIds,
               carSeatsBreakdown: {
                 rearFacing: form.rearFacingCount,
                 frontFacing: form.frontFacingCount,
@@ -943,6 +997,7 @@ export function BookingEngineV2({
                 luggageCount: form.bags,
                 hasOversizedLuggage: form.hasOversizedLuggage,
                 luggageType: form.luggageType,
+                petCarrier: form.specialRequests.petFriendly,
               },
               isAirportPickup: airportDetection.isPickupAirport,
               isAirportDropoff: airportDetection.isDropoffAirport,
@@ -977,10 +1032,14 @@ export function BookingEngineV2({
           },
           intermediateStops: validStops.length > 0 ? validStops : undefined,
           vehicleTier: mapChoiceToTier(form.vehicleChoice),
+          vehicleType: form.vehicleChoice,
           bookingType: form.timingType === 'later' ? 'scheduled' : 'asap',
           scheduledPickupTime,
           passengerCount: form.passengers,
           luggageCount: form.bags,
+          oversizedBags: activeOversizedBags,
+          selectedCustomExtras: activeCustomExtras,
+          evaluateAllVehicleIds: allVehicleIds,
           carSeatsBreakdown: {
             rearFacing: form.rearFacingCount,
             frontFacing: form.frontFacingCount,
@@ -993,6 +1052,7 @@ export function BookingEngineV2({
             luggageCount: form.bags,
             hasOversizedLuggage: form.hasOversizedLuggage,
             luggageType: form.luggageType,
+            petCarrier: form.specialRequests.petFriendly,
           },
           isAirportPickup: airportDetection.isPickupAirport,
           isAirportDropoff: airportDetection.isDropoffAirport,
@@ -1030,7 +1090,11 @@ export function BookingEngineV2({
     form.boosterCount,
     totalCarSeats,
     form.hasOversizedLuggage,
+    form.oversizedBags,
+    form.selectedCustomExtras,
+    form.specialRequests.petFriendly,
     form.luggageType,
+    activeVehicleTiers,
     mapChoiceToTier,
   ]);
 
@@ -1070,6 +1134,7 @@ export function BookingEngineV2({
               },
               intermediateStops: validStops.length > 0 ? validStops : undefined,
               vehicleTier: mapChoiceToTier(vChoice),
+              vehicleType: vChoice,
               bookingType: 'scheduled',
               scheduledPickupTime: returnScheduledTime,
               passengerCount: Math.max(1, Math.ceil(form.returnPassengers / form.returnSelectedVehicles.length)),
@@ -1116,10 +1181,15 @@ export function BookingEngineV2({
           },
           intermediateStops: validStops.length > 0 ? validStops : undefined,
           vehicleTier: mapChoiceToTier(form.returnVehicleChoice),
+          vehicleType: form.returnVehicleChoice,
           bookingType: 'scheduled',
           scheduledPickupTime: returnScheduledTime,
           passengerCount: form.returnPassengers,
           luggageCount: form.returnBags,
+          oversizedBags: form.hasOversizedLuggage ? form.oversizedBags : undefined,
+          selectedCustomExtras: Object.values(form.selectedCustomExtras || {}).some((q) => q > 0)
+            ? form.selectedCustomExtras
+            : undefined,
           carSeatsBreakdown: {
             rearFacing: form.returnRearFacing,
             frontFacing: form.returnFrontFacing,
@@ -1501,7 +1571,11 @@ export function BookingEngineV2({
         combinedNotes = `[Flight: ${form.airline} #${form.flightNumber} from ${form.flightOrigin || 'N/A'}${form.hasCheckedLuggage ? ' (Checked Luggage)' : ''}] ${combinedNotes}`.trim();
       }
 
-      let effectivePricing: TripPricing = quote?.pricing || {
+      const resolvedOutboundPricing =
+        (!bookingConfig.allowMultiVehicle && quote?.vehicleQuotes?.[form.vehicleChoice]) ||
+        quote?.pricing;
+
+      let effectivePricing: TripPricing = resolvedOutboundPricing || {
         baseFare: 5.0,
         distanceMiles: 5,
         durationMinutes: 15,
@@ -1651,6 +1725,9 @@ export function BookingEngineV2({
           oversizedLuggageNotes: form.oversizedLuggageNotes,
           oversizedBags: form.oversizedBags,
           oversizedItemsSummary: oversizedItemsSummary,
+          selectedCustomExtras: form.selectedCustomExtras,
+          customExtrasSummary: selectedCustomExtrasSummary,
+          vehicleTypeId: form.vehicleChoice,
           createdByRole: 'customer_web',
           selectedVehicles: bookingConfig.allowMultiVehicle ? form.selectedVehicles : [form.vehicleChoice],
         },
@@ -2002,7 +2079,14 @@ export function BookingEngineV2({
     );
   }
 
-  const outboundRawFare = quote?.pricing.totalFare ?? null;
+  // Prefer the exact pre-computed vehicle quote for the currently selected vehicle
+  // so switching vehicle cards updates the Trip Summary & Breakdown instantaneously
+  const activeOutboundPricing =
+    (!bookingConfig.allowMultiVehicle && quote?.vehicleQuotes?.[form.vehicleChoice]) ||
+    quote?.pricing ||
+    null;
+
+  const outboundRawFare = activeOutboundPricing?.totalFare ?? null;
   const returnRawFare = returnQuote?.pricing.totalFare ?? null;
 
   // Roundtrip Reverse-Route Balancing:
@@ -2020,13 +2104,13 @@ export function BookingEngineV2({
     ? (form.returnTrip && returnFare !== null ? outboundFare + returnFare : outboundFare)
     : null;
 
-  // Estimate live per-tier dollar price so riders can compare Sedan vs SUV directly on vehicle cards
+  // Real per-vehicle fare computed directly by the Admin Tariff, Surcharges & Rules engine
   const estimateTierDisplayFare = (tier: VehicleTierConfig): number | null => {
-    if (!quote?.pricing) return null;
-    const currentMult = quote.pricing.vehicleMultiplier || 1;
-    const baseAtOneX = quote.pricing.totalFare / currentMult;
-    const targetMult = tier.baseMultiplier || 1;
-    return Math.ceil(baseAtOneX * targetMult);
+    const exactTierQuote = quote?.vehicleQuotes?.[tier.id];
+    if (exactTierQuote && typeof exactTierQuote.totalFare === 'number') {
+      return Math.ceil(exactTierQuote.totalFare);
+    }
+    return null;
   };
 
   const validationErrorCount = Object.keys(errors).length;
@@ -2992,6 +3076,102 @@ export function BookingEngineV2({
                     ))}
                   </div>
                 )}
+
+                {/* Admin-Configured Optional Bookable Extras */}
+                {bookableCustomExtras.length > 0 && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Optional Add-On Services
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {bookableCustomExtras.map((extra) => {
+                        const qty = form.selectedCustomExtras[extra.id] || 0;
+                        const isChecked = qty > 0;
+                        return (
+                          <div
+                            key={extra.id}
+                            className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border text-xs transition-colors ${
+                              isChecked
+                                ? 'bg-blue-50/70 border-blue-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    selectedCustomExtras: {
+                                      ...prev.selectedCustomExtras,
+                                      [extra.id]: checked ? Math.max(1, prev.selectedCustomExtras[extra.id] || 1) : 0,
+                                    },
+                                  }));
+                                }}
+                                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate">{extra.name}</span>
+                                  {extra.fee > 0 && (
+                                    <span className="text-[11px] font-bold text-emerald-700">
+                                      +${extra.fee.toFixed(2)}{extra.isPerUnit ? '/ea' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                {extra.description && (
+                                  <p className="text-[10.5px] text-slate-500 leading-tight mt-0.5">
+                                    {extra.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+
+                            {extra.isPerUnit && isChecked && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  aria-label={`Decrease ${extra.name}`}
+                                  onClick={() =>
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      selectedCustomExtras: {
+                                        ...prev.selectedCustomExtras,
+                                        [extra.id]: Math.max(0, (prev.selectedCustomExtras[extra.id] || 1) - 1),
+                                      },
+                                    }))
+                                  }
+                                  className="w-7 h-7 rounded-lg bg-white border border-slate-300 font-bold flex items-center justify-center text-slate-700 cursor-pointer"
+                                >
+                                  &minus;
+                                </button>
+                                <span className="w-4 text-center font-bold text-slate-900">{qty}</span>
+                                <button
+                                  type="button"
+                                  aria-label={`Increase ${extra.name}`}
+                                  onClick={() =>
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      selectedCustomExtras: {
+                                        ...prev.selectedCustomExtras,
+                                        [extra.id]: Math.min(10, (prev.selectedCustomExtras[extra.id] || 0) + 1),
+                                      },
+                                    }))
+                                  }
+                                  className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-300 font-bold flex items-center justify-center text-blue-700 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Vehicle Preference Subsection */}
@@ -3074,10 +3254,6 @@ export function BookingEngineV2({
                                     <span className="text-xs font-mono font-extrabold text-blue-700">
                                       ${liveTierPrice}
                                     </span>
-                                  ) : tier.baseMultiplier > 1.0 ? (
-                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
-                                      +{Math.round((tier.baseMultiplier - 1.0) * 100)}%
-                                    </span>
                                   ) : null}
                                 </div>
                                 <div className="text-[11px] text-slate-500 font-medium">
@@ -3131,10 +3307,6 @@ export function BookingEngineV2({
                           (form.vehicleChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
 
                         const liveTierPrice = estimateTierDisplayFare(tier);
-                        const multiplierDiff =
-                          tier.baseMultiplier > 1.0
-                            ? `+${Math.round((tier.baseMultiplier - 1.0) * 100)}%`
-                            : null;
 
                         return (
                           <button
@@ -3192,10 +3364,6 @@ export function BookingEngineV2({
                                         est.{form.returnTrip ? '/leg' : ''}
                                       </span>
                                     </div>
-                                  ) : multiplierDiff ? (
-                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 border border-amber-200 px-1.5 py-0.5 rounded">
-                                      {multiplierDiff}
-                                    </span>
                                   ) : null}
                                 </div>
                               </div>
@@ -3988,7 +4156,7 @@ export function BookingEngineV2({
 
                 {showPriceBreakdown && (
                   <PriceBreakdownPanel
-                    outboundPricing={quote?.pricing}
+                    outboundPricing={activeOutboundPricing}
                     returnPricing={returnQuote?.pricing}
                     outboundDisplayFare={outboundFare}
                     returnDisplayFare={returnFare}

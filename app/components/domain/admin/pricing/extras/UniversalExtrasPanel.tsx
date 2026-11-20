@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { UniversalExtrasConfig, CustomFleetExtra } from '~/core/services/pricing/extras.service';
 import { type OversizedBagCategory, DEFAULT_OVERSIZED_BAG_CATEGORIES } from '~/core/types/config';
 import { Button } from '~/components/ui/Button';
@@ -34,11 +34,17 @@ export function UniversalExtrasPanel({
   );
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  useEffect(() => {
+    setWorkingCopy(JSON.parse(JSON.stringify(extras)));
+  }, [extras]);
+
   // New Custom Extra form state
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customFee, setCustomFee] = useState(10.0);
   const [customDescription, setCustomDescription] = useState('');
+  const [customIsPerUnit, setCustomIsPerUnit] = useState(false);
+  const [customShowOnBooking, setCustomShowOnBooking] = useState(true);
 
   const updateField = <K extends keyof UniversalExtrasConfig>(field: K, val: any) => {
     setWorkingCopy({
@@ -73,25 +79,44 @@ export function UniversalExtrasPanel({
       name: customName.trim(),
       description: customDescription.trim() || undefined,
       fee: Number(customFee) || 0,
-      isPerUnit: true,
+      isPerUnit: customIsPerUnit,
       isActive: true,
+      showOnBookingForm: customShowOnBooking,
     };
 
-    setWorkingCopy({
+    const nextConfig: UniversalExtrasConfig = {
       ...workingCopy,
       customExtras: [...(workingCopy.customExtras || []), newExtra],
-    });
+    };
+    setWorkingCopy(nextConfig);
+    onSave(nextConfig).catch((err) => console.error(err));
 
     setIsAddingCustom(false);
     setCustomName('');
     setCustomDescription('');
+    setCustomIsPerUnit(false);
+    setCustomShowOnBooking(true);
+  };
+
+  const handleToggleCustomExtraField = (
+    id: string,
+    field: 'isActive' | 'showOnBookingForm' | 'isPerUnit'
+  ) => {
+    const nextConfig: UniversalExtrasConfig = {
+      ...workingCopy,
+      customExtras: (workingCopy.customExtras || []).map((ce) =>
+        ce.id === id ? { ...ce, [field]: !(ce[field] !== false) } : ce
+      ),
+    };
+    setWorkingCopy(nextConfig);
   };
 
   const handleRemoveCustomExtra = (id: string) => {
-    setWorkingCopy({
+    const nextConfig: UniversalExtrasConfig = {
       ...workingCopy,
       customExtras: (workingCopy.customExtras || []).filter((ce) => ce.id !== id),
-    });
+    };
+    setWorkingCopy(nextConfig);
   };
 
   return (
@@ -275,7 +300,7 @@ export function UniversalExtrasPanel({
               </div>
             </div>
             <span className="text-base font-bold text-amber-700">
-              ${(workingCopy.waitingRatePerMinute ?? workingCopy.curbWaitingRatePerMinute ?? 0.50).toFixed(2)} / min
+              ${(workingCopy.curbWaitingRatePerMinute ?? workingCopy.waitingRatePerMinute ?? 0.5).toFixed(2)} / min
             </span>
           </div>
 
@@ -286,12 +311,19 @@ export function UniversalExtrasPanel({
                 type="number"
                 step="1"
                 min="0"
-                value={workingCopy.pickupGraceMinutes}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('pickupGraceMinutes', parseInt(e.target.value, 10) || 0)}
+                value={workingCopy.curbWaitingGraceMinutes ?? workingCopy.pickupGraceMinutes ?? 10}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = parseInt(e.target.value, 10) || 0;
+                  setWorkingCopy((prev) => ({
+                    ...prev,
+                    curbWaitingGraceMinutes: val,
+                    pickupGraceMinutes: val,
+                  }));
+                }}
                 className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                10 minutes free courtesy grace
+                {workingCopy.curbWaitingGraceMinutes ?? workingCopy.pickupGraceMinutes ?? 10} minutes free courtesy grace
               </span>
             </div>
 
@@ -301,12 +333,19 @@ export function UniversalExtrasPanel({
                 type="number"
                 step="0.05"
                 min="0"
-                value={workingCopy.waitingRatePerMinute}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateField('waitingRatePerMinute', parseFloat(e.target.value) || 0)}
+                value={workingCopy.curbWaitingRatePerMinute ?? workingCopy.waitingRatePerMinute ?? 0.5}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  setWorkingCopy((prev) => ({
+                    ...prev,
+                    curbWaitingRatePerMinute: val,
+                    waitingRatePerMinute: val,
+                  }));
+                }}
                 className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
-                $0.50/min for time exceeding grace
+                ${(workingCopy.curbWaitingRatePerMinute ?? workingCopy.waitingRatePerMinute ?? 0.5).toFixed(2)}/min for time exceeding grace
               </span>
             </div>
           </div>
@@ -440,6 +479,26 @@ export function UniversalExtrasPanel({
                 />
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-slate-700">
+              <label className="flex items-center gap-1.5 cursor-pointer font-medium">
+                <input
+                  type="checkbox"
+                  checked={customShowOnBooking}
+                  onChange={(e) => setCustomShowOnBooking(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600"
+                />
+                <span>Show on Public Booking Form (/book)</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer font-medium">
+                <input
+                  type="checkbox"
+                  checked={customIsPerUnit}
+                  onChange={(e) => setCustomIsPerUnit(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600"
+                />
+                <span>Allow Quantity (Per-Unit Pricing)</span>
+              </label>
+            </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button
                 type="button"
@@ -463,16 +522,54 @@ export function UniversalExtrasPanel({
             workingCopy.customExtras.map((extra) => (
               <div
                 key={extra.id}
-                className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between"
+                className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  extra.isActive === false
+                    ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
               >
                 <div>
-                  <span className="text-xs font-semibold text-slate-800">{extra.name}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-800">{extra.name}</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      {extra.isPerUnit ? 'Per Unit' : 'Flat Fee'}
+                    </span>
+                    {extra.showOnBookingForm !== false && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Visible on /book
+                      </span>
+                    )}
+                  </div>
                   {extra.description && (
-                    <p className="text-[11px] text-slate-500">{extra.description}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{extra.description}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-emerald-700">${extra.fee.toFixed(2)}</span>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleCustomExtraField(extra.id, 'showOnBookingForm')}
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border cursor-pointer ${
+                      extra.showOnBookingForm !== false
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-white text-slate-500 border-slate-300'
+                    }`}
+                  >
+                    {extra.showOnBookingForm !== false ? 'On /book' : 'Hidden'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleCustomExtraField(extra.id, 'isActive')}
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border cursor-pointer ${
+                      extra.isActive !== false
+                        ? 'bg-blue-50 text-blue-700 border-blue-300'
+                        : 'bg-slate-200 text-slate-600 border-slate-300'
+                    }`}
+                  >
+                    {extra.isActive !== false ? 'Active' : 'Disabled'}
+                  </button>
+                  <span className="text-xs font-bold text-emerald-700 font-mono">
+                    ${extra.fee.toFixed(2)}{extra.isPerUnit ? '/ea' : ''}
+                  </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveCustomExtra(extra.id)}

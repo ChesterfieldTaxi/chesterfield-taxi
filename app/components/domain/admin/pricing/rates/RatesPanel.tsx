@@ -17,6 +17,7 @@ import {
 import { TaximeterEditor } from './TaximeterEditor';
 import { ZipRateMatrixEditor } from './ZipRateMatrixEditor';
 import { HourlyRateEditor } from './HourlyRateEditor';
+import { CorridorEditor } from './CorridorEditor';
 import { DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
 
 export interface RatesPanelProps {
@@ -155,9 +156,12 @@ export function RatesPanel({
       isDefault: false,
       allowSurgeMultiplier: true,
       allowOperationalSurcharges: true,
-      eligibleVehicleTypes: ['sedan', 'suv', 'minivan'],
-      eligibleVehicleClasses: ['standard', 'executive'],
-      triggers: {},
+      eligibleVehicleTypes: [],
+      eligibleVehicleClasses: [],
+      triggers: {
+        vehicleTypes: [],
+        vehicleClasses: [],
+      },
       taximeter: taximeterConfig,
       taximeterRate: taximeterConfig,
       corridors: [],
@@ -176,22 +180,51 @@ export function RatesPanel({
     await onSaveTariff(newTariff);
   };
 
+  const getWorkingVehicleTypes = (t: TariffProfile): string[] => {
+    if (t.triggers?.vehicleTypes && t.triggers.vehicleTypes.length > 0) {
+      return t.triggers.vehicleTypes;
+    }
+    return t.eligibleVehicleTypes || [];
+  };
+
+  const getWorkingVehicleClasses = (t: TariffProfile): string[] => {
+    if (t.triggers?.vehicleClasses && t.triggers.vehicleClasses.length > 0) {
+      return t.triggers.vehicleClasses;
+    }
+    return t.eligibleVehicleClasses || [];
+  };
+
   const toggleVehicleType = (vt: VehicleType) => {
     if (!workingCopy) return;
-    const current = workingCopy.eligibleVehicleTypes || [];
-    const next = current.includes(vt)
-      ? current.filter((x: string) => x !== vt)
+    const current = getWorkingVehicleTypes(workingCopy);
+    const next = current.some((x) => x.toLowerCase() === vt.toLowerCase())
+      ? current.filter((x) => x.toLowerCase() !== vt.toLowerCase())
       : [...current, vt];
-    setWorkingCopy({ ...workingCopy, eligibleVehicleTypes: next });
+    setWorkingCopy({
+      ...workingCopy,
+      eligibleVehicleTypes: next,
+      triggers: {
+        ...(workingCopy.triggers || {}),
+        vehicleTypes: next,
+        vehicleTiers: undefined,
+      },
+    });
   };
 
   const toggleVehicleClass = (vc: VehicleClass) => {
     if (!workingCopy) return;
-    const current = workingCopy.eligibleVehicleClasses || [];
+    const current = getWorkingVehicleClasses(workingCopy);
     const next = current.includes(vc)
       ? current.filter((x: string) => x !== vc)
       : [...current, vc];
-    setWorkingCopy({ ...workingCopy, eligibleVehicleClasses: next });
+    setWorkingCopy({
+      ...workingCopy,
+      eligibleVehicleClasses: next,
+      triggers: {
+        ...(workingCopy.triggers || {}),
+        vehicleClasses: next,
+      },
+    });
   };
 
   // Safe taximeter resolution
@@ -394,32 +427,61 @@ export function RatesPanel({
               </div>
 
               {workingCopy.rateModel === 'taximeter' && (
-                <TaximeterEditor
-                  taximeter={resolvedTaximeter}
+                <div className="space-y-4">
+                  <TaximeterEditor
+                    taximeter={resolvedTaximeter}
+                    onChange={(updated) =>
+                      setWorkingCopy({
+                        ...workingCopy,
+                        taximeter: updated,
+                        taximeterRate: updated,
+                      })
+                    }
+                  />
+                  <CorridorEditor
+                    corridors={workingCopy.corridors || []}
+                    onChange={(updated) =>
+                      setWorkingCopy({ ...workingCopy, corridors: updated })
+                    }
+                  />
+                </div>
+              )}
+
+              {workingCopy.rateModel === 'corridor' && (
+                <CorridorEditor
+                  corridors={workingCopy.corridors || []}
                   onChange={(updated) =>
-                    setWorkingCopy({
-                      ...workingCopy,
-                      taximeter: updated,
-                      taximeterRate: updated,
-                    })
+                    setWorkingCopy({ ...workingCopy, corridors: updated })
                   }
                 />
               )}
 
               {workingCopy.rateModel === 'zip_matrix' && (
                 <ZipRateMatrixEditor
-                  entries={workingCopy.zipMatrixRates || []}
+                  entries={
+                    workingCopy.zipMatrix && workingCopy.zipMatrix.length > 0
+                      ? workingCopy.zipMatrix
+                      : workingCopy.zipMatrixRates || []
+                  }
                   onChange={(updated) =>
-                    setWorkingCopy({ ...workingCopy, zipMatrixRates: updated })
+                    setWorkingCopy({
+                      ...workingCopy,
+                      zipMatrix: updated,
+                      zipMatrixRates: updated,
+                    })
                   }
                 />
               )}
 
               {workingCopy.rateModel === 'hourly' && (
                 <HourlyRateEditor
-                  hourlyConfig={workingCopy.hourlyRate}
+                  hourlyConfig={workingCopy.hourlyConfig || workingCopy.hourlyRate}
                   onChange={(updated) =>
-                    setWorkingCopy({ ...workingCopy, hourlyRate: updated })
+                    setWorkingCopy({
+                      ...workingCopy,
+                      hourlyConfig: updated,
+                      hourlyRate: updated,
+                    })
                   }
                 />
               )}
@@ -557,10 +619,35 @@ export function RatesPanel({
               {/* Dual Vehicle Classifications */}
               <div className="pt-3 border-t border-slate-200 space-y-2 text-xs">
                 <div>
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">Eligible Physical Vehicle Types:</span>
+                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Eligible Fleet Vehicle Types (Leave empty for All Vehicles):
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setWorkingCopy({
+                          ...workingCopy,
+                          eligibleVehicleTypes: [],
+                          triggers: {
+                            ...(workingCopy.triggers || {}),
+                            vehicleTypes: [],
+                            vehicleTiers: undefined,
+                          },
+                        })
+                      }
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors cursor-pointer ${
+                        getWorkingVehicleTypes(workingCopy).length === 0
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                      }`}
+                    >
+                      All Vehicles
+                    </button>
                     {activeVehicleTypes.map((vt) => {
-                      const isChecked = workingCopy.eligibleVehicleTypes?.some((t) => t.toLowerCase() === vt.id.toLowerCase());
+                      const isChecked = getWorkingVehicleTypes(workingCopy).some(
+                        (t) => t.toLowerCase() === vt.id.toLowerCase()
+                      );
                       return (
                         <button
                           key={vt.id}
@@ -580,10 +667,12 @@ export function RatesPanel({
                 </div>
 
                 <div className="pt-1">
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">Eligible Service Classes:</span>
+                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Eligible Service Classes (Optional):
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
                     {VEHICLE_CLASSES.map((vc) => {
-                      const isChecked = workingCopy.eligibleVehicleClasses?.includes(vc.id);
+                      const isChecked = getWorkingVehicleClasses(workingCopy).includes(vc.id);
                       return (
                         <button
                           key={vc.id}

@@ -33,8 +33,8 @@ import {
 } from '../zones/zone.service';
 import { getPricingRulesService } from '../pricing/pricing-rules.service';
 import { getTariffService } from '../pricing/tariff.service';
-import { getUniversalExtrasConfig } from '../pricing/extras.service';
-import { getSurchargesConfig } from '../pricing/surcharges.service';
+import { getUniversalExtrasConfig, getUniversalExtrasService } from '../pricing/extras.service';
+import { getSurchargesConfig, getSurchargesService } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
 import { generateTripId } from '../../utils/trip-id.util';
 
@@ -177,7 +177,7 @@ export class MockBookingService implements IBookingService {
     // 4-Pillar Config Hydration: Tariffs, Rules, Universal Extras, and Surcharges
     try {
       const tariffService = getTariffService();
-      const allTariffs = await tariffService.getAllTariffProfiles();
+      const allTariffs = await tariffService.getTariffs();
       if (allTariffs && allTariffs.length > 0) {
         dynamicPricingConfig.tariffs = allTariffs;
       }
@@ -194,21 +194,23 @@ export class MockBookingService implements IBookingService {
     }
 
     try {
-      const extras = await getUniversalExtrasConfig();
+      const extras = await getUniversalExtrasService().getExtras();
       if (extras) {
         dynamicPricingConfig.universalExtras = extras;
       }
     } catch (extrasErr) {
       console.warn('[MockBookingService] Could not load universal extras:', extrasErr);
+      dynamicPricingConfig.universalExtras = getUniversalExtrasConfig();
     }
 
     try {
-      const surcharges = await getSurchargesConfig();
+      const surcharges = await getSurchargesService().getSurcharges();
       if (surcharges) {
         dynamicPricingConfig.surchargesCatalog = surcharges;
       }
     } catch (surchargesErr) {
       console.warn('[MockBookingService] Could not load surcharges:', surchargesErr);
+      dynamicPricingConfig.surchargesCatalog = getSurchargesConfig();
     }
 
     const validIntermediateStops = (request.intermediateStops ?? []).filter((s) => {
@@ -275,46 +277,83 @@ export class MockBookingService implements IBookingService {
       }
     }
 
-    const { pricing } = calculateTripPricing(
-      {
-        distanceMiles,
-        durationMinutes,
-        vehicleTier: request.vehicleTier,
-        pickupDateTime,
-        promoCode: request.promoCode,
-        isAirportPickup,
-        isAirportDropoff,
-        isAirportTrip,
-        originZoneId: request.originZoneId || (isAirportPickup ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
-        destinationZoneId: request.destinationZoneId || (isAirportDropoff ? (airportCheck.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined),
-        curbWaitMinutes: request.curbWaitMinutes,
-        delayMinutes: request.delayMinutes,
-        intermediateStopsCount: validIntermediateStops.length,
-        tolls: request.tolls,
-        customTollsOrFees: request.customTollsOrFees,
-        bypassSurge: request.bypassSurge,
-        waiveMultiStopFees: request.waiveMultiStopFees,
-        waiveAirportFee: request.waiveAirportFee,
-        manualDiscount: request.manualDiscount,
-        manualFareOverride: request.manualFareOverride,
-        carSeatsBreakdown: request.carSeatsBreakdown,
-        passengers: request.passengerCount,
-        equipment: {
-          carSeats: request.carSeatsCount || (request.carSeatsBreakdown?.total ?? 0),
-          luggageCount: request.luggageCount,
-          ...request.equipment,
-        },
-        zoneIds: Array.from(matchedZoneIds),
-        zoneGroupIds: Array.from(matchedZoneGroupIds),
-        locationCollectionIds: Array.from(matchedLocationCollectionIds),
+    const basePricingInput = {
+      distanceMiles,
+      durationMinutes,
+      vehicleTypeId: request.vehicleType || request.vehicleTier,
+      vehicleType: request.vehicleType || request.vehicleTier,
+      vehicleTier: request.vehicleTier,
+      vehicleClass: request.vehicleClass,
+      pickupDateTime,
+      promoCode: request.promoCode,
+      corporateAccountId: request.corporateAccountId,
+      accountTags: request.accountTags,
+      isAirportPickup,
+      isAirportDropoff,
+      isAirportTrip,
+      originZoneId:
+        request.originZoneId ||
+        (isAirportPickup
+          ? airportCheck.airport?.iataCode === 'SUS'
+            ? 'zone-spirit-airport'
+            : 'zone-lambert-airport'
+          : undefined),
+      destinationZoneId:
+        request.destinationZoneId ||
+        (isAirportDropoff
+          ? airportCheck.airport?.iataCode === 'SUS'
+            ? 'zone-spirit-airport'
+            : 'zone-lambert-airport'
+          : undefined),
+      curbWaitMinutes: request.curbWaitMinutes,
+      delayMinutes: request.delayMinutes,
+      intermediateStopsCount: validIntermediateStops.length,
+      tolls: request.tolls,
+      customTollsOrFees: request.customTollsOrFees,
+      bypassSurge: request.bypassSurge,
+      waiveMultiStopFees: request.waiveMultiStopFees,
+      waiveAirportFee: request.waiveAirportFee,
+      manualDiscount: request.manualDiscount,
+      manualFareOverride: request.manualFareOverride,
+      carSeatsBreakdown: request.carSeatsBreakdown,
+      passengers: request.passengerCount,
+      oversizedBags: request.oversizedBags,
+      selectedCustomExtras: request.selectedCustomExtras,
+      equipment: {
+        carSeats: request.carSeatsCount || (request.carSeatsBreakdown?.total ?? 0),
+        luggageCount: request.luggageCount,
+        ...request.equipment,
       },
-      dynamicPricingConfig
-    );
+      zoneIds: Array.from(matchedZoneIds),
+      zoneGroupIds: Array.from(matchedZoneGroupIds),
+      locationCollectionIds: Array.from(matchedLocationCollectionIds),
+    };
+
+    const { pricing } = calculateTripPricing(basePricingInput, dynamicPricingConfig);
+
+    let vehicleQuotes: Record<string, typeof pricing> | undefined;
+    if (request.evaluateAllVehicleIds && request.evaluateAllVehicleIds.length > 0) {
+      vehicleQuotes = {};
+      for (const vId of request.evaluateAllVehicleIds) {
+        if (!vId) continue;
+        const vResult = calculateTripPricing(
+          {
+            ...basePricingInput,
+            vehicleTypeId: vId,
+            vehicleType: vId,
+            vehicleTier: vId,
+          },
+          dynamicPricingConfig
+        );
+        vehicleQuotes[vId] = vResult.pricing;
+      }
+    }
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min validity
 
     return {
       pricing,
+      vehicleQuotes,
       estimatedDistanceMiles: distanceMiles,
       estimatedDurationMinutes: durationMinutes,
       currency: pricing.currency,

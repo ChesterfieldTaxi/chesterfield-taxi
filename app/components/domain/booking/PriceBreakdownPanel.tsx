@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TripPricing } from '../../../core/types';
+import type { PriceLineItem, TripPricing } from '../../../core/types';
 
 export interface PriceBreakdownPanelProps {
   outboundPricing?: TripPricing | null;
@@ -11,6 +11,18 @@ export interface PriceBreakdownPanelProps {
   vehicleLabel: string;
 }
 
+/**
+ * Renders the canonical single-source-of-truth Price Breakdown produced by the
+ * Admin Tariff & Pricing Engine (`pricing.breakdown[]`).
+ *
+ * Line order:
+ * 1. Base Fare
+ * 2. Customer Extras & Add-ons (each on its own line)
+ * 3. Operational & Vehicle Surcharges (each on its own line)
+ * 4. Discounts (if any)
+ * 5. Rounding (only if percentage modifiers produced cents)
+ * 6. Outbound / Return Leg Summary (if Round-Trip) & Estimated Total
+ */
 export function PriceBreakdownPanel({
   outboundPricing,
   returnPricing,
@@ -28,10 +40,56 @@ export function PriceBreakdownPanel({
     );
   }
 
-  const distanceCharge = Math.max(0, outboundPricing.distanceMiles * outboundPricing.distanceRate);
-  const timeCharge = Math.max(0, outboundPricing.durationMinutes * outboundPricing.timeRate);
-  const hasMultiplier = outboundPricing.vehicleMultiplier && outboundPricing.vehicleMultiplier > 1.01;
-  const hasSurge = outboundPricing.surgeMultiplier && outboundPricing.surgeMultiplier > 1.01;
+  // Canonical line items from the pricing engine; graceful fallback for legacy trips without breakdown[]
+  const canonicalItems: PriceLineItem[] =
+    outboundPricing.breakdown && outboundPricing.breakdown.length > 0
+      ? outboundPricing.breakdown
+      : [
+          {
+            id: 'base-fare',
+            category: 'base',
+            label: 'Base Fare',
+            amount: outboundPricing.tariffBaseSubtotal ?? outboundPricing.subtotal ?? outboundPricing.baseFare,
+          },
+          ...(outboundPricing.itemizedSurcharges || [])
+            .filter((s) => s.amount > 0)
+            .map((s, i) => ({
+              id: `legacy-surcharge-${i}`,
+              category: 'surcharge' as const,
+              label: s.name,
+              amount: s.amount,
+            })),
+          ...(outboundPricing.discountAmount > 0
+            ? [
+                {
+                  id: 'legacy-discount',
+                  category: 'discount' as const,
+                  label: 'Applied Discount',
+                  amount: -outboundPricing.discountAmount,
+                },
+              ]
+            : []),
+        ];
+
+  const baseLine = canonicalItems.find((item) => item.category === 'base');
+  const extrasLines = canonicalItems.filter((item) => item.category === 'extra' && item.amount !== 0);
+  const surchargeLines = canonicalItems.filter(
+    (item) => item.category === 'surcharge' && item.amount !== 0
+  );
+  const discountLines = canonicalItems.filter(
+    (item) => item.category === 'discount' && item.amount !== 0
+  );
+  const roundingLines = canonicalItems.filter(
+    (item) => item.category === 'rounding' && item.amount !== 0
+  );
+
+  const orderedLines: PriceLineItem[] = [
+    ...(baseLine ? [{ ...baseLine, label: 'Base Fare' }] : []),
+    ...extrasLines,
+    ...surchargeLines,
+    ...discountLines,
+    ...roundingLines,
+  ];
 
   return (
     <div
@@ -48,111 +106,32 @@ export function PriceBreakdownPanel({
       </div>
 
       <div className="space-y-1.5 text-slate-700">
-        <div className="flex items-center justify-between">
-          <span>Base Flag-Drop Fare</span>
-          <span className="font-mono font-semibold text-slate-900">
-            ${outboundPricing.baseFare.toFixed(2)}
-          </span>
-        </div>
+        {orderedLines.map((item) => {
+          const isDiscount = item.category === 'discount' || item.amount < 0;
+          const isBase = item.category === 'base';
 
-        <div className="flex items-center justify-between">
-          <span>
-            Distance ({outboundPricing.distanceMiles.toFixed(1)} mi &times; ${outboundPricing.distanceRate.toFixed(2)}/mi)
-          </span>
-          <span className="font-mono font-semibold text-slate-900">
-            ${distanceCharge.toFixed(2)}
-          </span>
-        </div>
-
-        {timeCharge > 0 && (
-          <div className="flex items-center justify-between">
-            <span>
-              Est. Transit Time ({Math.round(outboundPricing.durationMinutes)} min)
-            </span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${timeCharge.toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {hasMultiplier && (
-          <div className="flex items-center justify-between text-blue-800">
-            <span>Vehicle Class ({vehicleLabel})</span>
-            <span className="font-mono font-semibold">
-              {outboundPricing.vehicleMultiplier.toFixed(2)}&times;
-            </span>
-          </div>
-        )}
-
-        {hasSurge && (
-          <div className="flex items-center justify-between text-amber-800">
-            <span>Peak Demand Multiplier</span>
-            <span className="font-mono font-semibold">
-              {outboundPricing.surgeMultiplier.toFixed(2)}&times;
-            </span>
-          </div>
-        )}
-
-        {Boolean(outboundPricing.airportSurcharge && outboundPricing.airportSurcharge > 0) && (
-          <div className="flex items-center justify-between">
-            <span>Airport Facility / Gate Fee</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${Number(outboundPricing.airportSurcharge).toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {Boolean(outboundPricing.multiStopSurcharge && outboundPricing.multiStopSurcharge > 0) && (
-          <div className="flex items-center justify-between">
-            <span>Intermediate Stops ({outboundPricing.intermediateStopsCount || 1})</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${Number(outboundPricing.multiStopSurcharge).toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {Boolean(outboundPricing.carSeatFee && outboundPricing.carSeatFee > 0) && (
-          <div className="flex items-center justify-between">
-            <span>Sanitized Child Safety Seats</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${Number(outboundPricing.carSeatFee).toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {Boolean(outboundPricing.passengerSurcharge && outboundPricing.passengerSurcharge > 0) && (
-          <div className="flex items-center justify-between">
-            <span>Extra Passenger Fee</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${Number(outboundPricing.passengerSurcharge).toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {Boolean(outboundPricing.tollsFee && outboundPricing.tollsFee > 0) && (
-          <div className="flex items-center justify-between">
-            <span>Estimated Tolls</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${Number(outboundPricing.tollsFee).toFixed(2)}
-            </span>
-          </div>
-        )}
-
-        {outboundPricing.itemizedSurcharges?.map((item, idx) => (
-          <div key={idx} className="flex items-center justify-between">
-            <span>{item.name}</span>
-            <span className="font-mono font-semibold text-slate-900">
-              ${item.amount.toFixed(2)}
-            </span>
-          </div>
-        ))}
-
-        {outboundPricing.discountAmount > 0 && (
-          <div className="flex items-center justify-between text-emerald-700 font-semibold">
-            <span>Applied Discount</span>
-            <span className="font-mono">-${outboundPricing.discountAmount.toFixed(2)}</span>
-          </div>
-        )}
+          return (
+            <div
+              key={item.id}
+              className={`flex items-center justify-between gap-2 ${
+                isDiscount ? 'text-emerald-700 font-semibold' : ''
+              }`}
+            >
+              <span className={isBase ? 'font-semibold text-slate-900' : 'text-slate-700'}>
+                {item.label}
+              </span>
+              <span
+                className={`font-mono font-semibold shrink-0 ${
+                  isDiscount ? 'text-emerald-700' : 'text-slate-900'
+                }`}
+              >
+                {isDiscount
+                  ? `-$${Math.abs(item.amount).toFixed(2)}`
+                  : `$${item.amount.toFixed(2)}`}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {isRoundTrip && (
@@ -180,7 +159,7 @@ export function PriceBreakdownPanel({
       </div>
 
       <p className="text-[10.5px] text-slate-500 leading-snug">
-        Estimated upfront fare rounded to nearest dollar (gratuity optional). Final confirmed fare is sent in your dispatch confirmation email.
+        Estimated upfront fare based on active tariff rules (gratuity optional). Final confirmed fare is sent in your dispatch confirmation email.
       </p>
     </div>
   );

@@ -23,10 +23,18 @@ export interface QuoteRequest {
   dropoffLocation: TripLocation;
   intermediateStops?: TripLocation[];
   vehicleTier: VehicleTier;
+  vehicleType?: string;
+  vehicleClass?: string;
   bookingType: 'asap' | 'scheduled';
   scheduledPickupTime?: string; // ISO 8601 string
   passengerCount?: number;
   luggageCount?: number;
+  oversizedBags?: Record<string, number>;
+  selectedCustomExtras?: Record<string, number>;
+  corporateAccountId?: string;
+  accountTags?: string[];
+  /** Optional list of vehicle type IDs to evaluate simultaneously on the resolved route */
+  evaluateAllVehicleIds?: string[];
   carSeatsBreakdown?: {
     rearFacing?: number;
     frontFacing?: number;
@@ -65,6 +73,8 @@ export interface QuoteRequest {
  */
 export interface QuoteResponse {
   pricing: TripPricing;
+  /** Exact engine-calculated pricing for every requested vehicle ID on the same route */
+  vehicleQuotes?: Record<string, TripPricing>;
   estimatedDistanceMiles: number;
   estimatedDurationMinutes: number;
   currency: string;

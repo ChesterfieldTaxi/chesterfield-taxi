@@ -76,8 +76,8 @@ export interface RulePassengerFilter {
   max?: number;
 }
 
-export type VehicleType = 'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav';
-export type VehicleClass = 'standard' | 'executive' | 'xl' | 'medical' | 'delivery';
+export type VehicleType = 'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav' | (string & {});
+export type VehicleClass = 'standard' | 'executive' | 'xl' | 'medical' | 'delivery' | (string & {});
 
 export interface OversizedBagCategory {
   id: string;
@@ -118,6 +118,7 @@ export interface UniversalExtrasConfig {
     description?: string;
     isPerUnit?: boolean;
     isActive?: boolean;
+    showOnBookingForm?: boolean;
   }>;
 }
 
