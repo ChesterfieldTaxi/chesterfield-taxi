@@ -6,7 +6,7 @@ import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
-import { SparklesIcon } from '../../../ui/Icons';
+import { SparklesIcon, MegaphoneIcon } from '../../../ui/Icons';
 
 export interface WebsiteNavigationTabProps {
   settings: AppSettings;
@@ -335,7 +335,10 @@ export function WebsiteNavigationTab({
                   : 'bg-blue-600 text-white border-blue-700'
               }`}
             >
-              <span>📢 {announcementText}</span>
+              <span className="inline-flex items-center gap-2">
+                <MegaphoneIcon className="w-4 h-4 shrink-0" />
+                <span>{announcementText}</span>
+              </span>
               <span className="text-[10px] opacity-80 uppercase tracking-wider font-mono">Live Preview</span>
             </div>
           </CardContent>

@@ -13,6 +13,8 @@ import {
   ShieldCheckIcon,
   CheckIcon,
   CreditCardIcon,
+  CashIcon,
+  BuildingIcon,
   InfoIcon,
   PlaneLandingIcon,
 } from '../../../ui/Icons';
@@ -257,7 +259,7 @@ export function WebsiteFormControlsTab({
                   Live Customer Notice Preview (Rendered on <code>/book</code>)
                 </span>
                 <div className="flex items-start gap-2.5 text-xs text-amber-900">
-                  <span className="text-base shrink-0">ℹ️</span>
+                  <InfoIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-semibold">
                       {formConfig.multiVehicleCustomNote || (
@@ -583,7 +585,8 @@ export function WebsiteFormControlsTab({
                   onChange={() => togglePaymentMethod('card')}
                   className="w-4 h-4 rounded text-blue-600"
                 />
-                <span>💳 Credit / Debit Card (Online Pre-Auth)</span>
+                <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span>Credit / Debit Card (Online Pre-Auth)</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
@@ -592,7 +595,8 @@ export function WebsiteFormControlsTab({
                   onChange={() => togglePaymentMethod('cash')}
                   className="w-4 h-4 rounded text-blue-600"
                 />
-                <span>💵 Cash to Driver in Cab</span>
+                <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Cash to Driver in Cab</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
@@ -601,7 +605,8 @@ export function WebsiteFormControlsTab({
                   onChange={() => togglePaymentMethod('account')}
                   className="w-4 h-4 rounded text-blue-600"
                 />
-                <span>🏢 Corporate Direct Billing Account</span>
+                <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>Corporate Direct Billing Account</span>
               </label>
             </div>
           </div>

@@ -95,6 +95,10 @@ export interface OperatorUser {
   blacklistReason?: string;
   isArchived?: boolean;
   driverScore?: number;
+  deskExtension?: string;
+  hireDate?: string;
+  emergencyContact?: string;
+  adminNotes?: string;
 }
 
 export interface DriverRosterItem {
@@ -371,6 +375,10 @@ export class OperatorService {
             blacklistReason: data.blacklistReason,
             isArchived: data.isArchived,
             driverScore: data.driverScore,
+            deskExtension: data.deskExtension || '',
+            hireDate: data.hireDate || '',
+            emergencyContact: data.emergencyContact || '',
+            adminNotes: data.adminNotes || '',
           });
         }
       });
@@ -533,6 +541,10 @@ export class OperatorService {
                 blacklistReason: data.blacklistReason,
                 isArchived: data.isArchived,
                 driverScore: data.driverScore,
+                deskExtension: data.deskExtension || '',
+                hireDate: data.hireDate || '',
+                emergencyContact: data.emergencyContact || '',
+                adminNotes: data.adminNotes || '',
               });
             }
           });
@@ -580,7 +592,10 @@ export class OperatorService {
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestore(getFirebaseApp());
-        await setDoc(doc(db, 'users', completeOperator.uid), completeOperator, { merge: true });
+        const sanitized = Object.fromEntries(
+          Object.entries(completeOperator).filter(([, v]) => v !== undefined)
+        );
+        await setDoc(doc(db, 'users', completeOperator.uid), sanitized, { merge: true });
       } catch (err) {
         console.warn('[OperatorService] Firestore save error:', err);
       }

@@ -21,6 +21,9 @@ import {
   PhoneIcon,
   MailIcon,
   SearchIcon,
+  UserIcon,
+  InfoIcon,
+  XIcon,
 } from '../../../ui/Icons';
 import { TripAuditModal } from '../TripAuditModal';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
@@ -115,7 +118,7 @@ function TripRowActionDropdown({
               }}
               className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>✓</span>
+              <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
               <span>Confirm Trip</span>
             </button>
           )}
@@ -130,7 +133,7 @@ function TripRowActionDropdown({
               }}
               className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-blue-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>👤</span>
+              <UserIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Assign Driver</span>
             </button>
           )}
@@ -145,7 +148,7 @@ function TripRowActionDropdown({
               }}
               className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <span>✓</span>
+              <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
               <span>Complete Trip</span>
             </button>
           )}
@@ -200,7 +203,11 @@ function TripRowActionDropdown({
             }}
             className="w-full text-left px-3 py-1.5 hover:bg-slate-100 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer transition-colors"
           >
-            <span>{isSelected ? '✕' : 'ℹ️'}</span>
+            {isSelected ? (
+              <XIcon className="w-3.5 h-3.5 text-slate-500" />
+            ) : (
+              <InfoIcon className="w-3.5 h-3.5 text-slate-500" />
+            )}
             <span>{isSelected ? 'Close Details' : 'View Full Details'}</span>
           </button>
         </div>
@@ -611,7 +618,9 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           </div>
         ) : currentDisplayTrips.length === 0 ? (
           <div className="p-12 text-center text-slate-400">
-            <p className="text-3xl mb-2">🚕</p>
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+              <CarIcon className="w-6 h-6" />
+            </div>
             <p className="text-sm font-bold text-slate-700">No trips matching this view</p>
             <p className="text-xs text-slate-500 mt-1">
               {searchTerm ? 'Try adjusting your search query' : 'Dispatch queue is currently clear.'}
@@ -688,7 +697,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                         </span>
                       </div>
                       <div className="flex items-start gap-1.5">
-                        <span className="text-rose-500 font-bold text-xs">🔴</span>
+                        <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0 mt-1" />
                         <span className="truncate font-medium" title={trip.dropoffLocation?.address}>
                           {trip.dropoffLocation?.address || 'Dropoff address'}
                         </span>
@@ -888,13 +897,13 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
                       <td className="px-4 py-3 align-top min-w-[220px]">
                         <div className="flex items-start gap-1.5">
-                          <span className="text-emerald-500 font-bold text-xs mt-0.5">🟢</span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0 mt-1" />
                           <span className="text-slate-800 font-medium line-clamp-1">
                             {trip.pickupLocation?.address || 'Pickup address'}
                           </span>
                         </div>
                         <div className="flex items-start gap-1.5 mt-1">
-                          <span className="text-rose-500 font-bold text-xs mt-0.5">🔴</span>
+                          <span className="w-2 h-2 rounded-full bg-rose-500 inline-block shrink-0 mt-1" />
                           <span className="text-slate-800 font-medium line-clamp-1">
                             {trip.dropoffLocation?.address || 'Dropoff address'}
                           </span>

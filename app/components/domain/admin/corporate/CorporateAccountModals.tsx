@@ -3,6 +3,7 @@ import type { CorporateAccountConfig, PoHistoryRecord } from '../../../../core/t
 import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
 import { Button } from '../../../ui/Button';
 import { Badge } from '../../../ui/Badge';
+import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import {
   ShieldCheckIcon,
   RefreshCwIcon,
@@ -65,27 +66,38 @@ export function RegeneratePoModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
-        <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-              <ShieldCheckIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-black text-slate-900 text-base">Regenerate Corporate PO Number</h3>
-              <p className="text-xs text-slate-500">{account.companyName} ({account.accountNumber})</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2"
-          >
-            ✕
-          </button>
-        </div>
-
+    <AdminSlideOverDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Regenerate PO Number"
+      subtitle={`${account.companyName} (${account.accountNumber})`}
+      size="md"
+      footer={
+        !rotatedResult ? (
+          <>
+            <Button type="button" variant="outline" size="md" onClick={onClose} disabled={isRotating}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={handleRegenerate}
+              disabled={isRotating}
+              leftIcon={<RefreshCwIcon className={`w-4 h-4 ${isRotating ? 'animate-spin' : ''}`} />}
+              className="bg-amber-600 hover:bg-amber-700 font-bold"
+            >
+              {isRotating ? 'Regenerating...' : 'Regenerate PO'}
+            </Button>
+          </>
+        ) : (
+          <Button type="button" variant="primary" size="md" onClick={onClose} className="font-bold">
+            Done
+          </Button>
+        )
+      }
+    >
+      <div className="space-y-4">
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
             {error}
@@ -95,7 +107,7 @@ export function RegeneratePoModal({
         {!rotatedResult ? (
           <div className="space-y-4 text-xs">
             {/* Anti-Fraud Notice */}
-            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5 text-amber-900">
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5 text-amber-900">
               <div className="font-bold flex items-center gap-1.5 text-amber-800">
                 <AlertCircleIcon className="w-4 h-4 text-amber-600 shrink-0" />
                 Anti-Fraud PO Rotation Notice
@@ -113,81 +125,65 @@ export function RegeneratePoModal({
             </div>
 
             {/* Current PO Info */}
-            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">Current Active PO</span>
-                <span className="font-mono font-bold text-slate-800 text-xs">
-                  {account.currentPoNumber || 'None (Unassigned)'}
-                </span>
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Current Active PO</span>
+                  <span className="font-mono font-bold text-slate-800 text-xs">
+                    {account.currentPoNumber || 'None (Unassigned)'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Issued At</span>
+                  <span className="text-slate-700 text-xs">
+                    {account.poGeneratedAt ? new Date(account.poGeneratedAt).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-bold">Issued At</span>
-                <span className="text-slate-700 text-xs">
-                  {account.poGeneratedAt ? new Date(account.poGeneratedAt).toLocaleDateString() : 'N/A'}
-                </span>
-              </div>
-            </div>
 
-            {/* Reason Presets */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1.5">Reason for PO Rotation</label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {[
-                  'Routine periodic rotation',
-                  'Suspected fraud / code misuse',
-                  'Staff / account holder change',
-                  'Requested by client travel manager',
-                ].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setReason(preset)}
-                    className={`text-[10px] px-2.5 py-1 rounded-lg border font-medium transition-colors ${
-                      reason === preset
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
+              {/* Reason Presets */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">Reason for PO Rotation</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    'Routine periodic rotation',
+                    'Suspected fraud / code misuse',
+                    'Staff / account holder change',
+                    'Requested by client travel manager',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setReason(preset)}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-medium transition-colors cursor-pointer ${
+                        reason === preset
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Custom reason or memo..."
+                  className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
               </div>
-              <input
-                type="text"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Custom reason or memo..."
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isRotating}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={isRotating}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5"
-              >
-                <RefreshCwIcon className={`w-3.5 h-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-                {isRotating ? 'Regenerating & Revoking Old PO...' : 'Confirm & Regenerate PO'}
-              </Button>
-            </div>
+            </section>
           </div>
         ) : (
           /* SUCCESS STATE */
-          <div className="space-y-4 text-center py-2 animate-in fade-in-50">
+          <section className="bg-white rounded-2xl border border-slate-200/90 p-5 space-y-4 text-center animate-in fade-in-50">
             <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
               <CheckIcon className="w-6 h-6" />
             </div>
 
             <div>
-              <h4 className="text-sm font-black text-slate-900">New PO Code Generated!</h4>
+              <h4 className="text-sm font-black text-slate-900">New PO Code Generated</h4>
               <p className="text-xs text-slate-500 mt-0.5">
                 The previous PO code has been revoked. Provide this new code to authorized bookers.
               </p>
@@ -216,16 +212,10 @@ export function RegeneratePoModal({
                 Revoked Code: <span className="line-through text-slate-500">{rotatedResult.oldPo}</span>
               </p>
             )}
-
-            <div className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={onClose} className="w-full">
-                Done
-              </Button>
-            </div>
-          </div>
+          </section>
         )}
       </div>
-    </div>
+    </AdminSlideOverDrawer>
   );
 }
 
@@ -245,24 +235,21 @@ export function PoHistoryModal({ account, isOpen, onClose }: PoHistoryModalProps
   const history: PoHistoryRecord[] = account.poNumberHistory || [];
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
-        <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="font-black text-slate-900 text-base">PO Audit &amp; Rotation History</h3>
-            <p className="text-xs text-slate-500">{account.companyName} • {account.accountNumber}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2"
-          >
-            ✕
-          </button>
-        </div>
-
+    <AdminSlideOverDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="PO Rotation History"
+      subtitle={`${account.companyName} · ${account.accountNumber}`}
+      size="md"
+      footer={
+        <Button type="button" variant="outline" size="md" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="space-y-4">
         {/* Current Active PO */}
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
           <div>
             <span className="text-[10px] text-emerald-700 font-bold uppercase block">Current Active PO</span>
             <span className="font-mono font-bold text-emerald-950 text-sm">
@@ -275,8 +262,8 @@ export function PoHistoryModal({ account, isOpen, onClose }: PoHistoryModalProps
         </div>
 
         {/* Historical List */}
-        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-          <span className="text-[11px] font-bold text-slate-600 block">
+        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-2.5">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 block">
             Revoked Historical POs ({history.length})
           </span>
 
@@ -310,15 +297,9 @@ export function PoHistoryModal({ account, isOpen, onClose }: PoHistoryModalProps
               </div>
             ))
           )}
-        </div>
-
-        <div className="pt-2 border-t border-slate-100 flex justify-end">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
+        </section>
       </div>
-    </div>
+    </AdminSlideOverDrawer>
   );
 }
 
@@ -397,34 +378,41 @@ export function CorporateCsvImportModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] flex flex-col animate-in zoom-in-95">
-        <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="font-black text-slate-900 text-base">Import Corporate Accounts from CSV</h3>
-            <p className="text-xs text-slate-500">
-              Bulk create or update corporate accounts directly in the database.
-            </p>
-          </div>
-          <button
+    <AdminSlideOverDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Import Corporate Accounts"
+      subtitle="Bulk create or update corporate accounts from CSV"
+      size="xl"
+      footer={
+        <>
+          <Button type="button" variant="outline" size="md" onClick={onClose} disabled={isProcessing}>
+            Cancel
+          </Button>
+          <Button
             type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 font-bold text-lg px-2"
+            variant="primary"
+            size="md"
+            onClick={handleCommitImport}
+            disabled={previewAccounts.length === 0 || isProcessing}
+            className="font-bold"
           >
-            ✕
-          </button>
-        </div>
-
+            {isProcessing ? 'Importing...' : `Import ${previewAccounts.length} Accounts`}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium">
             {error}
           </div>
         )}
 
-        <div className="space-y-3 overflow-y-auto pr-1">
+        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
           {/* File Picker & Paste Input */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Upload CSV File</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Upload CSV File</label>
             <input
               type="file"
               accept=".csv"
@@ -434,7 +422,7 @@ export function CorporateCsvImportModal({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Or Paste Raw CSV Data</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Or Paste Raw CSV Data</label>
             <textarea
               rows={4}
               value={csvRaw}
@@ -491,67 +479,52 @@ export function CorporateCsvImportModal({
               </label>
             </div>
           </div>
+        </section>
 
-          {/* Preview Table */}
-          {previewAccounts.length > 0 && (
-            <div className="space-y-1.5 pt-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-800">
-                  Ready to Import ({previewAccounts.length} Corporate Accounts)
-                </span>
-                <span className="text-[11px] text-emerald-600 font-bold">
-                  ✓ Initial POs Auto-Generated
-                </span>
-              </div>
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                <table className="w-full text-left border-collapse text-[11px]">
-                  <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 sticky top-0">
-                    <tr>
-                      <th className="p-2">Account #</th>
-                      <th className="p-2">Company</th>
-                      <th className="p-2">Generated PO</th>
-                      <th className="p-2">Credit Limit</th>
-                      <th className="p-2">Discount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {previewAccounts.slice(0, 50).map((acc, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-2 font-mono font-bold text-blue-600">{acc.accountNumber}</td>
-                        <td className="p-2 font-medium text-slate-800">{acc.companyName}</td>
-                        <td className="p-2 font-mono text-emerald-700">{acc.currentPoNumber}</td>
-                        <td className="p-2">${acc.creditLimit.toLocaleString()}</td>
-                        <td className="p-2">{acc.discountPercent}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {previewAccounts.length > 50 && (
-                <p className="text-[10px] text-slate-400 italic">
-                  Showing first 50 accounts of {previewAccounts.length} total.
-                </p>
-              )}
+        {/* Preview Table */}
+        {previewAccounts.length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-800">
+                Ready to Import ({previewAccounts.length} Corporate Accounts)
+              </span>
+              <span className="text-[11px] text-emerald-600 font-bold inline-flex items-center gap-1">
+                <CheckIcon className="w-3.5 h-3.5" />
+                Initial POs Auto-Generated
+              </span>
             </div>
-          )}
-        </div>
-
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isProcessing}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={handleCommitImport}
-            disabled={previewAccounts.length === 0 || isProcessing}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5"
-          >
-            {isProcessing ? 'Importing to Database...' : `Commit ${previewAccounts.length} Accounts to Database`}
-          </Button>
-        </div>
+            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+              <table className="w-full text-left border-collapse text-[11px]">
+                <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 sticky top-0">
+                  <tr>
+                    <th className="p-2">Account #</th>
+                    <th className="p-2">Company</th>
+                    <th className="p-2">Generated PO</th>
+                    <th className="p-2">Credit Limit</th>
+                    <th className="p-2">Discount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {previewAccounts.slice(0, 50).map((acc, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="p-2 font-mono font-bold text-blue-600">{acc.accountNumber}</td>
+                      <td className="p-2 font-medium text-slate-800">{acc.companyName}</td>
+                      <td className="p-2 font-mono text-emerald-700">{acc.currentPoNumber}</td>
+                      <td className="p-2">${acc.creditLimit.toLocaleString()}</td>
+                      <td className="p-2">{acc.discountPercent}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {previewAccounts.length > 50 && (
+              <p className="text-[10px] text-slate-400 italic">
+                Showing first 50 accounts of {previewAccounts.length} total.
+              </p>
+            )}
+          </section>
+        )}
       </div>
-    </div>
+    </AdminSlideOverDrawer>
   );
 }

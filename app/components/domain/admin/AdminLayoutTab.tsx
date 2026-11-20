@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Alert } from '../../ui/Alert';
-import { InfoIcon, CarIcon } from '../../ui/Icons';
+import { InfoIcon, CarIcon, CreditCardIcon, CashIcon, BuildingIcon, PlaneIcon, StarIcon } from '../../ui/Icons';
 
 interface AdminLayoutTabProps {
   settings: AppSettings;
@@ -444,7 +444,8 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       onChange={() => togglePaymentMethod('card')}
                       className="rounded border-slate-300 text-blue-600"
                     />
-                    <span>💳 Credit / Debit Card (In-Vehicle Terminal or Card on File)</span>
+                    <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span>Credit / Debit Card (In-Vehicle Terminal or Card on File)</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
                     <input
@@ -453,7 +454,8 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       onChange={() => togglePaymentMethod('cash')}
                       className="rounded border-slate-300 text-blue-600"
                     />
-                    <span>💵 Cash on Arrival</span>
+                    <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Cash on Arrival</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
                     <input
@@ -462,7 +464,8 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       onChange={() => togglePaymentMethod('account')}
                       className="rounded border-slate-300 text-blue-600"
                     />
-                    <span>🏢 Corporate Account Invoicing</span>
+                    <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Corporate Account Invoicing</span>
                   </label>
                 </div>
               </div>
@@ -530,7 +533,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
             <CardContent className="p-5 space-y-3 text-xs text-slate-600">
               <ul className="space-y-1.5 list-disc pl-4 text-slate-700">
                 <li>Segmented [Now] / [Schedule] pickup control with 12h AM/PM</li>
-                <li>Pickup / dropoff card with ✈ Flight Information subcard</li>
+                <li>Pickup / dropoff card with Flight Information subcard</li>
                 <li>Multi-vehicle support (+ Add Vehicle) or call assistance note</li>
                 <li>Visual vehicle cards (Sedan, SUV, Minivan)</li>
                 <li>Special requests chips &amp; return trip toggle</li>
@@ -550,7 +553,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
             </CardContent>
             <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center">
               <span className="text-[11px] font-semibold text-emerald-600">
-                ★ Standard for Customers
+                <span className="inline-flex items-center gap-1"><StarIcon className="w-3.5 h-3.5 text-emerald-500" />Standard for Customers</span>
               </span>
               <Button
                 type="button"

@@ -181,16 +181,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       >
         {/* Top Brand Banner */}
         <div
-          className={`h-16 flex items-center border-b border-slate-800/80 shrink-0 ${
+          className={`relative h-16 flex items-center border-b border-slate-800/80 shrink-0 ${
             isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
           }`}
         >
           {isCollapsed ? (
-            <div className="relative group flex items-center justify-center">
+            <>
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className="w-10 h-10 rounded-xl flex items-center justify-center font-black shadow-md hover:scale-105 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-xl flex items-center justify-center font-black shadow-md hover:scale-105 transition-all cursor-pointer"
                 style={{
                   backgroundColor: 'var(--brand-primary, #2563eb)',
                   color: 'var(--btn-primary-text, #ffffff)',
@@ -201,7 +201,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   <img
                     src={settings.branding.logoUrl}
                     alt={settings.company?.name || COMPANY_CONFIG.name}
-                    className="w-6 h-6 object-contain"
+                    className="w-5 h-5 object-contain"
                   />
                 ) : (
                   <CarIcon className="w-5 h-5" />
@@ -210,12 +210,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className="absolute -right-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-slate-800 hover:bg-blue-600 border border-slate-700 hover:border-blue-500 rounded-full flex items-center justify-center text-slate-300 hover:text-white transition-colors shadow-xs cursor-pointer"
+                className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 bg-slate-800 hover:bg-blue-600 border border-slate-700 hover:border-blue-500 rounded-full items-center justify-center text-slate-300 hover:text-white transition-colors shadow-md cursor-pointer"
                 title="Expand sidebar"
+                aria-label="Expand sidebar"
               >
-                <ChevronRightIcon className="w-3 h-3" />
+                <ChevronRightIcon className="w-3.5 h-3.5" />
               </button>
-            </div>
+            </>
           ) : (
             <>
               <div className="flex items-center gap-3 overflow-hidden min-w-0">

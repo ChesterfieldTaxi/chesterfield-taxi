@@ -4,7 +4,7 @@ import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
-import { CheckIcon, SparklesIcon, CarIcon, ShieldCheckIcon } from '../../../ui/Icons';
+import { CheckIcon, SparklesIcon, CarIcon, ShieldCheckIcon, PaletteIcon } from '../../../ui/Icons';
 
 export interface WebsiteThemesTabProps {
   settings: AppSettings;
@@ -237,7 +237,8 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       {/* Preset Theme Cards Grid */}
       <div className="space-y-4">
         <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-          <span>🎨 Curated Theme Presets</span>
+          <PaletteIcon className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>Curated Theme Presets</span>
           <span className="text-xs font-semibold text-slate-500 lowercase">({THEME_PRESETS.length} available)</span>
         </h3>
 

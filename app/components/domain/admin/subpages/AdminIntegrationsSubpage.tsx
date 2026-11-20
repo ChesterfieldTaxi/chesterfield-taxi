@@ -12,6 +12,7 @@ import {
   AlertCircleIcon,
   CheckIcon,
   LockIcon,
+  ChatBubbleLeftRightIcon,
 } from '../../../ui/Icons';
 import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
@@ -458,7 +459,7 @@ export function AdminIntegrationsSubpage({
         setTestCallStatus('error');
         setTestCallMsg(
           data.message === 'Number must be verified in Twilio Trial Console'
-            ? '⚠️ Number must be verified in Twilio Trial Console. In trial mode, Twilio only connects to verified Caller IDs.'
+            ? 'Number must be verified in Twilio Trial Console. In trial mode, Twilio only connects to verified Caller IDs.'
             : (data.error || data.message || 'Failed to trigger outbound call via Twilio.')
         );
       }
@@ -509,7 +510,7 @@ export function AdminIntegrationsSubpage({
         setTestSmsStatus('error');
         setTestSmsMsg(
           data.message === 'Number must be verified in Twilio Trial Console'
-            ? '⚠️ Number must be verified in Twilio Trial Console. In trial mode, Twilio only sends SMS to verified Caller IDs.'
+            ? 'Number must be verified in Twilio Trial Console. In trial mode, Twilio only sends SMS to verified Caller IDs.'
             : (data.error || data.message || 'Failed to send SMS via Twilio.')
         );
       }
@@ -960,7 +961,10 @@ export function AdminIntegrationsSubpage({
                     {testCallStatus === 'calling' ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />
                     ) : (
-                      '📞 Ring My Cell Phone Now'
+                      <span className="inline-flex items-center gap-1.5">
+                        <PhoneIcon className="w-3.5 h-3.5" />
+                        <span>Ring My Cell Phone Now</span>
+                      </span>
                     )}
                   </Button>
                 </div>
@@ -1005,7 +1009,10 @@ export function AdminIntegrationsSubpage({
                     {testSmsStatus === 'sending' ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />
                     ) : (
-                      '💬 Send Test SMS to Cell Phone'
+                      <span className="inline-flex items-center gap-1.5">
+                        <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
+                        <span>Send Test SMS to Cell Phone</span>
+                      </span>
                     )}
                   </Button>
                   {testSmsMsg && (

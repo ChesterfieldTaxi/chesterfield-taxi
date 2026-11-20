@@ -17,6 +17,7 @@ import {
 } from '../../ui/Icons';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
 import { AdminFleetTab } from './AdminFleetTab';
+import { AdminSlideOverDrawer } from './AdminSlideOverDrawer';
 import { VehicleImagePicker } from './vehicles/VehicleImagePicker';
 
 export interface AdminVehiclesTabProps {
@@ -266,143 +267,169 @@ export function AdminVehiclesTab({
             </div>
           </div>
 
-          {/* Add New Tier Drawer / Inline Form */}
-          {showAddForm && (
-            <Card className="border-blue-200 bg-blue-50/20 shadow-sm animate-in fade-in duration-200">
-              <CardHeader>
-                <CardTitle className="text-sm font-bold text-blue-900">Add New Vehicle Type</CardTitle>
-                <CardDescription className="text-xs text-slate-600">
-                  Create a new vehicle class that customers can choose when booking and that physical cars are assigned to.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddNewTier} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Internal Type ID <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="e.g. sedan_luxury"
-                        value={newTier.id}
-                        onChange={(e) => setNewTier({ ...newTier, id: e.target.value })}
-                        required
-                      />
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">Unique system key</span>
-                    </div>
+          {/* Add Vehicle Type Slide-Over Drawer */}
+          <AdminSlideOverDrawer
+            isOpen={showAddForm}
+            onClose={() => setShowAddForm(false)}
+            title="Add Vehicle Type"
+            subtitle="Create a new service class that customers can book and fleet vehicles map to"
+            size="lg"
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  onClick={() => setShowAddForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  form="add-vehicle-type-form"
+                  variant="primary"
+                  size="md"
+                  leftIcon={<PlusIcon className="w-4 h-4" />}
+                  className="font-bold"
+                >
+                  Add Vehicle Type
+                </Button>
+              </>
+            }
+          >
+            <form id="add-vehicle-type-form" onSubmit={handleAddNewTier} className="space-y-5">
+              <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <CarIcon className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                    Class Identity
+                  </h3>
+                </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Display Name <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="e.g. Luxury Executive Sedan"
-                        value={newTier.name}
-                        onChange={(e) => setNewTier({ ...newTier, name: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Marketing Badge
-                      </label>
-                      <Input
-                        placeholder="e.g. VIP Choice, Most Popular"
-                        value={newTier.badge || ''}
-                        onChange={(e) => setNewTier({ ...newTier, badge: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Max Passengers
-                      </label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="20"
-                        value={newTier.maxPassengers}
-                        onChange={(e) =>
-                          setNewTier({ ...newTier, maxPassengers: parseInt(e.target.value) || 1 })
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Max Luggage
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={newTier.maxLuggage}
-                        onChange={(e) =>
-                          setNewTier({ ...newTier, maxLuggage: parseInt(e.target.value) || 0 })
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Icon Silhouette
-                      </label>
-                      <select
-                        className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs text-slate-800 focus:ring-1 focus:ring-blue-500"
-                        value={newTier.iconType || 'standard'}
-                        onChange={(e) =>
-                          setNewTier({ ...newTier, iconType: e.target.value as any })
-                        }
-                      >
-                        <option value="standard">Standard Sedan</option>
-                        <option value="premium">Executive Premium</option>
-                        <option value="xl">XL / SUV / Van</option>
-                        <option value="wheelchair">WAV Accessible</option>
-                      </select>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Internal Type ID <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="e.g. sedan_luxury"
+                      value={newTier.id}
+                      onChange={(e) => setNewTier({ ...newTier, id: e.target.value })}
+                      required
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Unique system key</span>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Customer Description
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Display Name <span className="text-rose-500">*</span>
                     </label>
-                    <textarea
-                      rows={2}
-                      className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
-                      placeholder="e.g. Spacious premium sedan offering exceptional legroom and trunk space."
-                      value={newTier.description || ''}
-                      onChange={(e) => setNewTier({ ...newTier, description: e.target.value })}
+                    <Input
+                      placeholder="e.g. Luxury Executive Sedan"
+                      value={newTier.name}
+                      onChange={(e) => setNewTier({ ...newTier, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Marketing Badge
+                    </label>
+                    <Input
+                      placeholder="e.g. VIP Choice, Most Popular"
+                      value={newTier.badge || ''}
+                      onChange={(e) => setNewTier({ ...newTier, badge: e.target.value })}
                     />
                   </div>
 
-                  <VehicleImagePicker
-                    value={newTier.imageUrl || ''}
-                    onChange={(url) => setNewTier({ ...newTier, imageUrl: url })}
-                    helperText="Optional vehicle image shown to customers on the booking form. Leave blank to use category icon."
-                  />
-
-                  <div className="flex justify-end gap-2 pt-2 border-t border-blue-200/60">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAddForm(false)}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Icon Silhouette
+                    </label>
+                    <select
+                      className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                      value={newTier.iconType || 'standard'}
+                      onChange={(e) =>
+                        setNewTier({ ...newTier, iconType: e.target.value as any })
+                      }
                     >
-                      Cancel
-                    </Button>
-                    <Button type="submit" variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      Add to Vehicle Classes
-                    </Button>
+                      <option value="standard">Standard Sedan</option>
+                      <option value="premium">Executive Premium</option>
+                      <option value="xl">XL / SUV / Van</option>
+                      <option value="wheelchair">WAV Accessible</option>
+                    </select>
                   </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
+                </div>
+              </section>
+
+              <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <UserIcon className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                    Capacities &amp; Description
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Max Passengers
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={newTier.maxPassengers}
+                      onChange={(e) =>
+                        setNewTier({ ...newTier, maxPassengers: parseInt(e.target.value) || 1 })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Max Luggage
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={newTier.maxLuggage}
+                      onChange={(e) =>
+                        setNewTier({ ...newTier, maxLuggage: parseInt(e.target.value) || 0 })
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Customer Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
+                    placeholder="e.g. Spacious premium sedan offering exceptional legroom and trunk space."
+                    value={newTier.description || ''}
+                    onChange={(e) => setNewTier({ ...newTier, description: e.target.value })}
+                  />
+                </div>
+              </section>
+
+              <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
+                <VehicleImagePicker
+                  value={newTier.imageUrl || ''}
+                  onChange={(url) => setNewTier({ ...newTier, imageUrl: url })}
+                  helperText="Optional vehicle image shown to customers on the booking form. Leave blank to use category icon."
+                />
+              </section>
+            </form>
+          </AdminSlideOverDrawer>
 
           {/* Vehicle Types Filter Bar */}
           <div className="flex items-center justify-between gap-4 flex-wrap pb-2 border-b border-slate-200">
@@ -617,29 +644,45 @@ export function AdminVehiclesTab({
         </div>
       )}
 
-      {/* Edit Vehicle Class Modal */}
-      {editingIndex !== null && editForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Edit Vehicle Class: {editForm.name}</h3>
-                <p className="text-xs text-slate-500">Update rates, capacities, silhouette, and customer photo</p>
+      {/* Edit Vehicle Type Slide-Over Drawer */}
+      <AdminSlideOverDrawer
+        isOpen={Boolean(editingIndex !== null && editForm)}
+        onClose={handleCloseEdit}
+        title={editForm ? `Edit Vehicle Type: ${editForm.name}` : 'Edit Vehicle Type'}
+        subtitle="Update capacities, icon silhouette, description, and customer booking photo"
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="outline" size="md" onClick={handleCloseEdit}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-vehicle-type-form"
+              variant="primary"
+              size="md"
+              leftIcon={<CheckIcon className="w-4 h-4" />}
+              className="font-bold"
+            >
+              Save Vehicle Type
+            </Button>
+          </>
+        }
+      >
+        {editingIndex !== null && editForm && (
+          <form id="edit-vehicle-type-form" onSubmit={handleSaveEdit} className="space-y-5">
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <CarIcon className="w-4 h-4 text-blue-600" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  Class Identity
+                </h3>
               </div>
-              <button
-                type="button"
-                onClick={handleCloseEdit}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
 
-            <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Display Name <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Display Name <span className="text-rose-500">*</span>
                   </label>
                   <Input
                     value={editForm.name}
@@ -648,7 +691,7 @@ export function AdminVehiclesTab({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Marketing Badge
                   </label>
                   <Input
@@ -659,9 +702,36 @@ export function AdminVehiclesTab({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Icon Silhouette
+                </label>
+                <select
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                  value={editForm.iconType || 'standard'}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, iconType: e.target.value as any })
+                  }
+                >
+                  <option value="standard">Standard Sedan</option>
+                  <option value="premium">Executive Premium</option>
+                  <option value="xl">XL / SUV / Van</option>
+                  <option value="wheelchair">WAV Accessible</option>
+                </select>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <UserIcon className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  Capacities &amp; Description
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Max Passengers
                   </label>
                   <Input
@@ -676,7 +746,7 @@ export function AdminVehiclesTab({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Max Luggage
                   </label>
                   <Input
@@ -693,54 +763,29 @@ export function AdminVehiclesTab({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Icon Silhouette
-                </label>
-                <select
-                  className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs text-slate-800 focus:ring-1 focus:ring-blue-500"
-                  value={editForm.iconType || 'standard'}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, iconType: e.target.value as any })
-                  }
-                >
-                  <option value="standard">Standard Sedan</option>
-                  <option value="premium">Executive Premium</option>
-                  <option value="xl">XL / SUV / Van</option>
-                  <option value="wheelchair">WAV Accessible</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Customer Description
                 </label>
                 <textarea
-                  rows={2}
-                  className="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
                   value={editForm.description || ''}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                   placeholder="Details displayed to customers..."
                 />
               </div>
+            </section>
 
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
               <VehicleImagePicker
                 value={editForm.imageUrl || ''}
                 onChange={(url) => setEditForm({ ...editForm, imageUrl: url })}
                 helperText="Optional image displayed to customers in the vehicle selection cards on the booking form."
               />
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <Button type="button" variant="outline" size="sm" onClick={handleCloseEdit}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" size="sm" className="bg-blue-600 hover:bg-blue-700">
-                  Apply Changes
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </section>
+          </form>
+        )}
+      </AdminSlideOverDrawer>
     </div>
   );
 }

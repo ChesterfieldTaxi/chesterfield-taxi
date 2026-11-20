@@ -5,7 +5,19 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from '../../ui/Input';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
-import { CheckIcon, SparklesIcon, CarIcon, ClockIcon, BuildingIcon } from '../../ui/Icons';
+import {
+  CheckIcon,
+  SparklesIcon,
+  CarIcon,
+  ClockIcon,
+  BuildingIcon,
+  AlertTriangleIcon,
+  PaletteIcon,
+  FileTextIcon,
+  SlidersIcon,
+  MonitorIcon,
+  GlobeIcon,
+} from '../../ui/Icons';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 
 export interface AdminGeneralTabProps {
@@ -328,12 +340,14 @@ export function AdminGeneralTab({
             <SparklesIcon className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-xs font-bold text-slate-700">Dynamic Branding Studio</span>
             {hasUnpublishedChanges ? (
-              <Badge variant="warning" size="sm">
-                ⚠️ Live Canvas (Draft Isolating)
+              <Badge variant="warning" size="sm" className="inline-flex items-center gap-1">
+                <AlertTriangleIcon className="w-3 h-3" />
+                <span>Live Canvas (Draft Isolating)</span>
               </Badge>
             ) : (
-              <Badge variant="success" size="sm">
-                ✓ Published &amp; Synced Site-Wide
+              <Badge variant="success" size="sm" className="inline-flex items-center gap-1">
+                <CheckIcon className="w-3 h-3" />
+                <span>Published &amp; Synced Site-Wide</span>
               </Badge>
             )}
           </div>
@@ -398,7 +412,7 @@ export function AdminGeneralTab({
             <Card variant="elevated" className="border-slate-200 shadow-xs">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4">
                 <CardTitle className="text-sm text-slate-900 flex items-center gap-2">
-                  <span className="text-base">🪄</span>
+                  <PaletteIcon className="w-4 h-4 text-blue-600" />
                   Curated Brand Presets
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
@@ -442,7 +456,7 @@ export function AdminGeneralTab({
             <Card variant="elevated" className="border-slate-200 shadow-xs">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4">
                 <CardTitle className="text-sm text-slate-900 flex items-center gap-2">
-                  <span className="text-base">🔤</span>
+                  <FileTextIcon className="w-4 h-4 text-indigo-600" />
                   Typography &amp; Text Colors
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
@@ -555,7 +569,7 @@ export function AdminGeneralTab({
             <Card variant="elevated" className="border-slate-200 shadow-xs">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4">
                 <CardTitle className="text-sm text-slate-900 flex items-center gap-2">
-                  <span className="text-base">🔘</span>
+                  <SlidersIcon className="w-4 h-4 text-slate-600" />
                   Buttons &amp; Corner Radius
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
@@ -686,7 +700,7 @@ export function AdminGeneralTab({
             <Card variant="elevated" className="border-slate-200 shadow-xs">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4">
                 <CardTitle className="text-sm text-slate-900 flex items-center gap-2">
-                  <span className="text-base">🖥️</span>
+                  <MonitorIcon className="w-4 h-4 text-slate-600" />
                   Surfaces &amp; Structural Backgrounds
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
@@ -825,14 +839,14 @@ export function AdminGeneralTab({
               >
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shadow-sm transition-all"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all"
                     style={{
                       backgroundColor: 'var(--btn-primary-bg)',
                       color: 'var(--btn-primary-text)',
                       borderRadius: 'var(--btn-radius)',
                     }}
                   >
-                    🚕
+                    <CarIcon className="w-4 h-4" />
                   </div>
                   <div>
                     <h3
@@ -1030,7 +1044,7 @@ export function AdminGeneralTab({
             {hasUnpublishedChanges && (
               <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-900 shadow-sm animate-in fade-in duration-200">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">⚠️</span>
+                  <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>You have unpublished style changes in this preview.</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1068,7 +1082,7 @@ export function AdminGeneralTab({
               <Card variant="elevated" className="border-slate-200 shadow-xs">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                   <CardTitle className="text-base text-slate-900 flex items-center gap-2">
-                    <span className="text-lg">🏢</span>
+                    <BuildingIcon className="w-4 h-4 text-blue-600" />
                     Company Details &amp; Business Profile
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
@@ -1202,7 +1216,7 @@ export function AdminGeneralTab({
               <Card variant="elevated" className="border-slate-200 shadow-xs">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
                   <CardTitle className="text-base text-slate-900 flex items-center gap-2">
-                    <span className="text-lg">🌐</span>
+                    <GlobeIcon className="w-4 h-4 text-blue-600" />
                     Regional Localization &amp; Currency
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">

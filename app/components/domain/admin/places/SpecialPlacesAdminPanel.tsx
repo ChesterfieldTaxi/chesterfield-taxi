@@ -17,76 +17,105 @@ import {
   SparklesIcon,
   SlidersIcon,
   AlertTriangleIcon,
+  PlaneIcon,
+  LandmarkIcon,
+  TrophyIcon,
+  HeartPulseIcon,
+  ShoppingBagIcon,
+  TrainIcon,
+  HomeModernIcon,
+  BuildingIcon,
+  StarIcon,
 } from '~/components/ui/Icons';
 
 const CATEGORY_CONFIG: Record<
   SpecialPlaceCategory,
-  { label: string; icon: string; bgClass: string; textClass: string; borderClass: string }
+  { label: string; bgClass: string; textClass: string; borderClass: string }
 > = {
   airport: {
     label: 'Airport',
-    icon: '✈️',
     bgClass: 'bg-blue-50',
     textClass: 'text-blue-700',
     borderClass: 'border-blue-200',
   },
   landmark: {
     label: 'Landmark',
-    icon: '🏛️',
     bgClass: 'bg-amber-50',
     textClass: 'text-amber-700',
     borderClass: 'border-amber-200',
   },
   venue: {
     label: 'Venue / Arena',
-    icon: '🏟️',
     bgClass: 'bg-purple-50',
     textClass: 'text-purple-700',
     borderClass: 'border-purple-200',
   },
   hospital: {
     label: 'Hospital / Medical',
-    icon: '🏥',
     bgClass: 'bg-rose-50',
     textClass: 'text-rose-700',
     borderClass: 'border-rose-200',
   },
   shopping: {
     label: 'Shopping / Retail',
-    icon: '🛍️',
     bgClass: 'bg-emerald-50',
     textClass: 'text-emerald-700',
     borderClass: 'border-emerald-200',
   },
   transit: {
     label: 'Transit / Station',
-    icon: '🚆',
     bgClass: 'bg-cyan-50',
     textClass: 'text-cyan-700',
     borderClass: 'border-cyan-200',
   },
   hotel: {
     label: 'Hotel / Lodging',
-    icon: '🏨',
     bgClass: 'bg-orange-50',
     textClass: 'text-orange-700',
     borderClass: 'border-orange-200',
   },
   corporate: {
     label: 'Corporate Account',
-    icon: '🏢',
     bgClass: 'bg-indigo-50',
     textClass: 'text-indigo-700',
     borderClass: 'border-indigo-200',
   },
   custom: {
     label: 'Special Place',
-    icon: '📍',
     bgClass: 'bg-slate-50',
     textClass: 'text-slate-700',
     borderClass: 'border-slate-200',
   },
 };
+
+function SpecialPlaceCategoryIcon({
+  category,
+  className = 'w-3 h-3',
+}: {
+  category: SpecialPlaceCategory;
+  className?: string;
+}) {
+  switch (category) {
+    case 'airport':
+      return <PlaneIcon className={className} />;
+    case 'landmark':
+      return <LandmarkIcon className={className} />;
+    case 'venue':
+      return <TrophyIcon className={className} />;
+    case 'hospital':
+      return <HeartPulseIcon className={className} />;
+    case 'shopping':
+      return <ShoppingBagIcon className={className} />;
+    case 'transit':
+      return <TrainIcon className={className} />;
+    case 'hotel':
+      return <HomeModernIcon className={className} />;
+    case 'corporate':
+      return <BuildingIcon className={className} />;
+    default:
+      return <MapPinIcon className={className} />;
+  }
+}
 
 export function SpecialPlacesAdminPanel() {
   const [places, setPlaces] = useState<SpecialPlace[]>([]);
@@ -438,7 +467,7 @@ export function SpecialPlacesAdminPanel() {
               >
                 {Object.entries(CATEGORY_CONFIG).map(([key, cat]) => (
                   <option key={key} value={key}>
-                    {cat.icon} {cat.label}
+                    {cat.label}
                   </option>
                 ))}
               </select>
@@ -457,8 +486,8 @@ export function SpecialPlacesAdminPanel() {
                   }
                   className="w-full h-8.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                 >
-                  <option value="commercial">✈️ Commercial Airline Terminal (STL)</option>
-                  <option value="private">🛩️ Private Aviation / FBO (SUS, Signature)</option>
+                  <option value="commercial">Commercial Airline Terminal (STL)</option>
+                  <option value="private">Private Aviation / FBO (SUS, Signature)</option>
                 </select>
               </div>
             )}
@@ -541,7 +570,10 @@ export function SpecialPlacesAdminPanel() {
                 }
                 className="rounded border-slate-300 text-amber-500 focus:ring-0"
               />
-              <span>⭐ Mark as Popular (Shown immediately when input is focused)</span>
+              <span className="inline-flex items-center gap-1.5">
+                <StarIcon className="w-3.5 h-3.5 text-amber-500" />
+                <span>Mark as Popular (Shown immediately when input is focused)</span>
+              </span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
@@ -602,7 +634,7 @@ export function SpecialPlacesAdminPanel() {
             <option value="all">All Categories ({places.length})</option>
             {Object.entries(CATEGORY_CONFIG).map(([key, cat]) => (
               <option key={key} value={key}>
-                {cat.icon} {cat.label}
+                {cat.label}
               </option>
             ))}
           </select>
@@ -617,7 +649,7 @@ export function SpecialPlacesAdminPanel() {
                 : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
             }`}
           >
-            <span>⭐</span>
+            <StarIcon className="w-3.5 h-3.5 text-amber-500" />
             <span>Popular Only</span>
           </button>
 
@@ -646,11 +678,14 @@ export function SpecialPlacesAdminPanel() {
                         type="button"
                         onClick={() => handleTogglePopular(place)}
                         title={place.isPopular ? 'Click to remove from Popular' : 'Click to make Popular'}
-                        className={`text-base leading-none transition-transform active:scale-125 cursor-pointer ${
-                          place.isPopular ? 'text-amber-500 drop-shadow-2xs' : 'text-slate-300 hover:text-amber-400'
+                        className={`p-0.5 leading-none transition-transform active:scale-125 cursor-pointer ${
+                          place.isPopular ? 'text-amber-500' : 'text-slate-300 hover:text-amber-400'
                         }`}
                       >
-                        ★
+                        <StarIcon
+                          className="w-4 h-4"
+                          fill={place.isPopular ? 'currentColor' : 'none'}
+                        />
                       </button>
 
                       <span className="text-sm font-bold text-slate-900 truncate">
@@ -666,7 +701,7 @@ export function SpecialPlacesAdminPanel() {
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${catConfig.bgClass} ${catConfig.textClass} ${catConfig.borderClass}`}
                       >
-                        <span>{catConfig.icon}</span>
+                        <SpecialPlaceCategoryIcon category={place.category} className="w-3 h-3 shrink-0" />
                         <span>{catConfig.label}</span>
                       </span>
 
@@ -678,7 +713,8 @@ export function SpecialPlacesAdminPanel() {
                               : 'bg-sky-50 text-sky-700 border-sky-200'
                           }`}
                         >
-                          {place.airportType === 'private' ? '🛩️ Private / FBO' : '✈️ Commercial'}
+                          <PlaneIcon className="w-3 h-3 shrink-0" />
+                          <span>{place.airportType === 'private' ? 'Private / FBO' : 'Commercial'}</span>
                         </span>
                       )}
 

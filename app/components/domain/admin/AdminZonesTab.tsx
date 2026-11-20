@@ -19,7 +19,29 @@ import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
-import { PlusIcon, TrashIcon, CheckIcon, SpinnerIcon, MapPinIcon, LayersIcon, CompassIcon, AlertTriangleIcon, ZapIcon } from '../../ui/Icons';
+import {
+  PlusIcon,
+  TrashIcon,
+  CheckIcon,
+  SpinnerIcon,
+  MapPinIcon,
+  LayersIcon,
+  CompassIcon,
+  AlertTriangleIcon,
+  ZapIcon,
+  PlaneIcon,
+  TrophyIcon,
+  TrainIcon,
+  HomeModernIcon,
+  HeartPulseIcon,
+  EditIcon,
+  RulerIcon,
+  MapIcon,
+  GlobeIcon,
+  BuildingIcon,
+  LandmarkIcon,
+  PlaneTakeoffIcon,
+} from '../../ui/Icons';
 import { SpecialPlacesAdminPanel } from './places/SpecialPlacesAdminPanel';
 import { InteractiveZoneGoogleMap } from './zones/InteractiveZoneGoogleMap';
 
@@ -667,17 +689,17 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
   const getCategoryIcon = (cat?: LocationCategory | string) => {
     switch (cat) {
       case 'airport':
-        return '✈️';
+        return <PlaneIcon className="w-3.5 h-3.5 inline-block text-blue-600" />;
       case 'venue':
-        return '🏟️';
+        return <TrophyIcon className="w-3.5 h-3.5 inline-block text-purple-600" />;
       case 'train_station':
-        return '🚆';
+        return <TrainIcon className="w-3.5 h-3.5 inline-block text-cyan-600" />;
       case 'hotel':
-        return '🏨';
+        return <HomeModernIcon className="w-3.5 h-3.5 inline-block text-amber-600" />;
       case 'hospital':
-        return '🏥';
+        return <HeartPulseIcon className="w-3.5 h-3.5 inline-block text-rose-600" />;
       default:
-        return '📍';
+        return <MapPinIcon className="w-3.5 h-3.5 inline-block text-slate-500" />;
     }
   };
 
@@ -744,9 +766,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 variant="primary"
                 size="sm"
                 onClick={handleStartDrawPolygonZone}
+                leftIcon={<EditIcon className="w-3.5 h-3.5" />}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
-                ✏️ Draw Polygon Zone
+                Draw Polygon Zone
               </Button>
             </>
           )}
@@ -1481,7 +1504,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
-                            <span>📐 Polygon Boundary Vertices</span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <RulerIcon className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Polygon Boundary Vertices</span>
+                            </span>
                             <span
                               className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
                                 (zoneFormData.vertices?.length || 0) >= 3
@@ -1867,12 +1893,12 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                           setCollectionFormData((prev) => ({ ...prev, category: e.target.value as LocationCategory }))
                         }
                       >
-                        <option value="airport">✈️ Airport / FBO</option>
-                        <option value="venue">🏟️ Sports &amp; Entertainment</option>
-                        <option value="train_station">🚆 Transit &amp; Rail Station</option>
-                        <option value="hotel">🏨 Hotel &amp; Resort</option>
-                        <option value="hospital">🏥 Medical Center</option>
-                        <option value="custom">📍 Custom POI List</option>
+                        <option value="airport">Airport / FBO</option>
+                        <option value="venue">Sports &amp; Entertainment</option>
+                        <option value="train_station">Transit &amp; Rail Station</option>
+                        <option value="hotel">Hotel &amp; Resort</option>
+                        <option value="hospital">Medical Center</option>
+                        <option value="custom">Custom POI List</option>
                       </select>
                     </div>
                   </div>
@@ -2412,7 +2438,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
             <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-900 text-white flex flex-row flex-wrap items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>🗺️</span>
+                  <MapIcon className="w-4 h-4 text-blue-400" />
                   <span>Chesterfield &amp; St. Louis Regional Geofence Map</span>
                 </CardTitle>
                 <CardDescription className="text-[10px] text-slate-400">
@@ -2434,24 +2460,26 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                   <button
                     type="button"
                     onClick={() => setMapMode('google')}
-                    className={`px-2.5 py-1 rounded-md font-bold transition-colors ${
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors inline-flex items-center gap-1.5 ${
                       mapMode === 'google'
                         ? 'bg-blue-600 text-white shadow-2xs'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
-                    🌎 Live Map
+                    <GlobeIcon className="w-3.5 h-3.5" />
+                    <span>Live Map</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMapMode('schematic')}
-                    className={`px-2.5 py-1 rounded-md font-bold transition-colors ${
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors inline-flex items-center gap-1.5 ${
                       mapMode === 'schematic'
                         ? 'bg-blue-600 text-white shadow-2xs'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
-                    📐 Schematic
+                    <RulerIcon className="w-3.5 h-3.5" />
+                    <span>Schematic</span>
                   </button>
                 </div>
 
@@ -2636,23 +2664,27 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
 
                   {/* Regional Landmark Badges */}
                   <div className="absolute left-[20%] top-[48%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                      ✈️ Spirit of St. Louis
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800 inline-flex items-center gap-1">
+                      <PlaneIcon className="w-3 h-3 text-sky-400" />
+                      <span>Spirit of St. Louis</span>
                     </span>
                   </div>
                   <div className="absolute left-[38%] top-[52%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                      🏢 Chesterfield Valley
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800 inline-flex items-center gap-1">
+                      <BuildingIcon className="w-3 h-3 text-blue-400" />
+                      <span>Chesterfield Valley</span>
                     </span>
                   </div>
                   <div className="absolute left-[70%] top-[25%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                      🛫 STL Lambert Int&apos;l
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800 inline-flex items-center gap-1">
+                      <PlaneTakeoffIcon className="w-3 h-3 text-sky-400" />
+                      <span>STL Lambert Int&apos;l</span>
                     </span>
                   </div>
                   <div className="absolute left-[88%] top-[65%] -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center">
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">
-                      🏛️ Gateway Arch &amp; Busch Stadium
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800 inline-flex items-center gap-1">
+                      <LandmarkIcon className="w-3 h-3 text-amber-400" />
+                      <span>Gateway Arch &amp; Busch Stadium</span>
                     </span>
                   </div>
 

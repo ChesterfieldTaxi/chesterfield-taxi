@@ -33,6 +33,7 @@ import {
   BarChartIcon,
   PhoneIcon,
   ShieldCheckIcon,
+  ChatBubbleLeftRightIcon,
   AlertCircleIcon,
   LockIcon,
   CopyIcon,
@@ -2364,7 +2365,7 @@ export function AdminInvoicingSubpage({
                   leftIcon={testCallStatus === 'calling' ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : <PhoneIcon className="w-3.5 h-3.5" />}
                   className="w-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-2.5"
                 >
-                  {testCallStatus === 'calling' ? 'Calling Your Phone...' : '📞 Ring My Cell Phone Now'}
+                  {testCallStatus === 'calling' ? 'Calling Your Phone...' : 'Ring My Cell Phone Now'}
                 </Button>
               </CardContent>
             </Card>
@@ -2425,9 +2426,10 @@ export function AdminInvoicingSubpage({
                   size="sm"
                   disabled={testSmsStatus === 'sending'}
                   onClick={handleSendTestSms}
+                  leftIcon={testSmsStatus === 'sending' ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />}
                   className="w-full text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white py-2.5"
                 >
-                  {testSmsStatus === 'sending' ? 'Dispatching SMS...' : '💬 Send Test SMS to Cell Phone'}
+                  {testSmsStatus === 'sending' ? 'Dispatching SMS...' : 'Send Test SMS to Cell Phone'}
                 </Button>
               </CardContent>
             </Card>

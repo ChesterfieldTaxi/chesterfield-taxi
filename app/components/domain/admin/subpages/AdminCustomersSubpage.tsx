@@ -16,9 +16,15 @@ import {
   CopyIcon,
   RefreshCwIcon,
   CheckIcon,
+  StarIcon,
+  BanIcon,
+  PlusIcon,
+  EditIcon,
+  CarIcon,
 } from '../../../ui/Icons';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
+import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { getContactService } from '../../../../core/services/customer/contact.service';
 import {
   RegeneratePoModal,
@@ -77,6 +83,9 @@ export function AdminCustomersSubpage({
   const [corpFilter, setCorpFilter] = useState<'all' | 'po_enforced' | 'po_disabled'>('all');
   const [corpPage, setCorpPage] = useState(1);
   const CORP_PAGE_SIZE = 30;
+  const [editingCorp, setEditingCorp] = useState<CorporateAccountConfig | null>(null);
+  const [isNewCorp, setIsNewCorp] = useState(false);
+  const [isSavingCorp, setIsSavingCorp] = useState(false);
 
   useEffect(() => {
     setActiveSub(initialSubTab);
@@ -308,6 +317,51 @@ export function AdminCustomersSubpage({
     setTimeout(() => setCopiedPoId(null), 2000);
   };
 
+  const handleOpenNewCorp = () => {
+    const nextNum = `CORP-${String(corporateClients.length + 101).padStart(3, '0')}`;
+    setIsNewCorp(true);
+    setEditingCorp({
+      id: `corp_${Date.now()}`,
+      companyName: '',
+      accountNumber: nextNum,
+      billingContactName: '',
+      billingContactEmail: '',
+      billingCycle: 'net30',
+      creditLimit: 5000,
+      discountPercent: 0,
+      isActive: true,
+      poRequired: true,
+      currentPoNumber: `PO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  const handleSaveCorporateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCorp || !onSave) return;
+    if (!editingCorp.companyName.trim()) return;
+    setIsSavingCorp(true);
+    try {
+      const updatedRecord: CorporateAccountConfig = {
+        ...editingCorp,
+        companyName: editingCorp.companyName.trim(),
+        accountNumber: editingCorp.accountNumber.trim() || `CORP-${Date.now().toString().slice(-4)}`,
+        billingContactName: (editingCorp.billingContactName || '').trim(),
+        billingContactEmail: editingCorp.billingContactEmail.trim(),
+        updatedAt: new Date().toISOString(),
+      };
+      const exists = corporateClients.some((a) => a.id === updatedRecord.id);
+      const nextAccounts = exists
+        ? corporateClients.map((a) => (a.id === updatedRecord.id ? updatedRecord : a))
+        : [updatedRecord, ...corporateClients];
+      await onSave({ corporateAccounts: nextAccounts });
+      setEditingCorp(null);
+      setIsNewCorp(false);
+    } finally {
+      setIsSavingCorp(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ─── Unified Directory Toolbar (only shown on Directory sub-tab; Corporate has its own toolbar) ─── */}
@@ -366,6 +420,7 @@ export function AdminCustomersSubpage({
             type="button"
             variant="primary"
             size="sm"
+            leftIcon={<PlusIcon className="w-4 h-4" />}
             onClick={() => {
               handleOpenCustomer({
                 id: `cust_new_${Date.now()}`,
@@ -381,7 +436,7 @@ export function AdminCustomersSubpage({
             }}
             className="text-xs font-bold shrink-0"
           >
-            + Add Contact
+            Add Contact
           </Button>
         </div>
       )}
@@ -442,7 +497,8 @@ export function AdminCustomersSubpage({
                         }`}
                         title="Phase 29 Dual-Scoring Engine: Customer Metric"
                       >
-                        ★ {cust.customerScore ?? 90} / 100
+                        <StarIcon className="w-3 h-3 shrink-0" />
+                        <span>{cust.customerScore ?? 90} / 100</span>
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -619,6 +675,19 @@ export function AdminCustomersSubpage({
                   PO Optional ({corporateClients.filter((a) => !a.poRequired).length})
                 </button>
               </div>
+
+              {onSave && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<PlusIcon className="w-4 h-4" />}
+                  onClick={handleOpenNewCorp}
+                  className="text-xs font-bold shrink-0"
+                >
+                  Add Corporate Account
+                </Button>
+              )}
             </div>
 
             {/* Grid */}
@@ -639,9 +708,24 @@ export function AdminCustomersSubpage({
                             {corp.accountNumber} • {corp.billingCycle.toUpperCase()}
                           </CardDescription>
                         </div>
-                        <Badge variant={corp.isActive ? 'success' : 'default'} size="sm" className="text-[10px]">
-                          {corp.isActive ? 'Active' : 'Paused'}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant={corp.isActive ? 'success' : 'default'} size="sm" className="text-[10px]">
+                            {corp.isActive ? 'Active' : 'Paused'}
+                          </Badge>
+                          {onSave && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsNewCorp(false);
+                                setEditingCorp({ ...corp });
+                              }}
+                              className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                              title="Edit Corporate Account"
+                            >
+                              <EditIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-2.5 text-xs">
@@ -795,72 +879,139 @@ export function AdminCustomersSubpage({
         );
       })()}
 
-      {/* ─── Customer Details & Edit Modal ─── */}
-      {selectedCustomer && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start border-b border-slate-200 pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-black text-slate-900 text-base">
-                    {isEditingCustomer
-                      ? selectedCustomer.id?.startsWith('cust_new_')
-                        ? 'New Passenger Contact'
-                        : `Edit Contact: ${selectedCustomer.name || 'Passenger'}`
-                      : selectedCustomer.name}
-                  </h3>
-                  {selectedCustomer.isVip && !isEditingCustomer && (
-                    <Badge variant="warning" className="text-[10px] font-extrabold uppercase">
-                      VIP
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500">
-                  {isEditingCustomer
-                    ? 'Update profile details, notes, and chauffeur tier preferences'
-                    : selectedCustomer.email}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {!selectedCustomer.id?.startsWith('cust_new_') && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={isEditingCustomer ? 'outline' : 'primary'}
-                    onClick={() => {
-                      if (!isEditingCustomer) {
-                        setEditForm({
-                          name: selectedCustomer.name,
-                          phone: selectedCustomer.phone,
-                          email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
-                          corporateAccountName: selectedCustomer.corporateAccountName || '',
-                          isVip: selectedCustomer.isVip || false,
-                          preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
-                          notes: selectedCustomer.notes || '',
-                        });
-                      }
-                      setIsEditingCustomer(!isEditingCustomer);
-                    }}
-                    className="text-xs font-bold cursor-pointer"
-                  >
-                    {isEditingCustomer ? 'View Details' : 'Edit Profile'}
-                  </Button>
-                )}
+      {/* ─── Customer Details & Edit Slide-Over Drawer ─── */}
+      <AdminSlideOverDrawer
+        isOpen={Boolean(selectedCustomer)}
+        onClose={() => {
+          setSelectedCustomer(null);
+          setIsEditingCustomer(false);
+        }}
+        title={
+          selectedCustomer
+            ? isEditingCustomer
+              ? selectedCustomer.id?.startsWith('cust_new_')
+                ? 'Add Contact'
+                : `Edit Contact: ${selectedCustomer.name || 'Passenger'}`
+              : selectedCustomer.name
+            : 'Contact'
+        }
+        subtitle={
+          selectedCustomer
+            ? isEditingCustomer
+              ? 'Update contact details, chauffeur preferences, and dispatcher notes'
+              : selectedCustomer.email
+            : ''
+        }
+        size="lg"
+        headerBadge={
+          selectedCustomer && (
+            <div className="flex items-center gap-1.5">
+              {selectedCustomer.isVip && !isEditingCustomer && (
+                <Badge variant="warning" className="text-[10px] font-extrabold uppercase">
+                  VIP
+                </Badge>
+              )}
+              {!selectedCustomer.id?.startsWith('cust_new_') && (
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedCustomer(null);
-                    setIsEditingCustomer(false);
+                    if (!isEditingCustomer) {
+                      setEditForm({
+                        name: selectedCustomer.name,
+                        phone: selectedCustomer.phone,
+                        email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
+                        corporateAccountName: selectedCustomer.corporateAccountName || '',
+                        isVip: selectedCustomer.isVip || false,
+                        preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
+                        notes: selectedCustomer.notes || '',
+                      });
+                    }
+                    setIsEditingCustomer(!isEditingCustomer);
                   }}
-                  className="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer"
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-slate-700 transition-colors cursor-pointer"
                 >
-                  ✕
+                  {isEditingCustomer ? 'View Profile' : 'Edit Contact'}
                 </button>
-              </div>
+              )}
             </div>
-
+          )
+        }
+        footer={
+          selectedCustomer &&
+          (isEditingCustomer ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  if (selectedCustomer.id?.startsWith('cust_new_')) {
+                    setSelectedCustomer(null);
+                  }
+                  setIsEditingCustomer(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleSaveCustomer}
+                leftIcon={
+                  selectedCustomer.id?.startsWith('cust_new_') ? (
+                    <PlusIcon className="w-4 h-4" />
+                  ) : (
+                    <CheckIcon className="w-4 h-4" />
+                  )
+                }
+                className="font-bold"
+              >
+                {selectedCustomer.id?.startsWith('cust_new_') ? 'Add Contact' : 'Save Contact'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  setEditForm({
+                    name: selectedCustomer.name,
+                    phone: selectedCustomer.phone,
+                    email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
+                    corporateAccountName: selectedCustomer.corporateAccountName || '',
+                    isVip: selectedCustomer.isVip || false,
+                    preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
+                    notes: selectedCustomer.notes || '',
+                  });
+                  setIsEditingCustomer(true);
+                }}
+                leftIcon={<EditIcon className="w-4 h-4" />}
+              >
+                Edit Contact
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setIsEditingCustomer(false);
+                }}
+                className="font-bold"
+              >
+                Done
+              </Button>
+            </>
+          ))
+        }
+      >
+        {selectedCustomer && (
+          <div className="space-y-5">
             {saveSuccessMessage && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
                 <CheckIcon className="w-4 h-4 text-emerald-600" />
                 <span>{saveSuccessMessage}</span>
               </div>
@@ -868,214 +1019,214 @@ export function AdminCustomersSubpage({
 
             {isEditingCustomer ? (
               /* ─── EDIT MODE ─── */
-              <div className="space-y-3.5 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Full Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.name || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="e.g. Eleanor Davis"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+              <div className="space-y-5 text-xs">
+                <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <UserIcon className="w-4 h-4 text-blue-600" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                      Identity &amp; Contact
+                    </h3>
                   </div>
 
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Phone Number <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      value={editForm.phone || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="e.g. (314) 555-0199"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      value={editForm.email || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="e.g. passenger@example.com"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Corporate Account</label>
-                    <input
-                      type="text"
-                      value={editForm.corporateAccountName || ''}
-                      onChange={(e) => setEditForm((f) => ({ ...f, corporateAccountName: e.target.value }))}
-                      placeholder="e.g. Bayer Crop Science"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Preferred Chauffeur Class</label>
-                    <select
-                      value={editForm.preferredVehicle || 'Standard Sedan'}
-                      onChange={(e) => setEditForm((f) => ({ ...f, preferredVehicle: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Standard Sedan">Standard Sedan</option>
-                      <option value="Premium Executive">Premium Executive</option>
-                      <option value="XL Minivan / SUV">XL Minivan / SUV</option>
-                      <option value="Wheelchair Accessible (WAV)">Wheelchair Accessible (WAV)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center pt-5">
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">
+                        Full Name <span className="text-rose-500">*</span>
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={!!editForm.isVip}
-                        onChange={(e) => setEditForm((f) => ({ ...f, isVip: e.target.checked }))}
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                        type="text"
+                        value={editForm.name || ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="e.g. Eleanor Davis"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       />
-                      <span className="font-bold text-slate-800">VIP Priority Passenger</span>
-                    </label>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">
+                        Phone Number <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={editForm.phone || ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                        placeholder="e.g. (314) 555-0199"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Dispatcher & Driver Notes</label>
-                  <textarea
-                    rows={3}
-                    value={editForm.notes || ''}
-                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
-                    placeholder="Special luggage requests, gate codes, terminal preferences, mobility needs..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={editForm.email || ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                        placeholder="e.g. passenger@example.com"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (selectedCustomer.id?.startsWith('cust_new_')) {
-                        setSelectedCustomer(null);
-                      }
-                      setIsEditingCustomer(false);
-                    }}
-                    className="text-slate-600 hover:text-slate-800 cursor-pointer"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={handleSaveCustomer}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
-                  >
-                    Save Contact
-                  </Button>
-                </div>
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Corporate Account</label>
+                      <input
+                        type="text"
+                        value={editForm.corporateAccountName || ''}
+                        onChange={(e) => setEditForm((f) => ({ ...f, corporateAccountName: e.target.value }))}
+                        placeholder="e.g. Bayer Crop Science"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <CarIcon className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                      Ride Preferences &amp; Notes
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Preferred Chauffeur Class</label>
+                      <select
+                        value={editForm.preferredVehicle || 'Standard Sedan'}
+                        onChange={(e) => setEditForm((f) => ({ ...f, preferredVehicle: e.target.value }))}
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800"
+                      >
+                        <option value="Standard Sedan">Standard Sedan</option>
+                        <option value="Premium Executive">Premium Executive</option>
+                        <option value="XL Minivan / SUV">XL Minivan / SUV</option>
+                        <option value="Wheelchair Accessible (WAV)">Wheelchair Accessible (WAV)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center pt-5">
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!editForm.isVip}
+                          onChange={(e) => setEditForm((f) => ({ ...f, isVip: e.target.checked }))}
+                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span className="font-bold text-slate-800">VIP Priority Passenger</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">Dispatcher &amp; Driver Notes</label>
+                    <textarea
+                      rows={3}
+                      value={editForm.notes || ''}
+                      onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                      placeholder="Special luggage requests, gate codes, terminal preferences, mobility needs..."
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </section>
               </div>
             ) : (
               /* ─── VIEW MODE ─── */
-              <div className="space-y-3 text-xs">
-                {/* Customer Score Banner */}
-                <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
-                      Dual-Scoring Engine
-                    </span>
-                    <div className="text-sm font-black text-slate-900 mt-0.5">
-                      Customer Score: {selectedCustomer.customerScore ?? 90} / 100
+              <div className="space-y-4 text-xs">
+                <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+                  <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
+                        Dual-Scoring Engine
+                      </span>
+                      <div className="text-sm font-black text-slate-900 mt-0.5">
+                        Customer Score: {selectedCustomer.customerScore ?? 90} / 100
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        Evaluated from ride frequency, completion fidelity, and cancellations.
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">
-                      Evaluated from ride frequency, completion fidelity, and cancellations.
+                    <div
+                      className={`text-xl font-black px-3 py-1.5 rounded-xl border shrink-0 inline-flex items-center gap-1.5 ${
+                        (selectedCustomer.customerScore ?? 90) >= 80
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : (selectedCustomer.customerScore ?? 90) >= 60
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-rose-50 text-rose-700 border-rose-200'
+                      }`}
+                    >
+                      <StarIcon className="w-4 h-4 shrink-0" />
+                      <span>{selectedCustomer.customerScore ?? 90}</span>
                     </div>
                   </div>
-                  <div
-                    className={`text-xl font-black px-3 py-1.5 rounded-xl border shrink-0 ${
-                      (selectedCustomer.customerScore ?? 90) >= 80
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : (selectedCustomer.customerScore ?? 90) >= 60
-                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                        : 'bg-rose-50 text-rose-700 border-rose-200'
-                    }`}
-                  >
-                    ★ {selectedCustomer.customerScore ?? 90}
-                  </div>
-                </div>
 
-                {selectedCustomer.isBlacklisted && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
-                    <div className="font-black flex items-center gap-1.5">
-                      <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
-                      <span>BLACKLISTED PASSENGER</span>
+                  {selectedCustomer.isBlacklisted && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
+                      <div className="font-black flex items-center gap-1.5">
+                        <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
+                        <span>BLACKLISTED PASSENGER</span>
+                      </div>
+                      <p className="text-[11px] text-rose-700">
+                        Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-rose-700">
-                      Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Bookings</span>
+                      <span className="text-base font-black text-slate-900">{selectedCustomer.tripCount} Trips</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Volume</span>
+                      <span className="text-base font-black text-emerald-600">${selectedCustomer.totalSpend.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="font-semibold text-slate-600 block mb-1">Phone Number</span>
+                      <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono">{selectedCustomer.phone}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-600 block mb-1">Email</span>
+                      <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl truncate">{selectedCustomer.email || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {selectedCustomer.corporateAccountName && (
+                    <div>
+                      <span className="font-semibold text-slate-600 block mb-1">Corporate Account</span>
+                      <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold">
+                        {selectedCustomer.corporateAccountName}
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <span className="font-semibold text-slate-600 block mb-1">Preferred Chauffeur Class</span>
+                    <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl capitalize">
+                      {selectedCustomer.preferredVehicle || 'Standard Sedan'}
                     </p>
                   </div>
-                )}
 
-                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
-                  <div>
-                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Bookings</span>
-                    <span className="text-base font-black text-slate-900">{selectedCustomer.tripCount} Trips</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Volume</span>
-                    <span className="text-base font-black text-emerald-600">${selectedCustomer.totalSpend.toFixed(2)}</span>
-                  </div>
-                </div>
+                  {selectedCustomer.notes && (
+                    <div>
+                      <span className="font-semibold text-slate-600 block mb-1">Dispatcher Notes</span>
+                      <p className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-amber-900">
+                        {selectedCustomer.notes}
+                      </p>
+                    </div>
+                  )}
+                </section>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="font-bold text-slate-700 block mb-1">Phone Number</span>
-                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono">{selectedCustomer.phone}</p>
+                <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <ShieldIcon className="w-4 h-4 text-slate-600" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                      Governance Actions
+                    </h3>
                   </div>
-                  <div>
-                    <span className="font-bold text-slate-700 block mb-1">Email</span>
-                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg truncate">{selectedCustomer.email || 'N/A'}</p>
-                  </div>
-                </div>
-
-                {selectedCustomer.corporateAccountName && (
-                  <div>
-                    <span className="font-bold text-slate-700 block mb-1">Corporate Account</span>
-                    <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-semibold">
-                      {selectedCustomer.corporateAccountName}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <span className="font-bold text-slate-700 block mb-1">Preferred Chauffeur Class</span>
-                  <p className="p-2 bg-slate-50 border border-slate-200 rounded-lg capitalize">
-                    {selectedCustomer.preferredVehicle || 'Standard Sedan'}
-                  </p>
-                </div>
-
-                {selectedCustomer.notes && (
-                  <div>
-                    <span className="font-bold text-slate-700 block mb-1">Dispatcher Notes</span>
-                    <p className="p-2 bg-amber-50/70 border border-amber-200/80 rounded-lg text-amber-900">
-                      {selectedCustomer.notes}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-200 gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -1114,7 +1265,19 @@ export function AdminCustomersSubpage({
                           : 'text-rose-700 border-rose-300 hover:bg-rose-50'
                       }`}
                     >
-                      {selectedCustomer.isBlacklisted ? '✅ Restore Passenger' : '🚫 Blacklist'}
+                      <span className="inline-flex items-center gap-1.5">
+                        {selectedCustomer.isBlacklisted ? (
+                          <>
+                            <CheckIcon className="w-3.5 h-3.5" />
+                            <span>Restore Passenger</span>
+                          </>
+                        ) : (
+                          <>
+                            <BanIcon className="w-3.5 h-3.5" />
+                            <span>Blacklist</span>
+                          </>
+                        )}
+                      </span>
                     </Button>
 
                     <Button
@@ -1136,47 +1299,204 @@ export function AdminCustomersSubpage({
                       {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
                     </Button>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditForm({
-                          name: selectedCustomer.name,
-                          phone: selectedCustomer.phone,
-                          email: selectedCustomer.email === 'N/A' ? '' : selectedCustomer.email,
-                          corporateAccountName: selectedCustomer.corporateAccountName || '',
-                          isVip: selectedCustomer.isVip || false,
-                          preferredVehicle: selectedCustomer.preferredVehicle || 'Standard Sedan',
-                          notes: selectedCustomer.notes || '',
-                        });
-                        setIsEditingCustomer(true);
-                      }}
-                      className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer"
-                    >
-                      Edit Contact
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedCustomer(null);
-                        setIsEditingCustomer(false);
-                      }}
-                      className="bg-blue-600 text-white font-bold cursor-pointer"
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </div>
+                </section>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </AdminSlideOverDrawer>
+
+      {/* ─── Add / Edit Corporate Account Slide-Over Drawer ─── */}
+      <AdminSlideOverDrawer
+        isOpen={Boolean(editingCorp)}
+        onClose={() => {
+          setEditingCorp(null);
+          setIsNewCorp(false);
+        }}
+        title={isNewCorp ? 'Add Corporate Account' : `Edit Corporate Account`}
+        subtitle={
+          isNewCorp
+            ? 'Configure corporate billing terms, credit limit, and PO authorization'
+            : editingCorp?.companyName || ''
+        }
+        size="lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => {
+                setEditingCorp(null);
+                setIsNewCorp(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="corporate-account-form"
+              variant="primary"
+              size="md"
+              isLoading={isSavingCorp}
+              leftIcon={isNewCorp ? <PlusIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
+              className="font-bold"
+            >
+              {isNewCorp ? 'Add Corporate Account' : 'Save Corporate Account'}
+            </Button>
+          </>
+        }
+      >
+        {editingCorp && (
+          <form id="corporate-account-form" onSubmit={handleSaveCorporateAccount} className="space-y-5 text-xs">
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <BuildingIcon className="w-4 h-4 text-blue-600" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  Company &amp; Billing Contact
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Company Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCorp.companyName}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, companyName: e.target.value })}
+                    placeholder="e.g. Bayer Crop Science"
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Account Number <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCorp.accountNumber}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, accountNumber: e.target.value })}
+                    placeholder="e.g. CORP-101"
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Billing Contact Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCorp.billingContactName || ''}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, billingContactName: e.target.value })}
+                    placeholder="e.g. Sarah Jenkins"
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Billing Contact Email <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editingCorp.billingContactEmail}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, billingContactEmail: e.target.value })}
+                    placeholder="ap@company.com"
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  Billing Terms &amp; PO Controls
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Billing Cycle</label>
+                  <select
+                    value={editingCorp.billingCycle}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, billingCycle: e.target.value as any })}
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800"
+                  >
+                    <option value="immediate">Immediate</option>
+                    <option value="net15">Net 15</option>
+                    <option value="net30">Net 30</option>
+                    <option value="net60">Net 60</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Credit Limit ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingCorp.creditLimit}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, creditLimit: Number(e.target.value) || 0 })}
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editingCorp.discountPercent}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, discountPercent: Number(e.target.value) || 0 })}
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Authorized PO Number</label>
+                <input
+                  type="text"
+                  value={editingCorp.currentPoNumber || ''}
+                  onChange={(e) => setEditingCorp({ ...editingCorp, currentPoNumber: e.target.value })}
+                  placeholder="PO-XXXXXX"
+                  className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 pt-1">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingCorp.poRequired)}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, poRequired: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                  />
+                  <span className="font-semibold text-slate-800">Enforce PO Number on Bookings</span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingCorp.isActive)}
+                    onChange={(e) => setEditingCorp({ ...editingCorp, isActive: e.target.checked })}
+                    className="w-4 h-4 text-emerald-600 rounded border-slate-300"
+                  />
+                  <span className="font-semibold text-slate-800">Account Active</span>
+                </label>
+              </div>
+            </section>
+          </form>
+        )}
+      </AdminSlideOverDrawer>
 
       {/* ─── Regenerate PO Modal ─── */}
       {selectedPoAccount && (

@@ -18,6 +18,12 @@ import {
   DollarSignIcon,
   CompassIcon,
   InfoIcon,
+  RepeatIcon,
+  PlaneIcon,
+  MoonIcon,
+  SunIcon,
+  BanIcon,
+  StarIcon,
 } from '../../ui/Icons';
 import {
   BookingRulesEngine,
@@ -177,8 +183,9 @@ function ModularTierCard({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-700">Customer Score Floor (Min)</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800">
-                  ★ {config.customerScoreMin}
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
+                  <StarIcon className="w-3 h-3 text-amber-500" />
+                  <span>{config.customerScoreMin}</span>
                 </span>
               </div>
               <input
@@ -199,8 +206,9 @@ function ModularTierCard({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-700">Customer Score Ceiling (Max)</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800">
-                  ★ {config.customerScoreMax}
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
+                  <StarIcon className="w-3 h-3 text-amber-500" />
+                  <span>{config.customerScoreMax}</span>
                 </span>
               </div>
               <input
@@ -503,8 +511,11 @@ function ModularTierCard({
                   className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">🔄 Return Trip Booked</span>
-                  <span className="text-[11px] text-slate-500">Apply rule when round-trip reservation is detected</span>
+                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
+                    <RepeatIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Return Trip Booked</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">Apply rule when round-trip reservation is detected</span>
                 </div>
               </label>
 
@@ -516,8 +527,11 @@ function ModularTierCard({
                   className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">👤 Separate Contact Person</span>
-                  <span className="text-[11px] text-slate-500">Apply rule when booker is different from passenger</span>
+                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
+                    <UserIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Separate Contact Person</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">Apply rule when booker is different from passenger</span>
                 </div>
               </label>
 
@@ -529,8 +543,11 @@ function ModularTierCard({
                   className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">🛑 Multiple / Intermediate Stops</span>
-                  <span className="text-[11px] text-slate-500">Apply rule when trip includes 1+ intermediate waypoints</span>
+                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
+                    <MapPinIcon className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Multiple / Intermediate Stops</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">Apply rule when trip includes 1+ intermediate waypoints</span>
                 </div>
               </label>
 
@@ -542,8 +559,11 @@ function ModularTierCard({
                   className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">🚗 Multiple Vehicles Requested</span>
-                  <span className="text-[11px] text-slate-500">Apply rule when reservation requests 2 or more cars</span>
+                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
+                    <CarIcon className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Multiple Vehicles Requested</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">Apply rule when reservation requests 2 or more cars</span>
                 </div>
               </label>
             </div>
@@ -897,7 +917,9 @@ export function AdminRulesTab() {
         <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl">✈️</span>
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <PlaneIcon className="w-5 h-5" />
+              </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
                   STL Lambert Airport Curbside Pickup Location Description
@@ -960,8 +982,13 @@ export function AdminRulesTab() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700">Customer Score</span>
-                <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                  {simIsUnratedGuest ? 'Unrated' : `★ ${simCustomerScore}`}
+                <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                  {simIsUnratedGuest ? 'Unrated' : (
+                    <>
+                      <StarIcon className="w-3 h-3 text-blue-600" />
+                      <span>{simCustomerScore}</span>
+                    </>
+                  )}
                 </span>
               </div>
               <input
@@ -993,11 +1020,11 @@ export function AdminRulesTab() {
                 className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
               >
                 <option value="any">Standard Service Area</option>
-                <option value="airport">✈️ STL Airport Terminal</option>
-                <option value="prohibited">⛔ Prohibited Geofence Zone</option>
+                <option value="airport">STL Airport Terminal</option>
+                <option value="prohibited">Prohibited Geofence Zone</option>
                 {zones.map((z) => (
                   <option key={z.id} value={z.id}>
-                    📍 {z.name}
+                    {z.name}
                   </option>
                 ))}
               </select>
@@ -1012,11 +1039,11 @@ export function AdminRulesTab() {
                 className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
               >
                 <option value="any">Standard Service Area</option>
-                <option value="airport">✈️ STL Airport Terminal</option>
-                <option value="prohibited">⛔ Prohibited Geofence Zone</option>
+                <option value="airport">STL Airport Terminal</option>
+                <option value="prohibited">Prohibited Geofence Zone</option>
                 {zones.map((z) => (
                   <option key={z.id} value={z.id}>
-                    📍 {z.name}
+                    {z.name}
                   </option>
                 ))}
               </select>
@@ -1038,8 +1065,18 @@ export function AdminRulesTab() {
                 onChange={(e) => setSimPickupHour(parseInt(e.target.value) || 0)}
                 className="w-full accent-blue-600 cursor-pointer"
               />
-              <span className="text-[10px] text-slate-400 block">
-                {simPickupHour >= 23 || simPickupHour < 4 ? '🌙 Late Night Window' : '☀️ Standard Operating Hours'}
+              <span className="text-[10px] text-slate-400 inline-flex items-center gap-1">
+                {simPickupHour >= 23 || simPickupHour < 4 ? (
+                  <>
+                    <MoonIcon className="w-3 h-3 text-indigo-500" />
+                    <span>Late Night Window</span>
+                  </>
+                ) : (
+                  <>
+                    <SunIcon className="w-3 h-3 text-amber-500" />
+                    <span>Standard Operating Hours</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -1183,25 +1220,40 @@ export function AdminRulesTab() {
               <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
                 <span className="font-bold text-slate-600">Tier 3 (Security Block):</span>
                 {simResult.mode === 'BLACKLIST_BLOCK' ? (
-                  <span className="font-black text-rose-600">⛔ TRIGGERED</span>
+                  <span className="font-black text-rose-600 inline-flex items-center gap-1">
+                    <BanIcon className="w-3.5 h-3.5" />
+                    TRIGGERED
+                  </span>
                 ) : (
-                  <span className="font-bold text-emerald-600">✓ CLEAR</span>
+                  <span className="font-bold text-emerald-600 inline-flex items-center gap-1">
+                    <CheckIcon className="w-3.5 h-3.5" />
+                    CLEAR
+                  </span>
                 )}
               </div>
 
               <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
                 <span className="font-bold text-slate-600">Tier 2 (Review Queue):</span>
                 {simResult.mode === 'REQUIRE_REVIEW' ? (
-                  <span className="font-black text-amber-600">⚠️ HELD FOR REVIEW</span>
+                  <span className="font-black text-amber-600 inline-flex items-center gap-1">
+                    <AlertTriangleIcon className="w-3.5 h-3.5" />
+                    HELD FOR REVIEW
+                  </span>
                 ) : (
-                  <span className="font-bold text-emerald-600">✓ BYPASSED</span>
+                  <span className="font-bold text-emerald-600 inline-flex items-center gap-1">
+                    <CheckIcon className="w-3.5 h-3.5" />
+                    BYPASSED
+                  </span>
                 )}
               </div>
 
               <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
                 <span className="font-bold text-slate-600">Tier 1 (Auto-Confirm):</span>
                 {simResult.mode === 'AUTO_CONFIRM' ? (
-                  <span className="font-black text-emerald-600">✓ CONFIRMED</span>
+                  <span className="font-black text-emerald-600 inline-flex items-center gap-1">
+                    <CheckIcon className="w-3.5 h-3.5" />
+                    CONFIRMED
+                  </span>
                 ) : (
                   <span className="font-bold text-slate-400">— NOT ELIGIBLE</span>
                 )}
