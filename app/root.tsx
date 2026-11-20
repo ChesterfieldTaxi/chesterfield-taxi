@@ -68,10 +68,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           "--btn-primary-text": COMPANY_CONFIG.btnPrimaryText || primaryFg,
           "--btn-secondary-bg": COMPANY_CONFIG.btnSecondaryBg || "#0f172a",
           "--btn-secondary-text": COMPANY_CONFIG.btnSecondaryText || "#ffffff",
-          "--btn-radius": COMPANY_CONFIG.btnBorderRadius || "8px",
+          "--btn-radius": COMPANY_CONFIG.btnBorderRadius || "12px",
           "--navbar-bg": COMPANY_CONFIG.navbarBg || "#0f172a",
           "--card-bg": COMPANY_CONFIG.cardBg || "#ffffff",
-          "--font-heading": `'${COMPANY_CONFIG.headingFont || 'Inter'}', sans-serif`,
+          "--font-heading": `'${COMPANY_CONFIG.headingFont || 'Lexend'}', 'Inter', sans-serif`,
           "--font-body": `'${COMPANY_CONFIG.bodyFont || 'Inter'}', sans-serif`,
         } as React.CSSProperties
       }
@@ -84,7 +84,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lexend:wght@500;600;700;800&display=swap"
         />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />

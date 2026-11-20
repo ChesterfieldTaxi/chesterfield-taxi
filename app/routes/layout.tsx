@@ -35,7 +35,7 @@ export default function PublicLayout() {
   const [branding, setBranding] = useState<BrandingConfig>({
     primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb',
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a',
-    headingFont: COMPANY_CONFIG.headingFont || 'Inter',
+    headingFont: COMPANY_CONFIG.headingFont || 'Lexend',
     bodyFont: COMPANY_CONFIG.bodyFont || 'Inter',
     headingColor: COMPANY_CONFIG.headingColor || '#0f172a',
     bodyTextColor: COMPANY_CONFIG.bodyTextColor || '#334155',
@@ -44,7 +44,7 @@ export default function PublicLayout() {
     btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#ffffff',
     btnSecondaryBg: COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
     btnSecondaryText: COMPANY_CONFIG.btnSecondaryText || '#ffffff',
-    btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '8px',
+    btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '12px',
     navbarBg: COMPANY_CONFIG.navbarBg || '#0f172a',
     cardBg: COMPANY_CONFIG.cardBg || '#ffffff',
   });

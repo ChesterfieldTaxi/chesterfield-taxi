@@ -7212,6 +7212,153 @@ export default function DispatchRoute() {
                 </div>
               ) : (
                 <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+                  {/* Linked Multi-Car Convoy Banner Card */}
+                  {(() => {
+                    const mMeta = (reviewTrip.metadata || {}) as Record<string, any>;
+                    const mcGroupId =
+                      reviewTrip.multiCarGroupId ||
+                      (typeof mMeta.multiCarGroupId === 'string' ? mMeta.multiCarGroupId : undefined);
+                    const mcTotal = Number(
+                      reviewTrip.multiCarTotal || mMeta.multiCarTotal || reviewTrip.vehicleCount || 1
+                    );
+                    const mcIndex = Number(reviewTrip.multiCarIndex || mMeta.multiCarIndex || 1);
+                    if (!(mcGroupId || reviewTrip.multipleVehiclesRequested) || mcTotal <= 1) return null;
+
+                    const siblingTrips = mcGroupId
+                      ? trips
+                          .filter((t) => t.multiCarGroupId === mcGroupId)
+                          .sort((a, b) => (a.multiCarIndex || 0) - (b.multiCarIndex || 0))
+                      : [];
+                    const associates = Array.isArray(reviewTrip.multiCarAssociates)
+                      ? [...reviewTrip.multiCarAssociates].sort((a, b) => (a.carIndex || 0) - (b.carIndex || 0))
+                      : [];
+                    const totalPax = Number(mMeta.multiCarTotalPassengers || 0);
+                    const totalBags = Number(mMeta.multiCarTotalBags || 0);
+                    const orderTotalFare =
+                      typeof mMeta.multiCarOrderTotalFare === 'number' ? mMeta.multiCarOrderTotalFare : undefined;
+
+                    return (
+                      <div className="bg-violet-50/90 border border-violet-200 rounded-xl p-3.5 space-y-2.5 text-violet-950 shadow-2xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-600 text-white">
+                              Multi-Car · Car {mcIndex} of {mcTotal}
+                            </span>
+                            {mcGroupId && (
+                              <span className="font-mono text-[11px] font-bold bg-white px-2 py-0.5 rounded border border-violet-200 text-violet-900">
+                                {mcGroupId}
+                              </span>
+                            )}
+                            {(totalPax > 0 || totalBags > 0) && (
+                              <span className="text-[11px] font-semibold text-violet-800">
+                                Combined Party: {totalPax || reviewTrip.passenger?.passengerCount || 1} Pax
+                                {totalBags > 0 ? ` · ${totalBags} Bags` : ''}
+                              </span>
+                            )}
+                          </div>
+                          {typeof orderTotalFare === 'number' && (
+                            <span className="text-xs font-mono font-extrabold text-violet-900">
+                              Order Total: ${orderTotalFare.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {(siblingTrips.length > 0 || associates.length > 0) && (
+                          <div className="space-y-1.5">
+                            {(siblingTrips.length > 0
+                              ? siblingTrips.map((st, idx) => ({
+                                  tripId: st.id,
+                                  carIndex: st.multiCarIndex || idx + 1,
+                                  driverName:
+                                    (st.metadata as any)?.assignedDriverName ||
+                                    drivers.find((d) => d.id === st.assignedDriverId)?.name ||
+                                    (st.assignedDriverId ? `Driver ${st.assignedDriverId.slice(-4)}` : 'Unassigned'),
+                                  vehicleUnit:
+                                    st.assignedVehicle?.vehicleNumber ||
+                                    drivers.find((d) => d.id === st.assignedDriverId)?.cabNumber,
+                                  vehicleLabel: formatVehicleTierDisplay(
+                                    (st.metadata as any)?.vehicleTypeId || st.vehicleTier,
+                                    settings.vehicles,
+                                    (st.metadata as any)?.vehicleDisplayName
+                                  ),
+                                  status: st.status,
+                                  fare: st.pricing?.totalFare,
+                                  tripObj: st,
+                                }))
+                              : associates.map((a) => ({
+                                  tripId: a.tripId,
+                                  carIndex: a.carIndex,
+                                  driverName:
+                                    a.driverName ||
+                                    (a.driverId ? `Driver ${a.driverId.slice(-4)}` : 'Unassigned'),
+                                  vehicleUnit: a.vehicleUnit,
+                                  vehicleLabel: formatVehicleTierDisplay(
+                                    a.vehicleTier,
+                                    settings.vehicles,
+                                    a.vehicleDisplayName
+                                  ),
+                                  status: a.status || 'pending',
+                                  fare: undefined as number | undefined,
+                                  tripObj: trips.find((t) => t.id === a.tripId),
+                                }))
+                            ).map((car) => {
+                              const isCurrent = car.tripId === reviewTrip.id;
+                              return (
+                                <div
+                                  key={car.tripId}
+                                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border text-[11px] ${
+                                    isCurrent
+                                      ? 'bg-violet-100/80 border-violet-300'
+                                      : 'bg-white border-violet-200/80'
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-violet-700">
+                                      Car {car.carIndex}/{mcTotal}
+                                    </span>
+                                    <span className="font-bold text-slate-900">{car.driverName}</span>
+                                    {car.vehicleUnit && (
+                                      <span className="font-mono text-[10px] text-slate-500">
+                                        ({car.vehicleUnit})
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                                      {car.vehicleLabel}
+                                    </span>
+                                    {typeof car.fare === 'number' && (
+                                      <span className="font-mono font-bold text-emerald-700">
+                                        ${car.fare.toFixed(2)}
+                                      </span>
+                                    )}
+                                    {isCurrent && (
+                                      <span className="text-[9px] font-black uppercase text-violet-700">
+                                        (Viewing)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                      {car.status}
+                                    </span>
+                                    {!isCurrent && car.tripObj && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReviewModal(car.tripObj!, reviewModalTab)}
+                                        className="px-2 py-0.5 rounded bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] transition-colors cursor-pointer"
+                                      >
+                                        Switch →
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Linked Round-Trip Banner Card */}
                   {hasLinkedLeg && (
                     <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">

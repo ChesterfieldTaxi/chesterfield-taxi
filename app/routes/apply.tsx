@@ -37,8 +37,14 @@ export default function Apply() {
     setError(null);
     try {
       const db = getFirestore(getFirebaseApp());
+      const nameParts = formData.fullName.trim().split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || formData.fullName.trim();
+      const lastName = nameParts.slice(1).join(' ') || '-';
       await addDoc(collection(db, 'applications'), {
         ...formData,
+        firstName,
+        lastName,
+        phone: formData.phone.trim(),
         status: 'PENDING_REVIEW',
         submittedAt: new Date().toISOString(),
       });
@@ -78,17 +84,22 @@ export default function Apply() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="py-12 bg-slate-50 flex-1 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900">Join Our Team</h1>
-          <p className="text-slate-600 max-w-xl mx-auto">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+            Careers &amp; Fleet Recruiting
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
+            Join Our Team
+          </h1>
+          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
             We are always looking for professional drivers, experienced dispatchers, and reliable office staff to join the Chesterfield Taxi family.
           </p>
         </div>
 
-        <Card className="shadow-xl border-slate-200">
-          <CardHeader className="border-b border-slate-100 bg-white rounded-t-xl">
+        <Card className="shadow-xs border-slate-200/90 rounded-2xl overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-white">
             <CardTitle>Employment Application</CardTitle>
           </CardHeader>
           <CardContent className="p-6 md:p-8">

@@ -5,12 +5,34 @@ html {
   overflow-y: scroll;
 }
 
+body {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  color: var(--color-text-main, #334155);
+  background-color: var(--surface-page, #f8fafc);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading, 'Lexend', 'Inter', sans-serif);
+}
+
+::selection {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
 :root {
   --color-primary: #2563eb;
   --color-primary-fg: #ffffff;
   --color-secondary: #0f172a;
   --brand-primary: var(--color-primary);
   --brand-secondary: var(--color-secondary);
+  --surface-page: #f8fafc;
+  --surface-card: #ffffff;
+  --border-subtle: #e2e8f0;
+  --radius-card: 16px;
+  --radius-control: 12px;
   --color-heading: #0f172a;
   --color-text-main: #334155;
   --color-text-muted: #64748b;
@@ -18,25 +40,25 @@ html {
   --btn-primary-text: #ffffff;
   --btn-secondary-bg: #0f172a;
   --btn-secondary-text: #ffffff;
-  --btn-radius: 8px;
+  --btn-radius: 12px;
   --navbar-bg: #0f172a;
   --card-bg: #ffffff;
-  --font-heading: 'Inter', sans-serif;
+  --font-heading: 'Lexend', 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
 }
 
 
 /* Dynamic Branding Utility Classes & Overrides */
 .brand-bg-primary {
-  background-color: var(--color-primary, #f59e0b) !important;
+  background-color: var(--color-primary, #2563eb) !important;
 }
 
 .brand-text-primary {
-  color: var(--color-primary, #f59e0b) !important;
+  color: var(--color-primary, #2563eb) !important;
 }
 
 .brand-border-primary {
-  border-color: var(--color-primary, #f59e0b) !important;
+  border-color: var(--color-primary, #2563eb) !important;
 }
 
 .brand-bg-secondary {
@@ -153,7 +175,7 @@ html {
 
 .pac-item:hover,
 .pac-item-selected {
-  background-color: #fef3c7 !important; /* amber-100 */
+  background-color: #eff6ff !important; /* blue-50 */
 }
 
 .pac-item-query {
@@ -165,7 +187,7 @@ html {
 
 .pac-matched {
   font-weight: 700 !important;
-  color: var(--color-primary, #f59e0b) !important;
+  color: var(--color-primary, #2563eb) !important;
 }
 
 .pac-icon {

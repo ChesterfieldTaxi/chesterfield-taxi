@@ -16,14 +16,15 @@ export function meta() {
 
 export default function PrivacyPage() {
   return (
-    <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8">
+    <div className="py-12 bg-slate-50 flex-1 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider border border-emerald-200">
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-900 text-xs font-bold uppercase tracking-wider border border-blue-200">
           <ShieldCheckIcon className="w-3.5 h-3.5" />
-          Data Protection & Privacy
+          Data Protection &amp; Privacy
         </div>
-        <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
           Privacy Policy
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl mx-auto">
@@ -137,6 +138,7 @@ export default function PrivacyPage() {
           </div>
         </section>
       </Card>
+      </div>
     </div>
   );
 }

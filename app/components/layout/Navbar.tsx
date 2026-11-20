@@ -440,23 +440,25 @@ export function Navbar() {
                 <XIcon className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-6 overflow-y-auto space-y-5">
               <div className="text-center space-y-2">
-                <p className="text-sm text-slate-600 font-medium">
-                  Get the Chesterfield Taxi Passenger App for faster bookings, live tracking, and digital receipts.
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20">
+                  <CarIcon className="w-7 h-7" />
+                </div>
+                <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                  Install the {companySettings.name || COMPANY_CONFIG.name} Passenger Web App directly to your phone&apos;s home screen for faster bookings, live driver tracking, and digital receipts.
                 </p>
               </div>
 
-              <div className="flex justify-center">
-                <div className="w-40 h-40 bg-white border-2 border-slate-100 shadow-sm rounded-xl flex items-center justify-center">
-                  <svg className="w-32 h-32 text-slate-800" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 0h3v2h-3v-2zm3 3h5v2h-5v-2zm-3 3h3v2h-3v-2zm3 3h3v2h-3v-2zm-3 0h2v2h-2v-2z" />
-                  </svg>
-                </div>
+              <div className="rounded-xl bg-slate-50 border border-slate-200/90 p-4 space-y-2 text-xs text-slate-600">
+                <div className="font-bold text-slate-900">Quick Home Screen Install</div>
+                <p>
+                  <strong>iPhone / iPad (Safari):</strong> Tap the <strong>Share</strong> icon, then select <strong>Add to Home Screen</strong>.
+                </p>
+                <p>
+                  <strong>Android (Chrome):</strong> Tap the browser menu (<strong>⋮</strong>), then select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                </p>
               </div>
-              <p className="text-xs text-center text-slate-500 uppercase font-bold tracking-wider">
-                Scan to Install
-              </p>
 
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <Link
@@ -467,9 +469,6 @@ export function Navbar() {
                   <CarIcon className="w-4 h-4" />
                   <span>Open Passenger Portal Web App</span>
                 </Link>
-                <p className="text-[11px] text-center text-slate-500">
-                  Tip: Tap <strong>Share &rarr; Add to Home Screen</strong> on iOS Safari or Android Chrome to install as a fullscreen mobile app.
-                </p>
               </div>
             </div>
           </div>

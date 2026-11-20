@@ -142,6 +142,20 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
     }
   };
 
+  const meta = (trip.metadata || {}) as Record<string, any>;
+  const multiCarGroupId =
+    trip.multiCarGroupId || (typeof meta.multiCarGroupId === 'string' ? meta.multiCarGroupId : undefined);
+  const multiCarTotal = Number(trip.multiCarTotal || meta.multiCarTotal || trip.vehicleCount || 1);
+  const multiCarIndex = Number(trip.multiCarIndex || meta.multiCarIndex || 1);
+  const isMultiCar = Boolean((multiCarGroupId || trip.multipleVehiclesRequested) && multiCarTotal > 1);
+  const multiCarAssociates = Array.isArray(trip.multiCarAssociates)
+    ? [...trip.multiCarAssociates].sort((a, b) => (a.carIndex || 0) - (b.carIndex || 0))
+    : [];
+  const multiCarTotalPax = Number(meta.multiCarTotalPassengers || 0);
+  const multiCarTotalBags = Number(meta.multiCarTotalBags || 0);
+  const multiCarOrderTotalFare =
+    typeof meta.multiCarOrderTotalFare === 'number' ? meta.multiCarOrderTotalFare : undefined;
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {!hideSummaryBar && (
@@ -189,6 +203,71 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
               {copied ? '✓ JSON Copied' : '📋 Copy Raw Audit JSON'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Multi-Car Convoy Audit Summary */}
+      {isMultiCar && (
+        <div className="px-4 py-3 bg-violet-50/90 border-b border-violet-200 text-xs space-y-2 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-600 text-white">
+                Multi-Car · Car {multiCarIndex} of {multiCarTotal}
+              </span>
+              {multiCarGroupId && (
+                <span className="font-mono text-[11px] font-bold text-violet-900 bg-white px-2 py-0.5 rounded border border-violet-200">
+                  {multiCarGroupId}
+                </span>
+              )}
+              {(multiCarTotalPax > 0 || multiCarTotalBags > 0) && (
+                <span className="text-[11px] font-semibold text-violet-800">
+                  Party Total: {multiCarTotalPax || trip.passenger?.passengerCount || 1} Pax
+                  {multiCarTotalBags > 0 ? ` · ${multiCarTotalBags} Bags` : ''}
+                </span>
+              )}
+            </div>
+            {typeof multiCarOrderTotalFare === 'number' && (
+              <span className="text-[11px] font-mono font-extrabold text-violet-900">
+                Convoy Total: ${multiCarOrderTotalFare.toFixed(2)}
+              </span>
+            )}
+          </div>
+
+          {multiCarAssociates.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {multiCarAssociates.map((assoc) => {
+                const isSelf = assoc.tripId === trip.id;
+                return (
+                  <div
+                    key={assoc.tripId}
+                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${
+                      isSelf
+                        ? 'bg-violet-100/80 border-violet-300 font-semibold'
+                        : 'bg-white border-violet-200/80'
+                    }`}
+                  >
+                    <div className="min-w-0 truncate">
+                      <span className="font-black text-violet-700 mr-1.5">
+                        Car {assoc.carIndex}/{multiCarTotal}
+                      </span>
+                      <span className="text-slate-800 font-semibold">
+                        {assoc.driverName || (assoc.driverId ? `Driver ${assoc.driverId.slice(-4)}` : 'Unassigned')}
+                      </span>
+                      {assoc.vehicleUnit && (
+                        <span className="text-slate-500 font-mono text-[10px] ml-1">({assoc.vehicleUnit})</span>
+                      )}
+                      {isSelf && (
+                        <span className="ml-1.5 text-[9px] font-black uppercase text-violet-700">(This Trip)</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                      {assoc.status || 'pending'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

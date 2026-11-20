@@ -628,6 +628,14 @@ function LiveFleetMapComponent({
     }
   };
 
+  const handleFindSelectedVehicle = useCallback(() => {
+    const coords = selectedDriver?.telemetry?.coordinates;
+    if (!coords || !mapInstanceRef.current) return;
+    mapInstanceRef.current.panTo(coords);
+    const currentZoom = mapInstanceRef.current.getZoom?.() || 11;
+    mapInstanceRef.current.setZoom(Math.max(16, currentZoom));
+  }, [selectedDriver]);
+
   const showFallbackRadar = mapsStatus === 'error' || mapsStatus === 'unconfigured';
 
   return (
@@ -995,7 +1003,22 @@ function LiveFleetMapComponent({
           )}
 
           {/* Primary Actions */}
-          <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={!selectedDriver.telemetry?.coordinates}
+              onClick={handleFindSelectedVehicle}
+              className="py-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-[11px] shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1"
+              title={
+                selectedDriver.telemetry?.coordinates
+                  ? `Zoom directly to ${selectedDriver.name}'s vehicle on the map`
+                  : 'Awaiting live GPS fix for this vehicle'
+              }
+            >
+              <MapPinIcon className="w-3.5 h-3.5 text-sky-400" />
+              <span>Find Vehicle</span>
+            </button>
+
             {canAssignSelectedTrip && selectedTrip && (
               <button
                 type="button"

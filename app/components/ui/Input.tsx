@@ -42,7 +42,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
           >
             {label}
-            {required && <span className="text-amber-600 ml-1" title="Required">*</span>}
+            {required && <span className="text-rose-600 ml-1" title="Required">*</span>}
           </label>
         )}
 
@@ -66,7 +66,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             } ${suffixIcon || suffixText ? 'pr-10' : ''} ${
               error
                 ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-200 hover:border-slate-300 focus:border-amber-500 focus:ring-amber-100'
+                : 'border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:ring-blue-500/20'
             } ${className}`}
             {...props}
           />
