@@ -5746,20 +5746,19 @@ function DispatchBookingEngineComponent({
                   <div className="grid grid-cols-2 gap-1.5">
                     <div>
                       <span className="block text-[9px] text-indigo-700 font-semibold mb-0.5">Return Date</span>
-                      <input
-                        type="date"
+                      <ModernDatePicker
+                        size="sm"
                         value={returnDate}
-                        onChange={(e) => setReturnDate(e.target.value)}
-                        className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs"
+                        minDate={scheduledDate || undefined}
+                        onChange={(val) => setReturnDate(val)}
                       />
                     </div>
                     <div>
                       <span className="block text-[9px] text-indigo-700 font-semibold mb-0.5">Return Time</span>
-                      <input
-                        type="time"
+                      <ModernTimePicker
+                        size="sm"
                         value={returnTime}
-                        onChange={(e) => setReturnTime(e.target.value)}
-                        className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs"
+                        onChange={(val) => setReturnTime(val)}
                       />
                     </div>
                   </div>
@@ -6054,11 +6053,11 @@ function DispatchBookingEngineComponent({
                   <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-200/70">
                     <div>
                       <span className="block text-[9px] text-emerald-800 font-semibold mb-0.5">Until Date</span>
-                      <input
-                        type="date"
+                      <ModernDatePicker
+                        size="sm"
                         value={repeatUntilDate}
-                        onChange={(e) => setRepeatUntilDate(e.target.value)}
-                        className="w-full px-2 py-1 bg-white border border-emerald-300 rounded text-xs text-slate-800 font-medium"
+                        minDate={scheduledDate || undefined}
+                        onChange={(val) => setRepeatUntilDate(val)}
                       />
                     </div>
                     <div>

@@ -10,6 +10,7 @@ import {
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
 import type { BrandingConfig } from "./core/types/config";
+import { MapPinIcon, AlertTriangleIcon } from "./components/ui/Icons";
 import "./app.css";
 
 function getAccessibleContrastColor(hexColor?: string): string {
@@ -211,8 +212,8 @@ export function ErrorBoundary({ error }: { error?: unknown }) {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center px-4 py-12 text-center">
       <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
-        <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center text-3xl">
-          {is404 ? '📍' : '⚠️'}
+        <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center">
+          {is404 ? <MapPinIcon className="w-8 h-8" /> : <AlertTriangleIcon className="w-8 h-8 text-amber-400" />}
         </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">

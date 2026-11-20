@@ -1,6 +1,21 @@
 import React from 'react';
+import { useLoaderData } from 'react-router';
 import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { loadPublicSettingsForServer } from './api.public-config';
+import type { AppSettings } from '../core/types/config';
+
+export async function loader() {
+  try {
+    const settings = await Promise.race<Partial<AppSettings> | null>([
+      loadPublicSettingsForServer(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
+    return { initialSettings: settings ?? undefined };
+  } catch {
+    return { initialSettings: undefined };
+  }
+}
 
 export function meta() {
   return [
@@ -14,6 +29,7 @@ export function meta() {
 }
 
 export default function BookRoute() {
+  const { initialSettings } = useLoaderData<typeof loader>();
   const [isConfirmed, setIsConfirmed] = React.useState(false);
 
   return (
@@ -33,7 +49,7 @@ export default function BookRoute() {
 
         {/* Customer Booking Engine */}
         <div className={isConfirmed ? '' : 'mt-4'}>
-          <BookingEngineV2 onConfirmedChange={setIsConfirmed} />
+          <BookingEngineV2 onConfirmedChange={setIsConfirmed} initialSettings={initialSettings} />
         </div>
 
         {/* Live Support Footnote */}

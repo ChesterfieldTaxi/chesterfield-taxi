@@ -26,6 +26,7 @@ import {
 } from '../../core/services/config/admin-config.service';
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  type AppSettings,
   type CustomerBookingConfig,
   type VehicleTierConfig,
   type OversizedBagCategory,
@@ -117,6 +118,7 @@ export interface BookingEngineV2Props {
   onBookingSuccess?: (trip: Trip) => void;
   onConfirmedChange?: (isConfirmed: boolean) => void;
   initialValues?: BookingEngineV2InitialValues;
+  initialSettings?: Partial<AppSettings>;
   editingTripId?: string;
   onCancelEdit?: () => void;
   hideDispatchBanner?: boolean;
@@ -283,6 +285,7 @@ export function BookingEngineV2({
   onBookingSuccess,
   onConfirmedChange,
   initialValues,
+  initialSettings,
   editingTripId,
   onCancelEdit,
   hideDispatchBanner = false,
@@ -290,21 +293,15 @@ export function BookingEngineV2({
 }: BookingEngineV2Props) {
   const location = useLocation();
 
-  // Initialize default date (local timezone today) and time (+45 minutes in future)
-  const todayLocalDate = useMemo(() => formatLocalDate(new Date()), []);
-  const defaultFutureDateTime = useMemo(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 45);
-    const dateStr = formatLocalDate(d);
-    const timeStr = d.toTimeString().slice(0, 5);
-    return { dateStr, timeStr };
-  }, []);
+  // Defer local-timezone default date/time computation to client mount so SSR (UTC)
+  // and browser hydration always match without React Hydration Error #418.
+  const [todayLocalDate, setTodayLocalDate] = useState<string>('');
 
   // Form State
   const [form, setForm] = useState<FormState>({
-    timingType: 'later',
-    scheduledDate: defaultFutureDateTime.dateStr,
-    scheduledTime: defaultFutureDateTime.timeStr,
+    timingType: initialValues?.timingType || 'later',
+    scheduledDate: initialValues?.scheduledDate || '',
+    scheduledTime: initialValues?.scheduledTime || '',
 
     pickupAddress: '',
     dropoffAddress: '',
@@ -352,8 +349,8 @@ export function BookingEngineV2({
     returnPickupAddress: '',
     returnDropoffAddress: '',
     returnIntermediateStops: [],
-    returnDate: defaultFutureDateTime.dateStr,
-    returnTime: defaultFutureDateTime.timeStr,
+    returnDate: '',
+    returnTime: '',
     returnPassengers: 1,
     returnBags: 1,
     returnCarSeats: false,
@@ -537,8 +534,37 @@ export function BookingEngineV2({
     }));
   }, [initialValues, editingTripId]);
 
+  // Populate client-local default date & time (+45 min rounded up to next 5-min step) after hydration
+  useEffect(() => {
+    const now = new Date();
+    const todayStr = formatLocalDate(now);
+    setTodayLocalDate(todayStr);
+
+    const future = new Date(now.getTime() + 45 * 60 * 1000);
+    const rem = future.getMinutes() % 5;
+    if (rem !== 0) {
+      future.setMinutes(future.getMinutes() + (5 - rem), 0, 0);
+    } else {
+      future.setSeconds(0, 0);
+    }
+    const defaultDate = formatLocalDate(future);
+    const defaultTime = `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`;
+
+    setForm((prev) => ({
+      ...prev,
+      scheduledDate: prev.scheduledDate || defaultDate,
+      scheduledTime: prev.scheduledTime || defaultTime,
+      returnDate: prev.returnDate || defaultDate,
+      returnTime: prev.returnTime || defaultTime,
+    }));
+  }, []);
+
   // Customer Booking Form Config and Active Vehicle Classes from Admin Settings
+  // Prefer SSR-loaded `initialSettings` when available so first paint & hydration match identically.
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
+    if (initialSettings?.customerBookingConfig) {
+      return { ...DEFAULT_CUSTOMER_BOOKING_CONFIG, ...initialSettings.customerBookingConfig };
+    }
     return (
       getAdminConfigService().getCachedSettings().customerBookingConfig ||
       DEFAULT_CUSTOMER_BOOKING_CONFIG
@@ -546,10 +572,16 @@ export function BookingEngineV2({
   });
 
   const [companyConfig, setCompanyConfig] = useState(() => {
+    if (initialSettings?.company) {
+      return initialSettings.company;
+    }
     return getAdminConfigService().getCachedSettings().company;
   });
 
   const [vehicleTiers, setVehicleTiers] = useState<VehicleTierConfig[]>(() => {
+    if (initialSettings?.vehicles && initialSettings.vehicles.length > 0) {
+      return initialSettings.vehicles.filter((v) => !v.isArchived);
+    }
     const cached = getAdminConfigService().getCachedSettings();
     if (cached.vehicles && cached.vehicles.length > 0) {
       return cached.vehicles.filter((v) => !v.isArchived);
@@ -2782,21 +2814,17 @@ export function BookingEngineV2({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
                           <label htmlFor="returnDate" className="block text-[11px] text-indigo-900 font-semibold mb-1">
                             Return Date
                           </label>
-                          <input
+                          <ModernDatePicker
                             id="returnDate"
-                            name="returnDate"
-                            type="date"
                             value={form.returnDate}
-                            min={form.scheduledDate || todayLocalDate}
-                            onChange={(e) => setForm((prev) => ({ ...prev, returnDate: e.target.value }))}
-                            className={`w-full px-3 py-2.5 bg-white border ${
-                              errors.returnDate ? 'border-red-400' : 'border-indigo-200'
-                            } rounded-xl text-base sm:text-sm text-slate-900`}
+                            minDate={form.scheduledDate || todayLocalDate || undefined}
+                            error={Boolean(errors.returnDate)}
+                            onChange={(val) => setForm((prev) => ({ ...prev, returnDate: val }))}
                           />
                           {errors.returnDate && (
                             <p className="text-xs text-red-600 font-semibold mt-1">{errors.returnDate}</p>
@@ -2806,15 +2834,11 @@ export function BookingEngineV2({
                           <label htmlFor="returnTime" className="block text-[11px] text-indigo-900 font-semibold mb-1">
                             Return Time
                           </label>
-                          <input
+                          <ModernTimePicker
                             id="returnTime"
-                            name="returnTime"
-                            type="time"
                             value={form.returnTime}
-                            onChange={(e) => setForm((prev) => ({ ...prev, returnTime: e.target.value }))}
-                            className={`w-full px-3 py-2.5 bg-white border ${
-                              errors.returnTime ? 'border-red-400' : 'border-indigo-200'
-                            } rounded-xl text-base sm:text-sm text-slate-900`}
+                            error={Boolean(errors.returnTime)}
+                            onChange={(val) => setForm((prev) => ({ ...prev, returnTime: val }))}
                           />
                           {errors.returnTime && (
                             <p className="text-xs text-red-600 font-semibold mt-1">{errors.returnTime}</p>
@@ -4214,7 +4238,9 @@ export function BookingEngineV2({
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Pickup Time</span>
                     <span className="font-semibold text-slate-800">
                       {form.timingType === 'later'
-                        ? `${form.scheduledDate} at ${formatTime12h(form.scheduledTime)}`
+                        ? form.scheduledDate && form.scheduledTime
+                          ? `${form.scheduledDate} at ${formatTime12h(form.scheduledTime)}`
+                          : 'Select pickup date & time'
                         : 'Immediate On-Demand (ASAP)'}
                     </span>
                   </div>

@@ -279,7 +279,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Comfortable full-size sedan for daily local commutes, errands, and regional trips.',
       badge: 'Popular',
       iconType: 'standard',
-      imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'premium',
@@ -290,7 +289,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Luxury sedan offering executive comfort, quiet cabin, and refreshments for VIP travel.',
       badge: 'Executive',
       iconType: 'premium',
-      imageUrl: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'xl',
@@ -301,7 +299,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       description: 'Spacious high-capacity vehicle designed for families, airport transfers, and group outings.',
       badge: 'Family',
       iconType: 'xl',
-      imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
     },
   ],
   fleet: [

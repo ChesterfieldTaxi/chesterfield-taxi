@@ -481,8 +481,12 @@ export function AdminVehiclesTab({
 
                 <CardHeader className="p-4 pb-2 border-b border-slate-100 flex flex-row items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
-                      {v.iconType === 'xl' ? '🚙' : v.iconType === 'wheelchair' ? '♿' : v.iconType === 'premium' ? '✨' : '🚗'}
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      {v.iconType === 'premium' ? (
+                        <SparklesIcon className="w-5 h-5" />
+                      ) : (
+                        <CarIcon className="w-5 h-5" />
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">

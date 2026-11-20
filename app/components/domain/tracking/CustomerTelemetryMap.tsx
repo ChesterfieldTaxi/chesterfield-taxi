@@ -6,7 +6,7 @@ import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import { buildFleetCarMarkerDataUrl } from '../dispatch/LiveFleetMap';
-import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon, ClockIcon } from '../../ui/Icons';
+import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon, ClockIcon, PhoneIcon, ChatBubbleLeftRightIcon } from '../../ui/Icons';
 
 export interface CustomerTelemetryMapProps {
   trip?: Trip | null;
@@ -619,14 +619,14 @@ export function CustomerTelemetryMap({
                     : 'Call your chauffeur via masked relay'
                 }
               >
-                <span>📞</span>
+                <PhoneIcon className="w-3.5 h-3.5 text-blue-400" />
                 <span>{isDispatchNumber ? 'Call Dispatch Bridge' : 'Call Chauffeur'}</span>
               </a>
               <a
                 href={`sms:${normalized.proxyPhone}?body=${encodeURIComponent(`Trip #${normalized.tripId}: `)}`}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
               >
-                <span>💬</span>
+                <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-blue-400" />
                 <span>Text</span>
               </a>
             </div>

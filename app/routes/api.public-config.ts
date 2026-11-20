@@ -2,25 +2,15 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestoreDb, getFirebaseAuth, isFirebaseConfigured } from '../core/services/firebase';
 import { DEFAULT_APP_SETTINGS, sanitizePublicSettings } from '../core/services/config/admin-config.service';
+import type { AppSettings } from '../core/types/config';
 
 /**
- * Public Configuration Resource Route (/api/public-config)
- *
- * Returns strictly sanitized public-facing configuration (company profile,
- * vehicles, branding, pricing, tariffs, website/CMS, booking rules).
- * NEVER includes corporateAccounts (PO codes), invoices, or configAuditTrail.
+ * Shared server-side loader helper that fetches the sanitized public-facing
+ * configuration (`config/publicSettings`) from Firestore with safe fallback.
  */
-export async function loader() {
+export async function loadPublicSettingsForServer(): Promise<Partial<AppSettings>> {
   if (!isFirebaseConfigured()) {
-    return Response.json(
-      {
-        success: true,
-        settings: sanitizePublicSettings(DEFAULT_APP_SETTINGS),
-      },
-      {
-        headers: { 'Cache-Control': 'no-store, max-age=0' },
-      }
-    );
+    return sanitizePublicSettings(DEFAULT_APP_SETTINGS);
   }
 
   const db = getFirestoreDb();
@@ -29,15 +19,7 @@ export async function loader() {
   try {
     const publicSnap = await getDoc(doc(db, 'config', 'publicSettings'));
     if (publicSnap.exists()) {
-      return Response.json(
-        {
-          success: true,
-          settings: sanitizePublicSettings(publicSnap.data()),
-        },
-        {
-          headers: { 'Cache-Control': 'no-store, max-age=0' },
-        }
-      );
+      return sanitizePublicSettings(publicSnap.data());
     }
   } catch (err) {
     console.warn('[/api/public-config] Could not read config/publicSettings:', err);
@@ -48,15 +30,7 @@ export async function loader() {
   try {
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      return Response.json(
-        {
-          success: true,
-          settings: sanitizePublicSettings(snap.data()),
-        },
-        {
-          headers: { 'Cache-Control': 'no-store, max-age=0' },
-        }
-      );
+      return sanitizePublicSettings(snap.data());
     }
   } catch (err: any) {
     if (
@@ -73,15 +47,7 @@ export async function loader() {
         );
         const authSnap = await getDoc(docRef);
         if (authSnap.exists()) {
-          return Response.json(
-            {
-              success: true,
-              settings: sanitizePublicSettings(authSnap.data()),
-            },
-            {
-              headers: { 'Cache-Control': 'no-store, max-age=0' },
-            }
-          );
+          return sanitizePublicSettings(authSnap.data());
         }
       } catch (authErr) {
         console.warn('[/api/public-config] Server-side fallback read failed:', authErr);
@@ -89,10 +55,22 @@ export async function loader() {
     }
   }
 
+  return sanitizePublicSettings(DEFAULT_APP_SETTINGS);
+}
+
+/**
+ * Public Configuration Resource Route (/api/public-config)
+ *
+ * Returns strictly sanitized public-facing configuration (company profile,
+ * vehicles, branding, pricing, tariffs, website/CMS, booking rules).
+ * NEVER includes corporateAccounts (PO codes), invoices, or configAuditTrail.
+ */
+export async function loader() {
+  const settings = await loadPublicSettingsForServer();
   return Response.json(
     {
       success: true,
-      settings: sanitizePublicSettings(DEFAULT_APP_SETTINGS),
+      settings,
     },
     {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
