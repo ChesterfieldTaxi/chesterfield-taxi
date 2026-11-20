@@ -66,8 +66,8 @@ export function FleetAlertCard({
         {m.text}
       </p>
 
-      {/* Hover Action Overlay */}
-      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/95 backdrop-blur-xs px-1 py-0.5 rounded-lg shadow-md border border-slate-200 z-10">
+      {/* Action Toolbar (always accessible on touch/keyboard; hover-revealed on desktop) */}
+      <div className="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-end gap-1 sm:mt-0 sm:pt-0 sm:border-0 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity sm:bg-white/95 sm:backdrop-blur-xs sm:px-1 sm:py-0.5 sm:rounded-lg sm:shadow-md sm:border sm:border-slate-200 z-10">
         {/* Pin / Unpin Button */}
         <button
           type="button"

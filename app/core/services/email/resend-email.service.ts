@@ -191,12 +191,12 @@ export class ResendEmailService implements IEmailDispatchService {
       });
 
       if (response.error) {
-        console.error('[ResendEmailService] Resend API error response:', response.error);
-        let errorMsg = response.error.message;
-        if (response.error.name === 'validation_error' && errorMsg.includes('not verified')) {
-          errorMsg = `Resend Domain Not Verified: ${errorMsg}. Please verify your domain in resend.com/domains by adding DNS records.`;
-        } else if (response.error.name === 'validation_error' && errorMsg.includes('testing emails')) {
-          errorMsg = `Resend Sandbox Restriction: ${errorMsg}`;
+        console.error('[ResendEmailService] Email gateway error:', response.error);
+        let errorMsg = 'Unable to deliver email right now. Please verify sender domain configuration or try again.';
+        if (response.error.name === 'validation_error' && response.error.message?.includes('not verified')) {
+          errorMsg = 'Email sender domain is not verified yet. Please contact your system administrator.';
+        } else if (response.error.name === 'validation_error' && response.error.message?.includes('testing emails')) {
+          errorMsg = 'Email delivery is currently restricted to verified test recipients until domain verification is completed.';
         }
         return {
           success: false,

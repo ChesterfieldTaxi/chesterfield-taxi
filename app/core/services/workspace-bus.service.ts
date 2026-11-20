@@ -113,8 +113,9 @@ export interface WorkspaceEventMap {
   };
   DRIVER_STATUS_UPDATE: {
     driverId: string;
-    cabNumber: string;
-    status: 'available' | 'en_route' | 'in_progress' | 'busy' | 'offline';
+    cabNumber?: string;
+    status: 'available' | 'en_route' | 'arrived' | 'in_progress' | 'busy' | 'break' | 'offline';
+    dutyStatus?: 'on_duty' | 'on_break' | 'off_duty';
   };
   WINDOW_REGISTER: {
     moduleKey: WorkspaceModuleKey;
@@ -124,8 +125,9 @@ export interface WorkspaceEventMap {
     moduleKey: WorkspaceModuleKey;
   };
   DRIVER_TELEMETRY_PING: {
-    tripId: string;
+    tripId?: string;
     driverId?: string;
+    dutyStatus?: 'on_duty' | 'on_break' | 'off_duty';
     coordinates: { lat: number; lng: number };
     speedMph?: number;
     heading?: number;

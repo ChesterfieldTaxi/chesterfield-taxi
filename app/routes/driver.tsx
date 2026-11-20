@@ -254,11 +254,17 @@ export default function DriverAppRoute() {
 
   const activeTrip = assignedTrips.find((t) => t.id === activeTripId) || scheduledTrips[0] || assignedTrips[0] || null;
 
-  // Phase 31.5: Adaptive Driver Geolocation Telemetry Engine
+  // Phase 31.5+: Continuous Shift & Trip Geolocation Telemetry Engine
   const telemetry = useDriverTelemetry({
     trip: activeTrip,
     driverId: driver?.id,
-    isEnabled: Boolean(driver && activeTrip),
+    dutyStatus: driver?.dutyStatus,
+    isEnabled: Boolean(
+      driver &&
+        (driver.dutyStatus === 'on_duty' ||
+          driver.dutyStatus === 'on_break' ||
+          (activeTrip && ['en_route', 'arrived', 'in_progress'].includes(activeTrip.status)))
+    ),
   });
 
   // Handle Taximeter ticker when trip is in_progress
@@ -810,7 +816,11 @@ export default function DriverAppRoute() {
               <span className={`relative inline-flex rounded-full h-2 w-2 ${telemetry.isOffline ? 'bg-amber-500' : 'bg-emerald-500'}`} />
             </span>
             <span className="font-semibold text-slate-200">
-              {telemetry.isOffline ? 'Offline GPS Buffer' : 'GPS Telemetry Active'}
+              {telemetry.isOffline
+                ? 'Offline GPS Buffer'
+                : driver?.dutyStatus === 'on_break'
+                ? 'Fleet GPS Active (On Break)'
+                : 'Fleet GPS Telemetry Live'}
             </span>
             <span className="text-slate-400 font-mono">
               {telemetry.currentTelemetry?.speedMph ? `${telemetry.currentTelemetry.speedMph} mph` : '0 mph'}

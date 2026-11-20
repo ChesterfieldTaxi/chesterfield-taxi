@@ -58,7 +58,11 @@ export interface QuoteRequest {
   waiveMultiStopFees?: boolean;
   waiveAirportFee?: boolean;
   manualDiscount?: number;
+  manualDiscountPercent?: number;
+  manualDiscountLabel?: string;
   manualFareOverride?: number;
+  selectedRuleId?: string;
+  accountType?: 'retail' | 'corporate' | 'vip';
   isAirportPickup?: boolean;
   isAirportDropoff?: boolean;
   isAirportTrip?: boolean;

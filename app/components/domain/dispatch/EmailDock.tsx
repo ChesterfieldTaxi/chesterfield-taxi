@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
+import { escapeHtml } from '../../../core/services/email/email-templates';
 import {
   MailIcon,
   SearchIcon,
@@ -204,71 +206,129 @@ export function EmailDock({
       showToast('No structured booking info in this email');
       return;
     }
-    if (onPopulateBooking) {
-      const passengerEmail = email.suggestedBooking.passengerEmail || email.fromEmail;
-      const notes = email.suggestedBooking.notes || `Extracted from email: ${email.subject}`;
-      onPopulateBooking({
-        passenger: {
-          name: email.suggestedBooking.passengerName,
-          fullName: email.suggestedBooking.passengerName,
-          phone: email.suggestedBooking.passengerPhone,
-          email: passengerEmail,
-        },
-        passengerName: email.suggestedBooking.passengerName,
+    const passengerEmail = email.suggestedBooking.passengerEmail || email.fromEmail;
+    const notes = email.suggestedBooking.notes || `Extracted from email: ${email.subject}`;
+    const payload = {
+      passenger: {
+        name: email.suggestedBooking.passengerName,
+        fullName: email.suggestedBooking.passengerName,
         phone: email.suggestedBooking.passengerPhone,
         email: passengerEmail,
-        pickupAddress: email.suggestedBooking.pickupLocation,
-        dropoffAddress: email.suggestedBooking.dropoffLocation,
-        pickupLocation: { address: email.suggestedBooking.pickupLocation },
-        dropoffLocation: { address: email.suggestedBooking.dropoffLocation },
-        pickup: email.suggestedBooking.pickupLocation,
-        dropoff: email.suggestedBooking.dropoffLocation,
-        notes,
+      },
+      passengerName: email.suggestedBooking.passengerName,
+      passengerPhone: email.suggestedBooking.passengerPhone,
+      phone: email.suggestedBooking.passengerPhone,
+      passengerEmail,
+      email: passengerEmail,
+      pickupAddress: email.suggestedBooking.pickupLocation,
+      dropoffAddress: email.suggestedBooking.dropoffLocation,
+      pickupLocation: { address: email.suggestedBooking.pickupLocation },
+      dropoffLocation: { address: email.suggestedBooking.dropoffLocation },
+      pickup: email.suggestedBooking.pickupLocation,
+      dropoff: email.suggestedBooking.dropoffLocation,
+      notes,
+    };
+    // Publish directly on WorkspaceBus so BOTH docked and popped-out booking drafts hydrate immediately
+    getWorkspaceBus().publish('POPULATE_BOOKING', payload);
+    if (onPopulateBooking && !isPopout) {
+      onPopulateBooking(payload);
+    }
+    showToast('Populated booking draft in Dispatch Console!');
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim() || !selectedEmail) return;
+    const subject = selectedEmail.subject.startsWith('Re:')
+      ? selectedEmail.subject
+      : `Re: ${selectedEmail.subject}`;
+    const safeBody = escapeHtml(replyText).replace(/\n/g, '<br/>');
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'direct',
+          recipient: selectedEmail.fromEmail,
+          subject,
+          text: replyText,
+          html: `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`,
+        }),
       });
-      showToast('Populated booking draft in Dispatch Console!');
+      const result = await res.json().catch(() => ({ success: false, error: 'Email dispatch failed' }));
+      if (!res.ok || !result?.success) {
+        showToast(result?.error || 'Failed to send reply — check email service configuration.');
+        return;
+      }
+      const newSentEmail: EmailMessage = {
+        id: `sent-${Date.now()}`,
+        fromName: 'Chesterfield Dispatch',
+        fromEmail: 'dispatch@chesterfieldtaxi.com',
+        toEmail: selectedEmail.fromEmail,
+        subject,
+        timestamp: 'Just now',
+        folder: 'sent',
+        isUnread: false,
+        body: replyText,
+      };
+      setEmails((prev) => [newSentEmail, ...prev]);
+      setReplyText('');
+      showToast(
+        result.simulated
+          ? `Reply logged (email gateway in local simulation mode)`
+          : `Reply delivered to ${selectedEmail.fromEmail}!`
+      );
+    } catch {
+      showToast('Network error sending email reply.');
     }
   };
 
-  const handleSendReply = () => {
-    if (!replyText.trim() || !selectedEmail) return;
-    const newSentEmail: EmailMessage = {
-      id: `sent-${Date.now()}`,
-      fromName: 'Chesterfield Dispatch',
-      fromEmail: 'dispatch@chesterfieldtaxi.com',
-      toEmail: selectedEmail.fromEmail,
-      subject: `Re: ${selectedEmail.subject}`,
-      timestamp: 'Just now',
-      folder: 'sent',
-      isUnread: false,
-      body: replyText,
-    };
-    setEmails((prev) => [newSentEmail, ...prev]);
-    setReplyText('');
-    showToast(`Reply sent to ${selectedEmail.fromEmail}!`);
-  };
-
-  const handleSendCompose = () => {
+  const handleSendCompose = async () => {
     if (!composeTo.trim() || !composeSubject.trim()) {
       showToast('Please specify recipient and subject');
       return;
     }
-    const newSentEmail: EmailMessage = {
-      id: `sent-${Date.now()}`,
-      fromName: 'Chesterfield Dispatch',
-      fromEmail: 'dispatch@chesterfieldtaxi.com',
-      toEmail: composeTo,
-      subject: composeSubject,
-      timestamp: 'Just now',
-      folder: 'sent',
-      isUnread: false,
-      body: composeBody,
-    };
-    setEmails((prev) => [newSentEmail, ...prev]);
-    setIsComposing(false);
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeBody('');
-    showToast(`Email sent to ${composeTo}!`);
+    const safeBody = escapeHtml(composeBody).replace(/\n/g, '<br/>');
+    try {
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'direct',
+          recipient: composeTo.trim(),
+          subject: composeSubject.trim(),
+          text: composeBody,
+          html: `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`,
+        }),
+      });
+      const result = await res.json().catch(() => ({ success: false, error: 'Email dispatch failed' }));
+      if (!res.ok || !result?.success) {
+        showToast(result?.error || 'Failed to send email — check email service configuration.');
+        return;
+      }
+      const newSentEmail: EmailMessage = {
+        id: `sent-${Date.now()}`,
+        fromName: 'Chesterfield Dispatch',
+        fromEmail: 'dispatch@chesterfieldtaxi.com',
+        toEmail: composeTo.trim(),
+        subject: composeSubject.trim(),
+        timestamp: 'Just now',
+        folder: 'sent',
+        isUnread: false,
+        body: composeBody,
+      };
+      setEmails((prev) => [newSentEmail, ...prev]);
+      setIsComposing(false);
+      setComposeTo('');
+      setComposeSubject('');
+      setComposeBody('');
+      showToast(
+        result.simulated
+          ? `Email logged (email gateway in local simulation mode)`
+          : `Email delivered to ${newSentEmail.toEmail}!`
+      );
+    } catch {
+      showToast('Network error sending email.');
+    }
   };
 
   const filteredEmails = emails.filter((item) => {

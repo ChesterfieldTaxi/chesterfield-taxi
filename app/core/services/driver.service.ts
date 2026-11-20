@@ -6,13 +6,14 @@
  * and live meter extra fee attachments.
  */
 
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseConfigured } from './firebase';
 import { sanitizePayload } from './firestore-sanitizer';
 import type { DriverProfile, DriverDutyStatus, DriverMeterExtra, DriverScheduleConfig, DayOfWeek } from '../types/driver';
-import type { Trip, TripStatus } from '../types/trip';
+import type { DriverTelemetryPing, Trip, TripStatus } from '../types/trip';
 import { getBookingService } from './booking';
 import { getOperatorService } from './operator.service';
+import { getWorkspaceBus } from './workspace-bus.service';
 
 const DRIVERS_STORAGE_KEY = 'chesterfield_active_driver_profile';
 
@@ -242,6 +243,14 @@ export class DriverService {
     }
 
     this.notifyDriverListeners(updated);
+    try {
+      getWorkspaceBus().publish('DRIVER_STATUS_UPDATE', {
+        driverId: id,
+        cabNumber: updated.cabNumber || updated.vehicleUnit,
+        status: status === 'on_break' ? 'break' : status === 'off_duty' ? 'offline' : 'available',
+        dutyStatus: status,
+      });
+    } catch {}
     return updated;
   }
 
@@ -493,6 +502,98 @@ export class DriverService {
     }
 
     return trip;
+  }
+
+  /**
+   * Persist a live GPS telemetry fix to `drivers/{driverId}` so Dispatch can track
+   * Available, En Route, Arrived/In Progress, and On-Break drivers continuously.
+   */
+  public async updateDriverLocation(
+    driverId: string,
+    ping: DriverTelemetryPing
+  ): Promise<void> {
+    if (!driverId || !ping?.coordinates) return;
+
+    const payload = {
+      id: driverId,
+      currentLocation: ping,
+      locationUpdatedAt: ping.timestamp || new Date().toISOString(),
+      lastActiveAt: ping.timestamp || new Date().toISOString(),
+    };
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const ref = doc(db, 'drivers', driverId);
+        await setDoc(ref, sanitizePayload(payload), { merge: true });
+      } catch (e) {
+        console.warn('[DriverService] Failed to write driver GPS telemetry to Firestore:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const key = DRIVERS_STORAGE_KEY + '_' + driverId;
+        const raw = localStorage.getItem(key);
+        const existing = raw ? JSON.parse(raw) : { id: driverId };
+        localStorage.setItem(key, JSON.stringify({ ...existing, ...payload }));
+      } catch {}
+    }
+  }
+
+  /**
+   * Real-time subscription to ALL driver operational profiles (`drivers` collection),
+   * delivering live `dutyStatus` (`on_duty | on_break | off_duty`) and `currentLocation`.
+   */
+  public subscribeToAllDrivers(
+    callback: (profiles: Record<string, DriverProfile>) => void
+  ): () => void {
+    const readLocalMap = (): Record<string, DriverProfile> => {
+      const map: Record<string, DriverProfile> = {};
+      if (typeof window === 'undefined') return map;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(DRIVERS_STORAGE_KEY + '_')) {
+            const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+            if (parsed?.id) map[parsed.id] = parsed;
+          }
+        }
+      } catch {}
+      return map;
+    };
+
+    // Emit initial local cache immediately for instant render
+    callback(readLocalMap());
+
+    if (!isFirebaseConfigured()) {
+      return () => {};
+    }
+
+    try {
+      const db = getFirestoreDb();
+      const unsub = onSnapshot(
+        collection(db, 'drivers'),
+        (snapshot) => {
+          const profiles: Record<string, DriverProfile> = {};
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Partial<DriverProfile>;
+            profiles[docSnap.id] = {
+              ...(data as DriverProfile),
+              id: docSnap.id,
+            };
+          });
+          callback(profiles);
+        },
+        (err) => {
+          console.warn('[DriverService] subscribeToAllDrivers snapshot error:', err);
+        }
+      );
+      return unsub;
+    } catch (e) {
+      console.warn('[DriverService] Failed to subscribe to drivers collection:', e);
+      return () => {};
+    }
   }
 }
 

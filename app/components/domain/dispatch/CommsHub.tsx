@@ -105,6 +105,7 @@ interface CommsHubProps {
   initialTab?: CommsTab;
   onTabChange?: (tab: CommsTab) => void;
   isPopout?: boolean;
+  isVisible?: boolean;
   showWindowControls?: boolean;
   onClose?: () => void;
   onPopOut?: () => void;
@@ -430,6 +431,7 @@ export function CommsHub({
   initialTab = 'all',
   onTabChange,
   isPopout = false,
+  isVisible = true,
   showWindowControls = false,
   onClose,
   onPopOut,
@@ -1154,17 +1156,17 @@ export function CommsHub({
     }
   }, [activeTab, callsSubTab]);
 
-  // Physical keyboard dialing response (0-9, *, #, +, Backspace, Enter)
+  // Physical keyboard dialing response (ONLY active when CommsHub is actually visible!)
   useEffect(() => {
-    if (activeTab !== 'phone') return;
+    if (!isVisible || activeTab !== 'phone') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      // If typing in another text input, textarea, or contenteditable, don't intercept
+      // If typing in another text input, textarea, select, or contenteditable, don't intercept
       if (target && target.tagName === 'INPUT' && target !== dialpadInputRef.current) {
         return;
       }
-      if (target && (target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
         return;
       }
 
@@ -1192,7 +1194,7 @@ export function CommsHub({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, dialpadNumber]);
+  }, [isVisible, activeTab, dialpadNumber]);
 
   // Listen for bus incoming call events
   useEffect(() => {
@@ -1556,7 +1558,7 @@ export function CommsHub({
           time: t.scheduledPickupTime ? new Date(t.scheduledPickupTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ASAP',
           pickupAddress: t.pickupLocation?.address || 'Pickup Point',
           dropoffAddress: t.dropoffLocation?.address || 'Destination',
-          fare: t.pricing?.totalFare || 45,
+          fare: t.pricing?.totalFare ?? 0,
         });
       }
     });
@@ -1574,7 +1576,7 @@ export function CommsHub({
           time: t.scheduledPickupTime ? new Date(t.scheduledPickupTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ASAP',
           pickupAddress: t.pickupLocation?.address || 'Pickup Point',
           dropoffAddress: t.dropoffLocation?.address || 'Destination',
-          fare: t.pricing?.totalFare || 45,
+          fare: t.pricing?.totalFare ?? 0,
         });
       }
     });
@@ -2012,22 +2014,28 @@ export function CommsHub({
       const twilioToken = creds.authToken;
       const twilioPhone = creds.phoneNumber || '+13142281454';
 
-      await fetch('/api/telephony', {
+      const res = await fetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'send_sms',
           to: sanitizeToE164(targetPhone),
-          body: 'Book your Chesterfield Taxi ride online anytime: https://chesterfieldtaxi.com/app',
+          body: 'Book your Chesterfield Taxi ride online anytime: https://chesterfieldtaxi.com/book',
           credentials: { accountSid: twilioSid, authToken: twilioToken, phoneNumber: sanitizeToE164(twilioPhone) },
         }),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.error) {
+        setBookingToast(data?.error || 'Failed to send booking link');
+        setTimeout(() => setBookingToast(null), 3500);
+        return;
+      }
 
-      setBookingToast('Link sent');
+      setBookingToast('Booking link sent!');
       setTimeout(() => setBookingToast(null), 2500);
     } catch {
-      setBookingToast('Link sent');
-      setTimeout(() => setBookingToast(null), 2500);
+      setBookingToast('Failed to send SMS link');
+      setTimeout(() => setBookingToast(null), 3500);
     }
   };
 
@@ -3923,36 +3931,13 @@ export function CommsHub({
                     </div>
                   )}
 
-                  {/* Diagnostics & Simulation */}
+                  {/* Inbound Call Status Footer (No fake production simulator) */}
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 font-medium">Inbound Call HUD:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        getWorkspaceBus().publish('CALL_INCOMING', {
-                          callSid: `CA_${Date.now()}`,
-                          callerNumber: '(314) 532-1200',
-                          callerName: 'Sarah Jenkins',
-                          numberType: 'home',
-                          mobileForSms: '(314) 532-1200',
-                          upcomingBookings: [
-                            {
-                              id: 'bk-994',
-                              time: 'Tomorrow 6:00 AM',
-                              pickupAddress: '14848 Conway Rd, Chesterfield, MO',
-                              dropoffAddress: 'Lambert Airport Terminal 1 (STL)',
-                              fare: 68.5,
-                            },
-                          ],
-                          vipTag: 'VIP Executive',
-                        });
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer flex items-center gap-1 shadow-2xs"
-                      title="Simulate incoming call to test screen-pop HUD and ring audio"
-                    >
+                    <span className="text-[10px] text-slate-400 font-medium">Inbound Call HUD: Active</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Simulate Inbound</span>
-                    </button>
+                      <span>Listening</span>
+                    </span>
                   </div>
                 </div>
               </div>

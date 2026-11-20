@@ -164,15 +164,9 @@ export async function loader() {
 
   return Response.json({
     status: 'healthy',
-    gateway: 'Chesterfield Taxi Resend Email Dispatch Gateway',
+    service: 'Chesterfield Taxi Email Dispatch Service',
+    configured: Boolean(apiKey),
+    customDomainConfigured: Boolean(fromEmail && !fromEmail.includes('onboarding@resend.dev')),
     timestamp: new Date().toISOString(),
-    environment: {
-      hasResendApiKey: Boolean(apiKey),
-      configuredFromEmail: fromEmail || 'Chesterfield Taxi <onboarding@resend.dev> (Sandbox Default)',
-      configuredAdminAlert: adminEmail || 'dispatch@chesterfieldtaxi.com (Default)',
-    },
-    resendDomainNotice: !fromEmail || fromEmail.includes('onboarding@resend.dev')
-      ? 'Resend sandbox active: Only emails to the registered account owner (admin@chesterfieldtaxi.com) will deliver until a domain is verified at resend.com/domains.'
-      : 'Custom domain sender configured. Ensure your domain DNS records (DKIM, SPF) are verified at resend.com/domains.',
   });
 }

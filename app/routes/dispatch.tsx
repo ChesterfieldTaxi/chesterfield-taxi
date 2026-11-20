@@ -61,6 +61,15 @@ import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
+import { LiveFleetMap } from '../components/domain/dispatch/LiveFleetMap';
+import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
+import {
+  useDispatchFleet,
+  FLEET_STATUS_COLORS,
+  getMapStatusLabel,
+  type LiveFleetDriver,
+} from '../core/hooks/useDispatchFleet';
+import { formatLocalDateStr } from '../core/services/pricing/vehicle-matching';
 import { FloatingWindow } from '../components/ui/FloatingWindow';
 
 export type { DriverRosterItem };
@@ -544,41 +553,42 @@ export default function DispatchRoute() {
     }
   }, []);
 
-  // Drivers Data State
-  const [drivers, setDrivers] = useState<DriverRosterItem[]>(INITIAL_DRIVERS);
-  const [driverFilter, setDriverFilter] = useState<'all' | 'available' | 'on_trip' | 'offline'>('all');
+  // Live Unified Fleet State (OperatorService + Firestore `drivers` dutyStatus/GPS + Trips + WorkspaceBus)
+  const { fleet: drivers, setDriverDutyStatus } = useDispatchFleet(trips);
+  const [driverFilter, setDriverFilter] = useState<'all' | 'available' | 'en_route' | 'busy' | 'break' | 'offline'>('all');
   const [driverSearch, setDriverSearch] = useState('');
+  const [focusedMapDriverId, setFocusedMapDriverId] = useState<string | null>(null);
+  const [dispatchToast, setDispatchToast] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [isBatchAssignOpen, setIsBatchAssignOpen] = useState(false);
+  const [batchAssignDriverId, setBatchAssignDriverId] = useState<string>('');
 
-  // Real-time synchronization of driver operators with active trips
+  const showDispatchToast = useCallback(
+    (text: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setDispatchToast({ type, text });
+    },
+    []
+  );
+
   useEffect(() => {
-    const unsub = getOperatorService().subscribeToDrivers((roster) => {
-      setDrivers(
-        roster.map((drv) => {
-          const activeTrip = trips.find(
-            (t) =>
-              t.assignedDriverId === drv.id &&
-              ['assigned', 'en_route', 'arrived', 'in_progress'].includes(t.status)
-          );
-          if (activeTrip) {
-            return {
-              ...drv,
-              status: 'on_trip',
-              currentTripId: activeTrip.id,
-            };
-          }
-          if (drv.zone === 'Suspended' || drv.status === 'offline') {
-            return drv;
-          }
-          return {
-            ...drv,
-            status: drv.status === 'on_trip' ? 'available' : drv.status,
-            currentTripId: undefined,
-          };
-        })
-      );
-    });
-    return () => unsub();
-  }, [trips]);
+    if (!dispatchToast) return;
+    const t = setTimeout(() => setDispatchToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [dispatchToast]);
+
+  const getDriverDropdownDot = (d: LiveFleetDriver) => {
+    switch (d.mapStatus) {
+      case 'available':
+        return '🟢';
+      case 'en_route':
+        return '🔵';
+      case 'busy':
+        return '🔴';
+      case 'break':
+        return '🟡';
+      default:
+        return '⚫';
+    }
+  };
 
   // Admin-configurable alert auto-dismiss duration (default: 60 minutes = 1 hour)
   const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(() => {
@@ -880,19 +890,18 @@ export default function DispatchRoute() {
     }
   }, [operationsWidth]);
 
-  // Dispatcher Hotkeys: M (Main), C (Comms), D (Drivers), A (Alerts), Escape (Close dock/drawers)
+  // Dispatcher Hotkeys: M (Main), Alt+P/P/C (Comms), Alt+E/E (Email), Alt+D/D (Drivers), A (Alerts), Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (
+      const isEditableTarget = Boolean(
         target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable ||
-          target.getAttribute('role') === 'textbox')
-      ) {
-        return;
-      }
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable ||
+            target.getAttribute('role') === 'textbox')
+      );
 
       if (e.metaKey || e.ctrlKey) {
         if (e.key.toLowerCase() === 'k') {
@@ -902,7 +911,28 @@ export default function DispatchRoute() {
         }
         return;
       }
-      if (e.altKey) return;
+
+      // Support advertised Alt+P / Alt+E / Alt+D / Alt+A shortcuts anywhere (except inside Alt+S booking swap)
+      if (e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'p' || key === 'c') {
+          e.preventDefault();
+          setCommsInitialTab('phone');
+          setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
+        } else if (key === 'e') {
+          e.preventDefault();
+          setActiveDockTab((prev) => (prev === 'email' ? 'none' : 'email'));
+        } else if (key === 'd') {
+          e.preventDefault();
+          setActiveDockTab((prev) => (prev === 'drivers' ? 'none' : 'drivers'));
+        } else if (key === 'a') {
+          e.preventDefault();
+          setShowAlertsDropdown((prev) => !prev);
+        }
+        return;
+      }
+
+      if (isEditableTarget) return;
 
       if (e.key === '/') {
         e.preventDefault();
@@ -917,7 +947,7 @@ export default function DispatchRoute() {
         setActiveDockTab('none');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'c' || e.key === 'C') {
         setCommsInitialTab('phone');
-        setActiveDockTab((prev) => (prev === 'phone' || (prev === 'comms' && commsInitialTab === 'phone') ? 'none' : 'phone'));
+        setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
       } else if (e.key === 'e' || e.key === 'E') {
         setActiveDockTab((prev) => (prev === 'email' ? 'none' : 'email'));
       } else if (e.key === 'd' || e.key === 'D') {
@@ -1147,7 +1177,7 @@ export default function DispatchRoute() {
           }
         : undefined;
 
-      const returnTripPayload = (reviewMeta.hasReturnTrip && linkedTripObj)
+      const returnTripPayload = linkedTripObj
         ? {
             tripId: linkedTripObj.id,
             pickupAddress: linkedTripObj.pickupLocation.address,
@@ -1156,7 +1186,10 @@ export default function DispatchRoute() {
               linkedTripObj.bookingType === 'scheduled' && linkedTripObj.scheduledPickupTime
                 ? new Date(linkedTripObj.scheduledPickupTime).toLocaleString()
                 : 'Scheduled Return',
-            vehicleTier: linkedTripObj.vehicleTier || 'standard',
+            vehicleTier:
+              (linkedTripObj.metadata as any)?.vehicleTypeId ||
+              linkedTripObj.vehicleTier ||
+              'standard',
             passengerCount: linkedTripObj.passenger?.passengerCount,
             luggageCount: linkedTripObj.passenger?.luggageCount,
             totalFare: linkedTripObj.pricing?.totalFare || 0,
@@ -1173,77 +1206,106 @@ export default function DispatchRoute() {
           }
         : undefined;
 
-      // Dispatch confirmation email to passenger
-      const emailResult = await emailService.sendBookingConfirmation({
-        tripId: reviewTrip.id,
-        status: 'CONFIRMED',
-        passenger: {
-          firstName: reviewTrip.passenger.firstName,
-          lastName: reviewTrip.passenger.lastName,
-          email: targetOverride && shouldUpdatePassengerEmail ? targetOverride : reviewTrip.passenger.email,
-          phone: reviewTrip.passenger.phone,
-        },
-        recipientEmailOverride: targetOverride,
-        pickupAddress: reviewTrip.pickupLocation.address,
-        dropoffAddress: reviewTrip.dropoffLocation.address,
-        pickupTime:
-          reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
-            ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
-            : 'Immediate Ride (ASAP)',
-        bookingType: reviewTrip.bookingType,
-        vehicleTier: reviewTrip.vehicleTier || (reviewMeta.vehiclePreference as string) || 'any',
-        passengerCount: reviewTrip.passenger.passengerCount,
-        luggageCount: reviewTrip.passenger.luggageCount,
-        contactPerson: reviewMeta.contactPerson
-          ? (reviewMeta.contactPerson as any)
-          : (reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName)
-          ? {
-              isBookerDifferent: Boolean(reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName),
-              contactName: reviewMeta.bookerName || reviewMeta.contactName,
-              contactPhone: reviewMeta.bookerPhone || reviewMeta.contactPhone,
-              contactEmail: reviewMeta.bookerEmail || reviewMeta.contactEmail,
-              contactRole: reviewMeta.bookerRole || reviewMeta.contactRole,
-            }
-          : undefined,
-        carSeatsBreakdown: reviewMeta.carSeatsBreakdown ? (reviewMeta.carSeatsBreakdown as any) : undefined,
-        additionalPassengers: reviewMeta.additionalPassengers ? (reviewMeta.additionalPassengers as any) : undefined,
-        totalFare: reviewTrip.pricing?.totalFare || 0,
-        currency: reviewTrip.pricing?.currency || 'USD',
-        paymentMethod: reviewTrip.payment?.method || 'cash',
-        specialRequests: reviewTrip.passenger.specialRequests,
-        oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
-        oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
-        pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
-        flightDetails: outboundFlightDetails,
-        returnTripDetails: shouldConfirmBoth ? returnTripPayload : undefined,
-      });
+      const resolvedVehTier =
+        (reviewMeta.vehicleTypeId as string) ||
+        reviewTrip.vehicleTier ||
+        (reviewMeta.vehiclePreference as string) ||
+        'standard';
+      const resolvedVehName = formatVehicleTier(
+        resolvedVehTier,
+        settings.vehicles,
+        reviewMeta.vehicleDisplayName as string | undefined
+      );
+      const effectiveConfirmedEmail = (targetOverride || reviewTrip.passenger.email || '').trim();
+
+      // Dispatch confirmation email ONLY when a valid email address is available
+      const emailResult = effectiveConfirmedEmail
+        ? await emailService.sendBookingConfirmation({
+            tripId: reviewTrip.id,
+            status: 'CONFIRMED',
+            passenger: {
+              firstName: reviewTrip.passenger.firstName,
+              lastName: reviewTrip.passenger.lastName,
+              email: targetOverride && shouldUpdatePassengerEmail ? targetOverride : reviewTrip.passenger.email,
+              phone: reviewTrip.passenger.phone,
+            },
+            recipientEmailOverride: targetOverride,
+            pickupAddress: reviewTrip.pickupLocation.address,
+            dropoffAddress: reviewTrip.dropoffLocation.address,
+            pickupTime:
+              reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
+                ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
+                : 'Immediate Ride (ASAP)',
+            bookingType: reviewTrip.bookingType,
+            vehicleTier: resolvedVehTier,
+            vehicleDisplayName: resolvedVehName,
+            passengerCount: reviewTrip.passenger.passengerCount,
+            luggageCount: reviewTrip.passenger.luggageCount,
+            contactPerson: reviewMeta.contactPerson
+              ? (reviewMeta.contactPerson as any)
+              : (reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName)
+              ? {
+                  isBookerDifferent: Boolean(reviewMeta.isBookerDifferent || reviewMeta.bookerName || reviewMeta.contactName),
+                  contactName: reviewMeta.bookerName || reviewMeta.contactName,
+                  contactPhone: reviewMeta.bookerPhone || reviewMeta.contactPhone,
+                  contactEmail: reviewMeta.bookerEmail || reviewMeta.contactEmail,
+                  contactRole: reviewMeta.bookerRole || reviewMeta.contactRole,
+                }
+              : undefined,
+            carSeatsBreakdown: reviewMeta.carSeatsBreakdown ? (reviewMeta.carSeatsBreakdown as any) : undefined,
+            additionalPassengers: reviewMeta.additionalPassengers ? (reviewMeta.additionalPassengers as any) : undefined,
+            totalFare: reviewTrip.pricing?.totalFare || 0,
+            breakdown: reviewTrip.pricing?.breakdown,
+            tariffProfileName:
+              reviewTrip.pricing?.matchedCorridorName || reviewTrip.pricing?.tariffProfileName,
+            currency: reviewTrip.pricing?.currency || 'USD',
+            paymentMethod: reviewTrip.payment?.method || 'cash',
+            specialRequests: reviewTrip.passenger.specialRequests,
+            oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
+            oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
+            customExtrasSummary: reviewMeta.customExtrasSummary as string | undefined,
+            pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
+            flightDetails: outboundFlightDetails,
+            returnTripDetails: shouldConfirmBoth ? returnTripPayload : undefined,
+          })
+        : { success: true, skipped: true, error: undefined as string | undefined };
 
       const nowIso = new Date().toISOString();
       const numPart = reviewTrip.id.replace(/[^0-9]/g, '').slice(-4) || '2001';
       const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
       const confRef = `CNF-${numPart}`;
-      const effectiveConfirmedEmail = targetOverride || reviewTrip.passenger.email;
+
+      // Fetch fresh auditLog so we never clobber the STATUS_CHANGED entry written by updateTripStatus
+      let latestAuditLog = reviewTrip.auditLog || [];
+      try {
+        const fresh = await bookingService.getBookingStatus(reviewTrip.id);
+        if (fresh?.trip?.auditLog) latestAuditLog = fresh.trip.auditLog;
+      } catch {}
 
       const newAuditEvents: TripAuditEvent[] = [
-        ...(reviewTrip.auditLog || []),
+        ...latestAuditLog,
         {
-          action: 'AUTO_CONFIRMED',
+          action: 'STATUS_CHANGED',
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: confRef,
           context: shouldConfirmBoth
-            ? `Dispatcher reviewed and confirmed round-trip (#${reviewTrip.id} & #${linkedLegId})`
-            : 'Dispatcher reviewed and confirmed reservation',
+            ? `Dispatcher confirmed round-trip (#${reviewTrip.id} & #${linkedLegId})`
+            : 'Dispatcher confirmed reservation',
         },
-        {
-          action: 'EMAIL_LOGGED',
-          timestamp: nowIso,
-          actorRole: 'system',
-          referenceNumber: emailRef,
-          context: emailResult.success
-            ? `Dispatched confirmation receipt & live tracking link to ${effectiveConfirmedEmail}${targetOverride ? ' (Alternate Override)' : ''}`
-            : `Confirmation email delivery failed for ${effectiveConfirmedEmail}: ${emailResult.error || 'Email service error'}`,
-        },
+        ...(effectiveConfirmedEmail
+          ? [
+              {
+                action: 'EMAIL_LOGGED' as const,
+                timestamp: nowIso,
+                actorRole: 'system' as const,
+                referenceNumber: emailRef,
+                context: emailResult.success
+                  ? `Dispatched confirmation receipt & live tracking link to ${effectiveConfirmedEmail}${targetOverride ? ' (Alternate Override)' : ''}`
+                  : `Confirmation email delivery failed for ${effectiveConfirmedEmail}: ${emailResult.error || 'Email service error'}`,
+              },
+            ]
+          : []),
       ];
 
       if (bookingService.updateTrip) {
@@ -1255,10 +1317,15 @@ export default function DispatchRoute() {
             : {}),
         });
         if (shouldConfirmBoth && linkedLegId) {
+          let latestLinkedAudit = linkedTripObj?.auditLog || [];
+          try {
+            const freshLinked = await bookingService.getBookingStatus(linkedLegId);
+            if (freshLinked?.trip?.auditLog) latestLinkedAudit = freshLinked.trip.auditLog;
+          } catch {}
           const linkedAudit: TripAuditEvent[] = [
-            ...(linkedTripObj?.auditLog || []),
+            ...latestLinkedAudit,
             {
-              action: 'AUTO_CONFIRMED',
+              action: 'STATUS_CHANGED',
               timestamp: nowIso,
               actorRole: 'dispatcher',
               referenceNumber: `CNF-${linkedLegId.replace(/[^0-9]/g, '').slice(-4) || '2002'}`,
@@ -1365,7 +1432,7 @@ export default function DispatchRoute() {
           }
         : undefined;
 
-      const returnTripPayload = (reviewMeta.hasReturnTrip && linkedTripObj)
+      const returnTripPayload = linkedTripObj
         ? {
             tripId: linkedTripObj.id,
             pickupAddress: linkedTripObj.pickupLocation.address,
@@ -1374,7 +1441,10 @@ export default function DispatchRoute() {
               linkedTripObj.bookingType === 'scheduled' && linkedTripObj.scheduledPickupTime
                 ? new Date(linkedTripObj.scheduledPickupTime).toLocaleString()
                 : 'Scheduled Return',
-            vehicleTier: linkedTripObj.vehicleTier || 'standard',
+            vehicleTier:
+              (linkedTripObj.metadata as any)?.vehicleTypeId ||
+              linkedTripObj.vehicleTier ||
+              'standard',
             passengerCount: linkedTripObj.passenger?.passengerCount,
             luggageCount: linkedTripObj.passenger?.luggageCount,
             totalFare: linkedTripObj.pricing?.totalFare || 0,
@@ -1391,7 +1461,25 @@ export default function DispatchRoute() {
           }
         : undefined;
 
-      const effectiveRecipient = targetOverride || reviewTrip.passenger.email;
+      const effectiveRecipient = (targetOverride || reviewTrip.passenger.email || '').trim();
+      if (!effectiveRecipient) {
+        setReviewAlert({
+          type: 'error',
+          message: 'No passenger email on file. Enable "Override Recipient Email" to send a copy.',
+        });
+        return;
+      }
+
+      const resolvedVehTier =
+        (reviewMeta.vehicleTypeId as string) ||
+        reviewTrip.vehicleTier ||
+        (reviewMeta.vehiclePreference as string) ||
+        'standard';
+      const resolvedVehName = formatVehicleTier(
+        resolvedVehTier,
+        settings.vehicles,
+        reviewMeta.vehicleDisplayName as string | undefined
+      );
 
       const emailResult = await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
@@ -1410,7 +1498,8 @@ export default function DispatchRoute() {
             ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
             : 'Immediate Ride (ASAP)',
         bookingType: reviewTrip.bookingType,
-        vehicleTier: reviewTrip.vehicleTier || (reviewMeta.vehiclePreference as string) || 'any',
+        vehicleTier: resolvedVehTier,
+        vehicleDisplayName: resolvedVehName,
         passengerCount: reviewTrip.passenger.passengerCount,
         luggageCount: reviewTrip.passenger.luggageCount,
         contactPerson: reviewMeta.contactPerson
@@ -1427,11 +1516,15 @@ export default function DispatchRoute() {
         carSeatsBreakdown: reviewMeta.carSeatsBreakdown ? (reviewMeta.carSeatsBreakdown as any) : undefined,
         additionalPassengers: reviewMeta.additionalPassengers ? (reviewMeta.additionalPassengers as any) : undefined,
         totalFare: reviewTrip.pricing?.totalFare || 0,
+        breakdown: reviewTrip.pricing?.breakdown,
+        tariffProfileName:
+          reviewTrip.pricing?.matchedCorridorName || reviewTrip.pricing?.tariffProfileName,
         currency: reviewTrip.pricing?.currency || 'USD',
         paymentMethod: reviewTrip.payment?.method || 'cash',
         specialRequests: reviewTrip.passenger.specialRequests,
         oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
         oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
+        customExtrasSummary: reviewMeta.customExtrasSummary as string | undefined,
         pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
         flightDetails: outboundFlightDetails,
         returnTripDetails: shouldIncludeReturn ? returnTripPayload : undefined,
@@ -1448,12 +1541,9 @@ export default function DispatchRoute() {
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: emailRef,
-          context: (() => {
-            if (!emailResult.success) {
-              throw new Error(emailResult.error || 'Failed to resend confirmation email.');
-            }
-            return `Resent confirmation email to ${effectiveRecipient}${targetOverride ? ' (Alternate Override)' : ''}`;
-          })(),
+          context: emailResult.success
+            ? `Resent confirmation email to ${effectiveRecipient}${targetOverride ? ' (Alternate Override)' : ''}`
+            : `Resend confirmation email failed for ${effectiveRecipient}: ${emailResult.error || 'Email service error'}`,
         },
       ];
 
@@ -1464,6 +1554,14 @@ export default function DispatchRoute() {
             ? { passenger: { ...reviewTrip.passenger, email: targetOverride } }
             : {}),
         });
+      }
+
+      if (!emailResult.success) {
+        setReviewAlert({
+          type: 'error',
+          message: emailResult.error || 'Failed to resend confirmation email.',
+        });
+        return;
       }
 
       const updatedTripObj: Trip = {
@@ -1563,10 +1661,16 @@ export default function DispatchRoute() {
       const emailRef = `EML-${numPart}-${Math.floor(100 + Math.random() * 900)}`;
       const decRef = `DEC-${numPart}`;
 
+      let latestDeclineAudit = reviewTrip.auditLog || [];
+      try {
+        const fresh = await bookingService.getBookingStatus(reviewTrip.id);
+        if (fresh?.trip?.auditLog) latestDeclineAudit = fresh.trip.auditLog;
+      } catch {}
+
       const newAuditEvents: TripAuditEvent[] = [
-        ...(reviewTrip.auditLog || []),
+        ...latestDeclineAudit,
         {
-          action: 'DRIVER_DECLINED',
+          action: 'STATUS_CHANGED',
           timestamp: nowIso,
           actorRole: 'dispatcher',
           referenceNumber: decRef,
@@ -1589,10 +1693,15 @@ export default function DispatchRoute() {
           auditLog: newAuditEvents,
         });
         if (shouldDeclineBoth && linkedLegId) {
+          let latestLinkedAudit = trips.find((t) => t.id === linkedLegId)?.auditLog || [];
+          try {
+            const freshLinked = await bookingService.getBookingStatus(linkedLegId);
+            if (freshLinked?.trip?.auditLog) latestLinkedAudit = freshLinked.trip.auditLog;
+          } catch {}
           const linkedAudit: TripAuditEvent[] = [
-            ...(trips.find((t) => t.id === linkedLegId)?.auditLog || []),
+            ...latestLinkedAudit,
             {
-              action: 'DRIVER_DECLINED',
+              action: 'STATUS_CHANGED',
               timestamp: nowIso,
               actorRole: 'dispatcher',
               referenceNumber: `DEC-${linkedLegId.replace(/[^0-9]/g, '').slice(-4) || '3002'}`,
@@ -1847,7 +1956,7 @@ export default function DispatchRoute() {
       (t) => selectedTripIds.includes(t.id) && t.status !== 'CONFIRMED' && t.status !== 'confirmed' && t.status !== 'completed'
     );
     if (tripsToConfirm.length === 0) {
-      alert('All selected trip(s) are already confirmed or completed.');
+      showDispatchToast('All selected trip(s) are already confirmed or completed.', 'info');
       return;
     }
     try {
@@ -1865,6 +1974,7 @@ export default function DispatchRoute() {
         if (t.passenger?.email) {
           try {
             const meta = (t.metadata || {}) as Record<string, any>;
+            const resolvedTier = (meta.vehicleTypeId as string) || t.vehicleTier || (meta.vehiclePreference as string) || 'standard';
             emailService.sendBookingConfirmation({
               tripId: t.id,
               status: 'CONFIRMED',
@@ -1881,7 +1991,8 @@ export default function DispatchRoute() {
                   ? new Date(t.scheduledPickupTime).toLocaleString()
                   : 'Immediate Ride (ASAP)',
               bookingType: t.bookingType,
-              vehicleTier: t.vehicleTier || (meta.vehiclePreference as string) || 'any',
+              vehicleTier: resolvedTier,
+              vehicleDisplayName: formatVehicleTier(resolvedTier, settings.vehicles, meta.vehicleDisplayName as string | undefined),
               passengerCount: t.passenger?.passengerCount,
               luggageCount: t.passenger?.luggageCount,
               contactPerson: meta.contactPerson
@@ -1898,16 +2009,23 @@ export default function DispatchRoute() {
               carSeatsBreakdown: meta.carSeatsBreakdown ? (meta.carSeatsBreakdown as any) : undefined,
               additionalPassengers: meta.additionalPassengers ? (meta.additionalPassengers as any) : undefined,
               totalFare: t.pricing?.totalFare || 0,
+              breakdown: t.pricing?.breakdown,
+              tariffProfileName: t.pricing?.matchedCorridorName || t.pricing?.tariffProfileName,
               currency: t.pricing?.currency || 'USD',
               paymentMethod: t.payment?.method || 'cash',
               specialRequests: t.passenger?.specialRequests,
               oversizedBags: meta.oversizedBags as Record<string, number> | undefined,
+              oversizedItemsSummary: meta.oversizedItemsSummary as string | undefined,
+              customExtrasSummary: meta.customExtrasSummary as string | undefined,
               pickupNotes: meta.pickupLocationDescription as string | undefined,
-              flightDetails: (meta.flightNumber || meta.airline || meta.airlineName)
+              flightDetails: (meta.flightNumber || meta.airline || meta.airlineName || meta.tailNumber)
                 ? {
                     flightNumber: meta.flightNumber ? String(meta.flightNumber) : undefined,
                     airlineName: (meta.airlineName || meta.airline || meta.airlineCode) ? String(meta.airlineName || meta.airline || meta.airlineCode) : undefined,
                     departureAirport: meta.flightOrigin || meta.departureAirport ? String(meta.flightOrigin || meta.departureAirport) : undefined,
+                    tailNumber: meta.tailNumber ? String(meta.tailNumber) : undefined,
+                    fboFacility: meta.fboFacility ? String(meta.fboFacility) : undefined,
+                    isPrivateAviation: Boolean(meta.isPrivateAviation || meta.tailNumber),
                     hasCheckedLuggage: Boolean(meta.hasCheckedLuggage),
                     isAirportTrip: Boolean(meta.isAirportTrip),
                   }
@@ -1922,17 +2040,35 @@ export default function DispatchRoute() {
         prev.map((t) => (selectedTripIds.includes(t.id) ? { ...t, status: 'CONFIRMED' as TripStatus } : t))
       );
       setSelectedTripIds([]);
+      showDispatchToast(`Confirmed ${tripsToConfirm.length} selected trip(s).`, 'success');
     } catch (err) {
       console.error('Failed to batch confirm trips:', err);
+      showDispatchToast('Failed to batch confirm selected trips. Please try again.', 'error');
     }
   };
 
   const handleBatchAssignDriver = () => {
     if (selectedTripIds.length === 0) return;
-    const firstTrip = trips.find((t) => t.id === selectedTripIds[0]);
-    if (firstTrip) {
-      handleOpenDriverModal(firstTrip);
+    setBatchAssignDriverId(drivers.find((d) => d.mapStatus === 'available')?.id || '');
+    setIsBatchAssignOpen(true);
+  };
+
+  const handleConfirmBatchAssign = async () => {
+    if (selectedTripIds.length === 0 || !batchAssignDriverId) return;
+    let successCount = 0;
+    for (const tripId of selectedTripIds) {
+      try {
+        await handleQuickAssignDriver(tripId, batchAssignDriverId);
+        successCount += 1;
+      } catch {}
     }
+    setIsBatchAssignOpen(false);
+    setSelectedTripIds([]);
+    const drv = drivers.find((d) => d.id === batchAssignDriverId);
+    showDispatchToast(
+      `Assigned ${drv?.formattedLabel || drv?.name || 'driver'} to ${successCount} trip(s).`,
+      'success'
+    );
   };
 
   const handleQuickAssignDriver = async (tripId: string, driverId: string) => {
@@ -1940,38 +2076,42 @@ export default function DispatchRoute() {
     const tripToUpdate = trips.find((t) => t.id === tripId);
     if (!tripToUpdate) return;
 
-    const previousDriverId = tripToUpdate.assignedDriverId;
+    const nextStatus: TripStatus = isUnassigning
+      ? tripToUpdate.status === 'assigned'
+        ? 'pending'
+        : tripToUpdate.status
+      : ['pending', 'unconfirmed', 'UNCONFIRMED', 'CONFIRMED', 'confirmed'].includes(tripToUpdate.status)
+      ? 'assigned'
+      : tripToUpdate.status;
 
     const updates: Partial<Trip> = {
       assignedDriverId: isUnassigning ? null : driverId,
-      status: isUnassigning
-        ? (tripToUpdate.status === 'assigned' ? 'pending' : tripToUpdate.status)
-        : (['pending', 'unconfirmed', 'UNCONFIRMED', 'CONFIRMED', 'confirmed'].includes(tripToUpdate.status)
-            ? 'assigned'
-            : tripToUpdate.status),
+      status: nextStatus,
     };
 
     const bookingService = getBookingService();
     try {
-      if (bookingService.updateTrip) {
+      if (bookingService.updateTripStatus && nextStatus !== tripToUpdate.status && !isUnassigning) {
+        await bookingService.updateTripStatus(tripId, nextStatus, {
+          assignedDriverId: driverId,
+          actorRole: 'admin',
+          reason: `Assigned to driver ${driverId} by dispatcher`,
+        });
+      } else if (bookingService.updateTrip) {
         await bookingService.updateTrip(tripId, updates);
       }
       setTrips((prev) => prev.map((t) => (t.id === tripId ? ({ ...t, ...updates } as Trip) : t)));
-
-      // Sync driver roster statuses
-      setDrivers((prev) =>
-        prev.map((d) => {
-          if (!isUnassigning && d.id === driverId) {
-            return { ...d, status: 'on_trip', currentTripId: tripId };
-          }
-          if (previousDriverId && d.id === previousDriverId && d.currentTripId === tripId) {
-            return { ...d, status: 'available', currentTripId: undefined };
-          }
-          return d;
-        })
+      const drv = drivers.find((d) => d.id === driverId);
+      showDispatchToast(
+        isUnassigning
+          ? `Trip #${tripId.slice(-6)} unassigned.`
+          : `Assigned ${drv?.formattedLabel || drv?.name || 'driver'} to Trip #${tripId.slice(-6)}.`,
+        'success'
       );
     } catch (err) {
       console.error('Failed to quick-assign driver:', err);
+      showDispatchToast('Failed to assign driver. Please try again.', 'error');
+      throw err;
     }
   };
 
@@ -2013,7 +2153,7 @@ export default function DispatchRoute() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `trips_export_${new Date().toISOString().slice(0, 10)}_${selectedTrips.length}_trips.csv`;
+    link.download = `trips_export_${formatLocalDateStr(new Date())}_${selectedTrips.length}_trips.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2210,7 +2350,7 @@ export default function DispatchRoute() {
   // Create new draft
   const createDraft = () => {
     if (drafts.length >= maxDrafts) {
-      alert(`Maximum of ${maxDrafts} drafts allowed.`);
+      showDispatchToast(`Maximum of ${maxDrafts} drafts allowed. Close a tab first.`, 'info');
       return;
     }
     const newDraft: DraftTab = {
@@ -2222,23 +2362,36 @@ export default function DispatchRoute() {
     setNextDraftIdx((n) => n + 1);
   };
 
-  // Clone an existing booking into a new draft reservation
+  // Clone an existing booking into a new draft reservation (PCI-safe: scrubs PAN & CVC)
   const handleCloneBookingToNewDraft = (clonedValues: DispatchFormValues) => {
     if (drafts.length >= maxDrafts) {
-      alert(`Maximum of ${maxDrafts} tabs open. Please close a tab before cloning.`);
+      showDispatchToast(`Maximum of ${maxDrafts} tabs open. Please close a tab before cloning.`, 'info');
       return;
     }
     const newId = `new-${nextDraftIdx}`;
     setNextDraftIdx((n) => n + 1);
 
+    const safeClonedValues: DispatchFormValues = {
+      ...clonedValues,
+      cardDetails: clonedValues.cardDetails
+        ? {
+            ...clonedValues.cardDetails,
+            cardNumber: clonedValues.cardDetails.cardNumber
+              ? clonedValues.cardDetails.cardNumber.replace(/\D/g, '').slice(-4)
+              : '',
+            cardCvc: '',
+          }
+        : clonedValues.cardDetails,
+    };
+
     try {
-      localStorage.setItem(`chesterfield_dispatch_draft_${newId}`, JSON.stringify(clonedValues));
+      localStorage.setItem(`chesterfield_dispatch_draft_${newId}`, JSON.stringify(safeClonedValues));
     } catch {}
 
     const newDraft: DraftTab = {
       id: newId,
       isNew: true,
-      formValues: clonedValues,
+      formValues: safeClonedValues,
     };
     setDrafts((prev) => [...prev, newDraft]);
     setActiveDraftId(newId);
@@ -2271,7 +2424,7 @@ export default function DispatchRoute() {
     }
 
     if (drafts.length >= maxDrafts) {
-      alert(`Maximum of ${maxDrafts} tabs open. Please close a tab before editing.`);
+      showDispatchToast(`Maximum of ${maxDrafts} tabs open. Please close a tab before editing.`, 'info');
       return;
     }
 
@@ -2296,23 +2449,38 @@ export default function DispatchRoute() {
     }
   }, [urlTripId, trips]);
 
-  // Clone an existing trip into a new booking draft tab
+  // Clone an existing trip into a new booking draft tab (local date + preserves vehicle, stops & extras)
   const handleCloneBooking = (trip: Trip) => {
     const pickupDate = trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime) : new Date();
+    const meta = (trip.metadata || {}) as Record<string, any>;
+    const clonedVehicle =
+      (Array.isArray(meta.selectedVehicles) && meta.selectedVehicles.length > 0
+        ? meta.selectedVehicles[0]
+        : meta.vehicleTypeId || trip.vehicleTier || 'any') as any;
+    const clonedVehicles =
+      Array.isArray(meta.selectedVehicles) && meta.selectedVehicles.length > 0
+        ? meta.selectedVehicles
+        : [clonedVehicle];
+    const hh = String(pickupDate.getHours()).padStart(2, '0');
+    const mm = String(pickupDate.getMinutes()).padStart(2, '0');
+
     const clonedValues: DispatchFormValues = {
       timingType: trip.scheduledPickupTime ? 'later' : 'asap',
-      scheduledDate: pickupDate.toISOString().split('T')[0],
-      scheduledTime: pickupDate.toTimeString().slice(0, 5),
+      scheduledDate: formatLocalDateStr(pickupDate),
+      scheduledTime: `${hh}:${mm}`,
       pickupAddress: trip.pickupLocation.address,
       pickupCoordinates: trip.pickupLocation.coordinates,
       dropoffAddress: trip.dropoffLocation.address,
       dropoffCoordinates: trip.dropoffLocation.coordinates,
-      intermediateStops: [],
+      intermediateStops: (trip.intermediateStops || []).map((s) => ({
+        address: s.address,
+        coordinates: s.coordinates,
+      })),
       passengerName: `${trip.passenger.firstName} ${trip.passenger.lastName}`.trim(),
       phone: trip.passenger.phone || '',
       email: trip.passenger.email || '',
-      additionalPassengers: [],
-      contactPerson: {
+      additionalPassengers: Array.isArray(meta.additionalPassengers) ? meta.additionalPassengers : [],
+      contactPerson: meta.contactPerson || {
         isBookerDifferent: false,
         contactName: '',
         contactPhone: '',
@@ -2321,35 +2489,46 @@ export default function DispatchRoute() {
       },
       passengers: trip.passenger.passengerCount || 1,
       bags: trip.passenger.luggageCount || 0,
-      carSeats: false,
-      carSeatsBreakdown: {
+      carSeats: Boolean(
+        meta.carSeatsBreakdown &&
+          ((meta.carSeatsBreakdown.rearFacing || 0) +
+            (meta.carSeatsBreakdown.frontFacing || 0) +
+            (meta.carSeatsBreakdown.booster || 0)) > 0
+      ),
+      carSeatsBreakdown: meta.carSeatsBreakdown || {
         rearFacing: 0,
         frontFacing: 0,
         booster: 0,
       },
-      selectedVehicles: ['any'],
-      vehicle: 'any',
-      paymentMethod: trip.payment?.method === 'card' ? 'card' : trip.payment?.method === 'corporate' ? 'account' : 'cash',
+      selectedVehicles: clonedVehicles,
+      vehicle: clonedVehicle,
+      paymentMethod:
+        trip.payment?.method === 'card'
+          ? 'card'
+          : trip.payment?.method === 'corporate' || trip.payment?.method === 'account'
+          ? 'account'
+          : 'cash',
       cardDetails: {
-        cardPaymentType: 'manual',
+        cardPaymentType: 'terminal',
         cardholderName: '',
         cardNumber: '',
         cardExp: '',
         cardCvc: '',
         saveCardOnFile: false,
       },
-      corporateDetails: {
-        corporateAccount: '',
+      corporateDetails: meta.corporateDetails || {
+        corporateAccount: meta.corporateOrgName || '',
         billingPo: '',
         authorizedBy: '',
-        invoicingTerms: 'NET30',
+        invoicingTerms: 'Net 30 Direct Bill',
       },
-      tariff: 'Standard Rates',
-      discount: '',
-      company: '',
-      driverId: trip.assignedDriverId || 'unassigned',
-      notesForAll: trip.passenger.specialRequests || '',
-      internalNotes: trip.pickupLocation.driverNotes || '',
+      tariff: meta.tariff || 'Standard',
+      pricingRuleId: meta.pricingRuleId,
+      discount: meta.discount || 'None',
+      company: meta.company || 'Chesterfield Taxi',
+      driverId: 'unassigned',
+      notesForAll: trip.driverNotes || trip.passenger.specialRequests || '',
+      internalNotes: meta.internalNotes || trip.pickupLocation.driverNotes || '',
       returnDetails: {
         returnTrip: false,
         returnPickupAddress: '',
@@ -2390,14 +2569,8 @@ export default function DispatchRoute() {
     handleCloneBookingToNewDraft(clonedValues);
   };
 
-  // Assign driver to current active draft
+  // Assign driver to current active draft (does NOT falsely mark driver busy before booking is submitted!)
   const handleAssignDriverToDraft = (driver: DriverRosterItem) => {
-    setDrivers((prev) =>
-      prev.map((d) => {
-        if (d.id === driver.id) return { ...d, status: 'on_trip' };
-        return d;
-      })
-    );
     setDrafts((prev) =>
       prev.map((draft) => {
         if (draft.id === activeDraftId) {
@@ -2412,9 +2585,10 @@ export default function DispatchRoute() {
         return draft;
       })
     );
+    showDispatchToast(`Selected ${driver.formattedLabel || driver.name} for active draft.`, 'info');
   };
 
-  // Re-order trips in driver queue
+  // Re-order trips in driver queue (rethrows on failure so DriverQueueWindow rolls back cleanly)
   const handleReorderDriverQueue = async (driverId: string, reorderedTripIds: string[]) => {
     const bookingService = getBookingService();
     const updatePromises = reorderedTripIds.map((id, index) => {
@@ -2430,6 +2604,7 @@ export default function DispatchRoute() {
       return bookingService.updateTrip ? bookingService.updateTrip(id, updates) : Promise.resolve(null as any);
     });
 
+    const previousTrips = trips;
     setTrips((prev) =>
       prev.map((t) => {
         const idx = reorderedTripIds.indexOf(t.id);
@@ -2450,7 +2625,10 @@ export default function DispatchRoute() {
     try {
       await Promise.all(updatePromises);
     } catch (err) {
+      setTrips(previousTrips);
       console.error('Failed to persist reordered driver queue:', err);
+      showDispatchToast('Failed to save queue order — reverted.', 'error');
+      throw err;
     }
   };
 
@@ -2838,90 +3016,162 @@ export default function DispatchRoute() {
     return 'All Dates';
   };
 
-  // Comprehensive filtered trips in queue
-  const filteredTrips = trips.filter((trip) => {
-    // Status filter from dropdown (including unconfirmed)
-    if (statusFilter !== 'all') {
-      const tripStatusLower = (trip.status || '').toLowerCase();
-      const filterLower = statusFilter.toLowerCase();
-      if (tripStatusLower !== filterLower) return false;
-    }
+  // Comprehensive memoized filtered trips in queue (local timezone dates + time range + all active filters)
+  const filteredTrips = useMemo(() => {
+    const normSearchDigits = searchTerm.replace(/\D/g, '');
+    const term = searchTerm.trim().toLowerCase();
 
-    // Filter pills
-    if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') return false;
-    if (pillFilter === 'pending' && trip.status !== 'pending') return false;
-    if (pillFilter === 'assigned' && trip.status !== 'assigned') return false;
-    if (pillFilter === 'completed' && trip.status !== 'completed') return false;
-    if (pillFilter === 'cancelled' && trip.status !== 'cancelled') return false;
-    if (pillFilter === 'unassigned' && trip.assignedDriverId) return false;
+    return trips.filter((trip) => {
+      const meta = (trip.metadata || {}) as Record<string, any>;
 
-    // Date Range (against scheduledPickupTime or createdAt)
-    if (dateTimeRange.startDate || dateTimeRange.endDate) {
-      const tripDateStr = trip.scheduledPickupTime || trip.createdAt;
-      if (tripDateStr) {
-        const tripDate = tripDateStr.slice(0, 10);
-        if (dateTimeRange.startDate && tripDate < dateTimeRange.startDate) return false;
-        if (dateTimeRange.endDate && tripDate > dateTimeRange.endDate) return false;
+      // Status filter from dropdown (including unconfirmed & live active states)
+      if (statusFilter !== 'all') {
+        const tripStatusLower = (trip.status || '').toLowerCase();
+        const filterLower = statusFilter.toLowerCase();
+        if (tripStatusLower !== filterLower) return false;
       }
-    } else if (filterStartDate || filterEndDate) {
-      const tripDateStr = trip.scheduledPickupTime || trip.createdAt;
-      if (tripDateStr) {
-        const tripDate = tripDateStr.slice(0, 10);
-        if (filterStartDate && tripDate < filterStartDate) return false;
-        if (filterEndDate && tripDate > filterEndDate) return false;
+
+      // Filter pills
+      if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') return false;
+      if (pillFilter === 'pending' && trip.status !== 'pending') return false;
+      if (pillFilter === 'assigned' && trip.status !== 'assigned') return false;
+      if (pillFilter === 'completed' && trip.status !== 'completed') return false;
+      if (pillFilter === 'cancelled' && trip.status !== 'cancelled') return false;
+      if (pillFilter === 'unassigned' && trip.assignedDriverId) return false;
+
+      // Local Timezone Date & Time Range (against scheduledPickupTime or createdAt)
+      const to24h = (t?: { hour: string; minute: string; period: 'AM' | 'PM' } | null): string | null => {
+        if (!t || !t.hour || !t.minute) return null;
+        let h = parseInt(t.hour, 10) % 12;
+        if (t.period === 'PM') h += 12;
+        return `${String(h).padStart(2, '0')}:${String(parseInt(t.minute, 10)).padStart(2, '0')}`;
+      };
+
+      if (dateTimeRange.startDate || dateTimeRange.endDate) {
+        const tripDateStr = trip.scheduledPickupTime || trip.createdAt;
+        if (tripDateStr) {
+          const d = new Date(tripDateStr);
+          if (!isNaN(d.getTime())) {
+            const localYmd = formatLocalDateStr(d);
+            const localHm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const startHm = to24h(dateTimeRange.startTime);
+            const endHm = to24h(dateTimeRange.endTime);
+            if (dateTimeRange.startDate && localYmd < dateTimeRange.startDate) return false;
+            if (dateTimeRange.endDate && localYmd > dateTimeRange.endDate) return false;
+            if (
+              dateTimeRange.startDate &&
+              startHm &&
+              localYmd === dateTimeRange.startDate &&
+              localHm < startHm
+            ) {
+              return false;
+            }
+            if (
+              dateTimeRange.endDate &&
+              endHm &&
+              localYmd === dateTimeRange.endDate &&
+              localHm > endHm
+            ) {
+              return false;
+            }
+          }
+        }
+      } else if (filterStartDate || filterEndDate) {
+        const tripDateStr = trip.scheduledPickupTime || trip.createdAt;
+        if (tripDateStr) {
+          const d = new Date(tripDateStr);
+          if (!isNaN(d.getTime())) {
+            const localYmd = formatLocalDateStr(d);
+            if (filterStartDate && localYmd < filterStartDate) return false;
+            if (filterEndDate && localYmd > filterEndDate) return false;
+          }
+        }
       }
-    }
 
-    // Active Filter: Driver
-    if (activeFilterKeys.includes('driver') && selectedDriverFilter !== 'all') {
-      if (trip.assignedDriverId !== selectedDriverFilter) return false;
-    }
-
-    // Active Filter: Vehicle
-    if (activeFilterKeys.includes('vehicle') && selectedVehicleFilter !== 'all') {
-      if (trip.vehicleTier !== selectedVehicleFilter) return false;
-    }
-
-    // Active Filter: Has Car Seat
-    if (activeFilterKeys.includes('has_car_seat')) {
-      const notesLower = (
-        (trip.passenger.specialRequests || '') + ' ' +
-        (trip.pickupLocation.notes || '') + ' ' +
-        (trip.pickupLocation.driverNotes || '')
-      ).toLowerCase();
-      const hasSeat = notesLower.includes('car seat') || notesLower.includes('carseat') || notesLower.includes('booster');
-      if (!hasSeat) return false;
-    }
-
-    // Active Filter: Company
-    if (activeFilterKeys.includes('company') && selectedCompanyFilter !== 'all') {
-      const company = ((trip as any).company || (trip.passenger as any).company || '').toLowerCase();
-      if (!company.includes(selectedCompanyFilter.toLowerCase())) return false;
-    }
-
-    // Active Filter: Payment Type
-    if (activeFilterKeys.includes('payment_type') && selectedPaymentFilter !== 'all') {
-      const method = trip.payment?.method || 'cash';
-      if (method !== selectedPaymentFilter) return false;
-    }
-
-    // Search query
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchId = trip.id.toLowerCase().includes(term);
-      const matchPassenger = `${trip.passenger.firstName} ${trip.passenger.lastName}`
-        .toLowerCase()
-        .includes(term);
-      const matchPhone = trip.passenger.phone.includes(term);
-      const matchPickup = trip.pickupLocation.address.toLowerCase().includes(term);
-      const matchDropoff = trip.dropoffLocation.address.toLowerCase().includes(term);
-      const matchDriver = trip.assignedDriverId?.toLowerCase().includes(term);
-      if (!matchId && !matchPassenger && !matchPhone && !matchPickup && !matchDropoff && !matchDriver) {
-        return false;
+      // Active Filter: Driver
+      if (activeFilterKeys.includes('driver') && selectedDriverFilter !== 'all') {
+        if (trip.assignedDriverId !== selectedDriverFilter) return false;
       }
-    }
-    return true;
-  });
+
+      // Active Filter: Vehicle (matches both vehicleTier and custom metadata.vehicleTypeId)
+      if (activeFilterKeys.includes('vehicle') && selectedVehicleFilter !== 'all') {
+        const vId = String(meta.vehicleTypeId || trip.vehicleTier || '').toLowerCase();
+        if (vId !== selectedVehicleFilter.toLowerCase() && (trip.vehicleTier || '').toLowerCase() !== selectedVehicleFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Active Filter: Tariff
+      if (activeFilterKeys.includes('tariff') && selectedTariffFilter !== 'all') {
+        const tariffStr = `${trip.pricing?.tariffProfileName || ''} ${trip.pricing?.matchedCorridorName || ''} ${meta.tariff || ''} ${meta.pricingRuleName || ''}`.toLowerCase();
+        if (!tariffStr.includes(selectedTariffFilter.toLowerCase())) return false;
+      }
+
+      // Active Filter: Has Car Seat (checks structured carSeatsBreakdown + notes)
+      if (activeFilterKeys.includes('has_car_seat')) {
+        const csb = meta.carSeatsBreakdown;
+        const hasStructuredSeats = Boolean(
+          csb && ((csb.rearFacing || 0) + (csb.frontFacing || 0) + (csb.booster || 0) > 0)
+        );
+        const notesLower = (
+          (trip.passenger?.specialRequests || '') + ' ' +
+          (trip.pickupLocation?.notes || '') + ' ' +
+          (trip.pickupLocation?.driverNotes || '')
+        ).toLowerCase();
+        const hasSeat = hasStructuredSeats || notesLower.includes('car seat') || notesLower.includes('carseat') || notesLower.includes('booster');
+        if (!hasSeat) return false;
+      }
+
+      // Active Filter: Company
+      if (activeFilterKeys.includes('company') && selectedCompanyFilter !== 'all') {
+        const companyStr = `${meta.corporateOrgName || ''} ${meta.corporateDetails?.corporateAccount || ''} ${meta.company || ''} ${(trip as any).company || ''}`.toLowerCase();
+        if (!companyStr.includes(selectedCompanyFilter.toLowerCase())) return false;
+      }
+
+      // Active Filter: Payment Type (treats corporate & account equivalently)
+      if (activeFilterKeys.includes('payment_type') && selectedPaymentFilter !== 'all') {
+        const method = trip.payment?.method || 'cash';
+        if (selectedPaymentFilter === 'account' || selectedPaymentFilter === 'corporate') {
+          if (method !== 'account' && method !== 'corporate') return false;
+        } else if (method !== selectedPaymentFilter) {
+          return false;
+        }
+      }
+
+      // Search query (null-safe & digit-normalized phone matching)
+      if (term) {
+        const matchId = (trip.id || '').toLowerCase().includes(term);
+        const matchPassenger = `${trip.passenger?.firstName || ''} ${trip.passenger?.lastName || ''}`
+          .toLowerCase()
+          .includes(term);
+        const rawPhone = trip.passenger?.phone || '';
+        const matchPhone =
+          rawPhone.toLowerCase().includes(term) ||
+          (normSearchDigits.length >= 3 && rawPhone.replace(/\D/g, '').includes(normSearchDigits));
+        const matchPickup = (trip.pickupLocation?.address || '').toLowerCase().includes(term);
+        const matchDropoff = (trip.dropoffLocation?.address || '').toLowerCase().includes(term);
+        const matchDriver = (trip.assignedDriverId || '').toLowerCase().includes(term);
+        if (!matchId && !matchPassenger && !matchPhone && !matchPickup && !matchDropoff && !matchDriver) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [
+    trips,
+    statusFilter,
+    pillFilter,
+    dateTimeRange,
+    filterStartDate,
+    filterEndDate,
+    activeFilterKeys,
+    selectedDriverFilter,
+    selectedVehicleFilter,
+    selectedTariffFilter,
+    selectedCompanyFilter,
+    selectedPaymentFilter,
+    searchTerm,
+  ]);
 
   // Table Selection Handlers
   const allFilteredSelected =
@@ -4126,13 +4376,38 @@ export default function DispatchRoute() {
               ? 'hidden lg:flex lg:flex-1 lg:min-h-[160px]'
               : 'flex-1 lg:min-h-[160px]'
           }`}>
-            <LiveDispatchMap
+            <LiveFleetMap
+              fleet={drivers}
+              trips={trips}
               activeFormValues={activeDraft?.formValues}
               activeTrip={activeDraft?.trip}
               selectedTrip={selectedMapTrip}
               shouldZoom={shouldZoomMap}
-              drivers={drivers}
-              trips={trips}
+              focusedDriverId={focusedMapDriverId}
+              onClearFocusedDriver={() => setFocusedMapDriverId(null)}
+              onAssignDriverToTrip={(tripId, driverId) => handleQuickAssignDriver(tripId, driverId)}
+              onOpenDriverQueue={(drv) => setQueueDriver(drv)}
+              onCallDriver={(phone, name) => {
+                setCommsInitialTab('phone');
+                setActiveDockTab('phone');
+                handleStartCall(phone, name);
+              }}
+              onChangeDriverDutyStatus={async (driverId, duty) => {
+                try {
+                  await setDriverDutyStatus(driverId, duty);
+                  showDispatchToast(
+                    `Driver status updated to ${duty === 'on_break' ? 'On Break' : duty === 'off_duty' ? 'Offline' : 'Available'}.`,
+                    'success'
+                  );
+                } catch {
+                  showDispatchToast('Failed to update driver status.', 'error');
+                }
+              }}
+              onSelectTrip={(trip) => {
+                setSelectedMapTrip(trip);
+                setSelectedQueueTripId(trip.id);
+                setShouldZoomMap(true);
+              }}
             />
           </div>
 
@@ -4253,7 +4528,12 @@ export default function DispatchRoute() {
                         </option>
                         <option value="confirmed">Confirmed</option>
                         <option value="pending">Pending</option>
+                        <option value="offered">Offered</option>
                         <option value="assigned">Assigned</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="en_route">En Route</option>
+                        <option value="arrived">Arrived</option>
+                        <option value="in_progress">In Progress</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                         <option value="declined">Declined</option>
@@ -4969,7 +5249,11 @@ export default function DispatchRoute() {
                             ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                           </span>
                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                            {formatVehicleTierDisplay(trip.vehicleTier)}
+                            {formatVehicleTierDisplay(
+                              (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
+                              settings.vehicles,
+                              (trip.metadata as any)?.vehicleDisplayName
+                            )}
                           </span>
                           <select
                             value={trip.assignedDriverId || 'unassigned'}
@@ -4992,7 +5276,7 @@ export default function DispatchRoute() {
                                 value={drv.id}
                                 disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                               >
-                                {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
+                                {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                               </option>
                             ))}
                           </select>
@@ -5326,14 +5610,18 @@ export default function DispatchRoute() {
                                       value={drv.id}
                                       disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                                     >
-                                      {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
+                                      {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                                     </option>
                                   ))}
                                </select>
                             </td>
                             <td className="py-2 px-3">
                               <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                                {formatVehicleTierDisplay(trip.vehicleTier)}
+                                {formatVehicleTierDisplay(
+                                  (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
+                                  settings.vehicles,
+                                  (trip.metadata as any)?.vehicleDisplayName
+                                )}
                               </span>
                             </td>
                             <td className="py-2 px-3 font-bold text-slate-900">
@@ -5453,26 +5741,35 @@ export default function DispatchRoute() {
                 )}
               </div>
 
-              {/* Status Segmented Tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar">
-                {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => {
+              {/* Status Segmented Tabs (Option C Fleet Palette) */}
+              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar">
+                {(
+                  [
+                    { key: 'all', label: 'All' },
+                    { key: 'available', label: 'Available' },
+                    { key: 'en_route', label: 'En Route' },
+                    { key: 'busy', label: 'Busy' },
+                    { key: 'break', label: 'Break' },
+                    { key: 'offline', label: 'Offline' },
+                  ] as const
+                ).map((tab) => {
                   const count =
-                    filterKey === 'all'
+                    tab.key === 'all'
                       ? drivers.length
-                      : drivers.filter((d) => d.status === filterKey).length;
-                  const isActive = driverFilter === filterKey;
+                      : drivers.filter((d) => d.mapStatus === tab.key).length;
+                  const isActive = driverFilter === tab.key;
                   return (
                     <button
-                      key={filterKey}
+                      key={tab.key}
                       type="button"
-                      onClick={() => setDriverFilter(filterKey)}
-                      className={`flex-1 min-w-[70px] shrink-0 py-1.5 text-center rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      onClick={() => setDriverFilter(tab.key)}
+                      className={`flex-1 min-w-[64px] shrink-0 py-1.5 text-center rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                         isActive
                           ? 'bg-white text-blue-700 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <span className="capitalize">{filterKey.replace('_', ' ')}</span>
+                      <span>{tab.label}</span>
                       <span
                         className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                           isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-200/70 text-slate-600'
@@ -5490,7 +5787,7 @@ export default function DispatchRoute() {
             <div className="flex-1 overflow-y-auto p-3.5 space-y-3 text-xs pb-24">
               {drivers
                 .filter((d) => {
-                  if (driverFilter !== 'all' && d.status !== driverFilter) return false;
+                  if (driverFilter !== 'all' && d.mapStatus !== driverFilter) return false;
                   if (driverSearch.trim()) {
                     const q = driverSearch.toLowerCase();
                     return (
@@ -5503,6 +5800,8 @@ export default function DispatchRoute() {
                   return true;
                 })
                 .map((driver) => {
+                  const statusPalette = FLEET_STATUS_COLORS[driver.mapStatus];
+                  const statusLabel = getMapStatusLabel(driver.mapStatus, driver.activeTripStatus);
                   return (
                     <div
                       key={driver.id}
@@ -5510,7 +5809,10 @@ export default function DispatchRoute() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 font-black text-sm flex items-center justify-center border border-slate-200 shrink-0">
+                          <div
+                            className="w-10 h-10 rounded-xl text-white font-black text-sm flex items-center justify-center shadow-2xs shrink-0"
+                            style={{ backgroundColor: statusPalette.hex }}
+                          >
                             {driver.name
                               .split(' ')
                               .map((n) => n[0])
@@ -5533,29 +5835,24 @@ export default function DispatchRoute() {
                         </div>
 
                         <div className="shrink-0">
-                          {driver.status === 'available' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Available
-                            </span>
-                          ) : driver.status === 'on_trip' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                              On Trip
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                              Offline
-                            </span>
-                          )}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusPalette.badgeClass}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusPalette.dotClass}`} />
+                            {statusLabel}
+                          </span>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between text-xs text-slate-600 py-1.5 px-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-400">📍 Zone:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400">📍</span>
                           <span className="font-bold text-slate-800">{driver.zone}</span>
+                          {driver.telemetry && (
+                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 rounded">
+                              GPS Live
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -5570,49 +5867,54 @@ export default function DispatchRoute() {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="grid grid-cols-3 gap-1.5 pt-0.5">
                         <button
                           type="button"
                           onClick={() => setQueueDriver(driver)}
-                          className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-2 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                           title="Open driver's full assigned schedule & queue"
                         >
-                          <span>Open Queue</span>
-                          {(() => {
-                            const count = trips.filter(
-                              (t) =>
-                                t.assignedDriverId === driver.id &&
-                                !['completed', 'cancelled', 'declined', 'DECLINED'].includes(t.status)
-                            ).length;
-                            return count > 0 ? (
-                              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-blue-700 font-black">
-                                {count}
-                              </span>
-                            ) : null;
-                          })()}
+                          <span>Queue</span>
+                          {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0) > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-blue-700 font-black">
+                              {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0)}
+                            </span>
+                          )}
                         </button>
                         <button
                           type="button"
                           onClick={() => {
-                            setDrivers((prev) =>
-                              prev.map((d) =>
-                                d.id === driver.id
-                                  ? {
-                                      ...d,
-                                      status:
-                                        d.status === 'available'
-                                          ? 'offline'
-                                          : d.status === 'offline'
-                                          ? 'available'
-                                          : 'available',
-                                    }
-                                  : d
-                              )
-                            );
+                            setFocusedMapDriverId(driver.id);
+                            setActiveMobileTab('map');
                           }}
-                          className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          title="Locate car icon on live fleet map"
                         >
-                          <span>Toggle Status</span>
+                          <span>📍 Map</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextDuty =
+                              driver.dutyStatus === 'on_duty'
+                                ? 'on_break'
+                                : driver.dutyStatus === 'on_break'
+                                ? 'off_duty'
+                                : 'on_duty';
+                            try {
+                              await setDriverDutyStatus(driver.id, nextDuty);
+                              showDispatchToast(
+                                `${driver.name} set to ${nextDuty === 'on_break' ? 'On Break' : nextDuty === 'off_duty' ? 'Offline' : 'Available'}.`,
+                                'success'
+                              );
+                            } catch {
+                              showDispatchToast('Failed to update driver status.', 'error');
+                            }
+                          }}
+                          className="py-2 px-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          title="Cycle status: Available → Break → Offline (persisted to Firestore)"
+                        >
+                          <span>Cycle</span>
                         </button>
                       </div>
                     </div>
@@ -5793,6 +6095,7 @@ export default function DispatchRoute() {
                   initialTab={commsInitialTab}
                   onTabChange={(tab) => setCommsActiveTab(tab)}
                   isPopout={false}
+                  isVisible={activeDockTab === 'phone' || activeDockTab === 'comms'}
                   onPopOut={() => getWorkspaceBus().popOutModule('comms')}
                   onClose={() => setActiveDockTab('none')}
                   onOpenEditTrip={(tripId) => {
@@ -5844,43 +6147,39 @@ export default function DispatchRoute() {
                     onClose={() => setActiveDockTab('none')}
                     onPopOut={() => getWorkspaceBus().popOutModule('email')}
                     showWindowControls={false}
-                    onPopulateBooking={(payload) => {
-                      setDrafts((prev) => {
-                        const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                        if (!target) return prev;
-                        const currentForm = target.formValues || ({} as any);
-                        const updatedForm: DispatchFormValues = {
-                          ...currentForm,
-                          passengerName: payload.passenger?.fullName || payload.passengerName || currentForm.passengerName || '',
-                          passengerPhone: payload.passenger?.phone || payload.passengerPhone || currentForm.passengerPhone || '',
-                          pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                          dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                          internalNotes: payload.notes
-                            ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                            : currentForm.internalNotes,
-                        };
-                        return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-                      });
+                    onPopulateBooking={() => {
+                      // EmailDock publishes POPULATE_BOOKING directly to DispatchBookingEngine via WorkspaceBus
+                      setActiveMobileTab('booking');
+                      showDispatchToast('Booking form populated from email!', 'success');
                     }}
                   />
                 </div>
               )}
 
-              {/* 2. DRIVERS ROSTER */}
+              {/* 2. DRIVERS ROSTER (Option C Live Status Palette + Locate on Map + Persisted Duty Switcher) */}
               {activeDockTab === 'drivers' && (
                 <div className="flex-1 flex flex-col h-full overflow-hidden">
                   {/* Filter tabs */}
-                  <div className="p-2 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-xs shrink-0">
-                    {(['all', 'available', 'on_trip', 'offline'] as const).map((filterKey) => (
+                  <div className="p-2 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-[11px] shrink-0 overflow-x-auto no-scrollbar">
+                    {(
+                      [
+                        { key: 'all', label: 'All' },
+                        { key: 'available', label: 'Avail' },
+                        { key: 'en_route', label: 'En Route' },
+                        { key: 'busy', label: 'Busy' },
+                        { key: 'break', label: 'Break' },
+                        { key: 'offline', label: 'Off' },
+                      ] as const
+                    ).map((tab) => (
                       <button
-                        key={filterKey}
+                        key={tab.key}
                         type="button"
-                        onClick={() => setDriverFilter(filterKey)}
-                        className={`flex-1 py-1 text-center rounded-lg font-bold capitalize transition-all cursor-pointer ${
-                          driverFilter === filterKey ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        onClick={() => setDriverFilter(tab.key)}
+                        className={`flex-1 min-w-[44px] py-1 text-center rounded-lg font-bold transition-all cursor-pointer ${
+                          driverFilter === tab.key ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        {filterKey.replace('_', ' ')}
+                        {tab.label}
                       </button>
                     ))}
                   </div>
@@ -5888,36 +6187,52 @@ export default function DispatchRoute() {
                   {/* Drivers List */}
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
                     {drivers
-                      .filter((d) => (driverFilter === 'all' ? true : d.status === driverFilter))
+                      .filter((d) => (driverFilter === 'all' ? true : d.mapStatus === driverFilter))
                       .map((driver) => {
-                        let badge = <Badge variant="success">Available</Badge>;
-                        if (driver.status === 'on_trip') badge = <Badge variant="info">On Trip</Badge>;
-                        if (driver.status === 'offline') badge = <Badge variant="neutral">Offline</Badge>;
+                        const palette = FLEET_STATUS_COLORS[driver.mapStatus];
+                        const statusLabel = getMapStatusLabel(driver.mapStatus, driver.activeTripStatus);
 
                         return (
                           <div
                             key={driver.id}
                             className="p-3 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-2 shadow-2xs"
                           >
-                            <div className="flex items-center justify-between">
-                              <div>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
                                 <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
-                                <span className="text-xs text-slate-500 ml-2">
+                                <span className="text-xs text-slate-500 ml-1.5">
                                   {driver.vehicle} ({driver.tier})
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 shrink-0">
                                 {driver.driverScore !== undefined && (
                                   <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Driver Score">
                                     ★ {driver.driverScore}
                                   </span>
                                 )}
-                                {badge}
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${palette.badgeClass}`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
+                                  {statusLabel}
+                                </span>
                               </div>
                             </div>
 
                             <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-100">
-                              <div>📍 {driver.zone}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span>📍 {driver.zone}</span>
+                                {driver.telemetry && (
+                                  <span className="text-[9.5px] font-mono font-bold px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    GPS
+                                  </span>
+                                )}
+                                {driver.queuedTripsCount > 0 && (
+                                  <span className="text-[9.5px] font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    {driver.queuedTripsCount} queued
+                                  </span>
+                                )}
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5932,50 +6247,50 @@ export default function DispatchRoute() {
                               </button>
                             </div>
 
-                            <div className="flex items-center gap-2 pt-1">
+                            <div className="flex items-center gap-1.5 pt-1">
                               <button
                                 type="button"
                                 onClick={() => setQueueDriver(driver)}
-                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer flex items-center justify-center gap-1"
                                 title="Open driver's full assigned schedule & queue"
                               >
-                                <span>📋 Open Queue</span>
-                                {(() => {
-                                  const count = trips.filter(
-                                    (t) =>
-                                      t.assignedDriverId === driver.id &&
-                                      !['completed', 'cancelled', 'declined', 'DECLINED'].includes(t.status)
-                                  ).length;
-                                  return count > 0 ? (
-                                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-600 text-white font-black">
-                                      {count}
-                                    </span>
-                                  ) : null;
-                                })()}
+                                <span>📋 Queue</span>
+                                {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0) > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-600 text-white font-black">
+                                    {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0)}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setDrivers((prev) =>
-                                    prev.map((d) =>
-                                      d.id === driver.id
-                                        ? {
-                                            ...d,
-                                            status:
-                                              d.status === 'available'
-                                                ? 'offline'
-                                                : d.status === 'offline'
-                                                ? 'available'
-                                                : 'available',
-                                          }
-                                        : d
-                                    )
-                                  );
-                                }}
-                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 cursor-pointer"
+                                onClick={() => setFocusedMapDriverId(driver.id)}
+                                className="px-2 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer"
+                                title="Locate driver's car icon on live fleet map"
                               >
-                                Toggle
+                                📍 Map
                               </button>
+                              <select
+                                value={driver.dutyStatus}
+                                disabled={Boolean(driver.activeTrip)}
+                                onChange={async (e) => {
+                                  const nextDuty = e.target.value as 'on_duty' | 'on_break' | 'off_duty';
+                                  try {
+                                    await setDriverDutyStatus(driver.id, nextDuty);
+                                    showDispatchToast(
+                                      `${driver.name} set to ${nextDuty === 'on_break' ? 'On Break' : nextDuty === 'off_duty' ? 'Offline' : 'Available'}.`,
+                                      'success'
+                                    );
+                                  } catch {
+                                    showDispatchToast('Failed to update driver status.', 'error');
+                                  }
+                                }}
+                                className="px-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-300 cursor-pointer disabled:opacity-50"
+                                title={driver.activeTrip ? 'Driver has an active trip in progress' : 'Set driver duty status (persisted to Firestore)'}
+                              >
+                                <option value="on_duty">🟢 Avail</option>
+                                <option value="on_break">🟡 Break</option>
+                                <option value="off_duty">⚫ Off</option>
+                              </select>
                             </div>
                           </div>
                         );
@@ -6500,7 +6815,7 @@ export default function DispatchRoute() {
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
                   isUnconfirmedTrip
                     ? 'bg-amber-400 text-slate-950 animate-pulse'
-                    : reviewTrip.status === 'confirmed'
+                    : (reviewTrip.status || '').toUpperCase() === 'CONFIRMED'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : (reviewTrip.status === 'cancelled' || reviewTrip.status === 'declined' || reviewTrip.status === 'DECLINED')
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
@@ -6608,7 +6923,7 @@ export default function DispatchRoute() {
                           if (linked) {
                             handleOpenReviewModal(linked, reviewModalTab);
                           } else {
-                            window.open(`/dispatch?tripId=${linkedLegId}`, '_blank');
+                            window.open(`/app/dispatch?tripId=${linkedLegId}`, '_blank');
                           }
                         }}
                         className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
@@ -6664,7 +6979,14 @@ export default function DispatchRoute() {
                       <div>
                         <span className="font-semibold">Vehicle Class: </span>
                         <span className="font-bold text-slate-800">
-                          {formatVehicleTier(reviewTrip.vehicleTier || (reviewTrip.metadata as any)?.vehiclePreference || 'standard')}
+                          {formatVehicleTier(
+                            (reviewTrip.metadata as any)?.vehicleTypeId ||
+                              reviewTrip.vehicleTier ||
+                              (reviewTrip.metadata as any)?.vehiclePreference ||
+                              'standard',
+                            settings.vehicles,
+                            (reviewTrip.metadata as any)?.vehicleDisplayName
+                          )}
                         </span>
                       </div>
                       <div>
@@ -6795,6 +7117,27 @@ export default function DispatchRoute() {
                         </div>
                       )}
                     </div>
+                  )}
+                  {tripMeta.customExtrasSummary && (
+                    <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-950 space-y-0.5">
+                      <div className="font-bold text-emerald-900">✨ Selected Extras &amp; Add-Ons</div>
+                      <div className="font-semibold text-emerald-800">{String(tripMeta.customExtrasSummary)}</div>
+                    </div>
+                  )}
+                  {reviewTrip.pricing && (
+                    <PriceBreakdownPanel
+                      outboundPricing={reviewTrip.pricing}
+                      returnPricing={null}
+                      outboundDisplayFare={reviewTrip.pricing.totalFare}
+                      returnDisplayFare={null}
+                      totalDisplayFare={reviewTrip.pricing.totalFare}
+                      isRoundTrip={false}
+                      vehicleLabel={formatVehicleTier(
+                        (reviewTrip.metadata as any)?.vehicleTypeId || reviewTrip.vehicleTier || 'standard',
+                        settings.vehicles,
+                        (reviewTrip.metadata as any)?.vehicleDisplayName
+                      )}
+                    />
                   )}
                   {reviewTrip.passenger.specialRequests && (
                     <div className="p-2 bg-white rounded-lg border border-amber-200 text-[11px] text-slate-700">
@@ -7428,9 +7771,9 @@ export default function DispatchRoute() {
             <PhoneIcon className="w-5 h-5" />
             {activeCallStatus !== 'idle' ? (
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-            ) : messages.length > 0 ? (
+            ) : unreadMessagesCount > 0 ? (
               <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
-                {messages.length}
+                {unreadMessagesCount}
               </span>
             ) : null}
           </div>
@@ -7450,7 +7793,7 @@ export default function DispatchRoute() {
           <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'drivers' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <UsersIcon className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
-              {drivers.filter((d) => d.status === 'available').length}
+              {drivers.filter((d) => d.mapStatus === 'available').length}
             </span>
           </div>
           <span className="text-[10px] tracking-tight leading-none">Drivers</span>
@@ -7472,265 +7815,99 @@ export default function DispatchRoute() {
           <span className="text-[10px] tracking-tight leading-none">Map</span>
         </button>
       </nav>
+
+      {/* ─── Batch Assign Driver Modal ─── */}
+      {isBatchAssignOpen && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  Batch Assign Driver ({selectedTripIds.length} Trips)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Select a driver operator to assign to all {selectedTripIds.length} selected trip(s).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchAssignOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Driver Operator
+              </label>
+              <select
+                value={batchAssignDriverId}
+                onChange={(e) => setBatchAssignDriverId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a driver...</option>
+                <option value="unassigned">⚠️ Unassign Selected Trips</option>
+                {drivers.map((drv) => (
+                  <option
+                    key={drv.id}
+                    value={drv.id}
+                    disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                  >
+                    {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)} — {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsBatchAssignOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!batchAssignDriverId}
+                onClick={handleConfirmBatchAssign}
+                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold shadow-xs cursor-pointer"
+              >
+                Assign to {selectedTripIds.length} Trip(s)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Non-Blocking Dispatch Toast Notification ─── */}
+      {dispatchToast && (
+        <div className="fixed bottom-16 lg:bottom-4 right-4 z-[130] max-w-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div
+            className={`px-3.5 py-2.5 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2 ${
+              dispatchToast.type === 'success'
+                ? 'bg-emerald-900 text-emerald-50 border-emerald-700'
+                : dispatchToast.type === 'error'
+                ? 'bg-rose-900 text-rose-50 border-rose-700'
+                : 'bg-slate-900 text-white border-slate-700'
+            }`}
+          >
+            <span>
+              {dispatchToast.type === 'success' ? '✓' : dispatchToast.type === 'error' ? '⚠️' : 'ℹ️'}
+            </span>
+            <span className="flex-1">{dispatchToast.text}</span>
+            <button
+              type="button"
+              onClick={() => setDispatchToast(null)}
+              className="text-white/70 hover:text-white cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Live Google Map Stage
-// ─────────────────────────────────────────────────────────────
-interface LiveDispatchMapProps {
-  activeFormValues?: DispatchFormValues;
-  activeTrip?: Trip | null;
-  selectedTrip?: Trip | null;
-  shouldZoom?: boolean;
-  drivers?: DriverRosterItem[];
-  trips?: Trip[];
-}
-
-function LiveDispatchMap({
-  activeFormValues,
-  activeTrip,
-  selectedTrip,
-  shouldZoom = false,
-  drivers = [],
-  trips = [],
-}: LiveDispatchMapProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const mockPolylineRef = useRef<google.maps.Polyline | null>(null);
-  const driverMarkersRef = useRef<google.maps.Marker[]>([]);
-
-  // Initialize Map
-  useEffect(() => {
-    let isMounted = true;
-    loadGoogleMaps()
-      .then((gMaps) => {
-        if (!isMounted || !gMaps || !mapContainerRef.current) return;
-
-        if (!mapInstanceRef.current) {
-          mapInstanceRef.current = new gMaps.maps.Map(mapContainerRef.current, {
-            center: { lat: CHESTERFIELD_CENTER.lat, lng: CHESTERFIELD_CENTER.lng },
-            zoom: 11,
-            disableDefaultUI: true,
-            zoomControl: true,
-            streetViewControl: false,
-          });
-
-          directionsRendererRef.current = new gMaps.maps.DirectionsRenderer({
-            map: mapInstanceRef.current,
-            suppressMarkers: false,
-            preserveViewport: true,
-            polylineOptions: {
-              strokeColor: '#2563eb',
-              strokeWeight: 5,
-              strokeOpacity: 0.85,
-            },
-          });
-        }
-      })
-      .catch((err) => {
-        console.warn('[LiveDispatchMap] Initialization failed:', err);
-      });
-
-    return () => {
-      isMounted = false;
-      if (directionsRendererRef.current) {
-        try {
-          directionsRendererRef.current.setMap(null);
-        } catch {}
-        directionsRendererRef.current = null;
-      }
-      if (mockPolylineRef.current) {
-        try {
-          mockPolylineRef.current.setMap(null);
-        } catch {}
-        mockPolylineRef.current = null;
-      }
-      if (driverMarkersRef.current.length > 0) {
-        driverMarkersRef.current.forEach((m) => {
-          try {
-            m.setMap(null);
-          } catch {}
-        });
-        driverMarkersRef.current = [];
-      }
-      if (mapInstanceRef.current && typeof google !== 'undefined' && google?.maps?.event) {
-        try {
-          google.maps.event.clearInstanceListeners(mapInstanceRef.current);
-        } catch {}
-        mapInstanceRef.current = null;
-      }
-    };
-  }, []);
-
-  // Update Route Polyline based on selected queue trip or active draft (debounced 800ms & trigger guarded)
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-
-    let origin: any = null;
-    let destination: any = null;
-    let waypoints: any[] = [];
-
-    // Priority 1: User explicitly clicked or double-clicked a trip in queue table
-    if (selectedTrip?.pickupLocation?.address && selectedTrip?.dropoffLocation?.address) {
-      origin = selectedTrip.pickupLocation.coordinates || selectedTrip.pickupLocation.address;
-      destination = selectedTrip.dropoffLocation.coordinates || selectedTrip.dropoffLocation.address;
-      waypoints = (selectedTrip.intermediateStops || [])
-        .map((s) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc) => ({ location: loc, stopover: true }));
-    }
-    // Priority 2: Active form values in active draft tab
-    else if (activeFormValues?.pickupAddress && activeFormValues?.dropoffAddress) {
-      origin = activeFormValues.pickupCoordinates || activeFormValues.pickupAddress;
-      destination = activeFormValues.dropoffCoordinates || activeFormValues.dropoffAddress;
-      waypoints = (activeFormValues.intermediateStops || [])
-        .map((s) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc) => ({ location: loc, stopover: true }));
-    }
-    // Priority 3: Active trip from edit draft
-    else if (activeTrip?.pickupLocation?.address && activeTrip?.dropoffLocation?.address) {
-      origin = activeTrip.pickupLocation.coordinates || activeTrip.pickupLocation.address;
-      destination = activeTrip.dropoffLocation.coordinates || activeTrip.dropoffLocation.address;
-      waypoints = (activeTrip.intermediateStops || [])
-        .map((s) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc) => ({ location: loc, stopover: true }));
-    }
-
-    // Offline / Developer Mock Mode: Zero Google Directions API cost
-    if (!isRealtimeRoutingEnabled()) {
-      try {
-        directionsRendererRef.current?.setDirections({ routes: [] } as any);
-      } catch {}
-
-      if (mockPolylineRef.current) {
-        mockPolylineRef.current.setMap(null);
-        mockPolylineRef.current = null;
-      }
-
-      if (origin && destination && window.google?.maps?.Polyline) {
-        const originCoord = resolveMockCoordinates(origin);
-        const destCoord = resolveMockCoordinates(destination);
-        const wpCoords = waypoints.map((w) => resolveMockCoordinates(w.location));
-        const path = [originCoord, ...wpCoords, destCoord];
-
-        mockPolylineRef.current = new window.google.maps.Polyline({
-          path,
-          strokeColor: '#2563eb',
-          strokeWeight: 5,
-          strokeOpacity: 0.85,
-          map: mapInstanceRef.current,
-        });
-
-        if (shouldZoom && window.google?.maps?.LatLngBounds) {
-          const bounds = new window.google.maps.LatLngBounds();
-          path.forEach((pt) => bounds.extend(pt));
-          mapInstanceRef.current.fitBounds(bounds);
-        }
-      }
-      return;
-    }
-
-    // Clean up mock polyline when live routing is enabled
-    if (mockPolylineRef.current) {
-      mockPolylineRef.current.setMap(null);
-      mockPolylineRef.current = null;
-    }
-
-    // Trigger Guard: Ensure both endpoints have valid place_id or Lat/Lng coordinates
-    if (!origin || !destination || !hasValidRoutePair(origin, destination)) {
-      try {
-        directionsRendererRef.current?.setDirections({ routes: [] } as any);
-      } catch {}
-      return;
-    }
-
-    if (typeof window.google?.maps?.DirectionsService !== 'function' || !directionsRendererRef.current) {
-      return;
-    }
-
-    // 800ms debounce quiet period before calling Google Directions API
-    const timer = setTimeout(() => {
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin,
-          destination,
-          waypoints,
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
-            directionsRendererRef.current.setOptions({
-              preserveViewport: !shouldZoom,
-            });
-            directionsRendererRef.current.setDirections(result);
-
-            if (shouldZoom && result?.routes?.[0]?.bounds && mapInstanceRef.current) {
-              mapInstanceRef.current.fitBounds(result.routes[0].bounds);
-            }
-          }
-        }
-      );
-    }, 800);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [activeFormValues, activeTrip, selectedTrip, shouldZoom]);
-
-  // Render live fleet driver markers on the dispatch map
-  useEffect(() => {
-    if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps?.Marker) {
-      return;
-    }
-
-    driverMarkersRef.current.forEach((m) => {
-      try {
-        m.setMap(null);
-      } catch {}
-    });
-    driverMarkersRef.current = [];
-
-    const activeDrivers = drivers.filter((d) => d.status !== 'offline' && !d.isBlacklisted);
-    activeDrivers.forEach((drv, idx) => {
-      const assignedTrip = trips.find(
-        (t) =>
-          t.assignedDriverId === drv.id &&
-          ['assigned', 'en_route', 'arrived', 'in_progress'].includes(t.status)
-      );
-      const telemetryCoords =
-        assignedTrip?.driverTelemetry?.coordinates ||
-        assignedTrip?.currentLocation?.coordinates ||
-        (drv as any).coordinates;
-
-      const fallbackPosition = resolveMockCoordinates(drv.zone || 'Chesterfield, MO');
-      const position =
-        telemetryCoords?.lat && telemetryCoords?.lng
-          ? telemetryCoords
-          : {
-              lat: fallbackPosition.lat + (idx % 3) * 0.004,
-              lng: fallbackPosition.lng + Math.floor(idx / 3) * 0.004,
-            };
-
-      const marker = new window.google.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-        title: `${drv.name} (${drv.vehicle}) • ${drv.status === 'on_trip' ? 'On Trip' : 'Available'}`,
-        label: {
-          text: drv.vehicle.replace(/[^0-9]/g, '').slice(-3) || 'CAB',
-          color: '#ffffff',
-          fontSize: '10px',
-          fontWeight: 'bold',
-        },
-      });
-      driverMarkersRef.current.push(marker);
-    });
-  }, [drivers, trips]);
-
-  return <div ref={mapContainerRef} className="w-full h-full" />;
 }

@@ -153,8 +153,8 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow get: if isAuthenticated();
       allow list: if isDispatcher() || isDriver();
-      allow update: if isDispatcher() || (isDriver() && request.auth.uid == driverId);
-      allow create, delete: if isDispatcher();
+      allow create, update: if isDispatcher() || (isDriver() && request.auth.uid == driverId);
+      allow delete: if isDispatcher();
     }
 
     // ─────────────────────────────────────────────────────────────

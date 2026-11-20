@@ -5,7 +5,7 @@
  * including passenger booking confirmations, dispatcher alerts, and status update notifications.
  */
 
-import type { TripStatus } from '../../types';
+import type { PriceLineItem, TripStatus } from '../../types';
 
 export interface FlightOperationsEmailDetails {
   airlineName?: string;
@@ -36,14 +36,18 @@ export interface BookingConfirmationEmailPayload {
   pickupTime: string;
   bookingType: 'asap' | 'scheduled';
   vehicleTier: string;
+  vehicleDisplayName?: string;
   passengerCount?: number;
   luggageCount?: number;
   totalFare: number;
+  breakdown?: PriceLineItem[];
+  tariffProfileName?: string;
   currency: string;
   paymentMethod: string;
   specialRequests?: string;
   oversizedBags?: Record<string, number>;
   oversizedItemsSummary?: string;
+  customExtrasSummary?: string;
   flightDetails?: FlightOperationsEmailDetails;
   status?: string;
   lambertPickupInstructions?: string;
@@ -92,6 +96,7 @@ export interface AdminDispatchAlertEmailPayload {
   luggageCount?: number;
   oversizedBags?: Record<string, number>;
   oversizedItemsSummary?: string;
+  customExtrasSummary?: string;
   pickupAddress: string;
   pickupNotes?: string;
   intermediateStops?: Array<{ address: string; notes?: string }>;
@@ -99,7 +104,11 @@ export interface AdminDispatchAlertEmailPayload {
   dropoffNotes?: string;
   pickupTime: string;
   vehicleTier: string;
+  vehicleDisplayName?: string;
   totalFare: number;
+  breakdown?: PriceLineItem[];
+  tariffProfileName?: string;
+  bookingSource?: string;
   currency: string;
   bookingType: 'asap' | 'scheduled';
   paymentMethod?: string;

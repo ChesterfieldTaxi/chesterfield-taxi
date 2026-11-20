@@ -105,6 +105,10 @@ export interface PricingInput {
   bypassSurge?: boolean;
   /** Dispatcher override: manual courtesy dollar discount */
   manualDiscount?: number;
+  /** Dispatcher/corporate percentage discount (0-100, e.g., 10 for 10% off) */
+  manualDiscountPercent?: number;
+  /** Optional display label for percentage/courtesy discount */
+  manualDiscountLabel?: string;
   /** Dispatcher override: complete manual fare override */
   manualFareOverride?: number;
   /** Child safety car seat counts */

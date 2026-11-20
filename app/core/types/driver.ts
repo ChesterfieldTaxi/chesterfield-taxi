@@ -5,7 +5,19 @@
  * and live Taximeter Extra Fee adjustments.
  */
 
+import type { DriverTelemetryPing } from './trip';
+
 export type DriverDutyStatus = 'on_duty' | 'off_duty' | 'on_break';
+
+/**
+ * Canonical Live Fleet Map Status (Option C CAD Palette):
+ * - available: Green  (on_duty, not currently en_route / arrived / in_progress)
+ * - en_route:  Blue   (heading to pickup)
+ * - busy:      Red    (arrived at pickup or trip in_progress)
+ * - break:     Yellow (on_break, still emitting light 30s GPS)
+ * - offline:   Slate  (off_duty or suspended)
+ */
+export type LiveDriverMapStatus = 'available' | 'en_route' | 'busy' | 'break' | 'offline';
 
 export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -48,6 +60,9 @@ export interface DriverProfile {
   zone?: string;
   avatarUrl?: string;
   lastActiveAt?: string;
+  /** Live GPS telemetry written continuously while on_duty or on_break */
+  currentLocation?: DriverTelemetryPing;
+  locationUpdatedAt?: string;
   schedule?: DriverScheduleConfig;
   
   /** Universal Governance & Scoring (Phase 29) */

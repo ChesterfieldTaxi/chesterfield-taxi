@@ -1,22 +1,30 @@
 /**
  * Driver Geolocation Telemetry Broadcaster
- * 
- * Adaptive GPS telemetry broadcaster with strict throttling:
- * - 15-second intervals when stationary or low speed (<= 15 mph)
- * - 10-second intervals when moving (> 15 mph)
- * 
- * Includes offline buffering, graceful network degradation,
- * and comprehensive cleanup of DOM listeners and geolocation watchers on unmount.
+ *
+ * Continuous shift-aware adaptive GPS telemetry broadcaster:
+ * - Active trip (en_route | arrived | in_progress): 10s moving (> 5 mph), 15s stationary
+ * - Available (on_duty, no active trip): 12s moving (> 5 mph), 30s idle
+ * - On Break (on_break): 30s light GPS update so dispatch keeps live visibility
+ * - Off Duty (off_duty): tracking stopped completely
+ *
+ * Dual-writes live GPS fixes to `drivers/{driverId}` (for fleet-wide Dispatch map
+ * tracking across Available / En Route / Arrived / In Progress / Break) AND to
+ * `trips/{tripId}` during active trips (for Customer Telemetry tracking).
+ * Automatically derives compass heading from consecutive fixes when GPS hardware
+ * omits `coords.heading`.
  */
 
 import { useState, useEffect, useRef } from 'react';
-import type { Trip, DriverTelemetryPing } from '../types/trip';
+import type { Trip, DriverTelemetryPing, GeoPoint } from '../types/trip';
+import type { DriverDutyStatus } from '../types/driver';
 import { getBookingService } from '../services/booking';
+import { getDriverService } from '../services/driver.service';
 import { getWorkspaceBus } from '../services/workspace-bus.service';
 
 export interface UseDriverTelemetryOptions {
   trip: Trip | null;
   driverId?: string;
+  dutyStatus?: DriverDutyStatus;
   isEnabled?: boolean;
 }
 
@@ -31,17 +39,64 @@ export interface UseDriverTelemetryResult {
 }
 
 /**
- * Calculates adaptive broadcast interval based on vehicle ground speed:
- * - > 15 mph: 10,000 ms (10 seconds)
- * - <= 15 mph: 15,000 ms (15 seconds)
+ * Haversine distance in meters between two WGS84 coordinates.
  */
-export function getAdaptiveThrottleIntervalMs(speedMph: number): number {
-  return speedMph > 15 ? 10000 : 15000;
+function distanceMeters(a: GeoPoint, b: GeoPoint): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+/**
+ * Initial compass bearing in degrees [0, 360) from point A to point B.
+ */
+export function computeCompassBearing(from: GeoPoint, to: GeoPoint): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return Math.round((toDeg(Math.atan2(y, x)) + 360) % 360);
+}
+
+/**
+ * Calculates adaptive broadcast interval based on vehicle speed, active trip, and duty status:
+ * - Active trip moving (> 5 mph): 10,000 ms
+ * - Active trip stationary/slow: 15,000 ms
+ * - Available (on_duty) moving (> 5 mph): 12,000 ms
+ * - Available idle or On Break: 30,000 ms
+ */
+export function getAdaptiveThrottleIntervalMs(
+  speedMph: number,
+  options?: { isActiveTrip?: boolean; dutyStatus?: DriverDutyStatus }
+): number {
+  const isActiveTrip = options?.isActiveTrip ?? true;
+  const dutyStatus = options?.dutyStatus;
+
+  if (isActiveTrip) {
+    return speedMph > 5 ? 10000 : 15000;
+  }
+  if (dutyStatus === 'on_break') {
+    return 30000;
+  }
+  return speedMph > 5 ? 12000 : 30000;
 }
 
 export function useDriverTelemetry({
   trip,
   driverId,
+  dutyStatus = 'on_duty',
   isEnabled = true,
 }: UseDriverTelemetryOptions): UseDriverTelemetryResult {
   const [currentTelemetry, setCurrentTelemetry] = useState<DriverTelemetryPing | null>(null);
@@ -57,8 +112,18 @@ export function useDriverTelemetry({
   const lastBroadcastMsRef = useRef<number>(0);
   const offlineBufferRef = useRef<DriverTelemetryPing[]>([]);
   const latestPingRef = useRef<DriverTelemetryPing | null>(null);
+  const prevFixRef = useRef<GeoPoint | null>(null);
+  const lastHeadingRef = useRef<number | undefined>(undefined);
   const watchIdRef = useRef<number | null>(null);
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isActiveTripState = Boolean(
+    trip &&
+      trip.id &&
+      (trip.status === 'en_route' ||
+        trip.status === 'arrived' ||
+        trip.status === 'in_progress')
+  );
 
   // Monitor network connectivity (Online / Offline)
   useEffect(() => {
@@ -66,22 +131,28 @@ export function useDriverTelemetry({
 
     const handleOnline = () => {
       setIsOffline(false);
-      // Flush buffered location if available upon reconnecting
-      if (offlineBufferRef.current.length > 0 && trip?.id) {
+      if (offlineBufferRef.current.length > 0 && (driverId || trip?.id)) {
         const latestBuffered = offlineBufferRef.current[offlineBufferRef.current.length - 1];
         offlineBufferRef.current = [];
         setPendingBufferCount(0);
 
         try {
-          const bookingService = getBookingService();
-          if (bookingService?.updateTrip) {
-            bookingService.updateTrip(trip.id, {
-              driverTelemetry: latestBuffered,
-              currentLocation: latestBuffered,
-            });
+          if (driverId) {
+            void getDriverService().updateDriverLocation(driverId, latestBuffered);
+          }
+          if (isActiveTripState && trip?.id) {
+            const bookingService = getBookingService();
+            if (bookingService?.updateTrip) {
+              void bookingService.updateTrip(trip.id, {
+                driverTelemetry: latestBuffered,
+                currentLocation: latestBuffered,
+              });
+            }
           }
           getWorkspaceBus().publish('DRIVER_TELEMETRY_PING', {
-            tripId: trip.id,
+            tripId: isActiveTripState ? trip?.id : undefined,
+            driverId,
+            dutyStatus,
             ...latestBuffered,
           });
           setLastBroadcastAt(new Date().toLocaleTimeString());
@@ -102,18 +173,14 @@ export function useDriverTelemetry({
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [trip?.id]);
+  }, [trip?.id, isActiveTripState, driverId, dutyStatus]);
 
   // Main Geolocation Tracking & Throttling Engine
   useEffect(() => {
-    // Only track during active in-flight trip phases
-    const isActiveTripState =
-      trip &&
-      (trip.status === 'en_route' ||
-        trip.status === 'arrived' ||
-        trip.status === 'in_progress');
+    const shouldTrackShift =
+      Boolean(driverId) && (dutyStatus === 'on_duty' || dutyStatus === 'on_break');
 
-    if (!isEnabled || !isActiveTripState || !trip?.id) {
+    if (!isEnabled || (!isActiveTripState && !shouldTrackShift)) {
       setIsTracking(false);
       if (watchIdRef.current !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchIdRef.current);
@@ -126,6 +193,8 @@ export function useDriverTelemetry({
       return;
     }
 
+    // Reset throttle on status transition so Dispatch sees the fresh state immediately
+    lastBroadcastMsRef.current = 0;
     setIsTracking(true);
     setGpsError(null);
 
@@ -133,7 +202,6 @@ export function useDriverTelemetry({
       setCurrentTelemetry(ping);
       latestPingRef.current = ping;
 
-      // If device is offline, buffer locally and do not flood network
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         offlineBufferRef.current.push({ ...ping, isOfflineBuffer: true });
         setPendingBufferCount(offlineBufferRef.current.length);
@@ -141,10 +209,12 @@ export function useDriverTelemetry({
       }
 
       const now = Date.now();
-      const intervalMs = getAdaptiveThrottleIntervalMs(ping.speedMph || 0);
+      const intervalMs = getAdaptiveThrottleIntervalMs(ping.speedMph || 0, {
+        isActiveTrip: isActiveTripState,
+        dutyStatus,
+      });
       setCurrentIntervalSeconds(intervalMs / 1000);
 
-      // Enforce strict 10s or 15s throttle interval
       if (now - lastBroadcastMsRef.current < intervalMs && lastBroadcastMsRef.current !== 0) {
         return;
       }
@@ -153,17 +223,27 @@ export function useDriverTelemetry({
       setLastBroadcastAt(new Date().toLocaleTimeString());
 
       try {
-        const bookingService = getBookingService();
-        if (bookingService?.updateTrip) {
-          bookingService.updateTrip(trip.id, {
-            driverTelemetry: ping,
-            currentLocation: ping,
-          });
+        // 1. Always update driver document for live fleet tracking (available / en_route / busy / break)
+        if (driverId) {
+          void getDriverService().updateDriverLocation(driverId, ping);
         }
 
+        // 2. Also update active trip document for customer live telemetry tracking
+        if (isActiveTripState && trip?.id) {
+          const bookingService = getBookingService();
+          if (bookingService?.updateTrip) {
+            void bookingService.updateTrip(trip.id, {
+              driverTelemetry: ping,
+              currentLocation: ping,
+            });
+          }
+        }
+
+        // 3. Publish across browser tabs/windows for instant local dispatch updates
         getWorkspaceBus().publish('DRIVER_TELEMETRY_PING', {
-          tripId: trip.id,
+          tripId: isActiveTripState ? trip?.id : undefined,
           driverId,
+          dutyStatus,
           ...ping,
         });
       } catch (err) {
@@ -171,27 +251,49 @@ export function useDriverTelemetry({
       }
     };
 
-    // Attempt HTML5 Geolocation API
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       try {
         const watchId = navigator.geolocation.watchPosition(
           (position) => {
+            const coords: GeoPoint = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+
             const rawSpeed = position.coords.speed;
             const speedMph =
-              rawSpeed != null && rawSpeed >= 0
+              rawSpeed != null && !Number.isNaN(rawSpeed) && rawSpeed >= 0
                 ? Number((rawSpeed * 2.23694).toFixed(1))
                 : 0;
 
+            // Use hardware compass heading if valid, otherwise compute from movement >= 15m
+            let resolvedHeading: number | undefined = lastHeadingRef.current;
+            const rawHeading = position.coords.heading;
+            if (
+              typeof rawHeading === 'number' &&
+              !Number.isNaN(rawHeading) &&
+              rawHeading >= 0 &&
+              rawHeading <= 360
+            ) {
+              resolvedHeading = Math.round(rawHeading);
+            } else if (prevFixRef.current && distanceMeters(prevFixRef.current, coords) >= 15) {
+              resolvedHeading = computeCompassBearing(prevFixRef.current, coords);
+            }
+
+            if (typeof resolvedHeading === 'number') {
+              lastHeadingRef.current = resolvedHeading;
+            }
+            if (!prevFixRef.current || distanceMeters(prevFixRef.current, coords) >= 15) {
+              prevFixRef.current = coords;
+            }
+
             const ping: DriverTelemetryPing = {
-              coordinates: {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              },
+              coordinates: coords,
               speedMph,
-              heading: position.coords.heading ?? undefined,
+              heading: resolvedHeading,
               accuracy: Math.round(position.coords.accuracy),
               timestamp: new Date(position.timestamp).toISOString(),
-              status: trip.status,
+              status: isActiveTripState ? trip?.status : dutyStatus,
             };
 
             broadcastPing(ping);
@@ -216,7 +318,6 @@ export function useDriverTelemetry({
       setGpsError('Geolocation API not supported on this device');
     }
 
-    // Safety unmount cleanup
     return () => {
       if (watchIdRef.current !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchIdRef.current);
@@ -228,7 +329,7 @@ export function useDriverTelemetry({
       }
       setIsTracking(false);
     };
-  }, [trip?.id, trip?.status, driverId, isEnabled]);
+  }, [trip?.id, trip?.status, isActiveTripState, driverId, dutyStatus, isEnabled]);
 
   return {
     currentTelemetry,

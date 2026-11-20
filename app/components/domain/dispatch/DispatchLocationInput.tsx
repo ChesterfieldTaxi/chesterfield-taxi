@@ -37,15 +37,44 @@ export interface DispatchLocationInputProps {
   className?: string;
 }
 
-const REGIONAL_DISPATCH_LOCATIONS = [
-  'St. Louis Lambert International Airport (STL), St. Louis, MO',
-  'Spirit of St. Louis Airport (SUS), Chesterfield, MO',
-  'Chesterfield Valley Shopping Center, Chesterfield, MO',
-  'Chesterfield Mall / Downtown Chesterfield, MO',
-  "St. Luke's Hospital, Chesterfield, MO",
-  'Downtown St. Louis / Gateway Arch, St. Louis, MO',
-  'Centene Community Ice Center, Maryland Heights, MO',
-  'Town and Country Crossing, Town and Country, MO',
+interface RegionalPresetLocation {
+  address: string;
+  coordinates: GeoPoint;
+}
+
+const REGIONAL_DISPATCH_LOCATIONS: RegionalPresetLocation[] = [
+  {
+    address: 'St. Louis Lambert International Airport (STL), St. Louis, MO',
+    coordinates: { lat: 38.7487, lng: -90.37 },
+  },
+  {
+    address: 'Spirit of St. Louis Airport (SUS), Chesterfield, MO',
+    coordinates: { lat: 38.6621, lng: -90.652 },
+  },
+  {
+    address: 'Chesterfield Valley Shopping Center, Chesterfield, MO',
+    coordinates: { lat: 38.6685, lng: -90.5797 },
+  },
+  {
+    address: 'Chesterfield Mall / Downtown Chesterfield, MO',
+    coordinates: { lat: 38.6531, lng: -90.5625 },
+  },
+  {
+    address: "St. Luke's Hospital, Chesterfield, MO",
+    coordinates: { lat: 38.6458, lng: -90.5091 },
+  },
+  {
+    address: 'Downtown St. Louis / Gateway Arch, St. Louis, MO',
+    coordinates: { lat: 38.6247, lng: -90.1848 },
+  },
+  {
+    address: 'Centene Community Ice Center, Maryland Heights, MO',
+    coordinates: { lat: 38.7248, lng: -90.4648 },
+  },
+  {
+    address: 'Town and Country Crossing, Town and Country, MO',
+    coordinates: { lat: 38.6295, lng: -90.4712 },
+  },
 ];
 
 export function DispatchLocationInput({
@@ -145,15 +174,54 @@ export function DispatchLocationInput({
     }
   };
 
-  const handleSelectRegional = (loc: string) => {
+  const handleSelectRegional = (loc: RegionalPresetLocation) => {
     setLocateError(null);
-    setInputValue(loc);
-    onChangeRef.current?.(loc);
+    setInputValue(loc.address);
+    onChangeRef.current?.(loc.address);
     onPlaceSelectedRef.current?.({
-      address: loc,
-      formattedAddress: loc,
+      address: loc.address,
+      formattedAddress: loc.address,
+      coordinates: loc.coordinates,
     });
     setIsOpen(false);
+  };
+
+  const handleConfirmFreeformAddress = (rawAddr: string) => {
+    const trimmed = rawAddr.trim();
+    if (!trimmed) return;
+    setIsOpen(false);
+
+    // Attempt live geocode so freeform typed addresses still get verified coordinates & placeId
+    if (typeof window !== 'undefined' && (window as any).google?.maps?.Geocoder) {
+      try {
+        const geocoder = new (window as any).google.maps.Geocoder();
+        geocoder.geocode({ address: trimmed }, (results: any[] | null, status: string) => {
+          if (status === 'OK' && results && results[0]?.geometry?.location) {
+            const loc = results[0].geometry.location;
+            const formatted = results[0].formatted_address || trimmed;
+            setInputValue(formatted);
+            onChangeRef.current?.(formatted);
+            onPlaceSelectedRef.current?.({
+              address: formatted,
+              formattedAddress: formatted,
+              placeId: results[0].place_id,
+              coordinates: { lat: loc.lat(), lng: loc.lng() },
+            });
+            return;
+          }
+          onPlaceSelectedRef.current?.({
+            address: trimmed,
+            formattedAddress: trimmed,
+          });
+        });
+        return;
+      } catch {}
+    }
+
+    onPlaceSelectedRef.current?.({
+      address: trimmed,
+      formattedAddress: trimmed,
+    });
   };
 
   const handleUseCurrentLocation = () => {
@@ -216,7 +284,7 @@ export function DispatchLocationInput({
   const filteredRegional = REGIONAL_DISPATCH_LOCATIONS.filter((loc) =>
     inputValue.trim().length === 0
       ? true
-      : loc.toLowerCase().includes(inputValue.toLowerCase())
+      : loc.address.toLowerCase().includes(inputValue.toLowerCase())
   );
 
   const hasLivePredictions =
@@ -249,11 +317,7 @@ export function DispatchLocationInput({
         }
       } else if (inputValue.trim()) {
         e.preventDefault();
-        onPlaceSelectedRef.current?.({
-          address: inputValue.trim(),
-          formattedAddress: inputValue.trim(),
-        });
-        setIsOpen(false);
+        handleConfirmFreeformAddress(inputValue);
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
@@ -394,7 +458,7 @@ export function DispatchLocationInput({
               </div>
               {filteredRegional.map((loc, idx) => (
                 <button
-                  key={loc}
+                  key={loc.address}
                   type="button"
                   role="option"
                   aria-selected={idx === highlightedIndex}
@@ -409,7 +473,7 @@ export function DispatchLocationInput({
                       : 'hover:bg-slate-50 text-slate-700'
                   }`}
                 >
-                  {loc}
+                  {loc.address}
                 </button>
               ))}
               {inputValue.trim().length >= 3 && (
@@ -417,11 +481,7 @@ export function DispatchLocationInput({
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    onPlaceSelectedRef.current?.({
-                      address: inputValue.trim(),
-                      formattedAddress: inputValue.trim(),
-                    });
-                    setIsOpen(false);
+                    handleConfirmFreeformAddress(inputValue);
                   }}
                   className="w-full text-left px-3 py-2 mt-0.5 border-t border-slate-100 text-blue-600 hover:bg-blue-50 font-semibold rounded-lg transition-colors cursor-pointer"
                 >
@@ -434,11 +494,7 @@ export function DispatchLocationInput({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault();
-                onPlaceSelectedRef.current?.({
-                  address: inputValue.trim(),
-                  formattedAddress: inputValue.trim(),
-                });
-                setIsOpen(false);
+                handleConfirmFreeformAddress(inputValue);
               }}
               className="w-full text-left px-3 py-2 text-blue-600 hover:bg-blue-50 font-semibold rounded-lg transition-colors cursor-pointer"
             >

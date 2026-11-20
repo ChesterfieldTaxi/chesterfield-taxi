@@ -6,6 +6,8 @@
  */
 
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import type { PriceLineItem } from '../../types';
+import type { VehicleTierConfig } from '../../types/config';
 import type {
   BookingConfirmationEmailPayload,
   AdminDispatchAlertEmailPayload,
@@ -21,37 +23,153 @@ export interface RenderedEmail {
 }
 
 /**
- * Common HTML email shell wrapping branded header, container, and footer.
+ * Escapes HTML special characters in user-provided strings before template interpolation.
  */
-export function formatVehicleTier(tier: string): string {
+export function escapeHtml(input?: string | null): string {
+  if (!input) return '';
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Resolves a human-friendly vehicle class label prioritizing:
+ * 1. Explicit persisted `vehicleDisplayName`
+ * 2. Live Admin `VehicleTierConfig.name` lookup by `id`
+ * 3. Clean fallback formatter
+ */
+export function formatVehicleTier(
+  tier: string,
+  vehicles?: VehicleTierConfig[],
+  explicitDisplayName?: string
+): string {
+  if (explicitDisplayName && explicitDisplayName.trim()) return explicitDisplayName.trim();
   if (!tier) return 'Standard Sedan';
+  if (vehicles && vehicles.length > 0) {
+    const matched = vehicles.find((v) => v.id.toLowerCase() === tier.trim().toLowerCase());
+    if (matched?.name) return matched.name;
+  }
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
   if (clean === 'any' || clean.startsWith('any')) return 'Any Vehicle (Best Available)';
-  if (clean === 'standard' || clean === 'sedan') return 'Executive Sedan';
+  if (clean === 'standard' || clean === 'sedan') return 'Standard Sedan';
+  if (clean === 'premium') return 'Premium Sedan';
   if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
   if (clean === 'compact suv') return 'Compact SUV';
   if (clean === 'midsize suv') return 'Midsize SUV';
-  if (clean === 'wheelchair' || clean === 'van' || clean === 'wav') return 'Accessible Van / WAV';
+  if (clean === 'minivan') return 'Minivan';
+  if (clean === 'van') return 'Passenger Van';
+  if (clean === 'wheelchair' || clean === 'wav') return 'Wheelchair Accessible Van (WAV)';
   return clean.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
  * Concise UI badge formatting for vehicle tiers in tables, queues, and cards
  */
-export function formatVehicleTierDisplay(tier?: string): string {
+export function formatVehicleTierDisplay(
+  tier?: string,
+  vehicles?: VehicleTierConfig[],
+  explicitDisplayName?: string
+): string {
+  if (explicitDisplayName && explicitDisplayName.trim()) return explicitDisplayName.trim();
   if (!tier) return 'Standard';
+  if (vehicles && vehicles.length > 0) {
+    const matched = vehicles.find((v) => v.id.toLowerCase() === tier.trim().toLowerCase());
+    if (matched?.name) return matched.name;
+  }
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
   if (clean === 'any') return 'Any';
   if (clean === 'compact suv') return 'Compact SUV';
   if (clean === 'midsize suv') return 'Midsize SUV';
-  if (clean === 'standard') return 'Standard';
+  if (clean === 'standard') return 'Standard Sedan';
   if (clean === 'sedan') return 'Sedan';
-  if (clean === 'xl') return 'SUV (XL)';
+  if (clean === 'xl') return 'Full-Size SUV (XL)';
   if (clean === 'suv' || clean === 'large suv' || clean === 'full size suv') return 'Full-Size SUV';
   if (clean === 'minivan') return 'Minivan';
-  if (clean === 'van' || clean === 'wheelchair' || clean === 'wav') return 'Van / WAV';
+  if (clean === 'van') return 'Passenger Van';
+  if (clean === 'wheelchair' || clean === 'wav') return 'WAV';
   if (clean === 'premium') return 'Premium';
   return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Renders the canonical Admin Tariff price breakdown (Base Fare + Extras + Surcharges + Discounts)
+ * as clean inline-CSS HTML rows for email clients.
+ */
+function renderPriceBreakdownHtml(breakdown?: PriceLineItem[], tariffProfileName?: string): string {
+  if (!breakdown || breakdown.length === 0) return '';
+  const baseLine = breakdown.find((i) => i.category === 'base');
+  const extras = breakdown.filter((i) => i.category === 'extra' && i.amount !== 0);
+  const surcharges = breakdown.filter((i) => i.category === 'surcharge' && i.amount !== 0);
+  const discounts = breakdown.filter((i) => i.category === 'discount' && i.amount !== 0);
+  const rounding = breakdown.filter((i) => i.category === 'rounding' && i.amount !== 0);
+  const ordered = [
+    ...(baseLine ? [{ ...baseLine, label: 'Base Fare' }] : []),
+    ...extras,
+    ...surcharges,
+    ...discounts,
+    ...rounding,
+  ];
+  if (ordered.length === 0) return '';
+
+  const rowsHtml = ordered
+    .map((item) => {
+      const isDiscount = item.category === 'discount' || item.amount < 0;
+      const color = isDiscount ? '#047857' : '#334155';
+      const formattedAmt = isDiscount
+        ? `-$${Math.abs(item.amount).toFixed(2)}`
+        : `$${item.amount.toFixed(2)}`;
+      return `
+        <tr>
+          <td style="padding: 3px 0; font-size: 12px; color: ${color}; ${item.category === 'base' ? 'font-weight: 700; color: #0f172a;' : ''}">
+            ${escapeHtml(item.label)}
+          </td>
+          <td align="right" style="padding: 3px 0; font-size: 12px; font-family: monospace; font-weight: 700; color: ${isDiscount ? '#047857' : '#0f172a'};">
+            ${formattedAmt}
+          </td>
+        </tr>`;
+    })
+    .join('');
+
+  return `
+    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #cbd5e1;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td colspan="2" style="padding-bottom: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">
+            Fare Breakdown${tariffProfileName ? ` • ${escapeHtml(tariffProfileName)}` : ''}
+          </td>
+        </tr>
+        ${rowsHtml}
+      </table>
+    </div>
+  `;
+}
+
+function renderPriceBreakdownText(breakdown?: PriceLineItem[]): string {
+  if (!breakdown || breakdown.length === 0) return '';
+  const baseLine = breakdown.find((i) => i.category === 'base');
+  const ordered = [
+    ...(baseLine ? [{ ...baseLine, label: 'Base Fare' }] : []),
+    ...breakdown.filter((i) => i.category === 'extra' && i.amount !== 0),
+    ...breakdown.filter((i) => i.category === 'surcharge' && i.amount !== 0),
+    ...breakdown.filter((i) => i.category === 'discount' && i.amount !== 0),
+    ...breakdown.filter((i) => i.category === 'rounding' && i.amount !== 0),
+  ];
+  if (ordered.length === 0) return '';
+  return (
+    '\nFARE BREAKDOWN:\n' +
+    ordered
+      .map((item) => {
+        const amt =
+          item.amount < 0
+            ? `-$${Math.abs(item.amount).toFixed(2)}`
+            : `$${item.amount.toFixed(2)}`;
+        return `- ${item.label}: ${amt}`;
+      })
+      .join('\n')
+  );
 }
 
 /**
@@ -126,7 +244,7 @@ function renderEmailShell(
   </style>
 </head>
 <body>
-  ${previewText ? `<div style="display:none;font-size:1px;color:#333333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${previewText}</div>` : ''}
+  ${previewText ? `<div style="display:none;font-size:1px;color:#333333;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${escapeHtml(previewText)}</div>` : ''}
   <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
     <tr>
       <td align="center">
@@ -442,7 +560,7 @@ export function renderBookingRequestReceivedEmail(
           <td width="50%" valign="top" style="padding-bottom: 12px;">
             <div class="item-label">Vehicle Preference</div>
             <div class="item-value">
-              ${formatVehicleTier(payload.vehicleTier)}
+              ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
             </div>
           </td>
         </tr>
@@ -571,12 +689,22 @@ export function renderBookingRequestReceivedEmail(
     </div>
     ` : ''}
 
+    ${payload.customExtrasSummary ? `
+    <!-- Selected Add-Ons / Custom Extras -->
+    <div class="card-box" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+      <div class="item-label" style="color: #166534;">Selected Extras &amp; Add-Ons</div>
+      <div style="font-size: 13px; font-weight: 600; color: #14532d; margin-top: 3px;">
+        ${escapeHtml(payload.customExtrasSummary)}
+      </div>
+    </div>
+    ` : ''}
+
     ${payload.specialRequests ? `
     <!-- Special Requests -->
     <div class="card-box">
       <div class="item-label">Passenger Notes / Special Requests</div>
       <div style="font-size: 13px; color: #334155; margin-top: 4px; line-height: 1.5;">
-        ${payload.specialRequests}
+        ${escapeHtml(payload.specialRequests)}
       </div>
     </div>
     ` : ''}
@@ -601,6 +729,7 @@ export function renderBookingRequestReceivedEmail(
           </td>
         </tr>
       </table>
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
     </div>
 
     <!-- Dispatch Assistance Callout -->
@@ -642,7 +771,7 @@ ${renderPassengerDetailsText(
 
 OUTBOUND LEG: #${payload.tripId}
 - Timing: ${payload.pickupTime} (${isScheduled ? 'Scheduled' : 'ASAP'})
-- Vehicle Preference: ${formatVehicleTier(payload.vehicleTier)}
+- Vehicle Preference: ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `(Note: ${payload.pickupNotes})` : ''}
 - Dropoff: ${payload.dropoffAddress} ${payload.dropoffNotes ? `(Note: ${payload.dropoffNotes})` : ''}
 ${hasFlight ? `- Flight: ${payload.flightDetails?.airlineName || payload.flightDetails?.airlineCode || ''} ${payload.flightDetails?.flightNumber || payload.flightDetails?.tailNumber || ''}\n` : ''}
@@ -763,7 +892,7 @@ export function renderBookingConfirmedEmail(
           <td width="50%" valign="top" style="padding-bottom: 12px;">
             <div class="item-label">Vehicle Tier</div>
             <div class="item-value">
-              ${formatVehicleTier(payload.vehicleTier)}
+              ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
             </div>
           </td>
         </tr>
@@ -905,12 +1034,22 @@ export function renderBookingConfirmedEmail(
     </div>
     ` : ''}
 
+    ${payload.customExtrasSummary ? `
+    <!-- Confirmed Custom Extras -->
+    <div class="card-box" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+      <div class="item-label" style="color: #166534;">Confirmed Extras &amp; Add-Ons</div>
+      <div style="font-size: 13px; font-weight: 600; color: #14532d; margin-top: 3px;">
+        ${escapeHtml(payload.customExtrasSummary)}
+      </div>
+    </div>
+    ` : ''}
+
     ${payload.specialRequests ? `
     <!-- Driver Notes -->
     <div class="card-box">
       <div class="item-label">Driver Dispatch Remarks / Special Requests</div>
       <div style="font-size: 13px; color: #334155; margin-top: 4px; line-height: 1.5;">
-        ${payload.specialRequests}
+        ${escapeHtml(payload.specialRequests)}
       </div>
     </div>
     ` : ''}
@@ -935,6 +1074,7 @@ export function renderBookingConfirmedEmail(
           </td>
         </tr>
       </table>
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
     </div>
 
     <!-- Personal Account Upsell CTA Card -->
@@ -991,7 +1131,7 @@ ${renderPassengerDetailsText(
 OUTBOUND LEG: #${payload.tripId}
 - Status: Confirmed
 - Timing: ${payload.pickupTime} (${isScheduled ? 'Scheduled' : 'ASAP'})
-- Vehicle Class: ${formatVehicleTier(payload.vehicleTier)}
+- Vehicle Class: ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `(Note: ${payload.pickupNotes})` : ''}
 - Dropoff: ${payload.dropoffAddress} ${payload.dropoffNotes ? `(Note: ${payload.dropoffNotes})` : ''}
 ${isLambert ? `- Lambert Pickup Instructions: ${lambertInstructions}\n` : ''}
@@ -1065,7 +1205,7 @@ export function renderDispatcherAlertEmail(
         New Booking #${payload.tripId}
       </h2>
       <p style="margin: 0; color: #64748b; font-size: 13px;">
-        Submitted via Web Portal • Dispatch Action Required
+        ${escapeHtml(payload.bookingSource || 'Submitted via Web Portal')} • Dispatch Action Required
       </p>
     </div>
 
@@ -1077,12 +1217,12 @@ export function renderDispatcherAlertEmail(
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td width="50%" valign="top">
-            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">${payload.passengerName}</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0f172a;">${escapeHtml(payload.passengerName)}</div>
             <div style="font-size: 13px; color: #475569; margin-top: 2px;">
-              <a href="tel:${payload.passengerPhone}" style="color: #0f172a; font-weight: 600; text-decoration: none;">📞 ${payload.passengerPhone}</a>
+              <a href="tel:${escapeHtml(payload.passengerPhone)}" style="color: #0f172a; font-weight: 600; text-decoration: none;">📞 ${escapeHtml(payload.passengerPhone)}</a>
             </div>
             <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
-              ✉ ${payload.passengerEmail}
+              ✉ ${escapeHtml(payload.passengerEmail)}
             </div>
           </td>
           <td width="50%" align="right" valign="top">
@@ -1091,7 +1231,7 @@ export function renderDispatcherAlertEmail(
               ${payload.passengerCount || 1} Pax • ${payload.luggageCount || 0} Luggage
             </div>
             <div style="font-size: 12px; color: #d97706; font-weight: 700; text-transform: uppercase; margin-top: 4px;">
-              Tier: ${formatVehicleTier(payload.vehicleTier)}
+              Tier: ${escapeHtml(formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName))}
             </div>
           </td>
         </tr>
@@ -1105,7 +1245,19 @@ export function renderDispatcherAlertEmail(
         🚨 Declared Oversized Cargo (Vehicle Assignment Alert)
       </div>
       <div style="font-size: 13px; font-weight: 700; color: #7f1d1d; margin-top: 3px;">
-        ${payload.oversizedItemsSummary}
+        ${escapeHtml(payload.oversizedItemsSummary)}
+      </div>
+    </div>
+    ` : ''}
+
+    ${payload.customExtrasSummary ? `
+    <!-- Custom Bookable Extras -->
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #16a34a; border-radius: 8px; padding: 12px 14px; margin: 14px 0;">
+      <div style="font-weight: 800; color: #166534; font-size: 12px; text-transform: uppercase;">
+        ✓ Selected Extras &amp; Add-Ons
+      </div>
+      <div style="font-size: 13px; font-weight: 700; color: #14532d; margin-top: 3px;">
+        ${escapeHtml(payload.customExtrasSummary)}
       </div>
     </div>
     ` : ''}
@@ -1117,38 +1269,55 @@ export function renderDispatcherAlertEmail(
       </div>
       
       <div class="route-point">
-        <div class="item-label" style="color: #d97706;">Pickup Location (${payload.pickupTime})</div>
-        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${payload.pickupAddress}</div>
-        ${payload.pickupNotes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Pickup Note: <strong>${payload.pickupNotes}</strong></div>` : ''}
+        <div class="item-label" style="color: #d97706;">Pickup Location (${escapeHtml(payload.pickupTime)})</div>
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${escapeHtml(payload.pickupAddress)}</div>
+        ${payload.pickupNotes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Pickup Note: <strong>${escapeHtml(payload.pickupNotes)}</strong></div>` : ''}
       </div>
 
       ${payload.intermediateStops && payload.intermediateStops.length > 0 ? payload.intermediateStops.map(s => `
       <div style="border-left: 2px dashed #cbd5e1; height: 14px; margin-left: 4px; margin-top: 6px; margin-bottom: 6px;"></div>
       <div class="route-point">
         <div class="item-label" style="color: #475569;">Intermediate Stop</div>
-        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${s.address}</div>
-        ${s.notes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Stop Note: <strong>${s.notes}</strong></div>` : ''}
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${escapeHtml(s.address)}</div>
+        ${s.notes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Stop Note: <strong>${escapeHtml(s.notes)}</strong></div>` : ''}
       </div>`).join('') : ''}
 
       <div style="border-left: 2px dashed #cbd5e1; height: 14px; margin-left: 4px; margin-top: 6px; margin-bottom: 6px;"></div>
 
       <div class="route-point">
         <div class="item-label" style="color: #0f172a;">Dropoff Destination</div>
-        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${payload.dropoffAddress}</div>
-        ${payload.dropoffNotes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Dropoff Note: <strong>${payload.dropoffNotes}</strong></div>` : ''}
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${escapeHtml(payload.dropoffAddress)}</div>
+        ${payload.dropoffNotes ? `<div style="font-size: 12px; color: #475569; margin-top: 3px; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;">Dropoff Note: <strong>${escapeHtml(payload.dropoffNotes)}</strong></div>` : ''}
       </div>
     </div>
 
-    ${payload.flightDetails?.airlineCode || payload.flightDetails?.flightNumber ? `
-    <!-- Airport & Flight Operations -->
+    ${payload.returnTripDetails ? `
+    <!-- Linked Return Trip -->
+    <div class="card-box" style="border-left: 4px solid #4f46e5; background: #eef2ff;">
+      <div style="font-size: 12px; font-weight: 700; color: #3730a3; text-transform: uppercase; margin-bottom: 8px;">
+        🔄 Linked Return Journey (#${escapeHtml(payload.returnTripDetails.tripId)})
+      </div>
+      <div style="font-size: 13px; color: #1e1b4b; line-height: 1.5;">
+        <strong>Return Pickup:</strong> ${escapeHtml(payload.returnTripDetails.pickupTime)}<br>
+        <strong>From:</strong> ${escapeHtml(payload.returnTripDetails.pickupAddress)}<br>
+        <strong>To:</strong> ${escapeHtml(payload.returnTripDetails.dropoffAddress)}<br>
+        <strong>Return Fare:</strong> $${payload.returnTripDetails.totalFare.toFixed(2)}
+      </div>
+    </div>
+    ` : ''}
+
+    ${payload.flightDetails?.airlineCode || payload.flightDetails?.flightNumber || payload.flightDetails?.tailNumber || payload.flightDetails?.fboFacility ? `
+    <!-- Airport & Aviation Operations -->
     <div style="background-color: #fefce8; border: 1px solid #fde047; border-radius: 8px; padding: 14px; margin: 16px 0;">
       <div style="font-weight: 700; color: #854d0e; font-size: 13px; margin-bottom: 6px;">
-        ✈ Airport Flight Tracking Data
+        ${payload.flightDetails.isPrivateAviation || payload.flightDetails.tailNumber ? '🛩️ Private Aviation / FBO Tracking Data' : '✈ Airport Flight Tracking Data'}
       </div>
       <div style="font-size: 13px; color: #713f12; line-height: 1.6;">
-        <strong>Airline:</strong> ${payload.flightDetails.airlineName || payload.flightDetails.airlineCode || 'N/A'}<br>
-        <strong>Flight #:</strong> ${payload.flightDetails.flightNumber || 'N/A'}<br>
-        <strong>Origin Airport:</strong> ${payload.flightDetails.departureAirport || 'N/A'}<br>
+        ${payload.flightDetails.tailNumber ? `<strong>Tail #:</strong> ${escapeHtml(payload.flightDetails.tailNumber)}<br>` : ''}
+        ${payload.flightDetails.fboFacility ? `<strong>FBO Facility:</strong> ${escapeHtml(payload.flightDetails.fboFacility)}<br>` : ''}
+        ${payload.flightDetails.airlineName || payload.flightDetails.airlineCode ? `<strong>Airline:</strong> ${escapeHtml(payload.flightDetails.airlineName || payload.flightDetails.airlineCode)}<br>` : ''}
+        ${payload.flightDetails.flightNumber ? `<strong>Flight #:</strong> ${escapeHtml(payload.flightDetails.flightNumber)}<br>` : ''}
+        ${payload.flightDetails.departureAirport ? `<strong>Origin Airport:</strong> ${escapeHtml(payload.flightDetails.departureAirport)}<br>` : ''}
         <strong>Checked Baggage:</strong> ${payload.flightDetails.hasCheckedLuggage ? 'YES' : 'NO'}
       </div>
     </div>
@@ -1159,7 +1328,7 @@ export function renderDispatcherAlertEmail(
     <div class="card-box" style="border-left: 4px solid #ef4444; background: #fef2f2;">
       <div class="item-label" style="color: #991b1b;">Special Passenger / Driver Instructions</div>
       <div style="font-size: 13px; color: #7f1d1d; font-weight: 600; margin-top: 4px; line-height: 1.5;">
-        "${payload.specialRequests}"
+        "${escapeHtml(payload.specialRequests)}"
       </div>
     </div>
     ` : ''}
@@ -1182,6 +1351,7 @@ export function renderDispatcherAlertEmail(
           </td>
         </tr>
       </table>
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
     </div>
     `,
     `[ALERT] New Ride #${payload.tripId} (${payload.bookingType.toUpperCase()}) for ${payload.passengerName}. Pickup: ${payload.pickupAddress}`,
@@ -1201,7 +1371,7 @@ Pax / Bags: ${payload.passengerCount || 1} Pax / ${payload.luggageCount || 0} Ba
 
 TIMING & TIER:
 - Pickup Time: ${payload.pickupTime}
-- Vehicle Tier: ${formatVehicleTier(payload.vehicleTier)}
+- Vehicle Tier: ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
 
 ROUTING:
 - Pickup: ${payload.pickupAddress} ${payload.pickupNotes ? `[Note: ${payload.pickupNotes}]` : ''}
@@ -1411,29 +1581,25 @@ export function renderBookingDeclinedEmail(
       }
     </div>
 
-    <!-- Requested Itinerary -->
-    <div class="summary-card">
-      <div class="summary-title">Original ${scopePrefix} Request Details</div>
-
-      <div class="route-point">
-        <div class="route-dot pickup-dot"></div>
-        <div class="route-address">
-          <div class="route-label">Pickup Address</div>
-          <div class="route-value">${payload.pickupAddress}</div>
-        </div>
+    <!-- Requested Itinerary (inline-styled for universal email client support) -->
+    <div class="card-box">
+      <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
+        Original ${escapeHtml(scopePrefix)} Request Details
       </div>
 
-      <div class="route-point">
-        <div class="route-dot dropoff-dot"></div>
-        <div class="route-address">
-          <div class="route-label">Dropoff Address</div>
-          <div class="route-value">${payload.dropoffAddress}</div>
-        </div>
+      <div class="route-point" style="margin-bottom: 10px;">
+        <div class="item-label" style="color: #059669;">Pickup Address</div>
+        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${escapeHtml(payload.pickupAddress)}</div>
       </div>
 
-      <div style="border-top: 1px dashed #cbd5e1; margin-top: 12px; padding-top: 12px; display: flex; justify-content: space-between; font-size: 13px;">
+      <div class="route-point" style="margin-bottom: 10px;">
+        <div class="item-label" style="color: #dc2626;">Dropoff Address</div>
+        <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${escapeHtml(payload.dropoffAddress)}</div>
+      </div>
+
+      <div style="border-top: 1px dashed #cbd5e1; margin-top: 12px; padding-top: 10px; font-size: 13px;">
         <span style="color: #64748b;">Requested Pickup:</span>
-        <span style="font-weight: 600; color: #0f172a;">${payload.pickupTime}</span>
+        <strong style="color: #0f172a; margin-left: 6px;">${escapeHtml(payload.pickupTime)}</strong>
       </div>
     </div>
 

@@ -3,10 +3,15 @@ import { useSearchParams, useNavigate } from 'react-router';
 import { getWorkspaceBus, type WorkspaceModuleKey } from '../core/services/workspace-bus.service';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
 import { EmailDock } from '../components/domain/dispatch/EmailDock';
-import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
+import { DispatchBookingEngine } from '../components/domain/dispatch/DispatchBookingEngine';
+import { LiveFleetMap } from '../components/domain/dispatch/LiveFleetMap';
+import {
+  useDispatchFleet,
+  FLEET_STATUS_COLORS,
+  getMapStatusLabel,
+} from '../core/hooks/useDispatchFleet';
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
-import { getOperatorService, type DriverRosterItem } from '../core/services/operator.service';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { SpinnerIcon } from '../components/ui/Icons';
 
@@ -21,15 +26,18 @@ export default function DispatchPopoutRoute() {
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [drivers, setDrivers] = useState<DriverRosterItem[]>(() => getOperatorService().getDriverRoster());
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
 
   const workspaceBus = getWorkspaceBus();
+  const { fleet, setDriverDutyStatus } = useDispatchFleet(trips);
 
   useEffect(() => {
     const authService = getAdminAuthService();
     const unsub = authService.onAuthStateChanged((user) => {
-      if (!user || (user.role !== 'admin' && user.role !== 'dispatcher')) {
+      const roles = user?.roles || (user?.role ? [user.role] : []);
+      const hasAccess = roles.includes('admin') || roles.includes('dispatcher');
+      if (!user || !hasAccess) {
         setIsAuthorized(false);
         setIsCheckingAuth(false);
         navigate('/app/login?redirect=/app/dispatch', { replace: true });
@@ -43,15 +51,6 @@ export default function DispatchPopoutRoute() {
 
   useEffect(() => {
     if (!isAuthorized) return;
-    const unsubDrivers = getOperatorService().subscribeToDrivers((roster) => {
-      setDrivers(roster);
-    });
-    return () => unsubDrivers();
-  }, [isAuthorized]);
-
-  useEffect(() => {
-    if (!isAuthorized) return;
-    // Notify main window that this module is active in an external window
     workspaceBus.publish('WINDOW_REGISTER', { moduleKey, timestamp: Date.now() });
 
     const handleBeforeUnload = () => {
@@ -64,7 +63,7 @@ export default function DispatchPopoutRoute() {
     const unsubTrips = bookingService.subscribeToAllTrips
       ? bookingService.subscribeToAllTrips(
           (list: Trip[]) => setTrips(list),
-          (err: any) => console.error(err)
+          (err: any) => console.error('[DispatchPopout] Trip subscription error:', err)
         )
       : () => {};
 
@@ -74,6 +73,17 @@ export default function DispatchPopoutRoute() {
       if (typeof unsubTrips === 'function') unsubTrips();
     };
   }, [isAuthorized, moduleKey, workspaceBus]);
+
+  // Listen to FOCUS_TRIP_ON_MAP in detached map window
+  useEffect(() => {
+    if (!isAuthorized || moduleKey !== 'map') return;
+    return workspaceBus.subscribe((msg) => {
+      if (msg.type === 'FOCUS_TRIP_ON_MAP' && msg.payload?.tripId) {
+        const match = trips.find((t) => t.id === msg.payload.tripId);
+        if (match) setSelectedMapTrip(match);
+      }
+    });
+  }, [isAuthorized, moduleKey, trips, workspaceBus]);
 
   if (isCheckingAuth || !isAuthorized) {
     return (
@@ -91,11 +101,11 @@ export default function DispatchPopoutRoute() {
       case 'email':
         return 'Dispatch Email & Bookings Console';
       case 'booking':
-        return 'Quick Ride Booking & Reservation Engine';
+        return 'Phone Order & Reservation Engine';
       case 'drivers':
         return 'Fleet & Driver Roster';
       case 'map':
-        return 'Live GPS Radar Fleet Map';
+        return 'Live GPS Fleet Radar';
       case 'trips':
         return 'Dispatch Queue & Trips Table';
       default:
@@ -105,7 +115,7 @@ export default function DispatchPopoutRoute() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
-      {/* ─── Compact Detached Window Header ─── */}
+      {/* Compact Detached Window Header */}
       <div className="h-10 bg-slate-950 border-b border-slate-800 px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -128,12 +138,12 @@ export default function DispatchPopoutRoute() {
         </div>
       </div>
 
-      {/* ─── Detached Content Body ─── */}
+      {/* Detached Content Body */}
       <div className="flex-1 min-h-0 bg-white text-slate-900 overflow-hidden">
         {moduleKey === 'comms' && (
           <CommsHub
             isPopout={true}
-            drivers={drivers}
+            drivers={fleet}
             trips={trips}
             onPopulateBooking={(data) => {
               workspaceBus.publish('POPULATE_BOOKING', data);
@@ -153,34 +163,48 @@ export default function DispatchPopoutRoute() {
         )}
 
         {moduleKey === 'booking' && (
-          <div className="h-full overflow-y-auto p-4 max-w-4xl mx-auto">
-            <BookingEngineV2 />
+          <div className="h-full overflow-hidden max-w-2xl mx-auto border-x border-slate-200">
+            <DispatchBookingEngine
+              draftId="popout-booking"
+              isActive={true}
+              trips={trips}
+              drivers={fleet}
+            />
           </div>
         )}
 
         {moduleKey === 'drivers' && (
           <div className="h-full overflow-y-auto p-4 space-y-4">
-            <h2 className="text-base font-extrabold text-slate-900">Drivers Roster (Detached)</h2>
+            <h2 className="text-base font-extrabold text-slate-900">Live Drivers Roster (Detached)</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {drivers.map((drv) => (
-                <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-sm text-slate-900">{drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">
-                      {drv.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span>{drv.vehicle}</span>
-                    {drv.username && (
-                      <span className="text-[11px] font-mono text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
-                        @{drv.username}
+              {fleet.map((drv) => {
+                const palette = FLEET_STATUS_COLORS[drv.mapStatus];
+                const label = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
+                return (
+                  <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-extrabold text-sm text-slate-900 truncate">
+                        {drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}
                       </span>
-                    )}
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${palette.badgeClass}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
+                        {label}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>{drv.vehicle}</span>
+                      {drv.queuedTripsCount > 0 && (
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                          {drv.queuedTripsCount} Queued
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
                   </div>
-                  <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -203,13 +227,29 @@ export default function DispatchPopoutRoute() {
         )}
 
         {moduleKey === 'map' && (
-          <div className="h-full flex items-center justify-center bg-slate-100 p-8 text-center text-slate-600">
-            <div>
-              <span className="text-3xl block mb-2">🗺️</span>
-              <h3 className="font-extrabold text-sm text-slate-900">Live GPS Fleet Radar</h3>
-              <p className="text-xs text-slate-500 mt-1">Satellite map tracking active vehicles and route polylines.</p>
-            </div>
-          </div>
+          <LiveFleetMap
+            fleet={fleet}
+            trips={trips}
+            selectedTrip={selectedMapTrip}
+            shouldZoom={Boolean(selectedMapTrip)}
+            onSelectTrip={(trip) => setSelectedMapTrip(trip)}
+            onChangeDriverDutyStatus={(driverId, duty) => setDriverDutyStatus(driverId, duty)}
+            onCallDriver={(phone, name) => {
+              workspaceBus.publish('CALL_OUTBOUND_STARTED', {
+                targetNumber: phone,
+                contactName: name,
+              });
+            }}
+            onAssignDriverToTrip={async (tripId, driverId) => {
+              const bookingService = getBookingService();
+              if (bookingService.updateTrip) {
+                await bookingService.updateTrip(tripId, {
+                  assignedDriverId: driverId,
+                  status: 'assigned',
+                });
+              }
+            }}
+          />
         )}
       </div>
     </div>

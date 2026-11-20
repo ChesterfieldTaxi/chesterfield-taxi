@@ -315,13 +315,33 @@ export function DriverQueueWindow({
                       ★ {driver.driverScore}
                     </span>
                   )}
-                  {driver.status === 'on_trip' ? (
-                    <Badge variant="info">On Trip</Badge>
-                  ) : driver.status === 'available' ? (
-                    <Badge variant="success">Available</Badge>
-                  ) : (
-                    <Badge variant="neutral">Offline</Badge>
-                  )}
+                  {(() => {
+                    const mapStatus = (driver as any).mapStatus as string | undefined;
+                    const activeTripStatus = (driver as any).activeTripStatus as string | undefined;
+                    if (mapStatus === 'busy') {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          {activeTripStatus === 'arrived' ? 'Arrived' : 'In Progress'}
+                        </span>
+                      );
+                    }
+                    if (mapStatus === 'en_route' || driver.status === 'on_trip') {
+                      return <Badge variant="info">En Route</Badge>;
+                    }
+                    if (mapStatus === 'break' || driver.status === 'break') {
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                          On Break
+                        </span>
+                      );
+                    }
+                    if (mapStatus === 'available' || driver.status === 'available') {
+                      return <Badge variant="success">Available</Badge>;
+                    }
+                    return <Badge variant="neutral">Offline</Badge>;
+                  })()}
                 </div>
                 <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
                   <span>{driver.vehicle} ({driver.tier})</span>
@@ -429,6 +449,42 @@ export function DriverQueueWindow({
                   </span>
                 </div>
               </div>
+
+              {/* Vehicle Class, Cargo & Custom Extras Strip */}
+              {(() => {
+                const meta = (activeTripSchedule.trip.metadata || {}) as Record<string, any>;
+                const vehLabel =
+                  meta.vehicleDisplayName ||
+                  meta.vehicleTypeId ||
+                  activeTripSchedule.trip.vehicleTier;
+                const oversized = meta.oversizedItemsSummary as string | undefined;
+                const customExtras = meta.customExtrasSummary as string | undefined;
+                const specialReq = activeTripSchedule.trip.passenger?.specialRequests;
+                return (
+                  <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                    {vehLabel && (
+                      <span className="px-1.5 py-0.5 rounded bg-white border border-emerald-200 font-bold text-slate-700">
+                        🚗 {String(vehLabel)}
+                      </span>
+                    )}
+                    {oversized && (
+                      <span className="px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 font-bold text-rose-700">
+                        🧳 {oversized}
+                      </span>
+                    )}
+                    {customExtras && (
+                      <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 font-bold text-indigo-700">
+                        ✨ {customExtras}
+                      </span>
+                    )}
+                    {specialReq && (
+                      <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 font-semibold text-amber-800">
+                        📝 {specialReq}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Arrival & Dropoff Times */}
               <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/80">

@@ -3,6 +3,7 @@ import type { Trip } from '../../../core/types/trip';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps/google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { buildFleetCarMarkerDataUrl } from '../dispatch/LiveFleetMap';
 import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon } from '../../ui/Icons';
 
 interface CustomerTelemetryMapProps {
@@ -65,8 +66,19 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
   };
 
   const vehicleCoord = getVehicleCoordinates();
+  const vehicleHeading = trip.driverTelemetry?.heading ?? trip.currentLocation?.heading ?? 0;
+  const carMapStatus =
+    trip.status === 'arrived' || trip.status === 'in_progress'
+      ? 'busy'
+      : trip.status === 'en_route'
+      ? 'en_route'
+      : 'available';
+  const carShortLabel = (
+    trip.assignedVehicle?.vehicleNumber ||
+    (trip.metadata?.vehicleUnit ? String(trip.metadata.vehicleUnit) : 'CAB')
+  ).replace(/Cab\s*/i, '');
 
-  // Initialize and update Google Maps with comprehensive memory leak cleanup
+  // Initialize Google Maps ONCE with proper cleanup on unmount (no teardown on every GPS ping!)
   useEffect(() => {
     let isMounted = true;
     loadGoogleMaps()
@@ -74,57 +86,62 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
         if (!isMounted || !gMaps || !mapContainerRef.current) return;
 
         if (!mapInstanceRef.current) {
-          mapInstanceRef.current = new gMaps.maps.Map(mapContainerRef.current, {
+          const map = new gMaps.maps.Map(mapContainerRef.current, {
             center: { lat: vehicleCoord.lat, lng: vehicleCoord.lng },
             zoom: 13,
             disableDefaultUI: true,
             zoomControl: true,
             mapTypeId: 'roadmap',
           });
+          mapInstanceRef.current = map;
 
-          // Markers
           markerPickupRef.current = new gMaps.maps.Marker({
             position: pickupCoord,
-            map: mapInstanceRef.current,
+            map,
             title: 'Pickup: ' + (trip.pickupLocation?.address || 'Pickup'),
             label: { text: 'P', color: '#ffffff', fontWeight: 'bold' },
           });
 
           markerDropoffRef.current = new gMaps.maps.Marker({
             position: dropoffCoord,
-            map: mapInstanceRef.current,
+            map,
             title: 'Dropoff: ' + (trip.dropoffLocation?.address || 'Dropoff'),
             label: { text: 'D', color: '#ffffff', fontWeight: 'bold' },
           });
 
           markerVehicleRef.current = new gMaps.maps.Marker({
             position: vehicleCoord,
-            map: mapInstanceRef.current,
+            map,
             title: trip.assignedVehicle?.vehicleNumber || 'Taxi Unit',
+            icon: {
+              url: buildFleetCarMarkerDataUrl({
+                status: carMapStatus,
+                cabLabel: carShortLabel,
+                heading: vehicleHeading,
+              }),
+              scaledSize: new gMaps.maps.Size(50, 59),
+              anchor: new gMaps.maps.Point(25, 22),
+            },
+            zIndex: 200,
+            optimized: false,
           });
 
-          // Route Polyline
           polylineRef.current = new gMaps.maps.Polyline({
             path: [pickupCoord, vehicleCoord, dropoffCoord],
             geodesic: true,
             strokeColor: '#2563eb',
             strokeOpacity: 0.8,
             strokeWeight: 4,
-            map: mapInstanceRef.current,
+            map,
           });
 
           setMapsLoaded(true);
-        } else {
-          // Update positions smoothly
-          markerVehicleRef.current?.setPosition(vehicleCoord);
-          polylineRef.current?.setPath([pickupCoord, vehicleCoord, dropoffCoord]);
         }
       })
       .catch(() => {
         setMapsLoaded(false);
       });
 
-    // Cleanup: explicitly detach markers, polyline, and clear listeners
     return () => {
       isMounted = false;
       if (markerPickupRef.current) {
@@ -148,7 +165,40 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
         mapInstanceRef.current = null;
       }
     };
-  }, [pickupCoord.lat, pickupCoord.lng, dropoffCoord.lat, dropoffCoord.lng, vehicleCoord.lat, vehicleCoord.lng]);
+  }, []);
+
+  // Smoothly update markers & rotated car icon on telemetry pings without recreating the map
+  useEffect(() => {
+    if (!mapsLoaded || !mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps) {
+      return;
+    }
+    markerPickupRef.current?.setPosition(pickupCoord);
+    markerDropoffRef.current?.setPosition(dropoffCoord);
+    if (markerVehicleRef.current) {
+      markerVehicleRef.current.setPosition(vehicleCoord);
+      markerVehicleRef.current.setIcon({
+        url: buildFleetCarMarkerDataUrl({
+          status: carMapStatus,
+          cabLabel: carShortLabel,
+          heading: vehicleHeading,
+        }),
+        scaledSize: new window.google.maps.Size(50, 59),
+        anchor: new window.google.maps.Point(25, 22),
+      });
+    }
+    polylineRef.current?.setPath([pickupCoord, vehicleCoord, dropoffCoord]);
+  }, [
+    mapsLoaded,
+    pickupCoord.lat,
+    pickupCoord.lng,
+    dropoffCoord.lat,
+    dropoffCoord.lng,
+    vehicleCoord.lat,
+    vehicleCoord.lng,
+    carMapStatus,
+    carShortLabel,
+    vehicleHeading,
+  ]);
 
   const assignedUnit =
     trip.assignedVehicle?.vehicleNumber ||

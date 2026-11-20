@@ -1393,21 +1393,48 @@ export function createSurchargesAndDiscountsStep(
       }
     }
 
-    // 6. Dispatcher Courtesy Discount
+    // 6. Dispatcher Courtesy / Corporate Percentage Discount
     let totalDiscountAmount = 0;
+    if (
+      typeof context.input.manualDiscountPercent === 'number' &&
+      context.input.manualDiscountPercent > 0 &&
+      context.input.manualDiscountPercent <= 100
+    ) {
+      const pct = context.input.manualDiscountPercent;
+      const pctDiscount = Math.min(roundCurrency(currentTotal * (pct / 100)), currentTotal);
+      if (pctDiscount > 0) {
+        const label = context.input.manualDiscountLabel || `Courtesy Discount (${pct}%)`;
+        totalDiscountAmount = roundCurrency(totalDiscountAmount + pctDiscount);
+        newDiscounts.push({
+          name: label,
+          code: 'PERCENT_DISCOUNT',
+          amount: pctDiscount,
+        });
+        newLineItems.push({
+          id: 'discount-percent',
+          category: 'discount',
+          label,
+          amount: -pctDiscount,
+          sourceType: 'discount',
+        });
+        currentTotal = roundCurrency(currentTotal - pctDiscount);
+      }
+    }
+
     if (context.input.manualDiscount && context.input.manualDiscount > 0) {
       const discountVal = Math.min(roundCurrency(context.input.manualDiscount), currentTotal);
       if (discountVal > 0) {
+        const label = context.input.manualDiscountLabel || 'Dispatcher Courtesy Discount';
         totalDiscountAmount = roundCurrency(totalDiscountAmount + discountVal);
         newDiscounts.push({
-          name: 'Dispatcher Courtesy Discount',
+          name: label,
           code: 'DISPATCHER_CREDIT',
           amount: discountVal,
         });
         newLineItems.push({
           id: 'discount-courtesy',
           category: 'discount',
-          label: 'Dispatcher Courtesy Discount',
+          label,
           amount: -discountVal,
           sourceType: 'discount',
         });

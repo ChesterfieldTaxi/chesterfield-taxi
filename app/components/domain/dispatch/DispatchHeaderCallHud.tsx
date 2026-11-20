@@ -174,18 +174,19 @@ export function DispatchHeaderCallHud({
   const handleNewBooking = () => {
     if (!activeCall) return;
     const payload = {
-      passengerName: activeCall.callerName,
+      passengerName: activeCall.callerName === 'Unregistered Caller' ? '' : activeCall.callerName,
       passengerPhone: activeCall.mobileForSms,
+      phone: activeCall.mobileForSms,
       callingFromPhone: activeCall.callerNumber,
       pickupAddress:
         activeCall.upcomingBookings.length > 0
           ? activeCall.upcomingBookings[0].pickupAddress
-          : DEFAULT_PASSENGER_ACCOUNT.savedPlaces[0]?.address || '14848 Conway Rd, Chesterfield, MO',
+          : '',
       notes: `Inbound Call via ${activeCall.numberType.toUpperCase()} line (${activeCall.callerNumber}). SMS updates routed to ${activeCall.mobileForSms}.`,
     };
 
+    // Publish once on WorkspaceBus (avoid double-firing with onPopulateBooking which duplicated notes)
     workspaceBus.publish('POPULATE_BOOKING', payload);
-    if (onPopulateBooking) onPopulateBooking(payload);
     if (onOpenBooking) onOpenBooking();
     setShowInboundFlydown(false);
   };
