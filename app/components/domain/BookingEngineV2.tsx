@@ -10,6 +10,7 @@ import type {
   TripPricing,
 } from '../../core/types';
 import { getBookingService } from '../../core/services/booking';
+import { getFirebaseAuth, isFirebaseConfigured } from '../../core/services/firebase';
 import type { QuoteResponse } from '../../core/services/booking-service';
 import { getPaymentService } from '../../core/services/payment.service';
 import { getEmailDispatchService } from '../../core/services/email';
@@ -491,7 +492,10 @@ export function BookingEngineV2({
   }, [location.search]);
 
   // Pre-fill from initialValues prop (e.g. from Passenger App embedded booking)
+  // Always clear confirmedTrip when parent triggers a Rebook / Edit / Saved Place chip!
   useEffect(() => {
+    if (!initialValues && !editingTripId) return;
+    setConfirmedTrip(null);
     if (!initialValues) return;
     setForm((prev) => ({
       ...prev,
@@ -506,7 +510,7 @@ export function BookingEngineV2({
       ...(initialValues.driverNotes !== undefined && initialValues.driverNotes !== ''
         ? { driverNotes: initialValues.driverNotes }
         : {}),
-      ...(initialValues.vehicleChoice && ['any', 'sedan', 'suv', 'van'].includes(initialValues.vehicleChoice)
+      ...(initialValues.vehicleChoice
         ? {
             vehicleChoice: initialValues.vehicleChoice,
             selectedVehicles: [initialValues.vehicleChoice],
@@ -520,7 +524,7 @@ export function BookingEngineV2({
       ...(initialValues.passengerPhone ? { passengerPhone: initialValues.passengerPhone } : {}),
       ...(initialValues.passengerEmail ? { passengerEmail: initialValues.passengerEmail } : {}),
     }));
-  }, [initialValues]);
+  }, [initialValues, editingTripId]);
 
   // Customer Booking Form Config and Active Vehicle Classes from Admin Settings
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
@@ -1632,6 +1636,37 @@ export function BookingEngineV2({
       if (form.paymentMethod === 'card') paymentMethodType = 'card';
       if (form.paymentMethod === 'account') paymentMethodType = 'corporate';
 
+      // Verify Corporate Account # & PO anti-fraud via rate-limited server endpoint (never falls back to mock 'corp-1'!)
+      let verifiedCorporateAccountId: string | undefined;
+      if (form.paymentMethod === 'account') {
+        const acctNum = form.corporateAccountNumber.trim();
+        if (!acctNum) {
+          throw new Error('Please enter your Corporate Account Number to bill a corporate account.');
+        }
+        const totalProjected = form.returnTrip
+          ? effectivePricing.totalFare + returnEffectivePricing.totalFare
+          : effectivePricing.totalFare;
+        const verifyResp = await fetch('/api/corporate/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountNumber: acctNum,
+            poNumber: form.billingPo.trim(),
+            estimatedFare: totalProjected,
+          }),
+        });
+        const verifyData = (await verifyResp.json().catch(() => ({}))) as any;
+        if (!verifyResp.ok || !verifyData.verified) {
+          throw new Error(
+            verifyData.error ||
+              'Unable to verify Corporate Account / PO Number. Please check your details or call dispatch.'
+          );
+        }
+        if (verifyData.corporateAccountId) {
+          verifiedCorporateAccountId = String(verifyData.corporateAccountId);
+        }
+      }
+
       // Phase 31: PCI-Compliant Stripe Pre-authorization Hold (or In-Cab Payment Fallback)
       let paymentIntentId: string | undefined;
       let cardLast4: string | undefined;
@@ -1658,8 +1693,16 @@ export function BookingEngineV2({
         paymentIntentId = holdIntent.id;
       }
 
+      // Resolve signed-in Firebase Auth UID (if any) and Admin-configured vehicle display name
+      const signedInUid =
+        isFirebaseConfigured() ? getFirebaseAuth().currentUser?.uid || undefined : undefined;
+      const selectedVehicleTierObj = activeVehicleTiers.find((v) => v.id === form.vehicleChoice);
+      const vehicleDisplayName =
+        selectedVehicleTierObj?.name || formatVehicleTier(mapChoiceToTier(form.vehicleChoice));
+
       // Customer web submissions strictly default to 'UNCONFIRMED'
       const inputPayload: CreateTripInput = {
+        ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
         pickupLocation,
         dropoffLocation,
         intermediateStops: intermediateStopsLocations.length > 0 ? intermediateStopsLocations : undefined,
@@ -1685,6 +1728,7 @@ export function BookingEngineV2({
           cardLast4,
           cardBrand,
           preAuthHoldAmount: paymentIntentId ? effectivePricing.totalFare : undefined,
+          corporateAccountId: verifiedCorporateAccountId,
         },
         driverNotes: sanitizeTextInput(combinedNotes, 1500),
         metadata: {
@@ -1728,14 +1772,16 @@ export function BookingEngineV2({
           selectedCustomExtras: form.selectedCustomExtras,
           customExtrasSummary: selectedCustomExtrasSummary,
           vehicleTypeId: form.vehicleChoice,
+          vehicleDisplayName,
           createdByRole: 'customer_web',
           selectedVehicles: bookingConfig.allowMultiVehicle ? form.selectedVehicles : [form.vehicleChoice],
         },
       };
 
-      // If editing an existing reservation, update it in place rather than creating a duplicate
+      // If editing an existing reservation, update it in place and flag UNCONFIRMED for dispatch re-review
       if (editingTripId && bookingService.updateTrip) {
         const updatedTrip = await bookingService.updateTrip(editingTripId, {
+          status: 'UNCONFIRMED',
           pickupLocation: inputPayload.pickupLocation,
           dropoffLocation: inputPayload.dropoffLocation,
           intermediateStops: inputPayload.intermediateStops,
@@ -1776,7 +1822,12 @@ export function BookingEngineV2({
             }
           }
 
+          const returnVehicleTierObj = activeVehicleTiers.find((v) => v.id === form.returnVehicleChoice);
+          const returnVehicleDisplayName =
+            returnVehicleTierObj?.name || formatVehicleTier(mapChoiceToTier(form.returnVehicleChoice));
+
           const returnPayload: CreateTripInput = {
+            ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
             pickupLocation: {
               address: form.returnPickupAddress,
               coordinates: form.returnPickupCoordinates || dropoffLocation.coordinates,
@@ -1806,11 +1857,14 @@ export function BookingEngineV2({
               method: paymentMethodType,
               status: 'pending',
               amount: returnEffectivePricing.totalFare,
+              corporateAccountId: verifiedCorporateAccountId,
             },
             driverNotes: `[Return Leg of Trip #${createdTrip.id}] ${returnFlightNotes}${form.driverNotes}`.trim(),
             metadata: {
               linkedTripId: createdTrip.id,
               isReturnRide: true,
+              vehicleTypeId: form.returnVehicleChoice,
+              vehicleDisplayName: returnVehicleDisplayName,
               createdByRole: 'customer_web',
               airline: form.returnProvideFlightInfo ? form.returnAirline : undefined,
               airlineName: form.returnProvideFlightInfo ? form.returnAirline : undefined,
@@ -1843,6 +1897,7 @@ export function BookingEngineV2({
           if (createdTrip.metadata) {
             createdTrip.metadata.hasReturnTrip = true;
             createdTrip.metadata.returnTripId = returnTripObj.id;
+            createdTrip.metadata.returnTripTrackingToken = returnTripObj.trackingToken;
             createdTrip.metadata.linkedReturnTripId = returnTripObj.id;
             createdTrip.metadata.returnDate = form.returnDate;
             createdTrip.metadata.returnTime = form.returnTime;
@@ -1883,6 +1938,7 @@ export function BookingEngineV2({
         // Single consolidated confirmation email to passenger (includes return trip details if round trip)
         const confirmResult = await emailService.sendBookingConfirmation({
           tripId: createdTrip.id,
+          trackingToken: createdTrip.trackingToken,
           passenger: {
             firstName: createdTrip.passenger.firstName,
             lastName: createdTrip.passenger.lastName,
@@ -1938,6 +1994,7 @@ export function BookingEngineV2({
           } : undefined,
           returnTripDetails: createdReturnTripObj ? {
             tripId: createdReturnTripObj.id,
+            trackingToken: createdReturnTripObj.trackingToken,
             pickupAddress: createdReturnTripObj.pickupLocation.address,
             dropoffAddress: createdReturnTripObj.dropoffLocation.address,
             pickupTime:
@@ -1945,6 +2002,7 @@ export function BookingEngineV2({
                 ? new Date(createdReturnTripObj.scheduledPickupTime).toLocaleString()
                 : 'Scheduled Return',
             vehicleTier: form.returnVehicleChoice === 'any' ? 'any' : (createdReturnTripObj.vehicleTier || 'standard'),
+            vehicleDisplayName: (createdReturnTripObj.metadata?.vehicleDisplayName as string) || undefined,
             passengerCount: createdReturnTripObj.passenger?.passengerCount,
             luggageCount: createdReturnTripObj.passenger?.luggageCount,
             totalFare: createdReturnTripObj.pricing.totalFare,
@@ -2033,10 +2091,11 @@ export function BookingEngineV2({
           error: confirmResult.error,
         });
       } catch (err: unknown) {
-        console.warn('[BookingEngineV2] Email dispatch notice:', err);
+        console.warn('[BookingEngineV2] Email dispatch error:', err);
         setEmailDelivery({
-          status: 'sent',
+          status: 'failed',
           recipient: createdTrip.passenger.email,
+          error: err instanceof Error ? err.message : 'Unable to send confirmation email right now.',
         });
       }
 

@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router';
 import {
   LogOutIcon,
   ChevronDownIcon,
-  SunIcon,
-  MoonIcon,
   ShieldCheckIcon,
   RadioIcon,
   CarIcon,
@@ -61,11 +59,14 @@ export function UserDropdown({
 }: UserDropdownProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const displayEmail = email || 'admin@chesterfieldtaxi.com';
-  const initial = displayEmail[0]?.toUpperCase() || 'A';
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() =>
+    getAdminAuthService().getCurrentUser()
+  );
+
+  const displayEmail = email || currentUser?.email || currentUser?.displayName || 'Account';
+  const initial = displayEmail[0]?.toUpperCase() || 'U';
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -80,18 +81,6 @@ export function UserDropdown({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
-
-  // Sync dark mode state with HTML class
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isDarkMode = document.documentElement.classList.contains('dark');
-      setIsDark(isDarkMode);
-    }
-  }, []);
-
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() =>
-    getAdminAuthService().getCurrentUser()
-  );
 
   useEffect(() => {
     const authService = getAdminAuthService();
@@ -123,20 +112,6 @@ export function UserDropdown({
         ? 'app'
         : 'public'
       : 'app');
-
-  const handleToggleTheme = () => {
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    if (typeof window !== 'undefined') {
-      if (nextDark) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      }
-    }
-  };
 
   const handleNavigateView = (path: string) => {
     setIsOpen(false);
@@ -345,35 +320,6 @@ export function UserDropdown({
               </button>
             </div>
           ) : null}
-
-          {/* Theme Toggle (Light / Dark) */}
-          <div className="p-1">
-            <button
-              type="button"
-              onClick={handleToggleTheme}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                {isDark ? (
-                  <MoonIcon className="w-4 h-4 text-indigo-500 shrink-0" />
-                ) : (
-                  <SunIcon className="w-4 h-4 text-amber-500 shrink-0" />
-                )}
-                <span>Theme: {isDark ? 'Dark Mode' : 'Light Mode'}</span>
-              </div>
-              <div className="flex items-center">
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isDark
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  {isDark ? 'Dark' : 'Light'}
-                </span>
-              </div>
-            </button>
-          </div>
 
           {/* Sign Out Action */}
           <div className="p-1">

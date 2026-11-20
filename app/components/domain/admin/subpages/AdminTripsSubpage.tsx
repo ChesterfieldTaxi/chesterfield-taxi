@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
 import { getEmailDispatchService } from '../../../../core/services/email';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
+import { formatVehicleTier } from '../../../../core/services/email/email-templates';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
@@ -279,43 +281,109 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
       const service = getBookingService();
 
       if (service.updateTripStatus) {
+        const previousTrip = trips.find((t) => t.id === tripId);
+        const previousStatus = previousTrip?.status || null;
         const updated = await service.updateTripStatus(tripId, newStatus, {
           ...options,
           actorRole: 'admin',
           reason: options?.reason || `Admin dispatch update to ${newStatus}`,
         });
         let mailStatus = '';
-        // Trigger passenger status notification email if available
-        const currentTrip = updated || trips.find((t) => t.id === tripId);
+        // Route confirmation, decline, and status/cancellation transitions to the RIGHT email template!
+        const currentTrip = updated || previousTrip;
         if (currentTrip && currentTrip.passenger?.email) {
           try {
             const emailService = getEmailDispatchService();
+            const cachedSettings = getAdminConfigService().getCachedSettings();
+            const meta = (currentTrip.metadata || {}) as Record<string, any>;
+            const resolvedVehName = formatVehicleTier(
+              currentTrip.vehicleTier || 'standard',
+              cachedSettings.vehicles,
+              typeof meta.vehicleDisplayName === 'string' ? meta.vehicleDisplayName : undefined
+            );
             const formattedPickupTime =
               currentTrip.bookingType === 'scheduled' && currentTrip.scheduledPickupTime
                 ? new Date(currentTrip.scheduledPickupTime).toLocaleString()
                 : 'Immediate Ride (ASAP)';
+            const companySettings = {
+              name: cachedSettings.company?.name,
+              phone: cachedSettings.company?.phone,
+              address: cachedSettings.company?.address,
+              email: cachedSettings.company?.email,
+            };
 
-            const sendResult = await emailService.sendBookingConfirmation({
-              tripId: currentTrip.id,
-              status: (newStatus === 'CONFIRMED' || newStatus === 'confirmed') ? 'CONFIRMED' : newStatus,
-              passenger: {
-                firstName: currentTrip.passenger?.firstName || 'Valued',
-                lastName: currentTrip.passenger?.lastName || 'Customer',
-                email: currentTrip.passenger?.email || '',
-                phone: currentTrip.passenger?.phone || '',
-              },
-              pickupAddress: currentTrip.pickupLocation?.address || 'Pickup Address',
-              dropoffAddress: currentTrip.dropoffLocation?.address || 'Dropoff Address',
-              pickupTime: formattedPickupTime,
-              bookingType: currentTrip.bookingType || 'scheduled',
-              vehicleTier: currentTrip.vehicleTier || 'standard',
-              totalFare: currentTrip.pricing?.totalFare || 0,
-              currency: 'USD',
-              paymentMethod: currentTrip.payment?.method || 'card',
-            });
+            let sendResult;
+            if (newStatus === 'CONFIRMED' || newStatus === 'confirmed') {
+              sendResult = await emailService.sendBookingConfirmation({
+                tripId: currentTrip.id,
+                trackingToken: currentTrip.trackingToken,
+                status: 'CONFIRMED',
+                passenger: {
+                  firstName: currentTrip.passenger?.firstName || 'Valued',
+                  lastName: currentTrip.passenger?.lastName || 'Customer',
+                  email: currentTrip.passenger?.email || '',
+                  phone: currentTrip.passenger?.phone || '',
+                },
+                pickupAddress: currentTrip.pickupLocation?.address || 'Pickup Address',
+                intermediateStops: currentTrip.intermediateStops?.map((s) => ({ address: s.address, notes: s.notes })),
+                dropoffAddress: currentTrip.dropoffLocation?.address || 'Dropoff Address',
+                dropoffNotes: currentTrip.dropoffLocation?.notes,
+                pickupTime: formattedPickupTime,
+                bookingType: currentTrip.bookingType || 'scheduled',
+                vehicleTier: currentTrip.vehicleTier || 'standard',
+                vehicleDisplayName: resolvedVehName,
+                passengerCount: currentTrip.passenger?.passengerCount,
+                luggageCount: currentTrip.passenger?.luggageCount,
+                totalFare: currentTrip.pricing?.totalFare || 0,
+                breakdown: currentTrip.pricing?.breakdown,
+                tariffProfileName:
+                  currentTrip.pricing?.matchedCorridorName || currentTrip.pricing?.tariffProfileName,
+                currency: currentTrip.pricing?.currency || 'USD',
+                paymentMethod: currentTrip.payment?.method || 'cash',
+                specialRequests: currentTrip.passenger?.specialRequests,
+                companySettings,
+              });
+            } else if (newStatus === 'DECLINED' || newStatus === 'declined') {
+              sendResult = await emailService.sendBookingDeclined({
+                tripId: currentTrip.id,
+                passenger: {
+                  firstName: currentTrip.passenger?.firstName || 'Valued',
+                  lastName: currentTrip.passenger?.lastName || 'Customer',
+                  email: currentTrip.passenger?.email || '',
+                  phone: currentTrip.passenger?.phone || '',
+                },
+                pickupAddress: currentTrip.pickupLocation?.address || 'Pickup Address',
+                dropoffAddress: currentTrip.dropoffLocation?.address || 'Dropoff Address',
+                pickupTime: formattedPickupTime,
+                vehicleTier: currentTrip.vehicleTier || 'standard',
+                vehicleDisplayName: resolvedVehName,
+                reason: options?.reason || 'Unable to accommodate request',
+                companySettings,
+              });
+            } else {
+              sendResult = await emailService.sendStatusUpdateNotification({
+                tripId: currentTrip.id,
+                trackingToken: currentTrip.trackingToken,
+                passenger: {
+                  firstName: currentTrip.passenger?.firstName || 'Valued',
+                  lastName: currentTrip.passenger?.lastName || 'Customer',
+                  email: currentTrip.passenger?.email || '',
+                  phone: currentTrip.passenger?.phone || '',
+                },
+                newStatus,
+                previousStatus,
+                pickupAddress: currentTrip.pickupLocation?.address || 'Pickup Address',
+                dropoffAddress: currentTrip.dropoffLocation?.address || 'Dropoff Address',
+                pickupTime: formattedPickupTime,
+                vehicleTier: currentTrip.vehicleTier || 'standard',
+                vehicleDisplayName: resolvedVehName,
+                statusReason: options?.reason,
+                companySettings,
+              });
+            }
 
             if (sendResult?.success) {
-              mailStatus = ` Confirmation email sent to ${currentTrip.passenger.email}.`;
+              mailStatus = ` Notification email sent to ${currentTrip.passenger.email}.`;
             } else if (sendResult?.error) {
               mailStatus = ` (Email error: ${sendResult.error})`;
             }

@@ -186,18 +186,20 @@ input.gm-err-autocomplete {
   display: none !important;
 }
 
-/* Printable PDF Invoice CSS */
+/* Printable PDF Invoice & Digital Receipt CSS */
 @media print {
   body {
     background: white !important;
     color: black !important;
     font-size: 11pt;
   }
-  body * {
+
+  /* Only isolate a modal when one of the designated printable containers is mounted */
+  body:has(#printable-invoice-modal) * {
     visibility: hidden;
   }
-  #printable-invoice-modal,
-  #printable-invoice-modal * {
+  body:has(#printable-invoice-modal) #printable-invoice-modal,
+  body:has(#printable-invoice-modal) #printable-invoice-modal * {
     visibility: visible;
   }
   #printable-invoice-modal {
@@ -212,9 +214,31 @@ input.gm-err-autocomplete {
     border: none !important;
     box-shadow: none !important;
   }
+
+  body:has(.printable-receipt) * {
+    visibility: hidden;
+  }
+  body:has(.printable-receipt) .printable-receipt,
+  body:has(.printable-receipt) .printable-receipt * {
+    visibility: visible;
+  }
+  .printable-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   .no-print,
   button,
-  .print-hide {
+  .print-hide,
+  .print\:hidden {
     display: none !important;
   }
 }

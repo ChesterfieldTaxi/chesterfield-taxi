@@ -40,6 +40,8 @@ export default [
 
   // Serverless API Routes
   route("api/public-config", "routes/api.public-config.ts"),
+  route("api/track", "routes/api.track.ts"),
+  route("api/corporate/verify", "routes/api.corporate-verify.ts"),
   route("api/send-email", "routes/api.send-email.ts"),
   route("api/seed-stress-data", "routes/api.seed-stress-data.tsx"),
   route("api/payments", "routes/api.payments.ts"),

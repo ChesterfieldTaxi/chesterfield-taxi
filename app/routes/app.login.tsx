@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { getBookingService } from '../core/services/booking';
+import { getPassengerService } from '../core/services/passenger.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { resolvePostAuthDestination } from '../core/utils/workspace-routing.util';
@@ -32,6 +34,22 @@ export default function UnifiedAppLoginRoute() {
 
   const rawRedirect = searchParams.get('redirect');
   const claimTrip = searchParams.get('claimTrip');
+  const isClaimingRef = React.useRef(false);
+
+  const claimGuestTripIfPresent = async (uid: string) => {
+    if (!claimTrip || !uid) return;
+    try {
+      const bookingService = getBookingService();
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(claimTrip.toUpperCase(), {
+          customerId: uid,
+          userId: uid,
+        } as any);
+      }
+    } catch (err) {
+      console.warn('[UnifiedAppLoginRoute] Could not link guest trip on login:', err);
+    }
+  };
 
   useEffect(() => {
     const message = searchParams.get('message');
@@ -45,6 +63,7 @@ export default function UnifiedAppLoginRoute() {
         try {
           sessionStorage.clear();
           localStorage.removeItem('chesterfield_taxi_admin_session');
+          getPassengerService().clearLocalSession();
         } catch {}
       }
       try {
@@ -56,15 +75,20 @@ export default function UnifiedAppLoginRoute() {
 
     setIsConfigured(isFirebaseConfigured());
     const authService = getAdminAuthService();
-    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
-      if (currentUser) {
+    const unsubscribe = authService.onAuthStateChanged(async (currentUser) => {
+      if (currentUser && !isClaimingRef.current) {
+        if (claimTrip) {
+          isClaimingRef.current = true;
+          await claimGuestTripIfPresent(currentUser.uid);
+          isClaimingRef.current = false;
+        }
         const dest = resolvePostAuthDestination(currentUser, { rawRedirect });
         navigate(dest, { replace: true });
       }
     });
 
     return unsubscribe;
-  }, [navigate, searchParams, rawRedirect]);
+  }, [navigate, searchParams, rawRedirect, claimTrip]);
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
@@ -88,9 +112,11 @@ export default function UnifiedAppLoginRoute() {
     e.preventDefault();
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       setInfoMessage(null);
       const user = await getAdminAuthService().signIn(email, password);
+      await claimGuestTripIfPresent(user.uid);
       const dest = resolvePostAuthDestination(user, { rawRedirect });
       navigate(dest, { replace: true });
     } catch (err: unknown) {
@@ -106,6 +132,7 @@ export default function UnifiedAppLoginRoute() {
         setError('Authentication failed. Please try again.');
       }
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -113,13 +140,16 @@ export default function UnifiedAppLoginRoute() {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       const user = await getAdminAuthService().signInWithGoogle();
+      await claimGuestTripIfPresent(user.uid);
       const dest = resolvePostAuthDestination(user, { rawRedirect });
       navigate(dest, { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign-in failed.');
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -127,13 +157,16 @@ export default function UnifiedAppLoginRoute() {
   const handleFacebookSignIn = async () => {
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       const user = await getAdminAuthService().signInWithFacebook();
+      await claimGuestTripIfPresent(user.uid);
       const dest = resolvePostAuthDestination(user, { rawRedirect });
       navigate(dest, { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Facebook sign-in failed.');
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };

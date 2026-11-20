@@ -1,316 +1,226 @@
 /**
  * Passenger Domain Service
- * 
- * Manages Customer Account state, Saved Places CRUD,
- * Communication preferences, active trip detection,
- * and ride history with itemized receipts.
+ *
+ * Manages authenticated Customer Account state synced with Firestore `/users/{uid}`,
+ * Saved Places CRUD, communication preferences, real-time scoped trip history,
+ * and active ride detection. Never leaks hardcoded demo personas to real users.
  */
 
-import type {
-  PassengerAccount,
-  SavedPlace,
-  CommunicationPreferences,
-} from '../types/passenger';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import type { PassengerAccount, SavedPlace } from '../types/passenger';
 import type { Trip, TripStatus } from '../types/trip';
 import { getBookingService } from './booking';
+import { getFirestoreDb, isFirebaseConfigured } from './firebase';
+import { sanitizePayload } from './firestore-sanitizer';
 
-const PASSENGER_STORAGE_KEY = 'chesterfield_passenger_account_v1';
+const PASSENGER_STORAGE_PREFIX = 'chesterfield_passenger_account_v2_';
+const LEGACY_PASSENGER_STORAGE_KEY = 'chesterfield_passenger_account_v1';
 
 export const DEFAULT_PASSENGER_ACCOUNT: PassengerAccount = {
-  id: 'cust-sarah-jenkins',
-  firstName: 'Sarah',
-  lastName: 'Jenkins',
-  phone: '(314) 738-9921',
-  homePhone: '(314) 532-1200',
-  workPhone: '(314) 694-1000',
-  primaryMobilePhone: '(314) 738-9921',
-  alternatePhones: [
-    { type: 'mobile', number: '(314) 738-9921', label: 'Personal Cell (SMS)', isPrimarySms: true },
-    { type: 'home', number: '(314) 532-1200', label: 'Chesterfield Residence Landline', isPrimarySms: false },
-    { type: 'work', number: '(314) 694-1000', label: 'Bayer Campus Desk Direct', isPrimarySms: false },
-  ],
-  email: 'sjenkins@bayer.com',
-  passengerNotes: 'Side porch door pickup. Gate code #4421. Please call or text on arrival.',
+  id: '',
+  firstName: '',
+  lastName: '',
+  phone: '',
+  email: '',
+  passengerNotes: '',
   preferredVehicleTier: 'standard',
   communicationPreferences: {
     smsUpdates: true,
     emailReceipts: true,
     phoneCalls: true,
   },
-  savedPlaces: [
-    {
-      id: 'place-home',
-      label: 'Home',
-      category: 'home',
-      address: '14848 Conway Rd, Chesterfield, MO 63017',
-      notes: 'Front circular driveway or side porch door',
-      coordinates: { lat: 38.6534, lng: -90.5281 },
-    },
-    {
-      id: 'place-work',
-      label: 'Work (Bayer Campus)',
-      category: 'work',
-      address: '700 Chesterfield Pkwy W, Chesterfield, MO 63017',
-      notes: 'Visitor dropoff circle at Building A entrance',
-      coordinates: { lat: 38.6631, lng: -90.5752 },
-    },
-    {
-      id: 'place-airport',
-      label: 'STL Lambert Airport',
-      category: 'airport',
-      address: '10701 Lambert International Blvd, St. Louis, MO 63145',
-      notes: 'Terminal 1 Departure Upper Level Curbside',
-      coordinates: { lat: 38.7499, lng: -90.3700 },
-    },
-    {
-      id: 'place-spirit',
-      label: 'Spirit of St. Louis Airport (SUS)',
-      category: 'airport',
-      address: '18270 Edison Ave, Chesterfield, MO 63005',
-      notes: 'Tac Air Executive FBO Terminal',
-      coordinates: { lat: 38.6622, lng: -90.6515 },
-    },
-    {
-      id: 'place-stlukes',
-      label: "St. Luke's Hospital",
-      category: 'medical',
-      address: '232 S Woods Mill Rd, Chesterfield, MO 63017',
-      notes: 'East Medical Building main patient canopy',
-      coordinates: { lat: 38.659, lng: -90.493 },
-    },
-  ],
-  recentSearches: [
-    'St. Louis Lambert International Airport (STL)',
-    '17200 Chesterfield Airport Rd, Chesterfield, MO',
-    '700 Chesterfield Pkwy W, Chesterfield, MO',
-  ],
+  savedPlaces: [],
+  recentSearches: [],
 };
 
-export const SAMPLE_PASSENGER_PAST_TRIPS: Trip[] = [
-  {
-    id: 'TRIP-9042',
-    customerId: 'cust-sarah-jenkins',
-    status: 'completed',
-    offeredToIds: [],
-    rejectedByIds: [],
-    assignedDriverId: 'drv-101',
-    bookingType: 'scheduled',
-    scheduledPickupTime: '2026-09-12T08:15:00.000Z',
-    actualPickupTime: '2026-09-12T08:14:20.000Z',
-    completedAt: '2026-09-12T08:44:10.000Z',
-    pickupLocation: {
-      address: '14848 Conway Rd, Chesterfield, MO 63017',
-      formattedAddress: '14848 Conway Rd, Chesterfield, MO 63017, USA',
-      notes: 'Front circular driveway',
-      coordinates: { lat: 38.6534, lng: -90.5281 },
-    },
-    dropoffLocation: {
-      address: '10701 Lambert International Blvd, St. Louis, MO 63145',
-      formattedAddress: 'Terminal 1, St. Louis Lambert International Airport (STL)',
-      notes: 'American Airlines Departures Door 3',
-      coordinates: { lat: 38.7499, lng: -90.3700 },
-    },
-    passenger: {
-      firstName: 'Sarah',
-      lastName: 'Jenkins',
-      email: 'sjenkins@bayer.com',
-      phone: '(314) 738-9921',
-      passengerCount: 1,
-      luggageCount: 2,
-      specialRequests: 'Flight AA 2314 to DFW. Need prompt airport curbside assistance.',
-    },
-    vehicleTier: 'standard',
-    pricing: {
-      baseFare: 4.5,
-      distanceMiles: 19.8,
-      durationMinutes: 28,
-      distanceRate: 2.8,
-      timeRate: 0.55,
-      vehicleMultiplier: 1.0,
-      surgeMultiplier: 1.0,
-      discountAmount: 0,
-      subtotal: 62.5,
-      airportSurcharge: 4.0,
-      tollsFee: 0,
-      totalFare: 66.5,
-      currency: 'USD',
-      tariffProfileName: 'Standard Flat Rate (Metro)',
-    },
-    payment: {
-      method: 'card',
-      status: 'captured',
-      amount: 66.5,
-      transactionId: 'ch_live_9042_stl_aa',
-      paidAt: '2026-09-12T08:44:15.000Z',
-    },
-    statusHistory: [
-      { from: null, to: 'UNCONFIRMED', timestamp: '2026-09-11T20:10:00.000Z', actorRole: 'passenger' },
-      { from: 'UNCONFIRMED', to: 'CONFIRMED', timestamp: '2026-09-11T20:25:00.000Z', actorRole: 'admin', reason: 'Confirmed by Dispatch Desk' },
-      { from: 'CONFIRMED', to: 'assigned', timestamp: '2026-09-12T07:45:00.000Z', actorRole: 'system', actorId: 'drv-101' },
-      { from: 'assigned', to: 'in_progress', timestamp: '2026-09-12T08:14:20.000Z', actorRole: 'driver', actorId: 'drv-101' },
-      { from: 'in_progress', to: 'completed', timestamp: '2026-09-12T08:44:10.000Z', actorRole: 'driver', actorId: 'drv-101' },
-    ],
-    metadata: {
-      driverName: 'Mike T. (Cab #204)',
-      vehicleUnit: 'Cab #204 (Toyota Camry)',
-      driverPhone: '(314) 555-0101',
-    },
-    createdAt: '2026-09-11T20:10:00.000Z',
-    updatedAt: '2026-09-12T08:44:15.000Z',
-  },
-  {
-    id: 'TRIP-8812',
-    customerId: 'cust-sarah-jenkins',
-    status: 'completed',
-    offeredToIds: [],
-    rejectedByIds: [],
-    assignedDriverId: 'drv-104',
-    bookingType: 'asap',
-    scheduledPickupTime: '2026-09-08T17:30:00.000Z',
-    actualPickupTime: '2026-09-08T17:35:10.000Z',
-    completedAt: '2026-09-08T18:12:45.000Z',
-    pickupLocation: {
-      address: '700 Chesterfield Pkwy W, Chesterfield, MO 63017',
-      formattedAddress: 'Bayer Chesterfield Campus, Building A',
-      notes: 'Visitor circle entrance',
-      coordinates: { lat: 38.6631, lng: -90.5752 },
-    },
-    dropoffLocation: {
-      address: '999 N 2nd St, St. Louis, MO 63102',
-      formattedAddress: 'Four Seasons Hotel St. Louis, Downtown Metro',
-      notes: 'Main hotel valet porte-cochere',
-      coordinates: { lat: 38.6315, lng: -90.1834 },
-    },
-    passenger: {
-      firstName: 'Sarah',
-      lastName: 'Jenkins',
-      email: 'sjenkins@bayer.com',
-      phone: '(314) 738-9921',
-      passengerCount: 2,
-      luggageCount: 1,
-      specialRequests: 'Corporate client dinner. Executive black car preferred.',
-    },
-    vehicleTier: 'premium',
-    pricing: {
-      baseFare: 6.5,
-      distanceMiles: 23.4,
-      durationMinutes: 34,
-      distanceRate: 3.2,
-      timeRate: 0.65,
-      vehicleMultiplier: 1.25,
-      surgeMultiplier: 1.0,
-      discountAmount: 0,
-      subtotal: 88.0,
-      tollsFee: 0,
-      totalFare: 88.0,
-      currency: 'USD',
-      tariffProfileName: 'Executive Flat Corridor',
-    },
-    payment: {
-      method: 'card',
-      status: 'captured',
-      amount: 88.0,
-      transactionId: 'ch_live_8812_fourseasons',
-      paidAt: '2026-09-08T18:12:50.000Z',
-    },
-    statusHistory: [
-      { from: null, to: 'CONFIRMED', timestamp: '2026-09-08T17:15:00.000Z', actorRole: 'passenger' },
-      { from: 'CONFIRMED', to: 'assigned', timestamp: '2026-09-08T17:20:00.000Z', actorRole: 'system', actorId: 'drv-104' },
-      { from: 'assigned', to: 'in_progress', timestamp: '2026-09-08T17:35:10.000Z', actorRole: 'driver', actorId: 'drv-104' },
-      { from: 'in_progress', to: 'completed', timestamp: '2026-09-08T18:12:45.000Z', actorRole: 'driver', actorId: 'drv-104' },
-    ],
-    metadata: {
-      driverName: 'Sarah K. (Cab #301)',
-      vehicleUnit: 'Cab #301 (Chevy Suburban)',
-      driverPhone: '(314) 555-0104',
-    },
-    createdAt: '2026-09-08T17:15:00.000Z',
-    updatedAt: '2026-09-08T18:12:50.000Z',
-  },
-  {
-    id: 'TRIP-7940',
-    customerId: 'cust-sarah-jenkins',
-    status: 'cancelled',
-    cancellationReason: 'Passenger requested schedule adjustment',
-    cancelledBy: 'passenger',
-    offeredToIds: [],
-    rejectedByIds: [],
-    assignedDriverId: null,
-    bookingType: 'scheduled',
-    scheduledPickupTime: '2026-08-25T14:00:00.000Z',
-    pickupLocation: {
-      address: '14848 Conway Rd, Chesterfield, MO 63017',
-      formattedAddress: '14848 Conway Rd, Chesterfield, MO',
-    },
-    dropoffLocation: {
-      address: '232 S Woods Mill Rd, Chesterfield, MO 63017',
-      formattedAddress: "St. Luke's Hospital Medical Arts",
-    },
-    passenger: {
-      firstName: 'Sarah',
-      lastName: 'Jenkins',
-      email: 'sjenkins@bayer.com',
-      phone: '(314) 738-9921',
-      passengerCount: 1,
-      luggageCount: 0,
-    },
-    vehicleTier: 'standard',
-    pricing: {
-      baseFare: 4.5,
-      distanceMiles: 4.2,
-      durationMinutes: 10,
-      distanceRate: 2.8,
-      timeRate: 0.55,
-      vehicleMultiplier: 1.0,
-      surgeMultiplier: 1.0,
-      discountAmount: 0,
-      subtotal: 18.5,
-      totalFare: 18.5,
-      currency: 'USD',
-    },
-    payment: {
-      method: 'cash',
-      status: 'refunded',
-      amount: 0,
-    },
-    statusHistory: [
-      { from: null, to: 'UNCONFIRMED', timestamp: '2026-08-24T18:00:00.000Z', actorRole: 'passenger' },
-      { from: 'UNCONFIRMED', to: 'cancelled', timestamp: '2026-08-25T09:00:00.000Z', actorRole: 'passenger', reason: 'Rescheduled appointment' },
-    ],
-    createdAt: '2026-08-24T18:00:00.000Z',
-    updatedAt: '2026-08-25T09:00:00.000Z',
-  },
-];
+export const SAMPLE_PASSENGER_PAST_TRIPS: Trip[] = [];
+
+function createEmptyAccountForUser(user?: {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  phone?: string | null;
+} | null): PassengerAccount {
+  if (!user?.uid) {
+    return { ...DEFAULT_PASSENGER_ACCOUNT, savedPlaces: [], recentSearches: [] };
+  }
+  const rawName = (user.displayName || '').trim();
+  const parts = rawName ? rawName.split(/\s+/) : [];
+  const fallbackFirst =
+    parts[0] || (user.email ? user.email.split('@')[0] : 'Passenger');
+  const fallbackLast = parts.slice(1).join(' ');
+
+  return {
+    ...DEFAULT_PASSENGER_ACCOUNT,
+    id: user.uid,
+    firstName: fallbackFirst,
+    lastName: fallbackLast,
+    email: (user.email || '').trim(),
+    phone: (user.phone || '').trim(),
+    savedPlaces: [],
+    recentSearches: [],
+  };
+}
 
 export class PassengerService {
-  private account: PassengerAccount = DEFAULT_PASSENGER_ACCOUNT;
+  private boundUid: string = '';
+  private account: PassengerAccount = createEmptyAccountForUser(null);
   private listeners = new Set<(account: PassengerAccount) => void>();
+  private firestoreUnsub: (() => void) | null = null;
 
   constructor() {
+    // Clean up legacy shared Sarah Jenkins cache key so stale demo PII never resurfaces
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem(PASSENGER_STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          this.account = {
-            ...DEFAULT_PASSENGER_ACCOUNT,
-            ...parsed,
-            communicationPreferences: {
-              ...DEFAULT_PASSENGER_ACCOUNT.communicationPreferences,
-              ...(parsed.communicationPreferences || {}),
-            },
-            savedPlaces: Array.isArray(parsed.savedPlaces) && parsed.savedPlaces.length > 0
-              ? parsed.savedPlaces
-              : DEFAULT_PASSENGER_ACCOUNT.savedPlaces,
-          };
+        localStorage.removeItem(LEGACY_PASSENGER_STORAGE_KEY);
+      } catch {}
+    }
+  }
+
+  /**
+   * Binds PassengerService to the signed-in Firebase Auth user and starts live
+   * synchronization with Firestore `/users/{uid}`.
+   */
+  public bindToAuthUser(
+    user: {
+      uid: string;
+      email?: string | null;
+      displayName?: string | null;
+      phone?: string | null;
+    } | null
+  ): void {
+    const nextUid = user?.uid || '';
+    if (nextUid === this.boundUid && nextUid) {
+      return;
+    }
+
+    if (this.firestoreUnsub) {
+      this.firestoreUnsub();
+      this.firestoreUnsub = null;
+    }
+
+    this.boundUid = nextUid;
+
+    if (!nextUid || !user) {
+      this.account = createEmptyAccountForUser(null);
+      this.notify();
+      return;
+    }
+
+    // Hydrate UID-scoped cache immediately, then live-sync from Firestore `/users/{uid}`
+    const baseAccount = createEmptyAccountForUser(user);
+    const cached = this.loadUidCache(nextUid);
+    this.account = cached
+      ? {
+          ...baseAccount,
+          ...cached,
+          id: nextUid,
+          email: cached.email || baseAccount.email,
+          communicationPreferences: {
+            ...baseAccount.communicationPreferences,
+            ...(cached.communicationPreferences || {}),
+          },
+          savedPlaces: Array.isArray(cached.savedPlaces) ? cached.savedPlaces : [],
         }
+      : baseAccount;
+    this.notify();
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const userRef = doc(db, 'users', nextUid);
+        this.firestoreUnsub = onSnapshot(
+          userRef,
+          (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data() as Record<string, any>;
+            const rawDisplay = String(data.displayName || '').trim();
+            const displayParts = rawDisplay ? rawDisplay.split(/\s+/) : [];
+
+            const hydrated: PassengerAccount = {
+              ...baseAccount,
+              id: nextUid,
+              firstName: data.firstName ?? displayParts[0] ?? baseAccount.firstName,
+              lastName: data.lastName ?? displayParts.slice(1).join(' ') ?? baseAccount.lastName,
+              email: data.email || baseAccount.email,
+              phone: data.phone || baseAccount.phone,
+              homePhone: data.homePhone,
+              workPhone: data.workPhone,
+              primaryMobilePhone: data.primaryMobilePhone,
+              alternatePhones: Array.isArray(data.alternatePhones) ? data.alternatePhones : undefined,
+              passengerNotes: typeof data.passengerNotes === 'string' ? data.passengerNotes : '',
+              preferredVehicleTier: data.preferredVehicleTier || 'standard',
+              communicationPreferences: {
+                smsUpdates: data.communicationPreferences?.smsUpdates ?? true,
+                emailReceipts: data.communicationPreferences?.emailReceipts ?? true,
+                phoneCalls: data.communicationPreferences?.phoneCalls ?? true,
+              },
+              savedPlaces: Array.isArray(data.savedPlaces) ? data.savedPlaces : [],
+              recentSearches: Array.isArray(data.recentSearches) ? data.recentSearches : [],
+              customerScore: data.customerScore,
+              totalTrips: data.totalTrips,
+              isArchived: Boolean(data.isArchived),
+              isBlacklisted: Boolean(data.isBlacklisted),
+            };
+
+            this.account = hydrated;
+            this.persist();
+            this.notify();
+          },
+          (err) => {
+            console.warn('[PassengerService] Firestore user snapshot warning:', err);
+          }
+        );
       } catch (err) {
-        console.warn('[PassengerService] Could not parse stored account:', err);
+        console.warn('[PassengerService] Could not subscribe to /users/' + nextUid, err);
       }
     }
   }
 
+  /**
+   * Clears all passenger & cached trip data from browser storage on sign-out
+   * (prevents shared-device PII leakage).
+   */
+  public clearLocalSession(): void {
+    const prevUid = this.boundUid;
+    this.bindToAuthUser(null);
+    if (typeof window !== 'undefined') {
+      try {
+        if (prevUid) {
+          localStorage.removeItem(PASSENGER_STORAGE_PREFIX + prevUid);
+        }
+        localStorage.removeItem(LEGACY_PASSENGER_STORAGE_KEY);
+        localStorage.removeItem('chesterfield_taxi_mock_trips');
+      } catch {}
+    }
+  }
+
   public async getAccount(): Promise<PassengerAccount> {
+    if (this.boundUid && isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const snap = await getDoc(doc(db, 'users', this.boundUid));
+        if (snap.exists()) {
+          const data = snap.data() as Record<string, any>;
+          this.account = {
+            ...this.account,
+            id: this.boundUid,
+            firstName: data.firstName ?? this.account.firstName,
+            lastName: data.lastName ?? this.account.lastName,
+            phone: data.phone ?? this.account.phone,
+            email: data.email ?? this.account.email,
+            passengerNotes: data.passengerNotes ?? this.account.passengerNotes,
+            preferredVehicleTier: data.preferredVehicleTier ?? this.account.preferredVehicleTier,
+            communicationPreferences: {
+              ...this.account.communicationPreferences,
+              ...(data.communicationPreferences || {}),
+            },
+            savedPlaces: Array.isArray(data.savedPlaces) ? data.savedPlaces : this.account.savedPlaces,
+          };
+          this.persist();
+        }
+      } catch {}
+    }
     return { ...this.account };
   }
 
@@ -322,6 +232,7 @@ export class PassengerService {
     this.account = {
       ...this.account,
       ...updates,
+      id: this.boundUid || this.account.id,
       communicationPreferences: {
         ...this.account.communicationPreferences,
         ...(updates.communicationPreferences || {}),
@@ -329,6 +240,7 @@ export class PassengerService {
     };
     this.persist();
     this.notify();
+    await this.persistProfileToFirestore();
     return { ...this.account };
   }
 
@@ -345,6 +257,7 @@ export class PassengerService {
 
     this.persist();
     this.notify();
+    await this.persistProfileToFirestore();
     return newPlace;
   }
 
@@ -364,6 +277,7 @@ export class PassengerService {
 
     this.persist();
     this.notify();
+    await this.persistProfileToFirestore();
 
     if (!updatedTarget) {
       throw new Error(`Saved place #${id} not found.`);
@@ -379,6 +293,7 @@ export class PassengerService {
     };
     this.persist();
     this.notify();
+    await this.persistProfileToFirestore();
   }
 
   public subscribeToAccount(callback: (account: PassengerAccount) => void): () => void {
@@ -389,107 +304,151 @@ export class PassengerService {
     };
   }
 
-  /**
-   * Resolves past completed and cancelled trips for this passenger.
-   * Merges live Firestore trips with sample records for full historical auditing.
-   */
-  public async getPassengerTrips(): Promise<Trip[]> {
-    const bookingService = getBookingService();
-    let liveTrips: Trip[] = [];
-    try {
-      if (bookingService.getAllTrips) {
-        const all = await bookingService.getAllTrips();
-        const normAccountPhone = this.account.phone.replace(/\D/g, '');
-        const accountEmail = (this.account.email || '').toLowerCase();
+  private matchesCurrentPassenger(trip: Trip): boolean {
+    const uid = this.boundUid || this.account.id;
+    const normAccountPhone = normalizePhone(this.account.phone);
+    const accountEmail = (this.account.email || '').trim().toLowerCase();
 
-        liveTrips = all.filter((t) => {
-          const tPhone = (t.passenger?.phone || '').replace(/\D/g, '');
-          const tEmail = (t.passenger?.email || '').toLowerCase();
-          const tCust = t.customerId;
-          return (
-            (normAccountPhone && tPhone.includes(normAccountPhone)) ||
-            (accountEmail && tEmail === accountEmail) ||
-            tCust === this.account.id
-          );
-        });
-      }
-    } catch (err) {
-      console.warn('[PassengerService] Error reading live trips from booking service:', err);
+    if (uid && (trip.customerId === uid || trip.userId === uid)) return true;
+    if (accountEmail && trip.passenger?.email?.trim().toLowerCase() === accountEmail) return true;
+    if (normAccountPhone && normAccountPhone.length >= 10) {
+      const tripPhone = normalizePhone(trip.passenger?.phone);
+      if (tripPhone && tripPhone === normAccountPhone) return true;
     }
-
-    // Sort by scheduledPickupTime or createdAt descending (newest first)
-    return liveTrips.sort((a, b) => {
-      const timeA = new Date(a.scheduledPickupTime || a.createdAt).getTime();
-      const timeB = new Date(b.scheduledPickupTime || b.createdAt).getTime();
-      return timeB - timeA;
-    });
+    return false;
   }
 
   /**
-   * Alias for getPassengerTrips for trip history lists.
+   * Real-time scoped subscription to ALL trips belonging to the signed-in passenger.
+   * Satisfies strict Firestore `allow list` rules (queries by customerId, userId, passenger.email).
    */
+  public subscribeToPassengerTrips(callback: (trips: Trip[]) => void): () => void {
+    const bookingService = getBookingService();
+    const uid = this.boundUid || this.account.id;
+    const email = this.account.email;
+    const phone = this.account.phone;
+
+    const sortNewestFirst = (list: Trip[]) =>
+      [...list].sort((a, b) => {
+        const timeA = new Date(a.scheduledPickupTime || a.createdAt).getTime();
+        const timeB = new Date(b.scheduledPickupTime || b.createdAt).getTime();
+        return timeB - timeA;
+      });
+
+    if (bookingService.subscribeToPassengerTrips) {
+      return bookingService.subscribeToPassengerTrips({ uid, email, phone }, (remoteTrips) => {
+        callback(sortNewestFirst(remoteTrips));
+      });
+    }
+
+    if (bookingService.subscribeToAllTrips) {
+      return bookingService.subscribeToAllTrips((all) => {
+        callback(sortNewestFirst(all.filter((t) => this.matchesCurrentPassenger(t))));
+      });
+    }
+
+    this.getPassengerTrips().then(callback).catch(() => callback([]));
+    return () => {};
+  }
+
+  /**
+   * One-shot fetch of trips for the current passenger.
+   */
+  public async getPassengerTrips(): Promise<Trip[]> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const unsub = this.subscribeToPassengerTrips((list) => {
+        if (!settled) {
+          settled = true;
+          resolve(list);
+          setTimeout(() => unsub(), 0);
+        }
+      });
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          unsub();
+          resolve([]);
+        }
+      }, 2500);
+    });
+  }
+
   public async getTripsHistory(): Promise<Trip[]> {
     return this.getPassengerTrips();
   }
 
   /**
-   * Subscribes to live trips and locates any active trip for this passenger.
-   * Active statuses: UNCONFIRMED, CONFIRMED, assigned, accepted, en_route, arrived, in_progress.
+   * Subscribes to live scoped passenger trips and emits the most urgent active trip.
    */
   public subscribeToActiveTrip(callback: (activeTrip: Trip | null) => void): () => void {
-    const bookingService = getBookingService();
     const activeStatuses: TripStatus[] = [
-      'UNCONFIRMED',
-      'unconfirmed',
+      'in_progress',
+      'arrived',
+      'en_route',
+      'accepted',
+      'assigned',
       'CONFIRMED',
       'confirmed',
-      'assigned',
-      'accepted',
-      'en_route',
-      'arrived',
-      'in_progress',
+      'UNCONFIRMED',
+      'unconfirmed',
+      'pending',
     ];
 
-    const evaluateTrips = (trips: Trip[]) => {
-      const normAccountPhone = this.account.phone.replace(/\D/g, '');
-      const accountEmail = (this.account.email || '').toLowerCase();
+    return this.subscribeToPassengerTrips((trips) => {
+      const candidates = trips.filter((t) => activeStatuses.includes(t.status));
+      candidates.sort(
+        (a, b) => activeStatuses.indexOf(a.status) - activeStatuses.indexOf(b.status)
+      );
+      callback(candidates[0] || null);
+    });
+  }
 
-      const active = trips.find((t) => {
-        if (!activeStatuses.includes(t.status)) return false;
-        const tPhone = (t.passenger?.phone || '').replace(/\D/g, '');
-        const tEmail = (t.passenger?.email || '').toLowerCase();
-        const tCust = t.customerId;
-
-        return (
-          (normAccountPhone && tPhone.includes(normAccountPhone)) ||
-          (accountEmail && tEmail === accountEmail) ||
-          tCust === this.account.id
-        );
+  private async persistProfileToFirestore(): Promise<void> {
+    if (!this.boundUid || !isFirebaseConfigured()) return;
+    try {
+      const db = getFirestoreDb();
+      const userRef = doc(db, 'users', this.boundUid);
+      // Only write owner-allowed profile fields (NEVER role/roles/status/governance keys!)
+      const safeProfilePatch = sanitizePayload({
+        firstName: this.account.firstName,
+        lastName: this.account.lastName,
+        displayName: `${this.account.firstName} ${this.account.lastName}`.trim() || undefined,
+        phone: this.account.phone,
+        email: this.account.email,
+        homePhone: this.account.homePhone,
+        workPhone: this.account.workPhone,
+        primaryMobilePhone: this.account.primaryMobilePhone,
+        alternatePhones: this.account.alternatePhones,
+        passengerNotes: this.account.passengerNotes,
+        preferredVehicleTier: this.account.preferredVehicleTier,
+        communicationPreferences: this.account.communicationPreferences,
+        savedPlaces: this.account.savedPlaces,
+        recentSearches: this.account.recentSearches,
+        updatedAt: new Date().toISOString(),
       });
-
-      callback(active || null);
-    };
-
-    let unsubBooking: (() => void) | undefined;
-    if (bookingService.subscribeToAllTrips) {
-      unsubBooking = bookingService.subscribeToAllTrips((trips) => {
-        evaluateTrips(trips);
-      });
-    } else {
-      this.getPassengerTrips().then((trips) => evaluateTrips(trips));
+      await setDoc(userRef, safeProfilePatch, { merge: true });
+    } catch (err) {
+      console.warn('[PassengerService] Could not sync profile to Firestore /users/' + this.boundUid, err);
     }
+  }
 
-    return () => {
-      if (unsubBooking) unsubBooking();
-    };
+  private loadUidCache(uid: string): Partial<PassengerAccount> | null {
+    if (typeof window === 'undefined' || !uid) return null;
+    try {
+      const raw = localStorage.getItem(PASSENGER_STORAGE_PREFIX + uid);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   }
 
   private persist() {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && this.boundUid) {
       try {
-        localStorage.setItem(PASSENGER_STORAGE_KEY, JSON.stringify(this.account));
+        localStorage.setItem(PASSENGER_STORAGE_PREFIX + this.boundUid, JSON.stringify(this.account));
       } catch (err) {
-        console.warn('[PassengerService] Could not persist passenger account:', err);
+        console.warn('[PassengerService] Could not persist passenger account cache:', err);
       }
     }
   }
@@ -537,19 +496,16 @@ export function resolvePrimarySmsPhone(passenger: PassengerAccount): string {
 }
 
 /**
- * Matches an incoming caller phone number against all known customer phone numbers (mobile, home, work).
+ * Matches an incoming caller phone number against all known customer phone numbers.
  */
 export function matchPassengerByPhone(
   searchPhone: string,
   passengerDirectory: PassengerAccount[] = []
 ): { passenger: PassengerAccount; matchedType: 'mobile' | 'home' | 'work' | 'primary' } | null {
   const searchNorm = normalizePhone(searchPhone);
-  if (!searchNorm) return null;
+  if (!searchNorm || passengerDirectory.length === 0) return null;
 
-  // Search directory or default passenger
-  const directory = passengerDirectory.length > 0 ? passengerDirectory : [DEFAULT_PASSENGER_ACCOUNT];
-
-  for (const account of directory) {
+  for (const account of passengerDirectory) {
     if (normalizePhone(account.phone) === searchNorm) {
       return { passenger: account, matchedType: 'primary' };
     }

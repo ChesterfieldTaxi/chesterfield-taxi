@@ -67,9 +67,13 @@ export class AdminAuthService {
         let singleRole = data?.role as UserRole | undefined;
 
         if (singleRole && (!roles || roles.length === 0)) {
-          // Self-heal: migrate single role to roles array
+          // Self-heal: migrate single role to roles array (ignore if rules block)
           roles = [singleRole];
-          await setDoc(userRef, { roles }, { merge: true });
+          try {
+            await setDoc(userRef, { roles }, { merge: true });
+          } catch (healErr) {
+            console.warn('[AdminAuthService] Skipping role array self-heal write:', healErr);
+          }
         }
 
         if (!roles || roles.length === 0) {
@@ -343,14 +347,40 @@ export class AdminAuthService {
     throw new Error('Password reset requires Firebase Authentication to be configured.');
   }
 
+  private async ensureOAuthCustomerProfile(user: User): Promise<void> {
+    if (!this.isConfigured) return;
+    try {
+      const db = getFirestore(getFirebaseApp());
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(
+          userRef,
+          {
+            role: 'customer',
+            roles: ['customer'],
+            email: (user.email || '').toLowerCase(),
+            displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'Passenger'),
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+    } catch (err) {
+      console.warn('[AdminAuthService] Could not provision OAuth user profile:', err);
+    }
+  }
+
   public async signInWithGoogle(role: UserRole = 'customer'): Promise<AdminUser> {
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();
         const provider = new GoogleAuthProvider();
         const cred = await signInWithPopup(auth, provider);
-        
-        // Fetch or create user role
+
+        await this.ensureOAuthCustomerProfile(cred.user);
+        // Fetch user role
         const roles = await this.fetchUserRoles(cred.user);
         
         return {
@@ -374,8 +404,9 @@ export class AdminAuthService {
         const auth = getFirebaseAuth();
         const provider = new FacebookAuthProvider();
         const cred = await signInWithPopup(auth, provider);
-        
-        // Fetch or create user role
+
+        await this.ensureOAuthCustomerProfile(cred.user);
+        // Fetch user role
         const roles = await this.fetchUserRoles(cred.user);
         
         return {

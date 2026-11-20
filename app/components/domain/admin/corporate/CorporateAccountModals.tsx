@@ -347,7 +347,10 @@ export function CorporateCsvImportModal({
 
   if (!isOpen) return null;
 
-  const handleParse = (text: string) => {
+  const handleParse = (
+    text: string,
+    overrides?: { poRequired?: boolean; discountPercent?: number; creditLimit?: number }
+  ) => {
     setCsvRaw(text);
     if (!text.trim()) {
       setPreviewAccounts([]);
@@ -356,9 +359,9 @@ export function CorporateCsvImportModal({
     try {
       const service = getCorporateAccountService();
       const parsed = service.parseCorporateAccountsCsv(text, {
-        poRequired,
-        discountPercent,
-        creditLimit,
+        poRequired: overrides?.poRequired ?? poRequired,
+        discountPercent: overrides?.discountPercent ?? discountPercent,
+        creditLimit: overrides?.creditLimit ?? creditLimit,
         billingCycle: 'net30',
       });
       setPreviewAccounts(parsed);
@@ -451,7 +454,7 @@ export function CorporateCsvImportModal({
                 onChange={(e) => {
                   const val = Number(e.target.value);
                   setCreditLimit(val);
-                  if (csvRaw) handleParse(csvRaw);
+                  if (csvRaw) handleParse(csvRaw, { creditLimit: val });
                 }}
                 className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
               />
@@ -464,7 +467,7 @@ export function CorporateCsvImportModal({
                 onChange={(e) => {
                   const val = Number(e.target.value);
                   setDiscountPercent(val);
-                  if (csvRaw) handleParse(csvRaw);
+                  if (csvRaw) handleParse(csvRaw, { discountPercent: val });
                 }}
                 className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
               />
@@ -478,7 +481,7 @@ export function CorporateCsvImportModal({
                   onChange={(e) => {
                     const checked = e.target.checked;
                     setPoRequired(checked);
-                    if (csvRaw) handleParse(csvRaw);
+                    if (csvRaw) handleParse(csvRaw, { poRequired: checked });
                   }}
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
                 />

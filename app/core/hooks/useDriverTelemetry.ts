@@ -115,12 +115,14 @@ export function useDriverTelemetry({
   const prevFixRef = useRef<GeoPoint | null>(null);
   const lastHeadingRef = useRef<number | undefined>(undefined);
   const watchIdRef = useRef<number | null>(null);
-  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const MAX_OFFLINE_BUFFER = 50;
 
   const isActiveTripState = Boolean(
     trip &&
       trip.id &&
-      (trip.status === 'en_route' ||
+      (trip.status === 'assigned' ||
+        trip.status === 'accepted' ||
+        trip.status === 'en_route' ||
         trip.status === 'arrived' ||
         trip.status === 'in_progress')
   );
@@ -186,10 +188,6 @@ export function useDriverTelemetry({
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
       }
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-        fallbackIntervalRef.current = null;
-      }
       return;
     }
 
@@ -204,6 +202,9 @@ export function useDriverTelemetry({
 
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         offlineBufferRef.current.push({ ...ping, isOfflineBuffer: true });
+        if (offlineBufferRef.current.length > MAX_OFFLINE_BUFFER) {
+          offlineBufferRef.current = offlineBufferRef.current.slice(-MAX_OFFLINE_BUFFER);
+        }
         setPendingBufferCount(offlineBufferRef.current.length);
         return;
       }
@@ -322,10 +323,6 @@ export function useDriverTelemetry({
       if (watchIdRef.current !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
-      }
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-        fallbackIntervalRef.current = null;
       }
       setIsTracking(false);
     };

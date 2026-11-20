@@ -10,10 +10,13 @@ import type {
   VaultedCard,
   PaymentIntentRecord,
   DriverPayoutRecord,
+  DriverSettlementMethod,
   IPaymentService,
 } from '../types/payment';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { authorizedFetch } from './auth/auth-headers';
+import { sanitizePayload } from './firestore-sanitizer';
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 
 const DEFAULT_VAULTED_CARDS_STORAGE_KEY = 'ct_vaulted_cards';
 const DEFAULT_PAYMENT_INTENTS_STORAGE_KEY = 'ct_payment_intents';
@@ -253,26 +256,78 @@ class PaymentService implements IPaymentService {
     tripId: string,
     finalAmount: number,
     tipAmount: number = 0,
-    extrasAmount: number = 0
+    extrasAmount: number = 0,
+    options?: {
+      settlementMethod?: DriverSettlementMethod;
+      paymentIntentId?: string;
+      cardLast4?: string;
+      cardBrand?: CardBrand;
+    }
   ): Promise<PaymentIntentRecord> {
     const existing = this.memoryIntents.get(tripId);
     const now = new Date().toISOString();
-    const totalCaptured = Number((finalAmount + tipAmount + extrasAmount).toFixed(2));
+    const cleanFinal = Number(finalAmount.toFixed(2));
+    const cleanTip = Number(tipAmount.toFixed(2));
+    const cleanExtras = Number(extrasAmount.toFixed(2));
+    const totalCaptured = Number((cleanFinal + cleanTip + cleanExtras).toFixed(2));
+    const settlementMethod: DriverSettlementMethod = options?.settlementMethod || 'card_terminal';
+
+    let resolvedPaymentIntentId =
+      options?.paymentIntentId || existing?.id || `in_cab_${settlementMethod}_${tripId}_${Date.now().toString(36)}`;
+    let paymentStatus: 'captured' | 'pending_invoice' =
+      settlementMethod === 'corporate_account' ? 'pending_invoice' : 'captured';
+
+    // Real Stripe capture ONLY when explicitly settling a genuine Stripe pre-auth hold
+    if (
+      settlementMethod === 'stripe_preauth' &&
+      options?.paymentIntentId &&
+      /^pi_[a-zA-Z0-9]{8,64}$/.test(options.paymentIntentId)
+    ) {
+      const resp = await authorizedFetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'capture_intent',
+          paymentIntentId: options.paymentIntentId,
+          amount: totalCaptured,
+          tripId,
+        }),
+      });
+      const result = (await resp.json().catch(() => ({}))) as any;
+      if (!resp.ok || !result?.success) {
+        throw new Error(
+          result?.error ||
+            'Online Stripe capture failed. Please settle via In-Cab Card Terminal or Cash.'
+        );
+      }
+      resolvedPaymentIntentId = result.paymentIntentId || options.paymentIntentId;
+    }
 
     const updated: PaymentIntentRecord = {
-      id: existing ? existing.id : `pi_cap_${tripId}_${Date.now().toString(36)}`,
+      id: resolvedPaymentIntentId,
       tripId,
       customerId: existing?.customerId,
       amount: totalCaptured,
       currency: 'USD',
-      status: 'captured',
-      paymentMethodId: existing?.paymentMethodId || 'pm_terminal',
-      cardLast4: existing?.cardLast4 || '4242',
-      cardBrand: existing?.cardBrand || 'visa',
-      preAuthHoldAmount: existing?.preAuthHoldAmount || finalAmount,
-      capturedAmount: totalCaptured,
-      tipAmount,
-      extrasAmount,
+      status: settlementMethod === 'corporate_account' ? 'pending' : 'captured',
+      paymentMethodId:
+        settlementMethod === 'cash'
+          ? 'in_cab_cash'
+          : settlementMethod === 'corporate_account'
+          ? 'corporate_direct_bill'
+          : existing?.paymentMethodId || 'in_cab_terminal',
+      cardLast4:
+        settlementMethod === 'cash' || settlementMethod === 'corporate_account'
+          ? undefined
+          : options?.cardLast4 || existing?.cardLast4,
+      cardBrand:
+        settlementMethod === 'cash' || settlementMethod === 'corporate_account'
+          ? undefined
+          : options?.cardBrand || existing?.cardBrand,
+      preAuthHoldAmount: existing?.preAuthHoldAmount || cleanFinal,
+      capturedAmount: settlementMethod === 'corporate_account' ? 0 : totalCaptured,
+      tipAmount: cleanTip,
+      extrasAmount: cleanExtras,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };
@@ -280,22 +335,40 @@ class PaymentService implements IPaymentService {
     this.memoryIntents.set(tripId, updated);
     this.persistToStorage();
 
-    // Sync to Firestore trip document if available
-    if (isFirebaseConfigured()) {
+    // Sync directly to the REAL `trips/{tripId}` document (never paymentIntentId!)
+    const tripMethod =
+      settlementMethod === 'cash'
+        ? 'cash'
+        : settlementMethod === 'corporate_account'
+        ? 'account'
+        : 'card';
+
+    if (isFirebaseConfigured() && tripId) {
       try {
         const db = getFirestoreDb();
         if (db) {
           const tripRef = doc(db, 'trips', tripId);
-          await updateDoc(tripRef, {
-            'payment.status': 'captured',
+          const tripPaymentPatch: Record<string, any> = {
+            'payment.method': tripMethod,
+            'payment.status': paymentStatus,
             'payment.amount': totalCaptured,
-            'payment.tipAmount': tipAmount,
+            'payment.tipAmount': cleanTip,
             'payment.paymentIntentId': updated.id,
-            'payment.paidAt': now,
-          }).catch(() => {});
+            updatedAt: now,
+          };
+          if (paymentStatus === 'captured') {
+            tripPaymentPatch['payment.paidAt'] = now;
+          }
+          if (updated.cardLast4) {
+            tripPaymentPatch['payment.cardLast4'] = updated.cardLast4;
+          }
+          if (updated.cardBrand) {
+            tripPaymentPatch['payment.cardBrand'] = updated.cardBrand;
+          }
+          await updateDoc(tripRef, tripPaymentPatch);
         }
-      } catch {
-        // Tolerated
+      } catch (err) {
+        console.warn('[PaymentService] Failed syncing payment to trips/' + tripId, err);
       }
     }
 
@@ -308,24 +381,51 @@ class PaymentService implements IPaymentService {
     tripFare: number,
     tipAmount: number = 0,
     tollsAmount: number = 0,
-    extrasAmount: number = 0,
-    driverCommissionRate: number = 0.75 // Default: Driver receives 75% of base + extras, 100% of tip, 100% of tolls
+    nonTollExtrasAmount: number = 0,
+    driverCommissionRate: number = 0.75,
+    paymentMethod: DriverSettlementMethod = 'card_terminal'
   ): Promise<DriverPayoutRecord> {
-    const grossFareAndExtras = tripFare + extrasAmount;
-    const driverShare = Number((grossFareAndExtras * driverCommissionRate).toFixed(2));
-    const platformFee = Number((grossFareAndExtras - driverShare).toFixed(2));
-    const netPayout = Number((driverShare + tipAmount + tollsAmount).toFixed(2));
+    const safeRate =
+      Number.isFinite(driverCommissionRate) && driverCommissionRate >= 0 && driverCommissionRate <= 1
+        ? driverCommissionRate
+        : 0.75;
+
+    // Decision #3: 100% driver pass-through strictly for tolls + tips; base fare + non-toll extras split at commission rate
+    const cleanBaseFare = Number(Math.max(0, tripFare).toFixed(2));
+    const cleanNonTollExtras = Number(Math.max(0, nonTollExtrasAmount).toFixed(2));
+    const cleanTolls = Number(Math.max(0, tollsAmount).toFixed(2));
+    const cleanTip = Number(Math.max(0, tipAmount).toFixed(2));
+
+    const commissionableGross = Number((cleanBaseFare + cleanNonTollExtras).toFixed(2));
+    const driverShare = Number((commissionableGross * safeRate).toFixed(2));
+    const platformFee = Number((commissionableGross - driverShare).toFixed(2));
+    const passengerGrandTotal = Number(
+      (cleanBaseFare + cleanNonTollExtras + cleanTolls + cleanTip).toFixed(2)
+    );
+
+    const isCash = paymentMethod === 'cash';
+    // On Cash rides, driver keeps cash collected in cab and owes company its commission (`platformFee`)
+    const netPayout = isCash
+      ? Number((-platformFee).toFixed(2))
+      : Number((driverShare + cleanTip + cleanTolls).toFixed(2));
 
     const payout: DriverPayoutRecord = {
       id: `payout_${tripId}_${Date.now().toString(36)}`,
       driverId,
       tripId,
-      totalFare: Number((tripFare + extrasAmount + tipAmount + tollsAmount).toFixed(2)),
+      totalFare: passengerGrandTotal,
+      baseFareAmount: cleanBaseFare,
+      nonTollExtrasAmount: cleanNonTollExtras,
+      commissionRate: safeRate,
+      paymentMethod,
       platformFee,
       driverShare,
-      tipAmount,
-      tollsReimbursed: tollsAmount,
+      tipAmount: cleanTip,
+      tollsReimbursed: cleanTolls,
       netPayout,
+      driverCashCollected: isCash ? passengerGrandTotal : 0,
+      companyCommissionOwed: isCash ? platformFee : 0,
+      settlementDirection: isCash ? 'driver_owes_company' : 'company_owes_driver',
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
@@ -333,19 +433,20 @@ class PaymentService implements IPaymentService {
     this.memoryPayouts.set(tripId, payout);
     this.persistToStorage();
 
-    // Sync to Firestore trip if configured
+    // Persist payout record to Firestore `/driverPayouts/{payoutId}` & link on `trips/{tripId}`
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestoreDb();
         if (db) {
+          await setDoc(doc(db, 'driverPayouts', payout.id), sanitizePayload(payout));
           const tripRef = doc(db, 'trips', tripId);
           await updateDoc(tripRef, {
             'payment.driverPayoutId': payout.id,
             'payment.payoutStatus': 'pending',
           }).catch(() => {});
         }
-      } catch {
-        // Tolerated
+      } catch (err) {
+        console.warn('[PaymentService] Driver payout Firestore sync warning:', err);
       }
     }
 
@@ -354,6 +455,35 @@ class PaymentService implements IPaymentService {
 
   async getDriverPayoutForTrip(tripId: string): Promise<DriverPayoutRecord | null> {
     return this.memoryPayouts.get(tripId) || null;
+  }
+
+  async getDriverPayoutHistory(driverId: string): Promise<DriverPayoutRecord[]> {
+    const localRecords = Array.from(this.memoryPayouts.values()).filter(
+      (p) => p.driverId === driverId
+    );
+
+    if (isFirebaseConfigured() && driverId) {
+      try {
+        const db = getFirestoreDb();
+        const q = query(collection(db, 'driverPayouts'), where('driverId', '==', driverId));
+        const snap = await getDocs(q);
+        const byId = new Map<string, DriverPayoutRecord>();
+        localRecords.forEach((r) => byId.set(r.id, r));
+        snap.forEach((d) => {
+          const rec = d.data() as DriverPayoutRecord;
+          byId.set(rec.id || d.id, rec);
+        });
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      } catch (err) {
+        console.warn('[PaymentService] getDriverPayoutHistory Firestore warning:', err);
+      }
+    }
+
+    return localRecords.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 }
 

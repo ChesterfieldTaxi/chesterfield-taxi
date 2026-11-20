@@ -281,6 +281,9 @@ export interface TripAssignedVehicle {
 export interface Trip {
   id: string;
   customerId?: string;
+  userId?: string;
+  /** High-entropy token for zero-PII guest tracking links (/track/:trackingToken) */
+  trackingToken?: string;
 
   /** State machine status */
   status: TripStatus;

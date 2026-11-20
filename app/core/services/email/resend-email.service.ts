@@ -14,6 +14,8 @@ import type {
   StatusUpdateEmailPayload,
   BookingDeclinedEmailPayload,
   BookingClarificationRequestEmailPayload,
+  TripReceiptEmailPayload,
+  CorporateInvoiceEmailPayload,
   EmailDispatchResult,
   EmailDispatchApiRequest,
 } from './types';
@@ -23,8 +25,11 @@ import {
   renderStatusUpdateEmail,
   renderBookingDeclinedEmail,
   renderClarificationRequestEmail,
+  renderTripReceiptEmail,
+  renderCorporateInvoiceEmail,
 } from './email-templates';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { getFirebaseAuthHeaders } from '../auth/auth-headers';
 
 export interface EmailServiceConfig {
   apiKey?: string;
@@ -124,9 +129,13 @@ export class ResendEmailService implements IEmailDispatchService {
               text,
             }
           : request;
+        const authHeaders = await getFirebaseAuthHeaders();
         const response = await fetch('/api/send-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
           body: JSON.stringify(requestPayload),
         });
 
@@ -184,6 +193,7 @@ export class ResendEmailService implements IEmailDispatchService {
     try {
       const response = await this.resendClient.emails.send({
         from: this.fromAddress,
+        replyTo: this.adminAlertRecipient,
         to: recipient,
         subject,
         html,
@@ -326,6 +336,38 @@ export class ResendEmailService implements IEmailDispatchService {
       rendered.text
     );
   }
+
+  /**
+   * Sends official itemized post-trip tax receipt email to passenger.
+   */
+  public async sendTripReceipt(
+    payload: TripReceiptEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderTripReceiptEmail(payload);
+    return this.dispatch(
+      { type: 'trip_receipt', payload },
+      payload.passenger.email,
+      rendered.subject,
+      rendered.html,
+      rendered.text
+    );
+  }
+
+  /**
+   * Sends B2B corporate billing invoice statement email.
+   */
+  public async sendCorporateInvoice(
+    payload: CorporateInvoiceEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderCorporateInvoiceEmail(payload);
+    return this.dispatch(
+      { type: 'corporate_invoice', payload },
+      payload.customerEmail,
+      rendered.subject,
+      rendered.html,
+      rendered.text
+    );
+  }
 }
 
 /**
@@ -417,6 +459,40 @@ export class StubEmailDispatchService implements IEmailDispatchService {
     };
     this.dispatchedEmails.push(result);
     console.info(`[StubEmailDispatch] Status update (${payload.newStatus}) logged for Trip #${payload.tripId}`);
+    return result;
+  }
+
+  public async sendTripReceipt(
+    payload: TripReceiptEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderTripReceiptEmail(payload);
+    const result: EmailDispatchResult = {
+      success: true,
+      simulated: true,
+      messageId: `stub_receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      recipient: payload.passenger.email,
+      subject: rendered.subject,
+      dispatchedAt: new Date().toISOString(),
+    };
+    this.dispatchedEmails.push(result);
+    console.info(`[StubEmailDispatch] Receipt logged for Trip #${payload.tripId}`);
+    return result;
+  }
+
+  public async sendCorporateInvoice(
+    payload: CorporateInvoiceEmailPayload
+  ): Promise<EmailDispatchResult> {
+    const rendered = renderCorporateInvoiceEmail(payload);
+    const result: EmailDispatchResult = {
+      success: true,
+      simulated: true,
+      messageId: `stub_invoice_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      recipient: payload.customerEmail,
+      subject: rendered.subject,
+      dispatchedAt: new Date().toISOString(),
+    };
+    this.dispatchedEmails.push(result);
+    console.info(`[StubEmailDispatch] Invoice ${payload.invoiceNumber} logged for ${payload.customerEmail}`);
     return result;
   }
 }

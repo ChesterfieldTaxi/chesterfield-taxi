@@ -82,6 +82,8 @@ export interface ITelephonyService {
       vehicleModel?: string;
       etaMinutes?: number;
       finalFare?: number;
+      trackingToken?: string;
+      trackingUrl?: string;
     }
   ): Promise<SmsNotification>;
 

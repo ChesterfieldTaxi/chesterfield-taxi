@@ -52,10 +52,14 @@ export interface DriverProfile {
   email?: string;
   dutyStatus: DriverDutyStatus;
   vehicleUnit: string;
+  vehicleId?: string;
   vehicleTier: string;
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleColor?: string;
+  licensePlate?: string;
+  /** Configurable driver fare commission share (0.0 - 1.0, default 0.75) */
+  commissionRate?: number;
   currentTripId?: string | null;
   zone?: string;
   avatarUrl?: string;

@@ -1,15 +1,14 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestoreDb, getFirebaseAuth, isFirebaseConfigured } from '../core/services/firebase';
-import { DEFAULT_APP_SETTINGS } from '../core/services/config/admin-config.service';
+import { DEFAULT_APP_SETTINGS, sanitizePublicSettings } from '../core/services/config/admin-config.service';
 
 /**
  * Public Configuration Resource Route (/api/public-config)
  *
- * Returns sanitized public-facing configuration from Firestore `config/appSettings`
- * (company profile, vehicles, branding, website navigation/pages, booking rules,
- * maintenance mode, and Get App button visibility) even when client-side Firestore
- * rules restrict unauthenticated reads.
+ * Returns strictly sanitized public-facing configuration (company profile,
+ * vehicles, branding, pricing, tariffs, website/CMS, booking rules).
+ * NEVER includes corporateAccounts (PO codes), invoices, or configAuditTrail.
  */
 export async function loader() {
   if (!isFirebaseConfigured()) {
@@ -25,8 +24,27 @@ export async function loader() {
   }
 
   const db = getFirestoreDb();
-  const docRef = doc(db, 'config', 'appSettings');
 
+  // 1. Prefer the dedicated zero-PII `config/publicSettings` document
+  try {
+    const publicSnap = await getDoc(doc(db, 'config', 'publicSettings'));
+    if (publicSnap.exists()) {
+      return Response.json(
+        {
+          success: true,
+          settings: sanitizePublicSettings(publicSnap.data()),
+        },
+        {
+          headers: { 'Cache-Control': 'no-store, max-age=0' },
+        }
+      );
+    }
+  } catch (err) {
+    console.warn('[/api/public-config] Could not read config/publicSettings:', err);
+  }
+
+  // 2. Fallback to `config/appSettings` (always stripped via sanitizePublicSettings)
+  const docRef = doc(db, 'config', 'appSettings');
   try {
     const snap = await getDoc(docRef);
     if (snap.exists()) {
@@ -41,7 +59,6 @@ export async function loader() {
       );
     }
   } catch (err: any) {
-    // If live Firestore rules block unauthenticated reads, only authenticate if server env vars are explicitly provided
     if (
       (err?.code === 'permission-denied' || err?.message?.includes('permission')) &&
       process.env.ADMIN_SETUP_EMAIL &&
@@ -81,23 +98,4 @@ export async function loader() {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     }
   );
-}
-
-function sanitizePublicSettings(raw: Record<string, any>) {
-  return {
-    company: raw.company ?? DEFAULT_APP_SETTINGS.company,
-    branding: raw.branding ?? DEFAULT_APP_SETTINGS.branding,
-    vehicles: raw.vehicles ?? DEFAULT_APP_SETTINGS.vehicles,
-    pricing: raw.pricing ?? DEFAULT_APP_SETTINGS.pricing,
-    tariffs: raw.tariffs ?? DEFAULT_APP_SETTINGS.tariffs,
-    customerBookingConfig: raw.customerBookingConfig ?? DEFAULT_APP_SETTINGS.customerBookingConfig,
-    bookingRulesConfig: raw.bookingRulesConfig ?? DEFAULT_APP_SETTINGS.bookingRulesConfig,
-    website: raw.website,
-    cms: raw.cms,
-    enableGetAppButtons: raw.enableGetAppButtons ?? DEFAULT_APP_SETTINGS.enableGetAppButtons,
-    constructionMode: raw.constructionMode ?? DEFAULT_APP_SETTINGS.constructionMode,
-    enableRealtimeRouting: raw.enableRealtimeRouting ?? DEFAULT_APP_SETTINGS.enableRealtimeRouting,
-    publicFormVersion: raw.publicFormVersion ?? DEFAULT_APP_SETTINGS.publicFormVersion,
-    updatedAt: raw.updatedAt ?? DEFAULT_APP_SETTINGS.updatedAt,
-  };
 }

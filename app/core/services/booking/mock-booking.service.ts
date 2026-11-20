@@ -23,6 +23,7 @@ import type {
   BookingStatusResponse,
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
+import { generateTrackingToken } from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
 import { getAdminConfigService } from '../config/admin-config.service';
 import {
@@ -455,6 +456,7 @@ export class MockBookingService implements IBookingService {
     const newTrip: Trip = {
       ...payload,
       id,
+      trackingToken: payload.trackingToken || generateTrackingToken(),
       status: initialStatus,
       offeredToIds: [],
       rejectedByIds: [],
@@ -627,6 +629,81 @@ export class MockBookingService implements IBookingService {
     };
   }
 
+  public subscribeToDriverTrips(
+    driverId: string,
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    return this.subscribeToAllTrips((all) => {
+      const scoped = all.filter(
+        (t) =>
+          t.assignedDriverId === driverId ||
+          (Array.isArray(t.offeredToIds) && t.offeredToIds.includes(driverId))
+      );
+      onUpdate(scoped);
+    }, onError);
+  }
+
+  public subscribeToPassengerTrips(
+    identity: { uid?: string; email?: string; phone?: string },
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const uid = identity.uid?.trim();
+    const email = identity.email?.trim().toLowerCase();
+    return this.subscribeToAllTrips((all) => {
+      const scoped = all.filter((t) => {
+        if (uid && (t.customerId === uid || t.userId === uid)) return true;
+        if (email && t.passenger?.email?.trim().toLowerCase() === email) return true;
+        return false;
+      });
+      onUpdate(scoped);
+    }, onError);
+  }
+
+  public async acceptDriverOffer(tripId: string, driverId: string): Promise<Trip> {
+    const trip = this.trips.get(tripId);
+    if (!trip) throw new Error(`Trip "${tripId}" not found.`);
+    if (trip.assignedDriverId && trip.assignedDriverId !== driverId) {
+      throw new Error('This trip offer was already claimed by another driver.');
+    }
+    if (trip.status !== 'offered' && trip.assignedDriverId !== driverId) {
+      throw new Error(`Trip offer is no longer available (current status: ${trip.status}).`);
+    }
+    return this.updateTripStatus(tripId, 'assigned', {
+      actorRole: 'driver',
+      assignedDriverId: driverId,
+      offeredToIds: [],
+      reason: 'Offer accepted by driver',
+    });
+  }
+
+  public async declineDriverOffer(tripId: string, driverId: string, reason?: string): Promise<Trip> {
+    const trip = this.trips.get(tripId);
+    if (!trip) throw new Error(`Trip "${tripId}" not found.`);
+    const remainingOffered = (trip.offeredToIds || []).filter((id) => id !== driverId);
+    const nextRejected = Array.from(new Set([...(trip.rejectedByIds || []), driverId]));
+    const nextStatus: TripStatus =
+      trip.status === 'offered' && remainingOffered.length === 0 ? 'pending' : trip.status;
+    const now = new Date().toISOString();
+    const updated: Trip = {
+      ...trip,
+      status: nextStatus,
+      assignedDriverId: trip.assignedDriverId === driverId ? null : trip.assignedDriverId,
+      offeredToIds: remainingOffered,
+      rejectedByIds: nextRejected,
+      statusHistory: [
+        ...(trip.statusHistory || []),
+        { from: trip.status, to: nextStatus, timestamp: now, actorRole: 'driver', reason: reason || 'Driver declined trip offer' },
+      ],
+      updatedAt: now,
+    };
+    this.trips.set(tripId, updated);
+    this.persistToStorage();
+    this.notifyListeners(updated);
+    return updated;
+  }
+
   public async updateTripStatus(
     tripId: string,
     status: TripStatus,
@@ -640,6 +717,11 @@ export class MockBookingService implements IBookingService {
     const trip = this.trips.get(tripId);
     if (!trip) {
       throw new Error(`Booking with ID "${tripId}" not found.`);
+    }
+
+    const isStaffOverride = options?.actorRole === 'admin' || options?.actorRole === 'system';
+    if (!isStaffOverride && trip.status !== status && !isValidTripTransition(trip.status, status)) {
+      throw new Error(`Invalid trip status transition from "${trip.status}" to "${status}".`);
     }
 
     const now = new Date().toISOString();
@@ -697,6 +779,10 @@ export class MockBookingService implements IBookingService {
 
     if (options?.offeredToIds !== undefined) {
       updated.offeredToIds = options.offeredToIds;
+    }
+
+    if (status === 'in_progress' && !trip.actualPickupTime) {
+      updated.actualPickupTime = now;
     }
 
     if (status === 'completed') {

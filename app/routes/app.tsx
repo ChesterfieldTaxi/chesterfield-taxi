@@ -4,17 +4,16 @@ import UnderConstruction from '../components/UnderConstruction';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { getBookingService } from '../core/services/booking';
-import {
-  getPassengerService,
-  DEFAULT_PASSENGER_ACCOUNT,
-} from '../core/services/passenger.service';
+import { getPassengerService } from '../core/services/passenger.service';
 import type {
   PassengerAccount,
   SavedPlace,
   SavedPlaceCategory,
 } from '../core/types/passenger';
-import type { Trip, TripStatus, VehicleTier } from '../core/types/trip';
+import type { GeoPoint, Trip, TripStatus, VehicleTier } from '../core/types/trip';
+import type { VehicleTierConfig } from '../core/types/config';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { formatLocalDateStr } from '../core/services/pricing/vehicle-matching';
 import {
   MapPinIcon,
   CarIcon,
@@ -38,6 +37,8 @@ import {
   RadioIcon,
 } from '../components/ui/Icons';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
+import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
+import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 
@@ -69,20 +70,25 @@ export default function PassengerAppRoute() {
     } catch {}
     return COMPANY_CONFIG.constructionMode ?? false;
   });
+  const [companySettings, setCompanySettings] = useState(() => getAdminConfigService().getCachedSettings().company);
+  const [brandPrimary, setBrandPrimary] = useState<string>(
+    () => getAdminConfigService().getCachedSettings().branding?.primaryColor || COMPANY_CONFIG.primaryColor || '#2563eb'
+  );
+  const [adminVehicles, setAdminVehicles] = useState<VehicleTierConfig[]>(
+    () => (getAdminConfigService().getCachedSettings().vehicles || []).filter((v) => !v.isArchived)
+  );
 
   useEffect(() => {
     const configService = getAdminConfigService();
-    try {
-      const cached = configService.getCachedSettings();
-      if (cached?.constructionMode !== undefined) {
-        setConstructionMode(cached.constructionMode);
-      }
-    } catch {}
-
     if (configService.subscribeToSettings) {
       const unsub = configService.subscribeToSettings((settings) => {
         if (settings?.constructionMode !== undefined) {
           setConstructionMode(settings.constructionMode);
+        }
+        if (settings?.company) setCompanySettings(settings.company);
+        if (settings?.branding?.primaryColor) setBrandPrimary(settings.branding.primaryColor);
+        if (settings?.vehicles?.length) {
+          setAdminVehicles(settings.vehicles.filter((v) => !v.isArchived));
         }
       });
       return unsub;
@@ -91,6 +97,8 @@ export default function PassengerAppRoute() {
 
   const passengerService = getPassengerService();
 
+  const [authUserUid, setAuthUserUid] = useState<string | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [account, setAccount] = useState<PassengerAccount>(() =>
     passengerService.getCachedAccount()
   );
@@ -101,11 +109,13 @@ export default function PassengerAppRoute() {
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>(['customer']);
 
-  // Auth guard
+  // Auth guard + bind real authenticated Firebase UID to PassengerService
   useEffect(() => {
     const authService = getAdminAuthService();
     const unsubscribe = authService.onAuthStateChanged((currentUser: any) => {
       if (!currentUser) {
+        passengerService.bindToAuthUser(null);
+        setAuthUserUid(null);
         navigate('/app/login?message=unauthenticated&redirect=/app/passenger', { replace: true });
       } else {
         const roles: string[] = currentUser.roles || (currentUser.role ? [currentUser.role] : ['customer']);
@@ -113,28 +123,31 @@ export default function PassengerAppRoute() {
           navigate('/app', { replace: true });
           return;
         }
+        passengerService.bindToAuthUser({
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName,
+          phone: currentUser.phone,
+        });
+        setAuthUserUid(currentUser.uid);
         setUserRoles(roles);
+        setIsAuthChecking(false);
       }
     });
     return unsubscribe;
-  }, [navigate]);
-
-  // Quick Book Drawer state
-  const [quickOrigin, setQuickOrigin] = useState<string>('');
-  const [quickDestination, setQuickDestination] = useState<string>('');
-  const [quickNotes, setQuickNotes] = useState<string>('');
-  const [selectedVehicleTier, setSelectedVehicleTier] = useState<VehicleTier>('standard');
+  }, [navigate, passengerService]);
 
   // Trip History state
   const [historyFilter, setHistoryFilter] = useState<'all' | 'upcoming' | 'history'>('upcoming');
   const [selectedReceiptTrip, setSelectedReceiptTrip] = useState<Trip | null>(null);
 
-  // Saved Places Modal state
+  // Saved Places Modal state (now stores exact coordinates & placeId from Places Autocomplete!)
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null);
   const [placeLabel, setPlaceLabel] = useState('');
   const [placeCategory, setPlaceCategory] = useState<SavedPlaceCategory>('home');
   const [placeAddress, setPlaceAddress] = useState('');
+  const [placeCoordinates, setPlaceCoordinates] = useState<GeoPoint | undefined>(undefined);
   const [placeNotes, setPlaceNotes] = useState('');
 
   // Profile Form state
@@ -179,35 +192,35 @@ export default function PassengerAppRoute() {
     return unsub;
   }, [passengerService]);
 
-  // Subscribe to Active Trip
+  // Close Receipt Modal on Escape key
   useEffect(() => {
-    const unsub = passengerService.subscribeToActiveTrip((trip) => {
+    if (!selectedReceiptTrip) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedReceiptTrip(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedReceiptTrip]);
+
+  // Real-time scoped Firestore subscriptions for Active Trip AND Full Trips History
+  useEffect(() => {
+    if (!authUserUid) return;
+    setIsLoadingTrips(true);
+
+    const unsubActive = passengerService.subscribeToActiveTrip((trip) => {
       setActiveTrip(trip);
     });
-    return unsub;
-  }, [passengerService]);
 
-  // Load Trips History
-  useEffect(() => {
-    let mounted = true;
-    setIsLoadingTrips(true);
-    passengerService
-      .getPassengerTrips()
-      .then((history: Trip[]) => {
-        if (mounted) {
-          setTrips(history);
-          setIsLoadingTrips(false);
-        }
-      })
-      .catch((err: unknown) => {
-        console.error('[PassengerApp] Failed to load history:', err);
-        if (mounted) setIsLoadingTrips(false);
-      });
+    const unsubAll = passengerService.subscribeToPassengerTrips((history: Trip[]) => {
+      setTrips(history);
+      setIsLoadingTrips(false);
+    });
 
     return () => {
-      mounted = false;
+      unsubActive();
+      unsubAll();
     };
-  }, [passengerService]);
+  }, [passengerService, authUserUid, account.email]);
 
   // Filtered trips
   const filteredTrips = useMemo(() => {
@@ -219,30 +232,58 @@ export default function PassengerAppRoute() {
     });
   }, [trips, historyFilter]);
 
-  // Booking initial values for embedded self-contained BookingEngineV2
+  // Booking initial values synced cleanly whenever real passenger profile hydrates
   const [bookingInitialValues, setBookingInitialValues] = useState<BookingEngineV2InitialValues>(() => ({
     passengerName: `${account.firstName} ${account.lastName}`.trim(),
     passengerPhone: account.phone || '',
     passengerEmail: account.email || '',
     driverNotes: account.passengerNotes || '',
-    vehicleChoice: 'sedan',
+    vehicleChoice: account.preferredVehicleTier || 'any',
   }));
+
+  useEffect(() => {
+    if (!account.id) return;
+    setBookingInitialValues((prev) => ({
+      ...prev,
+      passengerName: prev.passengerName || `${account.firstName} ${account.lastName}`.trim(),
+      passengerPhone: prev.passengerPhone || account.phone || '',
+      passengerEmail: prev.passengerEmail || account.email || '',
+      driverNotes: prev.driverNotes || account.passengerNotes || '',
+    }));
+  }, [account.id, account.firstName, account.lastName, account.phone, account.email, account.passengerNotes]);
 
   const isStaff = userRoles.includes('admin') || userRoles.includes('dispatcher');
   const hasAnyStaffOrDriverRole = isStaff || userRoles.includes('driver');
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <SpinnerIcon className="w-9 h-9 text-blue-600 animate-spin mb-3" />
+        <p className="text-sm font-bold text-slate-700">Loading your passenger portal...</p>
+      </div>
+    );
+  }
+
   if (constructionMode && !(isPreview && isStaff)) {
     return <UnderConstruction />;
   }
+
+  const resolveTripVehicleChoice = (trip: Trip): string => {
+    const meta = (trip.metadata || {}) as Record<string, any>;
+    if (typeof meta.vehicleTypeId === 'string' && meta.vehicleTypeId) return meta.vehicleTypeId;
+    return trip.vehicleTier || 'any';
+  };
 
   // Rebook an existing trip inside /app
   const handleRebookTrip = (trip: Trip) => {
     setEditingTripId(null);
     setBookingInitialValues({
       pickupAddress: trip.pickupLocation?.address || '',
+      pickupCoordinates: trip.pickupLocation?.coordinates,
       dropoffAddress: trip.dropoffLocation?.address || '',
-      driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
+      dropoffCoordinates: trip.dropoffLocation?.coordinates,
+      driverNotes: trip.driverNotes || trip.passenger?.specialRequests || account.passengerNotes || '',
+      vehicleChoice: resolveTripVehicleChoice(trip),
       passengers: trip.passenger?.passengerCount || 1,
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -257,9 +298,11 @@ export default function PassengerAppRoute() {
     setEditingTripId(null);
     setBookingInitialValues({
       pickupAddress: trip.dropoffLocation?.address || '',
+      pickupCoordinates: trip.dropoffLocation?.coordinates,
       dropoffAddress: trip.pickupLocation?.address || '',
-      driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
+      dropoffCoordinates: trip.pickupLocation?.coordinates,
+      driverNotes: trip.driverNotes || trip.passenger?.specialRequests || account.passengerNotes || '',
+      vehicleChoice: resolveTripVehicleChoice(trip),
       passengers: trip.passenger?.passengerCount || 1,
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -271,28 +314,47 @@ export default function PassengerAppRoute() {
     showToast(`Loaded return ride: ${returnFrom} → ${returnTo}`);
   };
 
-  // Edit upcoming trip in booking form
+  // Edit upcoming pre-dispatch trip (fixes UTC date shift bug & locks active rides!)
   const handleEditTrip = (trip: Trip) => {
+    if (['en_route', 'arrived', 'in_progress', 'completed', 'cancelled'].includes(trip.status)) {
+      showToast('This ride is already underway. Please call dispatch to make changes.');
+      return;
+    }
+    const pickupDateObj = trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime) : null;
     setEditingTripId(trip.id);
     setBookingInitialValues({
       pickupAddress: trip.pickupLocation?.address || '',
+      pickupCoordinates: trip.pickupLocation?.coordinates,
       dropoffAddress: trip.dropoffLocation?.address || '',
-      driverNotes: trip.passenger?.specialRequests || trip.driverNotes || account.passengerNotes || '',
-      vehicleChoice: trip.vehicleTier === 'xl' || trip.vehicleTier === 'van' ? 'suv' : 'sedan',
+      dropoffCoordinates: trip.dropoffLocation?.coordinates,
+      driverNotes: trip.driverNotes || trip.passenger?.specialRequests || account.passengerNotes || '',
+      vehicleChoice: resolveTripVehicleChoice(trip),
       passengers: trip.passenger?.passengerCount || 1,
-      passengerName: `${account.firstName} ${account.lastName}`.trim(),
-      passengerPhone: account.phone || '',
-      passengerEmail: account.email || '',
-      scheduledDate: trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).toISOString().split('T')[0] : '',
-      scheduledTime: trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).toTimeString().slice(0, 5) : '',
+      passengerName: `${trip.passenger?.firstName || account.firstName} ${trip.passenger?.lastName || account.lastName}`.trim(),
+      passengerPhone: trip.passenger?.phone || account.phone || '',
+      passengerEmail: trip.passenger?.email || account.email || '',
+      timingType: trip.bookingType === 'asap' ? 'asap' : 'later',
+      scheduledDate: pickupDateObj && !Number.isNaN(pickupDateObj.getTime()) ? formatLocalDateStr(pickupDateObj) : '',
+      scheduledTime: pickupDateObj && !Number.isNaN(pickupDateObj.getTime()) ? pickupDateObj.toTimeString().slice(0, 5) : '',
     });
     setActiveTab('book');
     showToast(`Editing Trip #${trip.id} — save your changes below.`);
   };
 
-  // Cancel reservation
+  // Cancel reservation (blocks en_route/arrived/in_progress; warns on <2h policy)
   const handleCancelTrip = async (trip: Trip) => {
-    if (!window.confirm(`Are you sure you want to cancel reservation #${trip.id}?`)) {
+    if (['en_route', 'arrived', 'in_progress'].includes(trip.status)) {
+      showToast('Your chauffeur is already on the way. Please call dispatch to cancel.');
+      return;
+    }
+    const isWithinTwoHours =
+      trip.scheduledPickupTime &&
+      new Date(trip.scheduledPickupTime).getTime() - Date.now() < 2 * 60 * 60 * 1000 &&
+      new Date(trip.scheduledPickupTime).getTime() > Date.now();
+    const confirmMsg = isWithinTwoHours
+      ? `Reservation #${trip.id} is within 2 hours of pickup (late cancellation policy may apply). Cancel anyway?`
+      : `Are you sure you want to cancel reservation #${trip.id}?`;
+    if (!window.confirm(confirmMsg)) {
       return;
     }
     try {
@@ -315,17 +377,19 @@ export default function PassengerAppRoute() {
 
   const handleSignOut = async () => {
     try {
+      passengerService.clearLocalSession();
       await getAdminAuthService().signOut();
     } catch {}
     showToast('Signed out of Passenger Portal.');
-    setTimeout(() => navigate('/app/login?message=logged_out'), 600);
+    setTimeout(() => navigate('/app/login?message=logged_out'), 500);
   };
 
-  // Quick 1-tap chip destination select
+  // Quick 1-tap chip destination select (passes coordinates too!)
   const handleSelectChip = (place: SavedPlace) => {
     setBookingInitialValues((prev) => ({
       ...prev,
       dropoffAddress: place.address,
+      dropoffCoordinates: place.coordinates,
       driverNotes: place.notes || prev.driverNotes || account.passengerNotes || '',
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -340,6 +404,7 @@ export default function PassengerAppRoute() {
     setBookingInitialValues((prev) => ({
       ...prev,
       dropoffAddress: place.address,
+      dropoffCoordinates: place.coordinates,
       driverNotes: place.notes || prev.driverNotes || account.passengerNotes || '',
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -354,6 +419,7 @@ export default function PassengerAppRoute() {
     setBookingInitialValues((prev) => ({
       ...prev,
       pickupAddress: place.address,
+      pickupCoordinates: place.coordinates,
       driverNotes: place.notes || prev.driverNotes || account.passengerNotes || '',
       passengerName: `${account.firstName} ${account.lastName}`.trim(),
       passengerPhone: account.phone || '',
@@ -370,12 +436,14 @@ export default function PassengerAppRoute() {
       setPlaceLabel(place.label);
       setPlaceCategory(place.category);
       setPlaceAddress(place.address);
+      setPlaceCoordinates(place.coordinates);
       setPlaceNotes(place.notes || '');
     } else {
       setEditingPlaceId(null);
       setPlaceLabel('');
       setPlaceCategory('favorite');
       setPlaceAddress('');
+      setPlaceCoordinates(undefined);
       setPlaceNotes('');
     }
     setIsPlaceModalOpen(true);
@@ -394,6 +462,7 @@ export default function PassengerAppRoute() {
           label: placeLabel.trim(),
           category: placeCategory,
           address: placeAddress.trim(),
+          coordinates: placeCoordinates,
           notes: placeNotes.trim() || undefined,
         });
         showToast('Saved place updated successfully.');
@@ -402,6 +471,7 @@ export default function PassengerAppRoute() {
           label: placeLabel.trim(),
           category: placeCategory,
           address: placeAddress.trim(),
+          coordinates: placeCoordinates,
           notes: placeNotes.trim() || undefined,
         });
         showToast('New place added to your shortcuts.');
@@ -528,19 +598,38 @@ export default function PassengerAppRoute() {
     }
   };
 
+  const displayCompanyName = companySettings?.name || COMPANY_CONFIG.name;
+  const displayCompanyPhone = companySettings?.phone || COMPANY_CONFIG.phone.primary;
+  const displayCompanyPhoneRaw = displayCompanyPhone.replace(/[^\d+]/g, '') || COMPANY_CONFIG.phone.primaryRaw;
+  const displayCompanyEmail = companySettings?.email || COMPANY_CONFIG.email.dispatch;
+  const displayCompanyAddress = companySettings?.address || `${COMPANY_CONFIG.address.street}, ${COMPANY_CONFIG.address.city}, ${COMPANY_CONFIG.address.state} ${COMPANY_CONFIG.address.zip}`;
+  const fullName = `${account.firstName} ${account.lastName}`.trim();
+
+  const resolveTripVehicleName = (trip: Trip): string => {
+    const meta = (trip.metadata || {}) as Record<string, any>;
+    const explicitName = typeof meta.vehicleDisplayName === 'string' ? meta.vehicleDisplayName : undefined;
+    const tierOrId = typeof meta.vehicleTypeId === 'string' && meta.vehicleTypeId ? meta.vehicleTypeId : trip.vehicleTier;
+    return formatVehicleTierDisplay(tierOrId, adminVehicles, explicitName);
+  };
+
+  const resolveTripDriverName = (trip: Trip): string => {
+    const meta = (trip.metadata || {}) as Record<string, any>;
+    return String(meta.assignedDriverName || meta.driverName || (trip.assignedDriverId ? 'Assigned Chauffeur' : 'Pending Assignment'));
+  };
+
   return (
     <div
       className="min-h-screen bg-slate-100 text-slate-900 pb-24 md:pb-12 flex flex-col font-sans"
       style={{
-        '--brand-primary': COMPANY_CONFIG.primaryColor || '#2563eb',
-        '--btn-primary-bg': COMPANY_CONFIG.primaryColor || '#2563eb',
+        '--brand-primary': brandPrimary || '#2563eb',
+        '--btn-primary-bg': brandPrimary || '#2563eb',
         '--btn-primary-text': '#ffffff',
         '--btn-radius': '12px',
       } as React.CSSProperties}
     >
-      {/* Toast Notification */}
+      {/* Toast Notification (offset above mobile Help FAB) */}
       {toastMessage && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:right-6 sm:w-96 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-36 md:bottom-20 right-4 left-4 sm:left-auto sm:right-6 sm:w-96 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5 print:hidden">
           <ShieldCheckIcon className="w-5 h-5 text-emerald-400 shrink-0" />
           <p className="text-sm font-semibold">{toastMessage}</p>
         </div>
@@ -559,10 +648,10 @@ export default function PassengerAppRoute() {
             </div>
             <div>
               <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none block">
-                {COMPANY_CONFIG.name}
+                {displayCompanyName}
               </span>
               <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                Hi, {`${account.firstName} ${account.lastName}`.trim()}
+                Hi, {fullName || 'Passenger'}
               </p>
             </div>
           </div>
@@ -599,11 +688,13 @@ export default function PassengerAppRoute() {
 
             <h3 className="text-lg font-extrabold leading-snug">
               {activeTrip.status === 'en_route'
-                ? 'Driver is en route to you'
+                ? 'Chauffeur is en route to you'
                 : activeTrip.status === 'arrived'
-                ? 'Driver arrived at pickup!'
+                ? 'Chauffeur arrived at pickup!'
                 : activeTrip.status === 'in_progress'
                 ? 'Your trip is in progress'
+                : activeTrip.status === 'assigned' || activeTrip.status === 'accepted'
+                ? 'Chauffeur Assigned to Your Ride'
                 : activeTrip.status === 'CONFIRMED' || activeTrip.status === 'confirmed'
                 ? 'Reservation Confirmed'
                 : 'Booking Requested'}
@@ -629,7 +720,7 @@ export default function PassengerAppRoute() {
               </div>
 
               <Link
-                to={`/track/${activeTrip.id}`}
+                to={`/track/${encodeURIComponent(activeTrip.trackingToken || activeTrip.id)}`}
                 className="px-4 py-2 bg-white text-blue-900 font-extrabold text-xs rounded-xl shadow-md hover:bg-blue-50 transition-colors flex items-center gap-1.5"
               >
                 <span>Track Live on Map</span>
@@ -831,10 +922,10 @@ export default function PassengerAppRoute() {
                         </div>
 
                         {/* Date & Vehicle */}
-                        <div className="text-xs font-semibold text-slate-500 flex items-center justify-between">
+                        <div className="text-xs font-semibold text-slate-500 flex items-center justify-between gap-2">
                           <span>{dateFormatted}</span>
-                          <span className="font-bold text-slate-700">
-                            {formatVehicleTierDisplay(trip.vehicleTier)} class
+                          <span className="font-bold text-slate-700 truncate">
+                            {resolveTripVehicleName(trip)}
                           </span>
                         </div>
 
@@ -846,6 +937,14 @@ export default function PassengerAppRoute() {
                               {trip.pickupLocation?.address || 'Pickup'}
                             </p>
                           </div>
+                          {Array.isArray(trip.intermediateStops) && trip.intermediateStops.length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <div className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0" />
+                              <p className="text-slate-500 font-medium leading-tight truncate">
+                                +{trip.intermediateStops.length} stop{trip.intermediateStops.length > 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          )}
                           <div className="flex items-start gap-2">
                             <div className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
                             <p className="text-slate-800 font-medium leading-tight truncate">
@@ -855,9 +954,9 @@ export default function PassengerAppRoute() {
                         </div>
 
                         {/* Driver & Unit Details */}
-                        {Boolean(trip.metadata?.driverName || trip.assignedDriverId) && (
+                        {Boolean(trip.metadata?.assignedDriverName || trip.metadata?.driverName || trip.assignedDriverId) && (
                           <div className="text-[11px] bg-slate-50 px-3 py-1.5 rounded-xl text-slate-600 flex items-center justify-between">
-                            <span>Driver: {String(trip.metadata?.driverName || 'Assigned Driver')}</span>
+                            <span>Chauffeur: {resolveTripDriverName(trip)}</span>
                             <span className="font-semibold text-slate-700">
                               {String(trip.metadata?.vehicleUnit || 'Assigned Fleet Unit')}
                             </span>
@@ -866,7 +965,14 @@ export default function PassengerAppRoute() {
 
                         {/* Action Buttons */}
                         {!(trip.status === 'completed' || trip.status === 'cancelled' || trip.status === 'DECLINED' || trip.status === 'declined') ? (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap">
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-wrap">
+                            <Link
+                              to={`/track/${encodeURIComponent(trip.trackingToken || trip.id)}`}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[11px] sm:text-xs font-extrabold transition-colors whitespace-nowrap flex items-center gap-1"
+                            >
+                              <span>Track Live</span>
+                              <ExternalLinkIcon className="w-3 h-3" />
+                            </Link>
                             <button
                               type="button"
                               onClick={() => setSelectedReceiptTrip(trip)}
@@ -874,20 +980,24 @@ export default function PassengerAppRoute() {
                             >
                               View
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleEditTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCancelTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
-                            >
-                              Cancel
-                            </button>
+                            {!['en_route', 'arrived', 'in_progress'].includes(trip.status) && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditTrip(trip)}
+                                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelTrip(trip)}
+                                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
@@ -1105,9 +1215,23 @@ export default function PassengerAppRoute() {
                   onChange={(e) => setProfileVehicleTier(e.target.value as VehicleTier)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="standard">Standard Sedan (Toyota Camry / Fusion)</option>
-                  <option value="premium">Executive SUV (Chevy Suburban / Lincoln)</option>
-                  <option value="xl">XL Group Transport (7 Passengers)</option>
+                  {adminVehicles.length > 0 ? (
+                    <>
+                      <option value="any">Any Available Vehicle (Best Value)</option>
+                      {adminVehicles.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} (Up to {v.maxPassengers} pax / {v.maxLuggage} bags)
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <option value="any">Any Available Vehicle</option>
+                      <option value="standard">Standard Sedan</option>
+                      <option value="premium">Executive SUV</option>
+                      <option value="xl">XL Group Transport</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -1265,14 +1389,7 @@ export default function PassengerAppRoute() {
               <div>
                 <button
                   type="button"
-                    onClick={async () => {
-                      try {
-                        
-                        await getAdminAuthService().signOut();
-                      } catch {}
-                      showToast('Signed out of Passenger Portal.');
-                      setTimeout(() => navigate('/app/login?message=logged_out'), 600);
-                    }}
+                  onClick={handleSignOut}
                   className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-50 hover:border-rose-300 text-rose-800 transition-all group text-left"
                 >
                   <div className="flex items-center gap-2.5">
@@ -1298,9 +1415,24 @@ export default function PassengerAppRoute() {
 
       {/* Modal: Add/Edit Saved Place */}
       {isPlaceModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
-            <h3 className="text-base font-extrabold text-slate-950 mb-1">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPlaceModalOpen(false);
+          }}
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <button
+              type="button"
+              onClick={() => setIsPlaceModalOpen(false)}
+              aria-label="Close modal"
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+            <h3 className="text-base font-extrabold text-slate-950 mb-1 pr-8">
               {editingPlaceId ? 'Edit Saved Place' : 'Add New Saved Place'}
             </h3>
             <p className="text-xs text-slate-500 mb-4">
@@ -1344,14 +1476,28 @@ export default function PassengerAppRoute() {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Full Street Address
                 </label>
-                <input
-                  type="text"
+                <DispatchLocationInput
+                  name="savedPlaceAddress"
+                  ariaLabel="Saved Place Street Address"
+                  placeholder="Search street address or airport..."
                   value={placeAddress}
-                  onChange={(e) => setPlaceAddress(e.target.value)}
-                  placeholder="e.g. 14848 Conway Rd, Chesterfield, MO"
+                  onChange={(val) => {
+                    setPlaceAddress(val);
+                    setPlaceCoordinates(undefined);
+                  }}
+                  onPlaceSelected={(details) => {
+                    setPlaceAddress(details.formattedAddress || details.address);
+                    setPlaceCoordinates(details.coordinates);
+                  }}
+                  variant="pickup"
+                  size="compact"
                   required
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {placeCoordinates && (
+                  <p className="text-[10px] text-emerald-700 font-semibold mt-1">
+                    ✓ GPS coordinates verified for accurate fare quoting
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1388,194 +1534,235 @@ export default function PassengerAppRoute() {
       )}
 
       {/* Modal: Itemized Printable Digital Receipt */}
-      {selectedReceiptTrip && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 print:shadow-none print:border-none print:m-0 print:p-0">
-            {/* Header / Brand */}
-            <div className="text-center pb-4 border-b border-slate-200">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-blue-600 text-white mb-2 shadow-sm">
-                <CarIcon className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg font-extrabold text-slate-950 tracking-tight">
-                {COMPANY_CONFIG.legalName}
-              </h3>
-              <p className="text-xs text-slate-500">
-                {COMPANY_CONFIG.address.street}, {COMPANY_CONFIG.address.city},{' '}
-                {COMPANY_CONFIG.address.state} {COMPANY_CONFIG.address.zip}
-              </p>
-              <p className="text-xs text-slate-500">
-                24/7 Dispatch Hotline: {COMPANY_CONFIG.phone.dispatch} • {COMPANY_CONFIG.email.dispatch}
-              </p>
-            </div>
+      {selectedReceiptTrip && (() => {
+        const tipAmount = selectedReceiptTrip.payment?.tipAmount || 0;
+        const baseTripTotal = selectedReceiptTrip.pricing?.totalFare || 0;
+        const grandTotal = baseTripTotal + tipAmount;
+        const isCancelledTrip =
+          selectedReceiptTrip.status === 'cancelled' ||
+          selectedReceiptTrip.status === 'DECLINED' ||
+          selectedReceiptTrip.status === 'declined';
+        const isCorporateBill =
+          selectedReceiptTrip.payment?.method === 'corporate' ||
+          selectedReceiptTrip.payment?.method === 'account';
+        const isSettled =
+          selectedReceiptTrip.payment?.status === 'captured' ||
+          selectedReceiptTrip.status === 'completed';
+        const paymentStatusLabel = isCancelledTrip
+          ? 'Cancelled'
+          : isCorporateBill
+          ? 'Corporate Direct Bill'
+          : isSettled
+          ? 'Paid'
+          : selectedReceiptTrip.payment?.status === 'authorized'
+          ? 'Authorized (Pending)'
+          : 'Pay in Cab / Pending';
+        const paymentStatusColor = isCancelledTrip
+          ? 'text-rose-600'
+          : isSettled || isCorporateBill
+          ? 'text-emerald-600'
+          : 'text-amber-600';
+        const totalLabel = isCancelledTrip
+          ? 'Quoted Total (Cancelled)'
+          : isCorporateBill
+          ? 'Corporate Billed Total'
+          : isSettled
+          ? 'Total Paid'
+          : 'Estimated Total';
 
-            {/* Receipt Meta */}
-            <div className="py-4 border-b border-slate-100 flex items-center justify-between text-xs">
-              <div>
-                <span className="text-slate-400 font-semibold block">RECEIPT ID</span>
-                <span className="font-mono font-bold text-slate-900 text-sm">
-                  #{selectedReceiptTrip.id}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-slate-400 font-semibold block">DATE / TIME</span>
-                <span className="font-semibold text-slate-800">
-                  {new Date(
-                    selectedReceiptTrip.actualPickupTime ||
-                      selectedReceiptTrip.scheduledPickupTime ||
-                      selectedReceiptTrip.createdAt
-                  ).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            </div>
-
-            {/* Passenger & Vehicle Info */}
-            <div className="py-3 border-b border-slate-100 grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-slate-400 font-semibold block">PASSENGER</span>
-                <span className="font-bold text-slate-800">
-                  {selectedReceiptTrip.passenger.firstName} {selectedReceiptTrip.passenger.lastName}
-                </span>
-                <span className="text-slate-500 block">{selectedReceiptTrip.passenger.phone}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-slate-400 font-semibold block">VEHICLE &amp; DRIVER</span>
-                <span className="font-bold text-slate-800">
-                  {String(selectedReceiptTrip.metadata?.driverName || (selectedReceiptTrip.assignedDriverId ? 'Assigned Driver' : 'Pending Assignment'))}
-                </span>
-                <span className="text-slate-500 block">
-                  {String(selectedReceiptTrip.metadata?.vehicleUnit || 'Fleet Unit')} (
-                  <span>{formatVehicleTierDisplay(selectedReceiptTrip.vehicleTier)}</span>)
-                </span>
-              </div>
-            </div>
-
-            {/* Route Summary */}
-            <div className="py-3 border-b border-slate-100 text-xs space-y-1.5">
-              <span className="text-slate-400 font-semibold block">ROUTING</span>
-              <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                <div>
-                  <span className="text-slate-400 font-medium">From: </span>
-                  <span className="font-semibold text-slate-900">
-                    {selectedReceiptTrip.pickupLocation.address}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-                <div>
-                  <span className="text-slate-400 font-medium">To: </span>
-                  <span className="font-semibold text-slate-900">
-                    {selectedReceiptTrip.dropoffLocation.address}
-                  </span>
-                </div>
-              </div>
-              {selectedReceiptTrip.pricing?.distanceMiles && (
-                <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-between">
-                  <span>Distance: {selectedReceiptTrip.pricing.distanceMiles.toFixed(1)} miles</span>
-                  <span>Duration: ~{selectedReceiptTrip.pricing.durationMinutes || 25} mins</span>
-                </div>
-              )}
-            </div>
-
-            {/* Itemized Breakdown Table */}
-            <div className="py-3 border-b border-slate-200 text-xs space-y-2">
-              <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
-                Itemized Fare Breakdown
-              </span>
-
-              <div className="flex justify-between text-slate-600">
-                <span>Base Flag Drop Fare</span>
-                <span>${selectedReceiptTrip.pricing?.baseFare?.toFixed(2) || '4.50'}</span>
-              </div>
-
-              {Boolean(selectedReceiptTrip.pricing?.distanceRate) && (
-                <div className="flex justify-between text-slate-600">
-                  <span>
-                    Distance Mileage ({selectedReceiptTrip.pricing.distanceMiles?.toFixed(1) || 0} mi)
-                  </span>
-                  <span>
-                    $
-                    {(
-                      (selectedReceiptTrip.pricing.distanceMiles || 0) *
-                      (selectedReceiptTrip.pricing.distanceRate || 2.8)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              )}
-
-              {Boolean(selectedReceiptTrip.pricing?.airportSurcharge) && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Airport Aviation Access Fee</span>
-                  <span>${selectedReceiptTrip.pricing.airportSurcharge?.toFixed(2)}</span>
-                </div>
-              )}
-
-              {Boolean(selectedReceiptTrip.pricing?.carSeatFee) && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Child Safety Seat Equipment</span>
-                  <span>${selectedReceiptTrip.pricing.carSeatFee?.toFixed(2)}</span>
-                </div>
-              )}
-
-              {Boolean(selectedReceiptTrip.pricing?.tollsFee) && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Highway / Bridge Tolls</span>
-                  <span>${selectedReceiptTrip.pricing.tollsFee?.toFixed(2)}</span>
-                </div>
-              )}
-
-              {Boolean(selectedReceiptTrip.pricing?.driverExtrasTotal) && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Driver In-Cab Meter Extras</span>
-                  <span>${selectedReceiptTrip.pricing.driverExtrasTotal?.toFixed(2)}</span>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-extrabold text-slate-950">
-                <span>Total Paid</span>
-                <span className="text-base text-blue-700">
-                  ${selectedReceiptTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
-                </span>
-              </div>
-            </div>
-
-            {/* Payment Details */}
-            <div className="py-3 text-xs text-slate-500 flex items-center justify-between">
-              <span>
-                Payment Method: <span className="font-bold uppercase text-slate-800">{selectedReceiptTrip.payment?.method || 'Card'}</span>
-              </span>
-              <span>
-                Status: <span className="font-bold text-emerald-600 uppercase">{selectedReceiptTrip.payment?.status || 'Captured'}</span>
-              </span>
-            </div>
-
-            {/* Buttons (Hidden on Print) */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2 print:hidden">
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Official Trip Receipt"
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedReceiptTrip(null);
+            }}
+          >
+            <div className="printable-receipt my-auto bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative print:shadow-none print:border-none print:m-0 print:p-0">
               <button
                 type="button"
                 onClick={() => setSelectedReceiptTrip(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                aria-label="Close receipt"
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors print:hidden"
               >
-                Close
+                <XIcon className="w-5 h-5" />
               </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
-              >
-                Print Official Receipt
-              </button>
+
+              {/* Header / Brand */}
+              <div className="text-center pb-4 border-b border-slate-200">
+                <div
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-2xl text-white mb-2 shadow-sm"
+                  style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }}
+                >
+                  <CarIcon className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-extrabold text-slate-950 tracking-tight">
+                  {displayCompanyName}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {displayCompanyAddress}
+                </p>
+                <p className="text-xs text-slate-500">
+                  24/7 Dispatch Hotline: {displayCompanyPhone} • {displayCompanyEmail}
+                </p>
+              </div>
+
+              {/* Receipt Meta */}
+              <div className="py-4 border-b border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 font-semibold block">RECEIPT ID</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">
+                    #{selectedReceiptTrip.id}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 font-semibold block">DATE / TIME</span>
+                  <span className="font-semibold text-slate-800">
+                    {new Date(
+                      selectedReceiptTrip.actualPickupTime ||
+                        selectedReceiptTrip.scheduledPickupTime ||
+                        selectedReceiptTrip.createdAt
+                    ).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Passenger & Vehicle Info */}
+              <div className="py-3 border-b border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400 font-semibold block">PASSENGER</span>
+                  <span className="font-bold text-slate-800">
+                    {selectedReceiptTrip.passenger.firstName} {selectedReceiptTrip.passenger.lastName}
+                  </span>
+                  <span className="text-slate-500 block">{selectedReceiptTrip.passenger.phone}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 font-semibold block">VEHICLE &amp; CHAUFFEUR</span>
+                  <span className="font-bold text-slate-800">
+                    {resolveTripDriverName(selectedReceiptTrip)}
+                  </span>
+                  <span className="text-slate-500 block">
+                    {selectedReceiptTrip.metadata?.vehicleUnit ? `${String(selectedReceiptTrip.metadata.vehicleUnit)} • ` : ''}
+                    {resolveTripVehicleName(selectedReceiptTrip)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Route Summary */}
+              <div className="py-3 border-b border-slate-100 text-xs space-y-1.5">
+                <span className="text-slate-400 font-semibold block">ROUTING</span>
+                <div className="flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                  <div>
+                    <span className="text-slate-400 font-medium">From: </span>
+                    <span className="font-semibold text-slate-900">
+                      {selectedReceiptTrip.pickupLocation.address}
+                    </span>
+                  </div>
+                </div>
+                {Array.isArray(selectedReceiptTrip.intermediateStops) &&
+                  selectedReceiptTrip.intermediateStops.map((stop, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0" />
+                      <div>
+                        <span className="text-slate-400 font-medium">Stop {idx + 1}: </span>
+                        <span className="font-semibold text-slate-800">{stop.address}</span>
+                      </div>
+                    </div>
+                  ))}
+                <div className="flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
+                  <div>
+                    <span className="text-slate-400 font-medium">To: </span>
+                    <span className="font-semibold text-slate-900">
+                      {selectedReceiptTrip.dropoffLocation.address}
+                    </span>
+                  </div>
+                </div>
+                {Boolean(selectedReceiptTrip.pricing?.distanceMiles) && (
+                  <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>Distance: {selectedReceiptTrip.pricing.distanceMiles!.toFixed(1)} miles</span>
+                    {Boolean(selectedReceiptTrip.pricing?.durationMinutes) && (
+                      <span>Duration: ~{Math.round(selectedReceiptTrip.pricing.durationMinutes!)} mins</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Canonical Itemized Breakdown */}
+              <div className="py-3 border-b border-slate-200 space-y-2.5">
+                {selectedReceiptTrip.pricing && (
+                  <PriceBreakdownPanel
+                    outboundPricing={selectedReceiptTrip.pricing}
+                    outboundDisplayFare={selectedReceiptTrip.pricing.totalFare}
+                    returnDisplayFare={null}
+                    totalDisplayFare={selectedReceiptTrip.pricing.totalFare}
+                    isRoundTrip={false}
+                    vehicleLabel={resolveTripVehicleName(selectedReceiptTrip)}
+                  />
+                )}
+
+                {tipAmount > 0 && (
+                  <div className="flex justify-between text-xs text-slate-700 px-1">
+                    <span>Chauffeur Gratuity (Tip)</span>
+                    <span className="font-bold tabular-nums">${tipAmount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-extrabold text-slate-950">
+                  <span>{totalLabel}</span>
+                  <span className="text-base text-blue-700 tabular-nums">
+                    ${grandTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <div className="py-3 text-xs text-slate-500 flex items-center justify-between gap-2 flex-wrap">
+                <span>
+                  Payment:{' '}
+                  <span className="font-bold uppercase text-slate-800">
+                    {(selectedReceiptTrip.payment?.method || 'pay_in_cab').replace(/_/g, ' ')}
+                    {selectedReceiptTrip.payment?.cardLast4 ? ` •••• ${selectedReceiptTrip.payment.cardLast4}` : ''}
+                  </span>
+                </span>
+                <span>
+                  Status:{' '}
+                  <span className={`font-bold uppercase ${paymentStatusColor}`}>
+                    {paymentStatusLabel}
+                  </span>
+                </span>
+              </div>
+
+              {/* Buttons (Hidden on Print) */}
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2 print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedReceiptTrip(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors"
+                >
+                  Print Official Receipt
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Bottom Sticky / Dock Navigation Bar */}
       <nav
@@ -1680,7 +1867,7 @@ export default function PassengerAppRoute() {
               <div className="py-2 space-y-1.5">
                 {/* 24/7 Dispatch Hotline */}
                 <a
-                  href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+                  href={`tel:${displayCompanyPhoneRaw}`}
                   className="w-full p-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-900 flex items-center gap-3 transition-colors group"
                 >
                   <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -1688,7 +1875,7 @@ export default function PassengerAppRoute() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="text-xs font-extrabold text-blue-950">Call 24/7 Dispatch Desk</p>
-                    <p className="text-[11px] text-blue-700 font-semibold">{COMPANY_CONFIG.phone.primary}</p>
+                    <p className="text-[11px] text-blue-700 font-semibold">{displayCompanyPhone}</p>
                   </div>
                 </a>
 
@@ -1712,7 +1899,7 @@ export default function PassengerAppRoute() {
 
                 {/* Email Support */}
                 <a
-                  href={`mailto:${COMPANY_CONFIG.email.dispatch}`}
+                  href={`mailto:${displayCompanyEmail}`}
                   className="w-full p-2.5 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-100"
                 >
                   <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
@@ -1720,7 +1907,7 @@ export default function PassengerAppRoute() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="text-xs font-bold text-slate-900">Email Dispatch Support</p>
-                    <p className="text-[11px] text-slate-500 truncate">{COMPANY_CONFIG.email.dispatch}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{displayCompanyEmail}</p>
                   </div>
                 </a>
               </div>
@@ -1728,15 +1915,10 @@ export default function PassengerAppRoute() {
                 {/* Sign Out */}
                 <button
                   type="button"
-                    onClick={async () => {
-                      setIsHelpMenuOpen(false);
-                      try {
-                        
-                        await getAdminAuthService().signOut();
-                      } catch {}
-                      showToast('Signed out of Passenger Portal.');
-                      setTimeout(() => navigate('/app/login?message=logged_out'), 800);
-                    }}
+                  onClick={() => {
+                    setIsHelpMenuOpen(false);
+                    void handleSignOut();
+                  }}
                   className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors"
                 >
                   <XIcon className="w-3.5 h-3.5 text-rose-500" />
@@ -1836,7 +2018,7 @@ export default function PassengerAppRoute() {
                   <p className="text-blue-100 text-[11px]">Dispatch desk agents are standing by 24/7.</p>
                 </div>
                 <a
-                  href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+                  href={`tel:${displayCompanyPhoneRaw}`}
                   className="px-3.5 py-2 bg-white text-blue-900 font-extrabold text-xs rounded-xl shadow-md hover:bg-blue-50 transition-colors shrink-0"
                 >
                   Call Now

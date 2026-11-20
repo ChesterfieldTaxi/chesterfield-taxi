@@ -7,6 +7,8 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import twilio from 'twilio';
+import { isFirebaseConfigured } from '../core/services/firebase';
+import { verifyServerRequestAuth } from '../core/services/auth/server-auth.server';
 
 export interface TelephonyApiRequest {
   action:
@@ -584,7 +586,35 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Resolve credentials from environment, .env.local, or request payload
+    // Security Guard: Require verified Firebase staff/driver auth for outbound telephony & admin actions
+    // (Twilio server-to-server webhook callbacks remain accessible)
+    const STAFF_ONLY_TELEPHONY_ACTIONS = new Set(['verify_credentials', 'save_credentials', 'get_voice_token']);
+    const OPERATOR_TELEPHONY_ACTIONS = new Set(['make_call', 'send_sms', 'end_call', 'get_call_status']);
+    const enforceAuth = process.env.NODE_ENV === 'production' || isFirebaseConfigured();
+
+    if (STAFF_ONLY_TELEPHONY_ACTIONS.has(data.action) || OPERATOR_TELEPHONY_ACTIONS.has(data.action)) {
+      const auth = await verifyServerRequestAuth(request);
+      if (enforceAuth) {
+        if (STAFF_ONLY_TELEPHONY_ACTIONS.has(data.action) && !auth.isDispatcher) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Dispatcher or Admin sign-in required for telephony configuration.' },
+            { status: 403 }
+          );
+        }
+        if (OPERATOR_TELEPHONY_ACTIONS.has(data.action) && !auth.isDispatcher && !auth.isDriver) {
+          return Response.json(
+            { success: false, error: 'Unauthorized: Driver or Dispatcher sign-in required for outbound calls/SMS.' },
+            { status: 403 }
+          );
+        }
+      }
+      // In production, never honor untrusted client-supplied Twilio secrets
+      if (process.env.NODE_ENV === 'production' && !auth.isAdmin) {
+        delete data.credentials;
+      }
+    }
+
+    // Resolve credentials from environment, .env.local, or authorized request payload
     let { accountSid, authToken, phoneNumber: twilioFromNumber, forwardingPhone, apiKeySid, apiKeySecret, twimlAppSid } = await resolveCredentials(data);
 
     // ─── GET TWILIO WEBRTC VOICE ACCESS TOKEN (POST) ───

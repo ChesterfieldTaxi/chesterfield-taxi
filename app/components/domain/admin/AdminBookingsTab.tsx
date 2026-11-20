@@ -3,6 +3,8 @@ import type { Trip, TripStatus } from '../../../core/types/trip';
 import { getBookingService } from '../../../core/services/booking';
 import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
 import { getEmailDispatchService } from '../../../core/services/email';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { formatVehicleTier } from '../../../core/services/email/email-templates';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
@@ -89,6 +91,9 @@ export function AdminBookingsTab() {
       const service = getBookingService();
 
       if (service.updateTripStatus) {
+        // Capture previousStatus BEFORE mutating trip!
+        const priorTrip = trips.find((t) => t.id === tripId);
+        const previousStatus = priorTrip?.status || null;
         const updated = await service.updateTripStatus(tripId, newStatus, {
           ...options,
           actorRole: 'admin',
@@ -101,16 +106,22 @@ export function AdminBookingsTab() {
         }
 
         // Trigger passenger status update notification email if email is present
-        const currentTrip = updated || trips.find((t) => t.id === tripId);
+        const currentTrip = updated || priorTrip;
         if (currentTrip && currentTrip.passenger?.email) {
           try {
             const emailService = getEmailDispatchService();
+            const cachedSettings = getAdminConfigService().getCachedSettings();
+            const meta = (currentTrip.metadata || {}) as Record<string, any>;
+            const matchedDriver = options?.assignedDriverId
+              ? drivers.find((d) => d.id === options.assignedDriverId)
+              : undefined;
             const formattedPickupTime = currentTrip.bookingType === 'scheduled' && currentTrip.scheduledPickupTime
               ? new Date(currentTrip.scheduledPickupTime).toLocaleString()
               : 'Immediate Ride (ASAP)';
 
             emailService.sendStatusUpdateNotification({
               tripId: currentTrip.id,
+              trackingToken: currentTrip.trackingToken,
               passenger: {
                 firstName: currentTrip.passenger.firstName,
                 lastName: currentTrip.passenger.lastName,
@@ -118,15 +129,28 @@ export function AdminBookingsTab() {
                 phone: currentTrip.passenger.phone,
               },
               newStatus,
-              previousStatus: currentTrip.status,
+              previousStatus,
               pickupAddress: currentTrip.pickupLocation.address,
               dropoffAddress: currentTrip.dropoffLocation.address,
               pickupTime: formattedPickupTime,
               vehicleTier: currentTrip.vehicleTier,
+              vehicleDisplayName: formatVehicleTier(
+                currentTrip.vehicleTier,
+                cachedSettings.vehicles,
+                typeof meta.vehicleDisplayName === 'string' ? meta.vehicleDisplayName : undefined
+              ),
               driverInfo: options?.assignedDriverId ? {
-                name: `Assigned Driver (ID: ${options.assignedDriverId})`,
+                name: matchedDriver?.name || String(meta.assignedDriverName || 'Assigned Chauffeur'),
+                phone: matchedDriver?.phone,
+                vehicleModel: matchedDriver?.vehicle || matchedDriver?.cabNumber,
               } : undefined,
               statusReason: options?.reason,
+              companySettings: {
+                name: cachedSettings.company?.name,
+                phone: cachedSettings.company?.phone,
+                address: cachedSettings.company?.address,
+                email: cachedSettings.company?.email,
+              },
             }).catch((err) => {
               console.warn('[AdminBookingsTab] Non-blocking status notification warning:', err);
             });

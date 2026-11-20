@@ -10,6 +10,7 @@ import type { Trip } from './trip';
 
 export type LedgerEntryType =
   | 'fare_revenue'
+  | 'invoice_settlement'
   | 'tip_collected'
   | 'driver_payout'
   | 'platform_commission'
@@ -98,11 +99,15 @@ export interface CorporateUnbilledTransaction {
   pickupDate: string;
   pickupAddress: string;
   dropoffAddress: string;
+  vehicleDisplayName?: string;
+  poNumber?: string;
+  authorizedBy?: string;
   baseFare: number;
   gratuity: number;
   tolls: number;
   waitTimeFee: number;
   discountAmount: number;
+  discountAlreadyApplied?: boolean;
   totalAmount: number;
   status: 'unbilled' | 'pending_invoice' | 'invoiced' | 'paid' | 'settled';
   invoiceId?: string;
@@ -147,9 +152,29 @@ export interface IInvoicingService {
   getUnbilledTransactions(corporateAccountId?: string): Promise<CorporateUnbilledTransaction[]>;
 
   /**
+   * Retrieves persisted invoices from Firestore / settings cache.
+   */
+  getInvoices?(): Promise<InvoiceRecord[]>;
+
+  /**
+   * Persists a direct/manual invoice to Firestore & balanced AR ledger.
+   */
+  saveInvoice?(invoice: InvoiceRecord): Promise<InvoiceRecord>;
+
+  /**
+   * Computes current open accounts receivable balance for a corporate account.
+   */
+  getCorporateAccountBalance?(corporateAccountId: string): Promise<number>;
+
+  /**
    * Marks an issued invoice as paid / settled and records corresponding ledger entries.
    */
   markInvoicePaid(invoiceId: string): Promise<InvoiceRecord | null>;
+
+  /**
+   * Marks specific unbilled/invoiced AR rows as settled (and settles linked invoices).
+   */
+  settleUnbilledTransactions?(txIds: string[]): Promise<void>;
 
   /**
    * Records a balanced transaction entry into the financial ledger.

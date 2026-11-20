@@ -58,6 +58,7 @@ import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher
 import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
+import { authorizedFetch } from '../core/services/auth/auth-headers';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
@@ -1222,6 +1223,7 @@ export default function DispatchRoute() {
       const emailResult = effectiveConfirmedEmail
         ? await emailService.sendBookingConfirmation({
             tripId: reviewTrip.id,
+            trackingToken: reviewTrip.trackingToken,
             status: 'CONFIRMED',
             passenger: {
               firstName: reviewTrip.passenger.firstName,
@@ -1231,7 +1233,9 @@ export default function DispatchRoute() {
             },
             recipientEmailOverride: targetOverride,
             pickupAddress: reviewTrip.pickupLocation.address,
+            intermediateStops: reviewTrip.intermediateStops?.map((s) => ({ address: s.address, notes: s.notes })),
             dropoffAddress: reviewTrip.dropoffLocation.address,
+            dropoffNotes: reviewTrip.dropoffLocation.notes,
             pickupTime:
               reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
                 ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
@@ -1264,9 +1268,15 @@ export default function DispatchRoute() {
             oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
             oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
             customExtrasSummary: reviewMeta.customExtrasSummary as string | undefined,
-            pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
+            pickupNotes: (reviewMeta.pickupLocationDescription as string | undefined) || reviewTrip.pickupLocation.notes,
             flightDetails: outboundFlightDetails,
             returnTripDetails: shouldConfirmBoth ? returnTripPayload : undefined,
+            companySettings: {
+              name: settings.company?.name,
+              phone: settings.company?.phone,
+              address: settings.company?.address,
+              email: settings.company?.email,
+            },
           })
         : { success: true, skipped: true, error: undefined as string | undefined };
 
@@ -1483,6 +1493,7 @@ export default function DispatchRoute() {
 
       const emailResult = await emailService.sendBookingConfirmation({
         tripId: reviewTrip.id,
+        trackingToken: reviewTrip.trackingToken,
         status: reviewTrip.status || 'CONFIRMED',
         passenger: {
           firstName: reviewTrip.passenger.firstName,
@@ -1492,7 +1503,9 @@ export default function DispatchRoute() {
         },
         recipientEmailOverride: targetOverride,
         pickupAddress: reviewTrip.pickupLocation.address,
+        intermediateStops: reviewTrip.intermediateStops?.map((s) => ({ address: s.address, notes: s.notes })),
         dropoffAddress: reviewTrip.dropoffLocation.address,
+        dropoffNotes: reviewTrip.dropoffLocation.notes,
         pickupTime:
           reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
             ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
@@ -1525,9 +1538,15 @@ export default function DispatchRoute() {
         oversizedBags: reviewMeta.oversizedBags as Record<string, number> | undefined,
         oversizedItemsSummary: reviewMeta.oversizedItemsSummary as string | undefined,
         customExtrasSummary: reviewMeta.customExtrasSummary as string | undefined,
-        pickupNotes: reviewMeta.pickupLocationDescription as string | undefined,
+        pickupNotes: (reviewMeta.pickupLocationDescription as string | undefined) || reviewTrip.pickupLocation.notes,
         flightDetails: outboundFlightDetails,
         returnTripDetails: shouldIncludeReturn ? returnTripPayload : undefined,
+        companySettings: {
+          name: settings.company?.name,
+          phone: settings.company?.phone,
+          address: settings.company?.address,
+          email: settings.company?.email,
+        },
       });
 
       const nowIso = new Date().toISOString();
@@ -1785,9 +1804,10 @@ export default function DispatchRoute() {
         customMessage: clarifyMessage.trim(),
         legScope: legScopeVal as any,
         companySettings: {
-          name: COMPANY_CONFIG.name,
-          phone: COMPANY_CONFIG.phone.primary || COMPANY_CONFIG.phone.dispatch,
-          email: COMPANY_CONFIG.email.dispatch || COMPANY_CONFIG.email.support,
+          name: settings.company?.name || COMPANY_CONFIG.name,
+          phone: settings.company?.phone || COMPANY_CONFIG.phone.primary || COMPANY_CONFIG.phone.dispatch,
+          address: settings.company?.address || COMPANY_CONFIG.address.formatted,
+          email: settings.company?.email || COMPANY_CONFIG.email.dispatch || COMPANY_CONFIG.email.support,
         },
       });
 
@@ -1977,6 +1997,7 @@ export default function DispatchRoute() {
             const resolvedTier = (meta.vehicleTypeId as string) || t.vehicleTier || (meta.vehiclePreference as string) || 'standard';
             emailService.sendBookingConfirmation({
               tripId: t.id,
+              trackingToken: t.trackingToken,
               status: 'CONFIRMED',
               passenger: {
                 firstName: t.passenger.firstName,
@@ -1985,7 +2006,9 @@ export default function DispatchRoute() {
                 phone: t.passenger.phone,
               },
               pickupAddress: t.pickupLocation?.address || '',
+              intermediateStops: t.intermediateStops?.map((s) => ({ address: s.address, notes: s.notes })),
               dropoffAddress: t.dropoffLocation?.address || '',
+              dropoffNotes: t.dropoffLocation?.notes,
               pickupTime:
                 t.bookingType === 'scheduled' && t.scheduledPickupTime
                   ? new Date(t.scheduledPickupTime).toLocaleString()
@@ -2017,7 +2040,13 @@ export default function DispatchRoute() {
               oversizedBags: meta.oversizedBags as Record<string, number> | undefined,
               oversizedItemsSummary: meta.oversizedItemsSummary as string | undefined,
               customExtrasSummary: meta.customExtrasSummary as string | undefined,
-              pickupNotes: meta.pickupLocationDescription as string | undefined,
+              pickupNotes: (meta.pickupLocationDescription as string | undefined) || t.pickupLocation?.notes,
+              companySettings: {
+                name: settings.company?.name,
+                phone: settings.company?.phone,
+                address: settings.company?.address,
+                email: settings.company?.email,
+              },
               flightDetails: (meta.flightNumber || meta.airline || meta.airlineName || meta.tailNumber)
                 ? {
                     flightNumber: meta.flightNumber ? String(meta.flightNumber) : undefined,
@@ -2344,7 +2373,7 @@ export default function DispatchRoute() {
     try {
       getAdminAuthService().signOut().catch(() => {});
     } catch {}
-    window.location.href = '/signin?message=logged_out';
+    window.location.href = '/app/login?message=logged_out';
   };
 
   // Create new draft
@@ -2671,7 +2700,7 @@ export default function DispatchRoute() {
     }
 
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

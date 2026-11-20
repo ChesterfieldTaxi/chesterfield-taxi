@@ -14,6 +14,7 @@ import type {
 } from '../types/telephony';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
+import { getFirebaseAuthHeaders } from './auth/auth-headers';
 import { doc, updateDoc } from 'firebase/firestore';
 
 const MASKED_SESSIONS_STORAGE_KEY = 'ct_telephony_masked_sessions';
@@ -141,18 +142,30 @@ class TelephonyService implements ITelephonyService {
       vehicleModel?: string;
       etaMinutes?: number;
       finalFare?: number;
+      trackingToken?: string;
+      trackingUrl?: string;
     }
   ): Promise<SmsNotification> {
     let message = '';
-    const unit = context.vehicleUnit ? `#${context.vehicleUnit}` : 'your taxi';
+    const cleanUnit = (context.vehicleUnit || '').replace(/^cab\s*#?/i, '').trim();
+    const unitLabel = cleanUnit ? `Cab #${cleanUnit}` : 'Your chauffeur';
     const driver = context.driverName ? ` (${context.driverName})` : '';
+    const origin =
+      typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'https://chesterfieldtaxi.com';
+    const liveTrackUrl =
+      context.trackingUrl ||
+      (context.trackingToken
+        ? `${origin}/track/${encodeURIComponent(context.trackingToken)}`
+        : `${origin}/track/${encodeURIComponent(tripId)}`);
 
     switch (type) {
       case 'driver_en_route':
-        message = `Chesterfield Taxi: Cab ${unit}${driver} is on the way! Estimated arrival in ${context.etaMinutes || 7} minutes.`;
+        message = `Chesterfield Taxi: ${unitLabel}${driver} is on the way! Est. arrival ${context.etaMinutes || 7} min. Track live: ${liveTrackUrl}`;
         break;
       case 'driver_arrived':
-        message = `Chesterfield Taxi: Your driver has arrived outside in a ${context.vehicleModel || 'vehicle'} (Cab ${unit}).`;
+        message = `Chesterfield Taxi: Your chauffeur has arrived outside in a ${context.vehicleModel || 'vehicle'} (${unitLabel}). Live status: ${liveTrackUrl}`;
         break;
       case 'trip_started':
         message = `Chesterfield Taxi: Your trip has started. Safe travels with Chesterfield Taxi!`;
@@ -187,26 +200,23 @@ class TelephonyService implements ITelephonyService {
 
     this.persistStorage();
 
-    // Trigger real outbound SMS via Twilio endpoint
+    // Trigger real outbound SMS via authenticated server Twilio endpoint (never send raw secrets from localStorage)
     if (typeof window !== 'undefined' && formattedRecipient) {
-      const twilioSid = localStorage.getItem('ct_twilio_sid') || '';
-      const twilioToken = localStorage.getItem('ct_twilio_token') || '';
-      const twilioPhone = localStorage.getItem('ct_twilio_phone') || '';
-
-      fetch('/api/telephony', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'send_sms',
-          to: formattedRecipient,
-          body: message,
-          credentials: {
-            accountSid: twilioSid,
-            authToken: twilioToken,
-            phoneNumber: twilioPhone,
-          },
-        }),
-      })
+      getFirebaseAuthHeaders()
+        .then((authHeaders) =>
+          fetch('/api/telephony', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify({
+              action: 'send_sms',
+              to: formattedRecipient,
+              body: message,
+            }),
+          })
+        )
         .then(async (res) => {
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));

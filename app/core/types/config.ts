@@ -259,6 +259,8 @@ export interface DynamicPricingConfig {
   stepIncrementTiers?: StepIncrementTier[];
   delayRate?: DelayRateConfig;
   conditionSurcharges?: ConditionSurchargeConfig;
+  /** Default driver commission split (0.0 - 1.0, e.g. 0.75 = 75% driver / 25% company) */
+  defaultDriverCommissionRate?: number;
 }
 
 export interface VehicleTierConfig {
@@ -381,20 +383,54 @@ export interface CorporateAccountConfig {
 }
 
 
+export interface InvoiceLineItemRecord {
+  description: string;
+  amount: number;
+  tripId?: string;
+  date?: string;
+  passengerName?: string;
+  pickupDropoff?: string;
+  poNumber?: string;
+  vehicleDisplayName?: string;
+  authorizedBy?: string;
+  baseFare?: number;
+  gratuity?: number;
+  tolls?: number;
+  waitTimeFee?: number;
+  discountAmount?: number;
+}
+
 export interface InvoiceRecord {
   id: string;
   invoiceNumber: string;
   corporateAccountId?: string;
+  accountNumber?: string;
+  billingCycle?: 'net15' | 'net30' | 'net60' | 'immediate';
   customerName: string;
   customerEmail: string;
   tripIds: string[];
+  subtotal?: number;
+  discountAmount?: number;
   totalAmount: number;
   status: 'draft' | 'issued' | 'paid' | 'overdue';
   dueDate: string;
   issuedDate: string;
   paidDate?: string;
-  lineItems: Array<{ description: string; amount: number }>;
+  lineItems: InvoiceLineItemRecord[];
   notes?: string;
+}
+
+export interface BillingSettingsConfig {
+  autoEmailReceipts?: boolean;
+  stripeTerminalEnabled?: boolean;
+  passCardSurcharge?: boolean;
+  surchargePercent?: number;
+  remittanceBankName?: string;
+  remittanceAccountName?: string;
+  remittanceRoutingNumber?: string;
+  remittanceAccountLast4?: string;
+  usdotNumber?: string;
+  taxId?: string;
 }
 
 export interface SecurityControlsConfig {
@@ -469,6 +505,7 @@ export interface AppSettings {
   customerBookingConfig?: CustomerBookingConfig;
   corporateAccounts?: CorporateAccountConfig[];
   invoices?: InvoiceRecord[];
+  billingSettings?: BillingSettingsConfig;
   securityControls?: SecurityControlsConfig;
   configAuditTrail?: ConfigAuditEntry[];
   fleetAlertsConfig?: FleetAlertsConfig;

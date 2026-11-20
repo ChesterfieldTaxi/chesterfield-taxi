@@ -29,6 +29,31 @@ export interface PoValidationResult {
   revokedRecord?: PoHistoryRecord;
 }
 
+/**
+ * Deterministic SHA-256 hex digest for zero-PII corporate account & PO verification lookups.
+ * Works identically in both browser (SubtleCrypto) and Node 18+ runtimes.
+ */
+export async function hashCorporateLookupValue(raw: string): Promise<string> {
+  const normalized = (raw || '').trim().toUpperCase();
+  if (!normalized) return '';
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    const data = new TextEncoder().encode(`ct_corp_v1:${normalized}`);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  // Fallback deterministic hash for constrained test environments
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < normalized.length; i++) {
+    const ch = normalized.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 export class CorporateAccountService {
   /**
    * Generates a collision-resistant, formatted PO number.
@@ -374,7 +399,24 @@ export class CorporateAccountService {
   }
 
   /**
-   * Helper to write a single account document to the 'corporateAccounts' Firestore collection.
+   * Public helper to sync a corporate account to BOTH `/corporateAccounts/{id}` (staff-only)
+   * AND zero-PII hashed `/corporateLookup/{accountNumberHash}` (for rate-limited web checkout verification).
+   */
+  public async syncAccountToFirestore(account: CorporateAccountConfig): Promise<void> {
+    await this.syncIndividualAccountToFirestore(account);
+  }
+
+  /**
+   * Syncs a batch of corporate accounts (e.g. after CSV import or Admin save).
+   */
+  public async syncAccountsBatchToFirestore(accounts: CorporateAccountConfig[]): Promise<void> {
+    if (!isFirebaseConfigured() || !accounts?.length) return;
+    await Promise.all(accounts.map((acc) => this.syncIndividualAccountToFirestore(acc)));
+  }
+
+  /**
+   * Helper to write a single account document to the 'corporateAccounts' Firestore collection
+   * plus its zero-PII hashed verification projection at 'corporateLookup/{accountHash}'.
    */
   private async syncIndividualAccountToFirestore(account: CorporateAccountConfig): Promise<void> {
     if (!isFirebaseConfigured()) return;
@@ -382,6 +424,32 @@ export class CorporateAccountService {
       const db = getFirestoreDb();
       const docRef = doc(db, 'corporateAccounts', account.id);
       await setDoc(docRef, sanitizePayload(account), { merge: true });
+
+      const acctHash = await hashCorporateLookupValue(account.accountNumber);
+      if (acctHash) {
+        const currentPoHash = account.currentPoNumber
+          ? await hashCorporateLookupValue(account.currentPoNumber)
+          : '';
+        const revokedPoHashes = await Promise.all(
+          (account.poNumberHistory || [])
+            .filter((h) => h.poNumber)
+            .map((h) => hashCorporateLookupValue(h.poNumber))
+        );
+        const lookupDoc = {
+          corporateAccountId: account.id,
+          isActive: Boolean(account.isActive),
+          poRequired: Boolean(account.poRequired),
+          currentPoHash: currentPoHash || null,
+          revokedPoHashes: revokedPoHashes.filter(Boolean),
+          creditLimit: Number(account.creditLimit || 0),
+          billingCycle: account.billingCycle || 'net30',
+          discountPercent: Number(account.discountPercent || 0),
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'corporateLookup', acctHash), sanitizePayload(lookupDoc), {
+          merge: true,
+        });
+      }
     } catch (err) {
       console.warn(`[CorporateAccountService] Failed to sync ${account.id} to corporateAccounts collection:`, err);
     }

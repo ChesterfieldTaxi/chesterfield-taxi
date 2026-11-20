@@ -18,8 +18,10 @@ import {
   getDoc,
   getDocs,
   query,
+  where,
   orderBy,
   updateDoc,
+  runTransaction,
   collection,
   onSnapshot,
   type Firestore,
@@ -43,6 +45,11 @@ import type {
   BookingStatusResponse,
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
+import {
+  generateTrackingToken,
+  computeTripPhoneLookupKey,
+  buildSanitizedTrackingProjection,
+} from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
 import { getAdminConfigService } from '../config/admin-config.service';
 import {
@@ -453,9 +460,12 @@ export class FirebaseBookingService implements IBookingService {
       context: `Initial reservation received via ${channel.toUpperCase()} intake by ${bookedByName} (${payload.passenger?.email || 'no email'}). ${initialHistoryEntry.reason}`,
     };
 
+    const trackingToken = payload.trackingToken || generateTrackingToken();
+
     const newTrip: Trip = {
       ...payload,
       id,
+      trackingToken,
       status: initialStatus,
       offeredToIds: [],
       rejectedByIds: [],
@@ -494,7 +504,35 @@ export class FirebaseBookingService implements IBookingService {
       console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), trip preserved in local storage:', err);
     }
 
+    // Mirror strictly zero-PII public tracking projection & last-4 phone lookup index
+    this.syncPublicTrackingProjection(sanitizedTrip, true).catch(() => {});
+
     return sanitizedTrip;
+  }
+
+  private async syncPublicTrackingProjection(trip: Trip, isInitialCreate = false): Promise<void> {
+    try {
+      const projection = buildSanitizedTrackingProjection(trip);
+      if (!projection) return;
+      const sanitizedProjection = sanitizePayload(projection);
+      await setDoc(doc(this.db, 'tripTracking', projection.trackingToken), sanitizedProjection, { merge: true });
+
+      if (isInitialCreate && trip.passenger?.phone) {
+        const lookupKey = await computeTripPhoneLookupKey(trip.id, trip.passenger.phone);
+        if (lookupKey) {
+          await setDoc(
+            doc(this.db, 'tripTrackingLookup', lookupKey),
+            {
+              trackingToken: projection.trackingToken,
+              updatedAt: projection.updatedAt,
+            },
+            { merge: true }
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[FirebaseBookingService] Public tracking projection sync warning:', err);
+    }
   }
 
   public async getBookingStatus(bookingId: string): Promise<BookingStatusResponse | null> {
@@ -504,9 +542,9 @@ export class FirebaseBookingService implements IBookingService {
 
     let trip: Trip | null = null;
 
-    // 1. Try direct doc lookup with raw and cleaned ID
-    for (const lookupKey of [cleanId, rawId]) {
-      if (!lookupKey) continue;
+    // 1. Try direct doc lookup with normalized uppercase, cleaned, and raw ID
+    const candidateKeys = Array.from(new Set([cleanId.toUpperCase(), cleanId, rawId].filter(Boolean)));
+    for (const lookupKey of candidateKeys) {
       try {
         const tripDocRef = doc(this.db, this.collectionName, lookupKey);
         const snapshot = await getDoc(tripDocRef);
@@ -618,6 +656,8 @@ export class FirebaseBookingService implements IBookingService {
       }
     }
 
+    this.syncPublicTrackingProjection(cancelledTrip).catch(() => {});
+
     return cancelledTrip;
   }
 
@@ -666,7 +706,8 @@ export class FirebaseBookingService implements IBookingService {
       window.addEventListener('storage', handleLocalTripEvent);
     }
 
-    const tripDocRef = doc(this.db, this.collectionName, cleanId || rawId);
+    const normalizedDocId = (cleanId || rawId).toUpperCase();
+    const tripDocRef = doc(this.db, this.collectionName, normalizedDocId);
 
     const unsubscribe = onSnapshot(
       tripDocRef,
@@ -805,6 +846,426 @@ export class FirebaseBookingService implements IBookingService {
     };
   }
 
+  /**
+   * Resolves a driver's real assigned vehicle snapshot from DriverProfile + `/fleet`
+   * without inventing fake Cab #204 / MO-7TX91 defaults.
+   */
+  private async resolveDriverVehicleSnapshot(driverId: string): Promise<{
+    vehicle?: TripAssignedVehicle;
+    driverName?: string;
+  }> {
+    let vehicle: TripAssignedVehicle | undefined;
+    let driverName: string | undefined;
+
+    try {
+      const { getDriverService } = await import('../driver.service');
+      const dProfile = await getDriverService().getDriverProfile(driverId);
+      if (dProfile?.name) driverName = dProfile.name;
+
+      let matchedFleetPlate = dProfile?.licensePlate || '';
+      let matchedFleetModel = `${dProfile?.vehicleMake || ''} ${dProfile?.vehicleModel || ''}`.trim();
+      let matchedFleetId = dProfile?.vehicleId || '';
+      let matchedFleetUnit = dProfile?.vehicleUnit || '';
+
+      try {
+        const { getFleetService } = await import('../fleet/fleet.service');
+        const assets = await getFleetService().getFleet();
+        const unitNorm = (matchedFleetUnit || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const asset = assets.find(
+          (a) =>
+            (matchedFleetId && a.id === matchedFleetId) ||
+            a.assignedDriverId === driverId ||
+            (unitNorm && a.unitNumber.toLowerCase().replace(/[^a-z0-9]/g, '') === unitNorm)
+        );
+        if (asset) {
+          matchedFleetId = asset.id;
+          matchedFleetUnit = asset.unitNumber;
+          matchedFleetPlate = asset.licensePlate || matchedFleetPlate;
+          matchedFleetModel = `${asset.year ? asset.year + ' ' : ''}${asset.make} ${asset.model}`.trim();
+        }
+      } catch {}
+
+      if (matchedFleetUnit || matchedFleetModel || matchedFleetPlate) {
+        vehicle = {
+          vehicleId: matchedFleetId || `unit-${driverId}`,
+          vehicleNumber: matchedFleetUnit || 'Assigned Cab',
+          licensePlate: matchedFleetPlate || '',
+          model: matchedFleetModel || 'Chauffeur Vehicle',
+        };
+      }
+    } catch {}
+
+    return { vehicle, driverName };
+  }
+
+  /**
+   * Scoped Driver Real-Time Subscription:
+   * Queries ONLY trips assigned to `driverId` OR offered to `driverId` in `offeredToIds`,
+   * fully compliant with strict Firestore `allow list` rules.
+   */
+  public subscribeToDriverTrips(
+    driverId: string,
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    if (!driverId) {
+      onUpdate([]);
+      return () => {};
+    }
+
+    let assignedRemote: Trip[] = [];
+    let offeredRemote: Trip[] = [];
+
+    const emitMerged = () => {
+      const localMatches = this.getLocalTrips().filter(
+        (t) => t.assignedDriverId === driverId || (Array.isArray(t.offeredToIds) && t.offeredToIds.includes(driverId))
+      );
+      const combined = this.mergeTrips([...assignedRemote, ...offeredRemote], localMatches);
+      onUpdate(combined);
+    };
+
+    Promise.resolve().then(emitMerged).catch(() => {});
+
+    const handleLocalTripEvent = () => emitMerged();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('chesterfield_trip_created', handleLocalTripEvent);
+      window.addEventListener('storage', handleLocalTripEvent);
+    }
+
+    const qAssigned = query(
+      collection(this.db, this.collectionName),
+      where('assignedDriverId', '==', driverId)
+    );
+    const qOffered = query(
+      collection(this.db, this.collectionName),
+      where('offeredToIds', 'array-contains', driverId)
+    );
+
+    const unsubAssigned = onSnapshot(
+      qAssigned,
+      (snap) => {
+        assignedRemote = snap.docs.map((d) => d.data() as Trip);
+        emitMerged();
+      },
+      (err) => {
+        console.warn('[FirebaseBookingService] Driver assigned trips snapshot error:', err);
+        emitMerged();
+        if (onError) onError(err);
+      }
+    );
+
+    const unsubOffered = onSnapshot(
+      qOffered,
+      (snap) => {
+        offeredRemote = snap.docs.map((d) => d.data() as Trip);
+        emitMerged();
+      },
+      (err) => {
+        console.warn('[FirebaseBookingService] Driver offered trips snapshot error:', err);
+        emitMerged();
+        if (onError) onError(err);
+      }
+    );
+
+    return () => {
+      unsubAssigned();
+      unsubOffered();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('chesterfield_trip_created', handleLocalTripEvent);
+        window.removeEventListener('storage', handleLocalTripEvent);
+      }
+    };
+  }
+
+  /**
+   * Scoped Passenger Real-Time Subscription:
+   * Queries ONLY trips matching authenticated `customerId`, `userId`, or `passenger.email`,
+   * fully compliant with strict Firestore `allow list` rules.
+   */
+  public subscribeToPassengerTrips(
+    identity: { uid?: string; email?: string; phone?: string },
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const uid = identity.uid?.trim();
+    const email = identity.email?.trim().toLowerCase();
+    const rawEmail = identity.email?.trim();
+
+    if (!uid && !email) {
+      onUpdate([]);
+      return () => {};
+    }
+
+    const buckets = new Map<string, Trip[]>();
+
+    const emitMerged = () => {
+      const remoteAll: Trip[] = [];
+      for (const list of buckets.values()) {
+        remoteAll.push(...list);
+      }
+      const localMatches = this.getLocalTrips().filter((t) => {
+        if (uid && (t.customerId === uid || t.userId === uid)) return true;
+        if (email && t.passenger?.email?.trim().toLowerCase() === email) return true;
+        return false;
+      });
+      onUpdate(this.mergeTrips(remoteAll, localMatches));
+    };
+
+    Promise.resolve().then(emitMerged).catch(() => {});
+
+    const handleLocalTripEvent = () => emitMerged();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('chesterfield_trip_created', handleLocalTripEvent);
+      window.addEventListener('storage', handleLocalTripEvent);
+    }
+
+    const unsubs: Array<() => void> = [];
+
+    const attachQuery = (bucketKey: string, q: ReturnType<typeof query>) => {
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          buckets.set(
+            bucketKey,
+            snap.docs.map((d) => d.data() as Trip)
+          );
+          emitMerged();
+        },
+        (err) => {
+          console.warn(`[FirebaseBookingService] Passenger ${bucketKey} snapshot warning:`, err);
+          emitMerged();
+          if (onError) onError(err);
+        }
+      );
+      unsubs.push(unsub);
+    };
+
+    if (uid) {
+      attachQuery('customerId', query(collection(this.db, this.collectionName), where('customerId', '==', uid)));
+      attachQuery('userId', query(collection(this.db, this.collectionName), where('userId', '==', uid)));
+    }
+    if (rawEmail) {
+      attachQuery('email', query(collection(this.db, this.collectionName), where('passenger.email', '==', rawEmail)));
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('chesterfield_trip_created', handleLocalTripEvent);
+        window.removeEventListener('storage', handleLocalTripEvent);
+      }
+    };
+  }
+
+  /**
+   * Atomically accepts a broadcast/offered trip using a Firestore transaction.
+   * Guarantees only the first accepting driver claims the ride and clears `offeredToIds`.
+   */
+  public async acceptDriverOffer(tripId: string, driverId: string): Promise<Trip> {
+    if (!tripId || !driverId) {
+      throw new Error('tripId and driverId are required to accept an offer.');
+    }
+
+    const tripDocRef = doc(this.db, this.collectionName, tripId);
+    const { vehicle, driverName } = await this.resolveDriverVehicleSnapshot(driverId);
+    const now = new Date().toISOString();
+
+    let updatedTrip: Trip | null = null;
+
+    try {
+      updatedTrip = await runTransaction(this.db, async (tx) => {
+        const snap = await tx.get(tripDocRef);
+        if (!snap.exists()) {
+          throw new Error(`Trip "${tripId}" was not found.`);
+        }
+        const current = snap.data() as Trip;
+
+        if (current.assignedDriverId && current.assignedDriverId !== driverId) {
+          throw new Error('This trip offer was already claimed by another driver.');
+        }
+        if (current.status !== 'offered' && current.assignedDriverId !== driverId) {
+          throw new Error(`Trip offer is no longer available (current status: ${current.status}).`);
+        }
+
+        const historyEntry: TripStatusHistoryEntry = {
+          from: current.status,
+          to: 'assigned',
+          timestamp: now,
+          actorRole: 'driver',
+          reason: `Offer accepted by driver ${driverName || driverId}`,
+        };
+
+        const auditEvent: TripAuditEvent = {
+          action: 'DRIVER_ACCEPTED',
+          timestamp: now,
+          actorId: driverId,
+          actorRole: 'driver',
+          referenceNumber: `ACP-${Math.floor(1000 + Math.random() * 9000)}`,
+          referenceType: 'offer',
+          context: `Driver ${driverName || driverId} atomically accepted trip offer${vehicle ? ` (${vehicle.vehicleNumber})` : ''}.`,
+        };
+
+        const nextMetadata = {
+          ...(current.metadata || {}),
+          ...(driverName ? { assignedDriverName: driverName } : {}),
+        };
+
+        const patch: Partial<Trip> = {
+          status: 'assigned',
+          assignedDriverId: driverId,
+          offeredToIds: [],
+          ...(vehicle ? { assignedVehicle: vehicle } : {}),
+          metadata: nextMetadata,
+          statusHistory: [...(current.statusHistory || []), historyEntry],
+          auditLog: [...(current.auditLog || []), auditEvent],
+          updatedAt: now,
+        };
+
+        tx.update(tripDocRef, sanitizePayload(patch));
+        return { ...current, ...patch } as Trip;
+      });
+    } catch (txErr: any) {
+      // Re-throw genuine business conflicts (already claimed / cancelled / expired)
+      if (
+        txErr?.message?.includes('already claimed') ||
+        txErr?.message?.includes('no longer available') ||
+        txErr?.message?.includes('not found')
+      ) {
+        throw txErr;
+      }
+      // Offline / local fallback if Firestore unavailable
+      const local = this.getLocalTrips().find((t) => t.id === tripId);
+      if (!local) throw txErr;
+      if (local.assignedDriverId && local.assignedDriverId !== driverId) {
+        throw new Error('This trip offer was already claimed by another driver.');
+      }
+      updatedTrip = {
+        ...local,
+        status: 'assigned',
+        assignedDriverId: driverId,
+        offeredToIds: [],
+        ...(vehicle ? { assignedVehicle: vehicle } : {}),
+        metadata: { ...(local.metadata || {}), ...(driverName ? { assignedDriverName: driverName } : {}) },
+        statusHistory: [
+          ...(local.statusHistory || []),
+          { from: local.status, to: 'assigned', timestamp: now, actorRole: 'driver', reason: 'Offer accepted by driver' },
+        ],
+        updatedAt: now,
+      };
+    }
+
+    if (updatedTrip && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
+        const trips: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
+        const idx = trips.findIndex((t) => t.id === updatedTrip!.id);
+        if (idx >= 0) trips[idx] = updatedTrip;
+        else trips.unshift(updatedTrip);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: updatedTrip }));
+      } catch {}
+    }
+
+    if (updatedTrip) {
+      this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+    }
+
+    return updatedTrip!;
+  }
+
+  /**
+   * Atomically declines a trip offer for `driverId`.
+   * Removes `driverId` from `offeredToIds`, records `driverId` in `rejectedByIds`,
+   * keeps `assignedDriverId: null`, and only reverts to `pending` if no other drivers remain offered.
+   */
+  public async declineDriverOffer(tripId: string, driverId: string, reason?: string): Promise<Trip> {
+    if (!tripId || !driverId) {
+      throw new Error('tripId and driverId are required to decline an offer.');
+    }
+
+    const tripDocRef = doc(this.db, this.collectionName, tripId);
+    const now = new Date().toISOString();
+    let updatedTrip: Trip | null = null;
+
+    try {
+      updatedTrip = await runTransaction(this.db, async (tx) => {
+        const snap = await tx.get(tripDocRef);
+        if (!snap.exists()) {
+          throw new Error(`Trip "${tripId}" was not found.`);
+        }
+        const current = snap.data() as Trip;
+
+        const remainingOffered = (current.offeredToIds || []).filter((id) => id !== driverId);
+        const nextRejected = Array.from(new Set([...(current.rejectedByIds || []), driverId]));
+        const nextStatus: TripStatus =
+          current.status === 'offered' && remainingOffered.length === 0 ? 'pending' : current.status;
+
+        const historyEntry: TripStatusHistoryEntry = {
+          from: current.status,
+          to: nextStatus,
+          timestamp: now,
+          actorRole: 'driver',
+          reason: reason || 'Driver declined trip offer',
+        };
+
+        const auditEvent: TripAuditEvent = {
+          action: 'DRIVER_DECLINED',
+          timestamp: now,
+          actorId: driverId,
+          actorRole: 'driver',
+          referenceNumber: `DEC-${Math.floor(1000 + Math.random() * 9000)}`,
+          referenceType: 'decline',
+          context: `Driver ${driverId} declined trip offer. Remaining offered drivers: ${remainingOffered.length}.`,
+        };
+
+        const patch: Partial<Trip> = {
+          status: nextStatus,
+          assignedDriverId: current.assignedDriverId === driverId ? null : current.assignedDriverId,
+          offeredToIds: remainingOffered,
+          rejectedByIds: nextRejected,
+          statusHistory: [...(current.statusHistory || []), historyEntry],
+          auditLog: [...(current.auditLog || []), auditEvent],
+          updatedAt: now,
+        };
+
+        tx.update(tripDocRef, sanitizePayload(patch));
+        return { ...current, ...patch } as Trip;
+      });
+    } catch (txErr) {
+      const local = this.getLocalTrips().find((t) => t.id === tripId);
+      if (!local) throw txErr;
+      const remainingOffered = (local.offeredToIds || []).filter((id) => id !== driverId);
+      const nextRejected = Array.from(new Set([...(local.rejectedByIds || []), driverId]));
+      const nextStatus: TripStatus =
+        local.status === 'offered' && remainingOffered.length === 0 ? 'pending' : local.status;
+      updatedTrip = {
+        ...local,
+        status: nextStatus,
+        assignedDriverId: local.assignedDriverId === driverId ? null : local.assignedDriverId,
+        offeredToIds: remainingOffered,
+        rejectedByIds: nextRejected,
+        updatedAt: now,
+      };
+    }
+
+    if (updatedTrip && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
+        const trips: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
+        const idx = trips.findIndex((t) => t.id === updatedTrip!.id);
+        if (idx >= 0) trips[idx] = updatedTrip;
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
+        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: updatedTrip }));
+      } catch {}
+    }
+
+    if (updatedTrip) {
+      this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+    }
+
+    return updatedTrip!;
+  }
+
   public async updateTripStatus(
     tripId: string,
     status: TripStatus,
@@ -837,6 +1298,12 @@ export class FirebaseBookingService implements IBookingService {
       throw new Error(`Booking with ID "${tripId}" not found.`);
     }
 
+    // Validate state machine transition for driver/passenger actions (admins/dispatchers may override)
+    const isStaffOverride = options?.actorRole === 'admin' || options?.actorRole === 'system';
+    if (!isStaffOverride && trip.status !== status && !isValidTripTransition(trip.status, status)) {
+      throw new Error(`Invalid trip status transition from "${trip.status}" to "${status}".`);
+    }
+
     const now = new Date().toISOString();
 
     const historyEntry: TripStatusHistoryEntry = {
@@ -864,34 +1331,31 @@ export class FirebaseBookingService implements IBookingService {
     if (options?.assignedDriverId !== undefined) {
       updates.assignedDriverId = options.assignedDriverId;
       if (options.assignedDriverId && (status === 'assigned' || status === 'accepted')) {
-         let vehicleSnapshot: TripAssignedVehicle = {
-            vehicleId: 'veh-' + options.assignedDriverId,
-            vehicleNumber: 'Cab #204',
-            licensePlate: 'MO-7TX91',
-            model: 'Toyota Camry Hybrid'
-         };
-         try {
-           const { getDriverService } = await import('../driver.service');
-           const dProfile = await getDriverService().getDriverProfile(options.assignedDriverId);
-           if (dProfile?.vehicleUnit) {
-             vehicleSnapshot.vehicleNumber = dProfile.vehicleUnit;
-             if (dProfile.vehicleMake || dProfile.vehicleModel) {
-               vehicleSnapshot.model = `${dProfile.vehicleMake || ''} ${dProfile.vehicleModel || ''}`.trim();
-             }
-           }
-         } catch {}
-         updates.assignedVehicle = vehicleSnapshot;
+         const { vehicle: vehicleSnapshot, driverName } = await this.resolveDriverVehicleSnapshot(options.assignedDriverId);
+         if (vehicleSnapshot) {
+           updates.assignedVehicle = vehicleSnapshot;
+         }
+         if (driverName) {
+           updates.metadata = {
+             ...(trip.metadata || {}),
+             assignedDriverName: driverName,
+           };
+         }
          updates.auditLog?.push({
             action: 'DRIVER_ACCEPTED',
             timestamp: now,
             actorRole: options.actorRole ?? 'dispatcher',
-            context: `Driver assigned: ${options.assignedDriverId} with ${vehicleSnapshot.vehicleNumber} (${vehicleSnapshot.model})`
+            context: `Driver assigned: ${driverName || options.assignedDriverId}${vehicleSnapshot ? ` with ${vehicleSnapshot.vehicleNumber} (${vehicleSnapshot.model})` : ''}`
          } as any);
       }
     }
 
     if (options?.offeredToIds !== undefined) {
       updates.offeredToIds = options.offeredToIds;
+    }
+
+    if (status === 'in_progress' && !trip.actualPickupTime) {
+      updates.actualPickupTime = now;
     }
 
     if (status === 'completed') {
@@ -967,11 +1431,49 @@ export class FirebaseBookingService implements IBookingService {
       }
     }
 
+    // Mirror status & assigned vehicle updates to zero-PII public tracking projection
+    this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+
     return updatedTrip;
   }
 
   public async updateTrip(tripId: string, updates: Partial<Trip>): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, tripId);
+    const updateKeys = Object.keys(updates).filter((k) => (updates as any)[k] !== undefined);
+    const isTelemetryOnly =
+      updateKeys.length > 0 &&
+      updateKeys.every((k) => k === 'driverTelemetry' || k === 'currentLocation' || k === 'updatedAt');
+
+    // Fast path for high-frequency GPS telemetry pings: avoid redundant getDoc, auditLog spam, and localStorage churn
+    if (isTelemetryOnly) {
+      const now = new Date().toISOString();
+      const telemetryPatch = sanitizePayload({
+        ...updates,
+        updatedAt: now,
+      });
+      try {
+        await updateDoc(tripDocRef, telemetryPatch);
+      } catch (err) {
+        console.warn('[FirebaseBookingService] Telemetry updateDoc warning:', err);
+      }
+      const cachedTrip = this.getLocalTrips().find((t) => t.id === tripId);
+      const token = cachedTrip?.trackingToken;
+      if (token) {
+        const ping = updates.driverTelemetry || updates.currentLocation;
+        if (ping) {
+          setDoc(
+            doc(this.db, 'tripTracking', token),
+            sanitizePayload({ driverTelemetry: ping, updatedAt: now }),
+            { merge: true }
+          ).catch(() => {});
+        }
+      }
+      return {
+        ...(cachedTrip || ({ id: tripId } as Trip)),
+        ...telemetryPatch,
+      } as Trip;
+    }
+
     let trip: Trip | null = null;
     let docExistsOnFirestore = false;
     try {
@@ -1093,6 +1595,8 @@ export class FirebaseBookingService implements IBookingService {
         // ignore
       }
     }
+
+    this.syncPublicTrackingProjection(mergedTrip).catch(() => {});
 
     return mergedTrip;
   }

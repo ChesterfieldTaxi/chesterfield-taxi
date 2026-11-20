@@ -10,6 +10,8 @@ import {
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getCorporateAccountService } from '../../../core/services/corporate-account.service';
+import { getInvoicingService } from '../../../core/services/invoicing.service';
+import { getEmailDispatchService } from '../../../core/services/email';
 import { getContactService, normalizePhone } from '../../../core/services/customer/contact.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
@@ -408,8 +410,10 @@ export function DispatchBookingEngine({
 
   const [corporateAccount, setCorporateAccount] = useState(DEFAULT_CORPORATE_ACCOUNTS[0]);
   const [billingPo, setBillingPo] = useState('');
+  const [allowPoOverride, setAllowPoOverride] = useState(false);
   const [authorizedBy, setAuthorizedBy] = useState('');
   const [invoicingTerms, setInvoicingTerms] = useState('Net 30 Direct Bill');
+  const [sendEmailConfirmation, setSendEmailConfirmation] = useState(true);
 
   const [tariff, setTariff] = useState('Standard');
   const [selectedRuleId, setSelectedRuleId] = useState('');
@@ -2270,6 +2274,12 @@ export function DispatchBookingEngine({
         (c) => c.companyName === corporateAccount || c.id === corporateAccount || c.accountNumber === corporateAccount
       );
       if (selectedCorp) {
+        if (selectedCorp.isActive === false) {
+          setSubmitError(
+            `Corporate account "${selectedCorp.companyName}" is currently PAUSED / INACTIVE and cannot accept new direct-bill rides.`
+          );
+          return;
+        }
         const poCheck = getCorporateAccountService().validateCorporatePo(selectedCorp, billingPo);
         if (poCheck.status === 'expired_revoked') {
           setSubmitError(
@@ -2282,6 +2292,34 @@ export function DispatchBookingEngine({
         if (selectedCorp.poRequired && !billingPo.trim()) {
           setSubmitError(`PO Number is strictly required for corporate client "${selectedCorp.companyName}".`);
           return;
+        }
+        if (selectedCorp.poRequired && poCheck.status === 'mismatch' && !allowPoOverride) {
+          setSubmitError(
+            `PO MISMATCH BLOCK: "${billingPo}" does not match the active authorized PO (${selectedCorp.currentPoNumber || 'N/A'}) for "${selectedCorp.companyName}". Verify PO or check Supervisor Override below.`
+          );
+          return;
+        }
+        // Check corporate credit limit against live open AR balance
+        if (selectedCorp.creditLimit > 0) {
+          try {
+            const invService = getInvoicingService();
+            const openBalance = invService.getCorporateAccountBalance
+              ? await invService.getCorporateAccountBalance(selectedCorp.id)
+              : 0;
+            const projectedFare = isFareOverridden && manualFare
+              ? Math.max(0, Math.ceil(parseFloat(manualFare) || 0))
+              : returnTrip
+              ? Math.ceil(estimatedFare) + Math.ceil(returnEstimatedFare || estimatedFare)
+              : Math.ceil(estimatedFare);
+            if (openBalance + projectedFare > selectedCorp.creditLimit) {
+              setSubmitError(
+                `CREDIT LIMIT EXCEEDED: "${selectedCorp.companyName}" open AR ($${openBalance.toFixed(2)}) + this booking ($${projectedFare.toFixed(2)}) exceeds the $${selectedCorp.creditLimit.toLocaleString()} limit.`
+              );
+              return;
+            }
+          } catch {
+            // Non-blocking if offline
+          }
         }
       }
     }
@@ -2550,6 +2588,7 @@ export function DispatchBookingEngine({
               billingPo,
               authorizedBy,
               invoicingTerms,
+              poOverrideAuthorized: allowPoOverride || undefined,
             }
           : undefined,
       returnDetails: returnTrip
@@ -2753,6 +2792,7 @@ export function DispatchBookingEngine({
         }
 
         // Auto-create linked return booking if requested
+        let createdReturnTripForEmail: Trip | null = null;
         if (returnTrip && autoCreateReturnTrip && returnDate && returnTime) {
           try {
             const retPickupAddr = returnPickupAddress.trim() || dropoffAddress;
@@ -2859,6 +2899,7 @@ export function DispatchBookingEngine({
               },
             };
             const createdReturnTrip = await service.createBooking(returnPayload);
+            createdReturnTripForEmail = createdReturnTrip;
             if (service.updateTrip && createdReturnTrip?.id) {
               await service.updateTrip(createdTrip.id, {
                 linkedReturnTripId: createdReturnTrip.id,
@@ -2903,6 +2944,95 @@ export function DispatchBookingEngine({
               console.warn(`[DispatchBookingEngine] Failed creating recurring occurrence ${occDate}:`, recErr);
             }
           }
+        }
+
+        // Send passenger confirmation email on phone bookings when opted in & email provided
+        if (sendEmailConfirmation && email.trim()) {
+          try {
+            const cachedAppSettings = getAdminConfigService().getCachedSettings();
+            getEmailDispatchService()
+              .sendBookingConfirmation({
+                tripId: createdTrip.id,
+                trackingToken: createdTrip.trackingToken,
+                status: 'CONFIRMED',
+                passenger: {
+                  firstName,
+                  lastName,
+                  email: email.trim(),
+                  phone,
+                },
+                pickupAddress,
+                pickupNotes: notesForAll || undefined,
+                intermediateStops:
+                  intermediateStops.length > 0
+                    ? intermediateStops.map((s) => ({ address: s.address }))
+                    : undefined,
+                dropoffAddress,
+                pickupTime:
+                  timingType === 'later' && scheduledPickupTime
+                    ? new Date(scheduledPickupTime).toLocaleString()
+                    : 'Immediate Dispatch (ASAP)',
+                bookingType: timingType === 'later' ? 'scheduled' : 'asap',
+                vehicleTier: String(tier),
+                vehicleDisplayName: primaryVehicleDisplayName,
+                passengerCount: passengers,
+                luggageCount: bags,
+                totalFare: finalFare,
+                breakdown: persistedOutboundPricing.breakdown,
+                tariffProfileName:
+                  persistedOutboundPricing.matchedCorridorName ||
+                  persistedOutboundPricing.tariffProfileName,
+                currency: 'USD',
+                paymentMethod: method,
+                specialRequests: specialRequests || undefined,
+                carSeatsBreakdown:
+                  carSeats && (rearFacingCount > 0 || frontFacingCount > 0 || boosterCount > 0)
+                    ? {
+                        rearFacing: rearFacingCount,
+                        frontFacing: frontFacingCount,
+                        booster: boosterCount,
+                        total: rearFacingCount + frontFacingCount + boosterCount,
+                      }
+                    : undefined,
+                flightDetails: provideFlightInfo
+                  ? {
+                      airlineName: airline || undefined,
+                      flightNumber: flightNumber || undefined,
+                      departureAirport: flightOrigin || undefined,
+                      tailNumber: tailNumber || undefined,
+                      fboFacility: fboFacility || undefined,
+                      isPrivateAviation: Boolean(airportDetection.isPrivateAviation),
+                      hasCheckedLuggage,
+                      isAirportTrip: Boolean(airportDetection.isAirportTrip),
+                    }
+                  : undefined,
+                returnTripDetails: createdReturnTripForEmail
+                  ? {
+                      tripId: createdReturnTripForEmail.id,
+                      trackingToken: createdReturnTripForEmail.trackingToken,
+                      pickupAddress: createdReturnTripForEmail.pickupLocation.address,
+                      dropoffAddress: createdReturnTripForEmail.dropoffLocation.address,
+                      pickupTime: createdReturnTripForEmail.scheduledPickupTime
+                        ? new Date(createdReturnTripForEmail.scheduledPickupTime).toLocaleString()
+                        : 'Scheduled Return',
+                      vehicleTier: String(createdReturnTripForEmail.vehicleTier),
+                      vehicleDisplayName: (createdReturnTripForEmail.metadata?.vehicleDisplayName as string) || undefined,
+                      totalFare: createdReturnTripForEmail.pricing.totalFare,
+                      passengerCount: createdReturnTripForEmail.passenger.passengerCount,
+                      luggageCount: createdReturnTripForEmail.passenger.luggageCount,
+                    }
+                  : undefined,
+                companySettings: {
+                  name: cachedAppSettings.company?.name,
+                  phone: cachedAppSettings.company?.phone,
+                  address: cachedAppSettings.company?.address,
+                  email: cachedAppSettings.company?.email,
+                },
+              })
+              .catch((mailErr) => {
+                console.warn('[DispatchBookingEngine] Non-blocking confirmation email warning:', mailErr);
+              });
+          } catch {}
         }
 
         try {
@@ -3912,19 +4042,12 @@ export function DispatchBookingEngine({
                   type="button"
                   onClick={() => setCardPaymentType('terminal')}
                   className={`py-1 text-center rounded text-[10.5px] font-bold transition-all ${
-                    cardPaymentType === 'terminal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                    cardPaymentType === 'terminal' || cardPaymentType === 'payment_link'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600'
                   }`}
                 >
-                  💳 In-Car Terminal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCardPaymentType('payment_link')}
-                  className={`py-1 text-center rounded text-[10.5px] font-bold transition-all ${
-                    cardPaymentType === 'payment_link' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
-                  }`}
-                >
-                  🔗 Payment Link
+                  💳 Pay in Cab (Terminal)
                 </button>
                 <button
                   type="button"
@@ -3935,13 +4058,13 @@ export function DispatchBookingEngine({
                       : 'text-slate-600'
                   }`}
                 >
-                  🔒 Card On File
+                  🔒 Card On File Reference
                 </button>
               </div>
 
-              {cardPaymentType === 'payment_link' && (
+              {(cardPaymentType === 'terminal' || cardPaymentType === 'payment_link') && (
                 <div className="p-2 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-900">
-                  Secure Stripe payment link will be sent via SMS/Email to the passenger upon confirmation — no card numbers handled by dispatch.
+                  Passenger will pay inside the vehicle via the chauffeur&apos;s contactless chip/tap card terminal upon completion.
                 </div>
               )}
 
@@ -4103,9 +4226,24 @@ export function DispatchBookingEngine({
                       </div>
                     )}
                     {poValidation?.status === 'mismatch' && (
-                      <div className="flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                        <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                        <span>PO does not match current authorized PO ({selectedCorp.currentPoNumber}).</span>
+                      <div className="space-y-1.5 text-rose-800 bg-rose-50 px-2.5 py-2 rounded-lg border border-rose-300">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                          <span>
+                            PO Mismatch — Active PO on file: {selectedCorp.currentPoNumber || 'None'}.
+                          </span>
+                        </div>
+                        {selectedCorp.poRequired && (
+                          <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-700 cursor-pointer pt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={allowPoOverride}
+                              onChange={(e) => setAllowPoOverride(e.target.checked)}
+                              className="rounded border-rose-400 text-rose-600 focus:ring-rose-500"
+                            />
+                            <span>Supervisor Override: authorize mismatched PO (logged in audit trail)</span>
+                          </label>
+                        )}
                       </div>
                     )}
                   </div>
@@ -5126,6 +5264,20 @@ export function DispatchBookingEngine({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {!isEditMode && (
+                <label
+                  className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
+                  title={email.trim() ? `Send confirmation email to ${email.trim()}` : 'Enter passenger email above to send confirmation'}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sendEmailConfirmation}
+                    onChange={(e) => setSendEmailConfirmation(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                  />
+                  <span>Email Confirm</span>
+                </label>
+              )}
               {isEditMode ? (
                 <button
                   type="button"

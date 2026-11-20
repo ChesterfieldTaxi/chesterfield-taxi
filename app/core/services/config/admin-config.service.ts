@@ -29,7 +29,7 @@ import type {
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
-import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
+import { getFirestoreDb, getFirebaseAuth, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DEFAULT_TARIFF_PROFILES } from '../pricing/tariff.service';
@@ -415,7 +415,36 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
 };
 
-const LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
+export const ADMIN_SETTINGS_LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
+const LOCAL_STORAGE_KEY = ADMIN_SETTINGS_LOCAL_STORAGE_KEY;
+
+/**
+ * Produces a strictly public-safe subset of AppSettings for `config/publicSettings`
+ * and `/api/public-config`. Explicitly strips sensitive staff/B2B data
+ * (`corporateAccounts` with anti-fraud PO numbers, `invoices`, `configAuditTrail`,
+ * `securityControls`, `fleet`, and `integrations` secrets).
+ */
+export function sanitizePublicSettings(raw: Record<string, any> = {}): Partial<AppSettings> {
+  const sanitized: Record<string, any> = {
+    company: raw.company ?? DEFAULT_APP_SETTINGS.company,
+    branding: raw.branding ?? DEFAULT_APP_SETTINGS.branding,
+    vehicles: raw.vehicles ?? DEFAULT_APP_SETTINGS.vehicles,
+    pricing: raw.pricing ?? DEFAULT_APP_SETTINGS.pricing,
+    tariffs: raw.tariffs ?? DEFAULT_APP_SETTINGS.tariffs,
+    customerBookingConfig: raw.customerBookingConfig ?? DEFAULT_APP_SETTINGS.customerBookingConfig,
+    bookingRulesConfig: raw.bookingRulesConfig ?? DEFAULT_APP_SETTINGS.bookingRulesConfig,
+    cms: raw.cms,
+    enableGetAppButtons: raw.enableGetAppButtons ?? DEFAULT_APP_SETTINGS.enableGetAppButtons,
+    constructionMode: raw.constructionMode ?? DEFAULT_APP_SETTINGS.constructionMode,
+    enableRealtimeRouting: raw.enableRealtimeRouting ?? DEFAULT_APP_SETTINGS.enableRealtimeRouting,
+    publicFormVersion: raw.publicFormVersion ?? DEFAULT_APP_SETTINGS.publicFormVersion,
+    updatedAt: raw.updatedAt ?? DEFAULT_APP_SETTINGS.updatedAt,
+  };
+  if (raw.website !== undefined) {
+    sanitized.website = raw.website;
+  }
+  return sanitized as Partial<AppSettings>;
+}
 
 export class AdminConfigService implements IAdminConfigService {
   private db: Firestore | null = null;
@@ -598,27 +627,54 @@ export class AdminConfigService implements IAdminConfigService {
     return this.cachedSettings;
   }
 
+  private hasAuthenticatedSession(): boolean {
+    if (typeof window === 'undefined' || !this.isConfigured) return false;
+    try {
+      return Boolean(getFirebaseAuth().currentUser);
+    } catch {
+      return false;
+    }
+  }
+
   public async getSettings(): Promise<AppSettings> {
     if (!this.db || !this.isConfigured) {
       return this.cachedSettings;
     }
 
-    try {
-      const docRef = doc(this.db, 'config', 'appSettings');
-      const snapshot = await getDoc(docRef);
+    // Authenticated users try staff `config/appSettings` first; non-staff or unauthenticated fall back to `config/publicSettings`
+    if (this.hasAuthenticatedSession()) {
+      try {
+        const docRef = doc(this.db, 'config', 'appSettings');
+        const snapshot = await getDoc(docRef);
+        if (snapshot.exists()) {
+          const data = snapshot.data() as Partial<AppSettings>;
+          this.cachedSettings = this.resolveNewestSettings(data);
+          this.saveToLocalStorage(this.cachedSettings);
+          this.initialized = true;
+          return this.cachedSettings;
+        }
+      } catch {
+        // Expected for non-dispatcher roles (customers/drivers) -> fall through to publicSettings
+      }
+    }
 
-      if (snapshot.exists()) {
-        const data = snapshot.data() as Partial<AppSettings>;
+    try {
+      const publicRef = doc(this.db, 'config', 'publicSettings');
+      const publicSnap = await getDoc(publicRef);
+      if (publicSnap.exists()) {
+        const data = sanitizePublicSettings(publicSnap.data() as Record<string, any>);
         this.cachedSettings = this.resolveNewestSettings(data);
         this.saveToLocalStorage(this.cachedSettings);
+        this.initialized = true;
+        return this.cachedSettings;
       }
-      this.initialized = true;
-      return this.cachedSettings;
     } catch (err) {
-      console.warn('[AdminConfigService] Error fetching from Firestore, trying /api/public-config fallback:', err);
-      await this.fetchPublicConfigFallback();
-      return this.cachedSettings;
+      console.warn('[AdminConfigService] Error fetching publicSettings from Firestore, trying /api/public-config fallback:', err);
     }
+
+    await this.fetchPublicConfigFallback();
+    this.initialized = true;
+    return this.cachedSettings;
   }
 
   public async updateSettings(updates: Partial<AppSettings>): Promise<AppSettings> {
@@ -714,6 +770,11 @@ export class AdminConfigService implements IAdminConfigService {
         const docRef = doc(this.db, 'config', 'appSettings');
         const sanitizedSettings = sanitizePayload(merged);
         await setDoc(docRef, sanitizedSettings, { merge: true });
+
+        // Mirror strictly sanitized public subset to `config/publicSettings` (no PO codes, invoices, or audit trail)
+        const publicDocRef = doc(this.db, 'config', 'publicSettings');
+        const publicSubset = sanitizePayload(sanitizePublicSettings(merged as Record<string, any>));
+        await setDoc(publicDocRef, publicSubset, { merge: true });
       } catch (err) {
         console.warn('[AdminConfigService] Could not persist updates to Firestore (saved locally):', err);
         // Keep local settings saved in localStorage and memory even if Firestore rejects write
@@ -738,31 +799,71 @@ export class AdminConfigService implements IAdminConfigService {
       };
     }
 
-    try {
-      const docRef = doc(this.db, 'config', 'appSettings');
-      const unsubscribe = onSnapshot(
-        docRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data() as Partial<AppSettings>;
-            this.cachedSettings = this.resolveNewestSettings(data);
-            this.saveToLocalStorage(this.cachedSettings);
-            onUpdate(this.cachedSettings);
+    let activeFirestoreUnsub: (() => void) | null = null;
+    let isDisposed = false;
+
+    const attachPublicListener = () => {
+      if (isDisposed || !this.db) return;
+      try {
+        const publicRef = doc(this.db, 'config', 'publicSettings');
+        activeFirestoreUnsub = onSnapshot(
+          publicRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const data = sanitizePublicSettings(snapshot.data() as Record<string, any>);
+              this.cachedSettings = this.resolveNewestSettings(data);
+              this.saveToLocalStorage(this.cachedSettings);
+              onUpdate(this.cachedSettings);
+            } else {
+              this.fetchPublicConfigFallback().catch(() => {});
+            }
+          },
+          (err) => {
+            console.warn('[AdminConfigService] publicSettings snapshot error, trying /api/public-config fallback:', err);
+            this.fetchPublicConfigFallback().catch(() => {});
+            if (onError) onError(err);
           }
-        },
-        (err) => {
-          console.warn('[AdminConfigService] onSnapshot error, trying /api/public-config fallback:', err);
-          this.fetchPublicConfigFallback().catch(() => {});
-          if (onError) onError(err);
-        }
-      );
+        );
+      } catch (err) {
+        console.warn('[AdminConfigService] Failed to establish publicSettings snapshot listener:', err);
+      }
+    };
+
+    try {
+      if (this.hasAuthenticatedSession()) {
+        const docRef = doc(this.db, 'config', 'appSettings');
+        activeFirestoreUnsub = onSnapshot(
+          docRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              const data = snapshot.data() as Partial<AppSettings>;
+              this.cachedSettings = this.resolveNewestSettings(data);
+              this.saveToLocalStorage(this.cachedSettings);
+              onUpdate(this.cachedSettings);
+            }
+          },
+          () => {
+            // Non-staff authenticated users (customers/drivers) fall back cleanly to publicSettings
+            if (activeFirestoreUnsub) {
+              activeFirestoreUnsub();
+              activeFirestoreUnsub = null;
+            }
+            attachPublicListener();
+          }
+        );
+      } else {
+        attachPublicListener();
+      }
+
       return () => {
+        isDisposed = true;
         this.listeners.delete(onUpdate);
-        unsubscribe();
+        if (activeFirestoreUnsub) activeFirestoreUnsub();
       };
     } catch (err) {
       console.warn('[AdminConfigService] Failed to establish snapshot listener:', err);
       return () => {
+        isDisposed = true;
         this.listeners.delete(onUpdate);
       };
     }

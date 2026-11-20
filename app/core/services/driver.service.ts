@@ -1,16 +1,21 @@
 /**
  * Driver Domain Service
- * 
+ *
  * Manages Driver profiles, shift state (on_duty, off_duty, on_break),
- * active vehicle assignment, step-by-step trip transitions,
- * and live meter extra fee attachments.
+ * active fleet vehicle assignment, atomic offer accept/decline,
+ * step-by-step trip transitions, and canonical breakdown-synced meter extras.
  */
 
 import { collection, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseConfigured } from './firebase';
 import { sanitizePayload } from './firestore-sanitizer';
-import type { DriverProfile, DriverDutyStatus, DriverMeterExtra, DriverScheduleConfig, DayOfWeek } from '../types/driver';
-import type { DriverTelemetryPing, Trip, TripStatus } from '../types/trip';
+import type {
+  DriverProfile,
+  DriverDutyStatus,
+  DriverMeterExtra,
+  DriverScheduleConfig,
+} from '../types/driver';
+import type { DriverTelemetryPing, PriceLineItem, Trip, TripStatus } from '../types/trip';
 import { getBookingService } from './booking';
 import { getOperatorService } from './operator.service';
 import { getWorkspaceBus } from './workspace-bus.service';
@@ -27,53 +32,14 @@ export const DEFAULT_SCHEDULE: DriverScheduleConfig = {
     sat: { enabled: true, startHour: '08:00', endHour: '16:00' },
     sun: { enabled: false, startHour: '08:00', endHour: '14:00' },
   },
-  timeOffList: [
-    {
-      id: 'to-1',
-      startDate: '2026-09-24',
-      endDate: '2026-09-26',
-      reason: 'Family event / Vacation',
-      createdAt: '2026-09-10T12:00:00Z',
-    },
-  ],
+  timeOffList: [],
 };
 
-export const DEFAULT_DRIVERS: DriverProfile[] = [
-  {
-    id: 'Cc5jehhcxuWxUx7Z3WyXNBXZjCy1',
-    name: 'Zakharya Rakhmanov',
-    phone: '(314) 915-1800',
-    dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #947',
-    vehicleTier: 'standard',
-    zone: 'Chesterfield Valley',
-    schedule: DEFAULT_SCHEDULE,
-  },
-  {
-    id: 'ClUoGzOahXcnsIuNZ3kmP1wJ4aC3',
-    name: 'Michael Vinnik',
-    phone: '(314) 683-0585',
-    dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #982',
-    vehicleTier: 'standard',
-    zone: 'Chesterfield Valley',
-    schedule: DEFAULT_SCHEDULE,
-  },
-  {
-    id: 'xo56ECpoXcT83x6GRyzjzHqA0mc2',
-    name: 'Wagnehu Mekonnen',
-    phone: '(314) 224-0008',
-    dutyStatus: 'on_duty',
-    vehicleUnit: 'Cab #47',
-    vehicleTier: 'standard',
-    zone: 'Chesterfield Valley',
-    schedule: DEFAULT_SCHEDULE,
-  },
-];
-
+// Kept empty in client bundles so production driver UIDs/phones are never shipped in JS
+export const DEFAULT_DRIVERS: DriverProfile[] = [];
 
 export class DriverService {
-  private activeDriverId: string = 'Cc5jehhcxuWxUx7Z3WyXNBXZjCy1';
+  private activeDriverId: string = '';
   private driverListeners = new Set<(driver: DriverProfile) => void>();
 
   constructor() {
@@ -93,50 +59,67 @@ export class DriverService {
     this.activeDriverId = driverId;
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('chesterfield_current_driver_id', driverId);
+        if (driverId) {
+          localStorage.setItem('chesterfield_current_driver_id', driverId);
+        } else {
+          localStorage.removeItem('chesterfield_current_driver_id');
+        }
       } catch {}
     }
   }
 
   public async getDriverProfile(driverId?: string): Promise<DriverProfile> {
-    const id = driverId || this.activeDriverId;
-    
-    // Check Firestore if configured
+    const id = (driverId || this.activeDriverId || '').trim();
+    if (!id) {
+      throw new Error('No authenticated driver ID is bound.');
+    }
+
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestoreDb();
         const ref = doc(db, 'drivers', id);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          return snap.data() as DriverProfile;
+          const data = snap.data() as DriverProfile;
+          return {
+            ...data,
+            id,
+            schedule: data.schedule || DEFAULT_SCHEDULE,
+          };
         }
 
-        // Check if driver is in users collection (Admin Operator)
+        // Hydrate from `/users/{id}` if driver profile hasn't been initialized yet
         const userRef = doc(db, 'users', id);
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const uData = userSnap.data();
           const firstName = uData.firstName || (uData.displayName ? uData.displayName.split(' ')[0] : '');
           const lastName = uData.lastName || (uData.displayName ? uData.displayName.split(' ').slice(1).join(' ') : '');
-          const cabNumber = uData.cabNumber || (uData.assignedUnit ? (uData.assignedUnit.match(/#?(\d+)/)?.[1] || uData.assignedUnit) : '');
+          const cabNumber =
+            uData.cabNumber ||
+            (uData.assignedUnit ? uData.assignedUnit.match(/#?(\d+)/)?.[1] || uData.assignedUnit : '');
           const username = uData.username || '';
 
           return {
             id,
-            name: uData.displayName || uData.name || id,
+            name: uData.displayName || uData.name || uData.email?.split('@')[0] || 'Driver',
             firstName,
             lastName,
+            email: uData.email,
             cabNumber,
             username,
-            phone: uData.phone || '(314) 738-0100',
-            dutyStatus: (uData.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
-            vehicleUnit: uData.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : 'Unassigned'),
-            vehicleTier: 'standard',
+            phone: uData.phone || '',
+            dutyStatus: (uData.status === 'suspended' ? 'off_duty' : 'off_duty') as DriverDutyStatus,
+            vehicleUnit: uData.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : ''),
+            vehicleTier: uData.vehicleTier || 'standard',
+            commissionRate:
+              typeof uData.commissionRate === 'number' ? uData.commissionRate : undefined,
             zone: uData.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
             schedule: DEFAULT_SCHEDULE,
             driverScore: uData.driverScore || 95,
             isBlacklisted: Boolean(uData.isBlacklisted),
             isArchived: Boolean(uData.isArchived),
+            blacklistReason: uData.blacklistReason,
           };
         }
       } catch (e) {
@@ -152,17 +135,19 @@ export class DriverService {
         name: op.displayName || op.email.split('@')[0],
         firstName: op.firstName,
         lastName: op.lastName,
+        email: op.email,
         cabNumber: op.cabNumber,
         username: op.username,
-        phone: op.phone || '(314) 738-0100',
+        phone: op.phone || '',
         dutyStatus: (op.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
-        vehicleUnit: op.assignedUnit || (op.cabNumber ? `Cab #${op.cabNumber}` : 'Unassigned'),
+        vehicleUnit: op.assignedUnit || (op.cabNumber ? `Cab #${op.cabNumber}` : ''),
         vehicleTier: 'standard',
         zone: op.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
         schedule: DEFAULT_SCHEDULE,
         driverScore: op.driverScore || 95,
         isBlacklisted: Boolean(op.isBlacklisted),
         isArchived: Boolean(op.isArchived),
+        blacklistReason: op.blacklistReason,
       };
     }
 
@@ -174,17 +159,16 @@ export class DriverService {
       } catch {}
     }
 
-    const defaultProfile = DEFAULT_DRIVERS.find((d) => d.id === id) || {
+    return {
       id,
-      name: 'Driver ' + id,
-      phone: '(314) 738-0100',
-      dutyStatus: 'on_duty' as DriverDutyStatus,
-      vehicleUnit: 'Cab #204',
+      name: 'Driver',
+      phone: '',
+      dutyStatus: 'off_duty',
+      vehicleUnit: '',
       vehicleTier: 'standard',
-      zone: 'Chesterfield',
+      zone: 'Chesterfield Valley',
+      schedule: DEFAULT_SCHEDULE,
     };
-
-    return defaultProfile;
   }
 
   public async setDutyStatus(status: DriverDutyStatus, driverId?: string): Promise<DriverProfile> {
@@ -220,26 +204,22 @@ export class DriverService {
         localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + id, JSON.stringify(updated));
       } catch {}
     }
-    
-    // Shift Tracking Logic
+
+    // Cross-device Firestore shift tracking (prevents duplicate shifts on on_break -> on_duty)
     try {
       const { getVehicleAssignmentService } = await import('./fleet/vehicle-assignment.service');
       const assignmentService = getVehicleAssignmentService();
-      
-      // If toggling off_duty, end active shift if any is stored locally (simplified for now)
+
       if (status === 'off_duty') {
-        const activeShiftId = typeof window !== 'undefined' ? localStorage.getItem('active_shift_id_' + id) : null;
-        if (activeShiftId) {
-          await assignmentService.endShift(activeShiftId);
-          if (typeof window !== 'undefined') localStorage.removeItem('active_shift_id_' + id);
-        }
+        await assignmentService.endAllActiveShiftsForDriver(id);
+        if (typeof window !== 'undefined') localStorage.removeItem('active_shift_id_' + id);
       } else if (status === 'on_duty' && updated.vehicleUnit) {
-         // Generate a mock vehicle ID for now, since we only have unit number string
-         const shift = await assignmentService.startShift(id, 'veh-' + updated.vehicleUnit.replace(/\D/g, ''), updated.vehicleUnit);
-         if (typeof window !== 'undefined') localStorage.setItem('active_shift_id_' + id, shift.id);
+        const vehId = updated.vehicleId || `unit-${updated.vehicleUnit.replace(/\D/g, '') || id}`;
+        const shift = await assignmentService.startShift(id, vehId, updated.vehicleUnit);
+        if (typeof window !== 'undefined') localStorage.setItem('active_shift_id_' + id, shift.id);
       }
     } catch (err) {
-      console.warn('Failed to update vehicle assignment shift', err);
+      console.warn('[DriverService] Shift tracking sync warning:', err);
     }
 
     this.notifyDriverListeners(updated);
@@ -254,16 +234,37 @@ export class DriverService {
     return updated;
   }
 
-  public async setVehicleUnit(vehicleUnit: string, vehicleId?: string, driverId?: string): Promise<DriverProfile> {
+  public async setVehicleUnit(
+    vehicleUnit: string,
+    vehicleId?: string,
+    driverId?: string,
+    vehicleMeta?: {
+      vehicleTier?: string;
+      vehicleMake?: string;
+      vehicleModel?: string;
+      vehicleColor?: string;
+      licensePlate?: string;
+    }
+  ): Promise<DriverProfile> {
     const id = driverId || this.activeDriverId;
     const current = await this.getDriverProfile(id);
     if (current.isBlacklisted || current.isArchived) {
-      throw new Error(`Vehicle selection rejected: Driver profile is ${current.isBlacklisted ? 'blacklisted' : 'archived'}`);
+      throw new Error(
+        `Vehicle selection rejected: Driver profile is ${current.isBlacklisted ? 'blacklisted' : 'archived'}`
+      );
     }
 
+    const cabDigits = vehicleUnit.match(/#?(\d+)/)?.[1] || current.cabNumber;
     const updated: DriverProfile = {
       ...current,
       vehicleUnit,
+      cabNumber: cabDigits,
+      vehicleId: vehicleId || current.vehicleId,
+      vehicleTier: vehicleMeta?.vehicleTier || current.vehicleTier,
+      vehicleMake: vehicleMeta?.vehicleMake ?? current.vehicleMake,
+      vehicleModel: vehicleMeta?.vehicleModel ?? current.vehicleModel,
+      vehicleColor: vehicleMeta?.vehicleColor ?? current.vehicleColor,
+      licensePlate: vehicleMeta?.licensePlate ?? current.licensePlate,
       lastActiveAt: new Date().toISOString(),
     };
 
@@ -283,19 +284,15 @@ export class DriverService {
       } catch {}
     }
 
-    if (current.dutyStatus === 'on_duty') {
+    if (current.dutyStatus === 'on_duty' || current.dutyStatus === 'on_break') {
       try {
         const { getVehicleAssignmentService } = await import('./fleet/vehicle-assignment.service');
         const assignmentService = getVehicleAssignmentService();
-        const activeShiftId = typeof window !== 'undefined' ? localStorage.getItem('active_shift_id_' + id) : null;
-        if (activeShiftId) {
-          await assignmentService.endShift(activeShiftId);
-        }
-        const vehId = vehicleId || ('veh-' + vehicleUnit.replace(/\D/g, ''));
+        const vehId = vehicleId || `unit-${vehicleUnit.replace(/\D/g, '') || id}`;
         const shift = await assignmentService.startShift(id, vehId, vehicleUnit);
         if (typeof window !== 'undefined') localStorage.setItem('active_shift_id_' + id, shift.id);
       } catch (e) {
-        console.warn('[DriverService] Error updating active shift for new vehicle:', e);
+        console.warn('[DriverService] Error rotating active shift for new vehicle:', e);
       }
     }
 
@@ -332,19 +329,27 @@ export class DriverService {
     return updated;
   }
 
-
   public subscribeToDriver(driverId: string, onUpdate: (driver: DriverProfile) => void): () => void {
+    if (!driverId) return () => {};
+
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestoreDb();
         const ref = doc(db, 'drivers', driverId);
-        const unsub = onSnapshot(ref, (snap) => {
-          if (snap.exists()) {
-            onUpdate(snap.data() as DriverProfile);
-          } else {
-            this.getDriverProfile(driverId).then(onUpdate);
+        const unsub = onSnapshot(
+          ref,
+          (snap) => {
+            if (snap.exists()) {
+              onUpdate({ ...(snap.data() as DriverProfile), id: driverId });
+            } else {
+              this.getDriverProfile(driverId).then(onUpdate).catch(() => {});
+            }
+          },
+          (err) => {
+            console.warn('[DriverService] Snapshot error, loading profile fallback:', err);
+            this.getDriverProfile(driverId).then(onUpdate).catch(() => {});
           }
-        });
+        );
         return unsub;
       } catch (e) {
         console.warn('[DriverService] Snapshot subscribe failed, using local fallback:', e);
@@ -352,7 +357,7 @@ export class DriverService {
     }
 
     this.driverListeners.add(onUpdate);
-    this.getDriverProfile(driverId).then(onUpdate);
+    this.getDriverProfile(driverId).then(onUpdate).catch(() => {});
 
     return () => {
       this.driverListeners.delete(onUpdate);
@@ -367,6 +372,28 @@ export class DriverService {
         console.error('[DriverService] Driver listener notification failed:', err);
       }
     }
+  }
+
+  /**
+   * Atomically accept a broadcast/offered ride.
+   */
+  public async acceptOffer(tripId: string, driverId: string): Promise<Trip> {
+    const bookingService = getBookingService();
+    if (bookingService.acceptDriverOffer) {
+      return await bookingService.acceptDriverOffer(tripId, driverId);
+    }
+    return await this.transitionTrip(tripId, 'assigned', driverId, 'Driver accepted offer');
+  }
+
+  /**
+   * Atomically decline an offered ride without assigning the declining driver.
+   */
+  public async declineOffer(tripId: string, driverId: string, reason?: string): Promise<Trip> {
+    const bookingService = getBookingService();
+    if (bookingService.declineDriverOffer) {
+      return await bookingService.declineDriverOffer(tripId, driverId, reason);
+    }
+    throw new Error('Booking service does not support offer declines.');
   }
 
   /**
@@ -386,55 +413,51 @@ export class DriverService {
     const updated = await bookingService.updateTripStatus(tripId, targetStatus, {
       actorRole: 'driver',
       assignedDriverId: driverId,
-      reason: reason || ('Driver transitioned trip to ' + targetStatus),
+      reason: reason || 'Driver transitioned trip to ' + targetStatus,
     });
-    
-    // Update driver score if completed
+
     if (targetStatus === 'completed') {
       try {
         const driverProfile = await this.getDriverProfile(driverId);
         const prevRatio = driverProfile.completionRatio || 100;
-        const newRatio = Math.min(100, prevRatio + 0.1); // Mock increment
-        
+        const newRatio = Math.min(100, Number((prevRatio + 0.1).toFixed(1)));
         await this.updateDriverScore(driverId, { completionRatio: newRatio });
-      } catch(err) {
+      } catch (err) {
         console.warn('Failed to update driver score', err);
       }
     }
 
     return updated;
   }
-  
+
   public async updateDriverScore(driverId: string, scores: Partial<DriverProfile>): Promise<DriverProfile> {
-     const current = await this.getDriverProfile(driverId);
-     const updated = { ...current, ...scores };
-     
-     if (isFirebaseConfigured()) {
-       try {
-         const db = getFirestoreDb();
-         const ref = doc(db, 'drivers', driverId);
-         await setDoc(ref, sanitizePayload(updated), { merge: true });
-       } catch (e) {
-         console.warn('[DriverService] Error updating driver score:', e);
-       }
-     }
-     
-     if (typeof window !== 'undefined') {
-       try {
-         localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + driverId, JSON.stringify(updated));
-       } catch {}
-     }
-     this.notifyDriverListeners(updated);
-     return updated;
+    const current = await this.getDriverProfile(driverId);
+    const updated = { ...current, ...scores };
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const ref = doc(db, 'drivers', driverId);
+        await setDoc(ref, sanitizePayload(updated), { merge: true });
+      } catch (e) {
+        console.warn('[DriverService] Error updating driver score:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(DRIVERS_STORAGE_KEY + '_' + driverId, JSON.stringify(updated));
+      } catch {}
+    }
+    this.notifyDriverListeners(updated);
+    return updated;
   }
 
   /**
-   * Append an on-the-fly extra fee (toll, parking, luggage, cleaning) during in_progress
+   * Append an in-cab extra fee (toll, parking, luggage, cleaning, custom) and
+   * atomically sync `pricing.breakdown[]` so `sum(breakdown[].amount) === totalFare`.
    */
-  public async addMeterExtra(
-    tripId: string,
-    extra: DriverMeterExtra
-  ): Promise<Trip> {
+  public async addMeterExtra(tripId: string, extra: DriverMeterExtra): Promise<Trip> {
     const bookingService = getBookingService();
     const currentStatusRes = await bookingService.getBookingStatus(tripId);
     if (!currentStatusRes || !currentStatusRes.trip) {
@@ -442,26 +465,60 @@ export class DriverService {
     }
 
     const trip = currentStatusRes.trip;
+    const cleanAmount = Number(Number(extra.amount || 0).toFixed(2));
+    if (!Number.isFinite(cleanAmount) || cleanAmount <= 0) {
+      throw new Error('Extra fee amount must be greater than $0.00.');
+    }
+
+    const cleanExtra: DriverMeterExtra = {
+      ...extra,
+      name: extra.name.trim() || 'In-Cab Extra',
+      amount: cleanAmount,
+    };
+
     const currentExtras = trip.pricing.driverExtras || [];
-    const updatedExtras = [...currentExtras, extra];
+    const updatedExtras = [...currentExtras, cleanExtra];
     const driverExtrasTotal = Number(
       updatedExtras.reduce((sum, item) => sum + item.amount, 0).toFixed(2)
     );
 
-    // Recalculate total fare
-    const baseTotal = trip.pricing.totalFare - (trip.pricing.driverExtrasTotal || 0);
-    const newTotalFare = Number((baseTotal + driverExtrasTotal).toFixed(2));
+    const baseTotalWithoutDriverExtras = Number(
+      (trip.pricing.totalFare - (trip.pricing.driverExtrasTotal || 0)).toFixed(2)
+    );
+    const newTotalFare = Number((baseTotalWithoutDriverExtras + driverExtrasTotal).toFixed(2));
+
+    // Preserve canonical breakdown invariant
+    const existingBreakdown: PriceLineItem[] = Array.isArray(trip.pricing.breakdown) && trip.pricing.breakdown.length > 0
+      ? [...trip.pricing.breakdown]
+      : [
+          {
+            id: 'base-quoted-fare',
+            label: 'Base Fare',
+            amount: baseTotalWithoutDriverExtras,
+            category: 'base',
+          },
+        ];
+
+    const extraLineItem: PriceLineItem = {
+      id: `driver-extra-${cleanExtra.id}`,
+      label: cleanExtra.name,
+      amount: cleanExtra.amount,
+      category: cleanExtra.category === 'toll' ? 'surcharge' : 'extra',
+      detail: cleanExtra.category === 'toll' ? 'In-Cab Toll' : `In-Cab ${cleanExtra.category}`,
+    };
 
     const updatedPricing = {
       ...trip.pricing,
       driverExtras: updatedExtras,
       driverExtrasTotal,
       totalFare: newTotalFare,
+      breakdown: [...existingBreakdown, extraLineItem],
     };
 
     if (bookingService.updateTrip) {
       return await bookingService.updateTrip(tripId, {
         pricing: updatedPricing,
+        meterExtras: updatedExtras,
       });
     }
 
@@ -469,13 +526,15 @@ export class DriverService {
   }
 
   /**
-   * Update live taximeter distance, time, and calculated fare
+   * Persist live taximeter metrics on a metered trip while preserving pre-booked extras,
+   * surcharges, discounts, and canonical `pricing.breakdown[]`.
    */
   public async updateLiveMeter(
     tripId: string,
     meterDistanceMiles: number,
     meterDurationMinutes: number,
-    meterCalculatedFare: number
+    meterCalculatedFare: number,
+    options?: { lockQuotedFare?: boolean }
   ): Promise<Trip> {
     const bookingService = getBookingService();
     const currentStatusRes = await bookingService.getBookingStatus(tripId);
@@ -484,15 +543,58 @@ export class DriverService {
     }
 
     const trip = currentStatusRes.trip;
-    const extrasTotal = trip.pricing.driverExtrasTotal || 0;
-    const finalFare = Number((meterCalculatedFare + extrasTotal).toFixed(2));
+    const driverExtrasTotal = trip.pricing.driverExtrasTotal || 0;
+
+    // Decision #2: For upfront quoted / flat-corridor trips, never overwrite the locked quoted fare
+    if (options?.lockQuotedFare) {
+      const updatedPricing = {
+        ...trip.pricing,
+        meterDistanceMiles,
+        meterDurationMinutes,
+      };
+      if (bookingService.updateTrip) {
+        return await bookingService.updateTrip(tripId, { pricing: updatedPricing });
+      }
+      return trip;
+    }
+
+    // Metered trip: keep non-base items (extras/surcharges/discounts/driver extras) intact
+    const existingBreakdown = Array.isArray(trip.pricing.breakdown) ? trip.pricing.breakdown : [];
+    const preservedNonBaseItems = existingBreakdown.filter(
+      (item) => item.category !== 'base' && item.category !== 'rounding'
+    );
+    const preservedNonBaseSum = Number(
+      preservedNonBaseItems.reduce((sum, i) => sum + i.amount, 0).toFixed(2)
+    );
+
+    const hasDriverExtrasInBreakdown = preservedNonBaseItems.some((i) =>
+      i.id.startsWith('driver-extra-')
+    );
+    const unrepresentedDriverExtras = hasDriverExtrasInBreakdown ? 0 : driverExtrasTotal;
+
+    const cleanMeterFare = Number(meterCalculatedFare.toFixed(2));
+    const finalFare = Number(
+      Math.max(0, cleanMeterFare + preservedNonBaseSum + unrepresentedDriverExtras).toFixed(2)
+    );
+
+    const updatedBreakdown: PriceLineItem[] = [
+      {
+        id: 'metered-base-fare',
+        label: 'Base Fare',
+        amount: cleanMeterFare,
+        category: 'base',
+        detail: `${meterDistanceMiles.toFixed(2)} mi · ${meterDurationMinutes.toFixed(1)} min`,
+      },
+      ...preservedNonBaseItems,
+    ];
 
     const updatedPricing = {
       ...trip.pricing,
       meterDistanceMiles,
       meterDurationMinutes,
-      meterCalculatedFare,
+      meterCalculatedFare: cleanMeterFare,
       totalFare: finalFare,
+      breakdown: updatedBreakdown,
     };
 
     if (bookingService.updateTrip) {
@@ -563,7 +665,6 @@ export class DriverService {
       return map;
     };
 
-    // Emit initial local cache immediately for instant render
     callback(readLocalMap());
 
     if (!isFirebaseConfigured()) {

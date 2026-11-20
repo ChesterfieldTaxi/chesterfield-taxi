@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getWorkspaceBus, type UpcomingBookingPreview } from '../../../core/services/workspace-bus.service';
+import { authorizedFetch } from '../../../core/services/auth/auth-headers';
 import {
   matchPassengerByPhone,
   resolvePrimarySmsPhone,
@@ -643,7 +644,7 @@ export function CommsHub({
       const twilioToken = creds.authToken;
       const twilioPhone = creds.phoneNumber || '+13142281454';
 
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -726,7 +727,7 @@ export function CommsHub({
 
       try {
         if (isMounted) setSoftphoneStatus('initializing');
-        const tokenResp = await fetch('/api/telephony', {
+        const tokenResp = await authorizedFetch('/api/telephony', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1790,7 +1791,7 @@ export function CommsHub({
         });
       }
 
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1871,7 +1872,7 @@ export function CommsHub({
     if (activeCallSid) {
       try {
         const creds = getClientTelephonyCredentials();
-        fetch('/api/telephony', {
+        authorizedFetch('/api/telephony', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1936,7 +1937,7 @@ export function CommsHub({
     const interval = setInterval(async () => {
       try {
         const creds = getClientTelephonyCredentials();
-        const resp = await fetch('/api/telephony', {
+        const resp = await authorizedFetch('/api/telephony', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2014,7 +2015,7 @@ export function CommsHub({
       const twilioToken = creds.authToken;
       const twilioPhone = creds.phoneNumber || '+13142281454';
 
-      const res = await fetch('/api/telephony', {
+      const res = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2198,7 +2199,7 @@ export function CommsHub({
       const twilioToken = creds.authToken;
       const twilioPhone = creds.phoneNumber || '+13142281454';
 
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

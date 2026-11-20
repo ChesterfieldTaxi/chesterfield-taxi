@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
+import { getFirebaseAuthHeaders } from '../../../core/services/auth/auth-headers';
 import { escapeHtml } from '../../../core/services/email/email-templates';
 import {
   MailIcon,
@@ -243,15 +244,23 @@ export function EmailDock({
       : `Re: ${selectedEmail.subject}`;
     const safeBody = escapeHtml(replyText).replace(/\n/g, '<br/>');
     try {
+      const html = `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`;
+      const authHeaders = await getFirebaseAuthHeaders();
       const res = await fetch('/api/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           type: 'direct',
           recipient: selectedEmail.fromEmail,
           subject,
           text: replyText,
-          html: `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`,
+          html,
+          payload: {
+            recipient: selectedEmail.fromEmail,
+            subject,
+            text: replyText,
+            html,
+          },
         }),
       });
       const result = await res.json().catch(() => ({ success: false, error: 'Email dispatch failed' }));
@@ -289,15 +298,25 @@ export function EmailDock({
     }
     const safeBody = escapeHtml(composeBody).replace(/\n/g, '<br/>');
     try {
+      const recipient = composeTo.trim();
+      const subject = composeSubject.trim();
+      const html = `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`;
+      const authHeaders = await getFirebaseAuthHeaders();
       const res = await fetch('/api/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           type: 'direct',
-          recipient: composeTo.trim(),
-          subject: composeSubject.trim(),
+          recipient,
+          subject,
           text: composeBody,
-          html: `<div style="font-family:sans-serif;font-size:14px;color:#0f172a;line-height:1.5;">${safeBody}</div>`,
+          html,
+          payload: {
+            recipient,
+            subject,
+            text: composeBody,
+            html,
+          },
         }),
       });
       const result = await res.json().catch(() => ({ success: false, error: 'Email dispatch failed' }));

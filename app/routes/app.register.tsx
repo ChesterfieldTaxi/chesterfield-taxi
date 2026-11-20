@@ -22,42 +22,52 @@ export default function UnifiedAppRegisterRoute() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(() => searchParams.get('email') || '');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(() => searchParams.get('name') || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
+  const isClaimingRef = React.useRef(false);
 
   const claimTripId = searchParams.get('claimTrip');
   const rawRedirect = searchParams.get('redirect');
-
-  useEffect(() => {
-    setIsConfigured(isFirebaseConfigured());
-    const authService = getAdminAuthService();
-    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
-      if (currentUser) {
-        const dest = resolvePostAuthDestination(currentUser, { rawRedirect });
-        navigate(dest, { replace: true });
-      }
-    });
-    return unsubscribe;
-  }, [navigate, rawRedirect]);
 
   const claimGuestTripIfPresent = async (uid: string) => {
     if (!claimTripId || !uid) return;
     try {
       const bookingService = getBookingService();
       if (bookingService.updateTrip) {
-        await bookingService.updateTrip(claimTripId, { customerId: uid } as any);
+        await bookingService.updateTrip(claimTripId.toUpperCase(), {
+          customerId: uid,
+          userId: uid,
+        } as any);
       }
     } catch (err) {
       console.warn('[UnifiedAppRegisterRoute] Could not link guest trip to new user:', err);
     }
   };
 
+  useEffect(() => {
+    setIsConfigured(isFirebaseConfigured());
+    const authService = getAdminAuthService();
+    const unsubscribe = authService.onAuthStateChanged(async (currentUser) => {
+      if (currentUser && !isClaimingRef.current) {
+        if (claimTripId) {
+          isClaimingRef.current = true;
+          await claimGuestTripIfPresent(currentUser.uid);
+          isClaimingRef.current = false;
+        }
+        const dest = resolvePostAuthDestination(currentUser, { rawRedirect });
+        navigate(dest, { replace: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigate, rawRedirect, claimTripId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       const authService = getAdminAuthService();
       const user = await authService.registerWithEmail(email, password, 'customer', displayName);
@@ -77,6 +87,7 @@ export default function UnifiedAppRegisterRoute() {
         setError('Registration failed. Please try again.');
       }
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -84,6 +95,7 @@ export default function UnifiedAppRegisterRoute() {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       const user = await getAdminAuthService().signInWithGoogle('customer');
       await claimGuestTripIfPresent(user.uid);
@@ -92,6 +104,7 @@ export default function UnifiedAppRegisterRoute() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Google sign-up failed.');
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -99,6 +112,7 @@ export default function UnifiedAppRegisterRoute() {
   const handleFacebookSignIn = async () => {
     try {
       setIsLoading(true);
+      isClaimingRef.current = true;
       setError(null);
       const user = await getAdminAuthService().signInWithFacebook('customer');
       await claimGuestTripIfPresent(user.uid);
@@ -107,6 +121,7 @@ export default function UnifiedAppRegisterRoute() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Facebook sign-up failed.');
     } finally {
+      isClaimingRef.current = false;
       setIsLoading(false);
     }
   };

@@ -149,6 +149,38 @@ export interface IBookingService {
   ): () => void;
 
   /**
+   * Scoped driver real-time stream: merges trips assigned to `driverId` and offers
+   * containing `driverId` in `offeredToIds`, satisfying strict Firestore `allow list` rules.
+   */
+  subscribeToDriverTrips?(
+    driverId: string,
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void;
+
+  /**
+   * Scoped passenger real-time stream: merges trips matching `customerId`, `userId`,
+   * or authenticated `passenger.email`, satisfying strict Firestore `allow list` rules.
+   */
+  subscribeToPassengerTrips?(
+    identity: { uid?: string; email?: string; phone?: string },
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void;
+
+  /**
+   * Atomically claims an offered trip for `driverId` using a Firestore transaction
+   * (prevents multi-driver race/hijack and clears `offeredToIds`).
+   */
+  acceptDriverOffer?(tripId: string, driverId: string): Promise<Trip>;
+
+  /**
+   * Atomically declines an offered trip for `driverId`, appending to `rejectedByIds`
+   * and removing from `offeredToIds` without assigning the declining driver.
+   */
+  declineDriverOffer?(tripId: string, driverId: string, reason?: string): Promise<Trip>;
+
+  /**
    * Transitions a trip through the state machine (e.g., admin dispatch assignment or completion).
    */
   updateTripStatus?(

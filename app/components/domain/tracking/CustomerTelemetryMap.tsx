@@ -1,84 +1,199 @@
-import React, { useEffect, useRef, useState } from 'react';
-import type { Trip } from '../../../core/types/trip';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import type { GeoPoint, Trip, TripStatus, DriverTelemetryPing } from '../../../core/types/trip';
+import type { VehicleTierConfig } from '../../../core/types/config';
+import type { PublicTripTrackingProjection } from '../../../core/utils/tracking-token.util';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps/google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import { buildFleetCarMarkerDataUrl } from '../dispatch/LiveFleetMap';
-import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon } from '../../ui/Icons';
+import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon, ClockIcon } from '../../ui/Icons';
 
-interface CustomerTelemetryMapProps {
-  trip: Trip;
+export interface CustomerTelemetryMapProps {
+  trip?: Trip | null;
+  tracking?: PublicTripTrackingProjection | null;
+  adminVehicles?: VehicleTierConfig[];
   className?: string;
 }
 
-export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetryMapProps) {
+const STALE_GPS_MS = 90_000;
+
+function haversineMiles(a: GeoPoint, b: GeoPoint): number {
+  const R = 3958.8;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function isValidCoord(c?: GeoPoint | null): c is GeoPoint {
+  return Boolean(
+    c &&
+      typeof c.lat === 'number' &&
+      typeof c.lng === 'number' &&
+      Number.isFinite(c.lat) &&
+      Number.isFinite(c.lng) &&
+      !(c.lat === 0 && c.lng === 0)
+  );
+}
+
+export function CustomerTelemetryMap({
+  trip,
+  tracking,
+  adminVehicles,
+  className = '',
+}: CustomerTelemetryMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerPickupRef = useRef<google.maps.Marker | null>(null);
   const markerDropoffRef = useRef<google.maps.Marker | null>(null);
   const markerVehicleRef = useRef<google.maps.Marker | null>(null);
-  const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const stopMarkersRef = useRef<google.maps.Marker[]>([]);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
+  const fallbackPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const lastRouteRequestMsRef = useRef<number>(0);
+  const lastRouteKeyRef = useRef<string>('');
+  const hasFitBoundsRef = useRef<boolean>(false);
+
   const [mapsLoaded, setMapsLoaded] = useState<boolean>(false);
+  const [liveEtaText, setLiveEtaText] = useState<string | null>(null);
+  const [liveDistanceText, setLiveDistanceText] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
-  const pickupCoord = trip.pickupLocation?.coordinates || {
-    lat: CHESTERFIELD_CENTER.lat - 0.015,
-    lng: CHESTERFIELD_CENTER.lng - 0.02,
-  };
+  // Tick every 15s to evaluate GPS freshness accurately
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, []);
 
-  const dropoffCoord = trip.dropoffLocation?.coordinates || {
-    lat: CHESTERFIELD_CENTER.lat + 0.025,
-    lng: CHESTERFIELD_CENTER.lng + 0.035,
-  };
+  // Unified normalized view over either full Trip or zero-PII PublicTripTrackingProjection
+  const normalized = useMemo(() => {
+    if (trip) {
+      const meta = (trip.metadata || {}) as Record<string, any>;
+      const telemetry: DriverTelemetryPing | undefined =
+        trip.driverTelemetry?.coordinates
+          ? trip.driverTelemetry
+          : trip.currentLocation?.coordinates
+          ? trip.currentLocation
+          : undefined;
+
+      const rawDriverName =
+        (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName) ||
+        (typeof meta.driverName === 'string' && meta.driverName) ||
+        '';
+      const driverFirstName = rawDriverName ? rawDriverName.trim().split(/\s+/)[0] : undefined;
+
+      const vehicleDisplayName =
+        (typeof meta.vehicleDisplayName === 'string' && meta.vehicleDisplayName.trim()) ||
+        formatVehicleTierDisplay(trip.vehicleTier, adminVehicles);
+
+      return {
+        tripId: trip.id,
+        status: trip.status as TripStatus,
+        hasAssignedDriver: Boolean(trip.assignedDriverId),
+        driverFirstName,
+        pickupAddress: trip.pickupLocation?.address || 'Pickup Location',
+        dropoffAddress: trip.dropoffLocation?.address || 'Destination',
+        pickupCoord: isValidCoord(trip.pickupLocation?.coordinates)
+          ? trip.pickupLocation.coordinates
+          : null,
+        dropoffCoord: isValidCoord(trip.dropoffLocation?.coordinates)
+          ? trip.dropoffLocation.coordinates
+          : null,
+        stops: (trip.intermediateStops || [])
+          .filter((s) => isValidCoord(s.coordinates))
+          .map((s) => ({ address: s.address, coordinates: s.coordinates! })),
+        telemetry,
+        assignedUnit:
+          trip.assignedVehicle?.vehicleNumber ||
+          (meta.vehicleUnit ? String(meta.vehicleUnit) : undefined),
+        assignedModel: trip.assignedVehicle?.model || vehicleDisplayName,
+        licensePlate: trip.assignedVehicle?.licensePlate || '',
+        proxyPhone: trip.proxyNumber || COMPANY_CONFIG.phone.primaryRaw,
+        updatedAt: trip.updatedAt || trip.createdAt,
+      };
+    }
+
+    if (tracking) {
+      const vehicleDisplayName =
+        tracking.vehicleDisplayName || formatVehicleTierDisplay(tracking.vehicleTier, adminVehicles);
+      return {
+        tripId: tracking.tripId,
+        status: tracking.status as TripStatus,
+        hasAssignedDriver: Boolean(
+          tracking.assignedDriverFirstName ||
+            tracking.assignedVehicle ||
+            ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(tracking.status)
+        ),
+        driverFirstName: tracking.assignedDriverFirstName,
+        pickupAddress: tracking.pickupDisplay || 'Pickup Location',
+        dropoffAddress: tracking.dropoffDisplay || 'Destination',
+        pickupCoord: isValidCoord(tracking.pickupCoordinates) ? tracking.pickupCoordinates : null,
+        dropoffCoord: isValidCoord(tracking.dropoffCoordinates) ? tracking.dropoffCoordinates : null,
+        stops: (tracking.intermediateStops || [])
+          .filter((s) => isValidCoord(s.coordinates))
+          .map((s) => ({ address: s.display, coordinates: s.coordinates! })),
+        telemetry: tracking.driverTelemetry,
+        assignedUnit: tracking.assignedVehicle?.vehicleNumber,
+        assignedModel: tracking.assignedVehicle?.model || vehicleDisplayName,
+        licensePlate: tracking.assignedVehicle?.licensePlate || '',
+        proxyPhone: tracking.proxyPhone || COMPANY_CONFIG.phone.primaryRaw,
+        updatedAt: tracking.updatedAt,
+      };
+    }
+
+    return null;
+  }, [trip, tracking, adminVehicles]);
+
+  if (!normalized) return null;
 
   const hasLiveGps = Boolean(
-    (trip.driverTelemetry?.coordinates?.lat && trip.driverTelemetry?.coordinates?.lng) ||
-    (trip.currentLocation?.coordinates?.lat && trip.currentLocation?.coordinates?.lng)
+    normalized.hasAssignedDriver && isValidCoord(normalized.telemetry?.coordinates)
+  );
+  const liveVehicleCoord = hasLiveGps ? normalized.telemetry!.coordinates : null;
+  const gpsTimestampMs = normalized.telemetry?.timestamp
+    ? Date.parse(normalized.telemetry.timestamp)
+    : 0;
+  const isGpsStale = Boolean(
+    hasLiveGps &&
+      (normalized.telemetry?.isOfflineBuffer ||
+        (gpsTimestampMs > 0 && nowMs - gpsTimestampMs > STALE_GPS_MS))
   );
 
-  // Calculate vehicle coordinates: Prefer live GPS telemetry if broadcasted, fallback to status waypoint
-  const getVehicleCoordinates = () => {
-    if (trip.driverTelemetry?.coordinates?.lat && trip.driverTelemetry?.coordinates?.lng) {
-      return trip.driverTelemetry.coordinates;
-    }
-    if (trip.currentLocation?.coordinates?.lat && trip.currentLocation?.coordinates?.lng) {
-      return trip.currentLocation.coordinates;
-    }
-
-    if (trip.status === 'en_route') {
-      return {
-        lat: pickupCoord.lat - 0.008,
-        lng: pickupCoord.lng - 0.006,
-      };
-    } else if (trip.status === 'arrived') {
-      return { lat: pickupCoord.lat, lng: pickupCoord.lng };
-    } else if (trip.status === 'in_progress') {
-      return {
-        lat: pickupCoord.lat + (dropoffCoord.lat - pickupCoord.lat) * 0.5,
-        lng: pickupCoord.lng + (dropoffCoord.lng - pickupCoord.lng) * 0.5,
-      };
-    } else if (trip.status === 'completed') {
-      return { lat: dropoffCoord.lat, lng: dropoffCoord.lng };
-    }
-    return {
-      lat: pickupCoord.lat - 0.005,
-      lng: pickupCoord.lng - 0.005,
-    };
-  };
-
-  const vehicleCoord = getVehicleCoordinates();
-  const vehicleHeading = trip.driverTelemetry?.heading ?? trip.currentLocation?.heading ?? 0;
+  const vehicleHeading = normalized.telemetry?.heading ?? 0;
   const carMapStatus =
-    trip.status === 'arrived' || trip.status === 'in_progress'
+    normalized.status === 'arrived' || normalized.status === 'in_progress'
       ? 'busy'
-      : trip.status === 'en_route'
+      : normalized.status === 'en_route'
       ? 'en_route'
       : 'available';
-  const carShortLabel = (
-    trip.assignedVehicle?.vehicleNumber ||
-    (trip.metadata?.vehicleUnit ? String(trip.metadata.vehicleUnit) : 'CAB')
-  ).replace(/Cab\s*/i, '');
+  const carShortLabel = (normalized.assignedUnit || 'CAB').replace(/Cab\s*/i, '');
 
-  // Initialize Google Maps ONCE with proper cleanup on unmount (no teardown on every GPS ping!)
+  // Fallback Haversine ETA when live GPS exists before DirectionsResult arrives
+  const fallbackEta = useMemo(() => {
+    if (!liveVehicleCoord) return null;
+    const target =
+      normalized.status === 'en_route' || normalized.status === 'assigned' || normalized.status === 'accepted'
+        ? normalized.pickupCoord
+        : normalized.status === 'in_progress'
+        ? normalized.dropoffCoord
+        : null;
+    if (!target) return null;
+    const miles = haversineMiles(liveVehicleCoord, target);
+    const speedMph = Math.max(22, normalized.telemetry?.speedMph || 28);
+    const mins = Math.max(1, Math.round((miles / speedMph) * 60));
+    return {
+      etaText: `${mins} min`,
+      distText: `${miles.toFixed(1)} mi`,
+    };
+  }, [liveVehicleCoord, normalized.status, normalized.pickupCoord, normalized.dropoffCoord, normalized.telemetry?.speedMph]);
+
+  // 1. Initialize Google Map ONCE cleanly (no React children inside mapContainerRef!)
   useEffect(() => {
     let isMounted = true;
     loadGoogleMaps()
@@ -86,53 +201,27 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
         if (!isMounted || !gMaps || !mapContainerRef.current) return;
 
         if (!mapInstanceRef.current) {
+          const initialCenter =
+            liveVehicleCoord || normalized.pickupCoord || normalized.dropoffCoord || CHESTERFIELD_CENTER;
+
           const map = new gMaps.maps.Map(mapContainerRef.current, {
-            center: { lat: vehicleCoord.lat, lng: vehicleCoord.lng },
-            zoom: 13,
+            center: initialCenter,
+            zoom: 12,
             disableDefaultUI: true,
             zoomControl: true,
             mapTypeId: 'roadmap',
           });
           mapInstanceRef.current = map;
-
-          markerPickupRef.current = new gMaps.maps.Marker({
-            position: pickupCoord,
+          directionsServiceRef.current = new gMaps.maps.DirectionsService();
+          directionsRendererRef.current = new gMaps.maps.DirectionsRenderer({
             map,
-            title: 'Pickup: ' + (trip.pickupLocation?.address || 'Pickup'),
-            label: { text: 'P', color: '#ffffff', fontWeight: 'bold' },
-          });
-
-          markerDropoffRef.current = new gMaps.maps.Marker({
-            position: dropoffCoord,
-            map,
-            title: 'Dropoff: ' + (trip.dropoffLocation?.address || 'Dropoff'),
-            label: { text: 'D', color: '#ffffff', fontWeight: 'bold' },
-          });
-
-          markerVehicleRef.current = new gMaps.maps.Marker({
-            position: vehicleCoord,
-            map,
-            title: trip.assignedVehicle?.vehicleNumber || 'Taxi Unit',
-            icon: {
-              url: buildFleetCarMarkerDataUrl({
-                status: carMapStatus,
-                cabLabel: carShortLabel,
-                heading: vehicleHeading,
-              }),
-              scaledSize: new gMaps.maps.Size(50, 59),
-              anchor: new gMaps.maps.Point(25, 22),
+            suppressMarkers: true,
+            preserveViewport: true,
+            polylineOptions: {
+              strokeColor: '#2563eb',
+              strokeOpacity: 0.9,
+              strokeWeight: 5,
             },
-            zIndex: 200,
-            optimized: false,
-          });
-
-          polylineRef.current = new gMaps.maps.Polyline({
-            path: [pickupCoord, vehicleCoord, dropoffCoord],
-            geodesic: true,
-            strokeColor: '#2563eb',
-            strokeOpacity: 0.8,
-            strokeWeight: 4,
-            map,
           });
 
           setMapsLoaded(true);
@@ -144,22 +233,18 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
 
     return () => {
       isMounted = false;
-      if (markerPickupRef.current) {
-        markerPickupRef.current.setMap(null);
-        markerPickupRef.current = null;
-      }
-      if (markerDropoffRef.current) {
-        markerDropoffRef.current.setMap(null);
-        markerDropoffRef.current = null;
-      }
-      if (markerVehicleRef.current) {
-        markerVehicleRef.current.setMap(null);
-        markerVehicleRef.current = null;
-      }
-      if (polylineRef.current) {
-        polylineRef.current.setMap(null);
-        polylineRef.current = null;
-      }
+      markerPickupRef.current?.setMap(null);
+      markerPickupRef.current = null;
+      markerDropoffRef.current?.setMap(null);
+      markerDropoffRef.current = null;
+      markerVehicleRef.current?.setMap(null);
+      markerVehicleRef.current = null;
+      stopMarkersRef.current.forEach((m) => m.setMap(null));
+      stopMarkersRef.current = [];
+      directionsRendererRef.current?.setMap(null);
+      directionsRendererRef.current = null;
+      fallbackPolylineRef.current?.setMap(null);
+      fallbackPolylineRef.current = null;
       if (mapInstanceRef.current && typeof google !== 'undefined' && google?.maps?.event) {
         google.maps.event.clearInstanceListeners(mapInstanceRef.current);
         mapInstanceRef.current = null;
@@ -167,130 +252,327 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
     };
   }, []);
 
-  // Smoothly update markers & rotated car icon on telemetry pings without recreating the map
+  // 2. Sync markers, real road route (DirectionsService), ETA & fitBounds smoothly
   useEffect(() => {
     if (!mapsLoaded || !mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps) {
       return;
     }
-    markerPickupRef.current?.setPosition(pickupCoord);
-    markerDropoffRef.current?.setPosition(dropoffCoord);
-    if (markerVehicleRef.current) {
-      markerVehicleRef.current.setPosition(vehicleCoord);
-      markerVehicleRef.current.setIcon({
+
+    const gMaps = window.google.maps;
+    const map = mapInstanceRef.current;
+
+    // Pickup marker (only when real coordinates exist)
+    if (normalized.pickupCoord) {
+      if (!markerPickupRef.current) {
+        markerPickupRef.current = new gMaps.Marker({
+          position: normalized.pickupCoord,
+          map,
+          title: `Pickup: ${normalized.pickupAddress}`,
+          label: { text: 'P', color: '#ffffff', fontWeight: 'bold' },
+        });
+      } else {
+        markerPickupRef.current.setPosition(normalized.pickupCoord);
+        markerPickupRef.current.setMap(map);
+      }
+    } else if (markerPickupRef.current) {
+      markerPickupRef.current.setMap(null);
+    }
+
+    // Dropoff marker
+    if (normalized.dropoffCoord) {
+      if (!markerDropoffRef.current) {
+        markerDropoffRef.current = new gMaps.Marker({
+          position: normalized.dropoffCoord,
+          map,
+          title: `Destination: ${normalized.dropoffAddress}`,
+          label: { text: 'D', color: '#ffffff', fontWeight: 'bold' },
+        });
+      } else {
+        markerDropoffRef.current.setPosition(normalized.dropoffCoord);
+        markerDropoffRef.current.setMap(map);
+      }
+    } else if (markerDropoffRef.current) {
+      markerDropoffRef.current.setMap(null);
+    }
+
+    // Intermediate Stop markers
+    stopMarkersRef.current.forEach((m) => m.setMap(null));
+    stopMarkersRef.current = normalized.stops.map(
+      (s, i) =>
+        new gMaps.Marker({
+          position: s.coordinates,
+          map,
+          title: `Stop ${i + 1}: ${s.address}`,
+          label: { text: String(i + 1), color: '#ffffff', fontWeight: 'bold' },
+        })
+    );
+
+    // Vehicle Marker — STRICTLY ONLY when assigned driver has real live GPS!
+    if (liveVehicleCoord) {
+      const iconSpec = {
         url: buildFleetCarMarkerDataUrl({
           status: carMapStatus,
           cabLabel: carShortLabel,
           heading: vehicleHeading,
+          isStale: isGpsStale,
         }),
-        scaledSize: new window.google.maps.Size(50, 59),
-        anchor: new window.google.maps.Point(25, 22),
-      });
+        scaledSize: new gMaps.Size(50, 59),
+        anchor: new gMaps.Point(25, 22),
+      };
+
+      if (!markerVehicleRef.current) {
+        markerVehicleRef.current = new gMaps.Marker({
+          position: liveVehicleCoord,
+          map,
+          title: normalized.assignedUnit || 'Assigned Chauffeur',
+          icon: iconSpec,
+          zIndex: 250,
+          optimized: false,
+        });
+      } else {
+        markerVehicleRef.current.setPosition(liveVehicleCoord);
+        markerVehicleRef.current.setIcon(iconSpec);
+        markerVehicleRef.current.setMap(map);
+      }
+    } else if (markerVehicleRef.current) {
+      markerVehicleRef.current.setMap(null);
     }
-    polylineRef.current?.setPath([pickupCoord, vehicleCoord, dropoffCoord]);
+
+    // Auto fitBounds on first paint or status change
+    const boundsPoints: GeoPoint[] = [];
+    if (normalized.pickupCoord) boundsPoints.push(normalized.pickupCoord);
+    if (normalized.dropoffCoord) boundsPoints.push(normalized.dropoffCoord);
+    normalized.stops.forEach((s) => boundsPoints.push(s.coordinates));
+    if (liveVehicleCoord) boundsPoints.push(liveVehicleCoord);
+
+    if (boundsPoints.length >= 2 && !hasFitBoundsRef.current) {
+      const bounds = new gMaps.LatLngBounds();
+      boundsPoints.forEach((pt) => bounds.extend(pt));
+      map.fitBounds(bounds, { top: 76, right: 36, bottom: 36, left: 36 });
+      hasFitBoundsRef.current = true;
+    } else if (boundsPoints.length === 1 && !hasFitBoundsRef.current) {
+      map.setCenter(boundsPoints[0]);
+      map.setZoom(14);
+      hasFitBoundsRef.current = true;
+    }
+
+    // Real Road Route via DirectionsService (throttled to max 1 request per 25s unless leg changes)
+    let routeOrigin: GeoPoint | null = null;
+    let routeDest: GeoPoint | null = null;
+    let routeWaypoints: google.maps.DirectionsWaypoint[] = [];
+
+    if (
+      liveVehicleCoord &&
+      normalized.pickupCoord &&
+      ['assigned', 'accepted', 'en_route'].includes(normalized.status)
+    ) {
+      routeOrigin = liveVehicleCoord;
+      routeDest = normalized.pickupCoord;
+    } else if (liveVehicleCoord && normalized.dropoffCoord && normalized.status === 'in_progress') {
+      routeOrigin = liveVehicleCoord;
+      routeDest = normalized.dropoffCoord;
+      routeWaypoints = normalized.stops.map((s) => ({ location: s.coordinates, stopover: true }));
+    } else if (normalized.pickupCoord && normalized.dropoffCoord) {
+      routeOrigin = normalized.pickupCoord;
+      routeDest = normalized.dropoffCoord;
+      routeWaypoints = normalized.stops.map((s) => ({ location: s.coordinates, stopover: true }));
+    }
+
+    if (routeOrigin && routeDest && directionsServiceRef.current && directionsRendererRef.current) {
+      const routeKey = `${normalized.status}:${routeOrigin.lat.toFixed(3)},${routeOrigin.lng.toFixed(3)}->${routeDest.lat.toFixed(3)},${routeDest.lng.toFixed(3)}`;
+      const elapsed = Date.now() - lastRouteRequestMsRef.current;
+
+      if (routeKey !== lastRouteKeyRef.current && (elapsed > 25_000 || lastRouteRequestMsRef.current === 0)) {
+        lastRouteKeyRef.current = routeKey;
+        lastRouteRequestMsRef.current = Date.now();
+
+        directionsServiceRef.current.route(
+          {
+            origin: routeOrigin,
+            destination: routeDest,
+            waypoints: routeWaypoints,
+            travelMode: gMaps.TravelMode.DRIVING,
+          },
+          (result, status) => {
+            if (status === gMaps.DirectionsStatus.OK && result) {
+              fallbackPolylineRef.current?.setMap(null);
+              directionsRendererRef.current?.setDirections(result);
+              const legs = result.routes?.[0]?.legs || [];
+              const totalSec = legs.reduce((acc, l) => acc + (l.duration?.value || 0), 0);
+              const totalMeters = legs.reduce((acc, l) => acc + (l.distance?.value || 0), 0);
+              if (totalSec > 0) {
+                setLiveEtaText(`${Math.max(1, Math.round(totalSec / 60))} min`);
+              }
+              if (totalMeters > 0) {
+                setLiveDistanceText(`${(totalMeters / 1609.34).toFixed(1)} mi`);
+              }
+            } else {
+              // Clean geodesic fallback ONLY along actual origin -> destination (never backwards!)
+              if (!fallbackPolylineRef.current) {
+                fallbackPolylineRef.current = new gMaps.Polyline({
+                  path: [routeOrigin!, ...normalized.stops.map((s) => s.coordinates), routeDest!],
+                  geodesic: true,
+                  strokeColor: '#2563eb',
+                  strokeOpacity: 0.75,
+                  strokeWeight: 4,
+                  map,
+                });
+              } else {
+                fallbackPolylineRef.current.setPath([routeOrigin!, routeDest!]);
+                fallbackPolylineRef.current.setMap(map);
+              }
+            }
+          }
+        );
+      }
+    }
   }, [
     mapsLoaded,
-    pickupCoord.lat,
-    pickupCoord.lng,
-    dropoffCoord.lat,
-    dropoffCoord.lng,
-    vehicleCoord.lat,
-    vehicleCoord.lng,
+    normalized.status,
+    normalized.pickupCoord?.lat,
+    normalized.pickupCoord?.lng,
+    normalized.dropoffCoord?.lat,
+    normalized.dropoffCoord?.lng,
+    liveVehicleCoord?.lat,
+    liveVehicleCoord?.lng,
     carMapStatus,
     carShortLabel,
     vehicleHeading,
+    isGpsStale,
   ]);
 
-  const assignedUnit =
-    trip.assignedVehicle?.vehicleNumber ||
-    (trip.metadata?.vehicleUnit ? String(trip.metadata.vehicleUnit) : 'Assigned Fleet Unit');
-  const assignedModel =
-    trip.assignedVehicle?.model ||
-    `${formatVehicleTierDisplay(trip.vehicleTier)} Class`;
-  const licensePlate = trip.assignedVehicle?.licensePlate || '';
-  const liveSpeedDisplay =
-    typeof trip.driverTelemetry?.speedMph === 'number'
-      ? `${Math.round(trip.driverTelemetry.speedMph)} mph`
-      : hasLiveGps
-      ? 'Live GPS'
-      : 'Awaiting GPS Ping';
+  const displayedEta = liveEtaText || fallbackEta?.etaText || null;
+  const displayedDist = liveDistanceText || fallbackEta?.distText || null;
+  const isDispatchNumber =
+    normalized.proxyPhone === COMPANY_CONFIG.phone.primaryRaw ||
+    normalized.proxyPhone === COMPANY_CONFIG.phone.dispatch;
+
+  const statusHeadline =
+    normalized.status === 'en_route'
+      ? 'Chauffeur En Route to Pickup'
+      : normalized.status === 'arrived'
+      ? 'Chauffeur Arrived at Pickup'
+      : normalized.status === 'in_progress'
+      ? 'Trip In Progress to Destination'
+      : normalized.status === 'completed'
+      ? 'Trip Completed'
+      : normalized.status === 'assigned' || normalized.status === 'accepted'
+      ? 'Chauffeur Assigned — Preparing for Pickup'
+      : 'Dispatch Monitoring Active';
+
+  const gpsTimestampDisplay = normalized.telemetry?.timestamp
+    ? new Date(normalized.telemetry.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : new Date(normalized.updatedAt).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-xl ${className}`}>
-      {/* Real-time Telemetry HUD Overlay Header */}
-      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-900/90 backdrop-blur-md px-4 py-2.5 border border-slate-700/60 shadow-lg text-white">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+      {/* Real-time Telemetry HUD Header */}
+      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-900/92 backdrop-blur-md px-4 py-2.5 border border-slate-700/60 shadow-lg text-white">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="relative flex h-3 w-3 shrink-0">
+            {hasLiveGps && !isGpsStale && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            )}
+            <span
+              className={`relative inline-flex rounded-full h-3 w-3 ${
+                !hasLiveGps
+                  ? 'bg-slate-400'
+                  : isGpsStale
+                  ? 'bg-amber-400'
+                  : 'bg-emerald-500'
+              }`}
+            />
           </span>
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-              <RadioIcon className="w-3 h-3 animate-pulse" /> Live Telemetry Feed
+          <div className="min-w-0">
+            <div
+              className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                !hasLiveGps
+                  ? 'text-slate-400'
+                  : isGpsStale
+                  ? 'text-amber-400'
+                  : 'text-emerald-400'
+              }`}
+            >
+              <RadioIcon className="w-3 h-3" />
+              {!hasLiveGps
+                ? 'Awaiting Live Driver GPS'
+                : isGpsStale
+                ? 'GPS Signal Delayed / Buffering'
+                : 'Live GPS Tracking'}
             </div>
-            <div className="text-xs font-bold text-slate-100">
-              {trip.status === 'en_route' && 'Driver En Route to Pickup'}
-              {trip.status === 'arrived' && 'Driver Arrived at Pickup'}
-              {trip.status === 'in_progress' && 'Trip In Progress to Destination'}
-              {trip.status === 'completed' && 'Trip Completed'}
-              {!['en_route', 'arrived', 'in_progress', 'completed'].includes(trip.status) && 'Dispatch Monitoring Active'}
-            </div>
+            <div className="text-xs font-bold text-slate-100 truncate">{statusHeadline}</div>
           </div>
         </div>
 
-        {trip.assignedDriverId && (
-          <div className="flex items-center gap-2 text-right">
-            <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-400">
-              <CarIcon className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-black text-slate-100">{assignedUnit}</div>
-              <div className="text-[10px] text-slate-400">
-                {assignedModel}{licensePlate ? ` • ${licensePlate}` : ''}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {displayedEta && ['assigned', 'accepted', 'en_route', 'in_progress'].includes(normalized.status) && (
+            <div className="px-2.5 py-1 rounded-xl bg-blue-600/25 border border-blue-400/40 text-right">
+              <div className="text-[9px] font-bold uppercase text-blue-300 flex items-center justify-end gap-1">
+                <ClockIcon className="w-2.5 h-2.5" /> ETA
+              </div>
+              <div className="text-xs font-black text-white">
+                {displayedEta}
+                {displayedDist ? <span className="text-[10px] font-normal text-blue-200"> · {displayedDist}</span> : null}
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {normalized.hasAssignedDriver && (
+            <div className="flex items-center gap-2 text-right">
+              <div className="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-400 shrink-0">
+                <CarIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-black text-slate-100">
+                  {normalized.driverFirstName ? `${normalized.driverFirstName} · ` : ''}
+                  {normalized.assignedUnit || 'Assigned Unit'}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {normalized.assignedModel}
+                  {normalized.licensePlate ? ` • ${normalized.licensePlate}` : ''}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Map Display: Google Maps canvas or High-contrast Stylized Radar Canvas */}
-      <div ref={mapContainerRef} className="w-full h-72 sm:h-80 bg-slate-950 relative">
+      {/* Map Wrapper: Google Maps container has ZERO React children to prevent removeChild crash! */}
+      <div className="w-full h-72 sm:h-80 bg-slate-950 relative">
+        <div ref={mapContainerRef} className="w-full h-full" />
+
         {!mapsLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
-            {/* Grid background lines */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:2rem_2rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30"></div>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center select-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black">
+            <div className="relative w-full max-w-sm h-40 flex items-center justify-between px-8">
+              <div className="absolute left-14 right-14 top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-rose-500 rounded-full" />
 
-            {/* Stylized vector telemetry radar */}
-            <div className="relative w-full max-w-sm h-48 flex items-center justify-between px-8 z-0">
-              {/* Route connecting line */}
-              <div className="absolute left-14 right-14 top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-rose-500 rounded-full"></div>
-
-              {/* Animated pulse wave */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-700 ease-out z-10"
-                style={{
-                  left: trip.status === 'en_route'
-                    ? '30%'
-                    : trip.status === 'arrived'
-                    ? '16%'
-                    : trip.status === 'in_progress'
-                    ? '52%'
-                    : trip.status === 'completed'
-                    ? '84%'
-                    : '50%',
-                }}
-              >
-                <div className="relative flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-blue-500/20 animate-ping absolute"></div>
+              {hasLiveGps && (
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-700 z-10"
+                  style={{
+                    left:
+                      normalized.status === 'en_route'
+                        ? '30%'
+                        : normalized.status === 'arrived'
+                        ? '18%'
+                        : normalized.status === 'in_progress'
+                        ? '55%'
+                        : '82%',
+                  }}
+                >
                   <div className="w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white">
                     <CarIcon className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold text-blue-400 bg-slate-900/90 px-1.5 py-0.5 rounded border border-blue-500/30">
-                  {assignedUnit}
-                </div>
-              </div>
+              )}
 
-              {/* Pickup Waypoint */}
               <div className="relative z-10 flex flex-col items-center">
                 <div className="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow flex items-center justify-center text-white text-xs font-black">
                   P
@@ -298,7 +580,6 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
                 <span className="text-[10px] font-bold text-emerald-400 mt-1">Pickup</span>
               </div>
 
-              {/* Dropoff Waypoint */}
               <div className="relative z-10 flex flex-col items-center">
                 <div className="w-7 h-7 rounded-full bg-rose-500 border-2 border-white shadow flex items-center justify-center text-white text-xs font-black">
                   D
@@ -307,12 +588,12 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
               </div>
             </div>
 
-            <div className="mt-2 text-[11px] text-slate-400 z-10 flex items-center gap-1.5 font-mono">
+            <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400" />
               <span>
                 {hasLiveGps
-                  ? `GPS: ${vehicleCoord.lat.toFixed(4)}, ${vehicleCoord.lng.toFixed(4)} • ${liveSpeedDisplay}`
-                  : `Route Corridor Active • ${liveSpeedDisplay}`}
+                  ? `Live GPS Fix${displayedEta ? ` • ETA ${displayedEta}` : ''}`
+                  : 'Waiting for chauffeur GPS telemetry'}
               </span>
             </div>
           </div>
@@ -321,32 +602,38 @@ export function CustomerTelemetryMap({ trip, className = '' }: CustomerTelemetry
 
       {/* Telemetry Status Footer */}
       <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
-        <div className="flex items-center gap-1.5">
-          <MapPinIcon className="w-3.5 h-3.5 text-slate-500" />
-          <span className="truncate max-w-[150px] sm:max-w-xs">{trip.pickupLocation?.address || 'Pickup location'}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <MapPinIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span className="truncate max-w-[220px] sm:max-w-xs">{normalized.pickupAddress}</span>
         </div>
-        
-        {trip.assignedDriverId && ['assigned', 'en_route', 'arrived', 'in_progress'].includes(trip.status) && (
-          <div className="flex items-center gap-2">
-            <a
-              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
-              title="Call Dispatch Bridge to connect with your assigned driver"
-            >
-              <span className="w-3 h-3 block">📞</span> Call Driver
-            </a>
-            <a
-              href={`sms:${COMPANY_CONFIG.phone.primaryRaw}?body=${encodeURIComponent(`Trip #${trip.id}: `)}`}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
-              title="Send SMS regarding your active trip"
-            >
-              💬 Text
-            </a>
-          </div>
-        )}
-        
-        <div className="font-mono text-[11px] text-slate-500 hidden sm:block">
-          Updated: {new Date(trip.updatedAt || trip.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+
+        {normalized.hasAssignedDriver &&
+          ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(normalized.status) && (
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={`tel:${normalized.proxyPhone}`}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
+                title={
+                  isDispatchNumber
+                    ? 'Call Dispatch Bridge to connect with your chauffeur'
+                    : 'Call your chauffeur via masked relay'
+                }
+              >
+                <span>📞</span>
+                <span>{isDispatchNumber ? 'Call Dispatch Bridge' : 'Call Chauffeur'}</span>
+              </a>
+              <a
+                href={`sms:${normalized.proxyPhone}?body=${encodeURIComponent(`Trip #${normalized.tripId}: `)}`}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
+              >
+                <span>💬</span>
+                <span>Text</span>
+              </a>
+            </div>
+          )}
+
+        <div className="font-mono text-[11px] text-slate-500">
+          {hasLiveGps ? `GPS: ${gpsTimestampDisplay}` : `Updated: ${gpsTimestampDisplay}`}
         </div>
       </div>
     </div>

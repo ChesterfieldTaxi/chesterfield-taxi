@@ -6,6 +6,10 @@ import type {
 } from '../../../../core/types/config';
 import { getInvoicingService } from '../../../../core/services/invoicing.service';
 import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
+import { getEmailDispatchService } from '../../../../core/services/email';
+import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
+import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
+import { formatLocalDateStr } from '../../../../core/services/pricing/vehicle-matching';
 import type {
   FinancialLedgerEntry,
   AccountingExportFormat,
@@ -63,8 +67,16 @@ export function AdminInvoicingSubpage({
     }
   }, [initialSubTab]);
 
-  // Invoices & Corporate state from settings
-  const invoices = settings.invoices || [];
+  // Invoices & Corporate state from settings + Firestore sync
+  const [firestoreInvoices, setFirestoreInvoices] = useState<InvoiceRecord[]>([]);
+  const invoices = React.useMemo(() => {
+    const byId = new Map<string, InvoiceRecord>();
+    (settings.invoices || []).forEach((inv) => byId.set(inv.id, inv));
+    firestoreInvoices.forEach((inv) => byId.set(inv.id, inv));
+    return Array.from(byId.values()).sort((a, b) =>
+      (b.issuedDate || '').localeCompare(a.issuedDate || '')
+    );
+  }, [settings.invoices, firestoreInvoices]);
   const corporateAccounts = settings.corporateAccounts || [];
 
   // Local state for modal / forms
@@ -72,7 +84,9 @@ export function AdminInvoicingSubpage({
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEmailingInvoice, setIsEmailingInvoice] = useState(false);
 
   // New Corporate Account Form State
   const [newCorpName, setNewCorpName] = useState('');
@@ -103,11 +117,42 @@ export function AdminInvoicingSubpage({
   const [newInvDescription, setNewInvDescription] = useState('Airport Executive Transport');
   const [newInvDueDays, setNewInvDueDays] = useState(30);
 
-  // Payment Gateways config state
-  const [stripeTerminalEnabled, setStripeTerminalEnabled] = useState(true);
-  const [passCardSurcharge, setPassCardSurcharge] = useState(false);
-  const [surchargePercent, setSurchargePercent] = useState(3.0);
-  const [autoEmailReceipts, setAutoEmailReceipts] = useState(true);
+  // Payment Gateways & Billing Policies state (persisted to AppSettings.billingSettings & pricing.defaultDriverCommissionRate)
+  const [stripeTerminalEnabled, setStripeTerminalEnabled] = useState(
+    () => settings.billingSettings?.stripeTerminalEnabled ?? true
+  );
+  const [passCardSurcharge, setPassCardSurcharge] = useState(
+    () => settings.billingSettings?.passCardSurcharge ?? false
+  );
+  const [surchargePercent, setSurchargePercent] = useState(
+    () => settings.billingSettings?.surchargePercent ?? 3.0
+  );
+  const [autoEmailReceipts, setAutoEmailReceipts] = useState(
+    () => settings.billingSettings?.autoEmailReceipts ?? true
+  );
+  const [driverCommissionPercent, setDriverCommissionPercent] = useState(
+    () => Math.round(((settings.pricing?.defaultDriverCommissionRate ?? 0.75) * 100))
+  );
+
+  useEffect(() => {
+    if (settings.billingSettings) {
+      if (settings.billingSettings.stripeTerminalEnabled !== undefined) {
+        setStripeTerminalEnabled(settings.billingSettings.stripeTerminalEnabled);
+      }
+      if (settings.billingSettings.passCardSurcharge !== undefined) {
+        setPassCardSurcharge(settings.billingSettings.passCardSurcharge);
+      }
+      if (settings.billingSettings.surchargePercent !== undefined) {
+        setSurchargePercent(settings.billingSettings.surchargePercent);
+      }
+      if (settings.billingSettings.autoEmailReceipts !== undefined) {
+        setAutoEmailReceipts(settings.billingSettings.autoEmailReceipts);
+      }
+    }
+    if (typeof settings.pricing?.defaultDriverCommissionRate === 'number') {
+      setDriverCommissionPercent(Math.round(settings.pricing.defaultDriverCommissionRate * 100));
+    }
+  }, [settings.billingSettings, settings.pricing?.defaultDriverCommissionRate]);
 
   // Stripe Gateway Credentials (Secrets managed strictly on server)
   const [stripeMode, setStripeMode] = useState<'test' | 'live'>(() => {
@@ -180,8 +225,22 @@ export function AdminInvoicingSubpage({
       const invoicingService = getInvoicingService();
       const txs = await invoicingService.getUnbilledTransactions();
       setUnbilledTransactions(txs);
+      if (invoicingService.getInvoices) {
+        const invs = await invoicingService.getInvoices();
+        setFirestoreInvoices(invs);
+      }
     } catch (err) {
       console.error('Failed to load corporate AR transactions:', err);
+    }
+  };
+
+  const fetchLedger = async () => {
+    try {
+      const invoicingService = getInvoicingService();
+      const entries = await invoicingService.getLedgerEntries();
+      setLedgerEntries(entries);
+    } catch (err) {
+      console.error('Failed to load ledger entries:', err);
     }
   };
 
@@ -190,13 +249,21 @@ export function AdminInvoicingSubpage({
   }, [activeSub]);
 
   useEffect(() => {
-    const fetchLedger = async () => {
-      const invoicingService = getInvoicingService();
-      const entries = await invoicingService.getLedgerEntries();
-      setLedgerEntries(entries);
-    };
     fetchLedger();
   }, [activeSub]);
+
+  const ledgerStartDate = React.useMemo(() => {
+    const now = new Date();
+    if (ledgerFilter === 'today') return formatLocalDateStr(now);
+    if (ledgerFilter === '7d') return formatLocalDateStr(new Date(now.getTime() - 7 * 86_400_000));
+    if (ledgerFilter === '30d') return formatLocalDateStr(new Date(now.getTime() - 30 * 86_400_000));
+    return undefined;
+  }, [ledgerFilter]);
+
+  const filteredLedgerEntries = React.useMemo(() => {
+    if (!ledgerStartDate) return ledgerEntries;
+    return ledgerEntries.filter((e) => e.date >= ledgerStartDate);
+  }, [ledgerEntries, ledgerStartDate]);
 
   useEffect(() => {
     if (selectedInvoice) {
@@ -215,7 +282,7 @@ export function AdminInvoicingSubpage({
     try {
       setIsExporting(true);
       const invoicingService = getInvoicingService();
-      const exportData = await invoicingService.exportLedger(format);
+      const exportData = await invoicingService.exportLedger(format, ledgerStartDate);
       const blob = new Blob([exportData.data], { type: exportData.mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -234,9 +301,62 @@ export function AdminInvoicingSubpage({
     }
   };
 
+  const handleEmailInvoice = async (inv: InvoiceRecord) => {
+    if (!inv.customerEmail) {
+      setActionErrorMessage('No billing email address is set on this invoice.');
+      setTimeout(() => setActionErrorMessage(null), 4000);
+      return;
+    }
+    try {
+      setIsEmailingInvoice(true);
+      setActionErrorMessage(null);
+      const emailService = getEmailDispatchService();
+      const res = await emailService.sendCorporateInvoice({
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        issuedDate: inv.issuedDate,
+        dueDate: inv.dueDate,
+        billingCycle: inv.billingCycle,
+        customerName: inv.customerName,
+        customerEmail: inv.customerEmail,
+        accountNumber: inv.accountNumber,
+        lineItems: inv.lineItems.map((li) => ({
+          date: li.date || inv.issuedDate,
+          passengerName: li.passengerName,
+          description: li.description,
+          poNumber: li.poNumber,
+          amount: li.amount,
+        })),
+        subtotal: inv.subtotal ?? inv.totalAmount,
+        discountAmount: inv.discountAmount ?? 0,
+        totalAmount: inv.totalAmount,
+        notes: inv.notes,
+        companySettings: {
+          name: settings.company?.name,
+          phone: settings.company?.phone,
+          address: settings.company?.address,
+          email: settings.company?.email,
+        },
+      });
+      if (res.success) {
+        setSaveSuccessMessage(`Invoice ${inv.invoiceNumber} emailed to ${inv.customerEmail}.`);
+        setTimeout(() => setSaveSuccessMessage(null), 4000);
+      } else {
+        setActionErrorMessage(res.error || 'Unable to deliver invoice email.');
+        setTimeout(() => setActionErrorMessage(null), 5000);
+      }
+    } catch (err: any) {
+      setActionErrorMessage(err?.message || 'Network error emailing invoice.');
+      setTimeout(() => setActionErrorMessage(null), 5000);
+    } finally {
+      setIsEmailingInvoice(false);
+    }
+  };
+
   const handleRunBatchInvoicing = async (corp: CorporateAccountConfig) => {
     try {
       setIsSaving(true);
+      setActionErrorMessage(null);
       const invoicingService = getInvoicingService();
       const accountUnbilled = unbilledTransactions.filter(
         (tx) =>
@@ -250,36 +370,21 @@ export function AdminInvoicingSubpage({
         return;
       }
 
-      const tripsToBill = accountUnbilled.map((tx) => ({
-        id: tx.tripId,
-        pickupLocation: { address: tx.pickupAddress },
-        dropoffLocation: { address: tx.dropoffAddress },
-        passenger: {
-          firstName: tx.passengerName.split(' ')[0] || corp.companyName,
-          lastName: tx.passengerName.split(' ').slice(1).join(' ') || '',
-          phone: tx.passengerPhone || corp.billingContactPhone || '',
-          email: corp.billingContactEmail,
-        },
-        vehicleTier: 'standard',
-        pricing: { baseFare: tx.baseFare, distanceCost: 0, timeCost: 0, totalFare: tx.totalAmount },
-        payment: { method: 'corporate', status: 'pending', amount: tx.totalAmount },
-        status: 'completed',
-        statusHistory: [],
-        createdAt: tx.pickupDate,
-        updatedAt: tx.pickupDate,
-      }));
-
-      const batchInvoice = await invoicingService.generateBatchInvoiceForCorporate(corp.id, tripsToBill as any);
+      const batchInvoice = await invoicingService.generateInvoiceFromUnbilled(corp.id, accountUnbilled);
 
       if (batchInvoice) {
-        const updatedInvoices = [batchInvoice, ...invoices];
+        const updatedInvoices = [batchInvoice, ...invoices.filter((i) => i.id !== batchInvoice.id)];
         await onSave({ invoices: updatedInvoices });
         await fetchUnbilled();
-        setSaveSuccessMessage(`Generated batch statement ${batchInvoice.invoiceNumber} (${tripsToBill.length} trips) for ${corp.companyName}`);
-        setTimeout(() => setSaveSuccessMessage(null), 3500);
+        await fetchLedger();
+        setSelectedInvoice(batchInvoice);
+        setSaveSuccessMessage(`Generated batch statement ${batchInvoice.invoiceNumber} (${accountUnbilled.length} trips) for ${corp.companyName}`);
+        setTimeout(() => setSaveSuccessMessage(null), 4000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to run batch invoicing:', err);
+      setActionErrorMessage(err?.message || 'Failed to generate batch invoice.');
+      setTimeout(() => setActionErrorMessage(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -319,13 +424,26 @@ export function AdminInvoicingSubpage({
   const handleGenerateInvoiceFromAR = async (targetTxs?: CorporateUnbilledTransaction[]) => {
     try {
       setIsSaving(true);
-      const pool = targetTxs || (selectedTxIds.length > 0
+      setActionErrorMessage(null);
+      const rawPool = targetTxs || (selectedTxIds.length > 0
         ? unbilledTransactions.filter((tx) => selectedTxIds.includes(tx.id))
         : unbilledTransactions.filter((tx) => tx.status === 'unbilled' || tx.status === 'pending_invoice'));
 
+      const pool = rawPool.filter((tx) => tx.status === 'unbilled' || tx.status === 'pending_invoice');
+
       if (pool.length === 0) {
-        setSaveSuccessMessage('No unbilled corporate transactions selected.');
-        setTimeout(() => setSaveSuccessMessage(null), 3000);
+        setActionErrorMessage('No unbilled corporate transactions selected.');
+        setTimeout(() => setActionErrorMessage(null), 3500);
+        return;
+      }
+
+      // Enforce single-corporation grouping so multiple corporate clients are never mixed on one invoice!
+      const distinctCorps = new Set(pool.map((tx) => tx.corporateAccountId));
+      if (distinctCorps.size > 1) {
+        setActionErrorMessage(
+          `Selected rides belong to ${distinctCorps.size} different corporate accounts. Please select rides for one corporate client per invoice.`
+        );
+        setTimeout(() => setActionErrorMessage(null), 5000);
         return;
       }
 
@@ -333,16 +451,19 @@ export function AdminInvoicingSubpage({
       const corpId = pool[0].corporateAccountId;
       const newInv = await invoicingService.generateInvoiceFromUnbilled(corpId, pool);
       if (newInv) {
-        const updatedInvoices = [newInv, ...invoices];
+        const updatedInvoices = [newInv, ...invoices.filter((i) => i.id !== newInv.id)];
         await onSave({ invoices: updatedInvoices });
         await fetchUnbilled();
+        await fetchLedger();
         setSelectedTxIds([]);
         setSelectedInvoice(newInv);
-        setSaveSuccessMessage(`Successfully generated ${newInv.invoiceNumber} covering ${pool.length} corporate trips.`);
+        setSaveSuccessMessage(`Successfully generated ${newInv.invoiceNumber} covering ${pool.length} corporate trip(s).`);
         setTimeout(() => setSaveSuccessMessage(null), 4000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate invoice from AR:', err);
+      setActionErrorMessage(err?.message || 'Failed to generate invoice from AR.');
+      setTimeout(() => setActionErrorMessage(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -351,31 +472,42 @@ export function AdminInvoicingSubpage({
   const handleMarkARPaidSettled = async (targetTxIds?: string[]) => {
     try {
       setIsSaving(true);
+      setActionErrorMessage(null);
       const idsToSettle = targetTxIds || selectedTxIds;
       if (idsToSettle.length === 0) {
-        setSaveSuccessMessage('Please select one or more transactions to settle.');
-        setTimeout(() => setSaveSuccessMessage(null), 3000);
+        setActionErrorMessage('Please select one or more transactions to settle.');
+        setTimeout(() => setActionErrorMessage(null), 3000);
         return;
       }
       const invoicingService = getInvoicingService();
+      if (invoicingService.settleUnbilledTransactions) {
+        await invoicingService.settleUnbilledTransactions(idsToSettle);
+      }
       setUnbilledTransactions((prev) =>
         prev.map((t) => (idsToSettle.includes(t.id) ? { ...t, status: 'settled' as const } : t))
       );
-      const linkedInvoiceIds = unbilledTransactions
-        .filter((t) => idsToSettle.includes(t.id) && t.invoiceId)
-        .map((t) => t.invoiceId as string);
+      const linkedInvoiceIds = Array.from(
+        new Set(
+          unbilledTransactions
+            .filter((t) => idsToSettle.includes(t.id) && t.invoiceId)
+            .map((t) => t.invoiceId as string)
+        )
+      );
 
       for (const invId of linkedInvoiceIds) {
         await invoicingService.markInvoicePaid(invId);
       }
       if (linkedInvoiceIds.length > 0) {
+        const today = formatLocalDateStr(new Date());
         const updated = invoices.map((inv) =>
           linkedInvoiceIds.includes(inv.id)
-            ? { ...inv, status: 'paid' as const, paidDate: new Date().toISOString().slice(0, 10) }
+            ? { ...inv, status: 'paid' as const, paidDate: today }
             : inv
         );
         await onSave({ invoices: updated });
       }
+      await fetchUnbilled();
+      await fetchLedger();
       setSelectedTxIds([]);
       setSaveSuccessMessage(`Marked ${idsToSettle.length} transaction(s) as Settled / Paid.`);
       setTimeout(() => setSaveSuccessMessage(null), 3500);
@@ -471,6 +603,7 @@ export function AdminInvoicingSubpage({
 
       const updatedAccounts = [...corporateAccounts, newAccount];
       await onSave({ corporateAccounts: updatedAccounts });
+      await service.syncAccountToFirestore(newAccount);
 
       setSaveSuccessMessage(`Corporate account "${newCorpName}" registered with initial PO: ${generatedPo}`);
       setTimeout(() => setSaveSuccessMessage(null), 3500);
@@ -491,11 +624,22 @@ export function AdminInvoicingSubpage({
   const handleTogglePoRequired = async (account: CorporateAccountConfig) => {
     try {
       setIsSaving(true);
+      const nextRequired = !account.poRequired;
+      const service = getCorporateAccountService();
+      const updatedAccount: CorporateAccountConfig = {
+        ...account,
+        poRequired: nextRequired,
+        currentPoNumber:
+          account.currentPoNumber ||
+          (nextRequired ? service.generateSecurePoNumber(account.companyName, account.accountNumber) : undefined),
+        updatedAt: new Date().toISOString(),
+      };
       const updatedAccounts = corporateAccounts.map((a) =>
-        a.id === account.id ? { ...a, poRequired: !a.poRequired, updatedAt: new Date().toISOString() } : a
+        a.id === account.id ? updatedAccount : a
       );
       await onSave({ corporateAccounts: updatedAccounts });
-      setSaveSuccessMessage(`PO requirement for "${account.companyName}" is now ${!account.poRequired ? 'Enforced' : 'Optional'}.`);
+      await service.syncAccountToFirestore(updatedAccount);
+      setSaveSuccessMessage(`PO requirement for "${account.companyName}" is now ${nextRequired ? 'Enforced' : 'Optional'}.`);
       setTimeout(() => setSaveSuccessMessage(null), 3500);
     } catch (err: any) {
       console.error('Failed to toggle PO required:', err);
@@ -509,6 +653,7 @@ export function AdminInvoicingSubpage({
       a.id === updatedAccount.id ? updatedAccount : a
     );
     await onSave({ corporateAccounts: updatedAccounts });
+    await getCorporateAccountService().syncAccountToFirestore(updatedAccount);
     setSaveSuccessMessage(`PO Number for ${updatedAccount.companyName} successfully regenerated: ${newPo}`);
     setTimeout(() => setSaveSuccessMessage(null), 4000);
   };
@@ -519,6 +664,7 @@ export function AdminInvoicingSubpage({
     importedAccounts.forEach((a) => map.set(a.accountNumber || a.id, a));
     const merged = Array.from(map.values());
     await onSave({ corporateAccounts: merged });
+    await getCorporateAccountService().syncAccountsBatchToFirestore(importedAccounts);
     setSaveSuccessMessage(`Successfully imported ${importedAccounts.length} corporate accounts into database!`);
     setTimeout(() => setSaveSuccessMessage(null), 4000);
   };
@@ -535,29 +681,95 @@ export function AdminInvoicingSubpage({
 
     try {
       setIsSaving(true);
+      setActionErrorMessage(null);
+      const issuedDate = formatLocalDateStr(new Date());
       const dueDate = new Date(Date.now() + newInvDueDays * 86400000).toISOString().slice(0, 10);
+      const matchedCorp = newInvCorpId
+        ? corporateAccounts.find((c) => c.id === newInvCorpId)
+        : undefined;
       const newInvoice: InvoiceRecord = {
         id: `inv-${Date.now().toString(36)}`,
-        invoiceNumber: `INV-2026-${(invoices.length + 101).toString()}`,
+        invoiceNumber: `INV-${new Date().getFullYear()}-${(invoices.length + 101).toString()}`,
         corporateAccountId: newInvCorpId || undefined,
+        accountNumber: matchedCorp?.accountNumber,
+        billingCycle: matchedCorp?.billingCycle,
         customerName: newInvCustomer,
         customerEmail: newInvEmail,
         tripIds: [],
+        subtotal: Number(newInvAmount),
+        discountAmount: 0,
         totalAmount: Number(newInvAmount),
         status: 'issued',
-        issuedDate: new Date().toISOString().slice(0, 10),
+        issuedDate,
         dueDate,
-        lineItems: [{ description: newInvDescription, amount: Number(newInvAmount) }],
+        lineItems: [
+          {
+            date: issuedDate,
+            passengerName: newInvCustomer,
+            description: newInvDescription,
+            amount: Number(newInvAmount),
+          },
+        ],
       };
 
-      const updatedInvoices = [newInvoice, ...invoices];
+      const invoicingService = getInvoicingService();
+      if (invoicingService.saveInvoice) {
+        await invoicingService.saveInvoice(newInvoice);
+      }
+      await invoicingService.recordLedgerEntry({
+        date: issuedDate,
+        type: 'fare_revenue',
+        corporateAccountId: newInvoice.corporateAccountId,
+        invoiceId: newInvoice.id,
+        amount: newInvoice.totalAmount,
+        description: `Direct Invoice ${newInvoice.invoiceNumber} issued to ${newInvoice.customerName}`,
+        accountCode: '1200-AccountsReceivable',
+      });
+
+      const updatedInvoices = [newInvoice, ...invoices.filter((i) => i.id !== newInvoice.id)];
       await onSave({ invoices: updatedInvoices });
 
-      setSaveSuccessMessage(`Invoice #${newInvoice.invoiceNumber} created and dispatched.`);
-      setTimeout(() => setSaveSuccessMessage(null), 3000);
+      // Actually email the corporate invoice via Resend!
+      const emailRes = await getEmailDispatchService().sendCorporateInvoice({
+        invoiceId: newInvoice.id,
+        invoiceNumber: newInvoice.invoiceNumber,
+        issuedDate: newInvoice.issuedDate,
+        dueDate: newInvoice.dueDate,
+        billingCycle: newInvoice.billingCycle,
+        customerName: newInvoice.customerName,
+        customerEmail: newInvoice.customerEmail,
+        accountNumber: newInvoice.accountNumber,
+        lineItems: newInvoice.lineItems.map((li) => ({
+          date: li.date || issuedDate,
+          passengerName: li.passengerName,
+          description: li.description,
+          amount: li.amount,
+        })),
+        subtotal: newInvoice.subtotal ?? newInvoice.totalAmount,
+        discountAmount: 0,
+        totalAmount: newInvoice.totalAmount,
+        companySettings: {
+          name: settings.company?.name,
+          phone: settings.company?.phone,
+          address: settings.company?.address,
+          email: settings.company?.email,
+        },
+      });
+
+      await fetchUnbilled();
+      await fetchLedger();
+
+      setSaveSuccessMessage(
+        emailRes.success
+          ? `Invoice #${newInvoice.invoiceNumber} issued and emailed to ${newInvoice.customerEmail}.`
+          : `Invoice #${newInvoice.invoiceNumber} saved (Email warning: ${emailRes.error || 'delivery offline'}).`
+      );
+      setTimeout(() => setSaveSuccessMessage(null), 4500);
       setIsNewInvoiceModalOpen(false);
     } catch (err: any) {
       console.error('Failed to create invoice:', err);
+      setActionErrorMessage(err?.message || 'Failed to create invoice.');
+      setTimeout(() => setActionErrorMessage(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -566,26 +778,64 @@ export function AdminInvoicingSubpage({
   const handleInvoiceStatusUpdate = async (invoiceId: string, newStatus: 'paid' | 'overdue' | 'issued' | 'draft') => {
     try {
       setIsSaving(true);
+      setActionErrorMessage(null);
+      const invoicingService = getInvoicingService();
+      const today = formatLocalDateStr(new Date());
+
+      if (newStatus === 'paid') {
+        await invoicingService.markInvoicePaid(invoiceId);
+      }
+
       const updatedInvoices = invoices.map((inv) =>
         inv.id === invoiceId
           ? {
               ...inv,
               status: newStatus,
-              paidDate: newStatus === 'paid' ? new Date().toISOString().slice(0, 10) : inv.paidDate,
+              paidDate: newStatus === 'paid' ? today : inv.paidDate,
             }
           : inv
       );
       await onSave({ invoices: updatedInvoices });
+      await fetchUnbilled();
+      await fetchLedger();
       if (selectedInvoice?.id === invoiceId) {
         setSelectedInvoice({
           ...selectedInvoice,
           status: newStatus,
+          paidDate: newStatus === 'paid' ? today : selectedInvoice.paidDate,
         });
       }
       setSaveSuccessMessage(`Invoice marked as ${newStatus.toUpperCase()}.`);
       setTimeout(() => setSaveSuccessMessage(null), 3000);
     } catch (err) {
       console.error('Failed to update invoice status:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBillingPolicies = async () => {
+    try {
+      setIsSaving(true);
+      const clampedCommission = Math.max(0.1, Math.min(0.99, Number((driverCommissionPercent / 100).toFixed(2))));
+      await onSave({
+        billingSettings: {
+          ...(settings.billingSettings || {}),
+          stripeTerminalEnabled,
+          passCardSurcharge,
+          surchargePercent: Number(surchargePercent) || 3.0,
+          autoEmailReceipts,
+        },
+        pricing: {
+          ...settings.pricing,
+          defaultDriverCommissionRate: clampedCommission,
+        },
+      });
+      setSaveSuccessMessage('Payment policies, receipt automation, and driver commission rate saved.');
+      setTimeout(() => setSaveSuccessMessage(null), 3500);
+    } catch (err: any) {
+      setActionErrorMessage(err?.message || 'Failed to save payment policies.');
+      setTimeout(() => setActionErrorMessage(null), 4000);
     } finally {
       setIsSaving(false);
     }
@@ -623,7 +873,7 @@ export function AdminInvoicingSubpage({
     setStripeStatus('checking');
     setStripeStatusMsg('Authenticating with Stripe API...');
     try {
-      const resp = await fetch('/api/payments', {
+      const resp = await authorizedFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -650,7 +900,7 @@ export function AdminInvoicingSubpage({
     setSquareStatus('checking');
     setSquareStatusMsg('Authenticating with Square API...');
     try {
-      const resp = await fetch('/api/payments', {
+      const resp = await authorizedFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -677,7 +927,7 @@ export function AdminInvoicingSubpage({
     setTwilioStatus('checking');
     setTwilioStatusMsg('Connecting to Twilio Accounts API...');
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -712,7 +962,7 @@ export function AdminInvoicingSubpage({
     setTestCallStatus('calling');
     setTestCallMsg(`Placing outbound voice call to ${testCallPhone}...`);
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -748,7 +998,7 @@ export function AdminInvoicingSubpage({
     setTestSmsStatus('sending');
     setTestSmsMsg(`Dispatching SMS to ${testSmsPhone}...`);
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -919,6 +1169,11 @@ export function AdminInvoicingSubpage({
       {saveSuccessMessage && (
         <Alert variant="success" className="animate-in fade-in text-xs font-semibold">
           {saveSuccessMessage}
+        </Alert>
+      )}
+      {actionErrorMessage && (
+        <Alert variant="error" className="animate-in fade-in text-xs font-semibold">
+          {actionErrorMessage}
         </Alert>
       )}
 
@@ -1930,22 +2185,72 @@ export function AdminInvoicingSubpage({
                   <p className="text-[11px] text-slate-500">
                     Adds an itemized {surchargePercent}% surcharge fee to credit card transactions.
                   </p>
+                  {passCardSurcharge && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="text-[11px] font-bold text-slate-700">Surcharge %:</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        value={surchargePercent}
+                        onChange={(e) => setSurchargePercent(Number(e.target.value))}
+                        className="w-20 px-2 py-1 border border-slate-200 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-blue-900 text-xs">Automatic Email Receipts</p>
-                  <p className="text-[11px] text-blue-700">
-                    Dispatches tax receipts automatically upon trip completion.
-                  </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-blue-900 text-xs">Automatic Email Receipts</p>
+                    <p className="text-[11px] text-blue-700">
+                      Dispatches itemized tax receipts automatically upon trip completion.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEmailReceipts}
+                    onChange={(e) => setAutoEmailReceipts(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={autoEmailReceipts}
-                  onChange={(e) => setAutoEmailReceipts(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-600"
-                />
+
+                <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-emerald-950 text-xs">Default Driver Commission Split</p>
+                    <p className="text-[11px] text-emerald-800">
+                      Driver keeps {driverCommissionPercent}% / Company {Math.max(0, 100 - driverCommissionPercent)}% (tolls &amp; tips 100% driver).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      min="10"
+                      max="99"
+                      value={driverCommissionPercent}
+                      onChange={(e) => setDriverCommissionPercent(Number(e.target.value))}
+                      className="w-16 px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900"
+                    />
+                    <span className="text-xs font-bold text-emerald-900">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSaving}
+                  onClick={handleSaveBillingPolicies}
+                  leftIcon={<CheckIcon className="w-3.5 h-3.5" />}
+                  className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isSaving ? 'Saving Policies...' : 'Save Payment & Commission Policies'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -2225,7 +2530,7 @@ export function AdminInvoicingSubpage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {ledgerEntries.map((entry) => {
+                    {filteredLedgerEntries.map((entry) => {
                       const isCredit = entry.type === 'fare_revenue' || entry.type === 'platform_commission';
                       return (
                         <tr key={entry.id} className="hover:bg-slate-50/70 transition-colors">
@@ -2235,6 +2540,8 @@ export function AdminInvoicingSubpage({
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                 entry.type === 'fare_revenue'
                                   ? 'bg-emerald-100 text-emerald-800'
+                                  : entry.type === 'invoice_settlement'
+                                  ? 'bg-teal-100 text-teal-800'
                                   : entry.type === 'driver_payout'
                                   ? 'bg-blue-100 text-blue-800'
                                   : entry.type === 'platform_commission'
@@ -2244,7 +2551,7 @@ export function AdminInvoicingSubpage({
                                   : 'bg-slate-100 text-slate-800'
                               }`}
                             >
-                              {entry.type.replace('_', ' ')}
+                              {entry.type.replace(/_/g, ' ')}
                             </span>
                           </td>
                           <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-700">{entry.accountCode}</td>
@@ -2259,6 +2566,13 @@ export function AdminInvoicingSubpage({
                         </tr>
                       );
                     })}
+                    {filteredLedgerEntries.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                          No ledger transactions recorded for the selected period.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2522,16 +2836,24 @@ export function AdminInvoicingSubpage({
             <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-5 gap-4">
               <div>
                 <h2 className="font-black text-2xl text-slate-900 tracking-tight">
-                  {COMPANY_CONFIG.name}
+                  {settings.company?.name || COMPANY_CONFIG.name}
                 </h2>
                 <p className="text-xs font-semibold text-slate-600 mt-0.5">
                   Corporate Transportation &amp; Fleet Logistics Division
                 </p>
-                <p className="text-xs text-slate-500 mt-1">{COMPANY_CONFIG.address.formatted}</p>
-                <p className="text-xs text-slate-500">
-                  Phone: {COMPANY_CONFIG.phone.dispatch} | Billing: billing@chesterfieldtaxi.com
+                <p className="text-xs text-slate-500 mt-1">
+                  {settings.company?.address || COMPANY_CONFIG.address.formatted}
                 </p>
-                <p className="text-[11px] font-mono text-slate-400">USDOT: 3829104 | Tax ID: 43-1892041</p>
+                <p className="text-xs text-slate-500">
+                  Phone: {settings.company?.phone || COMPANY_CONFIG.phone.dispatch} | Billing: {settings.company?.email || COMPANY_CONFIG.email.dispatch}
+                </p>
+                {(settings.billingSettings?.usdotNumber || settings.billingSettings?.taxId) && (
+                  <p className="text-[11px] font-mono text-slate-400">
+                    {settings.billingSettings?.usdotNumber ? `USDOT: ${settings.billingSettings.usdotNumber}` : ''}
+                    {settings.billingSettings?.usdotNumber && settings.billingSettings?.taxId ? ' | ' : ''}
+                    {settings.billingSettings?.taxId ? `Tax ID: ${settings.billingSettings.taxId}` : ''}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
@@ -2691,16 +3013,16 @@ export function AdminInvoicingSubpage({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Bank Remittance Details
+                  Bank / Remittance Details
                 </span>
                 <p className="font-bold text-slate-800">
-                  Bank: {printableData?.remittanceInfo?.bankName || 'Commerce Bank of St. Louis'}
+                  {printableData?.remittanceInfo?.bankName || 'ACH / Corporate Check Remittance'}
                 </p>
                 <p className="text-slate-600">
-                  Account Name: {printableData?.remittanceInfo?.accountName || COMPANY_CONFIG.legalName}
+                  Payable To: {printableData?.remittanceInfo?.accountName || settings.company?.name || COMPANY_CONFIG.legalName}
                 </p>
-                <p className="font-mono text-slate-700">
-                  Routing: {printableData?.remittanceInfo?.routingNumber || '081000601'} | Acct: {printableData?.remittanceInfo?.accountNumber || '••••••••4819'}
+                <p className="font-mono text-slate-700 text-[11px]">
+                  Billing Desk: {printableData?.remittanceInfo?.billingEmail || settings.company?.email || COMPANY_CONFIG.email.dispatch}
                 </p>
               </div>
 
@@ -2709,19 +3031,19 @@ export function AdminInvoicingSubpage({
                   Payment Remittance Terms
                 </span>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Net 30 Days. Please include invoice number{' '}
-                  <span className="font-mono font-bold text-slate-800">{selectedInvoice.invoiceNumber}</span> on all checks or electronic remittance advices.
+                  Terms: {(selectedInvoice.billingCycle || printableData?.corporateAccount?.billingCycle || 'net30').toUpperCase()}. Please include invoice number{' '}
+                  <span className="font-mono font-bold text-slate-800">{selectedInvoice.invoiceNumber}</span> on all checks or electronic remittances.
                 </p>
                 <p className="text-slate-500 text-[10px]">
-                  Mail checks to: Chesterfield Taxi Inc., 177 Chesterfield Valley Dr, Chesterfield, MO 63005
+                  Mail checks to: {settings.company?.name || COMPANY_CONFIG.legalName}, {settings.company?.address || COMPANY_CONFIG.address.formatted}
                 </p>
               </div>
             </div>
 
             {/* Modal Controls (Hidden in Print Mode) */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 no-print">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-200 no-print">
               <div className="text-xs text-slate-400">
-                Chesterfield Taxi Billing Division • Generated via Invoicing Engine
+                {settings.company?.name || COMPANY_CONFIG.name} Billing Division
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -2732,6 +3054,16 @@ export function AdminInvoicingSubpage({
                   className="cursor-pointer"
                 >
                   Close
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isEmailingInvoice}
+                  onClick={() => handleEmailInvoice(selectedInvoice)}
+                  className="text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 font-bold cursor-pointer"
+                >
+                  {isEmailingInvoice ? 'Emailing...' : 'Email Statement'}
                 </Button>
                 <Button
                   type="button"
@@ -2758,7 +3090,7 @@ export function AdminInvoicingSubpage({
             setSelectedPoAccount(null);
           }}
           onSuccess={handlePoRegenerateSuccess}
-          operatorEmail="admin@chesterfieldtaxi.com"
+          operatorEmail={getAdminAuthService().getCurrentUser()?.email || settings.company?.email || COMPANY_CONFIG.email.dispatch}
         />
       )}
 

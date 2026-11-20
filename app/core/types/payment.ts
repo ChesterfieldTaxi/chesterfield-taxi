@@ -48,16 +48,34 @@ export interface PaymentIntentRecord {
   updatedAt: string;
 }
 
+export type DriverSettlementMethod =
+  | 'cash'
+  | 'card_terminal'
+  | 'stripe_preauth'
+  | 'corporate_account';
+
 export interface DriverPayoutRecord {
   id: string;
   driverId: string;
   tripId: string;
+  /** Grand total charged to passenger (baseFareAmount + nonTollExtrasAmount + tollsReimbursed + tipAmount) */
   totalFare: number;
+  /** Ride base/metered/quoted fare before post-booking extras, tolls, and tip */
+  baseFareAmount?: number;
+  /** Non-toll in-cab extras (cleaning, luggage, parking, wait) subject to commission split */
+  nonTollExtrasAmount?: number;
+  /** Commission rate applied (e.g. 0.75 = 75% driver / 25% company) */
+  commissionRate?: number;
+  paymentMethod?: DriverSettlementMethod;
   platformFee: number;
   driverShare: number;
   tipAmount: number;
   tollsReimbursed: number;
+  /** Positive = company owes driver; Negative (or driver_owes_company) = cash ride commission owed by driver */
   netPayout: number;
+  driverCashCollected?: number;
+  companyCommissionOwed?: number;
+  settlementDirection?: 'company_owes_driver' | 'driver_owes_company';
   status: 'pending' | 'settled' | 'withheld';
   settledAt?: string;
   createdAt: string;
@@ -116,7 +134,13 @@ export interface IPaymentService {
     tripId: string,
     finalAmount: number,
     tipAmount?: number,
-    extrasAmount?: number
+    extrasAmount?: number,
+    options?: {
+      settlementMethod?: DriverSettlementMethod;
+      paymentIntentId?: string;
+      cardLast4?: string;
+      cardBrand?: CardBrand;
+    }
   ): Promise<PaymentIntentRecord>;
 
   /**
@@ -129,11 +153,17 @@ export interface IPaymentService {
     tipAmount: number,
     tollsAmount: number,
     extrasAmount: number,
-    driverCommissionRate?: number
+    driverCommissionRate?: number,
+    paymentMethod?: DriverSettlementMethod
   ): Promise<DriverPayoutRecord>;
 
   /**
    * Retrieves payout record for a specific trip.
    */
   getDriverPayoutForTrip(tripId: string): Promise<DriverPayoutRecord | null>;
+
+  /**
+   * Retrieves payout history for a specific driver (Firestore + local merged).
+   */
+  getDriverPayoutHistory?(driverId: string): Promise<DriverPayoutRecord[]>;
 }

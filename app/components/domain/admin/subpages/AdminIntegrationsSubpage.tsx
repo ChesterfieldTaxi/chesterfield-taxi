@@ -14,6 +14,7 @@ import {
   LockIcon,
 } from '../../../ui/Icons';
 import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
+import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 
 
 export type IntegrationsSubTab = 'gateways' | 'telephony' | 'webhooks';
@@ -226,7 +227,7 @@ export function AdminIntegrationsSubpage({
       setTwilioStatusMsg('Verifying credentials with Twilio REST API & saving public metadata...');
 
       // 1. Call server API to verify credentials
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -295,7 +296,7 @@ export function AdminIntegrationsSubpage({
     setStripeStatus('checking');
     setStripeStatusMsg('Authenticating with Stripe API...');
     try {
-      const resp = await fetch('/api/payments', {
+      const resp = await authorizedFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -330,7 +331,7 @@ export function AdminIntegrationsSubpage({
     setSquareStatus('checking');
     setSquareStatusMsg('Authenticating with Square API...');
     try {
-      const resp = await fetch('/api/payments', {
+      const resp = await authorizedFetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -425,7 +426,7 @@ export function AdminIntegrationsSubpage({
     setTestCallStatus('calling');
     setTestCallMsg(`Initiating outbound call to ${cleanTo}...`);
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -478,7 +479,7 @@ export function AdminIntegrationsSubpage({
     setTestSmsStatus('sending');
     setTestSmsMsg(`Dispatching SMS to ${cleanTo}...`);
     try {
-      const resp = await fetch('/api/telephony', {
+      const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

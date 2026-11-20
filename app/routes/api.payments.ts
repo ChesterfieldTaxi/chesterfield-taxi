@@ -1,14 +1,30 @@
 /**
  * Serverless / SSR Resource Route: Payment Gateway & Processors
- * 
- * Securely handles Stripe / Square payment intent creation, tokenization,
- * and processor verification on the server side using private API keys.
+ *
+ * Securely handles Stripe / Square payment intent creation, capture, and
+ * processor verification on the server side using private API keys.
+ *
+ * Security controls:
+ * - `verify_processor` requires verified Dispatcher/Admin auth; client credentials
+ *   are never accepted in production.
+ * - `capture_intent` requires verified Driver or Dispatcher/Admin auth, strictly
+ *   validates `paymentIntentId` against `/^pi_[a-zA-Z0-9]+$/`, and never returns
+ *   fake simulated capture success when Stripe is unconfigured.
+ * - `create_intent` is rate-limited per IP, validates amount bounds/currency, and
+ *   cleanly directs callers to Pay-in-Cab when Stripe is disabled.
  */
 
 import type { ActionFunctionArgs } from 'react-router';
+import { isFirebaseConfigured } from '../core/services/firebase';
+import {
+  checkRateLimit,
+  fetchFirestoreDocumentRest,
+  getRequestClientIp,
+  verifyServerRequestAuth,
+} from '../core/services/auth/server-auth.server';
 
 export interface PaymentApiRequest {
-  action: 'create_intent' | 'verify_processor' | 'capture_intent';
+  action: 'create_intent' | 'verify_processor' | 'capture_intent' | 'cancel_intent';
   processor?: 'stripe' | 'square';
   amount?: number; // In dollars (e.g. 45.50)
   currency?: string;
@@ -21,6 +37,9 @@ export interface PaymentApiRequest {
     squareLocationId?: string;
   };
 }
+
+const STRIPE_PI_PATTERN = /^pi_[a-zA-Z0-9]{8,64}$/;
+const ALLOWED_CURRENCIES = new Set(['usd']);
 
 export async function loader() {
   const stripeConfigured = Boolean(
@@ -40,6 +59,7 @@ export async function loader() {
     stripePublishableKey,
     stripeWebhookConfigured,
     squareConfigured,
+    defaultCheckoutMode: stripeConfigured ? 'stripe_or_in_cab' : 'pay_in_cab',
   });
 }
 
@@ -60,15 +80,13 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Security Guard: For actual transaction processing, strictly enforce server environment keys
-    // Do NOT permit untrusted client overrides for live charges
-    const isVerifyAction = data.action === 'verify_processor';
-    const adminSecret = process.env.ADMIN_API_SECRET;
-    const authHeader = request.headers.get('authorization') || request.headers.get('x-admin-secret');
-    const isAdmin = adminSecret ? authHeader === adminSecret || authHeader === `Bearer ${adminSecret}` : false;
+    const auth = await verifyServerRequestAuth(request);
+    const enforceAuth = process.env.NODE_ENV === 'production' || isFirebaseConfigured();
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    // Only allow custom credentials for verification if admin is authenticated or in development
-    const allowCustomCredentials = isVerifyAction && (!process.env.NODE_ENV || process.env.NODE_ENV !== 'production' || isAdmin);
+    // Never permit untrusted client credentials in production
+    const allowCustomCredentials =
+      data.action === 'verify_processor' && !isProduction && (auth.isDispatcher || !enforceAuth);
 
     const stripeSecretKey =
       process.env.STRIPE_SECRET_KEY ||
@@ -79,8 +97,15 @@ export async function action({ request }: ActionFunctionArgs) {
       (allowCustomCredentials ? data.credentials?.squareAccessToken?.trim() : '') ||
       '';
 
-    // ─── 1. Verify Processor Connectivity ───
+    // ─── 1. Verify Processor Connectivity (Staff Only) ───
     if (data.action === 'verify_processor') {
+      if (enforceAuth && !auth.isDispatcher) {
+        return Response.json(
+          { success: false, error: 'Unauthorized: Administrator or Dispatcher sign-in required.' },
+          { status: 403 }
+        );
+      }
+
       const targetProcessor = data.processor || 'stripe';
 
       if (targetProcessor === 'stripe') {
@@ -177,6 +202,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // ─── 2. Create Payment Intent (Stripe) ───
     if (data.action === 'create_intent') {
+      const clientIp = getRequestClientIp(request);
+      if (!auth.isDispatcher && !checkRateLimit(`pay_create:${clientIp}`, 20, 5 * 60_000)) {
+        return Response.json(
+          { success: false, error: 'Too many payment requests. Please wait a moment and try again.' },
+          { status: 429 }
+        );
+      }
+
       const rawAmount = Number(data.amount || 0);
       if (!Number.isFinite(rawAmount) || rawAmount < 5 || rawAmount > 10000) {
         return Response.json(
@@ -184,8 +217,28 @@ export async function action({ request }: ActionFunctionArgs) {
           { status: 400 }
         );
       }
+
+      const currency = String(data.currency || 'usd').toLowerCase();
+      if (!ALLOWED_CURRENCIES.has(currency)) {
+        return Response.json(
+          { success: false, error: `Unsupported currency: ${currency}.` },
+          { status: 400 }
+        );
+      }
+
+      // Cross-check fare bounds when caller is authenticated and references an existing Trip
+      if (data.tripId && auth.rawToken) {
+        const tripDoc = await fetchFirestoreDocumentRest('trips', data.tripId, auth.rawToken);
+        const quotedFare = Number(tripDoc?.pricing?.totalFare);
+        if (Number.isFinite(quotedFare) && quotedFare > 0 && rawAmount > quotedFare * 2 + 250) {
+          return Response.json(
+            { success: false, error: 'Requested charge amount exceeds allowable trip fare bounds.' },
+            { status: 400 }
+          );
+        }
+      }
+
       const amountInCents = Math.round(rawAmount * 100);
-      const currency = data.currency || 'usd';
 
       if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
         return Response.json(
@@ -203,11 +256,11 @@ export async function action({ request }: ActionFunctionArgs) {
       const params = new URLSearchParams();
       params.append('amount', String(amountInCents));
       params.append('currency', currency);
-      params.append('capture_method', 'manual'); // Pre-authorization hold
+      params.append('capture_method', 'manual');
       if (data.tripId) {
-        params.append('metadata[tripId]', data.tripId);
+        params.append('metadata[tripId]', String(data.tripId).slice(0, 64));
       }
-      if (data.paymentMethodId) {
+      if (data.paymentMethodId && /^pm_[a-zA-Z0-9]+$/.test(data.paymentMethodId)) {
         params.append('payment_method', data.paymentMethodId);
       }
 
@@ -243,32 +296,50 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    // ─── 3. Capture Payment Intent ───
+    // ─── 3. Capture Payment Intent (Driver or Staff Only) ───
     if (data.action === 'capture_intent') {
-      if (!data.paymentIntentId) {
+      if (enforceAuth && !auth.isDispatcher && !auth.isDriver) {
         return Response.json(
-          { success: false, error: 'paymentIntentId is required to capture payment.' },
+          { success: false, error: 'Unauthorized: Driver or Dispatcher authentication required to capture payments.' },
+          { status: 403 }
+        );
+      }
+
+      const paymentIntentId = String(data.paymentIntentId || '').trim();
+      if (!paymentIntentId || !STRIPE_PI_PATTERN.test(paymentIntentId)) {
+        return Response.json(
+          { success: false, error: 'Valid Stripe paymentIntentId (pi_...) is required to capture payment.' },
           { status: 400 }
         );
       }
 
-      if (!stripeSecretKey || data.paymentIntentId.startsWith('pi_mock_')) {
-        return Response.json({
-          success: true,
-          simulated: true,
-          status: 'succeeded',
-          paymentIntentId: data.paymentIntentId,
-          message: 'Payment captured in sandbox test mode.',
-        });
+      if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
+        return Response.json(
+          {
+            success: false,
+            stripeDisabled: true,
+            fallback: 'pay_in_cab',
+            error:
+              'Online Stripe capture is not configured on the server. Settle via Pay-in-Cab (Cash, External Card Terminal, or Corporate Account).',
+          },
+          { status: 503 }
+        );
       }
 
       const captureParams = new URLSearchParams();
-      if (data.amount) {
-        captureParams.append('amount_to_capture', String(Math.round(data.amount * 100)));
+      if (data.amount !== undefined) {
+        const amt = Number(data.amount);
+        if (!Number.isFinite(amt) || amt <= 0 || amt > 10000) {
+          return Response.json(
+            { success: false, error: 'Invalid capture amount.' },
+            { status: 400 }
+          );
+        }
+        captureParams.append('amount_to_capture', String(Math.round(amt * 100)));
       }
 
       const captureResp = await fetch(
-        `https://api.stripe.com/v1/payment_intents/${data.paymentIntentId}/capture`,
+        `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(paymentIntentId)}/capture`,
         {
           method: 'POST',
           headers: {
@@ -294,6 +365,55 @@ export async function action({ request }: ActionFunctionArgs) {
             success: false,
             error: captureResult.error?.message || 'Failed to capture payment',
           },
+          { status: 400 }
+        );
+      }
+    }
+
+    // ─── 4. Cancel / Release Pre-Auth Hold (Driver or Staff Only) ───
+    if (data.action === 'cancel_intent') {
+      if (enforceAuth && !auth.isDispatcher && !auth.isDriver) {
+        return Response.json(
+          { success: false, error: 'Unauthorized: Staff or Driver authentication required to release holds.' },
+          { status: 403 }
+        );
+      }
+
+      const paymentIntentId = String(data.paymentIntentId || '').trim();
+      if (!paymentIntentId || !STRIPE_PI_PATTERN.test(paymentIntentId)) {
+        return Response.json(
+          { success: false, error: 'Valid Stripe paymentIntentId (pi_...) is required.' },
+          { status: 400 }
+        );
+      }
+
+      if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
+        return Response.json(
+          { success: false, stripeDisabled: true, error: 'Stripe is not configured on the server.' },
+          { status: 503 }
+        );
+      }
+
+      const cancelResp = await fetch(
+        `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(paymentIntentId)}/cancel`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${stripeSecretKey}`,
+          },
+        }
+      );
+
+      const cancelResult = (await cancelResp.json()) as any;
+      if (cancelResp.ok) {
+        return Response.json({
+          success: true,
+          status: cancelResult.status,
+          paymentIntentId: cancelResult.id,
+        });
+      } else {
+        return Response.json(
+          { success: false, error: cancelResult.error?.message || 'Failed to cancel payment intent' },
           { status: 400 }
         );
       }

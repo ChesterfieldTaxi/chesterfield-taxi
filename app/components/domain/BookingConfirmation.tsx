@@ -22,7 +22,9 @@ import { Button } from '../ui/Button';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 import { getAdminAuthService } from '../../core/services/auth/admin-auth.service';
-import { formatVehicleTier } from '../../core/utils/trip-id.util';
+import type { VehicleTierConfig } from '../../core/types/config';
+import { formatVehicleTierDisplay } from '../../core/services/email/email-templates';
+import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 
 export interface EmailDeliveryFeedback {
   status: 'idle' | 'sending' | 'sent' | 'simulated' | 'failed';
@@ -60,12 +62,16 @@ export function BookingConfirmation({
   const [bookingConfig, setBookingConfig] = React.useState(() => {
     return getAdminConfigService().getCachedSettings().customerBookingConfig;
   });
+  const [adminVehicles, setAdminVehicles] = React.useState<VehicleTierConfig[]>(() => {
+    return getAdminConfigService().getCachedSettings().vehicles || [];
+  });
 
   React.useEffect(() => {
     const configService = getAdminConfigService();
     const unsubscribe = configService.subscribeToSettings((s) => {
       if (s.company) setCompanyConfig(s.company);
       if (s.customerBookingConfig) setBookingConfig(s.customerBookingConfig);
+      if (s.vehicles) setAdminVehicles(s.vehicles);
     });
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
@@ -90,7 +96,14 @@ export function BookingConfirmation({
     pickupLower.includes('10701 lambert') ||
     pickupLower.includes('st. louis lambert') ||
     pickupLower.includes('st louis lambert') ||
+    meta.airportIataCode === 'STL' ||
     meta.detectedAirportIata === 'STL';
+
+  const resolvedVehicleDisplayName =
+    (typeof meta.vehicleDisplayName === 'string' && meta.vehicleDisplayName.trim()) ||
+    formatVehicleTierDisplay(trip.vehicleTier, adminVehicles);
+
+  const trackPath = `/track/${encodeURIComponent(trip.trackingToken || trip.id)}`;
 
   const lambertInstructions =
     bookingConfig?.lambertPickupInstructions ||
@@ -135,10 +148,7 @@ export function BookingConfirmation({
       const description = `Pickup: ${trip.pickupLocation.address}\\nDropoff: ${trip.dropoffLocation.address}\\nTotal Fare: $${trip.pricing.totalFare.toFixed(2)}\\nDispatch Support: ${companyConfig?.phone || COMPANY_CONFIG.phone.dispatch}`;
       const locationStr = trip.pickupLocation.address.replace(/,/g, '\\,');
 
-      const icsContent = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Chesterfield Taxi//EN',
+      const events: string[] = [
         'BEGIN:VEVENT',
         `UID:${trip.id}@chesterfieldtaxi.com`,
         `DTSTAMP:${formatIcsDate(new Date())}`,
@@ -149,7 +159,33 @@ export function BookingConfirmation({
         `LOCATION:${locationStr}`,
         'STATUS:CONFIRMED',
         'END:VEVENT',
-        'END:VCALENDAR'
+      ];
+
+      if (hasReturnTrip && meta.returnDate) {
+        const retStart = new Date(`${meta.returnDate}T${meta.returnTime || '12:00'}:00`);
+        if (!Number.isNaN(retStart.getTime())) {
+          const retEnd = new Date(retStart.getTime() + (trip.pricing.durationMinutes || 30) * 60 * 1000);
+          events.push(
+            'BEGIN:VEVENT',
+            `UID:${meta.returnTripId || trip.id + '-return'}@chesterfieldtaxi.com`,
+            `DTSTAMP:${formatIcsDate(new Date())}`,
+            `DTSTART:${formatIcsDate(retStart)}`,
+            `DTEND:${formatIcsDate(retEnd)}`,
+            `SUMMARY:Chesterfield Taxi - Return Ride #${meta.returnTripId || trip.id}`,
+            `DESCRIPTION:Return Pickup: ${meta.returnPickupAddress || ''}\\nReturn Dropoff: ${meta.returnDropoffAddress || ''}\\nReturn Fare: $${returnLegFare.toFixed(2)}`,
+            `LOCATION:${String(meta.returnPickupAddress || '').replace(/,/g, '\\,')}`,
+            'STATUS:CONFIRMED',
+            'END:VEVENT'
+          );
+        }
+      }
+
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Chesterfield Taxi//EN',
+        ...events,
+        'END:VCALENDAR',
       ].join('\r\n');
 
       const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
@@ -171,7 +207,7 @@ export function BookingConfirmation({
   };
 
   return (
-    <Card variant="elevated" className={`max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-blue-200/80 shadow-lg'} ${className}`}>
+    <Card variant="elevated" className={`printable-receipt max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-blue-200/80 shadow-lg'} ${className}`}>
       {/* Top Banner */}
       <div className={`${isUnconfirmed ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white'} px-6 py-8 text-center relative`}>
         <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-100 text-amber-600' : 'bg-white text-blue-600'}`}>
@@ -418,7 +454,7 @@ export function BookingConfirmation({
             <div>
               <span className="text-xs font-medium text-slate-500 block">Vehicle Preference</span>
               <span className="text-sm font-bold text-slate-900">
-                {formatVehicleTier(trip.vehicleTier)}
+                {resolvedVehicleDisplayName}
               </span>
             </div>
           </div>
@@ -464,50 +500,121 @@ export function BookingConfirmation({
           </div>
         </div>
 
-        {/* Airport Flight Operations Block (if applicable) */}
-        {Boolean(trip.metadata?.isAirportTrip || trip.metadata?.flightNumber) ? (
+        {/* Canonical Itemized Fare Breakdown */}
+        {trip.pricing && (
+          <div className="pt-4 border-t border-slate-100">
+            <PriceBreakdownPanel
+              outboundPricing={trip.pricing}
+              outboundDisplayFare={trip.pricing.totalFare}
+              returnDisplayFare={hasReturnTrip ? returnLegFare : null}
+              totalDisplayFare={hasReturnTrip ? trip.pricing.totalFare + returnLegFare : trip.pricing.totalFare}
+              isRoundTrip={hasReturnTrip}
+              vehicleLabel={resolvedVehicleDisplayName}
+            />
+          </div>
+        )}
+
+        {/* Child Safety Seats & Custom Extras Summary */}
+        {Boolean(
+          meta.carSeatsBreakdown?.total > 0 ||
+            meta.carSeatsCount > 0 ||
+            meta.customExtrasSummary
+        ) && (
+          <div className="pt-4 border-t border-slate-100">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-xs">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block">
+                Selected Equipment &amp; Extras
+              </span>
+              {Boolean(meta.carSeatsBreakdown?.total > 0 || meta.carSeatsCount > 0) && (
+                <p className="text-slate-700">
+                  <strong>Child Safety Seats:</strong>{' '}
+                  {[
+                    meta.carSeatsBreakdown?.rearFacing ? `${meta.carSeatsBreakdown.rearFacing} Rear-Facing` : null,
+                    meta.carSeatsBreakdown?.frontFacing ? `${meta.carSeatsBreakdown.frontFacing} Front-Facing` : null,
+                    meta.carSeatsBreakdown?.booster ? `${meta.carSeatsBreakdown.booster} Booster` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || `${meta.carSeatsCount} seat(s)`}
+                </p>
+              )}
+              {Boolean(meta.customExtrasSummary) && (
+                <p className="text-slate-700">
+                  <strong>Booked Extras:</strong> {String(meta.customExtrasSummary)}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Airport & Private Aviation Block (if applicable) */}
+        {Boolean(
+          trip.metadata?.isAirportTrip ||
+            trip.metadata?.flightNumber ||
+            trip.metadata?.isPrivateAviation ||
+            trip.metadata?.tailNumber ||
+            trip.metadata?.fboFacility
+        ) ? (
           <div className="pt-4 border-t border-slate-100">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                   <PlaneLandingIcon className="w-4 h-4 text-blue-600" />
-                  Flight & Airport Details
+                  {trip.metadata?.isPrivateAviation || trip.metadata?.tailNumber
+                    ? 'Private Aviation (FBO / Tail #)'
+                    : 'Flight & Airport Details'}
                 </span>
-                {trip.metadata?.detectedAirportIata ? (
+                {(trip.metadata?.airportIataCode || trip.metadata?.detectedAirportIata) ? (
                   <Badge variant="info" size="sm">
-                    {String(trip.metadata.detectedAirportIata)}
+                    {String(trip.metadata.airportIataCode || trip.metadata.detectedAirportIata)}
                   </Badge>
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-                <div>
-                  <span className="text-slate-500 block font-medium">Airline</span>
-                  <span className="font-bold text-slate-800">
-                    {String(trip.metadata?.airlineName || trip.metadata?.airline || trip.metadata?.airlineCode || 'N/A')}
-                  </span>
+              {trip.metadata?.isPrivateAviation || trip.metadata?.tailNumber || trip.metadata?.fboFacility ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                  <div>
+                    <span className="text-slate-500 block font-medium">Tail Number</span>
+                    <span className="font-bold text-slate-800">{String(trip.metadata?.tailNumber || 'N/A')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">FBO Facility</span>
+                    <span className="font-bold text-slate-800">{String(trip.metadata?.fboFacility || 'N/A')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">Checked Bags</span>
+                    <span className="font-bold text-slate-800">{trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500 block font-medium">Flight Number</span>
-                  <span className="font-bold text-slate-800">
-                    {String(trip.metadata?.flightNumber || 'N/A')}
-                  </span>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                  <div>
+                    <span className="text-slate-500 block font-medium">Airline</span>
+                    <span className="font-bold text-slate-800">
+                      {String(trip.metadata?.airlineName || trip.metadata?.airline || trip.metadata?.airlineCode || 'N/A')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">Flight Number</span>
+                    <span className="font-bold text-slate-800">
+                      {String(trip.metadata?.flightNumber || 'N/A')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">Origin</span>
+                    <span className="font-bold text-slate-800 truncate block">
+                      {trip.metadata?.flightOrigin || trip.metadata?.departureAirport
+                        ? String(trip.metadata.flightOrigin || trip.metadata.departureAirport).toUpperCase()
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">Checked Bags</span>
+                    <span className="font-bold text-slate-800">
+                      {trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500 block font-medium">Origin</span>
-                  <span className="font-bold text-slate-800 truncate block">
-                    {trip.metadata?.flightOrigin || trip.metadata?.departureAirport
-                      ? String(trip.metadata.flightOrigin || trip.metadata.departureAirport).toUpperCase()
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block font-medium">Checked Bags</span>
-                  <span className="font-bold text-slate-800">
-                    {trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         ) : null}
@@ -520,9 +627,12 @@ export function BookingConfirmation({
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
                   🔁 Return Trip Scheduled
                   {Boolean(meta.returnTripId) && (
-                    <span className="font-mono text-[10px] text-indigo-700 font-normal">
-                      (Trip #{String(meta.returnTripId)})
-                    </span>
+                    <Link
+                      to={`/track/${encodeURIComponent(String(meta.returnTripTrackingToken || meta.returnTripId))}`}
+                      className="font-mono text-[10px] text-indigo-700 hover:underline font-bold"
+                    >
+                      (Track #{String(meta.returnTripId)} &rarr;)
+                    </Link>
                   )}
                 </span>
                 <Badge variant="info" size="sm">
@@ -557,30 +667,47 @@ export function BookingConfirmation({
                 </div>
               </div>
 
-              {Boolean(meta.returnFlightNumber || meta.returnAirline) && (
+              {Boolean(meta.returnFlightNumber || meta.returnAirline || meta.returnTailNumber || meta.returnFboFacility) && (
                 <div className="pt-2 border-t border-indigo-200/60 bg-white/80 p-2.5 rounded-lg text-xs space-y-1.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1">
                     <PlaneLandingIcon className="w-3.5 h-3.5 text-indigo-600" />
-                    Return Flight Information
+                    {meta.returnTailNumber || meta.returnFboFacility ? 'Return Private Aviation' : 'Return Flight Information'}
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                    <div>
-                      <span className="text-slate-500 block font-medium">Airline</span>
-                      <span className="font-bold text-slate-800">{String(meta.returnAirline || 'N/A')}</span>
+                  {meta.returnTailNumber || meta.returnFboFacility ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 block font-medium">Tail #</span>
+                        <span className="font-bold text-slate-800">{String(meta.returnTailNumber || 'N/A')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-medium">FBO Facility</span>
+                        <span className="font-bold text-slate-800">{String(meta.returnFboFacility || 'N/A')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-medium">Checked Bags</span>
+                        <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-500 block font-medium">Flight #</span>
-                      <span className="font-bold text-slate-800">{String(meta.returnFlightNumber || 'N/A')}</span>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 block font-medium">Airline</span>
+                        <span className="font-bold text-slate-800">{String(meta.returnAirline || 'N/A')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-medium">Flight #</span>
+                        <span className="font-bold text-slate-800">{String(meta.returnFlightNumber || 'N/A')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-medium">Origin</span>
+                        <span className="font-bold text-slate-800">{String(meta.returnFlightOrigin || 'N/A')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block font-medium">Checked Bags</span>
+                        <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-500 block font-medium">Origin</span>
-                      <span className="font-bold text-slate-800">{String(meta.returnFlightOrigin || 'N/A')}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block font-medium">Checked Bags</span>
-                      <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -612,15 +739,29 @@ export function BookingConfirmation({
           </div>
         )}
 
-        {/* Special Requests / Driver Notes */}
-        {trip.passenger.specialRequests && (
-          <div className="pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Driver Dispatch Notes
+        {/* Driver Dispatch Notes, Gate Code & Passenger Preferences */}
+        {(trip.driverNotes || meta.gateCode || trip.passenger.specialRequests) && (
+          <div className="pt-4 border-t border-slate-100 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Driver Dispatch Notes &amp; Preferences
             </h4>
-            <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line">
-              {trip.passenger.specialRequests}
-            </p>
+            <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+              {Boolean(meta.gateCode) && (
+                <p>
+                  <strong className="text-slate-900">Gate / Access Code:</strong> {String(meta.gateCode)}
+                </p>
+              )}
+              {trip.passenger.specialRequests && (
+                <p>
+                  <strong className="text-slate-900">Ride Preferences:</strong> {trip.passenger.specialRequests}
+                </p>
+              )}
+              {trip.driverNotes && (
+                <p className="whitespace-pre-line">
+                  <strong className="text-slate-900">Notes for Chauffeur:</strong> {trip.driverNotes}
+                </p>
+              )}
+            </div>
           </div>
         )}
         {/* Guest Account Claiming CTA */}
@@ -665,7 +806,7 @@ export function BookingConfirmation({
           {trip.id && (
             trip.status === 'en_route' ? (
               <Link
-                to={`/track/${trip.id}`}
+                to={trackPath}
                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors relative overflow-hidden group"
               >
                 <span className="absolute inset-0 w-full h-full bg-blue-400 opacity-20 animate-pulse"></span>
@@ -673,10 +814,10 @@ export function BookingConfirmation({
               </Link>
             ) : (
               <Link
-                to={`/track/${trip.id}`}
+                to={trackPath}
                 className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
               >
-                {isUnconfirmed ? 'Track Request Status' : 'View Ride Details'}
+                {isUnconfirmed ? 'Track Request Status' : 'Track Live Ride'}
               </Link>
             )
           )}

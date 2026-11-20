@@ -21,6 +21,8 @@ export interface FlightOperationsEmailDetails {
 
 export interface BookingConfirmationEmailPayload {
   tripId: string;
+  trackingToken?: string;
+  trackingUrl?: string;
   passenger: {
     firstName: string;
     lastName: string;
@@ -70,10 +72,12 @@ export interface BookingConfirmationEmailPayload {
   }>;
   returnTripDetails?: {
     tripId: string;
+    trackingToken?: string;
     pickupAddress: string;
     dropoffAddress: string;
     pickupTime: string;
     vehicleTier: string;
+    vehicleDisplayName?: string;
     totalFare: number;
     passengerCount?: number;
     luggageCount?: number;
@@ -123,6 +127,7 @@ export interface AdminDispatchAlertEmailPayload {
     dropoffAddress: string;
     pickupTime: string;
     vehicleTier: string;
+    vehicleDisplayName?: string;
     totalFare: number;
     flightDetails?: FlightOperationsEmailDetails;
   };
@@ -136,6 +141,8 @@ export interface AdminDispatchAlertEmailPayload {
 
 export interface StatusUpdateEmailPayload {
   tripId: string;
+  trackingToken?: string;
+  trackingUrl?: string;
   passenger: {
     firstName: string;
     lastName: string;
@@ -148,6 +155,7 @@ export interface StatusUpdateEmailPayload {
   dropoffAddress: string;
   pickupTime: string;
   vehicleTier: string;
+  vehicleDisplayName?: string;
   driverInfo?: {
     name?: string;
     phone?: string;
@@ -155,6 +163,12 @@ export interface StatusUpdateEmailPayload {
     licensePlate?: string;
   };
   statusReason?: string;
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 export interface BookingDeclinedEmailPayload {
@@ -169,10 +183,17 @@ export interface BookingDeclinedEmailPayload {
   dropoffAddress: string;
   pickupTime: string;
   vehicleTier?: string;
+  vehicleDisplayName?: string;
   reason: string;
   customNotes?: string;
   legScope?: 'outbound' | 'return' | 'roundtrip';
   linkedTripId?: string;
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 export interface BookingClarificationRequestEmailPayload {
@@ -187,9 +208,76 @@ export interface BookingClarificationRequestEmailPayload {
   dropoffAddress: string;
   pickupTime: string;
   vehicleTier?: string;
+  vehicleDisplayName?: string;
   clarificationTopic: string;
   customMessage?: string;
   legScope?: 'outbound' | 'return' | 'roundtrip';
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
+}
+
+export interface TripReceiptEmailPayload {
+  tripId: string;
+  completedAt: string;
+  passenger: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  };
+  pickupAddress: string;
+  intermediateStops?: Array<{ address: string }>;
+  dropoffAddress: string;
+  pickupTime: string;
+  vehicleTier: string;
+  vehicleDisplayName?: string;
+  driverName?: string;
+  vehicleUnit?: string;
+  distanceMiles?: number;
+  durationMinutes?: number;
+  subtotalFare: number;
+  tipAmount?: number;
+  grandTotal: number;
+  currency?: string;
+  breakdown?: PriceLineItem[];
+  tariffProfileName?: string;
+  paymentMethod: string;
+  cardLast4?: string;
+  paymentStatus?: string;
+  corporateAccountName?: string;
+  poNumber?: string;
+  companySettings?: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
+}
+
+export interface CorporateInvoiceEmailPayload {
+  invoiceId: string;
+  invoiceNumber: string;
+  issuedDate: string;
+  dueDate: string;
+  billingCycle?: string;
+  customerName: string;
+  customerEmail: string;
+  accountNumber?: string;
+  lineItems: Array<{
+    date?: string;
+    passengerName?: string;
+    description: string;
+    poNumber?: string;
+    amount: number;
+  }>;
+  subtotal: number;
+  discountAmount?: number;
+  totalAmount: number;
+  notes?: string;
   companySettings?: {
     name?: string;
     phone?: string;
@@ -214,6 +302,8 @@ export type EmailDispatchApiRequest = (
   | { type: 'status_update'; payload: StatusUpdateEmailPayload }
   | { type: 'booking_declined'; payload: BookingDeclinedEmailPayload }
   | { type: 'clarification_request'; payload: BookingClarificationRequestEmailPayload }
+  | { type: 'trip_receipt'; payload: TripReceiptEmailPayload }
+  | { type: 'corporate_invoice'; payload: CorporateInvoiceEmailPayload }
   | { type: 'contact_inquiry'; payload: Record<string, any> }
 ) & {
   subject?: string;
@@ -259,6 +349,20 @@ export interface IEmailDispatchService {
    */
   sendStatusUpdateNotification(
     payload: StatusUpdateEmailPayload
+  ): Promise<EmailDispatchResult>;
+
+  /**
+   * Sends itemized official tax receipt upon trip completion.
+   */
+  sendTripReceipt(
+    payload: TripReceiptEmailPayload
+  ): Promise<EmailDispatchResult>;
+
+  /**
+   * Sends itemized B2B corporate billing invoice statement.
+   */
+  sendCorporateInvoice(
+    payload: CorporateInvoiceEmailPayload
   ): Promise<EmailDispatchResult>;
 }
 
