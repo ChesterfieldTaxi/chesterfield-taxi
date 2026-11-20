@@ -26,6 +26,9 @@ export async function loader() {
   const stripeConfigured = Boolean(
     process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
   );
+  const rawPublishableKey =
+    process.env.STRIPE_PUBLISHABLE_KEY || process.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
+  const stripePublishableKey = rawPublishableKey.startsWith('pk_') ? rawPublishableKey : undefined;
   const stripeWebhookConfigured = Boolean(
     process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_')
   );
@@ -34,6 +37,7 @@ export async function loader() {
   return Response.json({
     success: true,
     stripeConfigured,
+    stripePublishableKey,
     stripeWebhookConfigured,
     squareConfigured,
   });

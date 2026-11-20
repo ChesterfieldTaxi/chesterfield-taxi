@@ -21,6 +21,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
+import { getAdminAuthService } from '../../core/services/auth/admin-auth.service';
 import { formatVehicleTier } from '../../core/utils/trip-id.util';
 
 export interface EmailDeliveryFeedback {
@@ -96,6 +97,22 @@ export function BookingConfirmation({
     'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.';
 
   const [copiedId, setCopiedId] = React.useState(false);
+  const [isSignedIn, setIsSignedIn] = React.useState(() =>
+    Boolean(getAdminAuthService().getCurrentUser())
+  );
+
+  React.useEffect(() => {
+    const unsub = getAdminAuthService().onAuthStateChanged((u) => {
+      setIsSignedIn(Boolean(u));
+    });
+    return unsub;
+  }, []);
+
+  const hasReturnTrip = Boolean(meta.hasReturnTrip);
+  const returnLegFare = hasReturnTrip ? Number(meta.returnFare || 0) : 0;
+  const combinedTotalFare = hasReturnTrip
+    ? trip.pricing.totalFare + returnLegFare
+    : trip.pricing.totalFare;
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(trip.id);
@@ -303,12 +320,7 @@ export function BookingConfirmation({
                 )}
                 {emailDelivery.status === 'failed' && (
                   <>
-                    Your reservation has been saved in our dispatch system, but the email notification to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong> could not be delivered by Resend.
-                    {emailDelivery.error && (
-                      <span className="block mt-1.5 p-2 bg-amber-100/70 rounded border border-amber-300/60 font-mono text-[10px] text-amber-950 break-words">
-                        {emailDelivery.error}
-                      </span>
-                    )}
+                    Your reservation is safely saved in our dispatch system, though we could not verify immediate email delivery to <strong className="font-semibold">{emailDelivery.recipient || trip.passenger.email}</strong>. Please save your Trip Reference above or call 24/7 dispatch if you need a copy.
                   </>
                 )}
                 {emailDelivery.status === 'simulated' && (
@@ -438,12 +450,15 @@ export function BookingConfirmation({
               )}
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">Payment Method & Total</span>
+              <span className="text-xs font-medium text-slate-500 block">
+                {hasReturnTrip ? 'Estimated Round-Trip Total' : 'Estimated Fare & Payment'}
+              </span>
               <span className="text-base font-extrabold text-slate-950">
-                ${trip.pricing.totalFare.toFixed(2)}
+                ${combinedTotalFare.toFixed(2)}
               </span>
               <span className="text-xs text-slate-500 block mt-0.5">
                 {paymentMethodLabel}
+                {hasReturnTrip ? ` ($${trip.pricing.totalFare.toFixed(2)} out + $${returnLegFare.toFixed(2)} return)` : ''}
               </span>
             </div>
           </div>
@@ -608,13 +623,34 @@ export function BookingConfirmation({
             </p>
           </div>
         )}
+        {/* Guest Account Claiming CTA */}
+        {!isSignedIn && trip.id && (
+          <div className="pt-4 border-t border-slate-100 print:hidden">
+            <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-extrabold text-blue-950">
+                  Save This Trip &amp; Rebook in Two Taps
+                </h4>
+                <p className="text-[11px] text-blue-800 mt-0.5">
+                  Create a free passenger account to attach Trip #{trip.id}, store favorite pickup spots, and view receipts anytime.
+                </p>
+              </div>
+              <Link
+                to={`/app/register?claimTrip=${encodeURIComponent(trip.id)}&email=${encodeURIComponent(trip.passenger.email || '')}`}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 text-center"
+              >
+                Create Account &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
       </CardContent>
 
-      <CardFooter className="bg-slate-50/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <CardFooter className="bg-slate-50/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
         <span className="text-xs text-slate-500 text-center sm:text-left">
           Questions about your ride? Call 24/7 Dispatch at{' '}
           <a
-            href={`tel:${(companyConfig?.phone || COMPANY_CONFIG.phone.dispatch).replace(/\D/g, '')}`}
+            href={`tel:${(companyConfig?.phone || COMPANY_CONFIG.phone.primaryRaw).replace(/[^\d+]/g, '')}`}
             className="font-bold text-blue-600 hover:text-blue-800 underline"
           >
             {companyConfig?.phone || COMPANY_CONFIG.phone.dispatch}
@@ -626,23 +662,23 @@ export function BookingConfirmation({
           ) : null}
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          {!isUnconfirmed && trip.id && (
-             trip.status === 'en_route' ? (
-                <Link
-                  to={`/track/${trip.id}`}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors relative overflow-hidden group"
-                >
-                  <span className="absolute inset-0 w-full h-full bg-blue-400 opacity-20 animate-pulse"></span>
-                  Track Live Ride
-                </Link>
-             ) : (
-                <Link
-                  to={`/track/${trip.id}`}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
-                >
-                  View Ride Details
-                </Link>
-             )
+          {trip.id && (
+            trip.status === 'en_route' ? (
+              <Link
+                to={`/track/${trip.id}`}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors relative overflow-hidden group"
+              >
+                <span className="absolute inset-0 w-full h-full bg-blue-400 opacity-20 animate-pulse"></span>
+                Track Live Ride
+              </Link>
+            ) : (
+              <Link
+                to={`/track/${trip.id}`}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+              >
+                {isUnconfirmed ? 'Track Request Status' : 'View Ride Details'}
+              </Link>
+            )
           )}
           <Button onClick={onBookAnother} variant="primary" size="md">
             Book Another Ride

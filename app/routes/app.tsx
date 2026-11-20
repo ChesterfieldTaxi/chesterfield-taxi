@@ -687,6 +687,7 @@ export default function PassengerAppRoute() {
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
               <BookingEngineV2
                 hideDispatchBanner={true}
+                embeddedInApp={true}
                 initialValues={bookingInitialValues}
                 editingTripId={editingTripId || undefined}
                 onCancelEdit={() => {

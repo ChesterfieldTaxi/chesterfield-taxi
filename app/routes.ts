@@ -6,7 +6,7 @@ export default [
     index("routes/_index.tsx"),
     route("book", "routes/book.tsx"),
     route("booking/status/:tripId", "routes/booking.status.tsx"),
-    route("track/:tripToken", "routes/track.tsx"),
+    route("track/:tripToken?", "routes/track.tsx"),
     route("services", "routes/services.tsx"),
     route("about", "routes/about.tsx"),
     route("contact", "routes/contact.tsx"),

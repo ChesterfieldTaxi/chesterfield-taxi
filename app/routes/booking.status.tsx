@@ -241,7 +241,7 @@ export default function BookingStatusRoute() {
               value={searchRef}
               onChange={(e) => setSearchRef(e.target.value)}
               placeholder="e.g. CT-4821-9034"
-              className="w-full px-3.5 py-2.5 text-sm font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
           <div>
@@ -255,7 +255,7 @@ export default function BookingStatusRoute() {
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               placeholder="(314) 555-0199"
-              className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 text-base sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
           <button
@@ -314,7 +314,7 @@ export default function BookingStatusRoute() {
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               placeholder="(314) 555-0199"
-              className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 text-base sm:text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
             />
           </div>
           <button
