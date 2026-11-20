@@ -301,7 +301,13 @@ export function RatesPanel({
                         : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}
                   >
-                    {t.rateModel || 'METER'}
+                    {t.rateModel === 'hourly'
+                      ? 'HOURLY'
+                      : t.rateModel === 'zip_matrix'
+                      ? 'ZIP MATRIX'
+                      : (t.taximeter?.startPrice ?? 0) === 0
+                      ? 'STEPPED FLAT'
+                      : 'METERED'}
                   </Badge>
                 </div>
 

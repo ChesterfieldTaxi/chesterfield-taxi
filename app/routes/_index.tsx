@@ -10,6 +10,8 @@ import {
   MapPinIcon,
   ChevronRightIcon,
   SpinnerIcon,
+  BoltIcon,
+  CalendarIcon,
 } from '../components/ui/Icons';
 import { Card } from '../components/ui/Card';
 import { COMPANY_CONFIG } from '../config/companyConfig';
@@ -327,24 +329,26 @@ export default function IndexRoute() {
                     <button
                       type="button"
                       onClick={() => setTiming('asap')}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                         timing === 'asap'
                           ? 'bg-white text-blue-700 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      ⚡ Ride Now (ASAP)
+                      <BoltIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Ride Now (ASAP)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setTiming('later')}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                         timing === 'later'
                           ? 'bg-white text-blue-700 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      📅 Schedule Later
+                      <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Schedule Later</span>
                     </button>
                   </div>
 

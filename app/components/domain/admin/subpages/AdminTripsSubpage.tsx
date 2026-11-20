@@ -18,8 +18,12 @@ import {
   CarIcon,
   CheckIcon,
   ChevronDownIcon,
+  PhoneIcon,
+  MailIcon,
+  SearchIcon,
 } from '../../../ui/Icons';
 import { TripAuditModal } from '../TripAuditModal';
+import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { LayoutToggle } from '../../../ui/LayoutToggle';
@@ -527,71 +531,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
   };
 
   return (
-    <div className="space-y-6">
-      {/* ─── Trips Contextual Action Bar ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
-          {activeSub === 'dispatch' && (
-            <>
-              <ActivityIcon className="w-4 h-4 text-blue-600" />
-              <span>Active Queue ({activeDispatchTrips.length} active trips)</span>
-            </>
-          )}
-          {activeSub === 'history' && (
-            <>
-              <HistoryIcon className="w-4 h-4 text-blue-600" />
-              <span>Trip Archive ({trips.length} records)</span>
-            </>
-          )}
-          {activeSub === 'archive' && (
-            <>
-              <ArchiveBoxIcon className="w-4 h-4 text-slate-700" />
-              <span>Archived Trips ({archivedTrips.length} soft-deleted trips)</span>
-            </>
-          )}
-          {activeSub === 'exceptions' && (
-            <>
-              <AlertTriangleIcon className="w-4 h-4 text-rose-500" />
-              <span>Exceptions & Cancellations ({exceptionTrips.length} flagged)</span>
-            </>
-          )}
-        </div>
-
-        {/* Archive Drawer & Export Tools */}
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsArchiveDrawerOpen(true)}
-            className="text-xs font-bold inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300"
-          >
-            <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-            <span>Universal Archive Drawer</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            className="text-xs font-bold inline-flex items-center gap-1.5"
-          >
-            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Export CSV</span>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportJSON}
-            className="text-xs font-bold inline-flex items-center gap-1.5"
-          >
-            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
-            <span>Export JSON</span>
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {actionSuccessMessage && (
         <Alert variant="success" className="animate-in fade-in text-xs font-semibold">
           {actionSuccessMessage}
@@ -604,42 +544,61 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
         </Alert>
       )}
 
-      {/* ─── Search & Filters Bar ─── */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="w-full sm:w-96 relative">
-          <input
-            type="text"
-            placeholder="Search passenger, phone, email, address, trip ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white outline-hidden"
-          />
-          <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+      {/* ─── Single Unified Trips Toolbar ─── */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-full sm:w-80 relative">
+            <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search passenger, phone, address, trip ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white outline-hidden"
+            />
+          </div>
+
+          {activeSub === 'history' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden"
+            >
+              <option value="all">All Lifecycles ({trips.length})</option>
+              <option value="completed">Completed Only</option>
+              <option value="cancelled">Cancelled Only</option>
+              <option value="assigned">Assigned / In Progress</option>
+              <option value="pending">Pending</option>
+            </select>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          {activeSub === 'history' && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-slate-600">Filter:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-800"
-              >
-                <option value="all">All Lifecycles</option>
-                <option value="completed">Completed Only</option>
-                <option value="cancelled">Cancelled Only</option>
-                <option value="assigned">Assigned / In Progress</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-          )}
-
+        <div className="flex items-center gap-2 justify-between lg:justify-end shrink-0">
           <LayoutToggle
             layout={displayLayout}
             onChange={setDisplayLayout}
             size="sm"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportCSV}
+            className="text-xs font-semibold inline-flex items-center gap-1.5"
+          >
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>CSV</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportJSON}
+            className="text-xs font-semibold inline-flex items-center gap-1.5"
+          >
+            <DownloadIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>JSON</span>
+          </Button>
         </div>
       </div>
 
@@ -723,7 +682,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
                     <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
                       <div className="flex items-start gap-1.5">
-                        <span className="text-emerald-500 font-bold text-xs">🟢</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
                         <span className="truncate font-medium" title={trip.pickupLocation?.address}>
                           {trip.pickupLocation?.address || 'Pickup address'}
                         </span>
@@ -1040,141 +999,135 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
         )}
       </Card>
 
-      {/* ─── Selected Trip Drawer / Modal Details ─── */}
-      {selectedTrip && (
-        <Card variant="elevated" className="border-2 border-blue-500/40 bg-white shadow-lg animate-in slide-in-from-bottom-2">
-          <CardHeader className="p-5 border-b border-slate-200/80 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <span>Trip Details: #{selectedTrip.id.toUpperCase()}</span>
-                <Badge
-                  variant={
-                    selectedTrip.status === 'completed'
-                      ? 'success'
-                      : selectedTrip.status === 'cancelled'
-                      ? 'error'
-                      : 'warning'
-                  }
-                  size="sm"
-                >
-                  {selectedTrip.status}
-                </Badge>
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-500 mt-0.5">
-                Full dispatch itinerary and audit overview
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
+      {/* ─── Selected Trip Slide-Over Drawer ─── */}
+      <AdminSlideOverDrawer
+        isOpen={Boolean(selectedTrip)}
+        onClose={() => setSelectedTrip(null)}
+        title={selectedTrip ? `Trip #${selectedTrip.id.toUpperCase()}` : ''}
+        subtitle="Full dispatch itinerary, passenger details, and lifecycle controls"
+        headerBadge={
+          selectedTrip ? (
+            <Badge
+              variant={
+                selectedTrip.status === 'completed'
+                  ? 'success'
+                  : selectedTrip.status === 'cancelled'
+                  ? 'error'
+                  : 'warning'
+              }
+              size="sm"
+            >
+              {selectedTrip.status}
+            </Badge>
+          ) : undefined
+        }
+        footer={
+          selectedTrip ? (
+            <>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setAuditModalTrip(selectedTrip)}
-                className="text-xs font-bold text-purple-700 border-purple-300 hover:bg-purple-50 flex items-center gap-1.5"
+                className="text-xs font-semibold inline-flex items-center gap-1.5 mr-auto"
               >
-                <HistoryIcon className="w-3.5 h-3.5" />
-                <span>Inspect Audit Trail</span>
+                <HistoryIcon className="w-3.5 h-3.5 text-purple-600" />
+                <span>Audit Trail</span>
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setSelectedTrip(null)}
-                className="text-xs font-bold"
+                onClick={() => handleStatusTransition(selectedTrip.id, 'confirmed')}
               >
-                ✕ Close
+                Confirm
               </Button>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Passenger &amp; Booker
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleStatusTransition(selectedTrip.id, 'completed')}
+              >
+                Mark Completed
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() =>
+                  handleStatusTransition(selectedTrip.id, 'cancelled', {
+                    reason: 'Admin cancelled from console',
+                  })
+                }
+              >
+                Cancel
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {selectedTrip && (
+          <div className="space-y-4 text-xs">
+            <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Passenger &amp; Contact
               </h4>
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
-                <p className="font-bold text-slate-900">
-                  {[selectedTrip.passenger?.firstName, selectedTrip.passenger?.lastName].filter(Boolean).join(' ') || 'Guest'}
-                </p>
-                <p className="text-slate-600">📞 {selectedTrip.passenger?.phone || 'No phone'}</p>
-                <p className="text-slate-600">✉️ {selectedTrip.passenger?.email || 'No email'}</p>
-                {(selectedTrip.passenger?.specialRequests || selectedTrip.driverNotes) && (
-                  <div className="pt-1.5 border-t border-slate-200">
-                    <p className="text-[11px] font-semibold text-slate-500">Special Notes:</p>
-                    <p className="text-[11px] text-slate-700">
-                      {selectedTrip.passenger?.specialRequests || selectedTrip.driverNotes}
-                    </p>
-                  </div>
-                )}
-              </div>
+              <p className="text-sm font-bold text-slate-900">
+                {[selectedTrip.passenger?.firstName, selectedTrip.passenger?.lastName].filter(Boolean).join(' ') || 'Guest'}
+              </p>
+              <p className="text-slate-600 flex items-center gap-1.5">
+                <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{selectedTrip.passenger?.phone || 'No phone'}</span>
+              </p>
+              <p className="text-slate-600 flex items-center gap-1.5">
+                <MailIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{selectedTrip.passenger?.email || 'No email'}</span>
+              </p>
+              {(selectedTrip.passenger?.specialRequests || selectedTrip.driverNotes) && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-semibold text-slate-500">Special Notes</p>
+                  <p className="text-slate-700 mt-0.5">
+                    {selectedTrip.passenger?.specialRequests || selectedTrip.driverNotes}
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2.5">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 Route Itinerary
               </h4>
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase block">Pickup</span>
-                  <p className="font-semibold text-slate-800">{selectedTrip.pickupLocation?.address}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-rose-600 uppercase block">Dropoff</span>
-                  <p className="font-semibold text-slate-800">{selectedTrip.dropoffLocation?.address}</p>
-                </div>
-                {selectedTrip.pricing?.distanceMiles && (
-                  <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
-                    Route: {selectedTrip.pricing.distanceMiles.toFixed(1)} miles (~{selectedTrip.pricing.durationMinutes || 0} mins)
-                  </div>
-                )}
+              <div>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase block">Pickup</span>
+                <p className="font-semibold text-slate-800 mt-0.5">{selectedTrip.pickupLocation?.address}</p>
               </div>
+              <div>
+                <span className="text-[10px] font-bold text-rose-600 uppercase block">Dropoff</span>
+                <p className="font-semibold text-slate-800 mt-0.5">{selectedTrip.dropoffLocation?.address}</p>
+              </div>
+              {selectedTrip.pricing?.distanceMiles && (
+                <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                  Distance: {selectedTrip.pricing.distanceMiles.toFixed(1)} miles (~{selectedTrip.pricing.durationMinutes || 0} mins)
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Financials & Status Actions
+            <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Financial Summary
               </h4>
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-600">Total Upfront Fare:</span>
-                  <span className="font-black text-slate-900 text-sm">
-                    ${Number(selectedTrip.pricing?.totalFare || selectedTrip.payment?.amount || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-[11px] text-slate-500">
-                  <span>Payment Method:</span>
-                  <span className="font-semibold capitalize">{selectedTrip.payment?.method || 'Card'}</span>
-                </div>
-
-                <div className="pt-2 border-t border-slate-200 flex flex-wrap gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStatusTransition(selectedTrip.id, 'confirmed')}
-                    className="text-[10px] font-bold flex-1"
-                  >
-                    Confirm
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStatusTransition(selectedTrip.id, 'completed')}
-                    className="text-[10px] font-bold flex-1 bg-emerald-50 text-emerald-700 border-emerald-300"
-                  >
-                    Complete
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStatusTransition(selectedTrip.id, 'cancelled', { reason: 'Admin cancelled from console' })}
-                    className="text-[10px] font-bold flex-1 bg-rose-50 text-rose-700 border-rose-300"
-                  >
-                    Cancel
-                  </Button>
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600">Total Upfront Fare</span>
+                <span className="font-extrabold text-slate-950 text-base font-mono">
+                  ${Number(selectedTrip.pricing?.totalFare || selectedTrip.payment?.amount || 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-slate-500">
+                <span>Payment Method</span>
+                <span className="font-semibold capitalize text-slate-700">
+                  {selectedTrip.payment?.method || 'Card'}
+                </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </AdminSlideOverDrawer>
 
       {/* Trip Audit Trail Inspector Modal */}
       {auditModalTrip && (

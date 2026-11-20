@@ -43,6 +43,11 @@ import {
   PencilIcon,
   ShieldCheckIcon,
   PlusIcon,
+  RepeatIcon,
+  RefreshCwIcon,
+  AlertTriangleIcon,
+  CheckIcon,
+  CopyIcon,
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
@@ -371,7 +376,7 @@ function TripActionDropdown({
                     }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
                   >
-                    <span>🔄</span>
+                    <RefreshCwIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>Reactivate Trip</span>
                   </button>
                 )
@@ -3338,7 +3343,8 @@ export default function DispatchRoute() {
       case 'arrived':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-            📍 Arrived
+            <MapPinIcon className="w-3 h-3 text-amber-700 shrink-0" />
+            <span>Arrived</span>
           </span>
         );
       case 'in_progress':
@@ -5485,13 +5491,13 @@ export default function DispatchRoute() {
 
                         <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
                           <div className="flex items-start gap-1.5">
-                            <span className="text-emerald-600 text-xs shrink-0">🟢</span>
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <span className="truncate font-medium" title={trip.pickupLocation.address}>
                               {trip.pickupLocation.address}
                             </span>
                           </div>
                           <div className="flex items-start gap-1.5">
-                            <span className="text-red-500 text-xs shrink-0">📍</span>
+                            <MapPinIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                             <span className="truncate font-medium" title={trip.dropoffLocation.address}>
                               {trip.dropoffLocation.address}
                             </span>
@@ -5929,7 +5935,7 @@ export default function DispatchRoute() {
                                     title="Review and Accept or Decline customer web booking"
                                   >
                                     <span>Review</span>
-                                    <span>📋</span>
+                                    <CopyIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                   </button>
                                 )}
                                  <TripActionDropdown
@@ -6134,7 +6140,7 @@ export default function DispatchRoute() {
 
                       <div className="flex items-center justify-between text-xs text-slate-600 py-1.5 px-3 bg-slate-50/80 rounded-xl border border-slate-100">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-slate-400">📍</span>
+                          <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span className="font-bold text-slate-800">{driver.zone}</span>
                           {driver.telemetry && (
                             <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 rounded">
@@ -6178,7 +6184,10 @@ export default function DispatchRoute() {
                           className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
                           title="Locate car icon on live fleet map"
                         >
-                          <span>📍 Map</span>
+                          <span className="inline-flex items-center gap-1">
+                        <MapPinIcon className="w-3.5 h-3.5" />
+                        <span>Map</span>
+                      </span>
                         </button>
                         <button
                           type="button"
@@ -7126,7 +7135,13 @@ export default function DispatchRoute() {
             onClose={() => setReviewTrip(null)}
             title={isUnconfirmedTrip ? 'Review Web Booking' : 'Trip Details & History'}
             subtitle={`Trip #${reviewTrip.id} • Created ${new Date(reviewTrip.createdAt || Date.now()).toLocaleTimeString()}`}
-            icon={<span className="text-sm">{isUnconfirmedTrip ? '📋' : '🛡️'}</span>}
+            icon={
+              isUnconfirmedTrip ? (
+                <DocumentTextIcon className="w-4 h-4 text-blue-400" />
+              ) : (
+                <ShieldCheckIcon className="w-4 h-4 text-purple-400" />
+              )
+            }
             headerExtra={
               <div className="flex items-center gap-1.5 flex-wrap mr-1">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
@@ -7141,12 +7156,14 @@ export default function DispatchRoute() {
                   {reviewTrip.status}
                 </span>
                 {isReturnRide ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
-                    🔁 Return Leg {linkedTripId ? `(#${linkedTripId})` : ''}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                    <RepeatIcon className="w-3 h-3" />
+                    <span>Return Leg {linkedTripId ? `(#${linkedTripId})` : ''}</span>
                   </span>
                 ) : hasReturnTrip ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
-                    🔁 Outbound Leg {returnTripId ? `(Return #${returnTripId})` : ''}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
+                    <RepeatIcon className="w-3 h-3" />
+                    <span>Outbound Leg {returnTripId ? `(Return #${returnTripId})` : ''}</span>
                   </span>
                 ) : null}
               </div>
@@ -7171,7 +7188,7 @@ export default function DispatchRoute() {
                       : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                   }`}
                 >
-                  <span>📋</span>
+                  <DocumentTextIcon className="w-3.5 h-3.5 text-blue-400" />
                   <span>Booking Details</span>
                 </button>
                 <button
@@ -7200,7 +7217,11 @@ export default function DispatchRoute() {
                       : 'bg-red-50 text-red-800 border-b border-red-200'
                   }`}
                 >
-                  <span>{reviewAlert.type === 'success' ? '✓' : '⚠️'}</span>
+                  {reviewAlert.type === 'success' ? (
+                    <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
+                  )}
                   <span>{reviewAlert.message}</span>
                 </div>
               )}
@@ -7317,7 +7338,7 @@ export default function DispatchRoute() {
                                       Car {car.carIndex}/{mcTotal}
                                     </span>
                                     <span className="font-bold text-slate-900">{car.driverName}</span>
-                                    {car.vehicleUnit && (
+                                    {car.vehicleUnit && car.vehicleUnit.toLowerCase() !== 'unassigned' && (
                                       <span className="font-mono text-[10px] text-slate-500">
                                         ({car.vehicleUnit})
                                       </span>
@@ -7364,7 +7385,7 @@ export default function DispatchRoute() {
                     <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                          🔁
+                          <RepeatIcon className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="font-extrabold text-xs text-indigo-900 flex items-center gap-1.5">
@@ -7407,13 +7428,13 @@ export default function DispatchRoute() {
                     </div>
                     <div className="space-y-1 text-slate-600">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">📞</span>
+                        <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <a href={`tel:${reviewTrip.passenger.phone}`} className="hover:underline font-mono text-blue-600">
                           {reviewTrip.passenger.phone}
                         </a>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-slate-400">✉️</span>
+                        <MailIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <a href={`mailto:${reviewTrip.passenger.email}`} className="hover:underline font-mono text-blue-600">
                           {reviewTrip.passenger.email}
                         </a>
@@ -7710,7 +7731,7 @@ export default function DispatchRoute() {
                   <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="font-bold text-blue-900 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                        <span>✉️</span>
+                        <MailIcon className="w-3.5 h-3.5 shrink-0" />
                         <span>Email Delivery &amp; Confirmation</span>
                       </div>
                       <span className="text-[11px] text-slate-600 font-medium truncate max-w-[280px]">

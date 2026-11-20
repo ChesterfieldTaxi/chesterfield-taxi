@@ -71,7 +71,7 @@ export function VehicleImagePicker({
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
-              <span className="text-base leading-none">🚗</span>
+              <CarIcon className="w-5 h-5 text-slate-400" />
               <span className="text-[9px] font-bold mt-0.5">No Image</span>
             </div>
           )}

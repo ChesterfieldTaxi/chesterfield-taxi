@@ -61,6 +61,12 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
     (initialSubTab as WebsiteSubTab) || 'pages'
   );
 
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as WebsiteSubTab);
+    }
+  }, [initialSubTab]);
+
   // Layout Builder State
   const defaultLayout = settings.cms?.homepageLayout || [
     { id: '1', type: 'HeroBanner', isEnabled: true },
@@ -126,29 +132,6 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Visual CMS Studio Navigation Tabs */}
-      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-1.5">
-        {WEBSITE_SUB_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveSubTab(tab.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* 1. PAGES TAB */}
       {activeSubTab === 'pages' && (
         <WebsitePagesTab

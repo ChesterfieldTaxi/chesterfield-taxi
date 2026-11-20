@@ -15,6 +15,8 @@ import {
   CarIcon,
   DollarSignIcon,
   ZapIcon,
+  MapPinIcon,
+  FlagIcon,
 } from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 
@@ -160,69 +162,42 @@ export function AdminDashboardTab({
 
   return (
     <div className="space-y-6">
-      {/* ─── Dashboard Contextual Action Bar ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
-          {activeSub === 'overview' && (
-            <>
-              <BarChartIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Operational Fleet Overview &amp; Live Status</span>
-            </>
-          )}
-          {activeSub === 'telemetry' && (
-            <>
-              <ActivityIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>System Infrastructure &amp; API Connectivity</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-1" />
-            </>
-          )}
-          {activeSub === 'analytics' && (
-            <>
-              <LayersIcon className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>Route &amp; Fleet Analytics</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" size="sm" className="font-mono text-[11px] text-slate-600">
-            {totalTripsCount} Total Bookings
-          </Badge>
-        </div>
-      </div>
-
       {activeSub === 'overview' && (
         <>
-          {/* ─── Unassigned Booking Alerts Banner ─── */}
+          {/* ─── Unassigned Booking Alert Banner (Executive Clean) ─── */}
           {pendingCount > 0 && (
-            <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/5 border-2 border-amber-500/40 rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="bg-white border border-slate-200/90 border-l-4 border-l-amber-500 rounded-2xl p-4 shadow-xs">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg shadow-xs shrink-0">
-                    <AlertTriangleIcon className="w-5 h-5 text-slate-950" />
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                    <AlertTriangleIcon className="w-4 h-4" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-extrabold text-slate-950 text-sm tracking-tight">
                         {pendingCount} Unassigned Booking{pendingCount > 1 ? 's' : ''} Awaiting Dispatch
                       </h3>
-                      <Badge variant="warning" size="sm" className="font-bold">
-                        Immediate Action
+                      <Badge variant="warning" size="sm">
+                        Action Needed
                       </Badge>
                     </div>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Latest pending request: <strong>{pendingTrips[0]?.passenger?.firstName || 'Customer'}</strong> from{' '}
-                  <span className="font-mono text-[11px] text-slate-800">{pendingTrips[0]?.pickupLocation?.address?.slice(0, 45) || 'Chesterfield, MO'}...</span>
-                </p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                      Latest request: <strong className="text-slate-700">{pendingTrips[0]?.passenger?.firstName || 'Customer'}</strong> from{' '}
+                      <span className="font-mono text-[11px] text-slate-700">{pendingTrips[0]?.pickupLocation?.address?.slice(0, 50) || 'Chesterfield, MO'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab?.('trips')}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
+                >
+                  Open Active Queue →
+                </button>
               </div>
             </div>
-
-            <span className="text-xs font-semibold text-amber-900 bg-amber-100/90 px-3 py-1.5 rounded-lg border border-amber-300 shrink-0">
-              Awaiting Driver Allocation
-            </span>
-          </div>
-        </div>
-      )}
+          )}
 
       {/* ─── High-Level KPI Summary Cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -491,12 +466,14 @@ export function AdminDashboardTab({
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 max-w-sm">
-                        <div className="truncate font-medium text-slate-800">
-                          📍 {pickup}
+                      <td className="px-4 py-3 text-slate-600 max-w-sm space-y-1">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                          <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">{pickup}</span>
                         </div>
-                        <div className="truncate text-slate-400 text-[11px]">
-                          🏁 {dropoff}
+                        <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                          <FlagIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          <span className="truncate">{dropoff}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">

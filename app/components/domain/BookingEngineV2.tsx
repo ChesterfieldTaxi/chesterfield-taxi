@@ -35,6 +35,7 @@ import {
   getUniversalExtrasService,
   DEFAULT_UNIVERSAL_EXTRAS,
 } from '../../core/services/pricing/extras.service';
+import { getSurchargesService } from '../../core/services/pricing/surcharges.service';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { formatVehicleTier } from '../../core/utils/trip-id.util';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
@@ -86,10 +87,14 @@ import {
   VolumeXIcon,
   MusicNoteIcon,
   DevicePhoneMobileIcon,
+  BoltIcon,
+  CalendarIcon,
+  AlertTriangleIcon,
 } from '../ui/Icons';
 import { StripePaymentInput } from './payments/StripePaymentInput';
 import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 import { FlightAssistanceCard } from './booking/FlightAssistanceCard';
+import { ModernDatePicker, ModernTimePicker } from '../ui/ModernDateTimePicker';
 
 export interface BookingEngineV2InitialValues {
   pickupAddress?: string;
@@ -560,12 +565,18 @@ export function BookingEngineV2({
     }
   });
 
+  const [surchargesVersion, setSurchargesVersion] = useState(0);
+
   useEffect(() => {
     const unsubExtras = getUniversalExtrasService().subscribeToExtras((liveExtras) => {
       setUniversalExtras(liveExtras);
     });
+    const unsubSurcharges = getSurchargesService().subscribeToSurcharges(() => {
+      setSurchargesVersion((v) => v + 1);
+    });
     return () => {
       if (typeof unsubExtras === 'function') unsubExtras();
+      if (typeof unsubSurcharges === 'function') unsubSurcharges();
     };
   }, []);
 
@@ -1106,6 +1117,7 @@ export function BookingEngineV2({
     form.luggageType,
     activeVehicleTiers,
     mapChoiceToTier,
+    surchargesVersion,
   ]);
 
   // Live Return Trip Quote Calculation
@@ -1244,6 +1256,7 @@ export function BookingEngineV2({
     form.returnBooster,
     returnTotalCarSeats,
     mapChoiceToTier,
+    surchargesVersion,
   ]);
 
   // Debounce quote calls (800ms)
@@ -2339,7 +2352,7 @@ export function BookingEngineV2({
             )}
             {submitError && (
               <div role="alert" className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2">
-                <span className="text-base">⚠</span>
+                <AlertTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{submitError}</span>
               </div>
             )}
@@ -2367,24 +2380,26 @@ export function BookingEngineV2({
                     <button
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, timingType: 'asap' }))}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                         form.timingType === 'asap'
                           ? 'bg-white text-blue-700 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      ⚡ Ride Now (ASAP)
+                      <BoltIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Ride Now (ASAP)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, timingType: 'later' }))}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                         form.timingType === 'later'
                           ? 'bg-white text-blue-700 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      📅 Schedule for Later
+                      <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Schedule for Later</span>
                     </button>
                   </div>
                 ) : (
@@ -2395,19 +2410,18 @@ export function BookingEngineV2({
                 )}
 
                 {form.timingType === 'later' ? (
-                  <div className="grid grid-cols-2 gap-2.5 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-in fade-in duration-150">
                     <div>
                       <label htmlFor="scheduledDate" className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Pickup Date
                       </label>
-                      <input
+                      <ModernDatePicker
                         id="scheduledDate"
-                        type="date"
-                        name="scheduledDate"
                         value={form.scheduledDate}
-                        min={todayLocalDate}
-                        onChange={(e) => {
-                          setForm((prev) => ({ ...prev, scheduledDate: e.target.value }));
+                        minDate={todayLocalDate}
+                        error={Boolean(errors.scheduledDate)}
+                        onChange={(val) => {
+                          setForm((prev) => ({ ...prev, scheduledDate: val }));
                           if (errors.scheduledDate || errors.scheduledTime) {
                             setErrors((prev) => {
                               const next = { ...prev };
@@ -2417,10 +2431,6 @@ export function BookingEngineV2({
                             });
                           }
                         }}
-                        required
-                        className={`w-full min-w-0 px-3 py-2.5 bg-slate-50 border ${
-                          errors.scheduledDate ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                        } rounded-xl text-slate-900 text-base sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 focus:outline-none`}
                       />
                       {errors.scheduledDate && (
                         <p className="text-[11px] text-red-600 font-semibold mt-1">{errors.scheduledDate}</p>
@@ -2430,13 +2440,12 @@ export function BookingEngineV2({
                       <label htmlFor="scheduledTime" className="block text-[11px] font-semibold text-slate-600 mb-1">
                         Pickup Time
                       </label>
-                      <input
+                      <ModernTimePicker
                         id="scheduledTime"
-                        type="time"
-                        name="scheduledTime"
                         value={form.scheduledTime}
-                        onChange={(e) => {
-                          setForm((prev) => ({ ...prev, scheduledTime: e.target.value }));
+                        error={Boolean(errors.scheduledTime)}
+                        onChange={(val) => {
+                          setForm((prev) => ({ ...prev, scheduledTime: val }));
                           if (errors.scheduledTime) {
                             setErrors((prev) => {
                               const next = { ...prev };
@@ -2445,16 +2454,18 @@ export function BookingEngineV2({
                             });
                           }
                         }}
-                        required
-                        className={`w-full min-w-0 px-3 py-2.5 bg-slate-50 border ${
-                          errors.scheduledTime ? 'border-red-400 bg-red-50/30' : 'border-slate-300'
-                        } rounded-xl text-slate-900 text-base sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 focus:outline-none`}
                       />
+                      {errors.scheduledTime && (
+                        <p className="text-[11px] text-red-600 font-semibold mt-1">{errors.scheduledTime}</p>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div className="px-3.5 py-2.5 bg-blue-50 border border-blue-200/80 rounded-xl text-blue-900 text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
-                    <span>⚡ Immediate Dispatch (Nearest Available Vehicle)</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <BoltIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Immediate Dispatch (Nearest Available Vehicle)</span>
+                    </span>
                     <span className="text-[11px] text-blue-700 font-medium">Typical arrival 15–25 mins</span>
                   </div>
                 )}
@@ -2905,36 +2916,36 @@ export function BookingEngineV2({
               </div>
 
               <div className="space-y-3">
-                {/* Passengers & Bags Row - Accessible 36px touch targets */}
+                {/* Passengers & Bags Row — Zero-overflow 3-column stepper cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {/* Passengers Counter */}
                   <div
                     data-field="passengers"
-                    className={`p-2.5 bg-slate-50 border ${
+                    className={`p-3 bg-slate-50 border ${
                       errors.passengers ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
-                    } rounded-xl flex items-center justify-between gap-2`}
+                    } rounded-xl flex flex-col justify-between gap-2 min-w-0`}
                   >
-                    <div className="flex items-center gap-2 text-slate-700 text-xs">
-                      <UserIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span className="font-bold text-slate-800">Passengers</span>
+                    <div className="flex items-center gap-1.5 text-slate-700 text-xs min-w-0">
+                      <UserIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="font-bold text-slate-800 truncate">Passengers</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         aria-label="Decrease passengers"
                         disabled={form.passengers <= 1}
                         onClick={() => setForm((prev) => ({ ...prev, passengers: Math.max(1, prev.passengers - 1) }))}
-                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
                         &minus;
                       </button>
-                      <span className="w-5 text-center font-extrabold text-sm text-slate-900">{form.passengers}</span>
+                      <span className="min-w-[1.5rem] text-center font-extrabold text-sm text-slate-900">{form.passengers}</span>
                       <button
                         type="button"
                         aria-label="Increase passengers"
                         disabled={form.passengers >= totalMaxPassengers}
                         onClick={() => setForm((prev) => ({ ...prev, passengers: Math.min(totalMaxPassengers, prev.passengers + 1) }))}
-                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-base leading-none disabled:opacity-40 cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-base leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
                         +
                       </button>
@@ -2944,15 +2955,15 @@ export function BookingEngineV2({
                   {/* Carry-on Bags */}
                   <div
                     data-field="bags"
-                    className={`p-2.5 bg-slate-50 border ${
+                    className={`p-3 bg-slate-50 border ${
                       errors.bags ? 'border-red-400 bg-red-50/30' : 'border-slate-200'
-                    } rounded-xl flex items-center justify-between gap-2`}
+                    } rounded-xl flex flex-col justify-between gap-2 min-w-0`}
                   >
-                    <div className="flex items-center gap-2 text-slate-700 text-xs">
-                      <LuggageIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span className="font-bold text-slate-800">Carry-on</span>
+                    <div className="flex items-center gap-1.5 text-slate-700 text-xs min-w-0">
+                      <LuggageIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="font-bold text-slate-800 truncate">Carry-on</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         aria-label="Decrease carry-on bags"
@@ -2963,11 +2974,11 @@ export function BookingEngineV2({
                             return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
                           })
                         }
-                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
                         &minus;
                       </button>
-                      <span className="w-5 text-center font-extrabold text-sm text-slate-900">{form.carryOnBags}</span>
+                      <span className="min-w-[1.5rem] text-center font-extrabold text-sm text-slate-900">{form.carryOnBags}</span>
                       <button
                         type="button"
                         aria-label="Increase carry-on bags"
@@ -2978,7 +2989,7 @@ export function BookingEngineV2({
                             return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
                           })
                         }
-                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-base leading-none cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-base leading-none cursor-pointer shrink-0"
                       >
                         +
                       </button>
@@ -2986,12 +2997,12 @@ export function BookingEngineV2({
                   </div>
 
                   {/* Checked Bags */}
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-slate-700 text-xs">
-                      <LuggageIcon className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span className="font-bold text-slate-800">Checked</span>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 text-slate-700 text-xs min-w-0">
+                      <LuggageIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="font-bold text-slate-800 truncate">Checked</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
                         aria-label="Decrease checked bags"
@@ -3002,11 +3013,11 @@ export function BookingEngineV2({
                             return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
                           })
                         }
-                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-base leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
                         &minus;
                       </button>
-                      <span className="w-5 text-center font-extrabold text-sm text-slate-900">{form.checkedBags}</span>
+                      <span className="min-w-[1.5rem] text-center font-extrabold text-sm text-slate-900">{form.checkedBags}</span>
                       <button
                         type="button"
                         aria-label="Increase checked bags"
@@ -3017,7 +3028,7 @@ export function BookingEngineV2({
                             return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
                           })
                         }
-                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-base leading-none cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-base leading-none cursor-pointer shrink-0"
                       >
                         +
                       </button>

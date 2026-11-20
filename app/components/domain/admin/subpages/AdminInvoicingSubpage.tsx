@@ -1027,144 +1027,89 @@ export function AdminInvoicingSubpage({
   };
 
   return (
-    <div className="space-y-6">
-      {/* ─── Invoicing Contextual Action Bar ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
-          {activeSub === 'ledger' && (
-            <>
-              <FileTextIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Invoices &amp; Billing Ledger ({invoices.length} invoices)</span>
-            </>
-          )}
+    <div className="space-y-5">
+      {/* ─── Clean Sub-Tab Utility Bar (Only when Accounts or Accounting Sync needs top actions) ─── */}
+      {(activeSub === 'accounts' || activeSub === 'accounting-sync') && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+            {activeSub === 'accounts' && (
+              <>
+                <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Corporate Direct Billing ({corporateAccounts.length} clients)</span>
+              </>
+            )}
+            {activeSub === 'accounting-sync' && (
+              <>
+                <BarChartIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>QuickBooks &amp; General Ledger Export</span>
+              </>
+            )}
+          </div>
+
           {activeSub === 'accounts' && (
-            <>
-              <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Corporate Direct Billing ({corporateAccounts.length} clients)</span>
-            </>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCsvModalOpen(true)}
+                leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
+                className="text-xs font-semibold"
+              >
+                Import CSV
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setIsNewAccountModalOpen(true)}
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+                className="text-xs font-bold"
+              >
+                Add Corporate Client
+              </Button>
+            </div>
           )}
-          {activeSub === 'gateways' && (
-            <>
-              <CreditCardIcon className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>Payment Gateway Terminals &amp; Processors</span>
-            </>
-          )}
+
           {activeSub === 'accounting-sync' && (
-            <>
-              <BarChartIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>QuickBooks &amp; General Ledger Accounting Sync</span>
-            </>
-          )}
-          {activeSub === 'telephony' && (
-            <>
-              <PhoneIcon className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>Twilio Telephony &amp; Voice Gateway</span>
-            </>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isExporting}
+                onClick={() => handleExport('quickbooks_csv')}
+                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
+                className="text-xs font-semibold"
+              >
+                QuickBooks CSV
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isExporting}
+                onClick={() => handleExport('quickbooks_iif')}
+                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
+                className="text-xs font-semibold"
+              >
+                QuickBooks IIF
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={isExporting}
+                onClick={() => handleExport('general_ledger_json')}
+                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
+                className="text-xs font-bold"
+              >
+                Export GL JSON
+              </Button>
+            </div>
           )}
         </div>
-
-        {activeSub === 'ledger' && (
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => setIsNewInvoiceModalOpen(true)}
-            leftIcon={<PlusIcon className="w-4 h-4" />}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm active:scale-95"
-          >
-            Generate Invoice
-          </Button>
-        )}
-
-        {activeSub === 'accounts' && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCsvModalOpen(true)}
-              leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
-              className="text-xs font-bold"
-            >
-              Import CSV
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => setIsNewAccountModalOpen(true)}
-              leftIcon={<PlusIcon className="w-4 h-4" />}
-              className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm active:scale-95"
-            >
-              Add Corporate Client
-            </Button>
-          </div>
-        )}
-
-        {activeSub === 'gateways' && (
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => handleSaveApiCredentials('Payment Gateway')}
-            leftIcon={<CheckIcon className="w-4 h-4" />}
-            className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs hover:shadow-sm active:scale-95"
-          >
-            Save Gateway Credentials
-          </Button>
-        )}
-
-        {activeSub === 'telephony' && (
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => handleSaveApiCredentials('Twilio Telephony')}
-            leftIcon={<CheckIcon className="w-4 h-4" />}
-            className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs hover:shadow-sm active:scale-95"
-          >
-            Save Telephony Credentials
-          </Button>
-        )}
-
-        {activeSub === 'accounting-sync' && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isExporting}
-              onClick={() => handleExport('quickbooks_csv')}
-              leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-              className="text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300"
-            >
-              QuickBooks CSV
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isExporting}
-              onClick={() => handleExport('quickbooks_iif')}
-              leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-              className="text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300"
-            >
-              QuickBooks IIF
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              disabled={isExporting}
-              onClick={() => handleExport('general_ledger_json')}
-              leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              Export GL JSON
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       {saveSuccessMessage && (
         <Alert variant="success" className="animate-in fade-in text-xs font-semibold">
@@ -1177,7 +1122,8 @@ export function AdminInvoicingSubpage({
         </Alert>
       )}
 
-      {/* ─── Metric KPI Badges ─── */}
+      {/* ─── Metric KPI Summary (Scoped cleanly to Ledger sub-tab only) ─── */}
+      {activeSub === 'ledger' && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Unbilled AR */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all">
@@ -1251,6 +1197,7 @@ export function AdminInvoicingSubpage({
           </span>
         </div>
       </div>
+      )}
 
       {/* ─── Sub-View: Invoicing & Accounts Receivable Ledger ─── */}
       {activeSub === 'ledger' && (

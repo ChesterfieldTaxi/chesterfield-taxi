@@ -1299,7 +1299,7 @@ export default function DriverAppRoute() {
     .reduce((sum, p) => sum + Number(p.companyCommissionOwed || p.platformFee || 0), 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-24 select-none antialiased">
+    <div className="h-dvh overflow-hidden bg-slate-950 text-slate-100 flex flex-col select-none antialiased">
       {/* Click-outside dismissal backdrop for profile dropdown */}
       {showProfileMenu && (
         <div
@@ -1627,8 +1627,9 @@ export default function DriverAppRoute() {
         </div>
       )}
 
-      {/* Main Container */}
-      <main className="p-4 max-w-lg mx-auto w-full flex-1 flex flex-col gap-4 pb-28">
+      {/* Main Scrollable Viewport Container (fits cleanly between header and bottom nav without dead scroll) */}
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain w-full">
+        <div className="p-4 max-w-lg mx-auto w-full flex flex-col gap-4 pb-6">
         {/* TAB 1: ACTIVE TRIP VIEW */}
         {currentTab === 'active' && (
           <>
@@ -2777,10 +2778,11 @@ export default function DriverAppRoute() {
             </div>
           </section>
         )}
+        </div>
       </main>
 
-      {/* STICKY BOTTOM TAB NAVIGATION BAR */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 border-t border-slate-800 backdrop-blur-md px-3 py-2 shadow-2xl">
+      {/* STICKY BOTTOM TAB NAVIGATION BAR (non-overlapping flex footer) */}
+      <nav className="shrink-0 z-40 bg-slate-900/95 border-t border-slate-800 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl">
         <div className="grid grid-cols-5 gap-1.5 max-w-lg mx-auto">
           <button
             type="button"

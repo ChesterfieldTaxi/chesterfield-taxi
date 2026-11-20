@@ -309,32 +309,28 @@ export function AdminCustomersSubpage({
   };
 
   return (
-    <div className="space-y-6">
-      {/* ─── Customers Contextual Action Bar ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
-          {activeSub === 'directory' ? (
-            <>
-              <UsersIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Passenger Directory ({allCustomers.length} profiles)</span>
-            </>
-          ) : (
-            <>
-              <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Corporate Client Accounts ({corporateClients.length} accounts)</span>
-            </>
-          )}
-        </div>
+    <div className="space-y-4">
+      {/* ─── Unified Directory Toolbar (only shown on Directory sub-tab; Corporate has its own toolbar) ─── */}
+      {activeSub === 'directory' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="w-full sm:w-64">
+              <input
+                type="text"
+                placeholder="Search passenger by name, phone, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {activeSub === 'directory' && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setArchiveFilter('active')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
                   archiveFilter === 'active'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
@@ -343,9 +339,9 @@ export function AdminCustomersSubpage({
               <button
                 type="button"
                 onClick={() => setArchiveFilter('archived')}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
                   archiveFilter === 'archived'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
@@ -355,16 +351,16 @@ export function AdminCustomersSubpage({
               <button
                 type="button"
                 onClick={() => setArchiveFilter('all')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
                   archiveFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 All ({allCustomers.length})
               </button>
             </div>
-          )}
+          </div>
 
           <Button
             type="button"
@@ -383,33 +379,12 @@ export function AdminCustomersSubpage({
                 preferredVehicle: 'Standard Sedan',
               }, true);
             }}
-            className="text-xs font-bold inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+            className="text-xs font-bold shrink-0"
           >
-            <span>+ Add Contact</span>
+            + Add Contact
           </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsArchiveDrawerOpen(true)}
-            className="text-xs font-bold inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300"
-          >
-            <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-            <span>Universal Archive Drawer</span>
-          </Button>
-
-          <div className="w-full sm:w-56">
-            <input
-              type="text"
-              placeholder="Search passenger..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
         </div>
-      </div>
+      )}
 
       {/* ─── Directory Table ─── */}
       {activeSub === 'directory' && (

@@ -12,6 +12,7 @@ import {
   UserIcon,
   CarIcon,
   ShieldIcon,
+  CopyIcon,
 } from '../../ui/Icons';
 
 export interface TripAuditModalProps {
@@ -178,8 +179,9 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
             </span>
             {trip.assignedVehicle ? (
               <div className="mt-0.5">
-                <div className="font-extrabold text-slate-900 flex items-center gap-1">
-                  <span>🚕</span> {trip.assignedVehicle.vehicleNumber}
+                <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>{trip.assignedVehicle.vehicleNumber}</span>
                 </div>
                 <div className="text-slate-500 font-mono text-[11px]">
                   {trip.assignedVehicle.model} ({trip.assignedVehicle.licensePlate})
@@ -198,9 +200,19 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
             <button
               type="button"
               onClick={handleCopyJson}
-              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-2 flex items-center gap-1 cursor-pointer"
+              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-2 inline-flex items-center gap-1.5 cursor-pointer"
             >
-              {copied ? '✓ JSON Copied' : '📋 Copy Raw Audit JSON'}
+              {copied ? (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>JSON Copied</span>
+                </>
+              ) : (
+                <>
+                  <CopyIcon className="w-3.5 h-3.5" />
+                  <span>Copy Raw Audit JSON</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -281,9 +293,19 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
             <button
               type="button"
               onClick={handleCopyJson}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1.5 cursor-pointer"
             >
-              {copied ? '✓ JSON Copied' : '📋 Copy Raw Audit JSON'}
+              {copied ? (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>JSON Copied</span>
+                </>
+              ) : (
+                <>
+                  <CopyIcon className="w-3.5 h-3.5" />
+                  <span>Copy Raw Audit JSON</span>
+                </>
+              )}
             </button>
           </div>
         )}

@@ -36,6 +36,12 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
   const [isRestoring, setIsRestoring] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveFilter(initialSubTab);
+    }
+  }, [initialSubTab]);
+
   const loadAllArchives = async () => {
     try {
       const gov = getUniversalGovernanceService();
@@ -309,34 +315,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
   };
 
   return (
-    <div className="space-y-6 max-w-7xl pb-16">
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800">
-              <ArchiveBoxIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Enterprise Archive &amp; Governance Center</h2>
-              <p className="text-xs text-slate-500 font-medium">
-                Unified data retention vault and 1-click restoration engine across all platform entities.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadAllArchives}
-            className="text-xs font-bold text-slate-700 bg-white shadow-2xs"
-          >
-            Refresh Vault
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4 max-w-7xl pb-12">
       {toastMessage && (
         <Alert
           variant={toastMessage.type === 'success' ? 'success' : 'error'}
@@ -346,83 +325,30 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
         </Alert>
       )}
 
-      {/* ─── KPI Metrics ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total Vault</span>
-          <span className="text-2xl font-black text-slate-900">{archivedRecords.length}</span>
-          <span className="text-[10px] text-slate-400 block">All archived records</span>
-        </div>
-
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Trips</span>
-          <span className="text-2xl font-black text-slate-800">{tripCount}</span>
-          <span className="text-[10px] text-slate-400 block">Archived trip logs</span>
-        </div>
-
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Riders &amp; Staff</span>
-          <span className="text-2xl font-black text-blue-700">{customerCount + operatorCount}</span>
-          <span className="text-[10px] text-slate-400 block">Archived users</span>
-        </div>
-
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Fleet &amp; Types</span>
-          <span className="text-2xl font-black text-amber-700">{vehicleCount}</span>
-          <span className="text-[10px] text-slate-400 block">Vehicles &amp; classes</span>
-        </div>
-
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Zones &amp; POIs</span>
-          <span className="text-2xl font-black text-rose-700">{zoneCount}</span>
-          <span className="text-[10px] text-slate-400 block">Geofences &amp; clusters</span>
-        </div>
-
-        <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Tariff Profiles</span>
-          <span className="text-2xl font-black text-purple-700">{tariffCount}</span>
-          <span className="text-[10px] text-slate-400 block">Pricing rate profiles</span>
-        </div>
-      </div>
-
-      {/* ─── Search & Category Filter Pills ─── */}
-      <Card variant="elevated" className="border-slate-200 shadow-xs">
+      {/* ─── Single Clean Toolbar + Table Card ─── */}
+      <Card variant="elevated" className="border-slate-200/90 shadow-xs">
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {/* Entity Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-              {[
-                { key: 'all', label: `All (${archivedRecords.length})` },
-                { key: 'trips', label: `Trips (${tripCount})` },
-                { key: 'customers', label: `Passengers (${customerCount})` },
-                { key: 'operators', label: `Staff & Drivers (${operatorCount})` },
-                { key: 'vehicles', label: `Fleet & Classes (${vehicleCount})` },
-                { key: 'zones', label: `Zones & Corridors (${zoneCount})` },
-                { key: 'tariffs', label: `Tariffs (${tariffCount})` },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveFilter(tab.key)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    activeFilter === tab.key
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Search Input */}
-            <div className="w-full sm:w-72 shrink-0">
+            <div className="w-full sm:w-80">
               <Input
                 placeholder="Search archive by ID, name, reason..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="text-xs h-9 bg-slate-50"
               />
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-xs font-semibold text-slate-500">
+                {filteredRecords.length} archived record{filteredRecords.length === 1 ? '' : 's'}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadAllArchives}
+                className="text-xs font-semibold text-slate-700 bg-white shadow-2xs"
+              >
+                Refresh
+              </Button>
             </div>
           </div>
 

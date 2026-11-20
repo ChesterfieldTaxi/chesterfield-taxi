@@ -16,14 +16,12 @@ import {
   AdminTripsSubpage,
   AdminInvoicingSubpage,
   AdminCustomersSubpage,
-  AdminBookingsTab,
-  AdminLayoutTab,
+  AdminWebsiteTab,
   AdminArchiveTab,
 } from '../components/domain/admin';
 import { AdminIntegrationsSubpage } from '../components/domain/admin/subpages/AdminIntegrationsSubpage';
 import { AdminRulesTab } from '../components/domain/admin/AdminRulesTab';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
-import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import {
   CarIcon,
   SpinnerIcon,
@@ -39,6 +37,9 @@ import {
   MenuIcon,
   ExternalLinkIcon,
   ArchiveBoxIcon,
+  PaletteIcon,
+  ZapIcon,
+  SlidersIcon,
 } from '../components/ui/Icons';
 
 export function meta() {
@@ -99,15 +100,9 @@ const PRIMARY_TABS: TabItem[] = [
     description: 'Double-entry general ledger, B2B corporate billing, statements, and QuickBooks/GL sync',
   },
   {
-    key: 'financials',
-    label: 'Financials & Invoicing',
-    icon: CreditCardIcon,
-    description: 'Double-entry general ledger, B2B corporate billing, statements, and QuickBooks/GL sync',
-  },
-  {
     key: 'integrations',
     label: 'Integrations & APIs',
-    icon: SettingsIcon,
+    icon: ZapIcon,
     description: 'Payment processors (Stripe & Square), Twilio voice & SMS gateway, and system webhooks',
   },
   {
@@ -118,19 +113,19 @@ const PRIMARY_TABS: TabItem[] = [
   },
   {
     key: 'rates',
-    label: 'Rates',
+    label: 'Rates & Tariffs',
     icon: DollarSignIcon,
     description: 'Base pricing rules, real-time fare simulator, named pricing rules, and distance tier tables',
   },
   {
     key: 'vehicles',
-    label: 'Vehicles',
+    label: 'Fleet & Vehicles',
     icon: CarIcon,
     description: 'Vehicle service classes & physical motorized fleet asset inventory',
   },
   {
     key: 'zones',
-    label: 'Zones',
+    label: 'Service Zones',
     icon: MapPinIcon,
     description: 'Geofence map manager for drawing and saving named polygon and radius surcharge zones',
   },
@@ -147,8 +142,14 @@ const PRIMARY_TABS: TabItem[] = [
     description: 'Enterprise data retention vault and 1-click restoration engine across all platform entities',
   },
   {
+    key: 'website',
+    label: 'Website Studio',
+    icon: PaletteIcon,
+    description: 'Visual pages directory, booking form controls, navigation, and SEO',
+  },
+  {
     key: 'general',
-    label: 'General',
+    label: 'General & Branding',
     icon: SettingsIcon,
     description: 'Dynamic branding studio, company profile, and regional localization',
   },
@@ -156,7 +157,7 @@ const PRIMARY_TABS: TabItem[] = [
     key: 'advanced',
     label: 'Advanced Settings',
     icon: SettingsIcon,
-    description: 'Visual website studio, security permissions, audit trails, and maintenance',
+    description: 'Security permissions, audit trails, and system operations',
   },
 ];
 
@@ -216,8 +217,16 @@ export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = 
     { key: 'studio', label: 'Branding Studio' },
     { key: 'profile', label: 'Business Profile' },
   ],
+  website: [
+    { key: 'pages', label: 'Pages' },
+    { key: 'themes', label: 'Themes & Livery' },
+    { key: 'form', label: 'Form Controls' },
+    { key: 'layout', label: 'Section Canvas' },
+    { key: 'navigation', label: 'Header & Footer' },
+    { key: 'seo', label: 'SEO & Analytics' },
+    { key: 'css', label: 'Custom CSS' },
+  ],
   advanced: [
-    { key: 'website', label: 'Website Studio' },
     { key: 'security', label: 'Security & Access' },
     { key: 'audit', label: 'Audit Trail' },
     { key: 'system', label: 'System Ops' },
@@ -251,7 +260,19 @@ export default function AdminLayout() {
   const [isLiveFirebase, setIsLiveFirebase] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSystemMenuOpen, setIsSystemMenuOpen] = useState(false);
+  const systemMenuRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!isSystemMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (systemMenuRef.current && !systemMenuRef.current.contains(e.target as Node)) {
+        setIsSystemMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSystemMenuOpen]);
 
   // Active tab derived reactively from location.search with legacy aliasing
   const searchParams = new URLSearchParams(location.search);
@@ -273,12 +294,13 @@ export default function AdminLayout() {
   } else if (rawTab === 'bookings') {
     normalizedTab = 'trips';
   } else if (rawTab === 'form' || rawTab === 'layout' || rawTab === 'website') {
-    normalizedTab = 'advanced';
-    activeSubParam = 'website';
+    normalizedTab = 'website';
+    activeSubParam = undefined;
   }
 
-  if (normalizedTab === 'advanced' && (activeSubParam === 'form' || activeSubParam === 'customer-form')) {
-    activeSubParam = 'website';
+  if (normalizedTab === 'advanced' && (activeSubParam === 'website' || activeSubParam === 'form' || activeSubParam === 'customer-form')) {
+    normalizedTab = 'website';
+    activeSubParam = undefined;
   }
 
   // Current subpages for the active tab (safely handle empty arrays)
@@ -391,24 +413,24 @@ export default function AdminLayout() {
 
   return (
     <div
-      className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-row antialiased"
+      className="min-h-screen bg-slate-50 text-slate-900 flex flex-row antialiased"
       style={
         {
-          "--color-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--color-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#2563eb",
           "--color-secondary": settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || "#0f172a",
-          "--brand-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#f59e0b",
+          "--brand-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#2563eb",
           "--brand-secondary": settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || "#0f172a",
           "--color-heading": settings.branding?.headingColor || COMPANY_CONFIG.headingColor || "#0f172a",
           "--color-text-main": settings.branding?.bodyTextColor || COMPANY_CONFIG.bodyTextColor || "#334155",
           "--color-text-muted": settings.branding?.mutedTextColor || COMPANY_CONFIG.mutedTextColor || "#64748b",
-          "--btn-primary-bg": settings.branding?.btnPrimaryBg || COMPANY_CONFIG.btnPrimaryBg || "#f59e0b",
-          "--btn-primary-text": settings.branding?.btnPrimaryText || COMPANY_CONFIG.btnPrimaryText || "#020617",
+          "--btn-primary-bg": settings.branding?.btnPrimaryBg || COMPANY_CONFIG.btnPrimaryBg || "#2563eb",
+          "--btn-primary-text": settings.branding?.btnPrimaryText || COMPANY_CONFIG.btnPrimaryText || "#ffffff",
           "--btn-secondary-bg": settings.branding?.btnSecondaryBg || COMPANY_CONFIG.btnSecondaryBg || "#0f172a",
           "--btn-secondary-text": settings.branding?.btnSecondaryText || COMPANY_CONFIG.btnSecondaryText || "#ffffff",
-          "--btn-radius": settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || "8px",
+          "--btn-radius": settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || "12px",
           "--navbar-bg": settings.branding?.navbarBg || COMPANY_CONFIG.navbarBg || "#0f172a",
           "--card-bg": settings.branding?.cardBg || COMPANY_CONFIG.cardBg || "#ffffff",
-          "--font-heading": `'${settings.branding?.headingFont || COMPANY_CONFIG.headingFont || "Inter"}', sans-serif`,
+          "--font-heading": `'${settings.branding?.headingFont || COMPANY_CONFIG.headingFont || "Lexend"}', 'Inter', sans-serif`,
           "--font-body": `'${settings.branding?.bodyFont || COMPANY_CONFIG.bodyFont || "Inter"}', sans-serif`,
         } as React.CSSProperties
       }
@@ -429,116 +451,47 @@ export default function AdminLayout() {
 
       {/* ─── Main Admin Workspace Canvas ─── */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        {/* Top Control Header with Section Title & Actions */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
-          <div className="px-4 sm:px-6 lg:px-8 h-15 sm:h-16 flex items-center justify-between gap-4">
-            {/* Left: Mobile Toggle & Active Section Title */}
-            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+        {/* Clean Executive Top Header + Underline Sub-Navigation */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90">
+          <div className="px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
+            {/* Left: Mobile Toggle + Page Title */}
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+                className="lg:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
                 title="Open Navigation Menu"
+                aria-label="Open Navigation Menu"
               >
                 <MenuIcon className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight whitespace-nowrap">
-                  {currentTabObj.label}
-                </span>
-                <span className="hidden sm:inline-flex text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
-                  Admin
-                </span>
-              </div>
+              <h1 className="text-base sm:text-lg font-extrabold text-slate-950 tracking-tight truncate">
+                {currentTabObj.label}
+              </h1>
+
+              {settings.constructionMode !== false && (
+                <button
+                  type="button"
+                  onClick={() => setIsSystemMenuOpen(true)}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer shrink-0"
+                  title="Maintenance Mode is active — click to manage"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Maintenance ON</span>
+                </button>
+              )}
             </div>
 
-            {/* Right: Maintenance Mode Quick Toggle, Quick Launch Dispatch, Public Link, Status Badge */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-              {/* Quick Sitewide "Get App" Buttons Switch */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const currentEnabled = settings.enableGetAppButtons === true;
-                  await handleSaveSettings({
-                    enableGetAppButtons: !currentEnabled,
-                    updatedAt: new Date().toISOString(),
-                  });
-                }}
-                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  settings.enableGetAppButtons === true
-                    ? 'bg-blue-500/15 border-blue-500/40 text-blue-900 shadow-xs hover:bg-blue-500/25'
-                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
-                }`}
-                title={
-                  settings.enableGetAppButtons === true
-                    ? '"Get App" buttons are currently ENABLED sitewide. Click to disable and hide them.'
-                    : '"Get App" buttons are currently DISABLED (hidden) sitewide. Click to enable them.'
-                }
-              >
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    settings.enableGetAppButtons === true
-                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
-                      : 'bg-slate-400'
-                  }`}
-                />
-                <span className="hidden sm:inline font-bold text-slate-700">Get App:</span>
-                <span className={`text-[11px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  settings.enableGetAppButtons === true ? 'bg-blue-600 text-white font-black' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {settings.enableGetAppButtons === true ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
-              {/* Prominent Maintenance / Construction Mode Switch */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const currentMode = settings.constructionMode !== false;
-                  const nextVal = !currentMode;
-                  await handleSaveSettings({
-                    constructionMode: nextVal,
-                    updatedAt: new Date().toISOString(),
-                  });
-                }}
-                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                  settings.constructionMode !== false
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-900 shadow-xs hover:bg-amber-500/25'
-                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
-                }`}
-                title={
-                  settings.constructionMode !== false
-                    ? 'Maintenance Mode is currently ON (Under Construction page shown to customers). Click to turn OFF.'
-                    : 'Maintenance Mode is currently OFF (Site is live for booking). Click to turn ON.'
-                }
-              >
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    settings.constructionMode !== false
-                      ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.9)]'
-                      : 'bg-emerald-500'
-                  }`}
-                />
-                <span className="hidden sm:inline font-bold text-slate-700">Maintenance:</span>
-                <span className={`text-[11px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  settings.constructionMode !== false ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {settings.constructionMode !== false ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
+            {/* Right: Primary Dispatch CTA, Live Site Link, System Controls Popover */}
+            <div className="flex items-center gap-2 shrink-0">
               <Link
                 to="/app/dispatch"
                 reloadDocument
-                style={{
-                  backgroundColor: 'var(--brand-primary, #2563eb)',
-                  color: 'var(--btn-primary-text, #ffffff)',
-                }}
-                className="text-xs font-black p-1.5 sm:px-3 sm:py-2 rounded-xl shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5"
+                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors flex items-center gap-1.5"
                 title="Launch Live 3-Pane Dispatch Console"
               >
-                <RadioIcon className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                <RadioIcon className="w-3.5 h-3.5 shrink-0" />
                 <span className="hidden sm:inline">Launch Dispatch</span>
               </Link>
 
@@ -546,27 +499,124 @@ export default function AdminLayout() {
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-slate-600 hover:text-slate-900 font-bold p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1"
-                title="View live passenger web app"
+                className="text-xs text-slate-600 hover:text-slate-900 font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 transition-colors flex items-center gap-1.5"
+                title="Open live customer website"
               >
                 <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span className="hidden md:inline">Live Site</span>
               </a>
 
-              <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-bold text-slate-600">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    isLiveFirebase ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-amber-400'
+              {/* Compact System Controls Popover (Maintenance, Get App, Cloud Sync) */}
+              <div className="relative" ref={systemMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsSystemMenuOpen((prev) => !prev)}
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    isSystemMenuOpen
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-50'
                   }`}
-                />
-                <span>{isLiveFirebase ? 'Cloud Synced' : 'Local Storage'}</span>
+                  title="Site Availability & System Status"
+                  aria-label="Site Availability & System Status"
+                >
+                  <SlidersIcon className="w-4 h-4" />
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      settings.constructionMode !== false
+                        ? 'bg-amber-500'
+                        : isLiveFirebase
+                        ? 'bg-emerald-500'
+                        : 'bg-slate-400'
+                    }`}
+                  />
+                </button>
+
+                {isSystemMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2.5 z-50">
+                    <div className="flex items-center justify-between px-1 pb-2 border-b border-slate-100">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Site Controls
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            isLiveFirebase ? 'bg-emerald-500' : 'bg-amber-400'
+                          }`}
+                        />
+                        {isLiveFirebase ? 'Cloud Synced' : 'Local Storage'}
+                      </span>
+                    </div>
+
+                    {/* Maintenance Mode Toggle */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const currentMode = settings.constructionMode !== false;
+                        await handleSaveSettings({
+                          constructionMode: !currentMode,
+                          updatedAt: new Date().toISOString(),
+                        });
+                      }}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-bold text-slate-900">Maintenance Mode</div>
+                        <div className="text-[11px] text-slate-500">
+                          {settings.constructionMode !== false
+                            ? 'Showing Under Construction page'
+                            : 'Public site live for booking'}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md shrink-0 ${
+                          settings.constructionMode !== false
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {settings.constructionMode !== false ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+
+                    {/* Get App Buttons Toggle */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const currentEnabled = settings.enableGetAppButtons === true;
+                        await handleSaveSettings({
+                          enableGetAppButtons: !currentEnabled,
+                          updatedAt: new Date().toISOString(),
+                        });
+                      }}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-bold text-slate-900">&ldquo;Get App&rdquo; Buttons</div>
+                        <div className="text-[11px] text-slate-500">
+                          {settings.enableGetAppButtons === true
+                            ? 'Visible in public header'
+                            : 'Hidden sitewide'}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md shrink-0 ${
+                          settings.enableGetAppButtons === true
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {settings.enableGetAppButtons === true ? 'ON' : 'OFF'}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Subpage Navigation Strip: Unabbreviated, Smooth-Scrolling Pill Tabs */}
+          {/* Clean Underline Sub-Navigation Bar */}
           {activeSubList.length > 0 && (
-            <div className="bg-slate-50/80 border-t border-slate-200/80 px-4 sm:px-6 lg:px-8 py-2 overflow-x-auto no-scrollbar flex items-center gap-1.5 shrink-0">
+            <div className="px-4 sm:px-6 lg:px-8 border-t border-slate-100 overflow-x-auto no-scrollbar flex items-center gap-5 shrink-0">
               {activeSubList.map((sub) => {
                 const isActive = effectiveSub === sub.key;
                 return (
@@ -574,10 +624,10 @@ export default function AdminLayout() {
                     key={sub.key}
                     type="button"
                     onClick={() => handleTabChange(normalizedTab, sub.key)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                    className={`py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-xs font-extrabold'
-                        : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-2xs'
+                        ? 'border-blue-600 text-blue-600 font-bold'
+                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
                     }`}
                   >
                     {sub.label}
@@ -665,6 +715,16 @@ export default function AdminLayout() {
               />
             )}
 
+            {/* Website Studio (Top-Level CMS) */}
+            {normalizedTab === 'website' && (
+              <AdminWebsiteTab
+                settings={settings}
+                onSave={handleSaveSettings}
+                isLoading={isSavingConfig || isConfigLoading}
+                initialSubTab={effectiveSub}
+              />
+            )}
+
             {/* General Settings */}
             {normalizedTab === 'general' && (
               <AdminGeneralTab
@@ -675,19 +735,6 @@ export default function AdminLayout() {
               />
             )}
 
-            {(normalizedTab === 'form' || normalizedTab === 'layout') && (
-              <AdminAdvancedTab
-                settings={settings}
-                onSave={handleSaveSettings}
-                isLoading={isSavingConfig || isConfigLoading}
-                initialSubTab="website"
-              />
-            )}
-
-            {normalizedTab === 'bookings' && (
-              <AdminTripsSubpage initialSubTab="dispatch" />
-            )}
-
             {normalizedTab === 'archive' && (
               <AdminArchiveTab initialSubTab={effectiveSub as any} />
             )}
@@ -696,20 +743,6 @@ export default function AdminLayout() {
           {/* Outlet for any nested routes */}
           <Outlet />
         </main>
-
-        {/* Admin Footer */}
-        <footer className="border-t border-slate-200 bg-white py-5 mt-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-            <div>
-              &copy; {new Date().getFullYear()} {settings.company?.name || COMPANY_CONFIG.name} &bull; Admin &amp; Dispatch Console
-            </div>
-            <div className="flex items-center gap-3">
-              <span>React Router v7 Framework Mode</span>
-              <span>&bull;</span>
-              <span>Firebase Firestore Sync</span>
-            </div>
-          </div>
-        </footer>
       </div>
     </div>
   );

@@ -15,6 +15,11 @@ import {
   ShieldCheckIcon,
   PlaneLandingIcon,
   LuggageIcon,
+  CopyIcon,
+  FileTextIcon,
+  SparklesIcon,
+  PlaneIcon,
+  RepeatIcon,
 } from '../ui/Icons';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -228,10 +233,20 @@ export function BookingConfirmation({
           <button
             type="button"
             onClick={handleCopyId}
-            className="ml-1 p-1 hover:bg-white/20 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+            className="ml-1 px-1.5 py-0.5 hover:bg-white/20 rounded text-[11px] font-sans font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
             title="Copy Trip Reference ID"
           >
-            {copiedId ? '✓ Copied' : '📋 Copy'}
+            {copiedId ? (
+              <>
+                <CheckIcon className="w-3 h-3" />
+                <span>Copied</span>
+              </>
+            ) : (
+              <>
+                <CopyIcon className="w-3 h-3" />
+                <span>Copy</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -259,15 +274,17 @@ export function BookingConfirmation({
               onClick={handlePrint}
               className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
             >
-              <span>🖨️ Print Receipt</span>
+              <FileTextIcon className="w-3.5 h-3.5 text-slate-500" />
+              <span>Print Receipt</span>
             </button>
           </div>
         </div>
 
         {/* "What Happens Next?" 3-Step Lifecycle Timeline */}
         <div className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 rounded-xl border border-blue-100 space-y-3">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <span>✨ What Happens Next?</span>
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>What Happens Next?</span>
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
@@ -332,7 +349,7 @@ export function BookingConfirmation({
               <div className="font-bold flex items-center justify-between">
                 <span>
                   {emailDelivery.status === 'sent' && (
-                    isUnconfirmed ? '📬 Request Acknowledgement Sent' : '✓ Confirmation Email Dispatched'
+                    isUnconfirmed ? 'Request Acknowledgement Sent' : 'Confirmation Email Dispatched'
                   )}
                   {emailDelivery.status === 'failed' && 'Email Notification Notice'}
                   {emailDelivery.status === 'simulated' && 'Simulated Email (Test Mode)'}
@@ -375,7 +392,8 @@ export function BookingConfirmation({
             </div>
             <div className="flex-1">
               <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 mb-1 flex items-center gap-1.5">
-                ✈ STL Lambert Curbside Pickup Instructions
+                <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>STL Lambert Curbside Pickup Instructions</span>
               </h4>
               <p className="text-xs text-blue-950 leading-relaxed font-medium">
                 {lambertInstructions}
@@ -625,7 +643,8 @@ export function BookingConfirmation({
             <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
-                  🔁 Return Trip Scheduled
+                  <RepeatIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Return Trip Scheduled</span>
                   {Boolean(meta.returnTripId) && (
                     <Link
                       to={`/track/${encodeURIComponent(String(meta.returnTripTrackingToken || meta.returnTripId))}`}

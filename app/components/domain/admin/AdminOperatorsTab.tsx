@@ -389,44 +389,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
   }
 
   return (
-    <div className="space-y-6">
-      {/* ─── Operators Top Action Bar ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-2 px-2">
-          <ShieldIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-bold text-slate-700">
-            Operational Staff &amp; Drivers ({operators.length} accounts)
-          </span>
-          <span className="hidden sm:inline-block text-xs text-slate-400">
-            • RBAC Access &amp; Fleet Assignments
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsArchiveDrawerOpen(true)}
-            className="text-xs font-bold inline-flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300 h-9"
-          >
-            <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-            <span>Universal Archive Drawer</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            leftIcon={<PlusIcon className="w-4 h-4" />}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95 h-9"
-          >
-            Provision Operator
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {success && (
         <Alert variant="success" title="Success">
           {success}
@@ -439,15 +402,15 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         </Alert>
       )}
 
-      {/* ─── Filter Bar ─── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-        {/* Archive Filter Pills */}
+      {/* ─── Single Unified Filter & Action Toolbar ─── */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
+        {/* Archive & Role Filter Pills */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
             <button
               type="button"
               onClick={() => setArchiveFilter('active')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 archiveFilter === 'active'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -541,14 +504,26 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
           </div>
         </div>
 
-        {/* Search Input */}
-        <div className="w-full sm:w-64">
-          <Input
-            placeholder="Search by name, email, phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="text-xs h-9"
-          />
+        {/* Search & Primary Action */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-full sm:w-56">
+            <Input
+              placeholder="Search name, email, phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-xs h-9"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => setShowAddModal(true)}
+            leftIcon={<PlusIcon className="w-4 h-4" />}
+            className="text-xs font-bold h-9 shrink-0"
+          >
+            Provision
+          </Button>
         </div>
       </div>
 
@@ -637,13 +612,27 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                                 handleUpdateRole(op.uid, op.email, newRoles);
                               }}
                             />
-                            {r === 'customer'
-                              ? '📱 Passenger'
-                              : r === 'driver'
-                              ? '🚕 Driver'
-                              : r === 'dispatcher'
-                              ? '🎧 Dispatcher'
-                              : '🛡️ Admin'}
+                            {r === 'customer' ? (
+                              <>
+                                <UserIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <span>Passenger</span>
+                              </>
+                            ) : r === 'driver' ? (
+                              <>
+                                <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>Driver</span>
+                              </>
+                            ) : r === 'dispatcher' ? (
+                              <>
+                                <RadioIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <span>Dispatcher</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldIcon className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                <span>Admin</span>
+                              </>
+                            )}
                           </label>
                         ))}
                       </div>
@@ -652,7 +641,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     {/* Contact Details */}
                     <td className="px-5 py-3.5 text-slate-600">
                       <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                        <span>📞</span>
+                        <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{op.phone || 'No phone recorded'}</span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">

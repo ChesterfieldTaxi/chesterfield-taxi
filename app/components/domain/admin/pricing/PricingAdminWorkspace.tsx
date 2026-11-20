@@ -22,6 +22,7 @@ import { UniversalExtrasPanel } from './extras/UniversalExtrasPanel';
 import { SurchargesPanel } from './surcharges/SurchargesPanel';
 import { PricingRulesPanel } from './rules/PricingRulesPanel';
 import { PersistentFareSimulator } from './simulator/PersistentFareSimulator';
+import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 
 import { getTariffService, DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
 import { getPricingRulesService, DEFAULT_NAMED_PRICING_RULES } from '~/core/services/pricing/pricing-rules.service';
@@ -54,8 +55,7 @@ export function PricingAdminWorkspace({
   initialTab = 'rates',
 }: PricingAdminWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<PricingPillarTab>(initialTab);
-  const [isSimulatorCollapsed, setIsSimulatorCollapsed] = useState<boolean>(false);
-  const [combineFeesAndExtras, setCombineFeesAndExtras] = useState<boolean>(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
 
   // Keep activeTab in sync with top admin navigation
   React.useEffect(() => {
@@ -214,107 +214,93 @@ export function PricingAdminWorkspace({
 
   return (
     <div className="space-y-4">
-      {/* Compact Context & Utility Toolbar (no duplicate sub-navigation cards) */}
-      <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-          <span className="font-semibold text-slate-800">
-            {activeTab === 'rates' && 'Tariffs & Stepped Distance Rate Tiers:'}
-            {activeTab === 'surcharges' && 'Built-In Fuel Surcharge, Operational & Conditional Surcharges:'}
-            {activeTab === 'extras' && 'Universal Passenger & Equipment Add-Ons:'}
-            {activeTab === 'rules' && 'Rule Conditions, Zone Triggers & Tariff Actions:'}
+      {/* Slim Utility Bar: Reclaims 384px by docking Fare Simulator into a Slide-Over Drawer */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-xs text-slate-600">
+          <span className="font-bold text-slate-900 mr-1.5">
+            {activeTab === 'rates' && 'Tariffs & Stepped Rates:'}
+            {activeTab === 'surcharges' && 'Operational & Conditional Surcharges:'}
+            {activeTab === 'extras' && 'Universal Extras & Equipment:'}
+            {activeTab === 'rules' && 'Pricing Rules & Routing:'}
           </span>
-          <span>
-            {activeTab === 'rates' && 'Configure stepped distance increments (e.g. first 1/5 mi + stepped mileage tiers) and flat airport matrices.'}
-            {activeTab === 'surcharges' && 'Manage built-in gas/fuel surcharge, airport gate fee, peak demand multiplier, and custom vehicle/distance surcharges.'}
-            {activeTab === 'extras' && 'Configure car seats, extra passenger headcount fees, intermediate stops, and curb waiting time.'}
-            {activeTab === 'rules' && 'Connect service zones, vehicle classes, and corporate accounts to target tariffs and fee waivers.'}
-          </span>
-        </div>
+          {activeTab === 'rates' && 'Stepped mileage tiers, hourly charters, and flat airport matrices.'}
+          {activeTab === 'surcharges' && 'Fuel surcharge, airport access fee, peak demand, and vehicle upgrades.'}
+          {activeTab === 'extras' && 'Car seats, extra passengers, stops, waiting time, and oversized cargo.'}
+          {activeTab === 'rules' && 'Connect zones, vehicle classes, and corporate accounts to target tariffs.'}
+        </p>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {(activeTab === 'surcharges' || activeTab === 'extras') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setCombineFeesAndExtras(!combineFeesAndExtras)}
-              className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
-            >
-              {combineFeesAndExtras ? 'Single Pillar View' : 'Show Surcharges + Extras Together'}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSimulatorCollapsed(!isSimulatorCollapsed)}
-            className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
-          >
-            <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-            {isSimulatorCollapsed ? 'Show Fare Simulator' : 'Hide Simulator'}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setIsSimulatorOpen(true)}
+          className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0"
+        >
+          <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+          <span>Test Fare Simulator</span>
+        </Button>
       </div>
 
-      {/* Main Content Layout */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Main Pillar View */}
-        <div className="flex-1 w-full min-w-0 space-y-6">
-          {activeTab === 'rates' && (
-            <RatesPanel
-              tariffs={tariffs}
-              vehicles={settings?.vehicles}
-              onSaveTariff={handleSaveTariff}
-              onDeleteTariff={handleDeleteTariff}
-              isSaving={isLoading}
-            />
-          )}
+      {/* Full-Width Main Pillar Workspace */}
+      <div className="w-full min-w-0 space-y-6">
+        {activeTab === 'rates' && (
+          <RatesPanel
+            tariffs={tariffs}
+            vehicles={settings?.vehicles}
+            onSaveTariff={handleSaveTariff}
+            onDeleteTariff={handleDeleteTariff}
+            isSaving={isLoading}
+          />
+        )}
 
-          {(activeTab === 'surcharges' || (combineFeesAndExtras && activeTab === 'extras')) && (
-            <SurchargesPanel
-              surcharges={surcharges}
-              tariffs={tariffs}
-              vehicles={settings?.vehicles}
-              onSave={handleSaveSurcharges}
-              isSaving={isLoading}
-            />
-          )}
+        {activeTab === 'surcharges' && (
+          <SurchargesPanel
+            surcharges={surcharges}
+            tariffs={tariffs}
+            vehicles={settings?.vehicles}
+            onSave={handleSaveSurcharges}
+            isSaving={isLoading}
+          />
+        )}
 
-          {(activeTab === 'extras' || (combineFeesAndExtras && activeTab === 'surcharges')) && (
-            <UniversalExtrasPanel
-              extras={universalExtras}
-              onSave={handleSaveExtras}
-              isSaving={isLoading}
-            />
-          )}
+        {activeTab === 'extras' && (
+          <UniversalExtrasPanel
+            extras={universalExtras}
+            onSave={handleSaveExtras}
+            isSaving={isLoading}
+          />
+        )}
 
-          {activeTab === 'rules' && (
-            <PricingRulesPanel
-              rules={rules}
-              tariffs={tariffs}
-              vehicles={settings?.vehicles}
-              corporateAccounts={settings?.corporateAccounts}
-              onSaveRule={handleSaveRule}
-              onDeleteRule={handleDeleteRule}
-              isSaving={isLoading}
-            />
-          )}
-        </div>
-
-        {/* Docked Fare Simulator Panel */}
-        {!isSimulatorCollapsed && (
-          <div className="w-full lg:w-96 shrink-0 lg:sticky lg:top-4">
-            <PersistentFareSimulator
-              tariffs={tariffs}
-              rules={rules}
-              universalExtras={universalExtras}
-              surcharges={surcharges}
-              vehicles={settings?.vehicles}
-              corporateAccounts={settings?.corporateAccounts}
-            />
-          </div>
+        {activeTab === 'rules' && (
+          <PricingRulesPanel
+            rules={rules}
+            tariffs={tariffs}
+            vehicles={settings?.vehicles}
+            corporateAccounts={settings?.corporateAccounts}
+            onSaveRule={handleSaveRule}
+            onDeleteRule={handleDeleteRule}
+            isSaving={isLoading}
+          />
         )}
       </div>
+
+      {/* On-Demand Slide-Over Fare Simulator Drawer */}
+      <AdminSlideOverDrawer
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        title="Live Fare Simulator"
+        subtitle="Test real-time quotes across tariffs, surcharges, extras, and vehicle classes"
+        size="lg"
+      >
+        <PersistentFareSimulator
+          tariffs={tariffs}
+          rules={rules}
+          universalExtras={universalExtras}
+          surcharges={surcharges}
+          vehicles={settings?.vehicles}
+          corporateAccounts={settings?.corporateAccounts}
+        />
+      </AdminSlideOverDrawer>
     </div>
   );
 }

@@ -89,18 +89,37 @@ function normalizeSurchargesConfig(raw: Partial<SurchargesConfig>): SurchargesCo
     cancellationFeeWithinOneHour,
     cancellationFee: cancellationFeeWithinOneHour,
     isPeakSurgeActive: Boolean(merged.isPeakSurgeActive),
+    isFuelSurchargeActive: Boolean(merged.isFuelSurchargeActive),
+    fuelSurchargeType: merged.fuelSurchargeType || 'flat',
+    fuelSurchargeAmount:
+      typeof merged.fuelSurchargeAmount === 'number'
+        ? merged.fuelSurchargeAmount
+        : DEFAULT_SURCHARGES_CONFIG.fuelSurchargeAmount,
     customSurcharges: Array.isArray(merged.customSurcharges) ? merged.customSurcharges : [],
   };
 }
 
 export class SurchargesService {
   private cache: SurchargesConfig | null = null;
+  private lastFetchAt = 0;
+  private hasLiveSubscription = false;
   private isConfigured: boolean;
   private db: Firestore | null = null;
 
   constructor() {
     this.isConfigured = isFirebaseConfigured();
     this.db = this.isConfigured ? getFirestoreDb() : null;
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key === SURCHARGES_STORAGE_KEY && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            this.cache = normalizeSurchargesConfig(parsed);
+            this.lastFetchAt = Date.now();
+          } catch {}
+        }
+      });
+    }
   }
 
   public getCached(): SurchargesConfig {
@@ -136,8 +155,9 @@ export class SurchargesService {
   }
 
   public async getSurcharges(forceRefresh = false): Promise<SurchargesConfig> {
-    if (this.cache && !forceRefresh) {
-      return { ...this.cache };
+    const cacheFresh = this.cache && (this.hasLiveSubscription || Date.now() - this.lastFetchAt < 15_000);
+    if (cacheFresh && !forceRefresh) {
+      return { ...this.cache! };
     }
 
     if (this.isConfigured && this.db) {
@@ -147,6 +167,7 @@ export class SurchargesService {
         if (snap.exists()) {
           const normalized = normalizeSurchargesConfig(snap.data() as Partial<SurchargesConfig>);
           this.setCached(normalized);
+          this.lastFetchAt = Date.now();
           return { ...normalized };
         }
       } catch (err) {
@@ -156,6 +177,7 @@ export class SurchargesService {
 
     const cached = this.getCached();
     this.cache = cached;
+    this.lastFetchAt = Date.now();
     return { ...cached };
   }
 
@@ -166,18 +188,20 @@ export class SurchargesService {
     onUpdate(this.getCached());
 
     if (!this.isConfigured || !this.db) {
-      this.getSurcharges().then(onUpdate).catch((err) => onError?.(err));
+      this.getSurcharges(true).then(onUpdate).catch((err) => onError?.(err));
       return () => {};
     }
 
     try {
+      this.hasLiveSubscription = true;
       const ref = doc(this.db, 'pricingConfig', 'surcharges');
-      return onSnapshot(
+      const unsub = onSnapshot(
         ref,
         (snap) => {
           if (snap.exists()) {
             const normalized = normalizeSurchargesConfig(snap.data() as Partial<SurchargesConfig>);
             this.setCached(normalized);
+            this.lastFetchAt = Date.now();
             onUpdate(normalized);
           }
         },
@@ -186,7 +210,12 @@ export class SurchargesService {
           onError?.(err);
         }
       );
+      return () => {
+        this.hasLiveSubscription = false;
+        unsub();
+      };
     } catch (err) {
+      this.hasLiveSubscription = false;
       console.warn('[SurchargesService] Snapshot setup failed:', err);
       return () => {};
     }

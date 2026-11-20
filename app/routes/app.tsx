@@ -35,6 +35,9 @@ import {
   InfoIcon,
   ArrowLeftRightIcon,
   RadioIcon,
+  HomeModernIcon,
+  PlaneIcon,
+  SparklesIcon,
 } from '../components/ui/Icons';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
@@ -584,17 +587,17 @@ export default function PassengerAppRoute() {
   const getCategoryIcon = (category: SavedPlaceCategory) => {
     switch (category) {
       case 'home':
-        return '🏠';
+        return <HomeModernIcon className="w-4 h-4 text-blue-600" />;
       case 'work':
-        return '💼';
+        return <BuildingIcon className="w-4 h-4 text-slate-600" />;
       case 'airport':
-        return '✈️';
+        return <PlaneIcon className="w-4 h-4 text-sky-600" />;
       case 'medical':
-        return '🏥';
+        return <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />;
       case 'favorite':
-        return '⭐';
+        return <SparklesIcon className="w-4 h-4 text-indigo-600" />;
       default:
-        return '📍';
+        return <MapPinIcon className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -1463,12 +1466,12 @@ export default function PassengerAppRoute() {
                   onChange={(e) => setPlaceCategory(e.target.value as SavedPlaceCategory)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="home">🏠 Home</option>
-                  <option value="work">💼 Work / Office</option>
-                  <option value="airport">✈️ Airport / Aviation</option>
-                  <option value="medical">🏥 Hospital / Medical</option>
-                  <option value="favorite">⭐ Favorite / Social</option>
-                  <option value="other">📍 Other Address</option>
+                  <option value="home">Home</option>
+                  <option value="work">Work / Office</option>
+                  <option value="airport">Airport / Aviation</option>
+                  <option value="medical">Hospital / Medical</option>
+                  <option value="favorite">Favorite / Social</option>
+                  <option value="other">Other Address</option>
                 </select>
               </div>
 

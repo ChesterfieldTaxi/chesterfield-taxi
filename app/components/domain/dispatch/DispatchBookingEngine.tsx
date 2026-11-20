@@ -7,6 +7,7 @@ import {
   getUniversalExtrasService,
   getUniversalExtrasConfig,
 } from '../../../core/services/pricing/extras.service';
+import { getSurchargesService } from '../../../core/services/pricing/surcharges.service';
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getCorporateAccountService } from '../../../core/services/corporate-account.service';
@@ -33,9 +34,11 @@ import {
   PawPrintIcon,
   VolumeXIcon,
   MusicNoteIcon,
+  CopyIcon,
 } from '../../ui/Icons';
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
+import { ModernDatePicker, ModernTimePicker } from '../../ui/ModernDateTimePicker';
 import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../../../core/services/operator.service';
 import {
@@ -444,6 +447,7 @@ function DispatchBookingEngineComponent({
   const [universalExtrasConfig, setUniversalExtrasConfig] = useState<UniversalExtrasConfig>(() =>
     getUniversalExtrasConfig()
   );
+  const [surchargesVersion, setSurchargesVersion] = useState(0);
   const [discount, setDiscount] = useState('None');
   const [manualDiscountDollars, setManualDiscountDollars] = useState('');
   const [waiveAirportFee, setWaiveAirportFee] = useState(false);
@@ -456,7 +460,7 @@ function DispatchBookingEngineComponent({
   const [showCallerSuggestions, setShowCallerSuggestions] = useState(false);
   const [callerQuickAddresses, setCallerQuickAddresses] = useState<string[]>([]);
 
-  // Subscribe to real-time named pricing rules & universal extras from Firestore
+  // Subscribe to real-time named pricing rules, universal extras & surcharges from Firestore
   useEffect(() => {
     const unsubRules = getPricingRulesService().subscribeToRules((rules) => {
       setAvailableNamedRules(rules.filter((r) => r.isActive));
@@ -464,9 +468,13 @@ function DispatchBookingEngineComponent({
     const unsubExtras = getUniversalExtrasService().subscribeToExtras((cfg) => {
       if (cfg) setUniversalExtrasConfig(cfg);
     });
+    const unsubSurcharges = getSurchargesService().subscribeToSurcharges(() => {
+      setSurchargesVersion((v) => v + 1);
+    });
     return () => {
       unsubRules();
       unsubExtras();
+      unsubSurcharges();
     };
   }, []);
 
@@ -1923,6 +1931,7 @@ function DispatchBookingEngineComponent({
     bypassSurge,
     availableNamedRules,
     universalExtrasConfig,
+    surchargesVersion,
     airportDetection.isPickupAirport,
     airportDetection.isDropoffAirport,
     airportDetection.isAirportTrip,
@@ -2087,6 +2096,7 @@ function DispatchBookingEngineComponent({
     bypassSurge,
     availableNamedRules,
     universalExtrasConfig,
+    surchargesVersion,
     returnAirportDetection.isPickupAirport,
     returnAirportDetection.isDropoffAirport,
     returnAirportDetection.isAirportTrip,
@@ -3969,20 +3979,16 @@ function DispatchBookingEngineComponent({
           </label>
 
           {timingType === 'later' ? (
-            <div className="flex items-center gap-1.5 flex-1 animate-in fade-in duration-150">
-              <input
-                type="date"
+            <div className="grid grid-cols-2 gap-1.5 flex-1 animate-in fade-in duration-150">
+              <ModernDatePicker
+                size="sm"
                 value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                required
-                className="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                onChange={setScheduledDate}
               />
-              <input
-                type="time"
+              <ModernTimePicker
+                size="sm"
                 value={scheduledTime}
-                onChange={(e) => setScheduledTime(e.target.value)}
-                required
-                className="w-1/2 px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                onChange={setScheduledTime}
               />
             </div>
           ) : (
@@ -6273,7 +6279,7 @@ function DispatchBookingEngineComponent({
                   className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   title="Create a new draft tab pre-populated with these trip details"
                 >
-                  <span>📋</span>
+                  <CopyIcon className="w-3.5 h-3.5 text-slate-500" />
                   <span>Copy Booking</span>
                 </button>
               ) : (

@@ -21,6 +21,8 @@ import {
   ChevronRightIcon,
   ExternalLinkIcon,
   XIcon,
+  PaletteIcon,
+  ZapIcon,
 } from '../../../ui/Icons';
 import { UserDropdown } from '../../common/UserDropdown';
 import { RoleViewSwitcher } from '../../common/RoleViewSwitcher';
@@ -47,11 +49,11 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         key: 'dashboard',
         label: 'Dashboard',
         icon: BarChartIcon,
-        subHint: 'KPIs & Telemetry',
+        subHint: 'KPIs & Overview',
       },
       {
         key: 'trips',
-        label: 'Trips & Dispatch',
+        label: 'Trips & Rules',
         icon: HistoryIcon,
         subHint: 'Active Queue & History',
       },
@@ -59,7 +61,13 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         key: 'invoicing',
         label: 'Financials & Invoicing',
         icon: CreditCardIcon,
-        subHint: 'Ledger, Invoices & Sync',
+        subHint: 'Ledger, Invoices & AR',
+      },
+      {
+        key: 'customers',
+        label: 'Customers',
+        icon: UsersIcon,
+        subHint: 'Passenger Directory & CRM',
       },
     ],
   },
@@ -67,16 +75,10 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
     title: 'Fleet & Pricing',
     items: [
       {
-        key: 'customers',
-        label: 'Passenger Directory',
-        icon: UsersIcon,
-        subHint: 'VIP & Corporate CRM',
-      },
-      {
         key: 'rates',
         label: 'Rates & Tariffs',
         icon: DollarSignIcon,
-        subHint: 'Fares, Tiers & Surges',
+        subHint: 'Fares, Extras & Surcharges',
       },
       {
         key: 'vehicles',
@@ -88,7 +90,13 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         key: 'zones',
         label: 'Service Zones',
         icon: MapPinIcon,
-        subHint: 'Geofences & Regions',
+        subHint: 'Geofences & Landmarks',
+      },
+      {
+        key: 'operators',
+        label: 'Drivers & Staff',
+        icon: UserCheckIcon,
+        subHint: 'Roster & Onboarding',
       },
     ],
   },
@@ -96,38 +104,34 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
     title: 'System & Platform',
     items: [
       {
-        key: 'operators',
-        label: 'Operators & Staff',
-        icon: UserCheckIcon,
-        subHint: 'Dispatchers & Drivers',
+        key: 'website',
+        label: 'Website Studio',
+        icon: PaletteIcon,
+        subHint: 'Pages, Forms & SEO',
+      },
+      {
+        key: 'general',
+        label: 'General & Branding',
+        icon: SettingsIcon,
+        subHint: 'Company & Brand Tokens',
+      },
+      {
+        key: 'integrations',
+        label: 'Integrations & APIs',
+        icon: ZapIcon,
+        subHint: 'Stripe, Square & Twilio',
       },
       {
         key: 'archive',
         label: 'Archive Vault',
         icon: ArchiveBoxIcon,
-        subHint: 'Enterprise Retention',
-      },
-      {
-        key: 'general',
-        label: 'General & Profile',
-        icon: SettingsIcon,
-        subHint: 'Company & Branding',
-      },
-      {
-        key: 'integrations',
-        label: 'Integrations & APIs',
-        icon: SettingsIcon,
-        badge: 'APIs',
-        badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30',
-        subHint: 'Stripe, Square, Twilio',
+        subHint: 'Data Retention & Restore',
       },
       {
         key: 'advanced',
         label: 'Advanced Settings',
         icon: WrenchIcon,
-        badge: 'CMS',
-        badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
-        subHint: 'Website Studio & Security',
+        subHint: 'Security, Audit & System Ops',
       },
     ],
   },
@@ -163,7 +167,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-950/60 z-50 lg:hidden transition-opacity"
           onClick={onCloseMobile}
           aria-hidden="true"
         />
@@ -285,25 +289,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           <RoleViewSwitcher variant="drawer" currentView="admin" user={user} onNavigate={onCloseMobile} />
         </div>
 
-        {/* Maintenance Mode Status Banner in Sidebar */}
-        {!isCollapsed && settings.constructionMode !== false && (
-          <div className="mx-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="font-bold text-[11px]">Maintenance Mode</span>
-            </div>
-            <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
-              ON
-            </span>
-          </div>
-        )}
-
         {/* Navigation Group Items */}
-        <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-5 custom-scrollbar">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2.5 py-3 space-y-5 custom-scrollbar">
           {ADMIN_NAV_GROUPS.map((group) => (
-            <div key={group.title} className="space-y-1">
+            <div key={group.title} className="space-y-0.5">
               {!isCollapsed && (
-                <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   {group.title}
                 </div>
               )}
@@ -321,35 +312,20 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                       onCloseMobile();
                     }}
                     title={isCollapsed ? `${item.label} – ${item.subHint}` : undefined}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group cursor-pointer ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20 font-bold'
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
                         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
                     } ${isCollapsed ? 'justify-center px-2' : ''}`}
                   >
                     <Icon
-                      className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
+                      className={`w-4 h-4 shrink-0 ${
                         isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
                       }`}
                     />
 
                     {!isCollapsed && (
-                      <div className="flex-1 flex items-center justify-between min-w-0">
-                        <span className="truncate text-left">{item.label}</span>
-                        {item.key === 'advanced' && settings.constructionMode !== false ? (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md border ml-2 shrink-0 bg-amber-500/20 text-amber-300 border-amber-400/40 animate-pulse">
-                            MAINT ON
-                          </span>
-                        ) : item.badge ? (
-                          <span
-                            className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border ml-2 shrink-0 ${
-                              item.badgeColor || 'bg-slate-700 text-slate-300 border-slate-600'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        ) : null}
-                      </div>
+                      <span className="truncate text-left flex-1">{item.label}</span>
                     )}
                   </button>
                 );

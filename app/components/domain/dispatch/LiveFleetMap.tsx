@@ -962,11 +962,13 @@ function LiveFleetMapComponent({
                   </button>
                 )}
               </div>
-              <div className="text-[11px] text-slate-700 truncate">
-                🟢 {selectedDriver.activeTrip.pickupLocation?.address}
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="truncate">{selectedDriver.activeTrip.pickupLocation?.address}</span>
               </div>
-              <div className="text-[11px] text-slate-700 truncate">
-                📍 {selectedDriver.activeTrip.dropoffLocation?.address}
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                <MapPinIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                <span className="truncate">{selectedDriver.activeTrip.dropoffLocation?.address}</span>
               </div>
             </div>
           )}

@@ -210,28 +210,7 @@ export function AdminVehiclesTab({
   };
 
   return (
-    <div className="space-y-6">
-      {/* ─── Contextual Asset Summary ─── */}
-      <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
-          {subTab === 'types' ? (
-            <>
-              <TagIcon className="w-4 h-4 text-blue-600" />
-              <span>Service Classes &amp; Capacities ({vehicles.length} categories)</span>
-            </>
-          ) : (
-            <>
-              <CarIcon className="w-4 h-4 text-emerald-600" />
-              <span>Physical Fleet Inventory ({settings.fleet?.length || 4} vehicles active)</span>
-            </>
-          )}
-        </div>
-
-        <div className="text-xs text-slate-500 font-medium px-2">
-          Fleet Asset Management
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* ─── SECTION 2: PHYSICAL FLEET ASSET MANAGEMENT TABLE ─── */}
       {subTab === 'fleet' && (
         <AdminFleetTab settings={settings} onSave={onSave} isLoading={isLoading} />
@@ -720,10 +699,10 @@ export function AdminVehiclesTab({
                     setEditForm({ ...editForm, iconType: e.target.value as any })
                   }
                 >
-                  <option value="standard">Standard Sedan 🚗</option>
-                  <option value="premium">Executive Premium ✨</option>
-                  <option value="xl">XL / SUV / Van 🚙</option>
-                  <option value="wheelchair">WAV Accessible ♿</option>
+                  <option value="standard">Standard Sedan</option>
+                  <option value="premium">Executive Premium</option>
+                  <option value="xl">XL / SUV / Van</option>
+                  <option value="wheelchair">WAV Accessible</option>
                 </select>
               </div>
 
