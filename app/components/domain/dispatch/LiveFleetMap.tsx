@@ -153,7 +153,7 @@ function formatLastSeen(seconds: number | null): string {
   return `${hrs}h ago`;
 }
 
-export function LiveFleetMap({
+function LiveFleetMapComponent({
   fleet,
   activeFormValues,
   activeTrip,
@@ -412,10 +412,9 @@ export function LiveFleetMap({
     });
   }, [mapReady, visibleWithGps, selectedDriverId]);
 
-  // Update Route Polyline (with mapReady dependency & cancellation sequence guard)
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current) return;
-
+  // Compute a stable route signature so Google Directions ONLY re-runs when the actual route changes
+  // (prevents map blinking/re-routing on unrelated form keystrokes like passenger name or notes!)
+  const resolvedRouteSpec = useMemo(() => {
     let origin: any = null;
     let destination: any = null;
     let waypoints: any[] = [];
@@ -442,6 +441,55 @@ export function LiveFleetMap({
         .filter(Boolean)
         .map((loc) => ({ location: loc, stopover: true }));
     }
+
+    const locKey = (val: any): string => {
+      if (!val) return '';
+      if (typeof val === 'string') return val.trim();
+      if (typeof val.lat === 'number' && typeof val.lng === 'number') {
+        return `${val.lat.toFixed(5)},${val.lng.toFixed(5)}`;
+      }
+      return String(val);
+    };
+
+    const signature = [
+      locKey(origin),
+      locKey(destination),
+      waypoints.map((w) => locKey(w.location)).join('|'),
+      shouldZoom ? '1' : '0',
+    ].join('=>');
+
+    return { origin, destination, waypoints, signature };
+  }, [
+    selectedTrip?.id,
+    selectedTrip?.pickupLocation?.address,
+    selectedTrip?.pickupLocation?.coordinates?.lat,
+    selectedTrip?.pickupLocation?.coordinates?.lng,
+    selectedTrip?.dropoffLocation?.address,
+    selectedTrip?.dropoffLocation?.coordinates?.lat,
+    selectedTrip?.dropoffLocation?.coordinates?.lng,
+    selectedTrip?.intermediateStops?.length,
+    activeFormValues?.pickupAddress,
+    activeFormValues?.pickupCoordinates?.lat,
+    activeFormValues?.pickupCoordinates?.lng,
+    activeFormValues?.dropoffAddress,
+    activeFormValues?.dropoffCoordinates?.lat,
+    activeFormValues?.dropoffCoordinates?.lng,
+    activeFormValues?.intermediateStops?.length,
+    activeTrip?.id,
+    activeTrip?.pickupLocation?.address,
+    activeTrip?.dropoffLocation?.address,
+    shouldZoom,
+  ]);
+
+  const lastRenderedRouteSigRef = useRef<string>('');
+
+  // Update Route Polyline (with mapReady dependency, routeSignature stability & cancellation guard)
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current) return;
+    if (lastRenderedRouteSigRef.current === resolvedRouteSpec.signature) return;
+    lastRenderedRouteSigRef.current = resolvedRouteSpec.signature;
+
+    const { origin, destination, waypoints } = resolvedRouteSpec;
 
     if (!isRealtimeRoutingEnabled()) {
       try {
@@ -516,7 +564,7 @@ export function LiveFleetMap({
     }, 650);
 
     return () => clearTimeout(timer);
-  }, [mapReady, activeFormValues, activeTrip, selectedTrip, shouldZoom]);
+  }, [mapReady, resolvedRouteSpec, shouldZoom]);
 
   // Fit all visible cars on map
   const handleFitFleet = useCallback(() => {
@@ -986,3 +1034,5 @@ export function LiveFleetMap({
     </div>
   );
 }
+
+export const LiveFleetMap = React.memo(LiveFleetMapComponent);

@@ -2,10 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ─────────────────────────────────────────────────────────────
-    // Helper Functions & Role Definitions
+    // Helper Functions & Role Definitions (CEL-safe: always check `'key' in map`!)
     // ─────────────────────────────────────────────────────────────
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function hasAuthEmail() {
+      return isAuthenticated() && 'email' in request.auth.token && request.auth.token.email != null;
     }
 
     function userDocExists() {
@@ -17,31 +21,26 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function hasUserRole(roleName) {
+      return userDocExists() && (
+        ('role' in getUserData() && getUserData().role == roleName) ||
+        ('roles' in getUserData() && getUserData().roles is list && roleName in getUserData().roles)
+      );
+    }
+
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'admin@chesterfieldtaxi.com' ||
-        (userDocExists() && (
-          getUserData().role == 'admin' ||
-          (getUserData().roles != null && 'admin' in getUserData().roles)
-        ))
+        (hasAuthEmail() && request.auth.token.email == 'admin@chesterfieldtaxi.com') ||
+        hasUserRole('admin')
       );
     }
 
     function isDispatcher() {
-      return isAuthenticated() && (
-        isAdmin() ||
-        (userDocExists() && (
-          getUserData().role == 'dispatcher' ||
-          (getUserData().roles != null && 'dispatcher' in getUserData().roles)
-        ))
-      );
+      return isAdmin() || hasUserRole('dispatcher');
     }
 
     function isDriver() {
-      return isAuthenticated() && userDocExists() && (
-        getUserData().role == 'driver' ||
-        (getUserData().roles != null && 'driver' in getUserData().roles)
-      );
+      return isDispatcher() || hasUserRole('driver');
     }
 
     function isOwner(userId) {
@@ -50,10 +49,12 @@ service cloud.firestore {
 
     function isTripCustomer(data) {
       return isAuthenticated() && (
-        data.customerId == request.auth.uid ||
-        data.userId == request.auth.uid ||
-        (data.passenger != null &&
-         request.auth.token.email != null &&
+        ('customerId' in data && data.customerId == request.auth.uid) ||
+        ('userId' in data && data.userId == request.auth.uid) ||
+        (hasAuthEmail() &&
+         'passenger' in data &&
+         data.passenger is map &&
+         'email' in data.passenger &&
          data.passenger.email == request.auth.token.email)
       );
     }
@@ -69,21 +70,22 @@ service cloud.firestore {
       allow create: if isDispatcher() || (
         isOwner(userId) &&
         request.resource.data.role == 'customer' &&
-        (request.resource.data.roles == null || request.resource.data.roles == ['customer']) &&
-        request.resource.data.isBlacklisted != true &&
-        request.resource.data.isArchived != true &&
-        (request.resource.data.status == null || request.resource.data.status == 'active')
+        (!('roles' in request.resource.data) || request.resource.data.roles == null || request.resource.data.roles == ['customer']) &&
+        (!('isBlacklisted' in request.resource.data) || request.resource.data.isBlacklisted != true) &&
+        (!('isArchived' in request.resource.data) || request.resource.data.isArchived != true) &&
+        (!('status' in request.resource.data) || request.resource.data.status == null || request.resource.data.status == 'active')
       );
 
       // Users can update profile/savedPlaces/preferences, NEVER role/roles/governance fields
-      // (Narrow legacy self-heal permitted only when roles was previously null and mirrors existing role)
+      // (Narrow legacy self-heal permitted only when roles was previously missing/null and mirrors existing role)
       allow update: if isDispatcher() || (
         isOwner(userId) && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'role', 'roles', 'status', 'isBlacklisted', 'blacklistReason', 'isArchived', 'adminNotes'
           ]) ||
           (
-            resource.data.roles == null &&
+            (!('roles' in resource.data) || resource.data.roles == null) &&
+            'role' in resource.data &&
             resource.data.role != null &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles']) &&
             request.resource.data.roles == [resource.data.role]
@@ -106,64 +108,76 @@ service cloud.firestore {
         request.resource.data.pricing != null &&
         request.resource.data.pricing.totalFare is number &&
         request.resource.data.pricing.totalFare >= 0 &&
-        request.resource.data.assignedDriverId == null &&
-        (request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0) &&
+        (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
+        (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0) &&
         (
+          !('customerId' in request.resource.data) ||
           request.resource.data.customerId == null ||
           (isAuthenticated() && request.resource.data.customerId == request.auth.uid)
         ) &&
         (
+          !('userId' in request.resource.data) ||
           request.resource.data.userId == null ||
           (isAuthenticated() && request.resource.data.userId == request.auth.uid)
         )
       );
 
-      // Single trip read: strictly authenticated owner, assigned/offered driver, or staff
+      // Single trip read: strictly authenticated owner, assigned/offered/convoy driver, or staff
       // Unauthenticated guests use zero-PII /tripTracking/{trackingToken} via /api/track
       allow get: if isDispatcher() ||
         isTripCustomer(resource.data) ||
         (isDriver() && (
-          resource.data.assignedDriverId == request.auth.uid ||
-          (resource.data.offeredToIds != null && request.auth.uid in resource.data.offeredToIds)
+          ('assignedDriverId' in resource.data && resource.data.assignedDriverId == request.auth.uid) ||
+          ('offeredToIds' in resource.data && resource.data.offeredToIds is list && request.auth.uid in resource.data.offeredToIds) ||
+          ('multiCarDriverIds' in resource.data && resource.data.multiCarDriverIds is list && request.auth.uid in resource.data.multiCarDriverIds)
         ));
 
-      // List query: strictly authenticated scoped queries or staff
+      // List query: statically provable scoped queries for passengers, drivers, and staff
       allow list: if isDispatcher() ||
         (isAuthenticated() && (
           resource.data.customerId == request.auth.uid ||
           resource.data.userId == request.auth.uid ||
-          (resource.data.passenger != null &&
-           request.auth.token.email != null &&
-           resource.data.passenger.email == request.auth.token.email) ||
+          (hasAuthEmail() && resource.data.passenger.email == request.auth.token.email) ||
           resource.data.assignedDriverId == request.auth.uid ||
-          (resource.data.offeredToIds != null && request.auth.uid in resource.data.offeredToIds)
+          request.auth.uid in resource.data.offeredToIds
         ));
 
       // Updates:
       // 1. Dispatchers / Admins: full operational control
       // 2. Assigned Driver: lifecycle, telemetry, meter extras, payment/completion fields only
-      // 3. Offered Driver: strictly atomic accept (claiming unassigned offer) OR decline (into rejectedByIds)
-      // 4. Customer Owner:
-      //    a) Claim unowned guest trip matching verified email
-      //    b) Cancel pre-dispatch trip (with statusHistory + auditLog)
-      //    c) Update passenger/driver notes on active non-terminal trips
-      //    d) Modify pre-dispatch booking details (reverts/stays UNCONFIRMED, never tampers completed/active rides)
+      // 3. Associate Driver in a linked multi-car convoy: sync ONLY associate roster status onto sibling cars
+      // 4. Offered Driver: strictly atomic accept (claiming unassigned offer) OR decline (into rejectedByIds)
+      // 5. Customer Owner: claim guest trip, cancel pre-dispatch, update notes, or edit pre-dispatch
       allow update: if isDispatcher() ||
         // Assigned driver operational updates
         (isDriver() &&
+          'assignedDriverId' in resource.data &&
           resource.data.assignedDriverId == request.auth.uid &&
           request.resource.data.assignedDriverId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'driverTelemetry', 'currentLocation',
             'actualPickupTime', 'completedAt', 'cancelledAt', 'cancellationReason', 'cancelledBy',
-            'pricing', 'payment', 'assignedVehicle', 'meterExtras', 'driverNotes', 'metadata', 'updatedAt'
+            'pricing', 'payment', 'assignedVehicle', 'meterExtras', 'driverNotes', 'metadata',
+            'multiCarAssociates', 'multiCarDriverIds', 'updatedAt'
+          ])
+        ) ||
+        // Associate driver in a linked multi-car convoy: sync ONLY associate roster status onto sibling cars
+        (isDriver() &&
+          'multiCarGroupId' in resource.data &&
+          resource.data.multiCarGroupId != null &&
+          'multiCarDriverIds' in resource.data &&
+          resource.data.multiCarDriverIds is list &&
+          request.auth.uid in resource.data.multiCarDriverIds &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'multiCarAssociates', 'updatedAt'
           ])
         ) ||
         // Offered driver atomic accept OR decline (prevents hijacking an already-assigned trip)
         (isDriver() &&
           resource.data.status == 'offered' &&
-          resource.data.assignedDriverId == null &&
-          resource.data.offeredToIds != null &&
+          (!('assignedDriverId' in resource.data) || resource.data.assignedDriverId == null) &&
+          'offeredToIds' in resource.data &&
+          resource.data.offeredToIds is list &&
           request.auth.uid in resource.data.offeredToIds &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'assignedDriverId', 'assignedVehicle', 'offeredToIds', 'rejectedByIds',
@@ -176,16 +190,18 @@ service cloud.firestore {
             // Decline offer
             (request.resource.data.assignedDriverId == null &&
              !(request.auth.uid in request.resource.data.offeredToIds) &&
-             request.resource.data.rejectedByIds != null &&
+             'rejectedByIds' in request.resource.data &&
+             request.resource.data.rejectedByIds is list &&
              request.auth.uid in request.resource.data.rejectedByIds &&
              request.resource.data.status in ['offered', 'pending'])
           )
         ) ||
         // Customer: claim guest trip matching email
-        (isAuthenticated() &&
-          resource.data.customerId == null &&
-          resource.data.passenger != null &&
-          request.auth.token.email != null &&
+        (hasAuthEmail() &&
+          (!('customerId' in resource.data) || resource.data.customerId == null) &&
+          'passenger' in resource.data &&
+          resource.data.passenger is map &&
+          'email' in resource.data.passenger &&
           resource.data.passenger.email == request.auth.token.email &&
           request.resource.data.customerId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -214,7 +230,7 @@ service cloud.firestore {
           request.resource.data.pricing != null &&
           request.resource.data.pricing.totalFare is number &&
           request.resource.data.pricing.totalFare >= 0 &&
-          request.resource.data.customerId == resource.data.customerId &&
+          (!('customerId' in resource.data) || request.resource.data.customerId == resource.data.customerId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'pickupLocation', 'dropoffLocation',
             'intermediateStops', 'bookingType', 'scheduledPickupTime', 'vehicleTier',
@@ -246,6 +262,7 @@ service cloud.firestore {
         isDispatcher() ||
         isDriver() ||
         (isAuthenticated() &&
+         'tripId' in resource.data &&
          resource.data.tripId != null &&
          exists(/databases/$(database)/documents/trips/$(resource.data.tripId)) &&
          isTripCustomer(get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data))
@@ -331,6 +348,10 @@ service cloud.firestore {
       allow write: if isDispatcher();
     }
     match /tariffs/{document=**} {
+      allow read: if true;
+      allow write: if isDispatcher();
+    }
+    match /pricingConfig/{document=**} {
       allow read: if true;
       allow write: if isDispatcher();
     }

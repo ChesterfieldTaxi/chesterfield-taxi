@@ -427,7 +427,7 @@ function stopInboundRingtone() {
   } catch {}
 }
 
-export function CommsHub({
+function CommsHubComponent({
   user,
   initialTab = 'all',
   onTabChange,
@@ -958,6 +958,7 @@ export function CommsHub({
                 suggestedBooking: v.suggestedBooking,
                 isUnread: v.isUnread ?? true,
               }));
+            if (newVms.length === 0) return prev;
             return [...newVms, ...prev];
           });
         }
@@ -1077,7 +1078,7 @@ export function CommsHub({
         const recData = (await recResp.json()) as any;
         if (recData.success && Array.isArray(recData.recordings)) {
           setInteractions((prev) => {
-            // Attach recordings to calls
+            let anyRecAttached = false;
             const updated = prev.map((item) => {
               if (item.type.startsWith('call_')) {
                 const match = recData.recordings.find(
@@ -1085,7 +1086,13 @@ export function CommsHub({
                     (item.callSid && r.callSid === item.callSid) ||
                     (item.recordingSid && r.sid === item.recordingSid)
                 );
-                if (match) {
+                if (
+                  match &&
+                  (item.recordingSid !== match.sid ||
+                    item.audioUrl !== match.audioUrl ||
+                    item.durationSeconds !== match.durationSeconds)
+                ) {
+                  anyRecAttached = true;
                   return {
                     ...item,
                     recordingSid: match.sid,
@@ -1119,6 +1126,7 @@ export function CommsHub({
                 isUnread: false,
               }));
 
+            if (!anyRecAttached && unattached.length === 0) return prev;
             return [...unattached, ...updated];
           });
         }
@@ -1128,34 +1136,53 @@ export function CommsHub({
     }
   };
 
-  // Fetch live Twilio voicemails, messages, and recordings on mount & poll every 3.5s
+  // Fetch live Twilio voicemails, messages, and recordings without hammering the console every 3.5s
+  // Poll every 12s when Phone drawer is actively open, 45s when hidden, and pause when tab is backgrounded
+  const isVisibleRef = useRef(isVisible);
+  isVisibleRef.current = isVisible;
+  const lastTelephonyFetchRef = useRef<number>(0);
+
   useEffect(() => {
-    fetchTelephonyData();
-
-    const interval = setInterval(() => {
-      fetchTelephonyData();
-    }, 3500);
-
-    const onFocus = () => {
+    const runFetchIfEligible = (force = false) => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const now = Date.now();
+      const minGap = isVisibleRef.current ? 10_000 : 40_000;
+      if (!force && now - lastTelephonyFetchRef.current < minGap) return;
+      lastTelephonyFetchRef.current = now;
       fetchTelephonyData();
     };
-    window.addEventListener('focus', onFocus);
+
+    runFetchIfEligible(true);
+
+    const interval = setInterval(() => {
+      runFetchIfEligible(false);
+    }, 12_000);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
-  // Focus dialpad input when switching to phone tab and keypad sub-tab
+  // Immediately refresh once when the dispatcher opens the Phone drawer
   useEffect(() => {
-    if (activeTab === 'phone' && callsSubTab === 'keypad') {
+    if (isVisible) {
+      const now = Date.now();
+      if (now - lastTelephonyFetchRef.current > 4_000) {
+        lastTelephonyFetchRef.current = now;
+        fetchTelephonyData();
+      }
+    }
+  }, [isVisible]);
+
+  // Focus dialpad input ONLY when the Phone drawer is actually visible and on keypad sub-tab
+  useEffect(() => {
+    if (isVisible && activeTab === 'phone' && callsSubTab === 'keypad') {
       const timer = setTimeout(() => {
         dialpadInputRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [activeTab, callsSubTab]);
+  }, [isVisible, activeTab, callsSubTab]);
 
   // Physical keyboard dialing response (ONLY active when CommsHub is actually visible!)
   useEffect(() => {
@@ -1311,8 +1338,12 @@ export function CommsHub({
 
   const unreadCount = unreadCountAll;
 
-  // Broadcast live unread count changes to workspaceBus so headers and indicators stay perfectly synced
+  // Broadcast live unread count changes ONLY when counts actually change (prevents unnecessary bus churn)
+  const lastBroadcastCountsRef = useRef<string>('');
   useEffect(() => {
+    const key = `${unreadCountMessages}|${unreadCountMissed}|${unreadCountVoicemail}`;
+    if (lastBroadcastCountsRef.current === key) return;
+    lastBroadcastCountsRef.current = key;
     workspaceBus.publish('UNREAD_COUNTS_CHANGED', {
       unreadMessages: unreadCountMessages,
       missedCalls: unreadCountMissed,
@@ -2316,58 +2347,30 @@ export function CommsHub({
         </div>
       )}
 
-      {/* ─── Segmented Sub-Toolbar Tabs (Omnichannel: All, Phone, Messages, Voicemail) ─── */}
-      <div className="bg-white border-b border-slate-200 p-2 shrink-0">
-        <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl text-center">
-          <button
-            type="button"
-            onClick={() => {
-              handleSelectTab('all');
-              setSelectedContactPhone(null);
-            }}
-            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
-              activeTab === 'all'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <span className="truncate">All</span>
-            {unreadCount > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeTab === 'all' ? 'bg-white text-blue-600' : 'bg-rose-500 text-white'
-                }`}
-              >
-                {unreadCount}
-              </span>
-            )}
-          </button>
-
+      {/* ─── Clean Sub-Navigation Bar (Calls | SMS | Voicemail | All) ─── */}
+      <div className="bg-white border-b border-slate-200/80 px-2.5 py-2 shrink-0">
+        <div className="grid grid-cols-4 gap-1 bg-slate-100/90 p-0.5 rounded-xl text-center">
           <button
             type="button"
             onClick={() => {
               handleSelectTab('phone');
               setSelectedContactPhone(null);
             }}
-            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'phone'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+            <PhoneIcon className="w-3 h-3 shrink-0" />
             <span className="truncate">Calls</span>
             {unreadCountMissed > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeTab === 'phone' ? 'bg-white text-blue-600' : 'bg-red-500 text-white'
-                }`}
-              >
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-rose-500 text-white">
                 {unreadCountMissed}
               </span>
             )}
             {callStatus !== 'idle' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block shrink-0" />
             )}
           </button>
 
@@ -2376,20 +2379,16 @@ export function CommsHub({
             onClick={() => {
               handleSelectTab('messages');
             }}
-            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'messages'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <MailIcon className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Messages</span>
+            <ChatBubbleLeftRightIcon className="w-3 h-3 shrink-0" />
+            <span className="truncate">SMS</span>
             {unreadCountMessages > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeTab === 'messages' ? 'bg-white text-blue-600' : 'bg-blue-500 text-white'
-                }`}
-              >
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-blue-600 text-white">
                 {unreadCountMessages}
               </span>
             )}
@@ -2401,20 +2400,36 @@ export function CommsHub({
               handleSelectTab('voicemail');
               setSelectedContactPhone(null);
             }}
-            className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeTab === 'voicemail'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <span className="truncate">Voicemail</span>
+            <span className="truncate">VM</span>
             {unreadCountVoicemail > 0 && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
-                  activeTab === 'voicemail' ? 'bg-white text-blue-600' : 'bg-amber-500 text-white'
-                }`}
-              >
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-amber-500 text-white">
                 {unreadCountVoicemail}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              handleSelectTab('all');
+              setSelectedContactPhone(null);
+            }}
+            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+              activeTab === 'all'
+                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span className="truncate">All</span>
+            {unreadCount > 0 && (
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-slate-700 text-white">
+                {unreadCount}
               </span>
             )}
           </button>
@@ -5539,3 +5554,5 @@ export function CommsHub({
     </div>
   );
 }
+
+export const CommsHub = React.memo(CommsHubComponent);

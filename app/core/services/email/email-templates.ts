@@ -81,14 +81,19 @@ export function formatVehicleTier(
   vehicles?: VehicleTierConfig[],
   explicitDisplayName?: string
 ): string {
-  if (explicitDisplayName && explicitDisplayName.trim()) return explicitDisplayName.trim();
+  if (explicitDisplayName && explicitDisplayName.trim()) {
+    const trimmed = explicitDisplayName.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower === 'any' || lower.startsWith('any vehicle')) return 'Any';
+    return trimmed;
+  }
   if (!tier) return 'Standard Sedan';
   if (vehicles && vehicles.length > 0) {
     const matched = vehicles.find((v) => v.id.toLowerCase() === tier.trim().toLowerCase());
     if (matched?.name) return matched.name;
   }
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
-  if (clean === 'any' || clean.startsWith('any')) return 'Any Vehicle (Best Available)';
+  if (clean === 'any' || clean.startsWith('any')) return 'Any';
   if (clean === 'standard' || clean === 'sedan') return 'Standard Sedan';
   if (clean === 'premium') return 'Premium Sedan';
   if (clean === 'xl' || clean === 'suv' || clean === 'large suv') return 'Full-Size SUV (XL)';
@@ -108,14 +113,19 @@ export function formatVehicleTierDisplay(
   vehicles?: VehicleTierConfig[],
   explicitDisplayName?: string
 ): string {
-  if (explicitDisplayName && explicitDisplayName.trim()) return explicitDisplayName.trim();
+  if (explicitDisplayName && explicitDisplayName.trim()) {
+    const trimmed = explicitDisplayName.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower === 'any' || lower.startsWith('any vehicle')) return 'Any';
+    return trimmed;
+  }
   if (!tier) return 'Standard';
   if (vehicles && vehicles.length > 0) {
     const matched = vehicles.find((v) => v.id.toLowerCase() === tier.trim().toLowerCase());
     if (matched?.name) return matched.name;
   }
   const clean = tier.trim().toLowerCase().replace(/_/g, ' ');
-  if (clean === 'any') return 'Any';
+  if (clean === 'any' || clean.startsWith('any vehicle')) return 'Any';
   if (clean === 'compact suv') return 'Compact SUV';
   if (clean === 'midsize suv') return 'Midsize SUV';
   if (clean === 'standard') return 'Standard Sedan';

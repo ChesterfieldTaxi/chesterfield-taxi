@@ -147,6 +147,7 @@ export interface EmailDockProps {
   onPopOut?: () => void;
   showWindowControls?: boolean;
   isPopout?: boolean;
+  isDocked?: boolean;
   onPopulateBooking?: (bookingData: any) => void;
 }
 
@@ -155,6 +156,7 @@ export function EmailDock({
   onPopOut,
   showWindowControls = false,
   isPopout = false,
+  isDocked = false,
   onPopulateBooking,
 }: EmailDockProps) {
   const [emails, setEmails] = useState<EmailMessage[]>(INITIAL_EMAILS);
@@ -367,59 +369,61 @@ export function EmailDock({
   const bookingCount = emails.filter((e) => e.folder === 'bookings' && e.isUnread).length;
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 select-none overflow-hidden text-slate-800">
-      {/* ─── DOCK HEADER ─── */}
-      <div className="bg-slate-900 text-white p-3 flex items-center justify-between shadow-xs shrink-0 border-b border-slate-800">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-500/30 flex items-center justify-center text-blue-400">
-            <MailIcon className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm tracking-tight text-white">Email Console</span>
-              {unreadCount > 0 && (
-                <span className="bg-blue-600 text-[10px] font-black px-1.5 py-0.2 rounded-full text-white">
-                  {unreadCount} unread
-                </span>
-              )}
+    <div className="flex flex-col h-full bg-white select-none overflow-hidden text-slate-800">
+      {/* ─── DOCK HEADER (hidden when embedded in Dispatch Drawer to prevent double headers) ─── */}
+      {!isDocked && (
+        <div className="bg-slate-900 text-white p-3 flex items-center justify-between shadow-xs shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <MailIcon className="w-4 h-4" />
             </div>
-            <p className="text-[10px] text-slate-400">dispatch@chesterfieldtaxi.com</p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm tracking-tight text-white">Email Console</span>
+                {unreadCount > 0 && (
+                  <span className="bg-blue-600 text-[10px] font-black px-1.5 py-0.2 rounded-full text-white">
+                    {unreadCount} unread
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400">dispatch@chesterfieldtaxi.com</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsComposing(true)}
+              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
+              title="Compose new email"
+            >
+              <span>+ Compose</span>
+            </button>
+
+            {!isPopout && onPopOut && (
+              <button
+                type="button"
+                onClick={onPopOut}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Pop out into floating window"
+              >
+                <ExternalLinkIcon className="w-4 h-4" />
+              </button>
+            )}
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close panel"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setIsComposing(true)}
-            className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1"
-            title="Compose new email"
-          >
-            <span>✏️ Compose</span>
-          </button>
-
-          {!isPopout && onPopOut && (
-            <button
-              type="button"
-              onClick={onPopOut}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Pop out into floating window"
-            >
-              <ExternalLinkIcon className="w-4 h-4" />
-            </button>
-          )}
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Close panel"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -434,81 +438,61 @@ export function EmailDock({
         </div>
       )}
 
-      {/* ─── FOLDER & SEARCH TOOLBAR ─── */}
-      <div className="bg-white border-b border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setFolderFilter('all');
-              setSelectedEmailId(null);
-            }}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              folderFilter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            📥 Inbox
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFolderFilter('bookings');
-              setSelectedEmailId(null);
-            }}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-              folderFilter === 'bookings'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <span>🚕 Bookings</span>
-            {bookingCount > 0 && (
-              <span className="bg-amber-500 text-white text-[9px] px-1 rounded-full font-black">
-                {bookingCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFolderFilter('receipts');
-              setSelectedEmailId(null);
-            }}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              folderFilter === 'receipts'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            🧾 Receipts
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFolderFilter('sent');
-              setSelectedEmailId(null);
-            }}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              folderFilter === 'sent'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            📤 Sent
-          </button>
+      {/* ─── COMPACT FOLDER & SEARCH TOOLBAR ─── */}
+      <div className="bg-white border-b border-slate-200/80 px-2.5 py-2 space-y-2 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1 min-w-0">
+            <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search mail..."
+              className="w-full pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+            />
+          </div>
+          {isDocked && (
+            <button
+              type="button"
+              onClick={() => setIsComposing(true)}
+              className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+              title="Compose new email"
+            >
+              + Compose
+            </button>
+          )}
         </div>
 
-        <div className="relative">
-          <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search mail..."
-            className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-36 sm:w-44 focus:outline-blue-500"
-          />
+        <div className="grid grid-cols-4 gap-1 bg-slate-100/90 p-0.5 rounded-xl text-center">
+          {(
+            [
+              { key: 'all', label: 'Inbox', count: unreadCount },
+              { key: 'bookings', label: 'Bookings', count: bookingCount },
+              { key: 'receipts', label: 'Receipts', count: 0 },
+              { key: 'sent', label: 'Sent', count: 0 },
+            ] as const
+          ).map((folder) => (
+            <button
+              key={folder.key}
+              type="button"
+              onClick={() => {
+                setFolderFilter(folder.key);
+                setSelectedEmailId(null);
+              }}
+              className={`py-1 px-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                folderFilter === folder.key
+                  ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span className="truncate">{folder.label}</span>
+              {folder.count > 0 && (
+                <span className="bg-blue-600 text-white text-[9px] px-1 rounded-full font-black">
+                  {folder.count}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 

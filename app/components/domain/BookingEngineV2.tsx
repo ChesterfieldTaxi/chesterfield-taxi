@@ -10,6 +10,12 @@ import type {
   TripPricing,
 } from '../../core/types';
 import { getBookingService } from '../../core/services/booking';
+import {
+  generateMultiCarGroupId,
+  distributeAcrossCars,
+  buildPerVehiclePricingSpecs,
+  buildAssociateEntryFromTrip,
+} from '../../core/services/booking/multi-car.util';
 import { getFirebaseAuth, isFirebaseConfigured } from '../../core/services/firebase';
 import type { QuoteResponse } from '../../core/services/booking-service';
 import { getPaymentService } from '../../core/services/payment.service';
@@ -1798,7 +1804,94 @@ export function BookingEngineV2({
         return;
       }
 
-      const createdTrip = await bookingService.createBooking(inputPayload);
+      const isWebMultiCar =
+        Boolean(bookingConfig.allowMultiVehicle) && form.selectedVehicles.length > 1;
+      let createdTrip: Trip;
+
+      if (isWebMultiCar) {
+        const groupId = generateMultiCarGroupId();
+        const carCount = form.selectedVehicles.length;
+        const resolveWebDisplayName = (choice: string, tier: string) => {
+          const found = activeVehicleTiers.find((v) => v.id === choice || v.id === tier);
+          return found?.name || formatVehicleTier(tier);
+        };
+        const carSpecs = buildPerVehiclePricingSpecs({
+          selectedVehicles: form.selectedVehicles,
+          resolveTier: (c) => String(mapChoiceToTier(c as any)),
+          resolveDisplayName: resolveWebDisplayName,
+          vehicleQuotes: quote?.vehicleQuotes || {},
+          primaryPricing: effectivePricing,
+          distanceMiles: effectivePricing.distanceMiles || 0,
+          durationMinutes: effectivePricing.durationMinutes || 0,
+          combinedTargetFare: effectivePricing.totalFare || 0,
+          isFareOverridden: false,
+        });
+        const paxCaps = form.selectedVehicles.map((v) => vehicleCapacities[v]?.maxPassengers || 4);
+        const bagCaps = form.selectedVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
+        const paxAlloc = distributeAcrossCars(form.passengers, carCount, paxCaps, 1);
+        const bagAlloc = distributeAcrossCars(form.bags, carCount, bagCaps, 0);
+
+        const createdWebCars: Trip[] = [];
+        for (let i = 0; i < carSpecs.length; i++) {
+          const spec = carSpecs[i];
+          const carPayload: CreateTripInput = {
+            ...inputPayload,
+            vehicleTier: spec.vehicleTier as VehicleTier,
+            passenger: {
+              ...inputPayload.passenger,
+              passengerCount: paxAlloc[i],
+              luggageCount: bagAlloc[i],
+            },
+            pricing: spec.pricing,
+            payment: {
+              ...inputPayload.payment,
+              amount: spec.fare,
+              preAuthHoldAmount: paymentIntentId && i === 0 ? effectivePricing.totalFare : undefined,
+            },
+            multipleVehiclesRequested: true,
+            vehicleCount: carCount,
+            multiCarGroupId: groupId,
+            multiCarIndex: i + 1,
+            multiCarTotal: carCount,
+            metadata: {
+              ...(inputPayload.metadata || {}),
+              vehicleTypeId: spec.vehicleChoice,
+              vehicleDisplayName: spec.vehicleDisplayName,
+              selectedVehicles: [spec.vehicleChoice],
+              multiCarGroupId: groupId,
+              multiCarIndex: i + 1,
+              multiCarTotal: carCount,
+              multiCarTotalPassengers: form.passengers,
+              multiCarTotalBags: form.bags,
+              multiCarOrderTotalFare: effectivePricing.totalFare,
+            },
+          };
+          const createdCar = await bookingService.createBooking(carPayload);
+          createdWebCars.push(createdCar);
+        }
+
+        const allTripIds = createdWebCars.map((t) => t.id);
+        const associates = createdWebCars.map((t) => buildAssociateEntryFromTrip(t));
+        if (bookingService.updateTrip) {
+          await Promise.all(
+            createdWebCars.map((t) =>
+              bookingService.updateTrip!(t.id, {
+                multiCarTripIds: allTripIds,
+                multiCarAssociates: associates,
+                multiCarDriverIds: [],
+              })
+            )
+          );
+        }
+        createdTrip = {
+          ...createdWebCars[0],
+          multiCarTripIds: allTripIds,
+          multiCarAssociates: associates,
+          multiCarDriverIds: [],
+        };
+      } else {
+        createdTrip = await bookingService.createBooking(inputPayload);
+      }
       let createdReturnTripObj: any = null;
 
       // Handle linked return trip creation if requested

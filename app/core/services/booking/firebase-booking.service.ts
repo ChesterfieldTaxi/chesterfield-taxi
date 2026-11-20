@@ -64,6 +64,10 @@ import { getUniversalExtrasConfig, getUniversalExtrasService } from '../pricing/
 import { getSurchargesConfig, getSurchargesService } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
 import { generateTripId } from '../../utils/trip-id.util';
+import {
+  buildAssociateEntryFromTrip,
+  mergeMultiCarAssociateUpdate,
+} from './multi-car.util';
 
 
 
@@ -805,15 +809,19 @@ export class FirebaseBookingService implements IBookingService {
       Promise.resolve().then(() => onUpdate(localTrips)).catch(onError);
     }
 
-    // Listen for local trip creations across tabs
+    // Listen for local trip creations across tabs (ignore unrelated localStorage keys like drafts/alerts!)
     const handleLocalTripEvent = () => {
       const freshLocal = this.getLocalTrips();
       onUpdate(this.mergeTrips(latestRemoteTrips, freshLocal));
     };
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key && e.key !== 'chesterfield_taxi_mock_trips') return;
+      handleLocalTripEvent();
+    };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('chesterfield_trip_created', handleLocalTripEvent);
-      window.addEventListener('storage', handleLocalTripEvent);
+      window.addEventListener('storage', handleStorageEvent);
     }
 
     const q = query(collection(this.db, this.collectionName), orderBy('createdAt', 'desc'));
@@ -841,31 +849,48 @@ export class FirebaseBookingService implements IBookingService {
       unsubscribe();
       if (typeof window !== 'undefined') {
         window.removeEventListener('chesterfield_trip_created', handleLocalTripEvent);
-        window.removeEventListener('storage', handleLocalTripEvent);
+        window.removeEventListener('storage', handleStorageEvent);
       }
     };
   }
 
   /**
-   * Resolves a driver's real assigned vehicle snapshot from DriverProfile + `/fleet`
-   * without inventing fake Cab #204 / MO-7TX91 defaults.
+   * Resolves a driver's real assigned vehicle snapshot + contact details from DriverProfile,
+   * OperatorService roster, and `/fleet` without inventing fake Cab #204 defaults.
    */
   private async resolveDriverVehicleSnapshot(driverId: string): Promise<{
     vehicle?: TripAssignedVehicle;
     driverName?: string;
+    driverPhone?: string;
   }> {
     let vehicle: TripAssignedVehicle | undefined;
     let driverName: string | undefined;
+    let driverPhone: string | undefined;
 
     try {
       const { getDriverService } = await import('../driver.service');
       const dProfile = await getDriverService().getDriverProfile(driverId);
       if (dProfile?.name) driverName = dProfile.name;
+      if (dProfile?.phone) driverPhone = dProfile.phone;
 
       let matchedFleetPlate = dProfile?.licensePlate || '';
       let matchedFleetModel = `${dProfile?.vehicleMake || ''} ${dProfile?.vehicleModel || ''}`.trim();
       let matchedFleetId = dProfile?.vehicleId || '';
       let matchedFleetUnit = dProfile?.vehicleUnit || '';
+
+      try {
+        const { getOperatorService } = await import('../operator.service');
+        const rosterMatch = getOperatorService()
+          .getDriverRoster()
+          .find((r) => r.id === driverId);
+        if (rosterMatch) {
+          if (!driverName && rosterMatch.name) driverName = rosterMatch.name;
+          if (!driverPhone && rosterMatch.phone) driverPhone = rosterMatch.phone;
+          if (!matchedFleetUnit && (rosterMatch.cabNumber || rosterMatch.vehicle)) {
+            matchedFleetUnit = rosterMatch.cabNumber ? `Cab #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
+          }
+        }
+      } catch {}
 
       try {
         const { getFleetService } = await import('../fleet/fleet.service');
@@ -895,7 +920,95 @@ export class FirebaseBookingService implements IBookingService {
       }
     } catch {}
 
-    return { vehicle, driverName };
+    return { vehicle, driverName, driverPhone };
+  }
+
+  /**
+   * Synchronizes `multiCarAssociates` (and `multiCarDriverIds` when staff/owner updates)
+   * across all sibling Trip documents in a linked multi-vehicle order so every driver
+   * always sees up-to-date associate driver names, cab numbers, phones, and live statuses.
+   */
+  private async syncMultiCarConvoyAssociates(
+    changedTrip: Trip,
+    resolvedDriver?: { driverName?: string; driverPhone?: string; vehicle?: TripAssignedVehicle },
+    actorRole: 'admin' | 'dispatcher' | 'driver' | 'system' | 'passenger' = 'admin'
+  ): Promise<void> {
+    if (!changedTrip.multiCarGroupId || !Array.isArray(changedTrip.multiCarTripIds) || changedTrip.multiCarTripIds.length <= 1) {
+      return;
+    }
+
+    let driverInfo = resolvedDriver;
+    if (changedTrip.assignedDriverId && (!driverInfo?.driverName || !driverInfo?.driverPhone || !driverInfo?.vehicle)) {
+      const fetched = await this.resolveDriverVehicleSnapshot(changedTrip.assignedDriverId);
+      driverInfo = {
+        driverName: driverInfo?.driverName || fetched.driverName,
+        driverPhone: driverInfo?.driverPhone || fetched.driverPhone,
+        vehicle: driverInfo?.vehicle || fetched.vehicle,
+      };
+    }
+
+    const updatedEntry = buildAssociateEntryFromTrip(changedTrip, {
+      driverId: changedTrip.assignedDriverId ?? null,
+      driverName: driverInfo?.driverName,
+      driverPhone: driverInfo?.driverPhone,
+      vehicleUnit: driverInfo?.vehicle?.vehicleNumber || changedTrip.assignedVehicle?.vehicleNumber,
+      licensePlate: driverInfo?.vehicle?.licensePlate || changedTrip.assignedVehicle?.licensePlate,
+      vehicleModel: driverInfo?.vehicle?.model || changedTrip.assignedVehicle?.model,
+    });
+
+    const now = new Date().toISOString();
+    const isDriverActor = actorRole === 'driver';
+
+    // Update every trip in the convoy (including changedTrip itself so its own associates stay fresh)
+    await Promise.all(
+      changedTrip.multiCarTripIds.map(async (siblingId) => {
+        try {
+          const sibRef = doc(this.db, this.collectionName, siblingId);
+          let siblingTrip: Trip | null = siblingId === changedTrip.id ? changedTrip : null;
+          if (!siblingTrip) {
+            try {
+              const snap = await getDoc(sibRef);
+              if (snap.exists()) siblingTrip = snap.data() as Trip;
+            } catch {}
+          }
+          if (!siblingTrip) {
+            siblingTrip = this.getLocalTrips().find((t) => t.id === siblingId) || null;
+          }
+
+          const baseAssociates =
+            siblingTrip?.multiCarAssociates && siblingTrip.multiCarAssociates.length > 0
+              ? siblingTrip.multiCarAssociates
+              : changedTrip.multiCarAssociates || [];
+
+          const { associates, driverIds } = mergeMultiCarAssociateUpdate(baseAssociates, updatedEntry);
+
+          // Drivers updating a sibling trip only write ['multiCarAssociates', 'updatedAt'] per firestore.rules
+          const patch: Partial<Trip> =
+            isDriverActor && siblingId !== changedTrip.id
+              ? { multiCarAssociates: associates, updatedAt: now }
+              : { multiCarAssociates: associates, multiCarDriverIds: driverIds, updatedAt: now };
+
+          try {
+            await updateDoc(sibRef, sanitizePayload(patch));
+          } catch {}
+
+          // Keep localStorage mirror fresh too
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+              const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
+              const list: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
+              const idx = list.findIndex((t) => t.id === siblingId);
+              if (idx >= 0) {
+                list[idx] = { ...list[idx], ...patch };
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+              }
+            } catch {}
+          }
+        } catch (err) {
+          console.warn(`[FirebaseBookingService] Multi-car associate sync warning for ${siblingId}:`, err);
+        }
+      })
+    );
   }
 
   /**
@@ -1067,7 +1180,7 @@ export class FirebaseBookingService implements IBookingService {
     }
 
     const tripDocRef = doc(this.db, this.collectionName, tripId);
-    const { vehicle, driverName } = await this.resolveDriverVehicleSnapshot(driverId);
+    const { vehicle, driverName, driverPhone } = await this.resolveDriverVehicleSnapshot(driverId);
     const now = new Date().toISOString();
 
     let updatedTrip: Trip | null = null;
@@ -1108,6 +1221,7 @@ export class FirebaseBookingService implements IBookingService {
         const nextMetadata = {
           ...(current.metadata || {}),
           ...(driverName ? { assignedDriverName: driverName } : {}),
+          ...(driverPhone ? { assignedDriverPhone: driverPhone } : {}),
         };
 
         const patch: Partial<Trip> = {
@@ -1168,6 +1282,11 @@ export class FirebaseBookingService implements IBookingService {
 
     if (updatedTrip) {
       this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+      this.syncMultiCarConvoyAssociates(
+        updatedTrip,
+        { driverName, driverPhone, vehicle },
+        'driver'
+      ).catch(() => {});
     }
 
     return updatedTrip!;
@@ -1261,6 +1380,7 @@ export class FirebaseBookingService implements IBookingService {
 
     if (updatedTrip) {
       this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+      this.syncMultiCarConvoyAssociates(updatedTrip, undefined, 'driver').catch(() => {});
     }
 
     return updatedTrip!;
@@ -1331,14 +1451,15 @@ export class FirebaseBookingService implements IBookingService {
     if (options?.assignedDriverId !== undefined) {
       updates.assignedDriverId = options.assignedDriverId;
       if (options.assignedDriverId && (status === 'assigned' || status === 'accepted')) {
-         const { vehicle: vehicleSnapshot, driverName } = await this.resolveDriverVehicleSnapshot(options.assignedDriverId);
+         const { vehicle: vehicleSnapshot, driverName, driverPhone } = await this.resolveDriverVehicleSnapshot(options.assignedDriverId);
          if (vehicleSnapshot) {
            updates.assignedVehicle = vehicleSnapshot;
          }
-         if (driverName) {
+         if (driverName || driverPhone) {
            updates.metadata = {
              ...(trip.metadata || {}),
-             assignedDriverName: driverName,
+             ...(driverName ? { assignedDriverName: driverName } : {}),
+             ...(driverPhone ? { assignedDriverPhone: driverPhone } : {}),
            };
          }
          updates.auditLog?.push({
@@ -1433,6 +1554,15 @@ export class FirebaseBookingService implements IBookingService {
 
     // Mirror status & assigned vehicle updates to zero-PII public tracking projection
     this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+
+    // Keep linked multi-car convoy associates synced when status or driver changes
+    if (updatedTrip.multiCarGroupId && updatedTrip.multiCarTripIds && updatedTrip.multiCarTripIds.length > 1) {
+      this.syncMultiCarConvoyAssociates(
+        updatedTrip,
+        undefined,
+        options?.actorRole ?? 'admin'
+      ).catch(() => {});
+    }
 
     return updatedTrip;
   }
@@ -1597,6 +1727,20 @@ export class FirebaseBookingService implements IBookingService {
     }
 
     this.syncPublicTrackingProjection(mergedTrip).catch(() => {});
+
+    // Sync linked multi-car convoy associates whenever driver, vehicle, or status changes
+    const affectsConvoy =
+      updates.assignedDriverId !== undefined ||
+      updates.assignedVehicle !== undefined ||
+      updates.status !== undefined;
+    if (
+      affectsConvoy &&
+      mergedTrip.multiCarGroupId &&
+      mergedTrip.multiCarTripIds &&
+      mergedTrip.multiCarTripIds.length > 1
+    ) {
+      this.syncMultiCarConvoyAssociates(mergedTrip, undefined, 'admin').catch(() => {});
+    }
 
     return mergedTrip;
   }

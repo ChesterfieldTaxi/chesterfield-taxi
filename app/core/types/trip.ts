@@ -276,6 +276,24 @@ export interface TripAssignedVehicle {
 }
 
 /**
+ * Snapshot of a sibling vehicle & its assigned driver within a linked multi-car order.
+ * Synced across all sibling Trip documents so every driver knows their convoy & associates.
+ */
+export interface MultiCarAssociate {
+  tripId: string;
+  carIndex: number; // 1-based (Car 1 of N)
+  vehicleDisplayName?: string;
+  vehicleTier?: string;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhone?: string;
+  vehicleUnit?: string;
+  licensePlate?: string;
+  vehicleModel?: string;
+  status?: TripStatus;
+}
+
+/**
  * Core Trip Document Model stored in Firestore.
  */
 export interface Trip {
@@ -336,6 +354,13 @@ export interface Trip {
   contactPerson?: { name: string; phone: string; email?: string };
   multipleVehiclesRequested?: boolean;
   vehicleCount?: number;
+  /** Linked multi-vehicle convoy identifiers & synced associate drivers */
+  multiCarGroupId?: string;
+  multiCarIndex?: number; // 1-based car number (e.g., 1 of 3)
+  multiCarTotal?: number; // Total vehicles in this multi-car order
+  multiCarTripIds?: string[]; // All sibling Trip IDs sharing multiCarGroupId
+  multiCarDriverIds?: string[]; // Assigned driver UIDs across sibling trips
+  multiCarAssociates?: MultiCarAssociate[];
 
   /** Passenger & Vehicle */
   passenger: TripPassenger;

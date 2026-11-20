@@ -94,6 +94,17 @@ export class AdminAuthService {
       return { roles: ['customer'] };
     } catch (err) {
       console.warn('[AdminAuthService] Error fetching user roles from Firestore:', err);
+      // Preserve previously hydrated roles on transient network/Firestore errors so active staff sessions never bounce/reload
+      if (this.cachedUser && this.cachedUser.uid === user.uid && this.cachedUser.roles?.length) {
+        return {
+          roles: this.cachedUser.roles,
+          status: this.cachedUser.status,
+          isArchived: this.cachedUser.isArchived,
+          isBlacklisted: this.cachedUser.isBlacklisted,
+          blacklistReason: this.cachedUser.blacklistReason,
+          assignedVehicleUnit: this.cachedUser.assignedVehicleUnit,
+        };
+      }
       return { roles: ['customer'] };
     }
   }

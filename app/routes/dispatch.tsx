@@ -85,9 +85,15 @@ export function meta() {
 interface DraftTab {
   id: string;
   isNew: boolean;
+  tripId?: string;
   trip?: Trip;
   formValues?: DispatchFormValues;
 }
+
+const DISPATCH_TABS_STORAGE_KEY = 'ct_dispatch_open_tabs_v1';
+const SIDEBAR_WIDTH_STORAGE_KEY = 'ct_dispatch_sidebar_width';
+const QUEUE_HEIGHT_STORAGE_KEY = 'ct_dispatch_queue_height';
+const DOCK_WIDTH_STORAGE_KEY = 'ct_dispatch_dock_width';
 
 const INITIAL_DRIVERS: DriverRosterItem[] = getOperatorService().getDriverRoster();
 
@@ -395,6 +401,76 @@ function TripActionDropdown({
 
 export type DesktopDockTab = 'none' | 'phone' | 'email' | 'drivers' | 'comms' | 'alerts';
 
+interface MemoizedDraftBookingPaneProps {
+  draftId: string;
+  isActive: boolean;
+  isNew: boolean;
+  trip?: Trip;
+  tripId?: string;
+  allTrips: Trip[];
+  drivers: DriverRosterItem[];
+  onValuesChangeByDraft: (draftId: string, vals: DispatchFormValues) => void;
+  onBookingSuccessByDraft: (draftId: string, savedTrip: Trip, isEdit: boolean) => void;
+  onClearDraftById: (draftId: string) => void;
+  onCloneBooking: (values: DispatchFormValues) => void;
+  onOpenLinkedTrip: (linkedTripId: string) => Promise<void>;
+}
+
+const MemoizedDraftBookingPane = React.memo(function MemoizedDraftBookingPane({
+  draftId,
+  isActive,
+  isNew,
+  trip,
+  tripId,
+  allTrips,
+  drivers,
+  onValuesChangeByDraft,
+  onBookingSuccessByDraft,
+  onClearDraftById,
+  onCloneBooking,
+  onOpenLinkedTrip,
+}: MemoizedDraftBookingPaneProps) {
+  const handleValuesChange = useCallback(
+    (vals: DispatchFormValues) => onValuesChangeByDraft(draftId, vals),
+    [draftId, onValuesChangeByDraft]
+  );
+  const handleBookingSuccess = useCallback(
+    (savedTrip: Trip, isEdit?: boolean) => onBookingSuccessByDraft(draftId, savedTrip, Boolean(isEdit)),
+    [draftId, onBookingSuccessByDraft]
+  );
+  const handleClearDraft = useCallback(
+    () => onClearDraftById(draftId),
+    [draftId, onClearDraftById]
+  );
+
+  return (
+    <div className={`h-full w-full ${isActive ? 'block' : 'hidden'}`}>
+      {!isNew && !trip && tripId ? (
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-500 gap-2 bg-slate-50">
+          <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
+          <span className="text-xs font-semibold text-slate-700">
+            Restoring trip #{tripId.slice(-6).toUpperCase()}...
+          </span>
+        </div>
+      ) : (
+        <DispatchBookingEngine
+          draftId={draftId}
+          isActiveDraft={isActive}
+          initialTrip={trip}
+          allTrips={allTrips}
+          drivers={drivers}
+          onValuesChange={handleValuesChange}
+          onBookingSuccess={handleBookingSuccess}
+          onClearDraft={handleClearDraft}
+          onCopyBooking={onCloneBooking}
+          onCloneBooking={onCloneBooking}
+          onOpenLinkedTrip={onOpenLinkedTrip}
+        />
+      )}
+    </div>
+  );
+});
+
 export default function DispatchRoute() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -501,15 +577,77 @@ export default function DispatchRoute() {
     });
   }, []);
 
-  // Draft Tabs state
+  // Draft Tabs state — persisted across page reloads so dispatchers never lose open drafts or edit tabs
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
-  const [drafts, setDrafts] = useState<DraftTab[]>([
-    { id: 'new-1', isNew: true },
-  ]);
-  const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
-  const [nextDraftIdx, setNextDraftIdx] = useState(2);
+  const loadPersistedTabs = (): { drafts: DraftTab[]; activeDraftId: string; nextDraftIdx: number } => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(DISPATCH_TABS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.drafts) && parsed.drafts.length > 0) {
+            const restored: DraftTab[] = parsed.drafts.slice(0, maxDrafts).map((item: any) => ({
+              id: String(item.id),
+              isNew: Boolean(item.isNew),
+              tripId: item.tripId ? String(item.tripId) : undefined,
+            }));
+            const validActive = restored.some((d) => d.id === parsed.activeDraftId)
+              ? parsed.activeDraftId
+              : restored[0].id;
+            const nextIdx =
+              typeof parsed.nextDraftIdx === 'number' && parsed.nextDraftIdx >= 2
+                ? parsed.nextDraftIdx
+                : restored.length + 2;
+            return { drafts: restored, activeDraftId: validActive, nextDraftIdx: nextIdx };
+          }
+        }
+      } catch {}
+    }
+    return { drafts: [{ id: 'new-1', isNew: true }], activeDraftId: 'new-1', nextDraftIdx: 2 };
+  };
+
+  const initialTabsState = useMemo(() => loadPersistedTabs(), []);
+  const [drafts, setDrafts] = useState<DraftTab[]>(initialTabsState.drafts);
+  const [activeDraftId, setActiveDraftId] = useState<string>(initialTabsState.activeDraftId);
+  const [nextDraftIdx, setNextDraftIdx] = useState<number>(initialTabsState.nextDraftIdx);
   const [isTabOverflowOpen, setIsTabOverflowOpen] = useState(false);
   const tabOverflowRef = useRef<HTMLDivElement>(null);
+
+  // Persist open tabs metadata cleanly whenever tabs/active tab change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const serializable = {
+        drafts: drafts.map((d) => ({
+          id: d.id,
+          isNew: d.isNew,
+          tripId: d.trip?.id || d.tripId,
+        })),
+        activeDraftId,
+        nextDraftIdx,
+      };
+      localStorage.setItem(DISPATCH_TABS_STORAGE_KEY, JSON.stringify(serializable));
+    } catch {}
+  }, [drafts, activeDraftId, nextDraftIdx]);
+
+  // Re-hydrate persisted Edit tabs with live Trip objects once Firestore trips load
+  useEffect(() => {
+    if (trips.length === 0) return;
+    setDrafts((prev) => {
+      let changed = false;
+      const next = prev.map((d) => {
+        if (!d.isNew && !d.trip && d.tripId) {
+          const match = trips.find((t) => t.id === d.tripId);
+          if (match) {
+            changed = true;
+            return { ...d, trip: match };
+          }
+        }
+        return d;
+      });
+      return changed ? next : prev;
+    });
+  }, [trips]);
 
   // Operational Right Dock Tools (Unified Dock: Main / Phone / Email / Drivers)
   const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
@@ -765,19 +903,38 @@ export default function DispatchRoute() {
   const [isApplyingDriverFare, setIsApplyingDriverFare] = useState<boolean>(false);
   const [driverFareTab, setDriverFareTab] = useState<'rule' | 'flat'>('rule');
 
-  // Resizable layout dimensions - Default to balanced heights so Softphone never overflows
-  const [sidebarWidth, setSidebarWidth] = useState(430); // 340px - 620px
-  const [queueHeight, setQueueHeight] = useState(240); // 160px - 50%
-  const [operationsWidth, setOperationsWidth] = useState(() => {
+  // Resizable layout dimensions — persisted to localStorage with safe viewport bounds
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ct_dispatch_dock_width');
+      const saved = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= 320 && parsed <= 750) return parsed;
+        if (!isNaN(parsed) && parsed >= 320 && parsed <= 680) return parsed;
       }
     }
-    return 420;
+    return 430;
   });
+  const [queueHeight, setQueueHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(QUEUE_HEIGHT_STORAGE_KEY);
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 150 && parsed <= 600) return parsed;
+      }
+    }
+    return 240;
+  });
+  const [operationsWidth, setOperationsWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(DOCK_WIDTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 320 && parsed <= 760) return parsed;
+      }
+    }
+    return 400;
+  });
+  const [activeResizeHandle, setActiveResizeHandle] = useState<'sidebar' | 'queue' | 'operations' | null>(null);
   const [panelHeights, setPanelHeights] = useState<Record<string, number>>({
     drivers: 180,
     messages: 180,
@@ -884,12 +1041,15 @@ export default function DispatchRoute() {
     return unsub;
   }, []);
 
-  // Persist right dock operations width in localStorage
+  // Persist panel dimensions in localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ct_dispatch_dock_width', String(operationsWidth));
-    }
-  }, [operationsWidth]);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(Math.round(sidebarWidth)));
+      localStorage.setItem(QUEUE_HEIGHT_STORAGE_KEY, String(Math.round(queueHeight)));
+      localStorage.setItem(DOCK_WIDTH_STORAGE_KEY, String(Math.round(operationsWidth)));
+    } catch {}
+  }, [sidebarWidth, queueHeight, operationsWidth]);
 
   // Dispatcher Hotkeys: M (Main), Alt+P/P/C (Comms), Alt+E/E (Email), Alt+D/D (Drivers), A (Alerts), Escape
   useEffect(() => {
@@ -2113,9 +2273,19 @@ export default function DispatchRoute() {
       ? 'assigned'
       : tripToUpdate.status;
 
+    const drvObj = isUnassigning ? undefined : drivers.find((d) => d.id === driverId);
     const updates: Partial<Trip> = {
       assignedDriverId: isUnassigning ? null : driverId,
       status: nextStatus,
+      ...(drvObj
+        ? {
+            metadata: {
+              ...(tripToUpdate.metadata || {}),
+              assignedDriverName: drvObj.name,
+              assignedDriverPhone: drvObj.phone,
+            },
+          }
+        : {}),
     };
 
     const bookingService = getBookingService();
@@ -2426,9 +2596,12 @@ export default function DispatchRoute() {
     setActiveDraftId(newId);
   };
 
-  // Close draft
+  // Close draft (cleans up its cached localStorage draft so stale data never resurfaces)
   const closeDraft = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    try {
+      localStorage.removeItem(`chesterfield_dispatch_draft_${id}`);
+    } catch {}
     if (drafts.length === 1) {
       const resetDraft: DraftTab = { id: `new-${nextDraftIdx}`, isNew: true };
       setDrafts([resetDraft]);
@@ -2446,8 +2619,11 @@ export default function DispatchRoute() {
 
   // Double-click to open edit tab for a trip
   const handleOpenEditTrip = (trip: Trip) => {
-    const existingEdit = drafts.find((d) => !d.isNew && d.trip?.id === trip.id);
+    const existingEdit = drafts.find((d) => !d.isNew && (d.trip?.id === trip.id || d.tripId === trip.id));
     if (existingEdit) {
+      if (!existingEdit.trip) {
+        setDrafts((prev) => prev.map((d) => (d.id === existingEdit.id ? { ...d, trip } : d)));
+      }
       setActiveDraftId(existingEdit.id);
       return;
     }
@@ -2460,6 +2636,7 @@ export default function DispatchRoute() {
     const editDraft: DraftTab = {
       id: `edit-${trip.id}`,
       isNew: false,
+      tripId: trip.id,
       trip,
     };
     setDrafts([...drafts, editDraft]);
@@ -2737,70 +2914,68 @@ export default function DispatchRoute() {
     setSoftphoneNotice(null);
   };
 
-  // Resizable sidebar handlers
-  const isDraggingSidebar = useRef(false);
-  const handleSidebarMouseDown = (e: React.MouseEvent) => {
+  // ─── Rock-Solid Panel Resizing (Sidebar, Bottom Queue, Right Operations Drawer) ───
+  // Uses a single activeResizeHandle state + window pointer/mouse listeners (zero render-churn teardown!)
+  // paired with a full-screen drag overlay so Google Maps canvas can never steal pointer events.
+  const handleSidebarMouseDown = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
-    isDraggingSidebar.current = true;
-    document.addEventListener('mousemove', handleSidebarMouseMove);
-    document.addEventListener('mouseup', handleSidebarMouseUp);
-  };
-
-  const handleSidebarMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingSidebar.current) return;
-    const newWidth = Math.min(Math.max(e.clientX, 340), 620);
-    setSidebarWidth(newWidth);
+    setActiveResizeHandle('sidebar');
   }, []);
 
-  const handleSidebarMouseUp = useCallback(() => {
-    isDraggingSidebar.current = false;
-    document.removeEventListener('mousemove', handleSidebarMouseMove);
-    document.removeEventListener('mouseup', handleSidebarMouseUp);
-  }, [handleSidebarMouseMove]);
-
-  // Resizable queue handlers
-  const isDraggingQueue = useRef(false);
-  const handleQueueMouseDown = (e: React.MouseEvent) => {
+  const handleQueueMouseDown = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
-    isDraggingQueue.current = true;
-    document.addEventListener('mousemove', handleQueueMouseMove);
-    document.addEventListener('mouseup', handleQueueMouseUp);
-  };
-
-  const handleQueueMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingQueue.current) return;
-    const windowHeight = window.innerHeight;
-    const newHeight = Math.min(Math.max(windowHeight - e.clientY, 150), windowHeight * 0.6);
-    setQueueHeight(newHeight);
+    setActiveResizeHandle('queue');
   }, []);
 
-  const handleQueueMouseUp = useCallback(() => {
-    isDraggingQueue.current = false;
-    document.removeEventListener('mousemove', handleQueueMouseMove);
-    document.removeEventListener('mouseup', handleQueueMouseUp);
-  }, [handleQueueMouseMove]);
-
-  // Operations panel horizontal resize
-  const isDraggingOperations = useRef(false);
-  const handleOperationsMouseDown = (e: React.MouseEvent) => {
+  const handleOperationsMouseDown = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
-    isDraggingOperations.current = true;
-    document.addEventListener('mousemove', handleOperationsMouseMove);
-    document.addEventListener('mouseup', handleOperationsMouseUp);
-  };
-
-  const handleOperationsMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingOperations.current) return;
-    const windowWidth = window.innerWidth;
-    const newWidth = Math.min(Math.max(windowWidth - e.clientX, 320), 750);
-    setOperationsWidth(newWidth);
+    setActiveResizeHandle('operations');
   }, []);
 
-  const handleOperationsMouseUp = useCallback(() => {
-    isDraggingOperations.current = false;
-    document.removeEventListener('mousemove', handleOperationsMouseMove);
-    document.removeEventListener('mouseup', handleOperationsMouseUp);
-  }, [handleOperationsMouseMove]);
+  useEffect(() => {
+    if (!activeResizeHandle || typeof window === 'undefined') return;
+
+    const handleMove = (e: MouseEvent | PointerEvent) => {
+      if (activeResizeHandle === 'sidebar') {
+        const maxSidebar = Math.min(680, Math.max(360, window.innerWidth - 420));
+        const nextWidth = Math.min(Math.max(e.clientX, 320), maxSidebar);
+        setSidebarWidth(nextWidth);
+      } else if (activeResizeHandle === 'queue') {
+        const maxQueue = Math.max(220, Math.floor(window.innerHeight * 0.65));
+        const nextHeight = Math.min(Math.max(window.innerHeight - e.clientY, 150), maxQueue);
+        setQueueHeight(nextHeight);
+      } else if (activeResizeHandle === 'operations') {
+        const maxDock = Math.min(760, Math.max(360, window.innerWidth - 460));
+        const nextWidth = Math.min(Math.max(window.innerWidth - e.clientX, 320), maxDock);
+        setOperationsWidth(nextWidth);
+      }
+    };
+
+    const handleUp = () => {
+      setActiveResizeHandle(null);
+    };
+
+    const prevCursor = document.body.style.cursor;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = activeResizeHandle === 'queue' ? 'row-resize' : 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('blur', handleUp);
+
+    return () => {
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevUserSelect;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('blur', handleUp);
+    };
+  }, [activeResizeHandle]);
 
   // Panel Minimization Toggle
   const toggleMinimizePanel = (panelKey: string) => {
@@ -2810,121 +2985,10 @@ export default function DispatchRoute() {
     }));
   };
 
-  // Operations panels vertical resize between cards with strict clamping
-  const isDraggingVerticalKey = useRef<string | null>(null);
-  const startDragY = useRef(0);
-  const startDragHeight = useRef(0);
-
-  const handleVerticalResizeStart = (e: React.MouseEvent, panelKey: string) => {
-    e.preventDefault();
-    isDraggingVerticalKey.current = panelKey;
-    startDragY.current = e.clientY;
-    startDragHeight.current = panelHeights[panelKey] || 300;
-    document.addEventListener('mousemove', handleVerticalResizeMove);
-    document.addEventListener('mouseup', handleVerticalResizeUp);
-  };
-
   // Keypad Toggle: opens numeric dialpad and ensures panel has sufficient height
   const toggleKeypad = () => {
-    setShowKeypad((prev) => {
-      const willShow = !prev;
-      if (willShow) {
-        const containerHeight = operationsContainerRef.current?.clientHeight || 650;
-        const requiredPhoneHeight = 270;
-        const availableForUpper = containerHeight - requiredPhoneHeight - 30;
-
-        setPanelHeights((curr) => {
-          const upperPanels = activePanels.filter((p) => p !== 'phone' && !minimizedPanels[p]);
-          const updated = { ...curr };
-          if (upperPanels.length > 0) {
-            const totalUpper = upperPanels.reduce((sum, p) => sum + (curr[p] || 250), 0);
-            if (totalUpper > availableForUpper) {
-              const scale = Math.max(0.35, availableForUpper / totalUpper);
-              upperPanels.forEach((p) => {
-                updated[p] = Math.max(120, Math.floor((curr[p] || 250) * scale));
-              });
-            }
-          }
-          updated.phone = Math.max(updated.phone || 0, requiredPhoneHeight);
-          return updated;
-        });
-      }
-      return willShow;
-    });
+    setShowKeypad((prev) => !prev);
   };
-
-  const handleVerticalResizeMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingVerticalKey.current) return;
-    const key = isDraggingVerticalKey.current;
-    const delta = e.clientY - startDragY.current;
-
-    const containerHeight = operationsContainerRef.current?.clientHeight || 650;
-    
-    // Find index of the panel being resized
-    const panelIdx = activePanels.indexOf(key as any);
-    if (panelIdx === -1) return;
-
-    // Calculate height consumed by all panels ABOVE this panel
-    let heightAbove = 0;
-    for (let i = 0; i < panelIdx; i++) {
-      const p = activePanels[i];
-      heightAbove += minimizedPanels[p] ? 32 : (panelHeights[p] || 160);
-      heightAbove += 8; // resize divider
-    }
-
-    // Calculate minimum height required for all panels BELOW this panel
-    let minBelow = 0;
-    for (let i = panelIdx + 1; i < activePanels.length; i++) {
-      const p = activePanels[i];
-      if (minimizedPanels[p]) {
-        minBelow += 32;
-      } else if (p === 'phone') {
-        minBelow += showKeypad ? 270 : 180;
-      } else {
-        minBelow += 120;
-      }
-      minBelow += 8; // resize divider
-    }
-
-    // Stop resizing when it reaches the lower panel's min height
-    const maxAllowedHeight = Math.max(120, containerHeight - heightAbove - minBelow - 16);
-    const minAllowedHeight = minimizedPanels[key] ? 32 : 120;
-
-    const nextHeight = Math.max(minAllowedHeight, Math.min(maxAllowedHeight, startDragHeight.current + delta));
-    setPanelHeights((prev) => ({
-      ...prev,
-      [key]: nextHeight,
-    }));
-  }, [activePanels, minimizedPanels, panelHeights, showKeypad]);
-
-  const handleVerticalResizeUp = useCallback(() => {
-    isDraggingVerticalKey.current = null;
-    document.removeEventListener('mousemove', handleVerticalResizeMove);
-    document.removeEventListener('mouseup', handleVerticalResizeUp);
-  }, [handleVerticalResizeMove]);
-
-  // Phase 31.5: Explicit cleanup of document resize listeners on unmount
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleSidebarMouseMove);
-      document.removeEventListener('mouseup', handleSidebarMouseUp);
-      document.removeEventListener('mousemove', handleQueueMouseMove);
-      document.removeEventListener('mouseup', handleQueueMouseUp);
-      document.removeEventListener('mousemove', handleOperationsMouseMove);
-      document.removeEventListener('mouseup', handleOperationsMouseUp);
-      document.removeEventListener('mousemove', handleVerticalResizeMove);
-      document.removeEventListener('mouseup', handleVerticalResizeUp);
-    };
-  }, [
-    handleSidebarMouseMove,
-    handleSidebarMouseUp,
-    handleQueueMouseMove,
-    handleQueueMouseUp,
-    handleOperationsMouseMove,
-    handleOperationsMouseUp,
-    handleVerticalResizeMove,
-    handleVerticalResizeUp,
-  ]);
 
   // Tactical Presets Admin Management
   const handleSaveNewPreset = () => {
@@ -3180,7 +3244,8 @@ export default function DispatchRoute() {
         const matchPickup = (trip.pickupLocation?.address || '').toLowerCase().includes(term);
         const matchDropoff = (trip.dropoffLocation?.address || '').toLowerCase().includes(term);
         const matchDriver = (trip.assignedDriverId || '').toLowerCase().includes(term);
-        if (!matchId && !matchPassenger && !matchPhone && !matchPickup && !matchDropoff && !matchDriver) {
+        const matchGroup = (trip.multiCarGroupId || '').toLowerCase().includes(term);
+        if (!matchId && !matchPassenger && !matchPhone && !matchPickup && !matchDropoff && !matchDriver && !matchGroup) {
           return false;
         }
       }
@@ -3296,6 +3361,145 @@ export default function DispatchRoute() {
   // Active Draft object for map route display
   const activeDraft = drafts.find((d) => d.id === activeDraftId);
 
+  // Ref-backed stable callbacks so toggling side menus/drawers never re-renders
+  // DispatchBookingEngine (6k+ lines per tab), LiveFleetMap, or CommsHub (5.5k+ lines).
+  const panelCallbacksRef = useRef({
+    trips,
+    activeDraftId,
+    handleDraftValuesChange,
+    handleOpenEditTrip,
+    handleQuickAssignDriver,
+    handleStartCall,
+    handleCloneBookingToNewDraft,
+    closeDraft,
+    setDriverDutyStatus,
+    showDispatchToast,
+  });
+  panelCallbacksRef.current = {
+    trips,
+    activeDraftId,
+    handleDraftValuesChange,
+    handleOpenEditTrip,
+    handleQuickAssignDriver,
+    handleStartCall,
+    handleCloneBookingToNewDraft,
+    closeDraft,
+    setDriverDutyStatus,
+    showDispatchToast,
+  };
+
+  const stableDraftValuesChange = useCallback((draftId: string, vals: DispatchFormValues) => {
+    panelCallbacksRef.current.handleDraftValuesChange(draftId, vals);
+  }, []);
+
+  const stableDraftBookingSuccess = useCallback((draftId: string, savedTrip: Trip, isEdit: boolean) => {
+    if (savedTrip.multiCarGroupId && (savedTrip.multiCarTotal || 1) > 1) {
+      panelCallbacksRef.current.showDispatchToast(
+        `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${savedTrip.multiCarGroupId}) — assign each car individually.`,
+        'success'
+      );
+    }
+    if (isEdit) {
+      panelCallbacksRef.current.closeDraft(draftId, { stopPropagation: () => {} } as any);
+    }
+  }, []);
+
+  const stableClearDraftById = useCallback((draftId: string) => {
+    setDrafts((prev) =>
+      prev.map((item) => (item.id === draftId ? { ...item, formValues: undefined } : item))
+    );
+  }, []);
+
+  const stableCloneBooking = useCallback((values: DispatchFormValues) => {
+    panelCallbacksRef.current.handleCloneBookingToNewDraft(values);
+  }, []);
+
+  const stableOpenLinkedTrip = useCallback(async (linkedTripId: string) => {
+    const linkedTrip = panelCallbacksRef.current.trips.find((t) => t.id === linkedTripId);
+    if (linkedTrip) {
+      panelCallbacksRef.current.handleOpenEditTrip(linkedTrip);
+    } else {
+      try {
+        const statusRes = await getBookingService().getBookingStatus(linkedTripId);
+        if (statusRes?.trip) {
+          panelCallbacksRef.current.handleOpenEditTrip(statusRes.trip);
+        }
+      } catch (err) {
+        console.error('Failed to load linked trip:', err);
+      }
+    }
+  }, []);
+
+  const stableClearFocusedDriver = useCallback(() => setFocusedMapDriverId(null), []);
+  const stableAssignDriverToTrip = useCallback((tripId: string, driverId: string) => {
+    panelCallbacksRef.current.handleQuickAssignDriver(tripId, driverId);
+  }, []);
+  const stableOpenDriverQueue = useCallback((drv: DriverRosterItem) => setQueueDriver(drv), []);
+  const stableCallDriverFromMap = useCallback((phone: string, name?: string) => {
+    setCommsInitialTab('phone');
+    setActiveDockTab('phone');
+    panelCallbacksRef.current.handleStartCall(phone, name);
+  }, []);
+  const stableChangeDriverDutyStatus = useCallback(async (driverId: string, duty: 'on_duty' | 'on_break' | 'off_duty') => {
+    try {
+      await panelCallbacksRef.current.setDriverDutyStatus(driverId, duty);
+      panelCallbacksRef.current.showDispatchToast(
+        `Driver status updated to ${duty === 'on_break' ? 'On Break' : duty === 'off_duty' ? 'Offline' : 'Available'}.`,
+        'success'
+      );
+    } catch {
+      panelCallbacksRef.current.showDispatchToast('Failed to update driver status.', 'error');
+    }
+  }, []);
+  const stableSelectMapTrip = useCallback((trip: Trip) => {
+    setSelectedMapTrip(trip);
+    setSelectedQueueTripId(trip.id);
+    setShouldZoomMap(true);
+  }, []);
+
+  const stableCommsTabChange = useCallback((tab: any) => setCommsActiveTab(tab), []);
+  const stableCommsPopOut = useCallback(() => getWorkspaceBus().popOutModule('comms'), []);
+  const stableCommsClose = useCallback(() => setActiveDockTab('none'), []);
+  const stableCommsOpenEditTrip = useCallback((tripId: string) => {
+    const found = panelCallbacksRef.current.trips.find((t) => t.id === tripId);
+    if (found) {
+      setSelectedQueueTripId(found.id);
+      setSelectedMapTrip(found);
+      setShouldZoomMap(true);
+      panelCallbacksRef.current.handleOpenEditTrip(found);
+      setActiveMobileTab('booking');
+    }
+  }, []);
+  const stableCommsPopulateBooking = useCallback((payload: any) => {
+    setDrafts((prev) => {
+      const target = prev.find((d) => d.id === panelCallbacksRef.current.activeDraftId) || prev[0];
+      if (!target) return prev;
+      const currentForm = target.formValues || ({} as any);
+      const updatedForm: DispatchFormValues = {
+        ...currentForm,
+        passengerName: payload.passengerName || currentForm.passengerName || '',
+        phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+        email: payload.passengerEmail || payload.email || currentForm.email || '',
+        pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+        dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+        vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+        selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+        corporateDetails: {
+          ...currentForm.corporateDetails,
+          corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+          billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+          authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+          invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+        },
+        paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
+        internalNotes: payload.notes
+          ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+          : currentForm.internalNotes,
+      };
+      return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+    });
+  }, []);
+
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
@@ -3306,6 +3510,14 @@ export default function DispatchRoute() {
 
   return (
     <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden text-slate-900 select-none">
+      {/* Full-screen drag overlay while resizing so Google Maps canvas / iframes never hijack pointer events */}
+      {activeResizeHandle && (
+        <div
+          className={`fixed inset-0 z-[9999] bg-transparent select-none ${
+            activeResizeHandle === 'queue' ? 'cursor-row-resize' : 'cursor-col-resize'
+          }`}
+        />
+      )}
       {/* ─────────────────────────────────────────────────────────────
           INCOMING WEBRTC SOFTPHONE CALL ALERT BANNER
       ───────────────────────────────────────────────────────────── */}
@@ -3374,18 +3586,18 @@ export default function DispatchRoute() {
             <MenuIcon className="w-5 h-5" />
           </button>
 
-          {/* Desktop Operational Panel Triggers: Main, Communications, Drivers, Alerts */}
-          <div className="hidden lg:flex items-center gap-1.5">
-            {/* Main Console Tab (Booking on left, Map on top right, Trips table on bottom right) */}
+          {/* Single Unified Desktop Workspace Switcher: Main | Phone | Email | Drivers */}
+          <div className="hidden lg:flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80">
+            {/* Main Console Tab */}
             <button
               type="button"
               onClick={() => setActiveDockTab('none')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'none'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Main Console: Booking form, Map, and Trips queue"
+              title="Main Console: Booking form, Map, and Trips queue (M)"
             >
               <Squares2X2Icon className="w-3.5 h-3.5 shrink-0" />
               <span>Main</span>
@@ -3395,11 +3607,7 @@ export default function DispatchRoute() {
             <button
               type="button"
               onClick={() => {
-                if (
-                  activeDockTab !== 'none' &&
-                  (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-                  commsActiveTab === 'phone'
-                ) {
+                if (activeDockTab === 'phone' || activeDockTab === 'comms') {
                   setActiveDockTab('none');
                 } else {
                   setCommsActiveTab('phone');
@@ -3407,19 +3615,22 @@ export default function DispatchRoute() {
                   setActiveDockTab('phone');
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeDockTab !== 'none' &&
-                (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-                commsActiveTab !== 'messages'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100'
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeDockTab === 'phone' || activeDockTab === 'comms'
+                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Phone: Omnichannel Calls, Messages, and Voicemail (Alt+P)"
+              title="Phone & SMS Hub (Alt+P)"
             >
               <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Phone</span>
               {activeCallStatus !== 'idle' && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+              )}
+              {unreadMessagesCount + missedCallsCount > 0 && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-rose-500 text-white leading-tight">
+                  {unreadMessagesCount + missedCallsCount}
+                </span>
               )}
             </button>
 
@@ -3427,12 +3638,12 @@ export default function DispatchRoute() {
             <button
               type="button"
               onClick={() => setActiveDockTab(activeDockTab === 'email' ? 'none' : 'email')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'email'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Email: Inquiries, Bookings, Receipts (Alt+E)"
+              title="Email Inbox: Requests, Bookings, Receipts (Alt+E)"
             >
               <MailIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Email</span>
@@ -3442,21 +3653,23 @@ export default function DispatchRoute() {
             <button
               type="button"
               onClick={() => setActiveDockTab(activeDockTab === 'drivers' ? 'none' : 'drivers')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'drivers'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Drivers Roster & Status (Alt+D)"
+              title="Live Fleet Roster & Status (Alt+D)"
             >
               <CarIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Drivers</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                  activeDockTab === 'drivers' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                  activeDockTab === 'drivers'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-emerald-100 text-emerald-700'
                 }`}
               >
-                {drivers.filter((d) => d.status === 'available').length}
+                {drivers.filter((d) => d.mapStatus === 'available').length}
               </span>
             </button>
           </div>
@@ -3486,11 +3699,12 @@ export default function DispatchRoute() {
           </span>
         </div>
 
-        {/* Right: Screen Pop Call HUD + Omnichannel Messages + Alerts Bell + App Suite Launcher */}
+        {/* Right: Active Call HUD (only visible on desktop during live call) + Utility Controls (Alerts, Audio, App Suite) */}
         <div className="flex items-center gap-2">
           <DispatchHeaderCallHud
             trips={trips}
             missedCallsCount={missedCallsCount}
+            hideIdleButtonOnDesktop={true}
             isPhoneDockActive={
               activeDockTab !== 'none' &&
               (activeDockTab === 'phone' || activeDockTab === 'comms') &&
@@ -3567,7 +3781,7 @@ export default function DispatchRoute() {
             }}
           />
 
-          {/* Omnichannel Messages Hub Button */}
+          {/* Mobile-only Messages Shortcut (hidden on desktop to prevent double nav bar) */}
           <button
             type="button"
             onClick={() => {
@@ -3585,7 +3799,7 @@ export default function DispatchRoute() {
                 setUnreadMessagesCount(0);
               }
             }}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+            className={`lg:hidden w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
               activeDockTab !== 'none' &&
               (activeDockTab === 'phone' || activeDockTab === 'comms') &&
               commsActiveTab === 'messages'
@@ -3603,7 +3817,7 @@ export default function DispatchRoute() {
             )}
           </button>
 
-          {/* Drivers Roster Dock Trigger Button */}
+          {/* Mobile-only Drivers Shortcut (hidden on desktop to prevent double nav bar) */}
           <button
             type="button"
             onClick={() => {
@@ -3614,16 +3828,16 @@ export default function DispatchRoute() {
                 setActiveMobileTab('drivers');
               }
             }}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+            className={`lg:hidden w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
               activeDockTab === 'drivers'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
             }`}
-            title="Open Drivers Tab in Dock"
+            title="Open Drivers Roster"
             aria-label="Drivers Roster"
           >
             <CarIcon className="w-4 h-4" />
-            {drivers.filter((d) => d.status === 'available').length > 0 && (
+            {drivers.filter((d) => d.mapStatus === 'available').length > 0 && (
               <span
                 className={`absolute -top-1 -right-1 text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs ${
                   activeDockTab === 'drivers'
@@ -3631,7 +3845,7 @@ export default function DispatchRoute() {
                     : 'bg-emerald-600 text-white'
                 }`}
               >
-                {drivers.filter((d) => d.status === 'available').length}
+                {drivers.filter((d) => d.mapStatus === 'available').length}
               </span>
             )}
           </button>
@@ -3874,7 +4088,7 @@ export default function DispatchRoute() {
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/60"
             onClick={() => setIsMobileDrawerOpen(false)}
           />
           <div className="relative w-80 max-w-[85vw] bg-slate-900 border-r border-slate-800 text-slate-300 h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
@@ -4219,17 +4433,29 @@ export default function DispatchRoute() {
               {drafts.map((d) => {
                 const isActive = d.id === activeDraftId;
                 const label = getTabLabel(d);
+                const hasData = Boolean(
+                  d.formValues?.pickupAddress?.trim() ||
+                    d.formValues?.dropoffAddress?.trim() ||
+                    d.formValues?.passengerName?.trim() ||
+                    d.formValues?.phone?.trim()
+                );
                 return (
                   <div
                     key={d.id}
                     onClick={() => setActiveDraftId(d.id)}
-                    title={d.formValues?.passengerName || d.id}
-                    className={`group relative h-7 px-2 rounded-t-md text-xs font-semibold flex items-center gap-1 cursor-pointer border-t border-x transition-colors shrink-0 max-w-[85px] ${
+                    title={d.formValues?.passengerName || label}
+                    className={`group relative h-7 px-2 rounded-t-md text-xs font-semibold flex items-center gap-1 cursor-pointer border-t border-x transition-colors shrink-0 max-w-[104px] ${
                       isActive
                         ? 'bg-white text-blue-600 border-slate-300 shadow-xs'
                         : 'bg-slate-200/60 text-slate-600 hover:bg-slate-200 border-transparent'
                     }`}
                   >
+                    {hasData && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"
+                        title="Saved draft data"
+                      />
+                    )}
                     <span className="truncate flex-1 text-[11px]">{label}</span>
                     <button
                       type="button"
@@ -4343,55 +4569,44 @@ export default function DispatchRoute() {
           {/* Persistent Draft / Edit Form Container */}
           <div className="flex-1 overflow-hidden relative">
             {drafts.map((d) => (
-              <div
+              <MemoizedDraftBookingPane
                 key={d.id}
-                className={`h-full w-full ${d.id === activeDraftId ? 'block' : 'hidden'}`}
-              >
-                <DispatchBookingEngine
-                  draftId={d.id}
-                  isActiveDraft={d.id === activeDraftId}
-                  initialTrip={d.trip}
-                  allTrips={trips}
-                  drivers={drivers}
-                  onValuesChange={(vals) => handleDraftValuesChange(d.id, vals)}
-                  onBookingSuccess={(savedTrip, isEdit) => {
-                    if (isEdit) {
-                      closeDraft(d.id, { stopPropagation: () => {} } as any);
-                    }
-                  }}
-                  onClearDraft={() => {
-                    setDrafts((prev) =>
-                      prev.map((item) => (item.id === d.id ? { ...item, formValues: undefined } : item))
-                    );
-                  }}
-                  onCopyBooking={handleCloneBookingToNewDraft}
-                  onCloneBooking={handleCloneBookingToNewDraft}
-                  onOpenLinkedTrip={async (linkedTripId) => {
-                    const linkedTrip = trips.find((t) => t.id === linkedTripId);
-                    if (linkedTrip) {
-                      handleOpenEditTrip(linkedTrip);
-                    } else {
-                      try {
-                        const statusRes = await getBookingService().getBookingStatus(linkedTripId);
-                        if (statusRes?.trip) {
-                          handleOpenEditTrip(statusRes.trip);
-                        }
-                      } catch (err) {
-                        console.error('Failed to load linked trip:', err);
-                      }
-                    }
-                  }}
-                />
-              </div>
+                draftId={d.id}
+                isActive={d.id === activeDraftId}
+                isNew={d.isNew}
+                trip={d.trip}
+                tripId={d.tripId}
+                allTrips={trips}
+                drivers={drivers}
+                onValuesChangeByDraft={stableDraftValuesChange}
+                onBookingSuccessByDraft={stableDraftBookingSuccess}
+                onClearDraftById={stableClearDraftById}
+                onCloneBooking={stableCloneBooking}
+                onOpenLinkedTrip={stableOpenLinkedTrip}
+              />
             ))}
           </div>
         </aside>
 
-        {/* Resizer Handle (Left Sidebar) */}
+        {/* Resizer Handle (Left Sidebar — drag to resize, double-click to reset to 430px) */}
         <div
-          onMouseDown={handleSidebarMouseDown}
-          className="w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 transition-colors z-20 shrink-0"
-        />
+          onPointerDown={handleSidebarMouseDown}
+          onDoubleClick={() => setSidebarWidth(430)}
+          title="Drag to resize booking panel (double-click to reset)"
+          className={`hidden lg:flex items-center justify-center w-2 h-full cursor-col-resize transition-colors z-30 shrink-0 select-none group ${
+            activeResizeHandle === 'sidebar'
+              ? 'bg-blue-500/30'
+              : 'bg-slate-200/60 hover:bg-blue-500/20'
+          }`}
+        >
+          <div
+            className={`w-0.5 h-10 rounded-full transition-colors ${
+              activeResizeHandle === 'sidebar'
+                ? 'bg-blue-600'
+                : 'bg-slate-300 group-hover:bg-blue-500'
+            }`}
+          />
+        </div>
 
         {/* ─── B. CENTER COLUMN: MAP VIEW STAGE + BOTTOM DOCKED QUEUE ─── */}
         <div className={`flex-1 flex-col h-full overflow-hidden relative min-w-0 ${
@@ -4413,38 +4628,34 @@ export default function DispatchRoute() {
               selectedTrip={selectedMapTrip}
               shouldZoom={shouldZoomMap}
               focusedDriverId={focusedMapDriverId}
-              onClearFocusedDriver={() => setFocusedMapDriverId(null)}
-              onAssignDriverToTrip={(tripId, driverId) => handleQuickAssignDriver(tripId, driverId)}
-              onOpenDriverQueue={(drv) => setQueueDriver(drv)}
-              onCallDriver={(phone, name) => {
-                setCommsInitialTab('phone');
-                setActiveDockTab('phone');
-                handleStartCall(phone, name);
-              }}
-              onChangeDriverDutyStatus={async (driverId, duty) => {
-                try {
-                  await setDriverDutyStatus(driverId, duty);
-                  showDispatchToast(
-                    `Driver status updated to ${duty === 'on_break' ? 'On Break' : duty === 'off_duty' ? 'Offline' : 'Available'}.`,
-                    'success'
-                  );
-                } catch {
-                  showDispatchToast('Failed to update driver status.', 'error');
-                }
-              }}
-              onSelectTrip={(trip) => {
-                setSelectedMapTrip(trip);
-                setSelectedQueueTripId(trip.id);
-                setShouldZoomMap(true);
-              }}
+              onClearFocusedDriver={stableClearFocusedDriver}
+              onAssignDriverToTrip={stableAssignDriverToTrip}
+              onOpenDriverQueue={stableOpenDriverQueue}
+              onCallDriver={stableCallDriverFromMap}
+              onChangeDriverDutyStatus={stableChangeDriverDutyStatus}
+              onSelectTrip={stableSelectMapTrip}
             />
           </div>
 
-          {/* Resizer Handle (Bottom Queue) */}
+          {/* Resizer Handle (Bottom Queue — drag to resize, double-click to reset to 240px) */}
           <div
-            onMouseDown={handleQueueMouseDown}
-            className="hidden lg:block h-1.5 w-full cursor-row-resize hover:bg-blue-500/50 transition-colors z-10 shrink-0"
-          />
+            onPointerDown={handleQueueMouseDown}
+            onDoubleClick={() => setQueueHeight(240)}
+            title="Drag to resize trips queue height (double-click to reset)"
+            className={`hidden lg:flex items-center justify-center h-2 w-full cursor-row-resize transition-colors z-30 shrink-0 select-none group ${
+              activeResizeHandle === 'queue'
+                ? 'bg-blue-500/30'
+                : 'bg-slate-200/60 hover:bg-blue-500/20'
+            }`}
+          >
+            <div
+              className={`h-0.5 w-12 rounded-full transition-colors ${
+                activeResizeHandle === 'queue'
+                  ? 'bg-blue-600'
+                  : 'bg-slate-300 group-hover:bg-blue-500'
+              }`}
+            />
+          </div>
 
           {/* Bottom Docked Queue */}
           <div
@@ -5233,8 +5444,24 @@ export default function DispatchRoute() {
                         </div>
 
                         <div className="mb-2.5">
-                          <div className="font-bold text-xs text-slate-900">
-                            {trip.passenger.firstName} {trip.passenger.lastName}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-xs text-slate-900">
+                              {trip.passenger.firstName} {trip.passenger.lastName}
+                            </span>
+                            {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSearchTerm(trip.multiCarGroupId!);
+                                  setIsSearchExpanded(true);
+                                }}
+                                className="px-1.5 py-0.5 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer"
+                                title={`Multi-car order ${trip.multiCarGroupId} — click to filter all ${trip.multiCarTotal} cars`}
+                              >
+                                Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
                             <span>{trip.passenger.phone}</span>
@@ -5415,6 +5642,20 @@ export default function DispatchRoute() {
                         <span className="font-bold text-slate-900 shrink-0 max-w-[120px] truncate">
                           {trip.passenger.firstName} {trip.passenger.lastName}
                         </span>
+                        {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchTerm(trip.multiCarGroupId!);
+                              setIsSearchExpanded(true);
+                            }}
+                            className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black shrink-0 cursor-pointer"
+                            title={`Multi-car order ${trip.multiCarGroupId} — click to filter all ${trip.multiCarTotal} cars`}
+                          >
+                            Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
+                          </button>
+                        )}
                         <span className="text-slate-500 truncate max-w-[200px]" title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}>
                           {trip.pickupLocation.address} → {trip.dropoffLocation.address}
                         </span>
@@ -5591,7 +5832,25 @@ export default function DispatchRoute() {
                               {pickupTimeStr}
                             </td>
                             <td className="py-2 px-3 font-medium">
-                              {trip.passenger.firstName} {trip.passenger.lastName}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>
+                                  {trip.passenger.firstName} {trip.passenger.lastName}
+                                </span>
+                                {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSearchTerm(trip.multiCarGroupId!);
+                                      setIsSearchExpanded(true);
+                                    }}
+                                    className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer"
+                                    title={`Multi-car order ${trip.multiCarGroupId} (${(trip.multiCarAssociates || []).filter((a) => Boolean(a.driverId)).length}/${trip.multiCarTotal} assigned) — click to filter convoy`}
+                                  >
+                                    Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
+                                  </button>
+                                )}
+                              </div>
                               <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                                 <span>{trip.passenger.phone}</span>
                                 {trip.passenger.phone && (
@@ -6007,84 +6266,80 @@ export default function DispatchRoute() {
           </div>
         )}
 
-        {/* ─── C. RIGHT DOCKED OPERATIONAL PANEL (DESKTOP SINGLE ACTIVE VIEW) ─── */}
+        {/* ─── C. RIGHT DOCKED OPERATIONAL DRAWER (SINGLE CLEAN HEADER — NO DOUBLE NAV BAR!) ─── */}
         <aside
-          className={`relative bg-slate-100 border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-2xl animate-in slide-in-from-right duration-250 ease-out ${
+          className={`relative bg-white border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-xl ${
             activeDockTab !== 'none' ? 'hidden lg:flex' : 'hidden'
           }`}
           style={{ width: `${operationsWidth}px` }}
         >
-            {/* Horizontal Resize Drag Handle on Left Edge */}
+            {/* Horizontal Resize Drag Handle on Left Edge (drag to resize, double-click to reset to 400px) */}
             <div
-              onMouseDown={handleOperationsMouseDown}
-              className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 transition-colors z-30 group select-none"
-              title="Drag to resize Operations Panel width"
+              onPointerDown={handleOperationsMouseDown}
+              onDoubleClick={() => setOperationsWidth(400)}
+              className={`absolute left-0 top-0 bottom-0 w-2 cursor-col-resize transition-colors z-30 group select-none flex items-center justify-center ${
+                activeResizeHandle === 'operations'
+                  ? 'bg-blue-500/30'
+                  : 'hover:bg-blue-500/20'
+              }`}
+              title="Drag to resize side drawer width (double-click to reset)"
             >
-              <div className="w-[1px] h-full bg-slate-300 group-hover:bg-blue-500 mx-auto" />
+              <div
+                className={`w-0.5 h-10 rounded-full transition-colors ${
+                  activeResizeHandle === 'operations'
+                    ? 'bg-blue-600'
+                    : 'bg-slate-300/80 group-hover:bg-blue-500'
+                }`}
+              />
             </div>
 
-            {/* Master Header with Tab Switchers & Actions */}
-            <div className="h-10 px-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 text-xs shadow-2xs pl-4 gap-2">
-              {/* Tab Switcher Pills: Phone | Email | Drivers */}
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCommsInitialTab('phone');
-                    setCommsActiveTab('phone');
-                    setActiveDockTab('phone');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'phone' || activeDockTab === 'comms'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="Phone Hub: Calls, SMS, Voicemail"
-                >
-                  <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>Phone</span>
-                  {activeCallStatus !== 'idle' && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveDockTab('email')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'email'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="Email Console: Requests, Bookings, Receipts"
-                >
-                  <MailIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>Email</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveDockTab('drivers')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeDockTab === 'drivers'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title="Drivers Roster"
-                >
-                  <CarIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span>Drivers</span>
-                  <span
-                    className={`text-[10px] font-bold px-1 py-0.1 rounded-full ${
-                      activeDockTab === 'drivers' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {drivers.filter((d) => d.status === 'available').length}
-                  </span>
-                </button>
+            {/* Clean Single-Row Drawer Title Bar (Workspace switching lives solely in Top Header) */}
+            <div className="h-10 px-3 pl-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                {(activeDockTab === 'phone' || activeDockTab === 'comms') && (
+                  <>
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center shrink-0">
+                      <PhoneIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-slate-900 tracking-tight truncate">Phone &amp; SMS</span>
+                    {activeCallStatus !== 'idle' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        Live Call
+                      </span>
+                    )}
+                  </>
+                )}
+                {activeDockTab === 'email' && (
+                  <>
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 flex items-center justify-center shrink-0">
+                      <MailIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-slate-900 tracking-tight truncate">Email Inbox</span>
+                  </>
+                )}
+                {activeDockTab === 'drivers' && (
+                  <>
+                    <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CarIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-slate-900 tracking-tight truncate">Live Fleet</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {drivers.filter((d) => d.mapStatus === 'available').length} avail
+                    </span>
+                  </>
+                )}
+                {activeDockTab === 'alerts' && (
+                  <>
+                    <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center shrink-0">
+                      <BellIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-extrabold text-slate-900 tracking-tight truncate">Fleet Alerts</span>
+                  </>
+                )}
               </div>
 
-              {/* Action Buttons: Pop-out and Close Dock */}
+              {/* Minimal Utility Actions: Pop-out & Close */}
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
@@ -6094,8 +6349,8 @@ export default function DispatchRoute() {
                     else if (activeDockTab === 'drivers') getWorkspaceBus().popOutModule('drivers');
                     else getWorkspaceBus().popOutModule('trips');
                   }}
-                  title="Pop out this view into separate desktop window"
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                  title="Pop out into separate window"
+                  className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                 >
                   <ExternalLinkIcon className="w-3.5 h-3.5" />
                 </button>
@@ -6103,10 +6358,11 @@ export default function DispatchRoute() {
                 <button
                   type="button"
                   onClick={() => setActiveDockTab('none')}
-                  className="px-2 py-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-rose-600 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1"
-                  title="Close dock (Return to Main)"
+                  className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="Close drawer (Esc)"
+                  aria-label="Close drawer"
                 >
-                  <span>✕ Close</span>
+                  <XIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -6122,57 +6378,21 @@ export default function DispatchRoute() {
                   drivers={drivers}
                   trips={trips}
                   initialTab={commsInitialTab}
-                  onTabChange={(tab) => setCommsActiveTab(tab)}
+                  onTabChange={stableCommsTabChange}
                   isPopout={false}
                   isVisible={activeDockTab === 'phone' || activeDockTab === 'comms'}
-                  onPopOut={() => getWorkspaceBus().popOutModule('comms')}
-                  onClose={() => setActiveDockTab('none')}
-                  onOpenEditTrip={(tripId) => {
-                    const found = trips.find((t) => t.id === tripId);
-                    if (found) {
-                      setSelectedQueueTripId(found.id);
-                      setSelectedMapTrip(found);
-                      setShouldZoomMap(true);
-                      handleOpenEditTrip(found);
-                      setActiveMobileTab('booking');
-                    }
-                  }}
-                  onPopulateBooking={(payload) => {
-                    setDrafts((prev) => {
-                      const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                      if (!target) return prev;
-                      const currentForm = target.formValues || ({} as any);
-                      const updatedForm: DispatchFormValues = {
-                        ...currentForm,
-                        passengerName: payload.passengerName || currentForm.passengerName || '',
-                        phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
-                        email: payload.passengerEmail || payload.email || currentForm.email || '',
-                        pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                        dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                        vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
-                        selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
-                        corporateDetails: {
-                          ...currentForm.corporateDetails,
-                          corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
-                          billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
-                          authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
-                          invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
-                        },
-                        paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
-                        internalNotes: payload.notes
-                          ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                          : currentForm.internalNotes,
-                      };
-                      return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-                    });
-                  }}
+                  onPopOut={stableCommsPopOut}
+                  onClose={stableCommsClose}
+                  onOpenEditTrip={stableCommsOpenEditTrip}
+                  onPopulateBooking={stableCommsPopulateBooking}
                 />
               </div>
 
-              {/* 2. EMAIL DOCK CONSOLE */}
+              {/* 2. EMAIL DOCK CONSOLE (isDocked hides redundant dark header bar) */}
               {activeDockTab === 'email' && (
                 <div className="flex-1 flex flex-col h-full overflow-hidden">
                   <EmailDock
+                    isDocked={true}
                     onClose={() => setActiveDockTab('none')}
                     onPopOut={() => getWorkspaceBus().popOutModule('email')}
                     showWindowControls={false}
@@ -6185,148 +6405,216 @@ export default function DispatchRoute() {
                 </div>
               )}
 
-              {/* 2. DRIVERS ROSTER (Option C Live Status Palette + Locate on Map + Persisted Duty Switcher) */}
-              {activeDockTab === 'drivers' && (
-                <div className="flex-1 flex flex-col h-full overflow-hidden">
-                  {/* Filter tabs */}
-                  <div className="p-2 bg-slate-100 border-b border-slate-200 flex items-center gap-1 text-[11px] shrink-0 overflow-x-auto no-scrollbar">
-                    {(
-                      [
-                        { key: 'all', label: 'All' },
-                        { key: 'available', label: 'Avail' },
-                        { key: 'en_route', label: 'En Route' },
-                        { key: 'busy', label: 'Busy' },
-                        { key: 'break', label: 'Break' },
-                        { key: 'offline', label: 'Off' },
-                      ] as const
-                    ).map((tab) => (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setDriverFilter(tab.key)}
-                        className={`flex-1 min-w-[44px] py-1 text-center rounded-lg font-bold transition-all cursor-pointer ${
-                          driverFilter === tab.key ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* 3. DRIVERS ROSTER (Clean, Scannable Live Fleet Cards + Search + Option C Status Filter) */}
+              {activeDockTab === 'drivers' && (() => {
+                const q = driverSearch.trim().toLowerCase();
+                const statusCounts = {
+                  all: drivers.length,
+                  available: drivers.filter((d) => d.mapStatus === 'available').length,
+                  en_route: drivers.filter((d) => d.mapStatus === 'en_route').length,
+                  busy: drivers.filter((d) => d.mapStatus === 'busy').length,
+                  break: drivers.filter((d) => d.mapStatus === 'break').length,
+                  offline: drivers.filter((d) => d.mapStatus === 'offline').length,
+                };
+                const visibleDrivers = drivers.filter((d) => {
+                  if (driverFilter !== 'all' && d.mapStatus !== driverFilter) return false;
+                  if (!q) return true;
+                  return (
+                    (d.name || '').toLowerCase().includes(q) ||
+                    (d.cabNumber || '').toLowerCase().includes(q) ||
+                    (d.vehicle || '').toLowerCase().includes(q) ||
+                    (d.zone || '').toLowerCase().includes(q)
+                  );
+                });
 
-                  {/* Drivers List */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
-                    {drivers
-                      .filter((d) => (driverFilter === 'all' ? true : d.mapStatus === driverFilter))
-                      .map((driver) => {
-                        const palette = FLEET_STATUS_COLORS[driver.mapStatus];
-                        const statusLabel = getMapStatusLabel(driver.mapStatus, driver.activeTripStatus);
-
-                        return (
-                          <div
-                            key={driver.id}
-                            className="p-3 rounded-xl border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-2 shadow-2xs"
+                return (
+                  <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+                    {/* Search + Compact Status Pills */}
+                    <div className="px-3 py-2.5 bg-white border-b border-slate-200/80 space-y-2 shrink-0">
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                        <input
+                          type="text"
+                          value={driverSearch}
+                          onChange={(e) => setDriverSearch(e.target.value)}
+                          placeholder="Search driver, cab #, or zone..."
+                          className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+                        />
+                        {driverSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDriverSearch('')}
+                            className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
-                                <span className="text-xs text-slate-500 ml-1.5">
-                                  {driver.vehicle} ({driver.tier})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {driver.driverScore !== undefined && (
-                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200" title="Driver Score">
-                                    ★ {driver.driverScore}
-                                  </span>
-                                )}
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                        {(
+                          [
+                            { key: 'all', label: 'All' },
+                            { key: 'available', label: 'Avail' },
+                            { key: 'en_route', label: 'En Route' },
+                            { key: 'busy', label: 'Busy' },
+                            { key: 'break', label: 'Break' },
+                            { key: 'offline', label: 'Off' },
+                          ] as const
+                        ).map((tab) => {
+                          const count = statusCounts[tab.key];
+                          const active = driverFilter === tab.key;
+                          return (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => setDriverFilter(tab.key)}
+                              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                                active
+                                  ? 'bg-slate-900 text-white shadow-2xs'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                              }`}
+                            >
+                              <span>{tab.label}</span>
+                              <span
+                                className={`text-[9.5px] font-mono ${
+                                  active ? 'text-slate-300' : 'text-slate-400'
+                                }`}
+                              >
+                                {count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Clean Scannable Driver List */}
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-200/70 bg-white">
+                      {visibleDrivers.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-slate-400">
+                          No drivers match this filter.
+                        </div>
+                      ) : (
+                        visibleDrivers.map((driver) => {
+                          const palette = FLEET_STATUS_COLORS[driver.mapStatus];
+                          const statusLabel = getMapStatusLabel(driver.mapStatus, driver.activeTripStatus);
+                          const totalAssigned = driver.queuedTripsCount + (driver.activeTrip ? 1 : 0);
+
+                          return (
+                            <div
+                              key={driver.id}
+                              className="px-3.5 py-2.5 hover:bg-slate-50/90 transition-colors space-y-2"
+                            >
+                              {/* Row 1: Color Dot + Name/Cab + Status Pill */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${palette.dotClass}`}
+                                    title={statusLabel}
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      {driver.cabNumber && (
+                                        <span className="font-mono text-[11px] font-black text-slate-500 shrink-0">
+                                          #{driver.cabNumber}
+                                        </span>
+                                      )}
+                                      <span className="font-bold text-slate-900 text-xs truncate">
+                                        {driver.name}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                                      <span>{driver.vehicle || driver.tier}</span>
+                                      <span>·</span>
+                                      <span>{driver.zone || 'Dispatch'}</span>
+                                      {driver.telemetry && (
+                                        <span className="text-[9.5px] font-semibold text-emerald-600">
+                                          · GPS
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
                                 <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${palette.badgeClass}`}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${palette.badgeClass}`}
                                 >
-                                  <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
                                   {statusLabel}
                                 </span>
                               </div>
-                            </div>
 
-                            <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-100">
-                              <div className="flex items-center gap-1.5">
-                                <span>📍 {driver.zone}</span>
-                                {driver.telemetry && (
-                                  <span className="text-[9.5px] font-mono font-bold px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    GPS
-                                  </span>
-                                )}
-                                {driver.queuedTripsCount > 0 && (
-                                  <span className="text-[9.5px] font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                    {driver.queuedTripsCount} queued
-                                  </span>
-                                )}
+                              {/* Row 2: Calm Action Strip */}
+                              <div className="flex items-center justify-between gap-1.5 pl-4">
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setQueueDriver(driver)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                    title="Open driver's assigned queue"
+                                  >
+                                    <span>Queue</span>
+                                    {totalAssigned > 0 && (
+                                      <span className="px-1 rounded bg-blue-600 text-white text-[9.5px] font-black">
+                                        {totalAssigned}
+                                      </span>
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFocusedMapDriverId(driver.id)}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer"
+                                    title="Locate on fleet map"
+                                  >
+                                    Locate
+                                  </button>
+                                  {driver.phone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCommsInitialTab('phone');
+                                        setActiveDockTab('phone');
+                                        handleStartCall(driver.phone, driver.name);
+                                      }}
+                                      className="p-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-lg transition-colors cursor-pointer"
+                                      title={`Call ${driver.name} (${driver.phone})`}
+                                    >
+                                      <PhoneIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <select
+                                  value={driver.dutyStatus}
+                                  disabled={Boolean(driver.activeTrip)}
+                                  onChange={async (e) => {
+                                    const nextDuty = e.target.value as 'on_duty' | 'on_break' | 'off_duty';
+                                    try {
+                                      await setDriverDutyStatus(driver.id, nextDuty);
+                                      showDispatchToast(
+                                        `${driver.name} set to ${nextDuty === 'on_break' ? 'On Break' : nextDuty === 'off_duty' ? 'Offline' : 'Available'}.`,
+                                        'success'
+                                      );
+                                    } catch {
+                                      showDispatchToast('Failed to update driver status.', 'error');
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] rounded-lg border border-slate-200 cursor-pointer disabled:opacity-50"
+                                  title={driver.activeTrip ? 'Driver has an active trip in progress' : 'Change driver duty status'}
+                                >
+                                  <option value="on_duty">Available</option>
+                                  <option value="on_break">On Break</option>
+                                  <option value="off_duty">Offline</option>
+                                </select>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCommsInitialTab('phone');
-                                  setActiveDockTab('phone');
-                                  handleStartCall(driver.phone, driver.name);
-                                }}
-                                className="font-mono text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <PhoneIcon className="w-3 h-3 text-blue-600" />
-                                <span>{driver.phone}</span>
-                              </button>
                             </div>
-
-                            <div className="flex items-center gap-1.5 pt-1">
-                              <button
-                                type="button"
-                                onClick={() => setQueueDriver(driver)}
-                                className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer flex items-center justify-center gap-1"
-                                title="Open driver's full assigned schedule & queue"
-                              >
-                                <span>📋 Queue</span>
-                                {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0) > 0 && (
-                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-600 text-white font-black">
-                                    {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0)}
-                                  </span>
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setFocusedMapDriverId(driver.id)}
-                                className="px-2 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer"
-                                title="Locate driver's car icon on live fleet map"
-                              >
-                                📍 Map
-                              </button>
-                              <select
-                                value={driver.dutyStatus}
-                                disabled={Boolean(driver.activeTrip)}
-                                onChange={async (e) => {
-                                  const nextDuty = e.target.value as 'on_duty' | 'on_break' | 'off_duty';
-                                  try {
-                                    await setDriverDutyStatus(driver.id, nextDuty);
-                                    showDispatchToast(
-                                      `${driver.name} set to ${nextDuty === 'on_break' ? 'On Break' : nextDuty === 'off_duty' ? 'Offline' : 'Available'}.`,
-                                      'success'
-                                    );
-                                  } catch {
-                                    showDispatchToast('Failed to update driver status.', 'error');
-                                  }
-                                }}
-                                className="px-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-300 cursor-pointer disabled:opacity-50"
-                                title={driver.activeTrip ? 'Driver has an active trip in progress' : 'Set driver duty status (persisted to Firestore)'}
-                              >
-                                <option value="on_duty">🟢 Avail</option>
-                                <option value="on_break">🟡 Break</option>
-                                <option value="off_duty">⚫ Off</option>
-                              </select>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* 3. FLEET ALERTS & BROADCASTS */}
               {activeDockTab === 'alerts' && (

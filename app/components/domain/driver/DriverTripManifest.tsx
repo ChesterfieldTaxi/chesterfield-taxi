@@ -28,12 +28,19 @@ export interface DriverTripManifestProps {
 export function resolveTripVehicleLabel(trip: Trip, adminVehicles?: VehicleTierConfig[]): string {
   const meta = (trip.metadata || {}) as Record<string, any>;
   if (typeof meta.vehicleDisplayName === 'string' && meta.vehicleDisplayName.trim()) {
-    return meta.vehicleDisplayName.trim();
+    const trimmed = meta.vehicleDisplayName.trim();
+    if (trimmed.toLowerCase() === 'any' || trimmed.toLowerCase().startsWith('any vehicle')) {
+      return 'Any';
+    }
+    return trimmed;
   }
   const typeId = typeof meta.vehicleTypeId === 'string' ? meta.vehicleTypeId : undefined;
-  if (typeId && adminVehicles?.length) {
-    const match = adminVehicles.find((v) => v.id === typeId);
-    if (match?.name) return match.name;
+  if (typeId) {
+    if (typeId.toLowerCase() === 'any') return 'Any';
+    if (adminVehicles?.length) {
+      const match = adminVehicles.find((v) => v.id === typeId);
+      if (match?.name) return match.name;
+    }
   }
   return formatVehicleTierDisplay(trip.vehicleTier, adminVehicles);
 }
@@ -69,6 +76,7 @@ export function resolveTripPaymentBadge(trip: Trip): {
 
 export function DriverTripManifest({ trip, adminVehicles, compact = false }: DriverTripManifestProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showMultiCarDetails, setShowMultiCarDetails] = useState(false);
   const meta = (trip.metadata || {}) as Record<string, any>;
 
   const vehicleLabel = resolveTripVehicleLabel(trip, adminVehicles);
@@ -139,6 +147,38 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
   const isReturnRide = Boolean(trip.isReturnRide || meta.isReturnRide);
   const hasReturnTrip = Boolean(trip.hasReturnTrip || trip.linkedReturnTripId);
 
+  // Multi-Car Convoy & Associate Drivers awareness (reads top-level fields OR metadata fallback)
+  const resolvedMultiCarGroupId = trip.multiCarGroupId || (typeof meta.multiCarGroupId === 'string' ? meta.multiCarGroupId : undefined);
+  const multiCarTotal = Number(trip.multiCarTotal || meta.multiCarTotal || trip.vehicleCount || 1);
+  const multiCarIndex = Number(trip.multiCarIndex || meta.multiCarIndex || 1);
+  const isMultiCar = Boolean((resolvedMultiCarGroupId || trip.multipleVehiclesRequested) && multiCarTotal > 1);
+  const multiCarAssociates = Array.isArray(trip.multiCarAssociates) ? trip.multiCarAssociates : [];
+  const otherAssociates = multiCarAssociates
+    .filter((a) => a.tripId !== trip.id)
+    .sort((a, b) => (a.carIndex || 0) - (b.carIndex || 0));
+  const multiCarTotalPax = Number(meta.multiCarTotalPassengers || 0);
+
+  const formatAssociateStatus = (status?: string) => {
+    switch ((status || '').toLowerCase()) {
+      case 'en_route':
+        return { label: 'En Route', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/40' };
+      case 'arrived':
+        return { label: 'Arrived', cls: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+      case 'in_progress':
+        return { label: 'On Trip', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+      case 'completed':
+        return { label: 'Completed', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+      case 'assigned':
+      case 'accepted':
+        return { label: 'Assigned', cls: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' };
+      case 'cancelled':
+      case 'declined':
+        return { label: 'Cancelled', cls: 'bg-rose-500/20 text-rose-300 border-rose-500/40' };
+      default:
+        return { label: 'Unassigned', cls: 'bg-slate-800 text-slate-400 border-slate-700' };
+    }
+  };
+
   const badgeToneClasses: Record<string, string> = {
     emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35',
     blue: 'bg-blue-500/15 text-blue-300 border-blue-500/35',
@@ -150,8 +190,20 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
 
   return (
     <div className="space-y-2.5">
-      {/* Primary Manifest Chips Row: Vehicle, Payment Method, Return Leg */}
+      {/* Primary Manifest Chips Row: Multi-Car Convoy, Vehicle, Payment Method, Return Leg */}
       <div className="flex flex-wrap items-center gap-1.5">
+        {isMultiCar && (
+          <button
+            type="button"
+            onClick={() => setShowMultiCarDetails((v) => !v)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black bg-violet-600/25 hover:bg-violet-600/35 text-violet-200 border border-violet-500/50 transition-colors cursor-pointer"
+            title="Toggle multi-car convoy & associate drivers details"
+          >
+            <span>MULTI-CAR</span>
+            <span>·</span>
+            <span>Car {multiCarIndex} of {multiCarTotal}</span>
+          </button>
+        )}
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-white border border-slate-700">
           <span>Vehicle:</span>
           <span className="text-blue-300">{vehicleLabel}</span>
@@ -173,6 +225,99 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
           </span>
         )}
       </div>
+
+      {/* Collapsible Multi-Car Convoy & Associate Drivers Toggle */}
+      {isMultiCar && (
+        <div className="bg-violet-950/40 border border-violet-600/45 rounded-2xl overflow-hidden text-xs">
+          <button
+            type="button"
+            onClick={() => setShowMultiCarDetails((v) => !v)}
+            className="w-full px-3 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-violet-900/25 transition-colors cursor-pointer"
+          >
+            <div className="min-w-0 flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black uppercase tracking-wider text-violet-200">
+                Multi-Car Order · Car {multiCarIndex} of {multiCarTotal}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-200 border border-violet-500/35 shrink-0">
+                {multiCarAssociates.filter((a) => Boolean(a.driverId)).length}/{multiCarTotal} Assigned
+              </span>
+            </div>
+            <span className="text-[11px] font-bold text-violet-300 shrink-0">
+              {showMultiCarDetails ? 'Hide ▲' : 'Associates ▼'}
+            </span>
+          </button>
+
+          {showMultiCarDetails && (
+            <div className="px-3 pb-3 pt-2 border-t border-violet-800/50 space-y-2 animate-in fade-in duration-150">
+              <div className="text-[11px] text-violet-200/80">
+                {resolvedMultiCarGroupId ? `Group ${resolvedMultiCarGroupId}` : 'Linked Multi-Vehicle Order'}
+                {multiCarTotalPax > 0 ? ` · ${multiCarTotalPax} total party passengers across ${multiCarTotal} vehicles` : ''}
+              </div>
+
+              {otherAssociates.length > 0 ? (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-violet-300/90 block">
+                    Associate Drivers ({otherAssociates.length})
+                  </span>
+                  {otherAssociates.map((assoc) => {
+                    const statusBadge = formatAssociateStatus(assoc.status);
+                    const cleanPhone = assoc.driverPhone ? assoc.driverPhone.replace(/[^\d+]/g, '') : '';
+                    return (
+                      <div
+                        key={assoc.tripId}
+                        className="flex items-center justify-between gap-2 bg-slate-950/60 border border-violet-800/40 rounded-xl px-2.5 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-200 border border-violet-500/30 shrink-0">
+                              Car {assoc.carIndex}/{multiCarTotal}
+                            </span>
+                            <span className="font-bold text-white truncate">
+                              {assoc.driverName || (assoc.driverId ? `Driver ${assoc.driverId.slice(-4)}` : 'Awaiting Assignment')}
+                            </span>
+                            {assoc.vehicleUnit && (
+                              <span className="text-[10px] font-mono text-blue-300 shrink-0">
+                                ({assoc.vehicleUnit})
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            {assoc.vehicleDisplayName || assoc.vehicleTier || 'Standard Vehicle'}
+                            {assoc.vehicleModel ? ` · ${assoc.vehicleModel}` : ''}
+                            {assoc.licensePlate ? ` · ${assoc.licensePlate}` : ''}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge.cls}`}
+                          >
+                            {statusBadge.label}
+                          </span>
+                          {cleanPhone && (
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2 py-1 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold transition-colors"
+                              title={`Call associate driver ${assoc.driverName || ''}`}
+                            >
+                              Call
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-[11px] text-violet-200/80">
+                  Coordinate curbside pickup with dispatch — {multiCarTotal - 1} associate vehicle{multiCarTotal - 1 === 1 ? '' : 's'} assigned separately.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Equipment, Cargo, Car Seats & Custom Extras Alert Strip */}
       {(carSeatSummary || oversizedSummary || customExtrasSummary) && (

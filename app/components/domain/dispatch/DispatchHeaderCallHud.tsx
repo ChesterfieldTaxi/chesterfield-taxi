@@ -30,6 +30,8 @@ interface DispatchHeaderCallHudProps {
   missedCallsCount?: number;
   isPhoneDockActive?: boolean;
   onTogglePhoneDock?: () => void;
+  /** When true, hides the idle Phone icon button on desktop (lg+) so the left workspace bar stays the single nav surface */
+  hideIdleButtonOnDesktop?: boolean;
 }
 
 export function DispatchHeaderCallHud({
@@ -41,6 +43,7 @@ export function DispatchHeaderCallHud({
   missedCallsCount = 0,
   isPhoneDockActive = false,
   onTogglePhoneDock,
+  hideIdleButtonOnDesktop = false,
 }: DispatchHeaderCallHudProps) {
   const [activeCall, setActiveCall] = useState<{
     callSid?: string;
@@ -244,7 +247,12 @@ export function DispatchHeaderCallHud({
   };
 
   return (
-    <div className="relative inline-flex items-center gap-1.5" ref={containerRef}>
+    <div
+      className={`relative inline-flex items-center gap-1.5 ${
+        !activeCall && hideIdleButtonOnDesktop ? 'lg:hidden' : ''
+      }`}
+      ref={containerRef}
+    >
       {/* RESTING STATE: Phone Icon Button with Missed Counter */}
       {!activeCall ? (
         <div className="relative">

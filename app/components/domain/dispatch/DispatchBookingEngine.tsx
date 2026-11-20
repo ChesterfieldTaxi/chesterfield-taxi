@@ -30,10 +30,20 @@ import {
   PlaneIcon,
   PlaneLandingIcon,
   PlaneTakeoffIcon,
+  PawPrintIcon,
+  VolumeXIcon,
+  MusicNoteIcon,
 } from '../../ui/Icons';
+import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../../../core/services/operator.service';
+import {
+  generateMultiCarGroupId,
+  distributeAcrossCars,
+  buildPerVehiclePricingSpecs,
+  buildAssociateEntryFromTrip,
+} from '../../../core/services/booking/multi-car.util';
 
 export const COMMON_FBO_FACILITIES = [
   'Signature Flight Support (STL - Hangar 2)',
@@ -270,7 +280,7 @@ const DEFAULT_CORPORATE_ACCOUNTS = [
 ];
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function DispatchBookingEngine({
+function DispatchBookingEngineComponent({
   draftId,
   isActiveDraft,
   isActive,
@@ -386,10 +396,23 @@ export function DispatchBookingEngine({
   const [contactEmail, setContactEmail] = useState('');
   const [contactRole, setContactRole] = useState('Hotel Front Desk / Concierge');
 
-  // Details: Passengers, Bags, Oversized Cargo, Car Seats, Admin Custom Extras
+  // Details: Passengers, Bags, Oversized Cargo (matching Customer Form toggle), Car Seats, Special Requests, Admin Custom Extras
   const [passengers, setPassengers] = useState(1);
   const [bags, setBags] = useState(0);
-  const [oversizedBagsCount, setOversizedBagsCount] = useState(0);
+  const [hasOversizedLuggage, setHasOversizedLuggage] = useState(false);
+  const [oversizedBags, setOversizedBags] = useState<Record<string, number>>({});
+  const [oversizedLuggageNotes, setOversizedLuggageNotes] = useState('');
+  const [showSpecialRequests, setShowSpecialRequests] = useState(false);
+  const [specialRequestFlags, setSpecialRequestFlags] = useState<{
+    petFriendly: boolean;
+    quietRide: boolean;
+    musicOk: boolean;
+  }>({
+    petFriendly: false,
+    quietRide: false,
+    musicOk: false,
+  });
+  const [gateCode, setGateCode] = useState('');
   const [selectedCustomExtras, setSelectedCustomExtras] = useState<Record<string, number>>({});
   const [carSeats, setCarSeats] = useState(false);
   const [rearFacingCount, setRearFacingCount] = useState(0);
@@ -561,6 +584,11 @@ export function DispatchBookingEngine({
 
   // Prevents Edit Mode from silently overwriting a saved trip's fare on initial mount
   const skipFirstEditQuoteRef = useRef<boolean>(Boolean(initialTrip));
+  // Prevents mount-order save race (blank initial state overwriting localStorage draft before hydration finishes)
+  // and prevents Firestore real-time trip updates from clobbering unsaved edits in an open Edit tab
+  const hydratedIdentityRef = useRef<string | null>(null);
+  const [hasHydratedDraft, setHasHydratedDraft] = useState<boolean>(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const submitErrorRef = useRef<HTMLDivElement>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -635,8 +663,199 @@ export function DispatchBookingEngine({
   const totalCarSeats = carSeats ? (rearFacingCount + frontFacingCount + boosterCount) : 0;
   const returnTotalCarSeats = returnCarSeats ? (returnRearFacing + returnFrontFacing + returnBooster) : 0;
 
-  // Hydrate from initialTrip if provided
+  // Hydrate ONCE per tab identity (prevents real-time Firestore ticks from clobbering unsaved edits
+  // AND restores cached unsaved localStorage edits on top of Edit tabs across reloads!)
   useEffect(() => {
+    const hydrationIdentity = initialTrip?.id ? `edit:${initialTrip.id}` : `draft:${draftStorageKey}`;
+    if (hydratedIdentityRef.current === hydrationIdentity) {
+      return;
+    }
+    hydratedIdentityRef.current = hydrationIdentity;
+
+    const applySavedDraftOverlay = (parsed: any) => {
+      // Support both flat draft storage AND nested DispatchFormValues (from Copy Booking)
+      if (parsed.timingType) setTimingType(parsed.timingType);
+      if (parsed.scheduledDate) setScheduledDate(parsed.scheduledDate);
+      if (parsed.scheduledTime) setScheduledTime(parsed.scheduledTime);
+      if (parsed.pickupAddress !== undefined) setPickupAddress(parsed.pickupAddress);
+      if (parsed.pickupCoordinates) setPickupCoordinates(parsed.pickupCoordinates);
+      if (parsed.pickupPlaceId !== undefined) setPickupPlaceId(parsed.pickupPlaceId);
+      if (parsed.dropoffAddress !== undefined) setDropoffAddress(parsed.dropoffAddress);
+      if (parsed.dropoffCoordinates) setDropoffCoordinates(parsed.dropoffCoordinates);
+      if (parsed.dropoffPlaceId !== undefined) setDropoffPlaceId(parsed.dropoffPlaceId);
+      if (parsed.intermediateStops) setIntermediateStops(parsed.intermediateStops);
+      if (parsed.passengerName !== undefined) setPassengerName(parsed.passengerName);
+      if (parsed.phone !== undefined) setPhone(parsed.phone);
+      if (parsed.email !== undefined) setEmail(parsed.email);
+      if (parsed.additionalPassengers) setAdditionalPassengers(parsed.additionalPassengers);
+
+      const cp = parsed.contactPerson;
+      if (parsed.isBookerDifferent !== undefined || cp?.isBookerDifferent !== undefined) {
+        setIsBookerDifferent(parsed.isBookerDifferent ?? cp?.isBookerDifferent);
+      }
+      if (parsed.contactName || cp?.contactName) setContactName(parsed.contactName || cp?.contactName);
+      if (parsed.contactPhone || cp?.contactPhone) setContactPhone(parsed.contactPhone || cp?.contactPhone);
+      if (parsed.contactEmail || cp?.contactEmail) setContactEmail(parsed.contactEmail || cp?.contactEmail);
+      if (parsed.contactRole || cp?.contactRole) setContactRole(parsed.contactRole || cp?.contactRole);
+
+      if (parsed.passengers) setPassengers(parsed.passengers);
+      if (parsed.bags !== undefined) setBags(parsed.bags);
+      if (parsed.hasOversizedLuggage !== undefined) setHasOversizedLuggage(Boolean(parsed.hasOversizedLuggage));
+      if (parsed.oversizedBags && typeof parsed.oversizedBags === 'object') {
+        setOversizedBags(parsed.oversizedBags);
+        const totalOv = Object.values(parsed.oversizedBags).reduce((s: number, v: any) => s + (Number(v) || 0), 0);
+        if (totalOv > 0) setHasOversizedLuggage(true);
+      } else if (typeof parsed.oversizedBagsCount === 'number' && parsed.oversizedBagsCount > 0) {
+        const defaultId = universalExtrasConfig?.oversizedBagsConfig?.[0]?.id || 'golf_bag';
+        setOversizedBags({ [defaultId]: parsed.oversizedBagsCount });
+        setHasOversizedLuggage(true);
+      }
+      if (parsed.oversizedLuggageNotes !== undefined) setOversizedLuggageNotes(parsed.oversizedLuggageNotes || '');
+      if (parsed.specialRequestFlags && typeof parsed.specialRequestFlags === 'object') {
+        setSpecialRequestFlags({
+          petFriendly: Boolean(parsed.specialRequestFlags.petFriendly),
+          quietRide: Boolean(parsed.specialRequestFlags.quietRide),
+          musicOk: Boolean(parsed.specialRequestFlags.musicOk),
+        });
+        if (Object.values(parsed.specialRequestFlags).some(Boolean)) setShowSpecialRequests(true);
+      }
+      if (parsed.gateCode !== undefined) {
+        setGateCode(parsed.gateCode || '');
+        if (parsed.gateCode) setShowSpecialRequests(true);
+      }
+      if (parsed.selectedCustomExtras) setSelectedCustomExtras(parsed.selectedCustomExtras);
+      if (parsed.carSeats !== undefined) setCarSeats(parsed.carSeats);
+
+      const csb = parsed.carSeatsBreakdown;
+      if (parsed.rearFacingCount !== undefined || csb?.rearFacing !== undefined) {
+        setRearFacingCount(parsed.rearFacingCount ?? csb?.rearFacing ?? 0);
+      }
+      if (parsed.frontFacingCount !== undefined || csb?.frontFacing !== undefined) {
+        setFrontFacingCount(parsed.frontFacingCount ?? csb?.frontFacing ?? 0);
+      }
+      if (parsed.boosterCount !== undefined || csb?.booster !== undefined) {
+        setBoosterCount(parsed.boosterCount ?? csb?.booster ?? 0);
+      }
+      if (parsed.selectedVehicles && Array.isArray(parsed.selectedVehicles) && parsed.selectedVehicles.length > 0) {
+        setSelectedVehicles(parsed.selectedVehicles);
+      }
+      if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+
+      const card = parsed.cardDetails;
+      if (parsed.cardPaymentType || card?.cardPaymentType) {
+        setCardPaymentType(parsed.cardPaymentType || card?.cardPaymentType);
+      }
+      if (parsed.cardholderName || card?.cardholderName) {
+        setCardholderName(parsed.cardholderName || card?.cardholderName);
+      }
+
+      const corp = parsed.corporateDetails;
+      if (parsed.corporateAccount || corp?.corporateAccount) {
+        setCorporateAccount(parsed.corporateAccount || corp?.corporateAccount);
+      }
+      if (parsed.billingPo !== undefined || corp?.billingPo !== undefined) {
+        setBillingPo(parsed.billingPo ?? corp?.billingPo ?? '');
+      }
+      if (parsed.authorizedBy !== undefined || corp?.authorizedBy !== undefined) {
+        setAuthorizedBy(parsed.authorizedBy ?? corp?.authorizedBy ?? '');
+      }
+      if (parsed.invoicingTerms || corp?.invoicingTerms) {
+        setInvoicingTerms(parsed.invoicingTerms || corp?.invoicingTerms);
+      }
+      if (parsed.tariff) setTariff(parsed.tariff);
+      if (parsed.pricingRuleId !== undefined) setSelectedRuleId(parsed.pricingRuleId);
+      if (parsed.discount) setDiscount(parsed.discount);
+      if (parsed.manualDiscountDollars !== undefined) setManualDiscountDollars(parsed.manualDiscountDollars);
+      if (parsed.waiveAirportFee !== undefined) setWaiveAirportFee(parsed.waiveAirportFee);
+      if (parsed.waiveMultiStopFees !== undefined) setWaiveMultiStopFees(parsed.waiveMultiStopFees);
+      if (parsed.bypassSurge !== undefined) setBypassSurge(parsed.bypassSurge);
+      if (parsed.company) setCompany(parsed.company);
+      if (parsed.driverId) setDriverId(parsed.driverId);
+      if (parsed.notesForAll !== undefined) setNotesForAll(parsed.notesForAll);
+      if (parsed.internalNotes !== undefined) setInternalNotes(parsed.internalNotes);
+      if (parsed.sendEmailConfirmation !== undefined) setSendEmailConfirmation(parsed.sendEmailConfirmation);
+
+      const ret = parsed.returnDetails;
+      if (parsed.returnTrip !== undefined || ret?.returnTrip !== undefined) {
+        setReturnTrip(parsed.returnTrip ?? ret?.returnTrip);
+      }
+      if (parsed.returnPickupAddress || ret?.returnPickupAddress) {
+        setReturnPickupAddress(parsed.returnPickupAddress || ret?.returnPickupAddress);
+      }
+      if (parsed.returnPickupCoordinates || ret?.returnPickupCoordinates) {
+        setReturnPickupCoordinates(parsed.returnPickupCoordinates || ret?.returnPickupCoordinates);
+      }
+      if (parsed.returnDropoffAddress || ret?.returnDropoffAddress) {
+        setReturnDropoffAddress(parsed.returnDropoffAddress || ret?.returnDropoffAddress);
+      }
+      if (parsed.returnDropoffCoordinates || ret?.returnDropoffCoordinates) {
+        setReturnDropoffCoordinates(parsed.returnDropoffCoordinates || ret?.returnDropoffCoordinates);
+      }
+      if (parsed.returnIntermediateStops || ret?.returnIntermediateStops) {
+        setReturnIntermediateStops(parsed.returnIntermediateStops || ret?.returnIntermediateStops);
+      }
+      if (parsed.returnDate || ret?.returnDate) setReturnDate(parsed.returnDate || ret?.returnDate);
+      if (parsed.returnTime || ret?.returnTime) setReturnTime(parsed.returnTime || ret?.returnTime);
+      if (parsed.returnPassengers !== undefined || ret?.returnPassengers !== undefined) {
+        setReturnPassengers(parsed.returnPassengers ?? ret?.returnPassengers);
+      }
+      if (parsed.returnBags !== undefined || ret?.returnBags !== undefined) {
+        setReturnBags(parsed.returnBags ?? ret?.returnBags);
+      }
+      if (parsed.returnCarSeats !== undefined || ret?.returnCarSeats !== undefined) {
+        setReturnCarSeats(parsed.returnCarSeats ?? ret?.returnCarSeats);
+      }
+      if (parsed.returnRearFacing !== undefined || ret?.returnCarSeatsBreakdown?.rearFacing !== undefined) {
+        setReturnRearFacing(parsed.returnRearFacing ?? ret?.returnCarSeatsBreakdown?.rearFacing ?? 0);
+      }
+      if (parsed.returnFrontFacing !== undefined || ret?.returnCarSeatsBreakdown?.frontFacing !== undefined) {
+        setReturnFrontFacing(parsed.returnFrontFacing ?? ret?.returnCarSeatsBreakdown?.frontFacing ?? 0);
+      }
+      if (parsed.returnBooster !== undefined || ret?.returnCarSeatsBreakdown?.booster !== undefined) {
+        setReturnBooster(parsed.returnBooster ?? ret?.returnCarSeatsBreakdown?.booster ?? 0);
+      }
+      if (parsed.returnVehicles || ret?.returnVehicles) {
+        setReturnVehicles(parsed.returnVehicles || ret?.returnVehicles);
+      }
+      if (parsed.autoCreateReturnTrip !== undefined || ret?.autoCreateReturnTrip !== undefined) {
+        setAutoCreateReturnTrip(parsed.autoCreateReturnTrip ?? ret?.autoCreateReturnTrip);
+      }
+
+      const rep = parsed.repeatDetails;
+      if (parsed.repeat !== undefined || rep?.repeat !== undefined) setRepeat(parsed.repeat ?? rep?.repeat);
+      if (parsed.repeatFrequency || rep?.repeatFrequency) {
+        setRepeatFrequency(parsed.repeatFrequency || rep?.repeatFrequency);
+      }
+      if (parsed.repeatDays || rep?.repeatDays) setRepeatDays(parsed.repeatDays || rep?.repeatDays);
+      if (parsed.repeatOccurrences || rep?.repeatOccurrences) {
+        setRepeatOccurrences(parsed.repeatOccurrences || rep?.repeatOccurrences);
+      }
+      if (parsed.repeatUntilDate || rep?.repeatUntilDate) {
+        setRepeatUntilDate(parsed.repeatUntilDate || rep?.repeatUntilDate);
+      }
+      if (parsed.repeatWeeksPattern || rep?.repeatWeeksPattern) {
+        setRepeatWeeksPattern(parsed.repeatWeeksPattern || rep?.repeatWeeksPattern);
+      }
+      if (parsed.estimatedFare) setEstimatedFare(parsed.estimatedFare);
+      if (parsed.returnEstimatedFare) setReturnEstimatedFare(parsed.returnEstimatedFare);
+      if (parsed.manualFare !== undefined) setManualFare(parsed.manualFare);
+      if (parsed.isFareOverridden !== undefined) setIsFareOverridden(parsed.isFareOverridden);
+      if (parsed.provideFlightInfo !== undefined) setProvideFlightInfo(parsed.provideFlightInfo);
+      if (parsed.airline !== undefined) setAirline(parsed.airline);
+      if (parsed.flightNumber !== undefined) setFlightNumber(parsed.flightNumber);
+      if (parsed.flightOrigin !== undefined) setFlightOrigin(parsed.flightOrigin);
+      if (parsed.tailNumber !== undefined) setTailNumber(parsed.tailNumber);
+      if (parsed.fboFacility !== undefined) setFboFacility(parsed.fboFacility);
+      if (parsed.hasCheckedLuggage !== undefined) setHasCheckedLuggage(parsed.hasCheckedLuggage);
+      if (parsed.returnProvideFlightInfo !== undefined) setReturnProvideFlightInfo(parsed.returnProvideFlightInfo);
+      if (parsed.returnAirline !== undefined) setReturnAirline(parsed.returnAirline);
+      if (parsed.returnFlightNumber !== undefined) setReturnFlightNumber(parsed.returnFlightNumber);
+      if (parsed.returnFlightOrigin !== undefined) setReturnFlightOrigin(parsed.returnFlightOrigin);
+      if (parsed.returnTailNumber !== undefined) setReturnTailNumber(parsed.returnTailNumber);
+      if (parsed.returnFboFacility !== undefined) setReturnFboFacility(parsed.returnFboFacility);
+      if (parsed.returnHasCheckedLuggage !== undefined) setReturnHasCheckedLuggage(parsed.returnHasCheckedLuggage);
+    };
+
     if (initialTrip) {
       skipFirstEditQuoteRef.current = true;
       setTimingType(initialTrip.bookingType === 'scheduled' ? 'later' : 'asap');
@@ -681,17 +900,46 @@ export function DispatchBookingEngine({
 
       const meta = (initialTrip.metadata || {}) as Record<string, any>;
 
-      // Hydrate oversized cargo & custom bookable extras
-      if (typeof meta.oversizedBagsCount === 'number') {
-        setOversizedBagsCount(meta.oversizedBagsCount);
-      } else if (meta.oversizedBags && typeof meta.oversizedBags === 'object') {
-        const count = Object.values(meta.oversizedBags).reduce(
-          (sum: number, val: any) => sum + (Number(val) || 0),
-          0
-        );
-        setOversizedBagsCount(count);
+      // Hydrate oversized cargo, special requests, gate code & custom bookable extras
+      if (meta.oversizedBags && typeof meta.oversizedBags === 'object') {
+        const cleanMap: Record<string, number> = {};
+        let totalOv = 0;
+        for (const [k, v] of Object.entries(meta.oversizedBags)) {
+          const n = Number(v) || 0;
+          if (n > 0) {
+            cleanMap[k] = n;
+            totalOv += n;
+          }
+        }
+        setOversizedBags(cleanMap);
+        setHasOversizedLuggage(totalOv > 0 || Boolean(meta.hasOversizedLuggage));
+      } else if (typeof meta.oversizedBagsCount === 'number' && meta.oversizedBagsCount > 0) {
+        const firstId = universalExtrasConfig?.oversizedBagsConfig?.[0]?.id || 'golf_bag';
+        setOversizedBags({ [firstId]: meta.oversizedBagsCount });
+        setHasOversizedLuggage(true);
       } else if (meta.hasOversizedLuggage || meta.oversizedItemsSummary) {
-        setOversizedBagsCount(1);
+        const firstId = universalExtrasConfig?.oversizedBagsConfig?.[0]?.id || 'golf_bag';
+        setOversizedBags({ [firstId]: 1 });
+        setHasOversizedLuggage(true);
+      }
+      if (typeof meta.oversizedLuggageNotes === 'string' && meta.oversizedLuggageNotes) {
+        setOversizedLuggageNotes(meta.oversizedLuggageNotes);
+        setHasOversizedLuggage(true);
+      }
+
+      // Hydrate special requests toggles & gate code
+      const srLower = (initialTrip.passenger?.specialRequests || '').toLowerCase();
+      const hydratedSr = {
+        petFriendly: srLower.includes('pet-friendly') || srLower.includes('pet friendly'),
+        quietRide: srLower.includes('quiet ride'),
+        musicOk: srLower.includes('music ok'),
+      };
+      setSpecialRequestFlags(hydratedSr);
+      if (typeof meta.gateCode === 'string' && meta.gateCode.trim()) {
+        setGateCode(meta.gateCode.trim());
+        setShowSpecialRequests(true);
+      } else if (Object.values(hydratedSr).some(Boolean)) {
+        setShowSpecialRequests(true);
       }
 
       if (meta.selectedCustomExtras && typeof meta.selectedCustomExtras === 'object') {
@@ -859,166 +1107,35 @@ export function DispatchBookingEngine({
       setReturnTailNumber(meta.returnTailNumber || returnMeta.tailNumber || returnMeta.flightDetails?.tailNumber || '');
       setReturnFboFacility(meta.returnFboFacility || returnMeta.fboFacility || returnMeta.flightDetails?.fboFacility || '');
       setReturnHasCheckedLuggage(Boolean(meta.returnHasCheckedLuggage || returnMeta.hasCheckedLuggage || returnMeta.flightDetails?.hasCheckedLuggage));
+
+      // Overlay any unsaved local edits for this specific Edit tab so a page reload never loses work
+      try {
+        const savedEdit = localStorage.getItem(draftStorageKey);
+        if (savedEdit) {
+          const parsed = JSON.parse(savedEdit);
+          if (parsed && parsed._editTripId === initialTrip.id) {
+            applySavedDraftOverlay(parsed);
+            if (parsed._savedAt) setDraftSavedAt(parsed._savedAt);
+          }
+        }
+      } catch {}
     } else {
       // Restore from localStorage draft
       try {
         const saved = localStorage.getItem(draftStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          // Support both flat draft storage AND nested DispatchFormValues (from Copy Booking)
-          if (parsed.timingType) setTimingType(parsed.timingType);
-          if (parsed.scheduledDate) setScheduledDate(parsed.scheduledDate);
-          if (parsed.scheduledTime) setScheduledTime(parsed.scheduledTime);
-          if (parsed.pickupAddress) setPickupAddress(parsed.pickupAddress);
-          if (parsed.pickupCoordinates) setPickupCoordinates(parsed.pickupCoordinates);
-          if (parsed.dropoffAddress) setDropoffAddress(parsed.dropoffAddress);
-          if (parsed.dropoffCoordinates) setDropoffCoordinates(parsed.dropoffCoordinates);
-          if (parsed.intermediateStops) setIntermediateStops(parsed.intermediateStops);
-          if (parsed.passengerName) setPassengerName(parsed.passengerName);
-          if (parsed.phone) setPhone(parsed.phone);
-          if (parsed.email) setEmail(parsed.email);
-          if (parsed.additionalPassengers) setAdditionalPassengers(parsed.additionalPassengers);
-
-          const cp = parsed.contactPerson;
-          if (parsed.isBookerDifferent !== undefined || cp?.isBookerDifferent !== undefined) {
-            setIsBookerDifferent(parsed.isBookerDifferent ?? cp?.isBookerDifferent);
+          if (parsed) {
+            applySavedDraftOverlay(parsed);
+            if (parsed._savedAt) setDraftSavedAt(parsed._savedAt);
           }
-          if (parsed.contactName || cp?.contactName) setContactName(parsed.contactName || cp?.contactName);
-          if (parsed.contactPhone || cp?.contactPhone) setContactPhone(parsed.contactPhone || cp?.contactPhone);
-          if (parsed.contactEmail || cp?.contactEmail) setContactEmail(parsed.contactEmail || cp?.contactEmail);
-          if (parsed.contactRole || cp?.contactRole) setContactRole(parsed.contactRole || cp?.contactRole);
-
-          if (parsed.passengers) setPassengers(parsed.passengers);
-          if (parsed.bags !== undefined) setBags(parsed.bags);
-          if (parsed.oversizedBagsCount !== undefined) setOversizedBagsCount(parsed.oversizedBagsCount);
-          if (parsed.selectedCustomExtras) setSelectedCustomExtras(parsed.selectedCustomExtras);
-          if (parsed.carSeats !== undefined) setCarSeats(parsed.carSeats);
-
-          const csb = parsed.carSeatsBreakdown;
-          if (parsed.rearFacingCount !== undefined || csb?.rearFacing !== undefined) {
-            setRearFacingCount(parsed.rearFacingCount ?? csb?.rearFacing ?? 0);
-          }
-          if (parsed.frontFacingCount !== undefined || csb?.frontFacing !== undefined) {
-            setFrontFacingCount(parsed.frontFacingCount ?? csb?.frontFacing ?? 0);
-          }
-          if (parsed.boosterCount !== undefined || csb?.booster !== undefined) {
-            setBoosterCount(parsed.boosterCount ?? csb?.booster ?? 0);
-          }
-          if (parsed.selectedVehicles) setSelectedVehicles(parsed.selectedVehicles);
-          if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
-
-          const card = parsed.cardDetails;
-          if (parsed.cardPaymentType || card?.cardPaymentType) {
-            setCardPaymentType(parsed.cardPaymentType || card?.cardPaymentType);
-          }
-          if (parsed.cardholderName || card?.cardholderName) {
-            setCardholderName(parsed.cardholderName || card?.cardholderName);
-          }
-
-          const corp = parsed.corporateDetails;
-          if (parsed.corporateAccount || corp?.corporateAccount) {
-            setCorporateAccount(parsed.corporateAccount || corp?.corporateAccount);
-          }
-          if (parsed.billingPo || corp?.billingPo) setBillingPo(parsed.billingPo || corp?.billingPo);
-          if (parsed.authorizedBy || corp?.authorizedBy) setAuthorizedBy(parsed.authorizedBy || corp?.authorizedBy);
-          if (parsed.invoicingTerms || corp?.invoicingTerms) {
-            setInvoicingTerms(parsed.invoicingTerms || corp?.invoicingTerms);
-          }
-          if (parsed.tariff) setTariff(parsed.tariff);
-          if (parsed.pricingRuleId !== undefined) setSelectedRuleId(parsed.pricingRuleId);
-          if (parsed.discount) setDiscount(parsed.discount);
-          if (parsed.manualDiscountDollars) setManualDiscountDollars(parsed.manualDiscountDollars);
-          if (parsed.waiveAirportFee !== undefined) setWaiveAirportFee(parsed.waiveAirportFee);
-          if (parsed.waiveMultiStopFees !== undefined) setWaiveMultiStopFees(parsed.waiveMultiStopFees);
-          if (parsed.bypassSurge !== undefined) setBypassSurge(parsed.bypassSurge);
-          if (parsed.company) setCompany(parsed.company);
-          if (parsed.driverId) setDriverId(parsed.driverId);
-          if (parsed.notesForAll) setNotesForAll(parsed.notesForAll);
-          if (parsed.internalNotes) setInternalNotes(parsed.internalNotes);
-
-          const ret = parsed.returnDetails;
-          if (parsed.returnTrip !== undefined || ret?.returnTrip !== undefined) {
-            setReturnTrip(parsed.returnTrip ?? ret?.returnTrip);
-          }
-          if (parsed.returnPickupAddress || ret?.returnPickupAddress) {
-            setReturnPickupAddress(parsed.returnPickupAddress || ret?.returnPickupAddress);
-          }
-          if (parsed.returnPickupCoordinates || ret?.returnPickupCoordinates) {
-            setReturnPickupCoordinates(parsed.returnPickupCoordinates || ret?.returnPickupCoordinates);
-          }
-          if (parsed.returnDropoffAddress || ret?.returnDropoffAddress) {
-            setReturnDropoffAddress(parsed.returnDropoffAddress || ret?.returnDropoffAddress);
-          }
-          if (parsed.returnDropoffCoordinates || ret?.returnDropoffCoordinates) {
-            setReturnDropoffCoordinates(parsed.returnDropoffCoordinates || ret?.returnDropoffCoordinates);
-          }
-          if (parsed.returnIntermediateStops || ret?.returnIntermediateStops) {
-            setReturnIntermediateStops(parsed.returnIntermediateStops || ret?.returnIntermediateStops);
-          }
-          if (parsed.returnDate || ret?.returnDate) setReturnDate(parsed.returnDate || ret?.returnDate);
-          if (parsed.returnTime || ret?.returnTime) setReturnTime(parsed.returnTime || ret?.returnTime);
-          if (parsed.returnPassengers !== undefined || ret?.returnPassengers !== undefined) {
-            setReturnPassengers(parsed.returnPassengers ?? ret?.returnPassengers);
-          }
-          if (parsed.returnBags !== undefined || ret?.returnBags !== undefined) {
-            setReturnBags(parsed.returnBags ?? ret?.returnBags);
-          }
-          if (parsed.returnCarSeats !== undefined || ret?.returnCarSeats !== undefined) {
-            setReturnCarSeats(parsed.returnCarSeats ?? ret?.returnCarSeats);
-          }
-          if (parsed.returnRearFacing !== undefined || ret?.returnCarSeatsBreakdown?.rearFacing !== undefined) {
-            setReturnRearFacing(parsed.returnRearFacing ?? ret?.returnCarSeatsBreakdown?.rearFacing ?? 0);
-          }
-          if (parsed.returnFrontFacing !== undefined || ret?.returnCarSeatsBreakdown?.frontFacing !== undefined) {
-            setReturnFrontFacing(parsed.returnFrontFacing ?? ret?.returnCarSeatsBreakdown?.frontFacing ?? 0);
-          }
-          if (parsed.returnBooster !== undefined || ret?.returnCarSeatsBreakdown?.booster !== undefined) {
-            setReturnBooster(parsed.returnBooster ?? ret?.returnCarSeatsBreakdown?.booster ?? 0);
-          }
-          if (parsed.returnVehicles || ret?.returnVehicles) {
-            setReturnVehicles(parsed.returnVehicles || ret?.returnVehicles);
-          }
-          if (parsed.autoCreateReturnTrip !== undefined || ret?.autoCreateReturnTrip !== undefined) {
-            setAutoCreateReturnTrip(parsed.autoCreateReturnTrip ?? ret?.autoCreateReturnTrip);
-          }
-
-          const rep = parsed.repeatDetails;
-          if (parsed.repeat !== undefined || rep?.repeat !== undefined) setRepeat(parsed.repeat ?? rep?.repeat);
-          if (parsed.repeatFrequency || rep?.repeatFrequency) {
-            setRepeatFrequency(parsed.repeatFrequency || rep?.repeatFrequency);
-          }
-          if (parsed.repeatDays || rep?.repeatDays) setRepeatDays(parsed.repeatDays || rep?.repeatDays);
-          if (parsed.repeatOccurrences || rep?.repeatOccurrences) {
-            setRepeatOccurrences(parsed.repeatOccurrences || rep?.repeatOccurrences);
-          }
-          if (parsed.repeatUntilDate || rep?.repeatUntilDate) {
-            setRepeatUntilDate(parsed.repeatUntilDate || rep?.repeatUntilDate);
-          }
-          if (parsed.repeatWeeksPattern || rep?.repeatWeeksPattern) {
-            setRepeatWeeksPattern(parsed.repeatWeeksPattern || rep?.repeatWeeksPattern);
-          }
-          if (parsed.estimatedFare) setEstimatedFare(parsed.estimatedFare);
-          if (parsed.returnEstimatedFare) setReturnEstimatedFare(parsed.returnEstimatedFare);
-          if (parsed.manualFare) setManualFare(parsed.manualFare);
-          if (parsed.isFareOverridden !== undefined) setIsFareOverridden(parsed.isFareOverridden);
-          if (parsed.provideFlightInfo !== undefined) setProvideFlightInfo(parsed.provideFlightInfo);
-          if (parsed.airline) setAirline(parsed.airline);
-          if (parsed.flightNumber) setFlightNumber(parsed.flightNumber);
-          if (parsed.flightOrigin) setFlightOrigin(parsed.flightOrigin);
-          if (parsed.tailNumber) setTailNumber(parsed.tailNumber);
-          if (parsed.fboFacility) setFboFacility(parsed.fboFacility);
-          if (parsed.hasCheckedLuggage !== undefined) setHasCheckedLuggage(parsed.hasCheckedLuggage);
-          if (parsed.returnProvideFlightInfo !== undefined) setReturnProvideFlightInfo(parsed.returnProvideFlightInfo);
-          if (parsed.returnAirline) setReturnAirline(parsed.returnAirline);
-          if (parsed.returnFlightNumber) setReturnFlightNumber(parsed.returnFlightNumber);
-          if (parsed.returnFlightOrigin) setReturnFlightOrigin(parsed.returnFlightOrigin);
-          if (parsed.returnTailNumber) setReturnTailNumber(parsed.returnTailNumber);
-          if (parsed.returnFboFacility) setReturnFboFacility(parsed.returnFboFacility);
-          if (parsed.returnHasCheckedLuggage !== undefined) setReturnHasCheckedLuggage(parsed.returnHasCheckedLuggage);
         }
       } catch {}
     }
-  }, [initialTrip, draftStorageKey]);
+
+    // Flip hydration gate AFTER queueing all state restores so the save effect NEVER overwrites localStorage with blank defaults on mount!
+    setHasHydratedDraft(true);
+  }, [initialTrip?.id, draftStorageKey]);
 
   // Listen for POPULATE_BOOKING on workspaceBus to hydrate active draft with complete contact & trip data
   useEffect(() => {
@@ -1120,18 +1237,24 @@ export function DispatchBookingEngine({
     }
   }, [returnTrip]);
 
-  // Persist draft to localStorage & notify parent of values changes
+  // Persist draft (AND unsaved Edit-tab changes!) to localStorage & notify parent of values changes
+  // Strictly gated by `hasHydratedDraft` so initial mount NEVER overwrites saved drafts with blank state!
   useEffect(() => {
-    if (isEditMode) return;
+    if (!hasHydratedDraft) return;
 
+    const savedTimestamp = Date.now();
     const draftData = {
+      _editTripId: isEditMode ? initialTrip?.id : undefined,
+      _savedAt: savedTimestamp,
       timingType,
       scheduledDate,
       scheduledTime,
       pickupAddress,
       pickupCoordinates,
+      pickupPlaceId,
       dropoffAddress,
       dropoffCoordinates,
+      dropoffPlaceId,
       intermediateStops,
       passengerName,
       phone,
@@ -1144,7 +1267,11 @@ export function DispatchBookingEngine({
       contactRole,
       passengers,
       bags,
-      oversizedBagsCount,
+      hasOversizedLuggage,
+      oversizedBags,
+      oversizedLuggageNotes,
+      specialRequestFlags,
+      gateCode,
       selectedCustomExtras,
       carSeats,
       rearFacingCount,
@@ -1158,6 +1285,7 @@ export function DispatchBookingEngine({
       billingPo,
       authorizedBy,
       invoicingTerms,
+      sendEmailConfirmation,
       tariff,
       pricingRuleId: selectedRuleId,
       discount,
@@ -1192,6 +1320,7 @@ export function DispatchBookingEngine({
       repeatUntilDate,
       repeatWeeksPattern,
       estimatedFare,
+      returnEstimatedFare,
       manualFare,
       isFareOverridden,
       provideFlightInfo,
@@ -1211,7 +1340,25 @@ export function DispatchBookingEngine({
     };
 
     try {
-      localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+      const hasMeaningfulData = Boolean(
+        isEditMode ||
+          pickupAddress.trim() ||
+          dropoffAddress.trim() ||
+          passengerName.trim() ||
+          phone.trim() ||
+          email.trim() ||
+          notesForAll.trim() ||
+          internalNotes.trim() ||
+          selectedVehicles.length > 1 ||
+          intermediateStops.length > 0
+      );
+      if (hasMeaningfulData) {
+        localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+        setDraftSavedAt(savedTimestamp);
+      } else {
+        localStorage.removeItem(draftStorageKey);
+        setDraftSavedAt(null);
+      }
     } catch {}
 
     onValuesChangeRef.current?.({
@@ -1324,15 +1471,19 @@ export function DispatchBookingEngine({
       hasCheckedLuggage,
     });
   }, [
+    hasHydratedDraft,
     draftStorageKey,
     isEditMode,
+    initialTrip?.id,
     timingType,
     scheduledDate,
     scheduledTime,
     pickupAddress,
     pickupCoordinates,
+    pickupPlaceId,
     dropoffAddress,
     dropoffCoordinates,
+    dropoffPlaceId,
     intermediateStops,
     passengerName,
     phone,
@@ -1345,6 +1496,12 @@ export function DispatchBookingEngine({
     contactRole,
     passengers,
     bags,
+    hasOversizedLuggage,
+    oversizedBags,
+    oversizedLuggageNotes,
+    specialRequestFlags,
+    gateCode,
+    selectedCustomExtras,
     carSeats,
     rearFacingCount,
     frontFacingCount,
@@ -1361,8 +1518,14 @@ export function DispatchBookingEngine({
     billingPo,
     authorizedBy,
     invoicingTerms,
+    sendEmailConfirmation,
     tariff,
+    selectedRuleId,
     discount,
+    manualDiscountDollars,
+    waiveAirportFee,
+    waiveMultiStopFees,
+    bypassSurge,
     company,
     driverId,
     notesForAll,
@@ -1449,11 +1612,40 @@ export function DispatchBookingEngine({
     return Array.from(ids);
   }, [dispatchVehicleOptions]);
 
+  const oversizedCategories = useMemo(() => {
+    if (universalExtrasConfig?.oversizedBagsConfig && universalExtrasConfig.oversizedBagsConfig.length > 0) {
+      return universalExtrasConfig.oversizedBagsConfig;
+    }
+    return DEFAULT_OVERSIZED_BAG_CATEGORIES;
+  }, [universalExtrasConfig]);
+
+  const totalOversizedCount = useMemo(
+    () => Object.values(oversizedBags || {}).reduce((sum, count) => sum + (Number(count) || 0), 0),
+    [oversizedBags]
+  );
+
   const oversizedBagsPayload = useMemo<Record<string, number> | undefined>(() => {
-    if (oversizedBagsCount <= 0) return undefined;
-    const firstRuleId = universalExtrasConfig?.oversizedBagsConfig?.[0]?.id || 'golf_bag';
-    return { [firstRuleId]: oversizedBagsCount };
-  }, [oversizedBagsCount, universalExtrasConfig]);
+    if (!hasOversizedLuggage || totalOversizedCount <= 0) return undefined;
+    const cleaned: Record<string, number> = {};
+    for (const [id, count] of Object.entries(oversizedBags || {})) {
+      if (count > 0) cleaned[id] = count;
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }, [hasOversizedLuggage, oversizedBags, totalOversizedCount]);
+
+  const oversizedItemsSummary = useMemo(() => {
+    if (!hasOversizedLuggage) return undefined;
+    const parts = Object.entries(oversizedBags || {})
+      .filter(([, count]) => count > 0)
+      .map(([id, count]) => {
+        const cat = oversizedCategories.find((c) => c.id === id);
+        return `${count}x ${cat?.label || id}`;
+      });
+    if (oversizedLuggageNotes.trim()) {
+      parts.push(oversizedLuggageNotes.trim());
+    }
+    return parts.length > 0 ? parts.join(', ') : undefined;
+  }, [hasOversizedLuggage, oversizedBags, oversizedCategories, oversizedLuggageNotes]);
 
   // Instant zero-latency inline caller lookup (ContactService + loaded dispatch trips)
   const callerSuggestions = useMemo(() => {
@@ -2064,6 +2256,13 @@ export function DispatchBookingEngine({
     setRearFacingCount(0);
     setFrontFacingCount(0);
     setBoosterCount(0);
+    setHasOversizedLuggage(false);
+    setOversizedBags({});
+    setOversizedLuggageNotes('');
+    setSelectedCustomExtras({});
+    setShowSpecialRequests(false);
+    setSpecialRequestFlags({ petFriendly: false, quietRide: false, musicOk: false });
+    setGateCode('');
     setSelectedVehicles(['any']);
     setPaymentMethod('cash');
     setCardPaymentType('terminal');
@@ -2334,7 +2533,7 @@ export function DispatchBookingEngine({
     );
     const primaryVehicleDisplayName =
       primaryVehicle === 'any'
-        ? 'Any Vehicle (Best Available)'
+        ? 'Any'
         : primaryVehicleOpt?.label || String(tier);
 
     let method: PaymentMethod = 'cash';
@@ -2472,11 +2671,6 @@ export function DispatchBookingEngine({
       Boolean(isFareOverridden && manualFare)
     );
 
-    const oversizedItemsSummary =
-      oversizedBagsCount > 0
-        ? `${oversizedBagsCount}x ${universalExtrasConfig?.oversizedBagsConfig?.[0]?.label || 'Oversized Cargo'}`
-        : undefined;
-
     const customExtrasSummaryParts: string[] = [];
     for (const [extraId, qty] of Object.entries(selectedCustomExtras || {})) {
       if (!qty || qty <= 0) continue;
@@ -2501,9 +2695,19 @@ export function DispatchBookingEngine({
       boosterCount > 0 ? `${boosterCount} Booster` : null,
     ].filter(Boolean);
 
-    const specialRequests = carSeats && carSeatSummaryParts.length > 0
-      ? `Car Seats: ${carSeatSummaryParts.join(', ')}`
-      : undefined;
+    const activeSpecialRequestLabels = [
+      specialRequestFlags.petFriendly ? 'Pet-Friendly' : null,
+      specialRequestFlags.quietRide ? 'Quiet Ride' : null,
+      specialRequestFlags.musicOk ? 'Music OK' : null,
+    ].filter(Boolean) as string[];
+
+    const specialRequestSections = [
+      activeSpecialRequestLabels.length > 0 ? activeSpecialRequestLabels.join(', ') : null,
+      carSeats && carSeatSummaryParts.length > 0 ? `Car Seats: ${carSeatSummaryParts.join(', ')}` : null,
+    ].filter(Boolean);
+
+    const specialRequests =
+      specialRequestSections.length > 0 ? specialRequestSections.join(' · ') : undefined;
 
     let outboundFlightNotes = '';
     if (provideFlightInfo) {
@@ -2545,10 +2749,17 @@ export function DispatchBookingEngine({
       vehicleTypeId: primaryVehicle === 'any' ? 'any' : String(tier),
       vehicleDisplayName: primaryVehicleDisplayName,
       vehiclePreference: primaryVehicle,
-      oversizedBagsCount,
+      oversizedBagsCount: hasOversizedLuggage ? totalOversizedCount : 0,
       oversizedBags: oversizedBagsPayload,
-      hasOversizedLuggage: oversizedBagsCount > 0,
+      hasOversizedLuggage:
+        hasOversizedLuggage && (totalOversizedCount > 0 || Boolean(oversizedLuggageNotes.trim())),
+      oversizedLuggageNotes:
+        hasOversizedLuggage && oversizedLuggageNotes.trim() ? oversizedLuggageNotes.trim() : undefined,
       oversizedItemsSummary,
+      gateCode: gateCode.trim() || undefined,
+      specialRequestFlags: Object.values(specialRequestFlags).some(Boolean)
+        ? { ...specialRequestFlags }
+        : undefined,
       selectedCustomExtras:
         Object.keys(selectedCustomExtras || {}).length > 0 ? selectedCustomExtras : undefined,
       customExtrasSummary,
@@ -2658,8 +2869,243 @@ export function DispatchBookingEngine({
     };
 
     try {
+      const resolveDisplayNameForChoice = (choice: string, resolvedTier: string) => {
+        if (choice === 'any') return 'Any';
+        const opt = dispatchVehicleOptions.find((o) => o.key === choice || o.key === resolvedTier);
+        return opt?.label || String(resolvedTier);
+      };
+
+      const selectedDriverInfo =
+        driverId !== 'unassigned'
+          ? driverOptions.find((d) => d.id === driverId)
+          : undefined;
+
       if (isEditMode && initialTrip) {
-        // Update existing trip (preserving full canonical pricing.breakdown & locking route on completed/cancelled)
+        const shouldSplitIntoMultiCar =
+          !isCompleted &&
+          !isCancelled &&
+          !initialTrip.multiCarGroupId &&
+          selectedVehicles.length > 1;
+
+        if (shouldSplitIntoMultiCar) {
+          // Splitting an existing unsplit trip into N separate linked multi-car trips:
+          // Car 1 updates `initialTrip` in place; Cars 2..N are created as linked sibling trips!
+          const groupId = generateMultiCarGroupId();
+          const carCount = selectedVehicles.length;
+          const carSpecs = buildPerVehiclePricingSpecs({
+            selectedVehicles,
+            resolveTier: (c) => resolveVehicleEngineId(c, activeAdminVehicleIds),
+            resolveDisplayName: resolveDisplayNameForChoice,
+            vehicleQuotes,
+            primaryPricing: outboundPricing,
+            distanceMiles: estimatedDistanceMiles,
+            durationMinutes: estimatedDurationMinutes,
+            combinedTargetFare: finalFare,
+            isFareOverridden: Boolean(isFareOverridden && manualFare),
+          });
+          const paxCaps = selectedVehicles.map((v) => vehicleCapacities[v]?.maxPassengers || 4);
+          const bagCaps = selectedVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
+          const paxAlloc = distributeAcrossCars(passengers, carCount, paxCaps, 1);
+          const bagAlloc = distributeAcrossCars(bags, carCount, bagCaps, 0);
+
+          const car1Spec = carSpecs[0];
+          const car1Updates: Partial<Trip> = {
+            pickupLocation: {
+              ...initialTrip.pickupLocation,
+              address: pickupAddress,
+              coordinates: pickupCoordinates,
+              placeId: pickupPlaceId,
+              notes: notesForAll || undefined,
+            },
+            dropoffLocation: {
+              ...initialTrip.dropoffLocation,
+              address: dropoffAddress,
+              coordinates: dropoffCoordinates,
+              placeId: dropoffPlaceId,
+            },
+            intermediateStops:
+              intermediateStops.length > 0
+                ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+                : undefined,
+            passenger: {
+              ...initialTrip.passenger,
+              firstName,
+              lastName,
+              phone,
+              email,
+              passengerCount: paxAlloc[0],
+              luggageCount: bagAlloc[0],
+              specialRequests,
+            },
+            vehicleTier: car1Spec.vehicleTier as VehicleTier,
+            bookingType: timingType === 'later' ? 'scheduled' : 'asap',
+            scheduledPickupTime,
+            driverNotes: notesForAll,
+            flightNotes: outboundFlightNotes || undefined,
+            assignedDriverId: driverId === 'unassigned' ? null : driverId,
+            status:
+              driverId !== 'unassigned' && initialTrip.status === 'pending'
+                ? 'assigned'
+                : initialTrip.status,
+            pricing: car1Spec.pricing,
+            payment: {
+              ...initialTrip.payment,
+              method,
+              amount: car1Spec.fare,
+              corporateAccountId: matchedCorporateAccount?.id,
+            },
+            multipleVehiclesRequested: true,
+            vehicleCount: carCount,
+            multiCarGroupId: groupId,
+            multiCarIndex: 1,
+            multiCarTotal: carCount,
+            metadata: {
+              ...initialTrip.metadata,
+              ...metadataPayload,
+              vehicleTypeId: car1Spec.vehicleChoice === 'any' ? 'any' : car1Spec.vehicleTier,
+              vehicleDisplayName: car1Spec.vehicleDisplayName,
+              vehiclePreference: car1Spec.vehicleChoice,
+              selectedVehicles: [car1Spec.vehicleChoice],
+              multiCarGroupId: groupId,
+              multiCarIndex: 1,
+              multiCarTotal: carCount,
+              multiCarTotalPassengers: passengers,
+              multiCarTotalBags: bags,
+              multiCarOrderTotalFare: finalFare,
+              ...(selectedDriverInfo
+                ? {
+                    assignedDriverName: selectedDriverInfo.name,
+                    assignedDriverPhone: selectedDriverInfo.phone,
+                  }
+                : {}),
+            },
+          };
+
+          const car1Updated = service.updateTrip
+            ? await service.updateTrip(initialTrip.id, car1Updates)
+            : ({ ...initialTrip, ...car1Updates } as Trip);
+
+          const convoyTrips: Trip[] = [car1Updated];
+
+          for (let i = 1; i < carCount; i++) {
+            const spec = carSpecs[i];
+            const sibPayload: CreateTripInput = {
+              bookingType: timingType === 'later' ? 'scheduled' : 'asap',
+              scheduledPickupTime,
+              pickupLocation: {
+                address: pickupAddress,
+                coordinates: pickupCoordinates,
+                placeId: pickupPlaceId,
+                notes: notesForAll || undefined,
+              },
+              dropoffLocation: {
+                address: dropoffAddress,
+                coordinates: dropoffCoordinates,
+                placeId: dropoffPlaceId,
+              },
+              intermediateStops:
+                intermediateStops.length > 0
+                  ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+                  : undefined,
+              passenger: {
+                firstName,
+                lastName,
+                phone,
+                email,
+                passengerCount: paxAlloc[i],
+                luggageCount: bagAlloc[i],
+              },
+              vehicleTier: spec.vehicleTier as VehicleTier,
+              driverNotes: notesForAll,
+              flightNotes: outboundFlightNotes || undefined,
+              pricing: spec.pricing,
+              payment: {
+                method,
+                status: 'pending',
+                amount: spec.fare,
+                corporateAccountId: matchedCorporateAccount?.id,
+              },
+              multipleVehiclesRequested: true,
+              vehicleCount: carCount,
+              multiCarGroupId: groupId,
+              multiCarIndex: i + 1,
+              multiCarTotal: carCount,
+              metadata: {
+                ...metadataPayload,
+                vehicleTypeId: spec.vehicleChoice === 'any' ? 'any' : spec.vehicleTier,
+                vehicleDisplayName: spec.vehicleDisplayName,
+                vehiclePreference: spec.vehicleChoice,
+                selectedVehicles: [spec.vehicleChoice],
+                oversizedBagsCount: 0,
+                oversizedBags: undefined,
+                hasOversizedLuggage: false,
+                oversizedLuggageNotes: undefined,
+                oversizedItemsSummary: undefined,
+                selectedCustomExtras: undefined,
+                customExtrasSummary: undefined,
+                carSeatsBreakdown: { rearFacing: 0, frontFacing: 0, booster: 0 },
+                multiCarGroupId: groupId,
+                multiCarIndex: i + 1,
+                multiCarTotal: carCount,
+                multiCarTotalPassengers: passengers,
+                multiCarTotalBags: bags,
+                multiCarOrderTotalFare: finalFare,
+                createdByRole: 'dispatcher',
+              },
+            };
+            const sibCreated = await service.createBooking(sibPayload);
+            convoyTrips.push(sibCreated);
+          }
+
+          const allTripIds = convoyTrips.map((t) => t.id);
+          const associates = convoyTrips.map((t, idx) =>
+            buildAssociateEntryFromTrip(
+              t,
+              idx === 0 && selectedDriverInfo
+                ? {
+                    driverId: selectedDriverInfo.id,
+                    driverName: selectedDriverInfo.name,
+                    driverPhone: selectedDriverInfo.phone,
+                    vehicleUnit: selectedDriverInfo.cabNumber
+                      ? `Cab #${selectedDriverInfo.cabNumber}`
+                      : selectedDriverInfo.vehicle,
+                  }
+                : undefined
+            )
+          );
+          const driverIds = associates
+            .map((a) => a.driverId)
+            .filter((id): id is string => Boolean(id));
+
+          if (service.updateTrip) {
+            await Promise.all(
+              convoyTrips.map((t) =>
+                service.updateTrip!(t.id, {
+                  multiCarTripIds: allTripIds,
+                  multiCarAssociates: associates,
+                  multiCarDriverIds: driverIds,
+                })
+              )
+            );
+          }
+
+          try {
+            localStorage.removeItem(draftStorageKey);
+          } catch {}
+
+          onBookingSuccess?.(
+            {
+              ...car1Updated,
+              multiCarTripIds: allTripIds,
+              multiCarAssociates: associates,
+              multiCarDriverIds: driverIds,
+            },
+            true
+          );
+          return;
+        }
+
+        // Standard Edit Update for single trip or individual car within an existing multi-car convoy
         const updates: Partial<Trip> = {
           pickupLocation:
             isCompleted || isCancelled
@@ -2723,6 +3169,12 @@ export function DispatchBookingEngine({
           metadata: {
             ...initialTrip.metadata,
             ...metadataPayload,
+            ...(selectedDriverInfo
+              ? {
+                  assignedDriverName: selectedDriverInfo.name,
+                  assignedDriverPhone: selectedDriverInfo.phone,
+                }
+              : {}),
           },
         };
 
@@ -2733,65 +3185,192 @@ export function DispatchBookingEngine({
           updatedTrip = { ...initialTrip, ...updates } as Trip;
         }
 
+        try {
+          localStorage.removeItem(draftStorageKey);
+        } catch {}
+
         onBookingSuccess?.(updatedTrip, true);
       } else {
-        // Create new primary trip with full canonical pricing & breakdown[]
-        const payload: CreateTripInput = {
-          bookingType: timingType === 'later' ? 'scheduled' : 'asap',
-          scheduledPickupTime,
-          pickupLocation: {
-            address: pickupAddress,
-            coordinates: pickupCoordinates,
-            placeId: pickupPlaceId,
-            notes: notesForAll || undefined,
-          },
-          dropoffLocation: {
-            address: dropoffAddress,
-            coordinates: dropoffCoordinates,
-            placeId: dropoffPlaceId,
-          },
-          intermediateStops:
-            intermediateStops.length > 0
-              ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
-              : undefined,
-          passenger: {
-            firstName,
-            lastName,
-            phone,
-            email,
-            passengerCount: passengers,
-            luggageCount: bags,
-            specialRequests,
-          },
-          vehicleTier: tier,
-          driverNotes: notesForAll,
-          flightNotes: outboundFlightNotes || undefined,
-          pricing: persistedOutboundPricing,
-          payment: {
-            method,
-            status: 'pending',
-            amount: finalFare,
-            corporateAccountId: matchedCorporateAccount?.id,
-          },
-          metadata: {
-            ...metadataPayload,
-            createdByRole: 'dispatcher',
-          },
-        };
+        // ─── NEW BOOKING CREATION (Single Car OR Separate Linked Multi-Car Convoy!) ───
+        const isMultiVehicle = selectedVehicles.length > 1;
+        const carCount = Math.max(1, selectedVehicles.length);
+        const multiCarGroupId = isMultiVehicle ? generateMultiCarGroupId() : undefined;
 
-        const createdTrip = await service.createBooking(payload);
+        const outboundCarSpecs = isMultiVehicle
+          ? buildPerVehiclePricingSpecs({
+              selectedVehicles,
+              resolveTier: (c) => resolveVehicleEngineId(c, activeAdminVehicleIds),
+              resolveDisplayName: resolveDisplayNameForChoice,
+              vehicleQuotes,
+              primaryPricing: outboundPricing,
+              distanceMiles: estimatedDistanceMiles,
+              durationMinutes: estimatedDurationMinutes,
+              combinedTargetFare: finalFare,
+              isFareOverridden: Boolean(isFareOverridden && manualFare),
+            })
+          : [
+              {
+                carIndex: 1,
+                vehicleChoice: primaryVehicle,
+                vehicleTier: String(tier),
+                vehicleDisplayName: primaryVehicleDisplayName,
+                pricing: persistedOutboundPricing,
+                fare: finalFare,
+              },
+            ];
 
-        // Assign driver if selected
-        if (driverId !== 'unassigned' && service.updateTripStatus) {
-          try {
-            await service.updateTripStatus(createdTrip.id, 'assigned', {
-              assignedDriverId: driverId,
-              reason: `Directly assigned to ${driverId} by dispatcher`,
-            });
-          } catch {}
+        const paxCaps = selectedVehicles.map((v) => vehicleCapacities[v]?.maxPassengers || 4);
+        const bagCaps = selectedVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
+        const paxAlloc = isMultiVehicle
+          ? distributeAcrossCars(passengers, carCount, paxCaps, 1)
+          : [passengers];
+        const bagAlloc = isMultiVehicle
+          ? distributeAcrossCars(bags, carCount, bagCaps, 0)
+          : [bags];
+
+        const createdOutboundTrips: Trip[] = [];
+
+        for (let i = 0; i < outboundCarSpecs.length; i++) {
+          const spec = outboundCarSpecs[i];
+          const isCar1 = i === 0;
+          const carPayload: CreateTripInput = {
+            bookingType: timingType === 'later' ? 'scheduled' : 'asap',
+            scheduledPickupTime,
+            pickupLocation: {
+              address: pickupAddress,
+              coordinates: pickupCoordinates,
+              placeId: pickupPlaceId,
+              notes: notesForAll || undefined,
+            },
+            dropoffLocation: {
+              address: dropoffAddress,
+              coordinates: dropoffCoordinates,
+              placeId: dropoffPlaceId,
+            },
+            intermediateStops:
+              intermediateStops.length > 0
+                ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+                : undefined,
+            passenger: {
+              firstName,
+              lastName,
+              phone,
+              email,
+              passengerCount: paxAlloc[i],
+              luggageCount: bagAlloc[i],
+              specialRequests: isCar1 ? specialRequests : undefined,
+            },
+            vehicleTier: spec.vehicleTier as VehicleTier,
+            driverNotes: notesForAll,
+            flightNotes: outboundFlightNotes || undefined,
+            pricing: spec.pricing,
+            payment: {
+              method,
+              status: 'pending',
+              amount: spec.fare,
+              corporateAccountId: matchedCorporateAccount?.id,
+            },
+            ...(isMultiVehicle
+              ? {
+                  multipleVehiclesRequested: true,
+                  vehicleCount: carCount,
+                  multiCarGroupId,
+                  multiCarIndex: i + 1,
+                  multiCarTotal: carCount,
+                }
+              : {}),
+            metadata: {
+              ...metadataPayload,
+              vehicleTypeId: spec.vehicleChoice === 'any' ? 'any' : spec.vehicleTier,
+              vehicleDisplayName: spec.vehicleDisplayName,
+              vehiclePreference: spec.vehicleChoice,
+              selectedVehicles: [spec.vehicleChoice],
+              ...(isMultiVehicle && !isCar1
+                ? {
+                    oversizedBagsCount: 0,
+                    oversizedBags: undefined,
+                    hasOversizedLuggage: false,
+                    oversizedLuggageNotes: undefined,
+                    oversizedItemsSummary: undefined,
+                    selectedCustomExtras: undefined,
+                    customExtrasSummary: undefined,
+                    carSeatsBreakdown: { rearFacing: 0, frontFacing: 0, booster: 0 },
+                  }
+                : {}),
+              ...(isMultiVehicle
+                ? {
+                    multiCarGroupId,
+                    multiCarIndex: i + 1,
+                    multiCarTotal: carCount,
+                    multiCarTotalPassengers: passengers,
+                    multiCarTotalBags: bags,
+                    multiCarOrderTotalFare: finalFare,
+                  }
+                : {}),
+              createdByRole: 'dispatcher',
+            },
+          };
+
+          let createdCar = await service.createBooking(carPayload);
+
+          // If dispatcher selected a driver on the form, assign to Car 1 (Cars 2..N stay open for individual assignment)
+          if (isCar1 && driverId !== 'unassigned' && service.updateTripStatus) {
+            try {
+              createdCar = await service.updateTripStatus(createdCar.id, 'assigned', {
+                assignedDriverId: driverId,
+                actorRole: 'admin',
+                reason: `Directly assigned to ${selectedDriverInfo?.name || driverId} by dispatcher`,
+              });
+            } catch {}
+          }
+
+          createdOutboundTrips.push(createdCar);
         }
 
-        // Auto-create linked return booking if requested
+        // Link all outbound multi-car trips together with full associate roster!
+        if (isMultiVehicle && createdOutboundTrips.length > 1) {
+          const allTripIds = createdOutboundTrips.map((t) => t.id);
+          const associates = createdOutboundTrips.map((t, idx) =>
+            buildAssociateEntryFromTrip(
+              t,
+              idx === 0 && selectedDriverInfo
+                ? {
+                    driverId: selectedDriverInfo.id,
+                    driverName: selectedDriverInfo.name,
+                    driverPhone: selectedDriverInfo.phone,
+                    vehicleUnit: selectedDriverInfo.cabNumber
+                      ? `Cab #${selectedDriverInfo.cabNumber}`
+                      : selectedDriverInfo.vehicle,
+                  }
+                : undefined
+            )
+          );
+          const driverIds = associates
+            .map((a) => a.driverId)
+            .filter((id): id is string => Boolean(id));
+
+          if (service.updateTrip) {
+            await Promise.all(
+              createdOutboundTrips.map((t) =>
+                service.updateTrip!(t.id, {
+                  multiCarTripIds: allTripIds,
+                  multiCarAssociates: associates,
+                  multiCarDriverIds: driverIds,
+                })
+              )
+            );
+          }
+          createdOutboundTrips[0] = {
+            ...createdOutboundTrips[0],
+            multiCarTripIds: allTripIds,
+            multiCarAssociates: associates,
+            multiCarDriverIds: driverIds,
+          };
+        }
+
+        const createdTrip = createdOutboundTrips[0];
+
+        // Auto-create linked return booking(s) if requested (supports multi-vehicle returns too!)
         let createdReturnTripForEmail: Trip | null = null;
         if (returnTrip && autoCreateReturnTrip && returnDate && returnTime) {
           try {
@@ -2810,108 +3389,179 @@ export function DispatchBookingEngine({
                 ? `Car Seats: ${returnCarSeatSummaryParts.join(', ')}`
                 : undefined;
 
-            const returnPrimaryVehicle = returnVehicles[0] || 'any';
-            const returnTier = resolveVehicleEngineId(returnPrimaryVehicle, activeAdminVehicleIds);
-            const returnVehicleOpt = dispatchVehicleOptions.find(
-              (o) => o.key === returnPrimaryVehicle || o.key === returnTier
-            );
+            const isReturnMultiCar = returnVehicles.length > 1;
+            const retCarCount = Math.max(1, returnVehicles.length);
+            const returnGroupId = isReturnMultiCar ? generateMultiCarGroupId() : undefined;
 
-            const persistedReturnPricing = buildPersistedPricing(
-              returnPricing,
-              returnLegFare,
-              returnEstimatedDistanceMiles || estimatedDistanceMiles,
-              returnEstimatedDurationMinutes || estimatedDurationMinutes,
-              Boolean(isFareOverridden && manualFare)
-            );
+            const returnCarSpecs = isReturnMultiCar
+              ? buildPerVehiclePricingSpecs({
+                  selectedVehicles: returnVehicles,
+                  resolveTier: (c) => resolveVehicleEngineId(c, activeAdminVehicleIds),
+                  resolveDisplayName: resolveDisplayNameForChoice,
+                  vehicleQuotes: returnVehicleQuotes,
+                  primaryPricing: returnPricing,
+                  distanceMiles: returnEstimatedDistanceMiles || estimatedDistanceMiles,
+                  durationMinutes: returnEstimatedDurationMinutes || estimatedDurationMinutes,
+                  combinedTargetFare: returnLegFare,
+                  isFareOverridden: Boolean(isFareOverridden && manualFare),
+                })
+              : (() => {
+                  const returnPrimaryVehicle = returnVehicles[0] || 'any';
+                  const returnTier = resolveVehicleEngineId(returnPrimaryVehicle, activeAdminVehicleIds);
+                  return [
+                    {
+                      carIndex: 1,
+                      vehicleChoice: returnPrimaryVehicle,
+                      vehicleTier: String(returnTier),
+                      vehicleDisplayName: resolveDisplayNameForChoice(returnPrimaryVehicle, String(returnTier)),
+                      pricing: buildPersistedPricing(
+                        returnPricing,
+                        returnLegFare,
+                        returnEstimatedDistanceMiles || estimatedDistanceMiles,
+                        returnEstimatedDurationMinutes || estimatedDurationMinutes,
+                        Boolean(isFareOverridden && manualFare)
+                      ),
+                      fare: returnLegFare,
+                    },
+                  ];
+                })();
 
-            const returnPayload: CreateTripInput = {
-              bookingType: 'scheduled',
-              scheduledPickupTime: returnScheduledTimeIso,
-              pickupLocation: {
-                address: retPickupAddr,
-                coordinates: returnPickupCoordinates || dropoffCoordinates,
-                placeId: returnPickupPlaceId || dropoffPlaceId,
-              },
-              dropoffLocation: {
-                address: retDropoffAddr,
-                coordinates: returnDropoffCoordinates || pickupCoordinates,
-                placeId: returnDropoffPlaceId || pickupPlaceId,
-              },
-              intermediateStops:
-                returnIntermediateStops.length > 0
-                  ? returnIntermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
-                  : undefined,
-              passenger: {
-                firstName,
-                lastName,
-                phone,
-                email,
-                passengerCount: returnPassengers,
-                luggageCount: returnBags,
-                specialRequests: returnSpecialRequests,
-              },
-              vehicleTier: returnTier,
-              driverNotes: notesForAll,
-              flightNotes: returnLegFlightNotes || undefined,
-              pricing: persistedReturnPricing,
-              payment: {
-                method,
-                status: 'pending',
-                amount: returnLegFare,
-                corporateAccountId: matchedCorporateAccount?.id,
-              },
-              metadata: {
-                ...metadataPayload,
-                vehicleTypeId: returnPrimaryVehicle === 'any' ? 'any' : String(returnTier),
-                vehicleDisplayName:
-                  returnPrimaryVehicle === 'any'
-                    ? 'Any Vehicle (Best Available)'
-                    : returnVehicleOpt?.label || String(returnTier),
-                selectedVehicles: returnVehicles,
-                linkedTripId: createdTrip.id,
-                isReturnRide: true,
-                hasReturnTrip: false,
-                createdByRole: 'dispatcher',
-                // Strip outbound flight details so outbound flight info never leaks onto return leg
-                flightNotes: returnLegFlightNotes || undefined,
-                provideFlightInfo: Boolean(returnProvideFlightInfo),
-                flightDetails: returnProvideFlightInfo
-                  ? {
-                      airlineName: returnAirline || undefined,
-                      flightNumber: returnFlightNumber || undefined,
-                      departureAirport: returnFlightOrigin || undefined,
-                      tailNumber: returnTailNumber || undefined,
-                      fboFacility: returnFboFacility || undefined,
-                      hasCheckedLuggage: returnHasCheckedLuggage,
-                    }
-                  : undefined,
-                airline: returnProvideFlightInfo ? returnAirline : undefined,
-                airlineName: returnProvideFlightInfo ? returnAirline : undefined,
-                flightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
-                flightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
-                departureAirport: returnProvideFlightInfo ? returnFlightOrigin : undefined,
-                tailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
-                fboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
-                isPrivateAviation: Boolean(returnAirportDetection.isPrivateAviation),
-                hasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
-                isAirportTrip: Boolean(returnAirportDetection.isAirportTrip),
-                airportIataCode: returnAirportDetection.airport?.iataCode,
-              },
-            };
-            const createdReturnTrip = await service.createBooking(returnPayload);
-            createdReturnTripForEmail = createdReturnTrip;
-            if (service.updateTrip && createdReturnTrip?.id) {
-              await service.updateTrip(createdTrip.id, {
-                linkedReturnTripId: createdReturnTrip.id,
-                returnScheduledPickupTime: returnScheduledTimeIso,
-                metadata: {
-                  ...createdTrip.metadata,
-                  hasReturnTrip: true,
-                  linkedReturnTripId: createdReturnTrip.id,
-                  returnScheduledPickupTime: returnScheduledTimeIso,
+            const retPaxCaps = returnVehicles.map((v) => vehicleCapacities[v]?.maxPassengers || 4);
+            const retBagCaps = returnVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
+            const retPaxAlloc = isReturnMultiCar
+              ? distributeAcrossCars(returnPassengers, retCarCount, retPaxCaps, 1)
+              : [returnPassengers];
+            const retBagAlloc = isReturnMultiCar
+              ? distributeAcrossCars(returnBags, retCarCount, retBagCaps, 0)
+              : [returnBags];
+
+            const createdReturnTrips: Trip[] = [];
+
+            for (let rIdx = 0; rIdx < returnCarSpecs.length; rIdx++) {
+              const rSpec = returnCarSpecs[rIdx];
+              const pairedOutbound = createdOutboundTrips[rIdx] || createdTrip;
+              const returnPayload: CreateTripInput = {
+                bookingType: 'scheduled',
+                scheduledPickupTime: returnScheduledTimeIso,
+                pickupLocation: {
+                  address: retPickupAddr,
+                  coordinates: returnPickupCoordinates || dropoffCoordinates,
+                  placeId: returnPickupPlaceId || dropoffPlaceId,
                 },
-              });
+                dropoffLocation: {
+                  address: retDropoffAddr,
+                  coordinates: returnDropoffCoordinates || pickupCoordinates,
+                  placeId: returnDropoffPlaceId || pickupPlaceId,
+                },
+                intermediateStops:
+                  returnIntermediateStops.length > 0
+                    ? returnIntermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+                    : undefined,
+                passenger: {
+                  firstName,
+                  lastName,
+                  phone,
+                  email,
+                  passengerCount: retPaxAlloc[rIdx],
+                  luggageCount: retBagAlloc[rIdx],
+                  specialRequests: rIdx === 0 ? returnSpecialRequests : undefined,
+                },
+                vehicleTier: rSpec.vehicleTier as VehicleTier,
+                driverNotes: notesForAll,
+                flightNotes: returnLegFlightNotes || undefined,
+                pricing: rSpec.pricing,
+                payment: {
+                  method,
+                  status: 'pending',
+                  amount: rSpec.fare,
+                  corporateAccountId: matchedCorporateAccount?.id,
+                },
+                ...(isReturnMultiCar
+                  ? {
+                      multipleVehiclesRequested: true,
+                      vehicleCount: retCarCount,
+                      multiCarGroupId: returnGroupId,
+                      multiCarIndex: rIdx + 1,
+                      multiCarTotal: retCarCount,
+                    }
+                  : {}),
+                metadata: {
+                  ...metadataPayload,
+                  vehicleTypeId: rSpec.vehicleChoice === 'any' ? 'any' : rSpec.vehicleTier,
+                  vehicleDisplayName: rSpec.vehicleDisplayName,
+                  selectedVehicles: [rSpec.vehicleChoice],
+                  linkedTripId: pairedOutbound.id,
+                  isReturnRide: true,
+                  hasReturnTrip: false,
+                  createdByRole: 'dispatcher',
+                  ...(isReturnMultiCar
+                    ? {
+                        multiCarGroupId: returnGroupId,
+                        multiCarIndex: rIdx + 1,
+                        multiCarTotal: retCarCount,
+                        multiCarTotalPassengers: returnPassengers,
+                        multiCarTotalBags: returnBags,
+                        multiCarOrderTotalFare: returnLegFare,
+                      }
+                    : {}),
+                  // Strip outbound flight details so outbound flight info never leaks onto return leg
+                  flightNotes: returnLegFlightNotes || undefined,
+                  provideFlightInfo: Boolean(returnProvideFlightInfo),
+                  flightDetails: returnProvideFlightInfo
+                    ? {
+                        airlineName: returnAirline || undefined,
+                        flightNumber: returnFlightNumber || undefined,
+                        departureAirport: returnFlightOrigin || undefined,
+                        tailNumber: returnTailNumber || undefined,
+                        fboFacility: returnFboFacility || undefined,
+                        hasCheckedLuggage: returnHasCheckedLuggage,
+                      }
+                    : undefined,
+                  airline: returnProvideFlightInfo ? returnAirline : undefined,
+                  airlineName: returnProvideFlightInfo ? returnAirline : undefined,
+                  flightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
+                  flightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                  departureAirport: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                  tailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
+                  fboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
+                  isPrivateAviation: Boolean(returnAirportDetection.isPrivateAviation),
+                  hasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
+                  isAirportTrip: Boolean(returnAirportDetection.isAirportTrip),
+                  airportIataCode: returnAirportDetection.airport?.iataCode,
+                },
+              };
+              const createdRet = await service.createBooking(returnPayload);
+              createdReturnTrips.push(createdRet);
+
+              if (service.updateTrip && createdRet?.id && pairedOutbound?.id) {
+                await service.updateTrip(pairedOutbound.id, {
+                  linkedReturnTripId: createdRet.id,
+                  returnScheduledPickupTime: returnScheduledTimeIso,
+                  metadata: {
+                    ...pairedOutbound.metadata,
+                    hasReturnTrip: true,
+                    linkedReturnTripId: createdRet.id,
+                    returnScheduledPickupTime: returnScheduledTimeIso,
+                  },
+                });
+              }
             }
+
+            if (isReturnMultiCar && createdReturnTrips.length > 1 && service.updateTrip) {
+              const retIds = createdReturnTrips.map((t) => t.id);
+              const retAssociates = createdReturnTrips.map((t) => buildAssociateEntryFromTrip(t));
+              await Promise.all(
+                createdReturnTrips.map((t) =>
+                  service.updateTrip!(t.id, {
+                    multiCarTripIds: retIds,
+                    multiCarAssociates: retAssociates,
+                    multiCarDriverIds: [],
+                  })
+                )
+              );
+            }
+
+            createdReturnTripForEmail = createdReturnTrips[0] || null;
           } catch (retErr) {
             console.warn('[DispatchBookingEngine] Failed to create linked return trip:', retErr);
           }
@@ -2930,26 +3580,101 @@ export function DispatchBookingEngine({
             const occDate = extraDates[occIdx];
             try {
               const occIso = new Date(`${occDate}T${scheduledTime}:00`).toISOString();
-              await service.createBooking({
-                ...payload,
-                bookingType: 'scheduled',
-                scheduledPickupTime: occIso,
-                metadata: {
-                  ...payload.metadata,
-                  recurringParentTripId: createdTrip.id,
-                  recurringOccurrenceIndex: occIdx + 2,
-                },
-              });
+              const occGroupId = isMultiVehicle ? generateMultiCarGroupId() : undefined;
+              const occTrips: Trip[] = [];
+              for (let cIdx = 0; cIdx < outboundCarSpecs.length; cIdx++) {
+                const spec = outboundCarSpecs[cIdx];
+                const occCreated = await service.createBooking({
+                  bookingType: 'scheduled',
+                  scheduledPickupTime: occIso,
+                  pickupLocation: {
+                    address: pickupAddress,
+                    coordinates: pickupCoordinates,
+                    placeId: pickupPlaceId,
+                    notes: notesForAll || undefined,
+                  },
+                  dropoffLocation: {
+                    address: dropoffAddress,
+                    coordinates: dropoffCoordinates,
+                    placeId: dropoffPlaceId,
+                  },
+                  intermediateStops:
+                    intermediateStops.length > 0
+                      ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+                      : undefined,
+                  passenger: {
+                    firstName,
+                    lastName,
+                    phone,
+                    email,
+                    passengerCount: paxAlloc[cIdx],
+                    luggageCount: bagAlloc[cIdx],
+                    specialRequests: cIdx === 0 ? specialRequests : undefined,
+                  },
+                  vehicleTier: spec.vehicleTier as VehicleTier,
+                  driverNotes: notesForAll,
+                  flightNotes: outboundFlightNotes || undefined,
+                  pricing: spec.pricing,
+                  payment: {
+                    method,
+                    status: 'pending',
+                    amount: spec.fare,
+                    corporateAccountId: matchedCorporateAccount?.id,
+                  },
+                  ...(isMultiVehicle
+                    ? {
+                        multipleVehiclesRequested: true,
+                        vehicleCount: carCount,
+                        multiCarGroupId: occGroupId,
+                        multiCarIndex: cIdx + 1,
+                        multiCarTotal: carCount,
+                      }
+                    : {}),
+                  metadata: {
+                    ...metadataPayload,
+                    vehicleTypeId: spec.vehicleChoice === 'any' ? 'any' : spec.vehicleTier,
+                    vehicleDisplayName: spec.vehicleDisplayName,
+                    selectedVehicles: [spec.vehicleChoice],
+                    recurringParentTripId: createdTrip.id,
+                    recurringOccurrenceIndex: occIdx + 2,
+                    createdByRole: 'dispatcher',
+                  },
+                });
+                occTrips.push(occCreated);
+              }
+              if (isMultiVehicle && occTrips.length > 1 && service.updateTrip) {
+                const ids = occTrips.map((t) => t.id);
+                const assocs = occTrips.map((t) => buildAssociateEntryFromTrip(t));
+                await Promise.all(
+                  occTrips.map((t) =>
+                    service.updateTrip!(t.id, {
+                      multiCarTripIds: ids,
+                      multiCarAssociates: assocs,
+                      multiCarDriverIds: [],
+                    })
+                  )
+                );
+              }
             } catch (recErr) {
               console.warn(`[DispatchBookingEngine] Failed creating recurring occurrence ${occDate}:`, recErr);
             }
           }
         }
 
-        // Send passenger confirmation email on phone bookings when opted in & email provided
+        // Send ONE consolidated passenger confirmation email (summarizing all N vehicles when multi-car!)
         if (sendEmailConfirmation && email.trim()) {
           try {
             const cachedAppSettings = getAdminConfigService().getCachedSettings();
+            const multiCarEmailLabel = isMultiVehicle
+              ? `${carCount} Vehicles (${outboundCarSpecs.map((s) => `${s.vehicleDisplayName} $${s.fare.toFixed(0)}`).join(', ')})`
+              : primaryVehicleDisplayName;
+            const multiCarEmailNote = isMultiVehicle
+              ? `Multi-Car Convoy (${multiCarGroupId}): ${createdOutboundTrips
+                  .map((t, idx) => `Car ${idx + 1} #${t.id.slice(-6).toUpperCase()}`)
+                  .join(', ')}.`
+              : '';
+            const combinedEmailPickupNotes = [multiCarEmailNote, notesForAll].filter(Boolean).join(' ') || undefined;
+
             getEmailDispatchService()
               .sendBookingConfirmation({
                 tripId: createdTrip.id,
@@ -2962,7 +3687,7 @@ export function DispatchBookingEngine({
                   phone,
                 },
                 pickupAddress,
-                pickupNotes: notesForAll || undefined,
+                pickupNotes: combinedEmailPickupNotes,
                 intermediateStops:
                   intermediateStops.length > 0
                     ? intermediateStops.map((s) => ({ address: s.address }))
@@ -2974,11 +3699,19 @@ export function DispatchBookingEngine({
                     : 'Immediate Dispatch (ASAP)',
                 bookingType: timingType === 'later' ? 'scheduled' : 'asap',
                 vehicleTier: String(tier),
-                vehicleDisplayName: primaryVehicleDisplayName,
+                vehicleDisplayName: multiCarEmailLabel,
                 passengerCount: passengers,
                 luggageCount: bags,
                 totalFare: finalFare,
-                breakdown: persistedOutboundPricing.breakdown,
+                breakdown: isMultiVehicle
+                  ? outboundCarSpecs.map((s) => ({
+                      id: `car-${s.carIndex}`,
+                      category: 'base' as const,
+                      label: `Car ${s.carIndex} of ${carCount} — ${s.vehicleDisplayName}`,
+                      amount: s.fare,
+                      sourceType: 'tariff' as const,
+                    }))
+                  : persistedOutboundPricing.breakdown,
                 tariffProfileName:
                   persistedOutboundPricing.matchedCorridorName ||
                   persistedOutboundPricing.tariffProfileName,
@@ -3016,10 +3749,13 @@ export function DispatchBookingEngine({
                         ? new Date(createdReturnTripForEmail.scheduledPickupTime).toLocaleString()
                         : 'Scheduled Return',
                       vehicleTier: String(createdReturnTripForEmail.vehicleTier),
-                      vehicleDisplayName: (createdReturnTripForEmail.metadata?.vehicleDisplayName as string) || undefined,
-                      totalFare: createdReturnTripForEmail.pricing.totalFare,
-                      passengerCount: createdReturnTripForEmail.passenger.passengerCount,
-                      luggageCount: createdReturnTripForEmail.passenger.luggageCount,
+                      vehicleDisplayName:
+                        returnVehicles.length > 1
+                          ? `${returnVehicles.length} Return Vehicles`
+                          : (createdReturnTripForEmail.metadata?.vehicleDisplayName as string) || undefined,
+                      totalFare: returnLegFare,
+                      passengerCount: returnPassengers,
+                      luggageCount: returnBags,
                     }
                   : undefined,
                 companySettings: {
@@ -3098,10 +3834,113 @@ export function DispatchBookingEngine({
           </div>
         )}
 
+        {/* ─── Multi-Car Convoy Banner (Edit Mode on Linked Multi-Vehicle Orders) ─── */}
+        {isEditMode && initialTrip?.multiCarGroupId && (initialTrip.multiCarTotal || 1) > 1 && (() => {
+          const liveSiblings = lookupTrips
+            .filter((t) => t.multiCarGroupId === initialTrip.multiCarGroupId)
+            .sort((a, b) => (a.multiCarIndex || 0) - (b.multiCarIndex || 0));
+          const associatesList =
+            liveSiblings.length > 0
+              ? liveSiblings.map((t) => ({
+                  tripId: t.id,
+                  carIndex: t.multiCarIndex || 1,
+                  vehicleDisplayName: (t.metadata as any)?.vehicleDisplayName || t.vehicleTier,
+                  driverName:
+                    driverOptions.find((d) => d.id === t.assignedDriverId)?.formattedLabel ||
+                    driverOptions.find((d) => d.id === t.assignedDriverId)?.name ||
+                    (t.metadata as any)?.assignedDriverName,
+                  driverId: t.assignedDriverId,
+                  status: t.status,
+                  fare: t.pricing?.totalFare || 0,
+                }))
+              : (initialTrip.multiCarAssociates || []).map((a) => ({
+                  tripId: a.tripId,
+                  carIndex: a.carIndex,
+                  vehicleDisplayName: a.vehicleDisplayName || a.vehicleTier || 'Standard',
+                  driverName: a.driverName,
+                  driverId: a.driverId,
+                  status: a.status || 'pending',
+                  fare: 0,
+                }));
+
+          return (
+            <div className="p-2.5 bg-violet-50 border border-violet-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-bold text-violet-900 flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded bg-violet-600 text-white text-[10px] font-black">
+                    CAR {initialTrip.multiCarIndex || 1}/{initialTrip.multiCarTotal}
+                  </span>
+                  <span>Multi-Car Convoy</span>
+                </div>
+                <span className="font-mono text-[10px] text-violet-600 font-semibold">
+                  {initialTrip.multiCarGroupId}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {associatesList.map((car) => {
+                  const isCurrent = car.tripId === initialTrip.id;
+                  return (
+                    <div
+                      key={car.tripId}
+                      className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border text-[11px] ${
+                        isCurrent
+                          ? 'bg-white border-violet-300 font-bold text-violet-950'
+                          : 'bg-violet-100/50 border-violet-200/70 text-slate-700'
+                      }`}
+                    >
+                      <div className="min-w-0 truncate">
+                        <span className="font-bold">Car #{car.carIndex}</span>
+                        <span className="text-slate-500"> · {car.vehicleDisplayName}</span>
+                        <span className="ml-1.5 text-[10px] font-semibold text-blue-700">
+                          {car.driverName || (car.driverId ? 'Assigned' : 'Unassigned')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isCurrent ? (
+                          <span className="text-[10px] font-black text-violet-700">Editing</span>
+                        ) : (
+                          onOpenLinkedTrip && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenLinkedTrip(car.tripId)}
+                              className="px-2 py-0.5 rounded bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-bold cursor-pointer"
+                            >
+                              Open
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── Multi-Car Split Info Notice when >1 vehicle selected on New or Unsplit Edit ─── */}
+        {selectedVehicles.length > 1 && !initialTrip?.multiCarGroupId && (
+          <div className="px-2.5 py-2 bg-violet-50/90 border border-violet-200 rounded-lg text-[11px] text-violet-900 flex items-center justify-between gap-2">
+            <span>
+              <strong>{selectedVehicles.length} separate linked trips</strong> will be created so each car can be assigned individually with associate driver awareness.
+            </span>
+          </div>
+        )}
+
         {/* ─── Timing Selector (Reverted clean pill switch design) ─── */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-xs">Pickup Time</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-800 text-xs">Pickup Time</span>
+              {draftSavedAt && (
+                <span
+                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  title="Form data is auto-saved locally so you won't lose work on reload"
+                >
+                  {isEditMode ? 'Edits cached' : 'Draft saved'}
+                </span>
+              )}
+            </div>
             <span className="text-[10px] text-slate-400 font-medium">
               {timingType === 'later' ? 'Scheduled reservation' : 'On-demand dispatch'}
             </span>
@@ -3731,23 +4570,133 @@ export function DispatchBookingEngine({
               </div>
             </div>
 
-            {/* Car Seats Master Toggle */}
+            {/* Collapsible Extras Row (Oversized Cargo + Car Seats — parity with Customer Form) */}
             <div className="pt-2 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={carSeats}
-                    onChange={(e) => handleToggleCarSeats(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="font-semibold text-slate-800">Car Seats Required</span>
-                </label>
-                {carSeats && (
-                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                    Total: {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
+              <div className="grid grid-cols-1 gap-1.5">
+                <label
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
+                    hasOversizedLuggage
+                      ? 'bg-blue-50/70 border-blue-300'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={hasOversizedLuggage}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setHasOversizedLuggage(checked);
+                        if (!checked) {
+                          setOversizedBags({});
+                          setOversizedLuggageNotes('');
+                        }
+                      }}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Oversized Cargo (Golf / Skis)</span>
                   </span>
+                  {hasOversizedLuggage && totalOversizedCount > 0 && (
+                    <span className="text-[10px] font-bold text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                      {totalOversizedCount} item{totalOversizedCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </label>
+
+                {/* Expanded Oversized Cargo Panel */}
+                {hasOversizedLuggage && (
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      Select oversized equipment so the right cargo space is dispatched:
+                    </div>
+                    <div className="space-y-1">
+                      {oversizedCategories.map((cat) => {
+                        const count = oversizedBags[cat.id] || 0;
+                        return (
+                          <div
+                            key={cat.id}
+                            className="flex items-center justify-between gap-2 text-[11px] bg-white px-2 py-1.5 rounded border border-slate-200"
+                          >
+                            <div className="flex items-center gap-1 flex-wrap min-w-0">
+                              <span className="font-semibold text-slate-800">{cat.label}</span>
+                              {cat.requiresUpgrade && (
+                                <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                                  SUV/Van
+                                </span>
+                              )}
+                              {cat.fee > 0 && (
+                                <span className="text-[10px] font-bold font-mono text-emerald-700">
+                                  +${cat.fee.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                aria-label={`Decrease ${cat.label}`}
+                                disabled={count <= 0}
+                                onClick={() =>
+                                  setOversizedBags((prev) => ({
+                                    ...prev,
+                                    [cat.id]: Math.max(0, (prev[cat.id] || 0) - 1),
+                                  }))
+                                }
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                              >
+                                &minus;
+                              </button>
+                              <span className="w-4 text-center font-bold text-slate-800">{count}</span>
+                              <button
+                                type="button"
+                                aria-label={`Increase ${cat.label}`}
+                                disabled={count >= (cat.maxCount || 4)}
+                                onClick={() =>
+                                  setOversizedBags((prev) => ({
+                                    ...prev,
+                                    [cat.id]: Math.min(cat.maxCount || 4, (prev[cat.id] || 0) + 1),
+                                  }))
+                                }
+                                className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Additional cargo notes (e.g. dimensions, fragile instruments)"
+                      value={oversizedLuggageNotes}
+                      onChange={(e) => setOversizedLuggageNotes(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
                 )}
+
+                <label
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
+                    carSeats
+                      ? 'bg-amber-50/80 border-amber-300'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={carSeats}
+                      onChange={(e) => handleToggleCarSeats(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Child Safety Seats</span>
+                  </span>
+                  {carSeats && (
+                    <span className="text-[10px] font-bold text-amber-900 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                      {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
+                    </span>
+                  )}
+                </label>
               </div>
 
               {/* 3 Car Seat Counters: Rear-Facing, Front-Facing, Booster */}
@@ -3833,93 +4782,132 @@ export function DispatchBookingEngine({
                 </div>
               )}
 
-              {/* Oversized Cargo & Admin Custom Bookable Extras */}
-              <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
-                <div className="flex items-center justify-between text-[11px]">
-                  <div className="flex items-center gap-1.5 text-slate-700">
-                    <span className="font-semibold">
-                      {universalExtrasConfig?.oversizedBagsConfig?.[0]?.label || 'Oversized Cargo (Golf / Skis)'}
+              {/* Admin Custom Bookable Extras */}
+              {universalExtrasConfig?.customExtras &&
+                universalExtrasConfig.customExtras.filter((e) => e.isActive).length > 0 && (
+                  <div className="space-y-1 pt-1.5 border-t border-slate-100">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Extras &amp; Add-Ons
                     </span>
-                    {universalExtrasConfig?.oversizedBagsConfig?.[0]?.fee ? (
-                      <span className="text-[10px] font-mono text-slate-500">
-                        (+${universalExtrasConfig.oversizedBagsConfig[0].fee.toFixed(0)}/ea)
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setOversizedBagsCount((c) => Math.max(0, c - 1))}
-                      className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                    >
-                      -
-                    </button>
-                    <span className="w-4 text-center font-bold text-slate-800">{oversizedBagsCount}</span>
-                    <button
-                      type="button"
-                      onClick={() => setOversizedBagsCount((c) => Math.min(6, c + 1))}
-                      className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {universalExtrasConfig?.customExtras &&
-                  universalExtrasConfig.customExtras.filter((e) => e.isActive).length > 0 && (
-                    <div className="space-y-1 pt-1 border-t border-slate-100">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Extras &amp; Add-Ons
-                      </span>
-                      {universalExtrasConfig.customExtras
-                        .filter((e) => e.isActive)
-                        .map((extra) => {
-                          const qty = selectedCustomExtras[extra.id] || 0;
-                          const maxQty = extra.isPerUnit ? 4 : 1;
-                          return (
-                            <div key={extra.id} className="flex items-center justify-between text-[11px]">
-                              <div className="min-w-0 pr-2">
-                                <span className="font-semibold text-slate-700">{extra.name}</span>
-                                <span className="text-[10px] font-mono text-slate-500 ml-1">
-                                  (+${extra.fee.toFixed(2)})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setSelectedCustomExtras((prev) => {
-                                      const next = { ...prev };
-                                      const nq = Math.max(0, (next[extra.id] || 0) - 1);
-                                      if (nq === 0) delete next[extra.id];
-                                      else next[extra.id] = nq;
-                                      return next;
-                                    })
-                                  }
-                                  className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                                >
-                                  -
-                                </button>
-                                <span className="w-4 text-center font-bold text-slate-800">{qty}</span>
-                                <button
-                                  type="button"
-                                  disabled={qty >= maxQty}
-                                  onClick={() =>
-                                    setSelectedCustomExtras((prev) => ({
-                                      ...prev,
-                                      [extra.id]: Math.min(maxQty, (prev[extra.id] || 0) + 1),
-                                    }))
-                                  }
-                                  className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
-                                >
-                                  +
-                                </button>
-                              </div>
+                    {universalExtrasConfig.customExtras
+                      .filter((e) => e.isActive)
+                      .map((extra) => {
+                        const qty = selectedCustomExtras[extra.id] || 0;
+                        const maxQty = extra.isPerUnit ? 4 : 1;
+                        return (
+                          <div key={extra.id} className="flex items-center justify-between text-[11px]">
+                            <div className="min-w-0 pr-2">
+                              <span className="font-semibold text-slate-700">{extra.name}</span>
+                              <span className="text-[10px] font-mono text-slate-500 ml-1">
+                                (+${extra.fee.toFixed(2)})
+                              </span>
                             </div>
-                          );
-                        })}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedCustomExtras((prev) => {
+                                    const next = { ...prev };
+                                    const nq = Math.max(0, (next[extra.id] || 0) - 1);
+                                    if (nq === 0) delete next[extra.id];
+                                    else next[extra.id] = nq;
+                                    return next;
+                                  })
+                                }
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
+                              >
+                                -
+                              </button>
+                              <span className="w-4 text-center font-bold text-slate-800">{qty}</span>
+                              <button
+                                type="button"
+                                disabled={qty >= maxQty}
+                                onClick={() =>
+                                  setSelectedCustomExtras((prev) => ({
+                                    ...prev,
+                                    [extra.id]: Math.min(maxQty, (prev[extra.id] || 0) + 1),
+                                  }))
+                                }
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+              {/* Collapsible Special Requests & Gate Code Toggle (parity with Customer Form) */}
+              <div className="pt-1.5 border-t border-slate-100 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSpecialRequests((prev) => !prev)}
+                  className="w-full flex items-center justify-between text-[11px] font-bold text-slate-700 hover:text-blue-700 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>Special Requests &amp; Gate Code</span>
+                    <span className="font-normal text-slate-400">(Optional)</span>
+                    {(Object.values(specialRequestFlags).some(Boolean) || Boolean(gateCode.trim())) && (
+                      <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                        {Object.values(specialRequestFlags).filter(Boolean).length + (gateCode.trim() ? 1 : 0)} active
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-blue-600 font-bold text-[10px]">
+                    {showSpecialRequests ? 'Hide ▲' : 'Add ▾'}
+                  </span>
+                </button>
+
+                {showSpecialRequests && (
+                  <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg animate-in fade-in duration-150">
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { key: 'petFriendly', label: 'Pet-Friendly', Icon: PawPrintIcon },
+                          { key: 'quietRide', label: 'Quiet Ride', Icon: VolumeXIcon },
+                          { key: 'musicOk', label: 'Music OK', Icon: MusicNoteIcon },
+                        ] as const
+                      ).map((item) => {
+                        const active = specialRequestFlags[item.key];
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() =>
+                              setSpecialRequestFlags((prev) => ({
+                                ...prev,
+                                [item.key]: !prev[item.key],
+                              }))
+                            }
+                            className={`py-1.5 px-1.5 rounded-lg text-[10px] font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                              active
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <item.Icon className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Subdivision / Gate Code
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. #1234 or Call box"
+                        value={gateCode}
+                        onChange={(e) => setGateCode(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -5339,3 +6327,5 @@ export function DispatchBookingEngine({
     </form>
   );
 }
+
+export const DispatchBookingEngine = React.memo(DispatchBookingEngineComponent);

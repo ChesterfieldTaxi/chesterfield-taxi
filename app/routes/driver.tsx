@@ -1744,9 +1744,23 @@ export default function DriverAppRoute() {
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-600/30 shrink-0">
-                    {activeTrip.bookingType === 'asap' ? 'ASAP' : 'PRE-BOOKED'}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-600/30">
+                      {activeTrip.bookingType === 'asap' ? 'ASAP' : 'PRE-BOOKED'}
+                    </span>
+                    {(() => {
+                      const meta = (activeTrip.metadata || {}) as Record<string, any>;
+                      const groupId = activeTrip.multiCarGroupId || meta.multiCarGroupId;
+                      const total = Number(activeTrip.multiCarTotal || meta.multiCarTotal || activeTrip.vehicleCount || 1);
+                      const idx = Number(activeTrip.multiCarIndex || meta.multiCarIndex || 1);
+                      if (!(groupId || activeTrip.multipleVehiclesRequested) || total <= 1) return null;
+                      return (
+                        <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-violet-600/30 text-violet-200 border border-violet-400/50">
+                          CAR {idx}/{total}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {/* Passenger Card & Contact Actions */}
@@ -2231,11 +2245,23 @@ export default function DriverAppRoute() {
                       className="bg-slate-900 border-2 border-blue-600/60 rounded-3xl p-4 shadow-xl space-y-3"
                     >
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
                           <span className="text-xs font-black text-blue-400 uppercase tracking-wide">
                             {offer.bookingType === 'asap' ? 'ASAP Dispatch Offer' : 'Scheduled Offer'}
                           </span>
+                          {(() => {
+                            const meta = (offer.metadata || {}) as Record<string, any>;
+                            const groupId = offer.multiCarGroupId || meta.multiCarGroupId;
+                            const total = Number(offer.multiCarTotal || meta.multiCarTotal || offer.vehicleCount || 1);
+                            const idx = Number(offer.multiCarIndex || meta.multiCarIndex || 1);
+                            if (!(groupId || offer.multipleVehiclesRequested) || total <= 1) return null;
+                            return (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-violet-600/30 text-violet-200 border border-violet-400/50">
+                                MULTI-CAR · CAR {idx}/{total}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <span className="text-base font-black text-white font-mono">
                           ${offer.pricing?.totalFare?.toFixed(2) || '0.00'}

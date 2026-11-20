@@ -38,6 +38,10 @@ import { getUniversalExtrasConfig, getUniversalExtrasService } from '../pricing/
 import { getSurchargesConfig, getSurchargesService } from '../pricing/surcharges.service';
 import { detectAirportInAddresses } from '../../config/airports';
 import { generateTripId } from '../../utils/trip-id.util';
+import {
+  buildAssociateEntryFromTrip,
+  mergeMultiCarAssociateUpdate,
+} from './multi-car.util';
 
 
 const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
@@ -796,6 +800,7 @@ export class MockBookingService implements IBookingService {
     this.trips.set(tripId, updated);
     this.persistToStorage();
     this.notifyListeners(updated);
+    await this.syncMultiCarConvoyAssociates(updated);
 
     return updated;
   }
@@ -817,7 +822,79 @@ export class MockBookingService implements IBookingService {
     this.persistToStorage();
     this.notifyListeners(updated);
 
+    const affectsConvoy =
+      updates.assignedDriverId !== undefined ||
+      updates.assignedVehicle !== undefined ||
+      updates.status !== undefined;
+    if (affectsConvoy) {
+      await this.syncMultiCarConvoyAssociates(updated);
+    }
+
     return updated;
+  }
+
+  private async syncMultiCarConvoyAssociates(changedTrip: Trip): Promise<void> {
+    if (!changedTrip.multiCarGroupId || !Array.isArray(changedTrip.multiCarTripIds) || changedTrip.multiCarTripIds.length <= 1) {
+      return;
+    }
+
+    let driverName: string | undefined;
+    let driverPhone: string | undefined;
+    let vehicleUnit = changedTrip.assignedVehicle?.vehicleNumber;
+    let licensePlate = changedTrip.assignedVehicle?.licensePlate;
+    let vehicleModel = changedTrip.assignedVehicle?.model;
+
+    if (changedTrip.assignedDriverId) {
+      try {
+        const { getOperatorService } = await import('../operator.service');
+        const rosterMatch = getOperatorService()
+          .getDriverRoster()
+          .find((r) => r.id === changedTrip.assignedDriverId);
+        if (rosterMatch) {
+          driverName = rosterMatch.name;
+          driverPhone = rosterMatch.phone;
+          if (!vehicleUnit && (rosterMatch.cabNumber || rosterMatch.vehicle)) {
+            vehicleUnit = rosterMatch.cabNumber ? `Cab #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
+          }
+        }
+      } catch {}
+    }
+
+    const updatedEntry = buildAssociateEntryFromTrip(changedTrip, {
+      driverId: changedTrip.assignedDriverId ?? null,
+      driverName,
+      driverPhone,
+      vehicleUnit,
+      licensePlate,
+      vehicleModel,
+    });
+
+    const now = new Date().toISOString();
+    let anyChanged = false;
+    for (const siblingId of changedTrip.multiCarTripIds) {
+      const sibling = this.trips.get(siblingId);
+      if (!sibling) continue;
+      const { associates, driverIds } = mergeMultiCarAssociateUpdate(
+        sibling.multiCarAssociates || changedTrip.multiCarAssociates,
+        updatedEntry
+      );
+      const patched: Trip = {
+        ...sibling,
+        multiCarAssociates: associates,
+        multiCarDriverIds: driverIds,
+        updatedAt: now,
+      };
+      this.trips.set(siblingId, patched);
+      anyChanged = true;
+    }
+
+    if (anyChanged) {
+      this.persistToStorage();
+      const latestChanged = this.trips.get(changedTrip.id);
+      if (latestChanged) {
+        this.notifyListeners(latestChanged);
+      }
+    }
   }
 }
 
