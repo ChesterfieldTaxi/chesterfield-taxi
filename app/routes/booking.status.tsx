@@ -8,7 +8,7 @@ import type { Trip, TripStatus } from '../core/types/trip';
 import type { VehicleTierConfig } from '../core/types/config';
 import type { PublicTripTrackingProjection } from '../core/utils/tracking-token.util';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import { PhoneIcon, SpinnerIcon, SearchIcon, ShieldCheckIcon } from '../components/ui/Icons';
+import { PhoneIcon, SpinnerIcon, SearchIcon, ShieldCheckIcon, CheckIcon, ClockIcon } from '../components/ui/Icons';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { getEffectiveRoles } from '../core/utils/workspace-routing.util';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
@@ -422,28 +422,55 @@ export default function BookingStatusRoute() {
     ? (trip.intermediateStops || []).map((s) => s.address)
     : (publicTracking!.intermediateStops || []).map((s) => s.display);
 
+  const rawPickupTs =
+    trip?.scheduledPickupTime ||
+    trip?.actualPickupTime ||
+    publicTracking?.scheduledPickupTime ||
+    trip?.createdAt;
+  const pickupTimeDisplay = rawPickupTs
+    ? new Date(rawPickupTs).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
+
   return (
-    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-28">
-      <div className="max-w-2xl mx-auto px-4">
-        {/* Header Summary */}
-        <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-6 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-mono uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
-              <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400" />
-              {trip ? 'Live Ride Status' : 'Verified Guest Live Tracking'}
+    <div className="py-4 sm:py-10 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-24 sm:pb-28">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4">
+        {/* Header Summary (Compact on mobile so Live Map appears immediately) */}
+        <div className="bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-xl mb-4 sm:mb-6 relative overflow-hidden">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-blue-400 flex items-center gap-1.5 min-w-0 truncate">
+              <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{trip ? 'Live Ride Status' : 'Verified Guest Tracking'}</span>
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-              {displayStatus.replace('_', ' ')}
+            <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shrink-0">
+              {displayStatus.replace(/_/g, ' ')}
             </span>
           </div>
 
-          {/* Full Trip ID (no truncation!) */}
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
-            {displayTripId}
-          </h1>
+          {/* Pickup Date & Time Prominent + Full Trip ID Secondary */}
+          {pickupTimeDisplay ? (
+            <>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                <ClockIcon className="w-5 h-5 text-blue-400 shrink-0" />
+                <span>{pickupTimeDisplay}</span>
+              </h1>
+              <p className="text-xs font-mono text-slate-400 mt-0.5 break-all">
+                Trip #{displayTripId}
+              </p>
+            </>
+          ) : (
+            <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight font-mono break-all">
+              #{displayTripId}
+            </h1>
+          )}
 
           {trip && (
-            <p className="text-sm text-slate-300 mt-1">
+            <p className="text-xs sm:text-sm text-slate-300 mt-1.5">
               Passenger:{' '}
               <strong className="text-white">
                 {trip.passenger?.firstName} {trip.passenger?.lastName}
@@ -459,21 +486,21 @@ export default function BookingStatusRoute() {
             </p>
           )}
 
-          <div className="mt-6 pt-6 border-t border-slate-800 grid grid-cols-2 gap-4">
+          <div className="mt-4 pt-3.5 sm:mt-5 sm:pt-5 border-t border-slate-800 grid grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <span className="text-[11px] text-slate-400 uppercase font-mono block">Vehicle</span>
+              <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Vehicle</span>
               <span className="text-sm font-bold text-white">{vehicleDisplayName}</span>
             </div>
             {trip ? (
               <div className="text-right">
-                <span className="text-[11px] text-slate-400 uppercase font-mono block">Fare Total</span>
+                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Fare Total</span>
                 <span className="text-lg font-black text-amber-400 font-mono">
                   ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                 </span>
               </div>
             ) : (
               <div className="text-right">
-                <span className="text-[11px] text-slate-400 uppercase font-mono block">Privacy Mode</span>
+                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Privacy Mode</span>
                 <span className="text-xs font-bold text-emerald-400">Personal Info Protected</span>
               </div>
             )}
@@ -485,12 +512,12 @@ export default function BookingStatusRoute() {
           trip={trip}
           tracking={publicTracking}
           adminVehicles={adminVehicles}
-          className="mb-6"
+          className="mb-4 sm:mb-6"
         />
 
         {/* Real-time Status Timeline */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-lg mb-6">
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-6 flex items-center justify-between">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-7 shadow-lg mb-4 sm:mb-6">
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-5 flex items-center justify-between">
             <span>Ride Progress</span>
             <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold normal-case">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
@@ -506,7 +533,7 @@ export default function BookingStatusRoute() {
               )}
             </div>
           ) : (
-            <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            <div className="relative pl-6 sm:pl-8 space-y-5 sm:space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
               {LIFECYCLE_STEPS.map((step, idx) => {
                 const isPassed = idx < currentStepIdx;
                 const isCurrent = idx === currentStepIdx;
@@ -522,7 +549,7 @@ export default function BookingStatusRoute() {
                           : 'bg-slate-200 text-slate-400')
                       }
                     >
-                      {isPassed ? '✓' : idx + 1}
+                      {isPassed ? <CheckIcon className="w-3.5 h-3.5" /> : idx + 1}
                     </div>
                     <div className="flex-1">
                       <h4

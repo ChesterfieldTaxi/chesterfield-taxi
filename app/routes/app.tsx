@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
+import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import UnderConstruction from '../components/UnderConstruction';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -38,6 +39,8 @@ import {
   HomeModernIcon,
   PlaneIcon,
   SparklesIcon,
+  PencilIcon,
+  TrashIcon,
 } from '../components/ui/Icons';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
@@ -167,6 +170,69 @@ export default function PassengerAppRoute() {
   // Floating Help & FAQ state
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+
+  // Mobile touch-and-hold quick action sheet for passenger trip cards
+  const [tripActionSheetTrip, setTripActionSheetTrip] = useState<Trip | null>(null);
+  const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
+  const tripLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tripLongPressStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const cancelTripCardLongPress = useCallback(() => {
+    if (tripLongPressTimerRef.current) {
+      clearTimeout(tripLongPressTimerRef.current);
+      tripLongPressTimerRef.current = null;
+    }
+    tripLongPressStartRef.current = null;
+    setLongPressingTripId(null);
+  }, []);
+
+  const handleTripCardTouchStart = useCallback(
+    (trip: Trip, e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, a, input')) return;
+      const touch = e.touches[0];
+      tripLongPressStartRef.current = { x: touch.clientX, y: touch.clientY };
+      setLongPressingTripId(trip.id);
+      if (tripLongPressTimerRef.current) clearTimeout(tripLongPressTimerRef.current);
+      tripLongPressTimerRef.current = setTimeout(() => {
+        tripLongPressTimerRef.current = null;
+        setLongPressingTripId(null);
+        try {
+          if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(15);
+          }
+        } catch {}
+        setTripActionSheetTrip(trip);
+      }, 380);
+    },
+    []
+  );
+
+  const handleTripCardTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!tripLongPressStartRef.current || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - tripLongPressStartRef.current.x);
+      const dy = Math.abs(touch.clientY - tripLongPressStartRef.current.y);
+      if (dx > 10 || dy > 10) {
+        cancelTripCardLongPress();
+      }
+    },
+    [cancelTripCardLongPress]
+  );
+
+  // Mobile drag-down-to-close gestures for passenger portal sheets
+  const dismissPlaceModal = useCallback(() => setIsPlaceModalOpen(false), []);
+  const dismissReceiptModal = useCallback(() => setSelectedReceiptTrip(null), []);
+  const dismissFaqModal = useCallback(() => setIsFaqModalOpen(false), []);
+  const dismissHelpSheet = useCallback(() => setIsHelpMenuOpen(false), []);
+  const dismissTripActionSheet = useCallback(() => setTripActionSheetTrip(null), []);
+  const placeSheetDrag = useBottomSheetDragToClose({ onClose: dismissPlaceModal });
+  const receiptSheetDrag = useBottomSheetDragToClose({ onClose: dismissReceiptModal });
+  const faqSheetDrag = useBottomSheetDragToClose({ onClose: dismissFaqModal });
+  const helpSheetDrag = useBottomSheetDragToClose({ onClose: dismissHelpSheet });
+  const tripActionSheetDrag = useBottomSheetDragToClose({ onClose: dismissTripActionSheet });
 
   // Feedback toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -638,28 +704,36 @@ export default function PassengerAppRoute() {
         </div>
       )}
 
-      {/* Main Container */}
-      <div className="max-w-3xl mx-auto px-4 pt-3 sm:pt-4 w-full flex-1">
-        {/* Minimalist Top App Status Bar */}
-        <div className="pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+      {/* Sticky Mobile-First Frosted Top App Bar */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 print:hidden">
+        <div className="max-w-3xl mx-auto px-3.5 sm:px-4 h-14 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="w-9 h-9 rounded-2xl flex items-center justify-center shadow-xs"
+              className="w-9 h-9 rounded-2xl flex items-center justify-center shadow-xs shrink-0"
               style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }}
             >
               <CarIcon className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none block">
+            <div className="min-w-0">
+              <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none block truncate">
                 {displayCompanyName}
               </span>
-              <p className="text-[11px] text-slate-500 font-medium leading-none mt-1">
-                Hi, {fullName || 'Passenger'}
+              <p className="text-[11px] text-slate-500 font-medium leading-none mt-1 truncate">
+                Hi, {account.firstName || fullName || 'Passenger'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsHelpMenuOpen(true)}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 flex items-center justify-center transition-all cursor-pointer"
+              aria-label="Help and 24/7 Dispatch Desk"
+              title="Assistance & 24/7 Dispatch Desk"
+            >
+              <InfoIcon className="w-4 h-4" />
+            </button>
             <UserDropdown
               email={account.email}
               onSignOut={handleSignOut}
@@ -670,6 +744,10 @@ export default function PassengerAppRoute() {
             />
           </div>
         </div>
+      </header>
+
+      {/* Main Container */}
+      <div className="max-w-3xl mx-auto px-2 sm:px-4 pt-2.5 sm:pt-4 w-full flex-1">
 
         {/* Active Trip Floating Banner (Visible only when driver is assigned or ride is active) */}
         {activeTrip && ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(activeTrip.status) && (
@@ -735,50 +813,50 @@ export default function PassengerAppRoute() {
 
         {/* Tab 1: Self-Contained Booking Flow */}
         {activeTab === 'book' && (
-          <div className="space-y-4">
-            {/* 1-Tap Saved Destinations quick chips */}
+          <div className="space-y-3 sm:space-y-4">
+            {/* Compact 1-Row Horizontal Scrollable Saved Destinations Rail */}
             {account.savedPlaces.length > 0 && (
-              <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
-                <div className="flex items-center justify-between mb-2.5">
-                  <label className="text-xs font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
-                    <MapPinIcon className="w-4 h-4 text-blue-600" />
-                    <span>1-Tap Saved Destinations</span>
-                  </label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                    <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Quick Destinations</span>
+                  </span>
                   <button
                     type="button"
                     onClick={() => setActiveTab('places')}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800"
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
                   >
-                    Manage Places →
+                    Manage →
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
                   {account.savedPlaces.map((place) => (
                     <button
                       key={place.id}
                       type="button"
                       onClick={() => handleSelectChip(place)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 text-xs font-bold border border-slate-200 transition-all active:scale-95 shadow-2xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-800 text-xs font-bold border border-slate-200/90 transition-all active:scale-95 shadow-2xs shrink-0 cursor-pointer"
                     >
-                      <span className="text-base">{getCategoryIcon(place.category)}</span>
-                      <span>{place.label}</span>
+                      <span className="shrink-0">{getCategoryIcon(place.category)}</span>
+                      <span className="whitespace-nowrap">{place.label}</span>
                     </button>
                   ))}
                   <button
                     type="button"
                     onClick={() => handleOpenPlaceModal()}
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-slate-100 text-blue-600 text-xs font-bold border border-dashed border-blue-300 transition-colors"
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl bg-white hover:bg-slate-50 text-blue-600 text-xs font-bold border border-dashed border-blue-300 transition-colors shrink-0 cursor-pointer"
                   >
                     <PlusIcon className="w-3.5 h-3.5" />
-                    <span>Add Place</span>
+                    <span className="whitespace-nowrap">Add</span>
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Self-Contained Embedded Booking Engine */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+            {/* Self-Contained Embedded Booking Engine (no double card wrapper) */}
+            <div>
               <BookingEngineV2
                 hideDispatchBanner={true}
                 embeddedInApp={true}
@@ -889,17 +967,37 @@ export default function PassengerAppRoute() {
                       minute: '2-digit',
                     });
 
+                    const isPastTrip =
+                      trip.status === 'completed' ||
+                      trip.status === 'cancelled' ||
+                      trip.status === 'DECLINED' ||
+                      trip.status === 'declined';
+                    const isPressing = longPressingTripId === trip.id;
+
                     return (
                       <div
                         key={trip.id}
-                        className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-2xs transition-all space-y-3 overflow-hidden"
+                        onTouchStart={(e) => handleTripCardTouchStart(trip, e)}
+                        onTouchMove={handleTripCardTouchMove}
+                        onTouchEnd={cancelTripCardLongPress}
+                        onTouchCancel={cancelTripCardLongPress}
+                        className={`p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-2xs transition-all space-y-3 overflow-hidden select-none ${
+                          isPressing ? 'scale-[0.985] border-blue-400 bg-blue-50/30' : ''
+                        }`}
                       >
-                        {/* Top row */}
+                        {/* Top row: Pickup Date/Time First & Prominent, Trip ID Secondary */}
                         <div className="flex items-start justify-between gap-2.5">
                           <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <ClockIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                                {dateFormatted}
+                              </span>
+                            </div>
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {getStatusBadge(trip.status)}
                               <span
-                                className="font-mono text-xs font-bold text-slate-500 truncate"
+                                className="font-mono text-[10.5px] font-semibold text-slate-400 truncate"
                                 title={trip.id}
                               >
                                 #{trip.id.length > 16 ? `${trip.id.slice(0, 8)}...${trip.id.slice(-4)}` : trip.id}
@@ -909,9 +1007,6 @@ export default function PassengerAppRoute() {
                                   Most Recent
                                 </span>
                               )}
-                            </div>
-                            <div className="pt-0.5">
-                              {getStatusBadge(trip.status)}
                             </div>
                           </div>
                           <div className="text-right shrink-0">
@@ -924,11 +1019,11 @@ export default function PassengerAppRoute() {
                           </div>
                         </div>
 
-                        {/* Date & Vehicle */}
+                        {/* Vehicle Tier */}
                         <div className="text-xs font-semibold text-slate-500 flex items-center justify-between gap-2">
-                          <span>{dateFormatted}</span>
-                          <span className="font-bold text-slate-700 truncate">
-                            {resolveTripVehicleName(trip)}
+                          <span className="inline-flex items-center gap-1 font-bold text-slate-700 truncate">
+                            <CarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{resolveTripVehicleName(trip)}</span>
                           </span>
                         </div>
 
@@ -966,64 +1061,98 @@ export default function PassengerAppRoute() {
                           </div>
                         )}
 
-                        {/* Action Buttons */}
-                        {!(trip.status === 'completed' || trip.status === 'cancelled' || trip.status === 'DECLINED' || trip.status === 'declined') ? (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-wrap">
-                            <Link
-                              to={`/track/${encodeURIComponent(trip.trackingToken || trip.id)}`}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[11px] sm:text-xs font-extrabold transition-colors whitespace-nowrap flex items-center gap-1"
-                            >
-                              <span>Track Live</span>
-                              <ExternalLinkIcon className="w-3 h-3" />
-                            </Link>
+                        {/* Action Buttons (Clean 2-button mobile footer + ⋮ sheet trigger; full buttons on sm+) */}
+                        {!isPastTrip ? (
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
+                              <Link
+                                to={`/track/${encodeURIComponent(trip.trackingToken || trip.id)}`}
+                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-emerald-600 sm:bg-emerald-50 text-white sm:text-emerald-700 border border-emerald-600 sm:border-emerald-200 hover:bg-emerald-500 sm:hover:bg-emerald-100 text-xs font-extrabold transition-colors whitespace-nowrap flex items-center gap-1 shadow-2xs sm:shadow-none"
+                              >
+                                <span>Track Live</span>
+                                <ExternalLinkIcon className="w-3 h-3" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReceiptTrip(trip)}
+                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap cursor-pointer"
+                              >
+                                Details
+                              </button>
+                            </div>
+
+                            {/* Mobile ⋮ Quick Actions trigger */}
                             <button
                               type="button"
-                              onClick={() => setSelectedReceiptTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                              onClick={() => setTripActionSheetTrip(trip)}
+                              className="sm:hidden w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer"
+                              aria-label="More trip actions"
                             >
-                              View
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                                <circle cx="12" cy="5" r="1.75" />
+                                <circle cx="12" cy="12" r="1.75" />
+                                <circle cx="12" cy="19" r="1.75" />
+                              </svg>
                             </button>
+
+                            {/* Desktop inline Edit / Cancel */}
                             {!['en_route', 'arrived', 'in_progress'].includes(trip.status) && (
-                              <>
+                              <div className="hidden sm:flex items-center gap-2">
                                 <button
                                   type="button"
                                   onClick={() => handleEditTrip(trip)}
-                                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                                  className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleCancelTrip(trip)}
-                                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap"
+                                  className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                                 >
                                   Cancel
                                 </button>
-                              </>
+                              </div>
                             )}
                           </div>
                         ) : (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto">
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
+                              <button
+                                type="button"
+                                onClick={() => handleRebookTrip(trip)}
+                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-blue-600 sm:bg-blue-50 text-white sm:text-blue-700 border border-blue-600 sm:border-blue-200 hover:bg-blue-500 sm:hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                                title="Rebook the same pickup and dropoff"
+                              >
+                                <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span>Rebook</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReceiptTrip(trip)}
+                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap cursor-pointer"
+                              >
+                                Receipt
+                              </button>
+                            </div>
+
                             <button
                               type="button"
-                              onClick={() => setSelectedReceiptTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+                              onClick={() => setTripActionSheetTrip(trip)}
+                              className="sm:hidden w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer"
+                              aria-label="More trip actions"
                             >
-                              View Receipt
+                              <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                                <circle cx="12" cy="5" r="1.75" />
+                                <circle cx="12" cy="12" r="1.75" />
+                                <circle cx="12" cy="19" r="1.75" />
+                              </svg>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRebookTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
-                              title="Rebook the same pickup and dropoff"
-                            >
-                              <CarIcon className="w-3.5 h-3.5 shrink-0" />
-                              <span>Rebook</span>
-                            </button>
+
                             <button
                               type="button"
                               onClick={() => handleBookReturnTrip(trip)}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-[11px] sm:text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap shrink-0"
+                              className="hidden sm:flex px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-extrabold transition-all active:scale-95 items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
                               title="Book return ride swapping pickup and dropoff"
                             >
                               <ArrowLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
@@ -1067,66 +1196,70 @@ export default function PassengerAppRoute() {
                 {account.savedPlaces.map((place) => (
                   <div
                     key={place.id}
-                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all flex items-start justify-between gap-3 shadow-2xs"
+                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all space-y-3 shadow-2xs"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-50 text-xl flex items-center justify-center shrink-0 border border-slate-100">
-                        {getCategoryIcon(place.category)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-extrabold text-slate-950">
-                            {place.label}
-                          </h4>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                            {place.category}
-                          </span>
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                          {getCategoryIcon(place.category)}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1 font-medium">
-                          {place.address}
-                        </p>
-                        {place.notes && (
-                          <p className="text-[11px] text-slate-500 mt-0.5 italic">
-                            &quot;{place.notes}&quot;
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-sm font-extrabold text-slate-950 truncate">
+                              {place.label}
+                            </h4>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                              {place.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-0.5 font-medium leading-snug">
+                            {place.address}
                           </p>
-                        )}
-
-                        {/* Quick 1-Tap Actions */}
-                        <div className="mt-3 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleRideToPlace(place)}
-                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
-                          >
-                            Ride To Here
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRideFromPlace(place)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition-colors"
-                          >
-                            Ride From Here
-                          </button>
+                          {place.notes && (
+                            <p className="text-[11px] text-slate-500 mt-1 italic leading-snug">
+                              &quot;{place.notes}&quot;
+                            </p>
+                          )}
                         </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPlaceModal(place)}
+                          className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                          title="Edit Place"
+                          aria-label={`Edit ${place.label}`}
+                        >
+                          <PencilIcon className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePlace(place.id, place.label)}
+                          className="w-8 h-8 rounded-xl bg-rose-50/70 hover:bg-rose-100 text-rose-500 hover:text-rose-700 flex items-center justify-center transition-colors cursor-pointer"
+                          title="Remove Place"
+                          aria-label={`Delete ${place.label}`}
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    {/* Full-width 2-column 1-Tap Ride Buttons */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
                       <button
                         type="button"
-                        onClick={() => handleOpenPlaceModal(place)}
-                        className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors text-xs font-bold"
-                        title="Edit Place"
+                        onClick={() => handleRideToPlace(place)}
+                        className="py-2 px-3 rounded-xl bg-blue-600 sm:bg-blue-50 text-white sm:text-blue-700 hover:bg-blue-500 sm:hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-[0.98] cursor-pointer text-center"
                       >
-                        Edit
+                        Ride To Here
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeletePlace(place.id, place.label)}
-                        className="p-2 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-xs font-bold"
-                        title="Remove Place"
+                        onClick={() => handleRideFromPlace(place)}
+                        className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer text-center"
                       >
-                        Delete
+                        Ride From Here
                       </button>
                     </div>
                   </div>
@@ -1416,33 +1549,42 @@ export default function PassengerAppRoute() {
         )}
       </div>
 
-      {/* Modal: Add/Edit Saved Place */}
+      {/* Modal: Add/Edit Saved Place (Bottom sheet on mobile with drag-down-to-close) */}
       {isPlaceModalOpen && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsPlaceModalOpen(false);
           }}
         >
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
-            <button
-              type="button"
-              onClick={() => setIsPlaceModalOpen(false)}
-              aria-label="Close modal"
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+          <div
+            style={placeSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl border-t sm:border border-slate-200 relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...placeSheetDrag.dragHandlers}
+              className="px-5 pt-2.5 sm:pt-5 pb-3 border-b border-slate-100 shrink-0 touch-none relative"
             >
-              <XIcon className="w-4 h-4" />
-            </button>
-            <h3 className="text-base font-extrabold text-slate-950 mb-1 pr-8">
-              {editingPlaceId ? 'Edit Saved Place' : 'Add New Saved Place'}
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Save your address for 1-tap booking shortcuts
-            </p>
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setIsPlaceModalOpen(false)}
+                aria-label="Close modal"
+                className="absolute top-3.5 sm:top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+              <h3 className="text-base font-extrabold text-slate-950 mb-0.5 pr-8">
+                {editingPlaceId ? 'Edit Saved Place' : 'Add New Saved Place'}
+              </h3>
+              <p className="text-xs text-slate-500">
+                Save your address for 1-tap booking shortcuts
+              </p>
+            </div>
 
-            <form onSubmit={handleSavePlace} className="space-y-3.5">
+            <form onSubmit={handleSavePlace} className="p-5 overflow-y-auto space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Place Label (e.g. Home, Work, Gym, Doctor)
@@ -1497,8 +1639,9 @@ export default function PassengerAppRoute() {
                   required
                 />
                 {placeCoordinates && (
-                  <p className="text-[10px] text-emerald-700 font-semibold mt-1">
-                    ✓ GPS coordinates verified for accurate fare quoting
+                  <p className="text-[10px] text-emerald-700 font-semibold mt-1 inline-flex items-center gap-1">
+                    <CheckIcon className="w-3 h-3 shrink-0" />
+                    <span>GPS coordinates verified for accurate fare quoting</span>
                   </p>
                 )}
               </div>
@@ -1578,17 +1721,24 @@ export default function PassengerAppRoute() {
             role="dialog"
             aria-modal="true"
             aria-label="Official Trip Receipt"
-            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in"
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelectedReceiptTrip(null);
             }}
           >
-            <div className="printable-receipt my-auto bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative print:shadow-none print:border-none print:m-0 print:p-0">
+            <div
+              style={receiptSheetDrag.sheetStyle}
+              className="printable-receipt sm:my-auto bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] sm:max-h-none overflow-y-auto p-5 sm:p-8 shadow-2xl border-t sm:border border-slate-200 relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-8 print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none"
+            >
+              {/* Drag-down Handle + Header */}
+              <div {...receiptSheetDrag.dragHandlers} className="touch-none print:hidden">
+                <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-3 sm:hidden" aria-hidden="true" />
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedReceiptTrip(null)}
                 aria-label="Close receipt"
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors print:hidden"
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer print:hidden"
               >
                 <XIcon className="w-5 h-5" />
               </button>
@@ -1767,21 +1917,21 @@ export default function PassengerAppRoute() {
         );
       })()}
 
-      {/* Bottom Sticky / Dock Navigation Bar */}
+      {/* Bottom Sticky / Dock Navigation Bar (Safe-area aware, clean badge pills) */}
       <nav
         aria-label="Bottom Navigation"
-        className="fixed bottom-0 md:bottom-3 inset-x-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[460px] z-40 bg-white/95 backdrop-blur-md border-t md:border border-slate-200/90 md:rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:shadow-xl px-2 py-1.5 flex items-center justify-around print:hidden"
+        className="fixed bottom-0 md:bottom-3 inset-x-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[460px] z-40 bg-white/95 backdrop-blur-md border-t md:border border-slate-200/90 md:rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:shadow-xl px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:py-1.5 flex items-center justify-around print:hidden"
       >
         <button
           type="button"
           onClick={() => setActiveTab('book')}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'book'
               ? 'text-blue-600 font-extrabold'
               : 'text-slate-500 hover:text-slate-800 font-medium'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors ${activeTab === 'book' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'book' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <CarIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] tracking-tight leading-none">Book</span>
@@ -1790,68 +1940,219 @@ export default function PassengerAppRoute() {
         <button
           type="button"
           onClick={() => setActiveTab('trips')}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all relative ${
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all relative cursor-pointer ${
             activeTab === 'trips'
               ? 'text-blue-600 font-extrabold'
               : 'text-slate-500 hover:text-slate-800 font-medium'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors relative ${activeTab === 'trips' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'trips' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <ClockIcon className="w-5 h-5" />
-            {activeTrip && (
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white animate-ping" />
-            )}
+            {activeTrip ? (
+              <span className="absolute top-0.5 right-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white animate-ping" />
+            ) : trips.length > 0 ? (
+              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-slate-900 text-white text-[9px] font-black flex items-center justify-center">
+                {trips.length > 99 ? '99+' : trips.length}
+              </span>
+            ) : null}
           </div>
-          <span className="text-[10px] tracking-tight leading-none">Trips ({trips.length})</span>
+          <span className="text-[10px] tracking-tight leading-none">Trips</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('places')}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'places'
               ? 'text-blue-600 font-extrabold'
               : 'text-slate-500 hover:text-slate-800 font-medium'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors ${activeTab === 'places' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'places' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <MapPinIcon className="w-5 h-5" />
+            {account.savedPlaces.length > 0 && (
+              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+                {account.savedPlaces.length}
+              </span>
+            )}
           </div>
-          <span className="text-[10px] tracking-tight leading-none">Places ({account.savedPlaces.length})</span>
+          <span className="text-[10px] tracking-tight leading-none">Places</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-1.5 flex flex-col items-center justify-center gap-1 rounded-xl transition-all ${
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'profile'
               ? 'text-blue-600 font-extrabold'
               : 'text-slate-500 hover:text-slate-800 font-medium'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <UserIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] tracking-tight leading-none">Profile</span>
         </button>
       </nav>
 
-      {/* Floating Action Button (?) & Assistance Menu */}
-      <div className="fixed bottom-20 md:bottom-5 right-4 sm:right-6 z-40 print:hidden flex flex-col items-end">
-        {/* Floating Menu Popover */}
-        {isHelpMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-2xs"
-              onClick={() => setIsHelpMenuOpen(false)}
-            />
+      {/* Passenger Trip Quick Action Bottom Sheet (Touch & hold or ⋮ on any trip card) */}
+      {tripActionSheetTrip && (() => {
+        const t = tripActionSheetTrip;
+        const isPast =
+          t.status === 'completed' ||
+          t.status === 'cancelled' ||
+          t.status === 'DECLINED' ||
+          t.status === 'declined';
+        const canModify = !isPast && !['en_route', 'arrived', 'in_progress'].includes(t.status);
+        const sheetDate = new Date(
+          t.scheduledPickupTime || t.actualPickupTime || t.createdAt
+        ).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
 
-            <div className="relative z-50 mb-3 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-slate-200/90 p-4 animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
+            onClick={dismissTripActionSheet}
+          >
+            <div
+              style={tripActionSheetDrag.sheetStyle}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+            >
+              <div
+                {...tripActionSheetDrag.dragHandlers}
+                className="bg-slate-900 text-white px-4 pt-2.5 pb-3.5 touch-none"
+              >
+                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-white">
+                      <ClockIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span className="truncate">{sheetDate}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      #{t.id} · ${t.pricing?.totalFare?.toFixed(2) || '0.00'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={dismissTripActionSheet}
+                    className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer shrink-0"
+                    aria-label="Close trip actions"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 space-y-2">
+                {!isPast && (
+                  <Link
+                    to={`/track/${encodeURIComponent(t.trackingToken || t.id)}`}
+                    onClick={dismissTripActionSheet}
+                    className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-xs"
+                  >
+                    <ExternalLinkIcon className="w-4 h-4" />
+                    <span>Track Live on Map</span>
+                  </Link>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripActionSheetTrip(null);
+                      setSelectedReceiptTrip(t);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>{isPast ? 'View Receipt' : 'Trip Details'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripActionSheetTrip(null);
+                      handleRebookTrip(t);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <CarIcon className="w-4 h-4" />
+                    <span>Rebook Ride</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripActionSheetTrip(null);
+                      handleBookReturnTrip(t);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeftRightIcon className="w-4 h-4" />
+                    <span>Book Return</span>
+                  </button>
+                  {canModify && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTripActionSheetTrip(null);
+                        handleEditTrip(t);
+                      }}
+                      className="py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <PencilIcon className="w-3.5 h-3.5" />
+                      <span>Edit Ride</span>
+                    </button>
+                  )}
+                </div>
+
+                {canModify && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTripActionSheetTrip(null);
+                      handleCancelTrip(t);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <XIcon className="w-4 h-4" />
+                    <span>Cancel Reservation</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Passenger Assistance Bottom Sheet (Opened from Top App Bar Info button) */}
+      {isHelpMenuOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
+          onClick={dismissHelpSheet}
+        >
+          <div
+            style={helpSheetDrag.sheetStyle}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200/90 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...helpSheetDrag.dragHandlers}
+              className="px-4 pt-2.5 sm:pt-4 pb-3 border-b border-slate-100 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xs">
-                    ?
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <InfoIcon className="w-4 h-4" />
                   </div>
                   <span className="font-extrabold text-slate-900 text-sm">
                     Passenger Assistance
@@ -1859,117 +2160,116 @@ export default function PassengerAppRoute() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsHelpMenuOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                  onClick={dismissHelpSheet}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
                   aria-label="Close menu"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>
               </div>
+            </div>
 
-              <div className="py-2 space-y-1.5">
-                {/* 24/7 Dispatch Hotline */}
-                <a
-                  href={`tel:${displayCompanyPhoneRaw}`}
-                  className="w-full p-2.5 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-900 flex items-center gap-3 transition-colors group"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                    <PhoneIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-extrabold text-blue-950">Call 24/7 Dispatch Desk</p>
-                    <p className="text-[11px] text-blue-700 font-semibold">{displayCompanyPhone}</p>
-                  </div>
-                </a>
+            <div className="p-4 space-y-2">
+              {/* 24/7 Dispatch Hotline */}
+              <a
+                href={`tel:${displayCompanyPhoneRaw}`}
+                className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-900 flex items-center gap-3 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <PhoneIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-xs font-extrabold text-blue-950">Call 24/7 Dispatch Desk</p>
+                  <p className="text-[11px] text-blue-700 font-semibold">{displayCompanyPhone}</p>
+                </div>
+              </a>
 
-                {/* Passenger FAQ & Help Guide */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsHelpMenuOpen(false);
-                    setIsFaqModalOpen(true);
-                  }}
-                  className="w-full p-2.5 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-100"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                    <InfoIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-bold text-slate-900">Help Center & FAQ</p>
-                    <p className="text-[11px] text-slate-500">Airports, Car Seats & Policies</p>
-                  </div>
-                </button>
+              {/* Passenger FAQ & Help Guide */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHelpMenuOpen(false);
+                  setIsFaqModalOpen(true);
+                }}
+                className="w-full p-3 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-200/80 cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <InfoIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-xs font-bold text-slate-900">Help Center &amp; FAQ</p>
+                  <p className="text-[11px] text-slate-500">Airports, Car Seats &amp; Policies</p>
+                </div>
+              </button>
 
-                {/* Email Support */}
-                <a
-                  href={`mailto:${displayCompanyEmail}`}
-                  className="w-full p-2.5 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-100"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                    <MailIcon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-bold text-slate-900">Email Dispatch Support</p>
-                    <p className="text-[11px] text-slate-500 truncate">{displayCompanyEmail}</p>
-                  </div>
-                </a>
-              </div>
+              {/* Email Support */}
+              <a
+                href={`mailto:${displayCompanyEmail}`}
+                className="w-full p-3 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-200/80"
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                  <MailIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-xs font-bold text-slate-900">Email Dispatch Support</p>
+                  <p className="text-[11px] text-slate-500 truncate">{displayCompanyEmail}</p>
+                </div>
+              </a>
+
               <div className="pt-2 border-t border-slate-100">
-                {/* Sign Out */}
                 <button
                   type="button"
                   onClick={() => {
                     setIsHelpMenuOpen(false);
                     void handleSignOut();
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors"
+                  className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-3.5 h-3.5 text-rose-500" />
                   <span>Sign Out</span>
                 </button>
               </div>
             </div>
-          </>
-        )}
+          </div>
+        </div>
+      )}
 
-        {/* Floating Action Button (FAB) */}
-        <button
-          type="button"
-          onClick={() => setIsHelpMenuOpen((prev) => !prev)}
-          className="w-13 h-13 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold shadow-xl flex items-center justify-center transition-all active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 group"
-          aria-label="Help and Dispatch hotline"
-          title="Assistance & 24/7 Dispatch Desk"
-        >
-          {isHelpMenuOpen ? (
-            <XIcon className="w-6 h-6 group-hover:rotate-90 transition-transform" />
-          ) : (
-            <span className="text-xl font-black">?</span>
-          )}
-        </button>
-      </div>
-
-      {/* Help Center & Passenger FAQ Modal */}
+      {/* Help Center & Passenger FAQ Modal (Drag-down-to-close sheet on mobile) */}
       {isFaqModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsFaqModalOpen(false);
+          }}
+        >
+          <div
+            style={faqSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
             {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                  <InfoIcon className="w-5 h-5" />
+            <div
+              {...faqSheetDrag.dragHandlers}
+              className="px-5 pt-2.5 sm:pt-5 pb-4 border-b border-slate-100 bg-slate-50 shrink-0 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
+                    <InfoIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-950">Help &amp; Passenger FAQ</h3>
+                    <p className="text-xs text-slate-500">Policies, Flight Tracking &amp; FAQs</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-950">Help &amp; Passenger FAQ</h3>
-                  <p className="text-xs text-slate-500">Policies, Flight Tracking &amp; FAQs</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFaqModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/50 cursor-pointer"
+                >
+                  <XIcon className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsFaqModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/50"
-              >
-                <XIcon className="w-5 h-5" />
-              </button>
             </div>
 
             {/* Content Body */}

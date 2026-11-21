@@ -41,6 +41,9 @@ import {
   CreditCardIcon,
   RepeatIcon,
   RefreshCwIcon,
+  ChevronDownIcon,
+  PencilIcon,
+  XIcon,
 } from '../../ui/Icons';
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
@@ -111,7 +114,12 @@ export interface ReturnTripDetails {
   returnDate: string;
   returnTime: string;
   returnPassengers: number;
+  returnCarryOnBags?: number;
+  returnCheckedBags?: number;
   returnBags: number;
+  returnHasOversizedLuggage?: boolean;
+  returnOversizedBags?: Record<string, number>;
+  returnOversizedLuggageNotes?: string;
   returnCarSeats: boolean;
   returnCarSeatsBreakdown: CarSeatsBreakdown;
   returnVehicles: Array<VehicleChoice>;
@@ -153,6 +161,8 @@ export interface DispatchFormValues {
   additionalPassengers: AdditionalPassenger[];
   contactPerson: ContactPersonDetails;
   passengers: number;
+  carryOnBags?: number;
+  checkedBags?: number;
   bags: number;
   carSeats: boolean;
   carSeatsBreakdown: CarSeatsBreakdown;
@@ -405,8 +415,10 @@ function DispatchBookingEngineComponent({
   const [contactEmail, setContactEmail] = useState('');
   const [contactRole, setContactRole] = useState('Hotel Front Desk / Concierge');
 
-  // Details: Passengers, Bags, Oversized Cargo (matching Customer Form toggle), Car Seats, Special Requests, Admin Custom Extras
+  // Details: Passengers, Carry-on & Checked Bags, Oversized Cargo, Car Seats, Special Requests, Admin Custom Extras
   const [passengers, setPassengers] = useState(1);
+  const [carryOnBags, setCarryOnBags] = useState(0);
+  const [checkedBags, setCheckedBags] = useState(0);
   const [bags, setBags] = useState(0);
   const [hasOversizedLuggage, setHasOversizedLuggage] = useState(false);
   const [oversizedBags, setOversizedBags] = useState<Record<string, number>>({});
@@ -528,7 +540,12 @@ function DispatchBookingEngineComponent({
   const [returnDate, setReturnDate] = useState(() => formatLocalDateStr(new Date()));
   const [returnTime, setReturnTime] = useState('17:00');
   const [returnPassengers, setReturnPassengers] = useState(1);
+  const [returnCarryOnBags, setReturnCarryOnBags] = useState(0);
+  const [returnCheckedBags, setReturnCheckedBags] = useState(0);
   const [returnBags, setReturnBags] = useState(0);
+  const [returnHasOversizedLuggage, setReturnHasOversizedLuggage] = useState(false);
+  const [returnOversizedBags, setReturnOversizedBags] = useState<Record<string, number>>({});
+  const [returnOversizedLuggageNotes, setReturnOversizedLuggageNotes] = useState('');
   const [returnCarSeats, setReturnCarSeats] = useState(false);
   const [returnRearFacing, setReturnRearFacing] = useState(0);
   const [returnFrontFacing, setReturnFrontFacing] = useState(0);
@@ -674,6 +691,14 @@ function DispatchBookingEngineComponent({
     (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
     0
   );
+  const returnTotalMaxPassengers = returnVehicles.reduce(
+    (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
+    0
+  );
+  const returnTotalMaxBags = returnVehicles.reduce(
+    (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
+    0
+  );
   const totalCarSeats = carSeats ? (rearFacingCount + frontFacingCount + boosterCount) : 0;
   const returnTotalCarSeats = returnCarSeats ? (returnRearFacing + returnFrontFacing + returnBooster) : 0;
 
@@ -713,7 +738,18 @@ function DispatchBookingEngineComponent({
       if (parsed.contactRole || cp?.contactRole) setContactRole(parsed.contactRole || cp?.contactRole);
 
       if (parsed.passengers) setPassengers(parsed.passengers);
-      if (parsed.bags !== undefined) setBags(parsed.bags);
+      if (parsed.carryOnBags !== undefined || parsed.checkedBags !== undefined) {
+        const c = Number(parsed.carryOnBags) || 0;
+        const ch = Number(parsed.checkedBags) || 0;
+        setCarryOnBags(c);
+        setCheckedBags(ch);
+        setBags(c + ch);
+      } else if (parsed.bags !== undefined) {
+        const b = Number(parsed.bags) || 0;
+        setCarryOnBags(b);
+        setCheckedBags(0);
+        setBags(b);
+      }
       if (parsed.hasOversizedLuggage !== undefined) setHasOversizedLuggage(Boolean(parsed.hasOversizedLuggage));
       if (parsed.oversizedBags && typeof parsed.oversizedBags === 'object') {
         setOversizedBags(parsed.oversizedBags);
@@ -813,8 +849,31 @@ function DispatchBookingEngineComponent({
       if (parsed.returnPassengers !== undefined || ret?.returnPassengers !== undefined) {
         setReturnPassengers(parsed.returnPassengers ?? ret?.returnPassengers);
       }
-      if (parsed.returnBags !== undefined || ret?.returnBags !== undefined) {
-        setReturnBags(parsed.returnBags ?? ret?.returnBags);
+      if (parsed.returnCarryOnBags !== undefined || parsed.returnCheckedBags !== undefined) {
+        const rc = Number(parsed.returnCarryOnBags) || 0;
+        const rch = Number(parsed.returnCheckedBags) || 0;
+        setReturnCarryOnBags(rc);
+        setReturnCheckedBags(rch);
+        setReturnBags(rc + rch);
+      } else if (parsed.returnBags !== undefined || ret?.returnBags !== undefined) {
+        const rb = Number(parsed.returnBags ?? ret?.returnBags) || 0;
+        setReturnCarryOnBags(rb);
+        setReturnCheckedBags(0);
+        setReturnBags(rb);
+      }
+      if (parsed.returnHasOversizedLuggage !== undefined) {
+        setReturnHasOversizedLuggage(Boolean(parsed.returnHasOversizedLuggage));
+      }
+      if (parsed.returnOversizedBags && typeof parsed.returnOversizedBags === 'object') {
+        setReturnOversizedBags(parsed.returnOversizedBags);
+        const totalRetOv = Object.values(parsed.returnOversizedBags).reduce(
+          (s: number, v: any) => s + (Number(v) || 0),
+          0
+        );
+        if (totalRetOv > 0) setReturnHasOversizedLuggage(true);
+      }
+      if (parsed.returnOversizedLuggageNotes !== undefined) {
+        setReturnOversizedLuggageNotes(parsed.returnOversizedLuggageNotes || '');
       }
       if (parsed.returnCarSeats !== undefined || ret?.returnCarSeats !== undefined) {
         setReturnCarSeats(parsed.returnCarSeats ?? ret?.returnCarSeats);
@@ -910,9 +969,19 @@ function DispatchBookingEngineComponent({
       setEmail(initialTrip.passenger?.email || '');
 
       setPassengers(initialTrip.passenger?.passengerCount || 1);
-      setBags(initialTrip.passenger?.luggageCount || 0);
-
       const meta = (initialTrip.metadata || {}) as Record<string, any>;
+      const initialTotalBags = initialTrip.passenger?.luggageCount || 0;
+      if (typeof meta.carryOnBags === 'number' || typeof meta.checkedBags === 'number') {
+        const initCarry = Number(meta.carryOnBags) || 0;
+        const initChecked = Number(meta.checkedBags) || 0;
+        setCarryOnBags(initCarry);
+        setCheckedBags(initChecked);
+        setBags(initCarry + initChecked);
+      } else {
+        setCarryOnBags(initialTotalBags);
+        setCheckedBags(0);
+        setBags(initialTotalBags);
+      }
 
       // Hydrate oversized cargo, special requests, gate code & custom bookable extras
       if (meta.oversizedBags && typeof meta.oversizedBags === 'object') {
@@ -1246,7 +1315,16 @@ function DispatchBookingEngineComponent({
         setReturnDropoffCoordinates(pickupCoordinates);
       }
       setReturnPassengers(passengers);
+      setReturnCarryOnBags(carryOnBags);
+      setReturnCheckedBags(checkedBags);
       setReturnBags(bags);
+      setReturnHasOversizedLuggage(hasOversizedLuggage);
+      setReturnOversizedBags({ ...oversizedBags });
+      setReturnOversizedLuggageNotes(oversizedLuggageNotes);
+      setReturnCarSeats(carSeats);
+      setReturnRearFacing(rearFacingCount);
+      setReturnFrontFacing(frontFacingCount);
+      setReturnBooster(boosterCount);
       setReturnVehicles(selectedVehicles);
     }
   }, [returnTrip]);
@@ -1280,6 +1358,8 @@ function DispatchBookingEngineComponent({
       contactEmail,
       contactRole,
       passengers,
+      carryOnBags,
+      checkedBags,
       bags,
       hasOversizedLuggage,
       oversizedBags,
@@ -1320,7 +1400,12 @@ function DispatchBookingEngineComponent({
       returnDate,
       returnTime,
       returnPassengers,
+      returnCarryOnBags,
+      returnCheckedBags,
       returnBags,
+      returnHasOversizedLuggage,
+      returnOversizedBags,
+      returnOversizedLuggageNotes,
       returnCarSeats,
       returnRearFacing,
       returnFrontFacing,
@@ -1396,6 +1481,8 @@ function DispatchBookingEngineComponent({
         contactRole,
       },
       passengers,
+      carryOnBags,
+      checkedBags,
       bags,
       carSeats,
       carSeatsBreakdown: {
@@ -1438,7 +1525,12 @@ function DispatchBookingEngineComponent({
         returnDate,
         returnTime,
         returnPassengers,
+        returnCarryOnBags,
+        returnCheckedBags,
         returnBags,
+        returnHasOversizedLuggage,
+        returnOversizedBags,
+        returnOversizedLuggageNotes,
         returnCarSeats,
         returnCarSeatsBreakdown: {
           rearFacing: returnRearFacing,
@@ -1509,6 +1601,8 @@ function DispatchBookingEngineComponent({
     contactEmail,
     contactRole,
     passengers,
+    carryOnBags,
+    checkedBags,
     bags,
     hasOversizedLuggage,
     oversizedBags,
@@ -1553,7 +1647,12 @@ function DispatchBookingEngineComponent({
     returnDate,
     returnTime,
     returnPassengers,
+    returnCarryOnBags,
+    returnCheckedBags,
     returnBags,
+    returnHasOversizedLuggage,
+    returnOversizedBags,
+    returnOversizedLuggageNotes,
     returnCarSeats,
     returnRearFacing,
     returnFrontFacing,
@@ -1660,6 +1759,35 @@ function DispatchBookingEngineComponent({
     }
     return parts.length > 0 ? parts.join(', ') : undefined;
   }, [hasOversizedLuggage, oversizedBags, oversizedCategories, oversizedLuggageNotes]);
+
+  // Return-leg oversized cargo helpers (100% parity with outbound & customer form)
+  const returnTotalOversizedCount = useMemo(
+    () => Object.values(returnOversizedBags || {}).reduce((sum, count) => sum + (Number(count) || 0), 0),
+    [returnOversizedBags]
+  );
+
+  const returnOversizedBagsPayload = useMemo<Record<string, number> | undefined>(() => {
+    if (!returnHasOversizedLuggage || returnTotalOversizedCount <= 0) return undefined;
+    const cleaned: Record<string, number> = {};
+    for (const [id, count] of Object.entries(returnOversizedBags || {})) {
+      if (count > 0) cleaned[id] = count;
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }, [returnHasOversizedLuggage, returnOversizedBags, returnTotalOversizedCount]);
+
+  const returnOversizedItemsSummary = useMemo(() => {
+    if (!returnHasOversizedLuggage) return undefined;
+    const parts = Object.entries(returnOversizedBags || {})
+      .filter(([, count]) => count > 0)
+      .map(([id, count]) => {
+        const cat = oversizedCategories.find((c) => c.id === id);
+        return `${count}x ${cat?.label || id}`;
+      });
+    if (returnOversizedLuggageNotes.trim()) {
+      parts.push(returnOversizedLuggageNotes.trim());
+    }
+    return parts.length > 0 ? parts.join(', ') : undefined;
+  }, [returnHasOversizedLuggage, returnOversizedBags, oversizedCategories, returnOversizedLuggageNotes]);
 
   // Instant zero-latency inline caller lookup (ContactService + loaded dispatch trips)
   const callerSuggestions = useMemo(() => {
@@ -1923,6 +2051,8 @@ function DispatchBookingEngineComponent({
     frontFacingCount,
     boosterCount,
     passengers,
+    carryOnBags,
+    checkedBags,
     bags,
     oversizedBagsPayload,
     selectedCustomExtras,
@@ -2012,7 +2142,7 @@ function DispatchBookingEngineComponent({
                 total: returnRearFacing + returnFrontFacing + returnBooster,
               }
             : undefined,
-          oversizedBags: oversizedBagsPayload,
+          oversizedBags: returnOversizedBagsPayload,
           selectedCustomExtras,
           corporateAccountId: matchedCorporateAccount?.id,
           accountType: paymentMethod === 'account' ? 'corporate' : 'retail',
@@ -2089,7 +2219,7 @@ function DispatchBookingEngineComponent({
     returnBooster,
     returnPassengers,
     returnBags,
-    oversizedBagsPayload,
+    returnOversizedBagsPayload,
     selectedCustomExtras,
     paymentMethod,
     matchedCorporateAccount?.id,
@@ -2267,6 +2397,8 @@ function DispatchBookingEngineComponent({
     setContactPhone('');
     setContactEmail('');
     setPassengers(1);
+    setCarryOnBags(0);
+    setCheckedBags(0);
     setBags(0);
     setCarSeats(false);
     setRearFacingCount(0);
@@ -2299,6 +2431,13 @@ function DispatchBookingEngineComponent({
     setReturnPickupAddress('');
     setReturnDropoffAddress('');
     setReturnIntermediateStops([]);
+    setReturnPassengers(1);
+    setReturnCarryOnBags(0);
+    setReturnCheckedBags(0);
+    setReturnBags(0);
+    setReturnHasOversizedLuggage(false);
+    setReturnOversizedBags({});
+    setReturnOversizedLuggageNotes('');
     setReturnCarSeats(false);
     setReturnRearFacing(0);
     setReturnFrontFacing(0);
@@ -2365,6 +2504,8 @@ function DispatchBookingEngineComponent({
         contactRole,
       },
       passengers,
+      carryOnBags,
+      checkedBags,
       bags,
       carSeats,
       carSeatsBreakdown: {
@@ -2406,7 +2547,12 @@ function DispatchBookingEngineComponent({
         returnDate,
         returnTime,
         returnPassengers,
+        returnCarryOnBags,
+        returnCheckedBags,
         returnBags,
+        returnHasOversizedLuggage,
+        returnOversizedBags,
+        returnOversizedLuggageNotes,
         returnCarSeats,
         returnCarSeatsBreakdown: {
           rearFacing: returnRearFacing,
@@ -2565,6 +2711,13 @@ function DispatchBookingEngineComponent({
       retDropoffResolved === pickupAddress.trim().toLowerCase() &&
       returnIntermediateStops.length === intermediateStops.length &&
       returnPassengers === passengers &&
+      returnBags === bags &&
+      returnCarSeats === carSeats &&
+      returnRearFacing === rearFacingCount &&
+      returnFrontFacing === frontFacingCount &&
+      returnBooster === boosterCount &&
+      returnHasOversizedLuggage === hasOversizedLuggage &&
+      JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
       JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
 
     let outboundFare = Math.ceil(estimatedFare);
@@ -2765,6 +2918,8 @@ function DispatchBookingEngineComponent({
       vehicleTypeId: primaryVehicle === 'any' ? 'any' : String(tier),
       vehicleDisplayName: primaryVehicleDisplayName,
       vehiclePreference: primaryVehicle,
+      carryOnBags,
+      checkedBags,
       oversizedBagsCount: hasOversizedLuggage ? totalOversizedCount : 0,
       oversizedBags: oversizedBagsPayload,
       hasOversizedLuggage:
@@ -3503,6 +3658,23 @@ function DispatchBookingEngineComponent({
                   vehicleTypeId: rSpec.vehicleChoice === 'any' ? 'any' : rSpec.vehicleTier,
                   vehicleDisplayName: rSpec.vehicleDisplayName,
                   selectedVehicles: [rSpec.vehicleChoice],
+                  carryOnBags: returnCarryOnBags,
+                  checkedBags: returnCheckedBags,
+                  oversizedBagsCount: returnHasOversizedLuggage ? returnTotalOversizedCount : 0,
+                  oversizedBags: returnOversizedBagsPayload,
+                  hasOversizedLuggage:
+                    returnHasOversizedLuggage &&
+                    (returnTotalOversizedCount > 0 || Boolean(returnOversizedLuggageNotes.trim())),
+                  oversizedLuggageNotes:
+                    returnHasOversizedLuggage && returnOversizedLuggageNotes.trim()
+                      ? returnOversizedLuggageNotes.trim()
+                      : undefined,
+                  oversizedItemsSummary: returnOversizedItemsSummary,
+                  carSeatsBreakdown: {
+                    rearFacing: returnRearFacing,
+                    frontFacing: returnFrontFacing,
+                    booster: returnBooster,
+                  },
                   linkedTripId: pairedOutbound.id,
                   isReturnRide: true,
                   hasReturnTrip: false,
@@ -4540,55 +4712,116 @@ function DispatchBookingEngineComponent({
             </span>
           </div>
 
-          <div className="p-2.5 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
-            {/* Passengers Counter */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span>Total Passengers</span>
+          <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2.5">
+            {/* Compact 3-Column Steppers: Pax, Carry-on & Checked (100% parity with Customer Form) */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Passengers */}
+              <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+                <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
+                  <UserIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <span className="font-bold text-slate-800 truncate">Pax</span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    aria-label="Decrease passengers"
+                    disabled={passengers <= 1}
+                    onClick={handleDecrementPassengers}
+                    className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    &minus;
+                  </button>
+                  <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                    {passengers}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Increase passengers"
+                    onClick={handleIncrementPassengers}
+                    title="Increments passengers. Auto-upgrades vehicles if capacity exceeded."
+                    className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none cursor-pointer shrink-0"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDecrementPassengers}
-                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                >
-                  -
-                </button>
-                <span className="w-5 text-center font-bold">{passengers}</span>
-                <button
-                  type="button"
-                  onClick={handleIncrementPassengers}
-                  title="Increments passengers. Auto-upgrades vehicles if capacity exceeded."
-                  className="w-6 h-6 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700"
-                >
-                  +
-                </button>
-              </div>
-            </div>
 
-            {/* Bags Counter */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                <LuggageIcon className="w-3.5 h-3.5 text-slate-500" />
-                <span>Bags</span>
+              {/* Carry-on Bags */}
+              <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+                <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
+                  <LuggageIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <span className="font-bold text-slate-800 truncate">Carry-on</span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    aria-label="Decrease carry-on bags"
+                    disabled={carryOnBags <= 0}
+                    onClick={() => {
+                      const nextCarry = Math.max(0, carryOnBags - 1);
+                      setCarryOnBags(nextCarry);
+                      setBags(nextCarry + checkedBags);
+                    }}
+                    className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    &minus;
+                  </button>
+                  <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                    {carryOnBags}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Increase carry-on bags"
+                    disabled={carryOnBags + checkedBags >= totalMaxBags}
+                    onClick={() => {
+                      const nextCarry = Math.min(totalMaxBags - checkedBags, carryOnBags + 1);
+                      setCarryOnBags(nextCarry);
+                      setBags(nextCarry + checkedBags);
+                    }}
+                    className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setBags((b) => Math.max(0, b - 1))}
-                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                >
-                  -
-                </button>
-                <span className="w-5 text-center font-bold">{bags}</span>
-                <button
-                  type="button"
-                  onClick={() => setBags((b) => Math.min(totalMaxBags, b + 1))}
-                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
-                >
-                  +
-                </button>
+
+              {/* Checked Bags */}
+              <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+                <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
+                  <LuggageIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <span className="font-bold text-slate-800 truncate">Checked</span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    aria-label="Decrease checked bags"
+                    disabled={checkedBags <= 0}
+                    onClick={() => {
+                      const nextChecked = Math.max(0, checkedBags - 1);
+                      setCheckedBags(nextChecked);
+                      setBags(carryOnBags + nextChecked);
+                    }}
+                    className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    &minus;
+                  </button>
+                  <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                    {checkedBags}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Increase checked bags"
+                    disabled={carryOnBags + checkedBags >= totalMaxBags}
+                    onClick={() => {
+                      const nextChecked = Math.min(totalMaxBags - carryOnBags, checkedBags + 1);
+                      setCheckedBags(nextChecked);
+                      setBags(carryOnBags + nextChecked);
+                    }}
+                    className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -5788,48 +6021,216 @@ function DispatchBookingEngineComponent({
                     </div>
                   </div>
 
-                  {/* Return Trip Details: Pax & Bags */}
-                  <div className="p-2 bg-white border border-indigo-200 rounded grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-indigo-900 font-medium">Return Pax:</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setReturnPassengers((p) => Math.max(1, p - 1))}
-                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="w-4 text-center font-bold">{returnPassengers}</span>
-                        <button
-                          type="button"
-                          onClick={() => setReturnPassengers((p) => p + 1)}
-                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
-                        >
-                          +
-                        </button>
+                  {/* Return Trip Details: Compact 3-Column Pax, Carry-on & Checked Steppers */}
+                  <div className="p-2 bg-white border border-indigo-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-indigo-900 uppercase tracking-wide">
+                        Return Pax &amp; Luggage
+                      </span>
+                      <span className="text-slate-500 font-medium">
+                        Max {returnTotalMaxPassengers} Pax • {returnTotalMaxBags} Bags
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {/* Return Pax */}
+                      <div className="p-1.5 bg-indigo-50/40 border border-indigo-100 rounded-lg flex flex-col justify-between gap-1 min-w-0">
+                        <div className="flex items-center justify-center gap-1 text-indigo-950 text-[10.5px] min-w-0">
+                          <UserIcon className="w-3 h-3 text-indigo-500 shrink-0" />
+                          <span className="font-bold truncate">Pax</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-0.5">
+                          <button
+                            type="button"
+                            aria-label="Decrease return passengers"
+                            disabled={returnPassengers <= 1}
+                            onClick={() => setReturnPassengers((p) => Math.max(1, p - 1))}
+                            className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 border border-indigo-200 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                          >
+                            &minus;
+                          </button>
+                          <span className="min-w-[1.1rem] text-center font-extrabold text-xs text-slate-900">
+                            {returnPassengers}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Increase return passengers"
+                            onClick={() => setReturnPassengers((p) => p + 1)}
+                            className="w-6 h-6 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 text-xs leading-none cursor-pointer shrink-0"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Return Carry-on */}
+                      <div className="p-1.5 bg-indigo-50/40 border border-indigo-100 rounded-lg flex flex-col justify-between gap-1 min-w-0">
+                        <div className="flex items-center justify-center gap-1 text-indigo-950 text-[10.5px] min-w-0">
+                          <LuggageIcon className="w-3 h-3 text-indigo-500 shrink-0" />
+                          <span className="font-bold truncate">Carry-on</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-0.5">
+                          <button
+                            type="button"
+                            aria-label="Decrease return carry-on bags"
+                            disabled={returnCarryOnBags <= 0}
+                            onClick={() => {
+                              const nextCarry = Math.max(0, returnCarryOnBags - 1);
+                              setReturnCarryOnBags(nextCarry);
+                              setReturnBags(nextCarry + returnCheckedBags);
+                            }}
+                            className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 border border-indigo-200 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                          >
+                            &minus;
+                          </button>
+                          <span className="min-w-[1.1rem] text-center font-extrabold text-xs text-slate-900">
+                            {returnCarryOnBags}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Increase return carry-on bags"
+                            disabled={returnCarryOnBags + returnCheckedBags >= returnTotalMaxBags}
+                            onClick={() => {
+                              const nextCarry = Math.min(returnTotalMaxBags - returnCheckedBags, returnCarryOnBags + 1);
+                              setReturnCarryOnBags(nextCarry);
+                              setReturnBags(nextCarry + returnCheckedBags);
+                            }}
+                            className="w-6 h-6 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Return Checked */}
+                      <div className="p-1.5 bg-indigo-50/40 border border-indigo-100 rounded-lg flex flex-col justify-between gap-1 min-w-0">
+                        <div className="flex items-center justify-center gap-1 text-indigo-950 text-[10.5px] min-w-0">
+                          <LuggageIcon className="w-3 h-3 text-indigo-500 shrink-0" />
+                          <span className="font-bold truncate">Checked</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-0.5">
+                          <button
+                            type="button"
+                            aria-label="Decrease return checked bags"
+                            disabled={returnCheckedBags <= 0}
+                            onClick={() => {
+                              const nextChecked = Math.max(0, returnCheckedBags - 1);
+                              setReturnCheckedBags(nextChecked);
+                              setReturnBags(returnCarryOnBags + nextChecked);
+                            }}
+                            className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 border border-indigo-200 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                          >
+                            &minus;
+                          </button>
+                          <span className="min-w-[1.1rem] text-center font-extrabold text-xs text-slate-900">
+                            {returnCheckedBags}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Increase return checked bags"
+                            disabled={returnCarryOnBags + returnCheckedBags >= returnTotalMaxBags}
+                            onClick={() => {
+                              const nextChecked = Math.min(returnTotalMaxBags - returnCarryOnBags, returnCheckedBags + 1);
+                              setReturnCheckedBags(nextChecked);
+                              setReturnBags(returnCarryOnBags + nextChecked);
+                            }}
+                            className="w-6 h-6 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-indigo-900 font-medium">Return Bags:</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setReturnBags((b) => Math.max(0, b - 1))}
-                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="w-4 text-center font-bold">{returnBags}</span>
-                        <button
-                          type="button"
-                          onClick={() => setReturnBags((b) => b + 1)}
-                          className="w-5 h-5 rounded bg-slate-100 border border-slate-300 font-bold"
-                        >
-                          +
-                        </button>
+
+                    {/* Return Oversized Cargo Toggle & Panel */}
+                    <label
+                      className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border cursor-pointer select-none transition-colors ${
+                        returnHasOversizedLuggage
+                          ? 'bg-indigo-50/80 border-indigo-300'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={returnHasOversizedLuggage}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setReturnHasOversizedLuggage(checked);
+                            if (!checked) {
+                              setReturnOversizedBags({});
+                              setReturnOversizedLuggageNotes('');
+                            }
+                          }}
+                          className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Return Oversized Cargo (Golf / Skis)</span>
+                      </span>
+                      {returnHasOversizedLuggage && returnTotalOversizedCount > 0 && (
+                        <span className="text-[10px] font-bold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
+                          {returnTotalOversizedCount} item{returnTotalOversizedCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </label>
+
+                    {returnHasOversizedLuggage && (
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                        {oversizedCategories.map((cat) => {
+                          const count = returnOversizedBags[cat.id] || 0;
+                          return (
+                            <div
+                              key={`disp-ret-ov-${cat.id}`}
+                              className="flex items-center justify-between gap-2 text-[11px] bg-white px-2 py-1.5 rounded border border-slate-200"
+                            >
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="font-semibold text-slate-800">{cat.label}</span>
+                                {cat.fee > 0 && (
+                                  <span className="text-[10px] font-bold text-emerald-700">
+                                    +${cat.fee.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={count <= 0}
+                                  onClick={() =>
+                                    setReturnOversizedBags((prev) => ({
+                                      ...prev,
+                                      [cat.id]: Math.max(0, (prev[cat.id] || 0) - 1),
+                                    }))
+                                  }
+                                  className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40 cursor-pointer"
+                                >
+                                  &minus;
+                                </button>
+                                <span className="w-4 text-center font-bold text-slate-900">{count}</span>
+                                <button
+                                  type="button"
+                                  disabled={count >= (cat.maxCount || 4)}
+                                  onClick={() =>
+                                    setReturnOversizedBags((prev) => ({
+                                      ...prev,
+                                      [cat.id]: Math.min(cat.maxCount || 4, (prev[cat.id] || 0) + 1),
+                                    }))
+                                  }
+                                  className="w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 disabled:opacity-40 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <input
+                          type="text"
+                          placeholder="Return cargo notes (e.g. dimensions, fragile instruments)"
+                          value={returnOversizedLuggageNotes}
+                          onChange={(e) => setReturnOversizedLuggageNotes(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Return Car Seats Toggle & Counters */}
@@ -6140,6 +6541,13 @@ function DispatchBookingEngineComponent({
           retD === pickupAddress.trim().toLowerCase() &&
           returnIntermediateStops.length === intermediateStops.length &&
           returnPassengers === passengers &&
+          returnBags === bags &&
+          returnCarSeats === carSeats &&
+          returnRearFacing === rearFacingCount &&
+          returnFrontFacing === frontFacingCount &&
+          returnBooster === boosterCount &&
+          returnHasOversizedLuggage === hasOversizedLuggage &&
+          JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
           JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
         const leg1 = isFareOverridden && manualFare
           ? returnTrip
@@ -6159,16 +6567,35 @@ function DispatchBookingEngineComponent({
         const primaryOpt = dispatchVehicleOptions.find((o) => o.key === selectedVehicles[0]);
 
         return (
-          <div className="border-t border-slate-200 bg-white px-3 py-2.5 max-h-64 overflow-y-auto shrink-0 shadow-inner">
-            <PriceBreakdownPanel
-              outboundPricing={outboundPricing}
-              returnPricing={returnPricing}
-              outboundDisplayFare={leg1}
-              returnDisplayFare={leg2}
-              totalDisplayFare={tot}
-              isRoundTrip={returnTrip}
-              vehicleLabel={primaryOpt?.label || String(selectedVehicles[0] || 'Standard')}
-            />
+          <div className="border-t border-slate-200 bg-white shrink-0 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] flex flex-col max-h-64">
+            <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Itemized Fare Breakdown
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPriceBreakdown(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 cursor-pointer"
+                aria-label="Close fare breakdown"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="px-3 py-2.5 overflow-y-auto">
+              <PriceBreakdownPanel
+                outboundPricing={outboundPricing}
+                returnPricing={returnPricing}
+                outboundDisplayFare={leg1}
+                returnDisplayFare={leg2}
+                totalDisplayFare={tot}
+                isRoundTrip={returnTrip}
+                vehicleLabel={primaryOpt?.label || String(selectedVehicles[0] || 'Standard')}
+                returnVehicleLabel={
+                  dispatchVehicleOptions.find((o) => o.key === returnVehicles[0])?.label ||
+                  String(returnVehicles[0] || 'Standard')
+                }
+              />
+            </div>
           </div>
         );
       })()}
@@ -6183,6 +6610,13 @@ function DispatchBookingEngineComponent({
           retD === pickupAddress.trim().toLowerCase() &&
           returnIntermediateStops.length === intermediateStops.length &&
           returnPassengers === passengers &&
+          returnBags === bags &&
+          returnCarSeats === carSeats &&
+          returnRearFacing === rearFacingCount &&
+          returnFrontFacing === frontFacingCount &&
+          returnBooster === boosterCount &&
+          returnHasOversizedLuggage === hasOversizedLuggage &&
+          JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
           JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
 
         const displayLeg1 =
@@ -6205,7 +6639,7 @@ function DispatchBookingEngineComponent({
         const displayTotal = returnTrip ? displayLeg1 + displayLeg2 : displayLeg1;
 
         return (
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 px-3 py-2 flex items-center justify-between shrink-0 shadow-sm z-20 gap-2">
+          <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5 lg:py-2 flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] z-20 gap-2">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {isFareOverridden ? (
@@ -6217,7 +6651,7 @@ function DispatchBookingEngineComponent({
                       placeholder="0.00"
                       value={manualFare}
                       onChange={(e) => setManualFare(e.target.value)}
-                      className="w-20 px-2 py-1 bg-white border border-blue-400 rounded font-mono font-bold text-sm text-blue-700"
+                      className="w-20 px-2 py-1 bg-white border border-blue-400 rounded-lg font-mono font-bold text-sm text-blue-700"
                       title={returnTrip ? 'Combined Round-Trip Override Total' : 'Manual Fare Override'}
                     />
                     <button
@@ -6229,91 +6663,117 @@ function DispatchBookingEngineComponent({
                     </button>
                   </div>
                 ) : (
-                  <div
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsFareOverridden(true);
                       setManualFare(displayTotal ? displayTotal.toFixed(2) : '');
                     }}
-                    className="cursor-pointer group flex items-baseline gap-1"
-                    title="Click to manually override fare"
+                    className="cursor-pointer group flex items-center gap-1 text-left"
+                    title="Tap to manually override fare"
                   >
-                    <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-none">
                       ${displayTotal.toFixed(2)}
                     </span>
                     {isQuoting && (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-blue-500" />
                     )}
                     {repeat && (
-                      <span className="text-xs font-bold text-indigo-600">
+                      <span className="text-[11px] font-bold text-indigo-600">
                         {repeatFrequency === 'daily'
                           ? '/ day'
                           : repeatFrequency === 'weekdays'
-                          ? '/ weekday'
+                          ? '/ wkday'
                           : repeatFrequency === 'weekly'
                           ? repeatDays.length > 1
-                            ? `/ trip (${repeatDays.length}x/wk)`
-                            : '/ week'
+                            ? `(${repeatDays.length}x/wk)`
+                            : '/ wk'
                           : '/ trip'}
                       </span>
                     )}
-                    <span className="text-[10px] text-slate-400 group-hover:text-blue-500 font-semibold">
-                      (Est. ✎)
-                    </span>
-                  </div>
+                    <PencilIcon className="w-3 h-3 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                  </button>
                 )}
 
                 <button
                   type="button"
                   onClick={() => setShowPriceBreakdown((v) => !v)}
-                  className={`px-1.5 py-0.5 rounded border text-[10px] font-bold transition-colors cursor-pointer ${
+                  className={`px-2 py-1 lg:px-1.5 lg:py-0.5 rounded-lg lg:rounded border text-[10px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1 ${
                     showPriceBreakdown
                       ? 'bg-blue-50 border-blue-300 text-blue-700'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                   }`}
                   title="Toggle itemized Admin Tariff fare breakdown"
                 >
-                  {showPriceBreakdown ? 'Breakdown ▼' : 'Breakdown ▲'}
+                  <span>Details</span>
+                  <ChevronDownIcon
+                    className={`w-3 h-3 transition-transform ${showPriceBreakdown ? 'rotate-0' : 'rotate-180'}`}
+                  />
                 </button>
               </div>
 
               {returnTrip && (
-                <div className="text-[10px] text-slate-500 font-medium">
-                  Leg 1: ${displayLeg1.toFixed(2)} | Return Leg: ${displayLeg2.toFixed(2)}
-                  {isFareOverridden && ' (Overridden)'}
+                <div className="text-[10px] text-slate-500 font-medium truncate">
+                  Leg 1: ${displayLeg1.toFixed(2)} | Return: ${displayLeg2.toFixed(2)}
+                  {isFareOverridden && ' (Custom)'}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {!isEditMode && (
-                <label
-                  className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
-                  title={email.trim() ? `Send confirmation email to ${email.trim()}` : 'Enter passenger email above to send confirmation'}
-                >
-                  <input
-                    type="checkbox"
-                    checked={sendEmailConfirmation}
-                    onChange={(e) => setSendEmailConfirmation(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                  />
-                  <span>Email Confirm</span>
-                </label>
+                <>
+                  {/* Mobile compact Email Confirm toggle pill */}
+                  <button
+                    type="button"
+                    onClick={() => setSendEmailConfirmation((v) => !v)}
+                    className={`sm:hidden w-9 h-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                      sendEmailConfirmation
+                        ? 'bg-blue-50 border-blue-300 text-blue-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}
+                    title={
+                      sendEmailConfirmation
+                        ? 'Email confirmation ON (tap to disable)'
+                        : 'Email confirmation OFF (tap to enable)'
+                    }
+                    aria-label="Toggle email confirmation"
+                  >
+                    <MailIcon className="w-4 h-4" />
+                  </button>
+
+                  {/* Desktop Email Confirm checkbox */}
+                  <label
+                    className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
+                    title={email.trim() ? `Send confirmation email to ${email.trim()}` : 'Enter passenger email above to send confirmation'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sendEmailConfirmation}
+                      onChange={(e) => setSendEmailConfirmation(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                    />
+                    <span>Email Confirm</span>
+                  </label>
+                </>
               )}
+
               {isEditMode ? (
                 <button
                   type="button"
                   onClick={handleCopyBooking}
-                  className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   title="Create a new draft tab pre-populated with these trip details"
                 >
                   <CopyIcon className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Copy Booking</span>
+                  <span className="hidden sm:inline">Copy Booking</span>
+                  <span className="sm:hidden">Copy</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleConfirmClear}
-                  className="px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
+                  className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
                   title="Clear all booking inputs"
                 >
                   Clear
@@ -6324,10 +6784,10 @@ function DispatchBookingEngineComponent({
                 type="submit"
                 disabled={isSubmitting}
                 title="Save booking (Ctrl+Enter)"
-                className={`rounded-xl font-black text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer ${
+                className={`rounded-xl font-black text-white shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer active:scale-[0.98] ${
                   isEditMode
-                    ? 'px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-xs'
-                    : 'px-6 py-2 bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 text-sm active:scale-95'
+                    ? 'px-3.5 sm:px-4 py-2 lg:py-1.5 bg-blue-600 hover:bg-blue-700 text-xs'
+                    : 'px-4 sm:px-6 py-2.5 lg:py-2 bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 text-sm'
                 }`}
               >
                 {isSubmitting ? (
@@ -6336,7 +6796,7 @@ function DispatchBookingEngineComponent({
                     <span>Saving...</span>
                   </>
                 ) : (
-                  <span>{isEditMode ? 'Update Booking' : 'Book'}</span>
+                  <span>{isEditMode ? 'Update' : 'Book'}</span>
                 )}
               </button>
             </div>

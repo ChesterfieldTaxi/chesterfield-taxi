@@ -4,6 +4,10 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(({ isSsrBuild }) => ({
+  server: {
+    host: true,
+    allowedHosts: ['.trycloudflare.com'],
+  },
   define: isSsrBuild
     ? {}
     : {

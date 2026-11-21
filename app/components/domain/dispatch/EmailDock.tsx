@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import { getFirebaseAuthHeaders } from '../../../core/services/auth/auth-headers';
 import { escapeHtml } from '../../../core/services/email/email-templates';
+import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 import {
   MailIcon,
   SearchIcon,
@@ -12,6 +13,9 @@ import {
   TrashIcon,
   ClockIcon,
   UserIcon,
+  CarIcon,
+  ChevronLeftIcon,
+  PlusIcon,
 } from '../../ui/Icons';
 
 export interface EmailMessage {
@@ -171,6 +175,65 @@ export function EmailDock({
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+
+  // Mobile touch-and-hold quick action sheet
+  const [actionSheetEmail, setActionSheetEmail] = useState<EmailMessage | null>(null);
+  const [longPressingEmailId, setLongPressingEmailId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextEmailClickRef = useRef<boolean>(false);
+
+  const cancelEmailLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartPosRef.current = null;
+    setLongPressingEmailId(null);
+  }, []);
+
+  const handleEmailRowTouchStart = useCallback(
+    (email: EmailMessage, e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, a, input')) return;
+      const touch = e.touches[0];
+      longPressStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      setLongPressingEmailId(email.id);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        suppressNextEmailClickRef.current = true;
+        setLongPressingEmailId(null);
+        try {
+          if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate(15);
+          }
+        } catch {}
+        setActionSheetEmail(email);
+      }, 380);
+    },
+    []
+  );
+
+  const handleEmailRowTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!longPressStartPosRef.current || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - longPressStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - longPressStartPosRef.current.y);
+      if (dx > 10 || dy > 10) {
+        cancelEmailLongPress();
+      }
+    },
+    [cancelEmailLongPress]
+  );
+
+  const dismissComposeModal = useCallback(() => setIsComposing(false), []);
+  const dismissActionSheet = useCallback(() => setActionSheetEmail(null), []);
+
+  const composeSheetDrag = useBottomSheetDragToClose({ onClose: dismissComposeModal });
+  const emailActionSheetDrag = useBottomSheetDragToClose({ onClose: dismissActionSheet });
 
   const selectedEmail = emails.find((e) => e.id === selectedEmailId) || null;
 
@@ -509,11 +572,24 @@ export function EmailDock({
           ) : (
             filteredEmails.map((email) => {
               const isSelected = selectedEmailId === email.id;
+              const isPressing = longPressingEmailId === email.id;
               return (
                 <div
                   key={email.id}
-                  onClick={() => handleSelectEmail(email)}
-                  className={`group relative p-3 transition-all cursor-pointer border-l-4 ${
+                  onTouchStart={(e) => handleEmailRowTouchStart(email, e)}
+                  onTouchMove={handleEmailRowTouchMove}
+                  onTouchEnd={cancelEmailLongPress}
+                  onTouchCancel={cancelEmailLongPress}
+                  onClick={() => {
+                    if (suppressNextEmailClickRef.current) {
+                      suppressNextEmailClickRef.current = false;
+                      return;
+                    }
+                    handleSelectEmail(email);
+                  }}
+                  className={`group relative p-3 transition-all cursor-pointer border-l-4 select-none ${
+                    isPressing ? 'scale-[0.985] bg-blue-50/80' : ''
+                  } ${
                     isSelected
                       ? 'bg-blue-50 border-l-blue-600 shadow-2xs'
                       : email.isUnread
@@ -548,18 +624,19 @@ export function EmailDock({
                   <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{email.body}</p>
 
                   {email.suggestedBooking && (
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
-                      <span>🚕 Ride Request</span>
+                    <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CarIcon className="w-3 h-3 shrink-0" />
+                      <span>Ride Request</span>
                     </div>
                   )}
 
-                  {/* Quick hover actions */}
-                  <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/95 shadow-md border border-slate-200 rounded-lg p-1">
+                  {/* Quick hover actions (desktop) */}
+                  <div className="absolute right-2 top-2 hidden sm:group-hover:flex items-center gap-1 bg-white/95 shadow-md border border-slate-200 rounded-lg p-1">
                     <button
                       type="button"
                       onClick={(e) => handleToggleRead(email.id, e)}
                       title={email.isUnread ? 'Mark as read' : 'Mark as unread'}
-                      className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded"
+                      className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
                     >
                       <MailIcon className="w-3 h-3" />
                     </button>
@@ -567,7 +644,7 @@ export function EmailDock({
                       type="button"
                       onClick={(e) => handleDeleteEmail(email.id, e)}
                       title="Archive"
-                      className="p-1 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded"
+                      className="p-1 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded cursor-pointer"
                     >
                       <TrashIcon className="w-3 h-3" />
                     </button>
@@ -581,47 +658,62 @@ export function EmailDock({
         {/* EMAIL DETAIL VIEW PANE */}
         {selectedEmail ? (
           <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
-            {/* Detail Header */}
-            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedEmailId(null)}
-                  className="sm:hidden px-2 py-1 rounded bg-white border border-slate-200 text-xs font-bold text-slate-700"
-                >
-                  ← Back
-                </button>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900 line-clamp-1">
+            {/* Detail Header (Stacked cleanly on mobile so nothing ever clips or wraps vertically) */}
+            <div className="p-3 border-b border-slate-200 bg-slate-50/90 space-y-2 shrink-0">
+              {/* Row 1: Mobile Back + Primary Actions */}
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmailId(null)}
+                    className="sm:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 active:bg-slate-100 cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    <ChevronLeftIcon className="w-3.5 h-3.5" />
+                    <span>Back</span>
+                  </button>
+                  <h3 className="hidden sm:block font-extrabold text-sm text-slate-900 truncate">
                     {selectedEmail.subject}
                   </h3>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                    <span className="font-bold text-slate-800">{selectedEmail.fromName}</span>
-                    <span className="font-mono text-slate-400">&lt;{selectedEmail.fromEmail}&gt;</span>
-                    <span>• {selectedEmail.timestamp}</span>
-                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedEmail.suggestedBooking && (
+                    <button
+                      type="button"
+                      onClick={() => handleConvertToBooking(selectedEmail)}
+                      className="px-3 py-1.5 rounded-xl sm:rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-xs cursor-pointer inline-flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+                      title="Populate booking form in Dispatch"
+                    >
+                      <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span className="sm:hidden">Book Ride</span>
+                      <span className="hidden sm:inline">Convert to Booking</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteEmail(selectedEmail.id)}
+                    className="p-2 sm:p-1.5 rounded-xl sm:rounded-lg bg-white sm:bg-transparent border border-slate-200 sm:border-transparent hover:bg-rose-50 text-slate-500 sm:text-slate-400 hover:text-rose-600 hover:border-rose-200 transition-colors cursor-pointer shrink-0"
+                    title="Archive email"
+                    aria-label="Archive email"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {selectedEmail.suggestedBooking && (
-                  <button
-                    type="button"
-                    onClick={() => handleConvertToBooking(selectedEmail)}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
-                    title="Populate booking form in Dispatch"
-                  >
-                    <span>🚕 Convert to Booking</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteEmail(selectedEmail.id)}
-                  className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer border border-transparent hover:border-rose-200"
-                  title="Archive email"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
+              {/* Row 2: Subject (mobile) + Sender & Timestamp */}
+              <div className="min-w-0 space-y-0.5">
+                <h3 className="sm:hidden font-extrabold text-sm text-slate-900 leading-snug">
+                  {selectedEmail.subject}
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500 min-w-0">
+                  <span className="font-bold text-slate-800">{selectedEmail.fromName}</span>
+                  <span className="font-mono text-slate-400 truncate max-w-full">
+                    &lt;{selectedEmail.fromEmail}&gt;
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-slate-500 shrink-0">{selectedEmail.timestamp}</span>
+                </div>
               </div>
             </div>
 
@@ -629,14 +721,15 @@ export function EmailDock({
             <div className="flex-1 p-4 overflow-y-auto space-y-4">
               {selectedEmail.suggestedBooking && (
                 <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-blue-900 flex items-center gap-1.5">
-                      <span>🎯 Detected Ride Reservation</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-blue-900 inline-flex items-center gap-1.5 min-w-0">
+                      <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="truncate">Detected Ride Reservation</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleConvertToBooking(selectedEmail)}
-                      className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded shadow-2xs cursor-pointer"
+                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg shadow-2xs cursor-pointer shrink-0"
                     >
                       Fill Booking Form
                     </button>
@@ -677,10 +770,10 @@ export function EmailDock({
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder={`Reply to ${selectedEmail.fromName}...`}
                 rows={2}
-                className="w-full text-xs p-2 rounded-lg border border-slate-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-blue-500 resize-none"
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-blue-500 resize-none"
               />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() =>
@@ -688,9 +781,9 @@ export function EmailDock({
                         `Hi ${selectedEmail.fromName},\n\nYour transfer has been received and scheduled. Our driver will contact you upon arrival.\n\nBest,\nChesterfield Taxi Dispatch`
                       )
                     }
-                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-blue-50 text-[10.5px] font-bold text-blue-700 hover:bg-blue-100 cursor-pointer"
                   >
-                    + Template: Confirmed
+                    + Confirmed
                   </button>
                   <button
                     type="button"
@@ -699,16 +792,16 @@ export function EmailDock({
                         `Hi ${selectedEmail.fromName},\n\nAttached is your official itemized trip receipt. Thank you for riding with Chesterfield Taxi!`
                       )
                     }
-                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-blue-50 text-[10.5px] font-bold text-blue-700 hover:bg-blue-100 cursor-pointer"
                   >
-                    + Template: Receipt
+                    + Receipt
                   </button>
                 </div>
                 <button
                   type="button"
                   onClick={handleSendReply}
                   disabled={!replyText.trim()}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer shrink-0"
                 >
                   Send Reply
                 </button>
@@ -728,24 +821,131 @@ export function EmailDock({
         )}
       </div>
 
-      {/* ─── COMPOSE MODAL OVERLAY ─── */}
-      {isComposing && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
-            <div className="bg-slate-900 text-white p-3 px-4 flex items-center justify-between">
-              <h3 className="font-extrabold text-sm flex items-center gap-2">
-                <span>✉️ New Dispatch Email</span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsComposing(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
+      {/* ─── MOBILE EMAIL QUICK ACTION BOTTOM SHEET (Touch & hold on email row) ─── */}
+      {actionSheetEmail && (
+        <div
+          className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={dismissActionSheet}
+        >
+          <div
+            style={emailActionSheetDrag.sheetStyle}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...emailActionSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 pt-2 pb-3.5 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-white truncate">{actionSheetEmail.fromName}</p>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">{actionSheetEmail.subject}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissActionSheet}
+                  className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer shrink-0"
+                  aria-label="Close email actions"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="p-3 space-y-2">
+              {actionSheetEmail.suggestedBooking && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = actionSheetEmail;
+                    setActionSheetEmail(null);
+                    handleConvertToBooking(target);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <CarIcon className="w-4 h-4" />
+                  <span>Convert to Booking</span>
+                </button>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = actionSheetEmail;
+                    setActionSheetEmail(null);
+                    handleSelectEmail(target);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <MailIcon className="w-4 h-4" />
+                  <span>Open Email</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const id = actionSheetEmail.id;
+                    setActionSheetEmail(null);
+                    handleToggleRead(id, e);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  <span>{actionSheetEmail.isUnread ? 'Mark Read' : 'Mark Unread'}</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  const id = actionSheetEmail.id;
+                  setActionSheetEmail(null);
+                  handleDeleteEmail(id, e);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <TrashIcon className="w-4 h-4" />
+                <span>Archive Email</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── COMPOSE MODAL / MOBILE BOTTOM SHEET OVERLAY ─── */}
+      {isComposing && (
+        <div
+          className="fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={dismissComposeModal}
+        >
+          <div
+            style={composeSheetDrag.sheetStyle}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...composeSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 pt-2 sm:pt-3 pb-3 flex flex-col touch-none shrink-0"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-sm flex items-center gap-2">
+                  <MailIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span>New Dispatch Email</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={dismissComposeModal}
+                  className="p-1 rounded-full text-slate-400 hover:text-white cursor-pointer"
+                  aria-label="Close compose email"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-3 overflow-y-auto">
               <div>
                 <label className="text-[11px] font-bold text-slate-600 block mb-1">To (Email):</label>
                 <input
@@ -753,7 +953,7 @@ export function EmailDock({
                   value={composeTo}
                   onChange={(e) => setComposeTo(e.target.value)}
                   placeholder="passenger@example.com"
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500"
+                  className="w-full text-xs p-2.5 sm:p-2 rounded-xl sm:rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500"
                 />
               </div>
 
@@ -764,7 +964,7 @@ export function EmailDock({
                   value={composeSubject}
                   onChange={(e) => setComposeSubject(e.target.value)}
                   placeholder="Ride Confirmation / Trip Receipt"
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500"
+                  className="w-full text-xs p-2.5 sm:p-2 rounded-xl sm:rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500"
                 />
               </div>
 
@@ -775,23 +975,23 @@ export function EmailDock({
                   onChange={(e) => setComposeBody(e.target.value)}
                   placeholder="Type message here..."
                   rows={6}
-                  className="w-full text-xs p-2 rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500 resize-none"
+                  className="w-full text-xs p-2.5 sm:p-2 rounded-xl sm:rounded-lg border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-blue-500 resize-none"
                 />
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setIsComposing(false)}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                onClick={dismissComposeModal}
+                className="px-3.5 py-2 sm:py-1.5 rounded-xl sm:rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSendCompose}
-                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 Send Email
               </button>

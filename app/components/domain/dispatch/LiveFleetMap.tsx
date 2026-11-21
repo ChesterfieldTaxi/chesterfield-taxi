@@ -31,7 +31,8 @@ import {
   getMapStatusLabel,
   type LiveFleetDriver,
 } from '../../../core/hooks/useDispatchFleet';
-import { PhoneIcon, CarIcon, MapPinIcon, XIcon } from '../../ui/Icons';
+import { PhoneIcon, CarIcon, MapPinIcon, XIcon, CheckIcon } from '../../ui/Icons';
+import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 
 export interface LiveFleetMapProps {
   fleet: LiveFleetDriver[];
@@ -182,6 +183,23 @@ function LiveFleetMapComponent({
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [showAwaitingGps, setShowAwaitingGps] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const dismissSelectedDriver = useCallback(() => {
+    setSelectedDriverId(null);
+    onClearFocusedDriver?.();
+  }, [onClearFocusedDriver]);
+
+  const dismissAwaitingGps = useCallback(() => {
+    setShowAwaitingGps(false);
+  }, []);
+
+  const driverSheetDrag = useBottomSheetDragToClose({
+    onClose: dismissSelectedDriver,
+  });
+
+  const awaitingGpsSheetDrag = useBottomSheetDragToClose({
+    onClose: dismissAwaitingGps,
+  });
 
   // Sync external "Locate on Map" focus request
   useEffect(() => {
@@ -706,13 +724,13 @@ function LiveFleetMapComponent({
       )}
 
       {/* ─── TOP FLOATING FLEET FILTER & LEGEND HUD ─── */}
-      <div className="absolute top-2.5 left-2.5 right-2.5 z-20 flex flex-wrap items-center justify-between gap-1.5 pointer-events-none">
-        {/* Status Color Filter Pills (Option C Palette) */}
-        <div className="pointer-events-auto flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-xl px-1.5 py-1">
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between gap-1.5 pointer-events-none">
+        {/* Status Color Filter Pills (Single-row horizontal rail on mobile, wrapping bar on sm+) */}
+        <div className="pointer-events-auto flex flex-nowrap sm:flex-wrap items-center gap-1 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl sm:rounded-xl px-1.5 py-1 max-w-full overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+            className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
               statusFilter === 'all'
                 ? 'bg-slate-900 text-white shadow-2xs'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -725,10 +743,10 @@ function LiveFleetMapComponent({
 
           {(
             [
-              { key: 'available', label: 'Available', hex: '#10b981', count: counts.available },
-              { key: 'en_route', label: 'En Route', hex: '#2563eb', count: counts.en_route },
-              { key: 'busy', label: 'Arrived / Busy', hex: '#ef4444', count: counts.busy },
-              { key: 'break', label: 'Break', hex: '#eab308', count: counts.break },
+              { key: 'available', label: 'Available', shortLabel: 'Avail', hex: '#10b981', count: counts.available },
+              { key: 'en_route', label: 'En Route', shortLabel: 'En Route', hex: '#2563eb', count: counts.en_route },
+              { key: 'busy', label: 'Arrived / Busy', shortLabel: 'Busy', hex: '#ef4444', count: counts.busy },
+              { key: 'break', label: 'Break', shortLabel: 'Break', hex: '#eab308', count: counts.break },
             ] as const
           ).map((item) => {
             const active = statusFilter === item.key;
@@ -737,7 +755,7 @@ function LiveFleetMapComponent({
                 key={item.key}
                 type="button"
                 onClick={() => setStatusFilter(active ? 'all' : item.key)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border shrink-0 ${
                   active
                     ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                     : 'bg-white text-slate-700 border-transparent hover:bg-slate-100'
@@ -748,13 +766,14 @@ function LiveFleetMapComponent({
                   className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/10"
                   style={{ backgroundColor: item.hex }}
                 />
+                <span className="sm:hidden">{item.shortLabel}</span>
                 <span className="hidden sm:inline">{item.label}</span>
                 <span className="font-mono text-[10px] opacity-80">{item.count}</span>
               </button>
             );
           })}
 
-          <div className="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block" />
+          <div className="h-4 w-px bg-slate-200 mx-0.5 shrink-0" />
 
           <button
             type="button"
@@ -762,7 +781,7 @@ function LiveFleetMapComponent({
               setShowOffline((v) => !v);
               if (!showOffline) setStatusFilter('all');
             }}
-            className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 border ${
+            className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 border shrink-0 ${
               showOffline
                 ? 'bg-slate-700 text-white border-slate-700'
                 : 'text-slate-500 border-transparent hover:bg-slate-100'
@@ -770,13 +789,14 @@ function LiveFleetMapComponent({
             title="Toggle Offline drivers on map"
           >
             <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+            <span className="sm:hidden">Off</span>
             <span className="hidden md:inline">Offline</span>
             <span className="font-mono text-[10px] opacity-80">{counts.offline}</span>
           </button>
         </div>
 
-        {/* Map Controls: Awaiting GPS Chip + Fit Fleet + Center */}
-        <div className="pointer-events-auto flex items-center gap-1.5">
+        {/* Desktop Map Controls: Awaiting GPS Chip + Fit Fleet + Center */}
+        <div className="pointer-events-auto hidden sm:flex items-center gap-1.5 shrink-0">
           {awaitingGpsDrivers.length > 0 && (
             <div className="relative">
               <button
@@ -842,7 +862,7 @@ function LiveFleetMapComponent({
             title="Zoom to fit all visible live GPS vehicles"
           >
             <CarIcon className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">Fit Fleet</span>
+            <span>Fit Fleet</span>
           </button>
 
           <button
@@ -856,46 +876,156 @@ function LiveFleetMapComponent({
         </div>
       </div>
 
-      {/* ─── FLOATING INTERACTIVE DRIVER TELEMETRY HUD (ON CAR CLICK) ─── */}
-      {selectedDriver && (
-        <div className="absolute bottom-3 left-3 z-30 w-[min(340px,calc(100%-24px))] bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl p-3 space-y-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0 shadow-xs"
-                style={{ backgroundColor: FLEET_STATUS_COLORS[selectedDriver.mapStatus].hex }}
-              >
-                {extractCabShortLabel(selectedDriver)}
+      {/* ─── MOBILE FLOATING RIGHT-EDGE MAP CONTROLS (Google Maps style) ─── */}
+      <div
+        className={`sm:hidden absolute right-3 z-20 flex flex-col items-end gap-2 pointer-events-auto transition-all ${
+          selectedDriver ? 'bottom-[245px]' : 'bottom-4'
+        }`}
+      >
+        {awaitingGpsDrivers.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAwaitingGps(true)}
+            className="px-3 py-2 rounded-full bg-amber-50/95 active:scale-95 border border-amber-300 text-amber-900 text-[11px] font-bold shadow-lg backdrop-blur-md cursor-pointer flex items-center gap-1.5"
+            title="On-shift drivers without live GPS"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>No GPS ({awaitingGpsDrivers.length})</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleFitFleet}
+          className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-blue-600 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
+          title="Fit all live GPS vehicles"
+          aria-label="Fit Fleet"
+        >
+          <CarIcon className="w-5 h-5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleRecenterChesterfield}
+          className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-slate-700 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
+          title="Recenter on Chesterfield, MO"
+          aria-label="Recenter Map"
+        >
+          <MapPinIcon className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* ─── MOBILE AWAITING GPS BOTTOM SHEET (Drag-down to close) ─── */}
+      {showAwaitingGps && awaitingGpsDrivers.length > 0 && (
+        <div
+          className="sm:hidden fixed inset-0 z-[110] bg-slate-900/40 backdrop-blur-[2px] flex items-end"
+          onClick={dismissAwaitingGps}
+        >
+          <div
+            style={awaitingGpsSheetDrag.sheetStyle}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[70vh] flex flex-col animate-in slide-in-from-bottom-4 duration-150"
+          >
+            <div {...awaitingGpsSheetDrag.dragHandlers} className="shrink-0 touch-none">
+              <div className="pt-2.5 pb-1 flex justify-center">
+                <div className="w-10 h-1.5 rounded-full bg-slate-300" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-slate-900 text-sm truncate">
-                    {selectedDriver.name}
+              <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                    On-Shift Without GPS ({awaitingGpsDrivers.length})
                   </span>
-                  {selectedDriver.driverScore !== undefined && (
-                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                      ★ {selectedDriver.driverScore}
-                    </span>
-                  )}
                 </div>
-                <div className="text-[11px] text-slate-500 truncate">
-                  {selectedDriver.vehicle} • {selectedDriver.tier}
-                </div>
+                <button
+                  type="button"
+                  onClick={dismissAwaitingGps}
+                  className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
             </div>
+            <div className="p-3 space-y-1.5 overflow-y-auto">
+              {awaitingGpsDrivers.map((drv) => {
+                const pal = FLEET_STATUS_COLORS[drv.mapStatus];
+                return (
+                  <button
+                    key={drv.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDriverId(drv.id);
+                      setShowAwaitingGps(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200/80 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: pal.hex }}
+                      />
+                      <span className="font-bold text-slate-900 truncate">
+                        {extractCabShortLabel(drv)} • {drv.name}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-500 shrink-0">
+                      {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedDriverId(null);
-                onClearFocusedDriver?.();
-              }}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-              aria-label="Close driver details"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
+      {/* ─── FLOATING INTERACTIVE DRIVER TELEMETRY HUD (Drag-down-to-close card on mobile) ─── */}
+      {selectedDriver && (
+        <div
+          style={driverSheetDrag.sheetStyle}
+          className="absolute bottom-2.5 left-2.5 right-2.5 sm:bottom-3 sm:left-3 sm:right-auto z-30 sm:w-[min(340px,calc(100%-24px))] bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl p-3 space-y-2.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          {/* Mobile Drag Handle + Header */}
+          <div {...driverSheetDrag.dragHandlers} className="touch-none space-y-1.5">
+            <div className="sm:hidden flex justify-center -mt-1">
+              <div className="w-9 h-1 rounded-full bg-slate-300" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0 shadow-xs"
+                  style={{ backgroundColor: FLEET_STATUS_COLORS[selectedDriver.mapStatus].hex }}
+                >
+                  {extractCabShortLabel(selectedDriver)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-slate-900 text-sm truncate">
+                      {selectedDriver.name}
+                    </span>
+                    {selectedDriver.driverScore !== undefined && (
+                      <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                        {selectedDriver.driverScore}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-500 truncate">
+                    {selectedDriver.vehicle} • {selectedDriver.tier}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={dismissSelectedDriver}
+                className="p-1.5 sm:p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close driver details"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Live Status & Telemetry Strip */}
@@ -975,8 +1105,8 @@ function LiveFleetMapComponent({
 
           {/* Quick Dispatcher Duty Override (Persisted to Firestore) */}
           {onChangeDriverDutyStatus && !selectedDriver.activeTrip && (
-            <div className="flex items-center gap-1 pt-0.5">
-              <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Set:</span>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase mr-0.5">Set:</span>
               {(
                 [
                   { duty: 'on_duty', label: 'Available', activeClass: 'bg-emerald-600 text-white border-emerald-600' },
@@ -991,7 +1121,7 @@ function LiveFleetMapComponent({
                     type="button"
                     disabled={isUpdatingStatus || isCurrent}
                     onClick={() => handleDutySwitch(selectedDriver.id, opt.duty)}
-                    className={`flex-1 py-1 px-2 rounded-lg text-[10.5px] font-bold border transition-colors cursor-pointer disabled:cursor-default ${
+                    className={`flex-1 py-1.5 sm:py-1 px-2 rounded-xl sm:rounded-lg text-[11px] sm:text-[10.5px] font-bold border transition-colors cursor-pointer disabled:cursor-default ${
                       isCurrent
                         ? opt.activeClass
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -1010,7 +1140,7 @@ function LiveFleetMapComponent({
               type="button"
               disabled={!selectedDriver.telemetry?.coordinates}
               onClick={handleFindSelectedVehicle}
-              className="py-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-[11px] shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1"
+              className="py-2 sm:py-1.5 px-3 sm:px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs sm:text-[11px] shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center gap-1"
               title={
                 selectedDriver.telemetry?.coordinates
                   ? `Zoom directly to ${selectedDriver.name}'s vehicle on the map`
@@ -1018,17 +1148,18 @@ function LiveFleetMapComponent({
               }
             >
               <MapPinIcon className="w-3.5 h-3.5 text-sky-400" />
-              <span>Find Vehicle</span>
+              <span>Locate</span>
             </button>
 
             {canAssignSelectedTrip && selectedTrip && (
               <button
                 type="button"
                 onClick={() => onAssignDriverToTrip?.(selectedTrip.id, selectedDriver.id)}
-                className="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-colors cursor-pointer truncate"
+                className="flex-1 py-2 sm:py-1.5 px-3 sm:px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-[11px] shadow-xs transition-colors cursor-pointer truncate flex items-center justify-center gap-1"
                 title={`Assign ${selectedDriver.name} to selected trip`}
               >
-                ✓ Assign Selected Trip
+                <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Assign Trip</span>
               </button>
             )}
 
@@ -1036,9 +1167,9 @@ function LiveFleetMapComponent({
               <button
                 type="button"
                 onClick={() => onOpenDriverQueue(selectedDriver)}
-                className="flex-1 py-1.5 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shadow-xs transition-colors cursor-pointer"
+                className="flex-1 py-2 sm:py-1.5 px-3 sm:px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-[11px] shadow-xs transition-colors cursor-pointer"
               >
-                Open Queue
+                Queue
               </button>
             )}
 
@@ -1046,7 +1177,7 @@ function LiveFleetMapComponent({
               <button
                 type="button"
                 onClick={() => onCallDriver(selectedDriver.phone, selectedDriver.name)}
-                className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] border border-slate-200 transition-colors cursor-pointer flex items-center gap-1"
+                className="py-2 sm:py-1.5 px-3 sm:px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-[11px] border border-slate-200 transition-colors cursor-pointer flex items-center gap-1"
                 title={`Call ${selectedDriver.phone}`}
               >
                 <PhoneIcon className="w-3.5 h-3.5 text-blue-600" />

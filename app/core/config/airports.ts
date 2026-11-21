@@ -129,6 +129,17 @@ export function detectAirportInAddresses(
   const pickupLower = (pickupAddress || '').toLowerCase();
   const dropoffLower = (dropoffAddress || '').toLowerCase();
 
+  // Helper: use strict word-boundary matching for short IATA/acronym codes (e.g. "stl", "sus", "cps", "fbo")
+  // so regular street/city names like "Castle", "Westlake", or "Sussex" never false-positive.
+  const matchesKeyword = (text: string, kw: string): boolean => {
+    if (!text) return false;
+    if (kw.length <= 4) {
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(text);
+    }
+    return text.includes(kw);
+  };
+
   // Check standalone private aviation keywords across both addresses
   const privateKeywords = [
     'signature flight support',
@@ -143,12 +154,12 @@ export function detectAirportInAddresses(
     'private terminal',
   ];
   const hasPrivateKeyword = privateKeywords.some(
-    (kw) => pickupLower.includes(kw) || dropoffLower.includes(kw)
+    (kw) => matchesKeyword(pickupLower, kw) || matchesKeyword(dropoffLower, kw)
   );
 
   for (const airport of REGIONAL_AIRPORTS) {
-    const matchesPickup = airport.keywords.some((kw) => pickupLower.includes(kw));
-    const matchesDropoff = airport.keywords.some((kw) => dropoffLower.includes(kw));
+    const matchesPickup = airport.keywords.some((kw) => matchesKeyword(pickupLower, kw));
+    const matchesDropoff = airport.keywords.some((kw) => matchesKeyword(dropoffLower, kw));
 
     if (matchesPickup || matchesDropoff) {
       const isPrivate = airport.airportType === 'private' || hasPrivateKeyword;
