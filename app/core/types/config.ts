@@ -518,6 +518,97 @@ export interface FleetAlertsConfig {
   autoDismissMinutes?: number; // default: 60 (1 hour)
 }
 
+export type DispatchRankingStrategy =
+  | 'nearest_in_zone'
+  | 'longest_idle_in_zone'
+  | 'highest_driver_score';
+
+export interface DispatchAutomationConfig {
+  /** false = 1-tap dispatcher-initiated (default); true = auto-start cascade when a ride becomes CONFIRMED / ASAP pending */
+  autoOfferOnConfirm: boolean;
+  rankingStrategy: DispatchRankingStrategy;
+  /** Seconds per cascade offer step (default 45, clamped 15–180s) */
+  offerTimeoutSeconds: number;
+  /** Maximum drivers offered sequentially per cascade (default 3, clamped 1–10) */
+  maxCascadeAttempts: number;
+  /** Minutes before scheduled pickup to enter SLA warning window (default 60) */
+  slaWarningMinutes: number;
+  /** Minutes before scheduled pickup to enter SLA critical window (default 30) */
+  slaCriticalMinutes: number;
+  /** Extra lead minutes added automatically when detectAirportInAddresses matches STL/SUS/CPS (default 15) */
+  airportExtraLeadMinutes: number;
+}
+
+export const DEFAULT_DISPATCH_AUTOMATION_CONFIG: DispatchAutomationConfig = {
+  autoOfferOnConfirm: false,
+  rankingStrategy: 'nearest_in_zone',
+  offerTimeoutSeconds: 45,
+  maxCascadeAttempts: 3,
+  slaWarningMinutes: 60,
+  slaCriticalMinutes: 30,
+  airportExtraLeadMinutes: 15,
+};
+
+export function normalizeDispatchAutomationConfig(
+  raw?: Partial<DispatchAutomationConfig> | null
+): DispatchAutomationConfig {
+  const validStrategies: readonly DispatchRankingStrategy[] = [
+    'nearest_in_zone',
+    'longest_idle_in_zone',
+    'highest_driver_score',
+  ];
+  const rankingStrategy: DispatchRankingStrategy =
+    raw?.rankingStrategy && validStrategies.includes(raw.rankingStrategy)
+      ? raw.rankingStrategy
+      : DEFAULT_DISPATCH_AUTOMATION_CONFIG.rankingStrategy;
+
+  const clampInt = (val: unknown, fallback: number, min: number, max: number): number => {
+    const num = typeof val === 'number' ? val : Number(val);
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(num)));
+  };
+
+  const slaCriticalMinutes = clampInt(
+    raw?.slaCriticalMinutes,
+    DEFAULT_DISPATCH_AUTOMATION_CONFIG.slaCriticalMinutes,
+    1,
+    720
+  );
+  const rawWarning = clampInt(
+    raw?.slaWarningMinutes,
+    DEFAULT_DISPATCH_AUTOMATION_CONFIG.slaWarningMinutes,
+    1,
+    720
+  );
+
+  return {
+    autoOfferOnConfirm: Boolean(
+      raw?.autoOfferOnConfirm ?? DEFAULT_DISPATCH_AUTOMATION_CONFIG.autoOfferOnConfirm
+    ),
+    rankingStrategy,
+    offerTimeoutSeconds: clampInt(
+      raw?.offerTimeoutSeconds,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.offerTimeoutSeconds,
+      15,
+      180
+    ),
+    maxCascadeAttempts: clampInt(
+      raw?.maxCascadeAttempts,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.maxCascadeAttempts,
+      1,
+      10
+    ),
+    slaWarningMinutes: Math.max(slaCriticalMinutes, rawWarning),
+    slaCriticalMinutes,
+    airportExtraLeadMinutes: clampInt(
+      raw?.airportExtraLeadMinutes,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.airportExtraLeadMinutes,
+      0,
+      180
+    ),
+  };
+}
+
 export interface TelephonyIntegrationConfig {
   provider: 'twilio';
   accountSid: string;
@@ -570,6 +661,7 @@ export interface AppSettings {
   tariffs?: import('./tariff').TariffProfile[]; // Unified Tariff Profiles
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
+  dispatchAutomation?: DispatchAutomationConfig;
   integrations?: IntegrationsConfig;
   constructionMode?: boolean;
   enableRealtimeRouting?: boolean;

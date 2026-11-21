@@ -712,6 +712,44 @@ export interface PassengerAccount {
   - `driver.tsx` binds `useWakeLock({ enabled: driver?.dutyStatus === 'on_duty' })`, triggers offer sound + push notification on unseen `offeredTrips`, stops offer alert when offers clear or on accept/decline, and passes memoized wake-lock and push props to `DriverShiftControls`.
   - `dispatch.tsx` persists `ct_dispatch_wake_lock` in `localStorage`, exposes **Keep Screen Awake** and **Browser Push Alerts** controls in the Dispatch header settings popover & operations drawer, and invokes `notifyDispatchAlert` for new `UNCONFIRMED` / `ASAP` trips arriving while backgrounded.
 
+## 24. Phase 35 Architecture: Scheduled-Ride SLA Monitor & Auto-Dispatch / Offer Cascade
+
+### 24.1 Architectural Guardrails & Pure Domain Isolation
+- Per `constitution.md`, keep all candidate eligibility filtering, spatial/idle/score ranking, SLA urgency math, and sequential offer cascade state transitions in pure, deterministic, unit-testable domain services under `app/core/services/dispatch/` (`sla-monitor.service.ts` and `auto-dispatch.service.ts`), never inline in React components.
+- Enforce defense-in-depth relative URL validation (`rawUrl.startsWith('/') && !rawUrl.startsWith('//')`, else `'/app/driver'`) in `public/sw.js` and `app/routes/api.push.ts`.
+
+### 24.2 Configuration, Trip Schema & Firestore Security Rules
+- **`app/core/types/config.ts` & `app/core/services/config/admin-config.service.ts`**:
+  - Define `DispatchAutomationConfig` (`autoOfferOnConfirm: false`, `rankingStrategy: 'nearest_in_zone'`, `offerTimeoutSeconds: 45` clamped `15`–`180`, `maxCascadeAttempts: 3` clamped `1`–`10`, `slaWarningMinutes: 60`, `slaCriticalMinutes: 30`, `airportExtraLeadMinutes: 15`) and `normalizeDispatchAutomationConfig`.
+  - Hydrate and persist `AppSettings.dispatchAutomation` in `AdminConfigService` (`DEFAULT_APP_SETTINGS`, `mergeWithDefaults`, `updateSettings`).
+- **`app/core/types/trip.ts`, `firestore.rules`, `firebase-booking.service.ts`, `mock-booking.service.ts`**:
+  - Add `Trip.offerCascade` and `Trip.slaStatus` schemas; allow `offered -> CONFIRMED` / `offered -> offered` state transitions in `TRIP_STATE_TRANSITIONS`.
+  - Add `'offerCascade'` and `'slaStatus'` to the offered-driver `affectedKeys().hasOnly([...])` list in `firestore.rules` (lines 176–198) so driver accept/decline transactions on `/app/driver` succeed under strict security rules.
+  - Update `acceptDriverOffer` and `declineDriverOffer` in `FirebaseBookingService` and `MockBookingService` to atomically transition `offerCascade.state = 'accepted'` on accept and clear `offerCascade.activeOfferedDriverId = null` on decline so the cascade coordinator advances immediately without waiting for timeout expiry.
+
+### 24.3 Pure SLA Monitor & Auto-Dispatch Services (`app/core/services/dispatch/`)
+- **`sla-monitor.service.ts`**:
+  - `evaluateTripSlaUrgency(trip, config, nowMs)`: Evaluates unassigned scheduled `UNCONFIRMED` / `CONFIRMED` / `pending` / `offered` trips, adds `airportExtraLeadMinutes` when `detectAirportInAddresses` matches STL/SUS/CPS, computes `minutesUntilPickup`, and classifies `'normal' | 'warning' | 'critical' | 'overdue'`.
+  - `scanUpcomingUnassignedSlaTrips(trips, config, options)`: Batch-scans trips, returns sorted evaluations and counts (`overdueCount`, `criticalCount`, `warningCount`, `normalCount`, `atRiskTrips`).
+- **`auto-dispatch.service.ts`**:
+  - `rankAutoDispatchCandidates(trip, drivers, zones, config, options)`: Pure deterministic pipeline filtering out off-duty/break, busy/en-route/conflicting, blacklisted/archived drivers, grounded/blacklisted fleet vehicles, `rejectedByIds` / `attemptedDriverIds`, and incompatible vehicle capacities/tiers, then sorting by `nearest_in_zone` (`isCoordinateInZone` + `calculateHaversineDistanceMiles`), `longest_idle_in_zone`, or `highest_driver_score`.
+  - `startOfferCascade`, `advanceOrExpireOfferCascade`, `cancelOfferCascade`: Sequential 1-driver-at-a-time offer coordinator (`status: 'offered'`, `offeredToIds: [candidate.driverId]`, `offerExpiresAt`), logging `DISPATCH_OFFERED` / `STATUS_CHANGED` audit events, triggering optional `/api/push` `send_push`, rolling over on decline/timeout, and marking `offerCascade.state = 'exhausted'` (reverting `status` to `'CONFIRMED'` or `'pending'` and `offeredToIds: []`) after `maxCascadeAttempts` or zero remaining candidates.
+
+### 24.4 Serverless Scheduled SLA Cron (`app/routes/api.cron.sla-dispatch.ts`, `app/routes.ts`, `vercel.json`)
+- Register `api/cron/sla-dispatch` (`GET` & `POST`) in `app/routes.ts` and configure `"crons": [{ "path": "/api/cron/sla-dispatch", "schedule": "*/5 * * * *" }]` in `vercel.json`.
+- Authenticate via `Authorization: Bearer ${CRON_SECRET}`, `x-admin-secret`, or verified Admin/Dispatcher token (`verifyServerRequestAuth`).
+- Support Google Service Account Firestore REST (`FIREBASE_SERVICE_ACCOUNT_JSON`), staff-token Firestore REST, and `IBookingService` local fallback; idempotently stamp `slaStatus.criticalNotifiedAt` and send alert email/SMS to dispatch operations when unattended scheduled rides enter the `critical` / `overdue` window.
+
+### 24.5 Dispatch, Driver & Admin UI Integration
+- **Dispatch Console**:
+  - `dispatch.tsx`: Lightweight 5s SLA & cascade coordinator effect (`playSlaWarningChime` + `notifyDispatchAlert` once per threshold transition, `advanceOrExpireOfferCascade` on decline/timeout, optional `autoOfferOnConfirm` trigger on confirm/auto-confirmed arrival) plus `handleStartAutoOffer` and `handleCancelAutoOffer` handlers.
+  - `DispatchTripQueuePane.tsx`, `TripActionDropdown.tsx`, `DispatchTripDetailsDrawer.tsx`: SLA Urgency Banner with 1-click at-risk filter & jump, SLA countdown badges, isolated 1s live cascade countdown pills, and 1-tap **Auto-Offer** / **Cancel Cascade** actions.
+- **Driver App (`DriverOfferSheet.tsx`, `DriverLiveMeterCard.tsx`)**:
+  - Isolated 1s countdown badge & progress bar (`Accept within Xs · Step k/N`) whenever `offerCascade?.offerExpiresAt` is present on an incoming offer.
+- **Admin Console (`AdminRulesTab.tsx`)**:
+  - **Dispatch Automation & Scheduled SLA** card bound to `settings.dispatchAutomation`.
+
+
 
 
 

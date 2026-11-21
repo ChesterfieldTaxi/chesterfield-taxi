@@ -1245,11 +1245,21 @@ export class FirebaseBookingService implements IBookingService {
           ...(driverPhone ? { assignedDriverPhone: driverPhone } : {}),
         };
 
+        const nextOfferCascade = current.offerCascade
+          ? {
+              ...current.offerCascade,
+              state: 'accepted' as const,
+              activeOfferedDriverId: driverId,
+              ...(driverName ? { activeOfferedDriverName: driverName } : {}),
+            }
+          : undefined;
+
         const patch: Partial<Trip> = {
           status: 'assigned',
           assignedDriverId: driverId,
           offeredToIds: [],
           ...(vehicle ? { assignedVehicle: vehicle } : {}),
+          ...(nextOfferCascade ? { offerCascade: nextOfferCascade } : {}),
           metadata: nextMetadata,
           statusHistory: [...(current.statusHistory || []), historyEntry],
           auditLog: [...(current.auditLog || []), auditEvent],
@@ -1280,6 +1290,16 @@ export class FirebaseBookingService implements IBookingService {
         assignedDriverId: driverId,
         offeredToIds: [],
         ...(vehicle ? { assignedVehicle: vehicle } : {}),
+        ...(local.offerCascade
+          ? {
+              offerCascade: {
+                ...local.offerCascade,
+                state: 'accepted',
+                activeOfferedDriverId: driverId,
+                ...(driverName ? { activeOfferedDriverName: driverName } : {}),
+              },
+            }
+          : {}),
         metadata: { ...(local.metadata || {}), ...(driverName ? { assignedDriverName: driverName } : {}) },
         statusHistory: [
           ...(local.statusHistory || []),
@@ -1358,11 +1378,28 @@ export class FirebaseBookingService implements IBookingService {
           context: `Driver ${driverId} declined trip offer. Remaining offered drivers: ${remainingOffered.length}.`,
         };
 
+        const nextOfferCascade = current.offerCascade
+          ? {
+              ...current.offerCascade,
+              activeOfferedDriverId:
+                current.offerCascade.activeOfferedDriverId === driverId
+                  ? null
+                  : current.offerCascade.activeOfferedDriverId,
+              ...(current.offerCascade.activeOfferedDriverId === driverId
+                ? { activeOfferedDriverName: '' }
+                : {}),
+              attemptedDriverIds: Array.from(
+                new Set([...(current.offerCascade.attemptedDriverIds || []), driverId])
+              ),
+            }
+          : undefined;
+
         const patch: Partial<Trip> = {
           status: nextStatus,
           assignedDriverId: current.assignedDriverId === driverId ? null : current.assignedDriverId,
           offeredToIds: remainingOffered,
           rejectedByIds: nextRejected,
+          ...(nextOfferCascade ? { offerCascade: nextOfferCascade } : {}),
           statusHistory: [...(current.statusHistory || []), historyEntry],
           auditLog: [...(current.auditLog || []), auditEvent],
           updatedAt: now,
@@ -1384,6 +1421,23 @@ export class FirebaseBookingService implements IBookingService {
         assignedDriverId: local.assignedDriverId === driverId ? null : local.assignedDriverId,
         offeredToIds: remainingOffered,
         rejectedByIds: nextRejected,
+        ...(local.offerCascade
+          ? {
+              offerCascade: {
+                ...local.offerCascade,
+                activeOfferedDriverId:
+                  local.offerCascade.activeOfferedDriverId === driverId
+                    ? null
+                    : local.offerCascade.activeOfferedDriverId,
+                ...(local.offerCascade.activeOfferedDriverId === driverId
+                  ? { activeOfferedDriverName: '' }
+                  : {}),
+                attemptedDriverIds: Array.from(
+                  new Set([...(local.offerCascade.attemptedDriverIds || []), driverId])
+                ),
+              },
+            }
+          : {}),
         updatedAt: now,
       };
     }
@@ -1494,6 +1548,24 @@ export class FirebaseBookingService implements IBookingService {
 
     if (options?.offeredToIds !== undefined) {
       updates.offeredToIds = options.offeredToIds;
+    } else if (status === 'assigned' || status === 'accepted' || status === 'cancelled') {
+      updates.offeredToIds = [];
+    }
+
+    if (trip.offerCascade?.state === 'active') {
+      if (status === 'assigned' || status === 'accepted') {
+        updates.offerCascade = {
+          ...trip.offerCascade,
+          state: 'accepted',
+          activeOfferedDriverId: options?.assignedDriverId || trip.assignedDriverId || null,
+        };
+      } else if (status === 'cancelled' || status === 'DECLINED' || status === 'declined') {
+        updates.offerCascade = {
+          ...trip.offerCascade,
+          state: 'cancelled',
+          activeOfferedDriverId: null,
+        };
+      }
     }
 
     if (status === 'in_progress' && !trip.actualPickupTime) {

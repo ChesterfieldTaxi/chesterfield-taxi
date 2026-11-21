@@ -2,6 +2,7 @@ import React from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import { DriverTripManifest } from './DriverTripManifest';
+import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
 import {
   openMapNavigation,
   resolveCallPassengerHref,
@@ -88,6 +89,10 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
                       ${offer.pricing?.totalFare?.toFixed(2) || '0.00'}
                     </span>
                   </div>
+
+                  {offer.offerCascade?.offerExpiresAt && (
+                    <DriverCascadeCountdownBar cascade={offer.offerCascade} />
+                  )}
 
                   <div className="bg-slate-950/70 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
                     <div>

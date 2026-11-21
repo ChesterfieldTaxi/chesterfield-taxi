@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Trip } from '../../../core/types/trip';
 import {
+  canTripTriggerAutoOffer,
+  isTripCascadeActive,
+} from './DispatchCascadeSlaBadges';
+import {
   ChevronDownIcon,
   PencilIcon,
   MapPinIcon,
@@ -12,6 +16,7 @@ import {
   CheckIcon,
   RefreshCwIcon,
   BanIcon,
+  XIcon,
 } from '../../ui/Icons';
 
 export interface TripActionDropdownProps {
@@ -27,6 +32,8 @@ export interface TripActionDropdownProps {
   onAudit: () => void;
   onClone: () => void;
   onFocusMap: () => void;
+  onStartAutoOffer?: () => void;
+  onCancelAutoOffer?: () => void;
   onCompleteTrip?: () => void;
   onCancelTrip?: () => void;
   onReactivateTrip?: () => void;
@@ -45,6 +52,8 @@ export function TripActionDropdown({
   onAudit,
   onClone,
   onFocusMap,
+  onStartAutoOffer,
+  onCancelAutoOffer,
   onCompleteTrip,
   onCancelTrip,
   onReactivateTrip,
@@ -240,6 +249,34 @@ export function TripActionDropdown({
               <DocumentTextIcon className={`w-3.5 h-3.5 shrink-0 ${isUnconfirmed ? 'text-amber-600' : 'text-blue-500'}`} />
               <span>{isUnconfirmed ? 'Review Booking' : 'Trip Details & Audit'}</span>
             </button>
+
+            {isTripCascadeActive(trip) && onCancelAutoOffer ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onCancelAutoOffer();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50/60 hover:bg-rose-100/80 transition-colors cursor-pointer"
+              >
+                <XIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                <span>Cancel Cascade</span>
+              </button>
+            ) : canTripTriggerAutoOffer(trip) && onStartAutoOffer ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onStartAutoOffer();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50/90 transition-colors cursor-pointer"
+              >
+                <BoltIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>
+                  {trip.offerCascade?.state === 'exhausted' ? 'Retry Auto-Offer' : 'Auto-Offer Cascade'}
+                </span>
+              </button>
+            ) : null}
 
             <button
               type="button"

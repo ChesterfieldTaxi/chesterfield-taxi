@@ -481,6 +481,30 @@
   - [x] 34.7.1 Create `scripts/test-pwa-notifications.ts` testing payload formatting, SW syntax & event handlers, manifest `/app/driver` scope, and SSR/unsupported fallbacks.
   - [x] 34.7.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-pwa-notifications.ts`, and `npm run test:e2e`, then mark Phase 34 complete in `tasks.md`.
 
+## Phase 35: Scheduled-Ride SLA Monitor & Auto-Dispatch / Offer Cascade
+- [x] 35.0 Baseline Commit & Notification URL Guard:
+  - [x] 35.0.1 Commit Phase 34 PWA baseline cleanly before Phase 35 changes.
+  - [x] 35.0.2 Add same-origin relative-path guard (`rawUrl.startsWith('/') && !rawUrl.startsWith('//')`, else `'/app/driver'`) to notification `url` normalization in `public/sw.js` and `app/routes/api.push.ts` (`send_push`).
+- [x] 35.1 Documentation First (SDD Convention):
+  - [x] 35.1.1 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 35 scope and architecture before modifying application code.
+- [x] 35.2 Config, Trip Schema & Firestore Security Rules:
+  - [x] 35.2.1 Add `DispatchAutomationConfig` (`autoOfferOnConfirm: false`, `rankingStrategy`, `offerTimeoutSeconds`, `maxCascadeAttempts`, `slaWarningMinutes`, `slaCriticalMinutes`, `airportExtraLeadMinutes`) to `app/core/types/config.ts` and hydrate/persist in `app/core/services/config/admin-config.service.ts`.
+  - [x] 35.2.2 Extend `Trip` in `app/core/types/trip.ts` with `offerCascade` and `slaStatus`, and update `TRIP_STATE_TRANSITIONS`.
+  - [x] 35.2.3 Update `firestore.rules` offered-driver `affectedKeys().hasOnly(...)` to allow `'offerCascade'` (and `'slaStatus'`), and update `acceptDriverOffer` / `declineDriverOffer` in `firebase-booking.service.ts` and `mock-booking.service.ts`.
+- [x] 35.3 Pure SLA Monitor & Auto-Dispatch Services (`app/core/services/dispatch/`):
+  - [x] 35.3.1 Implement `app/core/services/dispatch/sla-monitor.service.ts` (`evaluateTripSlaUrgency`, `scanUpcomingUnassignedSlaTrips`) with STL/SUS/CPS airport extra lead buffer.
+  - [x] 35.3.2 Implement `app/core/services/dispatch/auto-dispatch.service.ts` (`rankAutoDispatchCandidates`, `startOfferCascade`, `advanceOrExpireOfferCascade`, `cancelOfferCascade`) and barrel `app/core/services/dispatch/index.ts`.
+- [x] 35.4 Serverless Scheduled SLA Cron:
+  - [x] 35.4.1 Implement `app/routes/api.cron.sla-dispatch.ts` + `app/core/services/dispatch/sla-cron.server.ts` (`GET`/`POST`, secured via `CRON_SECRET` / `x-admin-secret` / Dispatcher-Admin auth, idempotent `criticalNotifiedAt` stamping, email/SMS alerts, cascade maintenance) and register in `app/routes.ts` + `vercel.json`.
+- [x] 35.5 Dispatch, Driver & Admin UI Integration:
+  - [x] 35.5.1 Wire periodic SLA & cascade coordinator tick, `autoOfferOnConfirm` hook, SLA Urgency Banner, SLA countdown badges, live cascade pills, and 1-tap Auto-Offer / Cancel Cascade actions across `app/routes/dispatch.tsx`, `DispatchTripQueuePane.tsx`, `TripActionDropdown.tsx`, and `DispatchTripDetailsDrawer.tsx`.
+  - [x] 35.5.2 Add live 1-second cascade offer countdown progress bar / badge in `DriverOfferSheet.tsx` and `DriverLiveMeterCard.tsx`.
+  - [x] 35.5.3 Add **Dispatch Automation & Scheduled SLA** settings card in `AdminRulesTab.tsx`.
+- [x] 35.6 Verification Gate:
+  - [x] 35.6.1 Create `scripts/test-auto-dispatch-sla.ts` covering all 3 ranking strategies, exclusion filters, multi-step cascade rollover & exhaustion, and SLA urgency math (including STL/SUS airport buffer).
+  - [x] 35.6.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-auto-dispatch-sla.ts`, `npm run test:e2e`, and `npm run test:stress`, then mark Phase 35 complete in `tasks.md`.
+
+
 
 
 

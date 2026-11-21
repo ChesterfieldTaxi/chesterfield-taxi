@@ -84,6 +84,15 @@ import {
   DispatchTripDetailsDrawer,
   sendDispatchContextualTripEmail,
 } from '../components/domain/dispatch/DispatchTripDetailsDrawer';
+import { getZoneService, DEFAULT_ZONES } from '../core/services/zones/zone.service';
+import type { ZoneGeofence } from '../core/types/zone';
+import {
+  advanceOrExpireOfferCascade,
+  buildTripSlaStatusPatch,
+  cancelOfferCascade,
+  scanUpcomingUnassignedSlaTrips,
+  startOfferCascade,
+} from '../core/services/dispatch';
 
 export type { DriverRosterItem };
 
@@ -126,6 +135,12 @@ export default function DispatchRoute() {
 
   // Trips real-time state
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [dispatchZones, setDispatchZones] = useState<ZoneGeofence[]>(() => [...DEFAULT_ZONES]);
+  const [slaUrgentOnlyFilter, setSlaUrgentOnlyFilter] = useState<boolean>(false);
+  const [slaClockTick, setSlaClockTick] = useState<number>(() => Date.now());
+  const inFlightCascadeIdsRef = useRef<Set<string>>(new Set());
+  const slaNotifiedLevelsRef = useRef<Map<string, 'warning' | 'critical'>>(new Map());
+  const autoOfferStartedIdsRef = useRef<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [filterPreset, setFilterPreset] = useState<string>('all');
   const [filterStartDate, setFilterStartDate] = useState<string>('');
@@ -781,7 +796,23 @@ export default function DispatchRoute() {
   // Settings
   useEffect(() => {
     const unsub = getAdminConfigService().subscribeToSettings((updated) => setSettings(updated), () => {});
+    getZoneService()
+      .getZones()
+      .then((loadedZones) => {
+        if (loadedZones && loadedZones.length > 0) {
+          setDispatchZones(loadedZones);
+        }
+      })
+      .catch(() => {});
     return unsub;
+  }, []);
+
+  // Refresh SLA urgency clock every 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSlaClockTick(Date.now());
+    }, 15_000);
+    return () => clearInterval(interval);
   }, []);
 
   // Persist panel dimensions in localStorage
@@ -1112,6 +1143,14 @@ export default function DispatchRoute() {
       );
       setSelectedTripIds([]);
       showDispatchToast(`Confirmed ${tripsToConfirm.length} selected trip(s).`, 'success');
+
+      if (settings.dispatchAutomation?.autoOfferOnConfirm) {
+        for (const t of tripsToConfirm) {
+          if (!t.assignedDriverId && !t.offerCascade) {
+            void handleStartAutoOffer({ ...t, status: 'CONFIRMED' });
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to batch confirm trips:', err);
       showDispatchToast('Failed to batch confirm selected trips. Please try again.', 'error');
@@ -1159,6 +1198,17 @@ export default function DispatchRoute() {
     const updates: Partial<Trip> = {
       assignedDriverId: isUnassigning ? null : driverId,
       status: nextStatus,
+      ...(isUnassigning ? {} : { offeredToIds: [] }),
+      ...(!isUnassigning && tripToUpdate.offerCascade?.state === 'active'
+        ? {
+            offerCascade: {
+              ...tripToUpdate.offerCascade,
+              state: 'accepted',
+              activeOfferedDriverId: driverId,
+              activeOfferedDriverName: drvObj?.formattedLabel || drvObj?.name,
+            },
+          }
+        : {}),
       ...(drvObj
         ? {
             metadata: {
@@ -1326,6 +1376,87 @@ export default function DispatchRoute() {
     setCompleteModalOpenSeq((seq) => seq + 1);
   }, []);
 
+  // Phase 35: Sequential Auto-Offer Cascade Start & Cancel Handlers
+  const handleStartAutoOffer = useCallback(
+    async (trip: Trip) => {
+      if (!trip?.id || inFlightCascadeIdsRef.current.has(trip.id)) return;
+      inFlightCascadeIdsRef.current.add(trip.id);
+      autoOfferStartedIdsRef.current.add(trip.id);
+
+      try {
+        const res = await startOfferCascade({
+          trip,
+          drivers,
+          zones: dispatchZones,
+          config: settings.dispatchAutomation,
+          fleetVehicles: settings.fleet,
+          activeTrips: trips,
+          vehicleTiers: settings.vehicles,
+          actorRole: user?.role === 'admin' ? 'admin' : 'dispatcher',
+          actorId: user?.uid,
+        });
+
+        setTrips((prev) => prev.map((t) => (t.id === trip.id ? res.trip : t)));
+        setReviewTrip((prev) => (prev && prev.id === trip.id ? res.trip : prev));
+
+        if (res.outcome === 'offered' && res.candidate) {
+          showDispatchToast(
+            `Offering Trip #${trip.id.slice(-6).toUpperCase()} to ${res.candidate.driverLabel} (Step 1/${res.trip.offerCascade?.maxAttempts || 3} · ${res.trip.offerCascade?.timeoutSeconds || 45}s).`,
+            'info'
+          );
+        } else if (res.outcome === 'exhausted') {
+          showDispatchToast(
+            `Auto-Offer Cascade: No eligible available drivers matched Trip #${trip.id.slice(-6).toUpperCase()}.`,
+            'error'
+          );
+        }
+      } catch (err) {
+        console.error('[Dispatch] Failed to start Auto-Offer Cascade:', err);
+        showDispatchToast('Failed to start Auto-Offer Cascade.', 'error');
+      } finally {
+        inFlightCascadeIdsRef.current.delete(trip.id);
+      }
+    },
+    [drivers, dispatchZones, settings.dispatchAutomation, settings.fleet, settings.vehicles, trips, user, showDispatchToast]
+  );
+
+  const handleCancelAutoOffer = useCallback(
+    async (trip: Trip) => {
+      if (!trip?.id || inFlightCascadeIdsRef.current.has(trip.id)) return;
+      inFlightCascadeIdsRef.current.add(trip.id);
+
+      try {
+        const res = await cancelOfferCascade({
+          trip,
+          actorRole: user?.role === 'admin' ? 'admin' : 'dispatcher',
+          actorId: user?.uid,
+        });
+
+        setTrips((prev) => prev.map((t) => (t.id === trip.id ? res.trip : t)));
+        setReviewTrip((prev) => (prev && prev.id === trip.id ? res.trip : prev));
+        showDispatchToast(
+          `Offer cascade cancelled for Trip #${trip.id.slice(-6).toUpperCase()}.`,
+          'info'
+        );
+      } catch (err) {
+        console.error('[Dispatch] Failed to cancel Offer Cascade:', err);
+        showDispatchToast('Failed to cancel Offer Cascade.', 'error');
+      } finally {
+        inFlightCascadeIdsRef.current.delete(trip.id);
+      }
+    },
+    [user, showDispatchToast]
+  );
+
+  const autoOfferContextRef = useRef({
+    autoOfferOnConfirm: Boolean(settings.dispatchAutomation?.autoOfferOnConfirm),
+    handleStartAutoOffer,
+  });
+  autoOfferContextRef.current = {
+    autoOfferOnConfirm: Boolean(settings.dispatchAutomation?.autoOfferOnConfirm),
+    handleStartAutoOffer,
+  };
+
   // Trips real-time subscription with ASAP Ride Audio Chime
   useEffect(() => {
     const service = getBookingService();
@@ -1352,6 +1483,21 @@ export default function DispatchRoute() {
           void pushNotificationService.notifyDispatchAlert(alertInput, { requireHidden: true });
         }
         newTrips.forEach((t) => knownTripIdsRef.current!.add(t.id));
+
+        if (autoOfferContextRef.current.autoOfferOnConfirm) {
+          for (const nt of newTrips) {
+            const isAutoEligible =
+              !nt.assignedDriverId &&
+              !nt.offerCascade &&
+              !autoOfferStartedIdsRef.current.has(nt.id) &&
+              (nt.status === 'CONFIRMED' ||
+                nt.status === 'confirmed' ||
+                (nt.bookingType === 'asap' && nt.status === 'pending'));
+            if (isAutoEligible) {
+              void autoOfferContextRef.current.handleStartAutoOffer(nt);
+            }
+          }
+        }
       }
 
       setTrips(updatedTrips);
@@ -2004,6 +2150,179 @@ export default function DispatchRoute() {
     return 'All Dates';
   };
 
+  // Phase 35: Scheduled-Ride SLA Urgency Summary
+  const slaSummary = useMemo(
+    () =>
+      scanUpcomingUnassignedSlaTrips(trips, settings.dispatchAutomation, {
+        nowMs: slaClockTick,
+      }),
+    [trips, settings.dispatchAutomation, slaClockTick]
+  );
+
+  // Phase 35: Periodic SLA Monitor & Active Offer Cascade Coordinator Tick
+  const coordinatorStateRef = useRef({
+    trips,
+    drivers,
+    dispatchZones,
+    settings,
+    showDispatchToast,
+  });
+  coordinatorStateRef.current = {
+    trips,
+    drivers,
+    dispatchZones,
+    settings,
+    showDispatchToast,
+  };
+
+  useEffect(() => {
+    const runCoordinatorTick = () => {
+      const {
+        trips: latestTrips,
+        drivers: latestDrivers,
+        dispatchZones: latestZones,
+        settings: latestSettings,
+        showDispatchToast: toastFn,
+      } = coordinatorStateRef.current;
+
+      if (!latestTrips || latestTrips.length === 0) return;
+
+      const nowMs = Date.now();
+      const nowIso = new Date(nowMs).toISOString();
+      const bookingSvc = getBookingService();
+
+      // 1. Evaluate Scheduled SLA threshold transitions (once per trip into warning / critical)
+      const currentSlaScan = scanUpcomingUnassignedSlaTrips(
+        latestTrips,
+        latestSettings.dispatchAutomation,
+        { nowMs }
+      );
+
+      for (const { trip, sla } of currentSlaScan.atRiskTrips) {
+        // Hydrate ref from persisted trip stamps so reload never re-chimes already notified rides
+        if (!slaNotifiedLevelsRef.current.has(trip.id)) {
+          if (trip.slaStatus?.criticalNotifiedAt) {
+            slaNotifiedLevelsRef.current.set(trip.id, 'critical');
+          } else if (trip.slaStatus?.warningNotifiedAt) {
+            slaNotifiedLevelsRef.current.set(trip.id, 'warning');
+          }
+        }
+
+        const prevLevel = slaNotifiedLevelsRef.current.get(trip.id);
+
+        if (
+          (sla.level === 'critical' || sla.level === 'overdue') &&
+          prevLevel !== 'critical'
+        ) {
+          slaNotifiedLevelsRef.current.set(trip.id, 'critical');
+          soundNotificationService.playSlaWarningChime();
+          void pushNotificationService.notifyDispatchAlert({
+            title: `SLA ${sla.level.toUpperCase()}: Trip #${trip.id.slice(-6).toUpperCase()} (${sla.badgeLabel})`,
+            body: `Unassigned scheduled ride: ${trip.pickupLocation?.address || 'Pickup'} → ${trip.dropoffLocation?.address || 'Destination'}`,
+            url: `/app/dispatch?tripId=${encodeURIComponent(trip.id)}`,
+            tag: `ct-sla-crit-${trip.id}`,
+            requireInteraction: true,
+          });
+          toastFn(
+            `SLA ${sla.level.toUpperCase()}: Scheduled Trip #${trip.id.slice(-6).toUpperCase()} (${sla.badgeLabel}) is unassigned!`,
+            'error'
+          );
+
+          if (bookingSvc.updateTrip && !trip.slaStatus?.criticalNotifiedAt) {
+            const nextSla = buildTripSlaStatusPatch(trip.slaStatus, sla, {
+              warningNotifiedAt: trip.slaStatus?.warningNotifiedAt || nowIso,
+              criticalNotifiedAt: nowIso,
+            });
+            bookingSvc.updateTrip(trip.id, { slaStatus: nextSla }).catch(() => {});
+          }
+        } else if (sla.level === 'warning' && !prevLevel) {
+          slaNotifiedLevelsRef.current.set(trip.id, 'warning');
+          soundNotificationService.playSlaWarningChime();
+          void pushNotificationService.notifyDispatchAlert({
+            title: `SLA Warning: Trip #${trip.id.slice(-6).toUpperCase()} (${sla.badgeLabel})`,
+            body: `Unassigned scheduled pickup: ${trip.pickupLocation?.address || 'Pickup'}`,
+            url: `/app/dispatch?tripId=${encodeURIComponent(trip.id)}`,
+            tag: `ct-sla-warn-${trip.id}`,
+          });
+
+          if (bookingSvc.updateTrip && !trip.slaStatus?.warningNotifiedAt) {
+            const nextSla = buildTripSlaStatusPatch(trip.slaStatus, sla, {
+              warningNotifiedAt: nowIso,
+            });
+            bookingSvc.updateTrip(trip.id, { slaStatus: nextSla }).catch(() => {});
+          }
+        }
+      }
+
+      // 2. Advance or Expire Active Offer Cascades
+      for (const trip of latestTrips) {
+        const cascade = trip.offerCascade;
+        if (!cascade || cascade.state !== 'active') continue;
+        if (inFlightCascadeIdsRef.current.has(trip.id)) continue;
+
+        const activeDriverId = cascade.activeOfferedDriverId;
+        const wasDeclined =
+          !activeDriverId ||
+          !Array.isArray(trip.offeredToIds) ||
+          !trip.offeredToIds.includes(activeDriverId) ||
+          (Array.isArray(trip.rejectedByIds) && trip.rejectedByIds.includes(activeDriverId));
+        const expiresMs = Date.parse(cascade.offerExpiresAt);
+        const isExpired = Number.isFinite(expiresMs) && nowMs >= expiresMs;
+        const isAccepted = Boolean(trip.assignedDriverId);
+
+        if (!wasDeclined && !isExpired && !isAccepted) {
+          continue;
+        }
+
+        inFlightCascadeIdsRef.current.add(trip.id);
+        advanceOrExpireOfferCascade({
+          trip,
+          drivers: latestDrivers,
+          zones: latestZones,
+          config: latestSettings.dispatchAutomation,
+          fleetVehicles: latestSettings.fleet,
+          activeTrips: latestTrips,
+          vehicleTiers: latestSettings.vehicles,
+          nowMs,
+        })
+          .then((res) => {
+            setTrips((prev) => prev.map((t) => (t.id === trip.id ? res.trip : t)));
+            setReviewTrip((prev) => (prev && prev.id === trip.id ? res.trip : prev));
+
+            if (res.outcome === 'advanced' && res.candidate) {
+              toastFn(
+                `Cascade Step ${res.trip.offerCascade?.cascadeAttempt}/${res.trip.offerCascade?.maxAttempts}: Rolled over Trip #${trip.id.slice(-6).toUpperCase()} to ${res.candidate.driverLabel}.`,
+                'info'
+              );
+            } else if (res.outcome === 'exhausted') {
+              soundNotificationService.playSlaWarningChime();
+              void pushNotificationService.notifyDispatchAlert({
+                title: `Offer Cascade Exhausted — Trip #${trip.id.slice(-6).toUpperCase()}`,
+                body: `No driver accepted after ${res.trip.offerCascade?.attemptedDriverIds.length || 0} attempt(s). Manual assignment needed.`,
+                url: `/app/dispatch?tripId=${encodeURIComponent(trip.id)}`,
+                tag: `ct-cascade-exhausted-${trip.id}`,
+                requireInteraction: true,
+              });
+              toastFn(
+                `Offer Cascade exhausted for Trip #${trip.id.slice(-6).toUpperCase()} — assign a driver manually.`,
+                'error'
+              );
+            }
+          })
+          .catch((err) => {
+            console.warn('[Dispatch] Cascade coordinator tick warning:', err);
+          })
+          .finally(() => {
+            inFlightCascadeIdsRef.current.delete(trip.id);
+          });
+      }
+    };
+
+    runCoordinatorTick();
+    const interval = setInterval(runCoordinatorTick, 3000);
+    return () => clearInterval(interval);
+  }, [trips]);
+
   // Comprehensive memoized filtered trips in queue (local timezone dates + time range + all active filters)
   const filteredTrips = useMemo(() => {
     const normSearchDigits = searchTerm.replace(/\D/g, '');
@@ -2011,6 +2330,11 @@ export default function DispatchRoute() {
 
     return trips.filter((trip) => {
       const meta = (trip.metadata || {}) as Record<string, any>;
+
+      if (slaUrgentOnlyFilter) {
+        const sla = slaSummary.byTripId[trip.id];
+        if (!sla || !sla.isEligible || sla.level === 'normal') return false;
+      }
 
       // Status filter from dropdown (including unconfirmed & live active states)
       if (statusFilter !== 'all') {
@@ -2160,6 +2484,8 @@ export default function DispatchRoute() {
     selectedCompanyFilter,
     selectedPaymentFilter,
     searchTerm,
+    slaUrgentOnlyFilter,
+    slaSummary,
   ]);
 
   // Table Selection Handlers
@@ -2242,6 +2568,15 @@ export default function DispatchRoute() {
       setDrafts((prev) =>
         prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item))
       );
+    } else if (
+      autoOfferContextRef.current.autoOfferOnConfirm &&
+      !savedTrip.assignedDriverId &&
+      !savedTrip.offerCascade &&
+      (savedTrip.status === 'CONFIRMED' ||
+        savedTrip.status === 'confirmed' ||
+        savedTrip.status === 'pending')
+    ) {
+      void autoOfferContextRef.current.handleStartAutoOffer(savedTrip);
     }
   }, []);
 
@@ -3957,6 +4292,11 @@ export default function DispatchRoute() {
               setActiveDockTab('phone');
               setActiveMobileTab('phone');
             }}
+            slaSummary={slaSummary}
+            slaUrgentOnlyFilter={slaUrgentOnlyFilter}
+            onToggleSlaUrgentOnlyFilter={() => setSlaUrgentOnlyFilter((prev) => !prev)}
+            onStartAutoOffer={handleStartAutoOffer}
+            onCancelAutoOffer={handleCancelAutoOffer}
           />
         </div>
 
@@ -4511,6 +4851,8 @@ export default function DispatchRoute() {
         onOpenCompleteTripModal={handleOpenCompleteTripModal}
         onCloseCompleteTripModal={() => setCompleteTripTarget(null)}
         onQuickAssignDriver={handleQuickAssignDriver}
+        onStartAutoOffer={handleStartAutoOffer}
+        onCancelAutoOffer={handleCancelAutoOffer}
         onPromptCancelTrip={handlePromptCancelTrip}
         onReactivateTrip={handleReactivateTrip}
         onCloneBookingFromReview={(trip) => {
@@ -4760,6 +5102,8 @@ export default function DispatchRoute() {
           setSelectedTripIds((prev) => (prev.includes(tripId) ? prev : [...prev, tripId]));
         }}
         onPromptCancelTrip={handlePromptCancelTrip}
+        onStartAutoOffer={handleStartAutoOffer}
+        onCancelAutoOffer={handleCancelAutoOffer}
         sheetStyle={dispatchSheetDrag.sheetStyle}
         dragHandlers={dispatchSheetDrag.dragHandlers}
       />

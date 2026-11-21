@@ -391,7 +391,9 @@ export async function action({ request }: ActionFunctionArgs) {
       const fcmEndpoint = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(
         projectId
       )}/messages:send`;
-      const targetUrl = notif.url || '/app/driver';
+      const rawUrl = String(notif.url || '').trim();
+      const targetUrl =
+        rawUrl.startsWith('/') && !rawUrl.startsWith('//') ? rawUrl : '/app/driver';
       let deliveredCount = 0;
 
       await Promise.all(

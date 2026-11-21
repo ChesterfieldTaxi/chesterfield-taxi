@@ -46,6 +46,7 @@ export default [
   route("api/seed-stress-data", "routes/api.seed-stress-data.tsx"),
   route("api/payments", "routes/api.payments.ts"),
   route("api/push", "routes/api.push.ts"),
+  route("api/cron/sla-dispatch", "routes/api.cron.sla-dispatch.ts"),
   route("api/telephony", "routes/api.telephony.ts"),
   route("api/telephony/verify", "routes/api.telephony.verify.ts"),
 ] satisfies RouteConfig;

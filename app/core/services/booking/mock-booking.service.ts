@@ -697,12 +697,22 @@ export class MockBookingService implements IBookingService {
     if (trip.status !== 'offered' && trip.assignedDriverId !== driverId) {
       throw new Error(`Trip offer is no longer available (current status: ${trip.status}).`);
     }
-    return this.updateTripStatus(tripId, 'assigned', {
+    const assigned = await this.updateTripStatus(tripId, 'assigned', {
       actorRole: 'driver',
       assignedDriverId: driverId,
       offeredToIds: [],
       reason: 'Offer accepted by driver',
     });
+    if (assigned.offerCascade) {
+      return this.updateTrip(tripId, {
+        offerCascade: {
+          ...assigned.offerCascade,
+          state: 'accepted',
+          activeOfferedDriverId: driverId,
+        },
+      });
+    }
+    return assigned;
   }
 
   public async declineDriverOffer(tripId: string, driverId: string, reason?: string): Promise<Trip> {
@@ -719,9 +729,38 @@ export class MockBookingService implements IBookingService {
       assignedDriverId: trip.assignedDriverId === driverId ? null : trip.assignedDriverId,
       offeredToIds: remainingOffered,
       rejectedByIds: nextRejected,
+      ...(trip.offerCascade
+        ? {
+            offerCascade: {
+              ...trip.offerCascade,
+              activeOfferedDriverId:
+                trip.offerCascade.activeOfferedDriverId === driverId
+                  ? null
+                  : trip.offerCascade.activeOfferedDriverId,
+              ...(trip.offerCascade.activeOfferedDriverId === driverId
+                ? { activeOfferedDriverName: '' }
+                : {}),
+              attemptedDriverIds: Array.from(
+                new Set([...(trip.offerCascade.attemptedDriverIds || []), driverId])
+              ),
+            },
+          }
+        : {}),
       statusHistory: [
         ...(trip.statusHistory || []),
         { from: trip.status, to: nextStatus, timestamp: now, actorRole: 'driver', reason: reason || 'Driver declined trip offer' },
+      ],
+      auditLog: [
+        ...(trip.auditLog || []),
+        {
+          action: 'DRIVER_DECLINED',
+          timestamp: now,
+          actorId: driverId,
+          actorRole: 'driver',
+          referenceNumber: `DEC-${Math.floor(1000 + Math.random() * 9000)}`,
+          referenceType: 'decline',
+          context: `Driver ${driverId} declined trip offer.`,
+        },
       ],
       updatedAt: now,
     };
@@ -806,6 +845,24 @@ export class MockBookingService implements IBookingService {
 
     if (options?.offeredToIds !== undefined) {
       updated.offeredToIds = options.offeredToIds;
+    } else if (status === 'assigned' || status === 'accepted' || status === 'cancelled') {
+      updated.offeredToIds = [];
+    }
+
+    if (trip.offerCascade?.state === 'active') {
+      if (status === 'assigned' || status === 'accepted') {
+        updated.offerCascade = {
+          ...trip.offerCascade,
+          state: 'accepted',
+          activeOfferedDriverId: options?.assignedDriverId || updated.assignedDriverId || null,
+        };
+      } else if (status === 'cancelled' || status === 'DECLINED' || status === 'declined') {
+        updated.offerCascade = {
+          ...trip.offerCascade,
+          state: 'cancelled',
+          activeOfferedDriverId: null,
+        };
+      }
     }
 
     if (status === 'in_progress' && !trip.actualPickupTime) {

@@ -5,6 +5,7 @@ import type { VehicleTierConfig } from '../../../core/types/config';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import { DriverTripManifest } from './DriverTripManifest';
+import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
 import {
   formatCabUnitLabel,
   formatTimer,
@@ -529,26 +530,31 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
           {/* SEQUENTIAL STATUS ACTION BUTTONS (with 2-tap safety confirm on live SMS triggers) */}
           <div className="pt-2 space-y-2.5">
             {activeTrip.status === 'offered' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  disabled={Boolean(actionLoading)}
-                  onClick={() => onAcceptOffer(activeTrip.id)}
-                  className="py-4 min-h-[52px] bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {actionLoading === `accept-${activeTrip.id}` ? (
-                    <SpinnerIcon className="w-5 h-5 animate-spin" />
-                  ) : null}
-                  <span>ACCEPT TRIP</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(actionLoading)}
-                  onClick={() => onDeclineOffer(activeTrip.id)}
-                  className="py-4 min-h-[52px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm rounded-2xl border border-slate-700 cursor-pointer"
-                >
-                  DECLINE
-                </button>
+              <div className="space-y-2.5">
+                {activeTrip.offerCascade?.offerExpiresAt && (
+                  <DriverCascadeCountdownBar cascade={activeTrip.offerCascade} />
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={Boolean(actionLoading)}
+                    onClick={() => onAcceptOffer(activeTrip.id)}
+                    className="py-4 min-h-[52px] bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {actionLoading === `accept-${activeTrip.id}` ? (
+                      <SpinnerIcon className="w-5 h-5 animate-spin" />
+                    ) : null}
+                    <span>ACCEPT TRIP</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(actionLoading)}
+                    onClick={() => onDeclineOffer(activeTrip.id)}
+                    className="py-4 min-h-[52px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm rounded-2xl border border-slate-700 cursor-pointer"
+                  >
+                    DECLINE
+                  </button>
+                </div>
               </div>
             ) : ['assigned', 'accepted', 'UNCONFIRMED', 'CONFIRMED', 'unconfirmed', 'confirmed'].includes(
                 activeTrip.status
@@ -681,13 +687,18 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
           </p>
 
           {offeredTrips.length > 0 && driver?.dutyStatus === 'on_duty' && (
-            <button
-              type="button"
-              onClick={() => onSwitchTab('offers')}
-              className="mt-4 px-5 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer"
-            >
-              View {offeredTrips.length} Pending Offer{offeredTrips.length === 1 ? '' : 's'} &rarr;
-            </button>
+            <div className="mt-4 flex flex-col items-center gap-2">
+              {offeredTrips[0]?.offerCascade?.offerExpiresAt && (
+                <DriverCascadeCountdownBar cascade={offeredTrips[0].offerCascade} compact />
+              )}
+              <button
+                type="button"
+                onClick={() => onSwitchTab('offers')}
+                className="px-5 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-lg cursor-pointer"
+              >
+                View {offeredTrips.length} Pending Offer{offeredTrips.length === 1 ? '' : 's'} &rarr;
+              </button>
+            </div>
           )}
 
           <div className="mt-6 pt-6 border-t border-slate-800/80 w-full flex items-center justify-around text-xs text-slate-400">

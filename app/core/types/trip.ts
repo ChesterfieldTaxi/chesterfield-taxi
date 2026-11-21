@@ -59,7 +59,7 @@ export const TRIP_STATE_TRANSITIONS = {
   declined: ['cancelled'],
 
   pending: ['CONFIRMED', 'confirmed', 'offered', 'assigned', 'accepted', 'en_route', 'cancelled'],
-  offered: ['assigned', 'accepted', 'pending', 'cancelled'],
+  offered: ['assigned', 'accepted', 'offered', 'CONFIRMED', 'confirmed', 'pending', 'cancelled'],
   assigned: ['accepted', 'en_route', 'arrived', 'in_progress', 'completed', 'cancelled', 'pending'],
   accepted: ['en_route', 'arrived', 'in_progress', 'cancelled', 'pending'],
   en_route: ['arrived', 'in_progress', 'cancelled'],
@@ -293,6 +293,30 @@ export interface MultiCarAssociate {
   status?: TripStatus;
 }
 
+export type OfferCascadeState = 'active' | 'accepted' | 'exhausted' | 'cancelled';
+
+export interface TripOfferCascade {
+  state: OfferCascadeState;
+  activeOfferedDriverId: string | null;
+  activeOfferedDriverName?: string;
+  offerStartedAt: string;
+  offerExpiresAt: string;
+  timeoutSeconds: number;
+  cascadeAttempt: number;
+  maxAttempts: number;
+  attemptedDriverIds: string[];
+  strategy: string;
+}
+
+export type TripSlaLevel = 'normal' | 'warning' | 'critical' | 'overdue';
+
+export interface TripSlaStatus {
+  level: TripSlaLevel;
+  minutesUntilPickup?: number;
+  warningNotifiedAt?: string;
+  criticalNotifiedAt?: string;
+}
+
 /**
  * Core Trip Document Model stored in Firestore.
  */
@@ -378,6 +402,10 @@ export interface Trip {
   // Phase 31.5: Driver Geolocation Telemetry
   driverTelemetry?: DriverTelemetryPing;
   currentLocation?: DriverTelemetryPing;
+
+  // Phase 35: Sequential Auto-Dispatch Offer Cascade & Scheduled SLA Monitor
+  offerCascade?: TripOfferCascade;
+  slaStatus?: TripSlaStatus;
 
   /** State Machine Audit Trail */
   statusHistory: TripStatusHistoryEntry[];

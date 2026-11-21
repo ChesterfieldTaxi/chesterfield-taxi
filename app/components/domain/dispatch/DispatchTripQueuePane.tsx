@@ -3,6 +3,13 @@ import type { AppSettings } from '../../../core/types/config';
 import type { Trip, TripStatus } from '../../../core/types/trip';
 import { CustomDateTimePicker, type DateTimeRange } from './CustomDateTimePicker';
 import { TripActionDropdown } from './TripActionDropdown';
+import {
+  DispatchCascadePill,
+  DispatchSlaBadge,
+  canTripTriggerAutoOffer,
+  isTripCascadeActive,
+} from './DispatchCascadeSlaBadges';
+import type { SlaScanSummary } from '../../../core/services/dispatch/sla-monitor.service';
 import { Badge } from '../../ui/Badge';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import { formatDriverAssignmentLabel } from '../../../core/services/operator.service';
@@ -35,6 +42,7 @@ import {
   PencilIcon,
   CopyIcon,
   ShieldCheckIcon,
+  AlertTriangleIcon,
 } from '../../ui/Icons';
 
 export type QueueFilterType = 'driver' | 'vehicle' | 'company' | 'payment_type' | 'tariff' | 'has_car_seat';
@@ -201,6 +209,11 @@ export interface DispatchTripQueuePaneProps {
   onReactivateTrip: (trip: Trip) => void;
   onQuickAssignDriver: (tripId: string, driverId: string) => void | Promise<void>;
   onCallPassengerFromQueue: (phone: string, passengerFullName: string) => void;
+  slaSummary: SlaScanSummary;
+  slaUrgentOnlyFilter: boolean;
+  onToggleSlaUrgentOnlyFilter: () => void;
+  onStartAutoOffer: (trip: Trip) => void | Promise<void>;
+  onCancelAutoOffer: (trip: Trip) => void | Promise<void>;
 }
 
 export function DispatchTripQueuePane({
@@ -273,6 +286,11 @@ export function DispatchTripQueuePane({
   onReactivateTrip,
   onQuickAssignDriver,
   onCallPassengerFromQueue,
+  slaSummary,
+  slaUrgentOnlyFilter,
+  onToggleSlaUrgentOnlyFilter,
+  onStartAutoOffer,
+  onCancelAutoOffer,
 }: DispatchTripQueuePaneProps) {
   const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1001,6 +1019,99 @@ export function DispatchTripQueuePane({
         </div>
       )}
 
+      {/* ─── Scheduled-Ride SLA Urgency Banner (Phase 35) ─── */}
+      {(slaSummary.atRiskCount > 0 || slaUrgentOnlyFilter) && (() => {
+        const hasCriticalOrOverdue = slaSummary.overdueCount > 0 || slaSummary.criticalCount > 0;
+        const mostUrgent = slaSummary.atRiskTrips[0];
+        return (
+          <div
+            className={`px-3 py-1.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 ${
+              hasCriticalOrOverdue
+                ? 'bg-rose-50/95 border-rose-200 text-rose-950'
+                : 'bg-amber-50/95 border-amber-200 text-amber-950'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-black uppercase tracking-wider shrink-0 ${
+                  hasCriticalOrOverdue
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-amber-500 text-slate-950'
+                }`}
+              >
+                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                <span>SLA Monitor</span>
+              </span>
+              <span className="font-bold text-[11.5px]">
+                {slaSummary.atRiskCount > 0 ? (
+                  <>
+                    {slaSummary.overdueCount > 0 && (
+                      <span className="text-rose-700 mr-2">{slaSummary.overdueCount} Overdue</span>
+                    )}
+                    {slaSummary.criticalCount > 0 && (
+                      <span className="text-rose-800 mr-2">{slaSummary.criticalCount} Critical</span>
+                    )}
+                    {slaSummary.warningCount > 0 && (
+                      <span className="text-amber-800 mr-2">{slaSummary.warningCount} Warning</span>
+                    )}
+                    <span className="font-medium text-slate-600">unassigned scheduled ride(s)</span>
+                  </>
+                ) : (
+                  <span>All upcoming scheduled rides are within SLA</span>
+                )}
+              </span>
+              {mostUrgent && (
+                <span className="hidden lg:inline text-[11px] text-slate-600 font-medium truncate">
+                  · Next: <strong className="font-mono text-slate-900">#{mostUrgent.trip.id.slice(-6).toUpperCase()}</strong> ({mostUrgent.sla.badgeLabel})
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {mostUrgent && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectTripOnQueue(mostUrgent.trip, true);
+                      onOpenReviewModal(mostUrgent.trip, 'details');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-[11px] shadow-2xs cursor-pointer transition-colors"
+                    title="Inspect & assign most urgent unassigned scheduled ride"
+                  >
+                    Jump #{mostUrgent.trip.id.slice(-4).toUpperCase()}
+                  </button>
+                  {canTripTriggerAutoOffer(mostUrgent.trip) && (
+                    <button
+                      type="button"
+                      onClick={() => onStartAutoOffer(mostUrgent.trip)}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shadow-2xs cursor-pointer inline-flex items-center gap-1 transition-colors"
+                      title="Start 1-tap sequential Auto-Offer Cascade for most urgent ride"
+                    >
+                      <BoltIcon className="w-3 h-3 shrink-0" />
+                      <span>Auto-Offer</span>
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={onToggleSlaUrgentOnlyFilter}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] border cursor-pointer transition-colors ${
+                  slaUrgentOnlyFilter
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+                }`}
+              >
+                {slaUrgentOnlyFilter
+                  ? 'Clear SLA Filter ✕'
+                  : `Filter At-Risk (${slaSummary.atRiskCount})`}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ─── Dedicated Batch Selection Actions Bar (Never overlaps Date/Status filters) ─── */}
       {selectedTripIds.length > 0 && (
         <div className="px-3 py-2 bg-slate-900 text-white border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold shrink-0 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -1189,6 +1300,11 @@ export function DispatchTripQueuePane({
                       <span className="font-bold text-xs text-slate-900">
                         {trip.passenger.firstName} {trip.passenger.lastName}
                       </span>
+                      <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                      <DispatchCascadePill
+                        trip={trip}
+                        onCancel={() => onCancelAutoOffer(trip)}
+                      />
                       {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
                         <button
                           type="button"
@@ -1255,6 +1371,33 @@ export function DispatchTripQueuePane({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {isTripCascadeActive(trip) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCancelAutoOffer(trip);
+                          }}
+                          className="px-2 py-1 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[10.5px] cursor-pointer shrink-0"
+                          title="Cancel active Offer Cascade"
+                        >
+                          Cancel Cascade
+                        </button>
+                      ) : canTripTriggerAutoOffer(trip) && !isUnconfirmedTrip ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartAutoOffer(trip);
+                          }}
+                          className="px-2 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0"
+                          title="Start sequential Auto-Offer Cascade"
+                        >
+                          <BoltIcon className="w-3 h-3 shrink-0" />
+                          <span>Auto-Offer</span>
+                        </button>
+                      ) : null}
+
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1336,6 +1479,8 @@ export function DispatchTripQueuePane({
                           onAudit={() => onOpenReviewModal(trip, 'audit')}
                           onClone={() => onCloneBookingFromQueue(trip)}
                           onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
+                          onStartAutoOffer={() => onStartAutoOffer(trip)}
+                          onCancelAutoOffer={() => onCancelAutoOffer(trip)}
                           onCompleteTrip={() => onOpenCompleteTripModal(trip)}
                           onCancelTrip={() => onPromptCancelTrip(trip)}
                           onReactivateTrip={() => onReactivateTrip(trip)}
@@ -1343,7 +1488,7 @@ export function DispatchTripQueuePane({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <select
                         value={trip.assignedDriverId || 'unassigned'}
                         onClick={(e) => e.stopPropagation()}
@@ -1351,7 +1496,7 @@ export function DispatchTripQueuePane({
                           e.stopPropagation();
                           onQuickAssignDriver(trip.id, e.target.value);
                         }}
-                        className={`w-full text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
+                        className={`flex-1 text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
                           trip.assignedDriverId
                             ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                             : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
@@ -1369,6 +1514,33 @@ export function DispatchTripQueuePane({
                           </option>
                         ))}
                       </select>
+
+                      {isTripCascadeActive(trip) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCancelAutoOffer(trip);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[11px] cursor-pointer shrink-0 transition-colors"
+                          title="Cancel active Offer Cascade"
+                        >
+                          Cancel
+                        </button>
+                      ) : canTripTriggerAutoOffer(trip) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStartAutoOffer(trip);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0 transition-colors"
+                          title="Start 1-tap sequential Auto-Offer Cascade"
+                        >
+                          <BoltIcon className="w-3 h-3 shrink-0" />
+                          <span>Auto-Offer</span>
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -1420,6 +1592,12 @@ export function DispatchTripQueuePane({
                   <span className="font-bold text-slate-900 shrink-0 max-w-[120px] truncate">
                     {trip.passenger.firstName} {trip.passenger.lastName}
                   </span>
+                  <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                  <DispatchCascadePill
+                    trip={trip}
+                    compact
+                    onCancel={() => onCancelAutoOffer(trip)}
+                  />
                   {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
                     <button
                       type="button"
@@ -1483,6 +1661,20 @@ export function DispatchTripQueuePane({
                         Review
                       </button>
                     )}
+                    {canTripTriggerAutoOffer(trip) && !isUnconfirmedTrip && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStartAutoOffer(trip);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] cursor-pointer inline-flex items-center gap-0.5"
+                        title="Start 1-tap sequential Auto-Offer Cascade"
+                      >
+                        <BoltIcon className="w-2.5 h-2.5 shrink-0" />
+                        <span>Auto</span>
+                      </button>
+                    )}
                     <TripActionDropdown
                       trip={trip}
                       isUnconfirmed={isUnconfirmedTrip}
@@ -1496,6 +1688,8 @@ export function DispatchTripQueuePane({
                       onAudit={() => onOpenReviewModal(trip, 'audit')}
                       onClone={() => onCloneBookingFromQueue(trip)}
                       onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
+                      onStartAutoOffer={() => onStartAutoOffer(trip)}
+                      onCancelAutoOffer={() => onCancelAutoOffer(trip)}
                       onCompleteTrip={() => onOpenCompleteTripModal(trip)}
                       onCancelTrip={() => onPromptCancelTrip(trip)}
                       onReactivateTrip={() => onReactivateTrip(trip)}
@@ -1582,7 +1776,10 @@ export function DispatchTripQueuePane({
                         />
                       </td>
                       <td className="py-2 px-3 font-semibold text-slate-700">
-                        {pickupTimeStr}
+                        <div className="flex flex-col items-start gap-1">
+                          <span>{pickupTimeStr}</span>
+                          <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                        </div>
                       </td>
                       <td className="py-2 px-3 font-medium">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1628,31 +1825,54 @@ export function DispatchTripQueuePane({
                         {trip.dropoffLocation.address}
                       </td>
                       <td className="py-2 px-3">
-                        <select
-                          value={trip.assignedDriverId || 'unassigned'}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            onQuickAssignDriver(trip.id, e.target.value);
-                          }}
-                          className={`text-xs font-semibold rounded-lg border py-1 px-2 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[155px] truncate ${
-                            trip.assignedDriverId
-                              ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
-                              : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
-                          }`}
-                          title="Quick-assign driver to this trip"
-                        >
-                          <option value="unassigned">Unassigned</option>
-                          {drivers.map((drv) => (
-                            <option
-                              key={drv.id}
-                              value={drv.id}
-                              disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                        <div className="flex flex-col items-start gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={trip.assignedDriverId || 'unassigned'}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                onQuickAssignDriver(trip.id, e.target.value);
+                              }}
+                              className={`text-xs font-semibold rounded-lg border py-1 px-2 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[145px] truncate ${
+                                trip.assignedDriverId
+                                  ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
+                                  : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
+                              }`}
+                              title="Quick-assign driver to this trip"
                             >
-                              {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-                            </option>
-                          ))}
-                        </select>
+                              <option value="unassigned">Unassigned</option>
+                              {drivers.map((drv) => (
+                                <option
+                                  key={drv.id}
+                                  value={drv.id}
+                                  disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                                >
+                                  {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
+                                </option>
+                              ))}
+                            </select>
+                            {canTripTriggerAutoOffer(trip) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onStartAutoOffer(trip);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0 transition-colors"
+                                title="Start 1-tap sequential Auto-Offer Cascade"
+                              >
+                                <BoltIcon className="w-3 h-3 shrink-0" />
+                                <span>Auto-Offer</span>
+                              </button>
+                            )}
+                          </div>
+                          <DispatchCascadePill
+                            trip={trip}
+                            compact
+                            onCancel={() => onCancelAutoOffer(trip)}
+                          />
+                        </div>
                       </td>
                       <td className="py-2 px-3">
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
@@ -1695,6 +1915,8 @@ export function DispatchTripQueuePane({
                             onAudit={() => onOpenReviewModal(trip, 'audit')}
                             onClone={() => onCloneBookingFromQueue(trip)}
                             onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
+                            onStartAutoOffer={() => onStartAutoOffer(trip)}
+                            onCancelAutoOffer={() => onCancelAutoOffer(trip)}
                             onCompleteTrip={() => onOpenCompleteTripModal(trip)}
                             onCancelTrip={() => onPromptCancelTrip(trip)}
                             onReactivateTrip={() => onReactivateTrip(trip)}
@@ -1743,6 +1965,8 @@ export interface DispatchTripQueueSheetsProps {
   onFocusTripOnMapFromQueue: (trip: Trip) => void;
   onAddTripToMultiSelect: (tripId: string) => void;
   onPromptCancelTrip: (trip: Trip) => void;
+  onStartAutoOffer: (trip: Trip) => void | Promise<void>;
+  onCancelAutoOffer: (trip: Trip) => void | Promise<void>;
   sheetStyle?: React.CSSProperties;
   dragHandlers?: Record<string, any>;
 }
@@ -1770,6 +1994,8 @@ export function DispatchTripQueueSheets({
   onFocusTripOnMapFromQueue,
   onAddTripToMultiSelect,
   onPromptCancelTrip,
+  onStartAutoOffer,
+  onCancelAutoOffer,
   sheetStyle,
   dragHandlers,
 }: DispatchTripQueueSheetsProps) {
@@ -2039,6 +2265,43 @@ export function DispatchTripQueueSheets({
                       <span className="font-mono text-[11px] text-slate-500">{sheetTrip.passenger.phone}</span>
                     </button>
                   )}
+
+                  {isTripCascadeActive(sheetTrip) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCloseMobileActionSheetTrip();
+                        onCancelAutoOffer(sheetTrip);
+                      }}
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-rose-700 bg-rose-50/70 hover:bg-rose-100 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <XIcon className="w-4 h-4 text-rose-600" />
+                        <span>Cancel Offer Cascade</span>
+                      </span>
+                      <span className="font-mono text-[10px]">
+                        Step {sheetTrip.offerCascade?.cascadeAttempt || 1}/{sheetTrip.offerCascade?.maxAttempts || 3}
+                      </span>
+                    </button>
+                  ) : canTripTriggerAutoOffer(sheetTrip) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onCloseMobileActionSheetTrip();
+                        onStartAutoOffer(sheetTrip);
+                      }}
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <BoltIcon className="w-4 h-4 text-indigo-600" />
+                        <span>
+                          {sheetTrip.offerCascade?.state === 'exhausted'
+                            ? 'Retry Auto-Offer Cascade'
+                            : 'Start Auto-Offer Cascade'}
+                        </span>
+                      </span>
+                    </button>
+                  ) : null}
 
                   <button
                     type="button"

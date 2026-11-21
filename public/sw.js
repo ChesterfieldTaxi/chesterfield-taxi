@@ -224,9 +224,10 @@ function normalizeNotificationPayload(raw) {
   const body = String(
     source.body || nestedNotif.body || nestedData.body || 'New dispatch notification available.'
   );
-  const url = String(
+  const rawUrl = String(
     source.url || nestedData.url || fcmOptions.link || '/app/driver'
-  );
+  ).trim();
+  const url = rawUrl.startsWith('/') && !rawUrl.startsWith('//') ? rawUrl : '/app/driver';
   const isDriverTarget = url.startsWith('/app/driver') || url.startsWith('/driver');
   const defaultIcon = isDriverTarget ? '/icon-driver-192.svg' : '/icon-192.svg';
 
@@ -309,7 +310,9 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   const notifData = (event.notification && event.notification.data) || {};
-  const targetUrl = String(notifData.url || '/app/driver');
+  const rawUrl = String(notifData.url || '/app/driver').trim();
+  const targetUrl =
+    rawUrl.startsWith('/') && !rawUrl.startsWith('//') ? rawUrl : '/app/driver';
   const tag = (event.notification && event.notification.tag) || notifData.tag || '';
 
   const preferDispatch = targetUrl.startsWith('/app/dispatch') || targetUrl.startsWith('/dispatch');

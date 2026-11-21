@@ -642,6 +642,37 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Driver Console (`/app/driver`)**: Automatically activates Screen Wake Lock whenever `dutyStatus === 'on_duty'`; triggers repeating offer chime + background push alert on newly unseen `offeredTrips` and stops immediately on accept/decline or empty offers; displays compact **Screen Awake** status and 1-tap **Enable Push Alerts** control in `DriverShiftControls`.
   - **Dispatch Console (`/app/dispatch`)**: Provides optional **Keep Screen Awake** toggle (`ct_dispatch_wake_lock` in `localStorage`) and **Browser Push Alerts** opt-in control in the Dispatch header/settings menu, firing `notifyDispatchAlert` for incoming `UNCONFIRMED` / `ASAP` rides when the Dispatch tab is backgrounded (`document.hidden`).
 
+## 35. Phase 35: Scheduled-Ride SLA Monitor & Auto-Dispatch / Offer Cascade
+- **Defense-in-Depth Notification URL Guard**:
+  - Enforce strict same-origin relative-path validation (`rawUrl.startsWith('/') && !rawUrl.startsWith('//')`, falling back to `'/app/driver'`) on notification `url` normalization in `public/sw.js` and `/api/push` (`send_push`).
+- **Dispatch Automation & SLA Configuration (`DispatchAutomationConfig`)**:
+  - Persist operator-configurable automation settings under `AppSettings.dispatchAutomation` with safe defaults:
+    - **Locked-In Product Default**: `autoOfferOnConfirm: false` (1-tap Dispatcher-initiated offer cascade by default; optional Admin toggle to enable automatic cascade startup upon trip confirmation).
+    - `rankingStrategy`: `'nearest_in_zone' | 'longest_idle_in_zone' | 'highest_driver_score'` (default `'nearest_in_zone'`).
+    - `offerTimeoutSeconds`: Default `45` seconds (clamped `15`–`180`s).
+    - `maxCascadeAttempts`: Default `3` attempts (clamped `1`–`10`).
+    - `slaWarningMinutes`: Default `60` minutes prior to scheduled pickup.
+    - `slaCriticalMinutes`: Default `30` minutes prior to scheduled pickup.
+    - `airportExtraLeadMinutes`: Default `15` minutes automatically added to warning/critical SLA thresholds when `detectAirportInAddresses` matches STL, SUS, or CPS airport pickups/dropoffs.
+- **Trip Cascade & SLA State Schema (`Trip.offerCascade` & `Trip.slaStatus`)**:
+  - Track sequential single-driver cascade progress (`state: 'active' | 'accepted' | 'exhausted' | 'cancelled'`, `activeOfferedDriverId`, `activeOfferedDriverName`, `offerStartedAt`, `offerExpiresAt`, `timeoutSeconds`, `cascadeAttempt`, `maxAttempts`, `attemptedDriverIds`, `strategy`) and SLA urgency (`level: 'normal' | 'warning' | 'critical' | 'overdue'`, `minutesUntilPickup`, `warningNotifiedAt`, `criticalNotifiedAt`) directly on `Trip`.
+  - Permit offered drivers on `/app/driver` to update `'offerCascade'` (and `'slaStatus'`) in `firestore.rules` during atomic offer acceptance or decline without permission errors.
+- **Pure Scheduled-Ride SLA Monitor (`sla-monitor.service.ts`)**:
+  - Deterministically evaluate unassigned scheduled `UNCONFIRMED`, `CONFIRMED`, `pending`, and `offered` trips (`assignedDriverId == null`), adding `airportExtraLeadMinutes` for regional airport trips and classifying urgency into `'normal' | 'warning' | 'critical' | 'overdue'`.
+- **Pure Candidate Ranking & Sequential Offer Cascade (`auto-dispatch.service.ts`)**:
+  - Exclude off-duty/break drivers, busy/en-route drivers on conflicting active trips, blacklisted/archived drivers, grounded/blacklisted fleet vehicles, and drivers already in `rejectedByIds` or `offerCascade.attemptedDriverIds`.
+  - Enforce vehicle passenger/luggage capacity and tier/upgrade compatibility (SUV/Van, car seats, oversized cargo, wheelchair WAV).
+  - Rank eligible candidates deterministically via `nearest_in_zone` (geofence containment + Haversine miles), `longest_idle_in_zone`, or `highest_driver_score`.
+  - Offer sequentially to one active target driver per step (`status: 'offered'`, `offeredToIds: [candidate.driverId]`), automatically rolling over to the next candidate on driver decline or `offerExpiresAt` timeout up to `maxCascadeAttempts`, and reverting cleanly to `'CONFIRMED'` (or `'pending'`) with `offerCascade.state = 'exhausted'` and audit logging if exhausted.
+- **Unattended Serverless SLA Cron (`/api/cron/sla-dispatch` & `vercel.json`)**:
+  - Scheduled every 5 minutes (`*/5 * * * *`) and secured via `CRON_SECRET`, `x-admin-secret`, or authenticated Dispatcher/Admin token.
+  - Idempotently stamps `slaStatus.criticalNotifiedAt` on unattended critical/overdue unassigned scheduled trips, dispatches operations email/SMS alerts via `ResendEmailService` / Twilio, advances expired cascades, and optionally initiates `autoOffer` when `autoOfferOnConfirm` is enabled.
+- **Dispatch, Driver & Admin UI Integration**:
+  - **Dispatch Console (`/app/dispatch`)**: Periodic SLA & cascade coordinator tick playing `playSlaWarningChime()` + `notifyDispatchAlert` once per threshold transition; compact **SLA Urgency Banner** with 1-click filter/jump; color-coded SLA countdown badges (`Due in 42m`, `CRITICAL • 18m`, `OVERDUE`) and live cascade pills (`Offering Car #204 • 31s · 1/3`, `Cascade Exhausted`); 1-tap **Auto-Offer** and **Cancel Cascade** controls across queue cards/rows, `TripActionDropdown`, and `DispatchTripDetailsDrawer`.
+  - **Driver App (`/app/driver`)**: Live 1-second countdown badge & progress bar (`Accept within 34s · Step 1/3`) in `DriverOfferSheet` and `DriverLiveMeterCard` whenever `offerCascade.offerExpiresAt` is active.
+  - **Admin Console (`/app/admin`)**: **Dispatch Automation & Scheduled SLA** configuration card in `AdminRulesTab` controlling trigger mode, ranking strategy, timeout, max cascade attempts, and SLA warning/critical/airport lead buffers.
+
+
 
 
 

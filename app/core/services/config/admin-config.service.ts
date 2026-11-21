@@ -25,8 +25,13 @@ import type {
   VehicleTierConfig,
   FleetAlertsConfig,
   OversizedBagCategory,
+  DispatchAutomationConfig,
 } from '../../types/config';
-import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../types/config';
+import {
+  DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  DEFAULT_DISPATCH_AUTOMATION_CONFIG,
+  normalizeDispatchAutomationConfig,
+} from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
 import { getFirestoreDb, getFirebaseAuth, isFirebaseConfigured } from '../firebase';
@@ -38,7 +43,11 @@ import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
 
-export { DEFAULT_OVERSIZED_BAG_CATEGORIES };
+export {
+  DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  DEFAULT_DISPATCH_AUTOMATION_CONFIG,
+  normalizeDispatchAutomationConfig,
+};
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   allowMultiVehicle: false,
@@ -410,6 +419,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   enableRealtimeRouting: COMPANY_CONFIG.enableRealtimeRouting ?? false,
   enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
+  dispatchAutomation: { ...DEFAULT_DISPATCH_AUTOMATION_CONFIG },
 };
 
 export const ADMIN_SETTINGS_LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -598,6 +608,11 @@ export class AdminConfigService implements IAdminConfigService {
             },
           }
         : (this.cachedSettings?.bookingRulesConfig || { ...DEFAULT_BOOKING_RULES_CONFIG }),
+      dispatchAutomation: normalizeDispatchAutomationConfig(
+        incoming.dispatchAutomation ||
+          this.cachedSettings?.dispatchAutomation ||
+          DEFAULT_DISPATCH_AUTOMATION_CONFIG
+      ),
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
     };
@@ -749,6 +764,14 @@ export class AdminConfigService implements IAdminConfigService {
             },
           }
         : (this.cachedSettings.bookingRulesConfig || { ...DEFAULT_BOOKING_RULES_CONFIG }),
+      dispatchAutomation: updates.dispatchAutomation
+        ? normalizeDispatchAutomationConfig({
+            ...(this.cachedSettings.dispatchAutomation || DEFAULT_DISPATCH_AUTOMATION_CONFIG),
+            ...updates.dispatchAutomation,
+          })
+        : normalizeDispatchAutomationConfig(
+            this.cachedSettings.dispatchAutomation || DEFAULT_DISPATCH_AUTOMATION_CONFIG
+          ),
       updatedAt: new Date().toISOString(),
     };
 
