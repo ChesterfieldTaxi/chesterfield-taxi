@@ -3123,31 +3123,28 @@ function DispatchBookingEngineComponent({
 
         // Standard Edit Update for single trip or individual car within an existing multi-car convoy
         const updates: Partial<Trip> = {
-          pickupLocation:
-            isCompleted || isCancelled
-              ? initialTrip.pickupLocation
-              : {
-                  ...initialTrip.pickupLocation,
-                  address: pickupAddress,
-                  coordinates: pickupCoordinates,
-                  placeId: pickupPlaceId,
-                  notes: notesForAll || undefined,
-                },
-          dropoffLocation:
-            isCompleted || isCancelled
-              ? initialTrip.dropoffLocation
-              : {
-                  ...initialTrip.dropoffLocation,
-                  address: dropoffAddress,
-                  coordinates: dropoffCoordinates,
-                  placeId: dropoffPlaceId,
-                },
-          intermediateStops:
-            isCompleted || isCancelled
-              ? initialTrip.intermediateStops
-              : intermediateStops.length > 0
-              ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
-              : undefined,
+          pickupLocation: isCancelled
+            ? initialTrip.pickupLocation
+            : {
+                ...initialTrip.pickupLocation,
+                address: pickupAddress,
+                coordinates: pickupCoordinates,
+                placeId: pickupPlaceId,
+                notes: notesForAll || undefined,
+              },
+          dropoffLocation: isCancelled
+            ? initialTrip.dropoffLocation
+            : {
+                ...initialTrip.dropoffLocation,
+                address: dropoffAddress,
+                coordinates: dropoffCoordinates,
+                placeId: dropoffPlaceId,
+              },
+          intermediateStops: isCancelled
+            ? initialTrip.intermediateStops
+            : intermediateStops.length > 0
+            ? intermediateStops.map((s) => ({ address: s.address, coordinates: s.coordinates, placeId: s.placeId }))
+            : undefined,
           passenger: {
             ...initialTrip.passenger,
             firstName,
@@ -3820,10 +3817,10 @@ function DispatchBookingEngineComponent({
           <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-emerald-900">
               <LockIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <span>Completed Trip (Immutable Route Record)</span>
+              <span>Completed Trip (Date &amp; Schedule Locked)</span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-relaxed">
-              Route and schedule are permanently locked for compliance. You may still adjust driver notes, fare overrides, tips, and payment status.
+              Date, time, and recurrence are locked for shift &amp; payout integrity. Passenger/contact details, location labels, notes, fare, and payment remain editable.
             </p>
           </div>
         )}
@@ -3832,10 +3829,10 @@ function DispatchBookingEngineComponent({
           <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 text-xs space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-rose-900">
               <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-              <span>Cancelled Trip</span>
+              <span>Cancelled Trip (Schedule &amp; Route Locked)</span>
             </div>
             <p className="text-[11px] text-rose-800 leading-relaxed">
-              Dispatch operations are halted. You may update internal remarks or click &quot;Copy Booking&quot; below to generate a new active booking.
+              You may update contact details and internal remarks, or use &quot;Copy Booking&quot; below to create a new active trip.
             </p>
           </div>
         )}
@@ -3948,6 +3945,12 @@ function DispatchBookingEngineComponent({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-800 text-xs">Pickup Time</span>
+              {(isCompleted || isCancelled) && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                  <LockIcon className="w-2.5 h-2.5 shrink-0" />
+                  <span>Locked</span>
+                </span>
+              )}
               {draftSavedAt && (
                 <span
                   className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200"
@@ -3962,11 +3965,12 @@ function DispatchBookingEngineComponent({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${isCompleted || isCancelled ? 'opacity-60 pointer-events-none select-none' : ''}`}>
             <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700 text-xs">
             <input
               type="checkbox"
               checked={timingType === 'later'}
+              disabled={isCompleted || isCancelled}
               onChange={(e) => setTimingType(e.target.checked ? 'later' : 'asap')}
               className="sr-only"
             />
@@ -4026,7 +4030,7 @@ function DispatchBookingEngineComponent({
                   placeholder="Pickup Location"
                   value={pickupAddress}
                   variant="pickup"
-                  disabled={isCompleted || isCancelled}
+                  disabled={isCancelled}
                   onChange={(val) => {
                     setPickupAddress(val);
                     setPickupPlaceId(undefined);
@@ -4045,7 +4049,7 @@ function DispatchBookingEngineComponent({
                       placeholder={`Stop #${idx + 1}`}
                       value={stop.address}
                       variant="stop"
-                      disabled={isCompleted || isCancelled}
+                      disabled={isCancelled}
                       onChange={(val) => {
                         const updated = [...intermediateStops];
                         updated[idx].address = val;
@@ -4060,7 +4064,7 @@ function DispatchBookingEngineComponent({
                     />
                     <button
                       type="button"
-                      disabled={isCompleted || isCancelled}
+                      disabled={isCancelled}
                       onClick={() => setIntermediateStops(intermediateStops.filter((_, i) => i !== idx))}
                       className="text-slate-400 hover:text-red-500 px-1 disabled:opacity-30"
                     >
@@ -4073,7 +4077,7 @@ function DispatchBookingEngineComponent({
                   placeholder="Dropoff Location"
                   value={dropoffAddress}
                   variant="dropoff"
-                  disabled={isCompleted || isCancelled}
+                  disabled={isCancelled}
                   onChange={(val) => {
                     setDropoffAddress(val);
                     setDropoffPlaceId(undefined);

@@ -541,6 +541,53 @@ function CommsHubComponent({
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 1.5 | 2>(1);
 
+  // Mobile long-press multi-select gesture for Comms rows (scroll-safe)
+  const commsLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commsLongPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const commsLongPressTriggeredIdRef = useRef<string | null>(null);
+  const cancelCommsLongPress = () => {
+    if (commsLongPressTimerRef.current) {
+      clearTimeout(commsLongPressTimerRef.current);
+      commsLongPressTimerRef.current = null;
+    }
+    commsLongPressStartRef.current = null;
+  };
+  const handleCommsRowTouchStart = (id: string, e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, input, select, a')) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    cancelCommsLongPress();
+    commsLongPressStartRef.current = { x: touch.clientX, y: touch.clientY };
+    commsLongPressTimerRef.current = setTimeout(() => {
+      commsLongPressTimerRef.current = null;
+      commsLongPressStartRef.current = null;
+      commsLongPressTriggeredIdRef.current = id;
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try {
+          navigator.vibrate(15);
+        } catch {}
+      }
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }, 380);
+  };
+  const handleCommsRowTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!commsLongPressStartRef.current) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    if (
+      Math.abs(touch.clientX - commsLongPressStartRef.current.x) > 10 ||
+      Math.abs(touch.clientY - commsLongPressStartRef.current.y) > 10
+    ) {
+      cancelCommsLongPress();
+    }
+  };
+
   // Contact Profile & Edit modal in CommsHub
   const [isContactEditOpen, setIsContactEditOpen] = useState(false);
   const [contactEditForm, setContactEditForm] = useState<Partial<ContactRecord>>({});
@@ -2531,8 +2578,22 @@ function CommsHubComponent({
                   return (
                     <div
                       key={event.id}
-                      onClick={() => setSelectedContactPhone(event.contactPhone)}
-                      className={`group relative p-3 transition-all cursor-pointer flex items-start justify-between gap-2.5 border-l-4 ${
+                      onTouchStart={(e) => handleCommsRowTouchStart(event.id, e)}
+                      onTouchMove={handleCommsRowTouchMove}
+                      onTouchEnd={cancelCommsLongPress}
+                      onTouchCancel={cancelCommsLongPress}
+                      onClick={() => {
+                        if (commsLongPressTriggeredIdRef.current === event.id) {
+                          commsLongPressTriggeredIdRef.current = null;
+                          return;
+                        }
+                        if (selectedItemIds.size > 0) {
+                          handleToggleSelectRow(event.id);
+                          return;
+                        }
+                        setSelectedContactPhone(event.contactPhone);
+                      }}
+                      className={`group relative p-3 transition-all cursor-pointer flex items-start justify-between gap-2.5 border-l-4 select-none ${
                         isRowSelected
                           ? 'bg-blue-100/70 border-l-blue-700 shadow-2xs'
                           : event.isUnread
@@ -2540,7 +2601,7 @@ function CommsHubComponent({
                           : 'bg-white hover:bg-slate-50 border-l-transparent text-slate-700'
                       }`}
                     >
-                      {/* Checkbox column + Unread Indicator Dot */}
+                      {/* Checkbox column (desktop always visible; mobile only when multi-select active) + Unread Dot */}
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2552,7 +2613,9 @@ function CommsHubComponent({
                           type="checkbox"
                           checked={isRowSelected}
                           onChange={() => {}}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer ${
+                            selectedItemIds.size > 0 ? 'block' : 'hidden lg:block'
+                          }`}
                         />
                         {event.isUnread ? (
                           <span

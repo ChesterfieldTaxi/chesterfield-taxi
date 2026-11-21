@@ -112,6 +112,7 @@ interface DraftTab {
 
 const DISPATCH_TABS_STORAGE_KEY = 'ct_dispatch_open_tabs_v1';
 const MOBILE_TAB_STORAGE_KEY = 'ct_dispatch_mobile_tab_v1';
+const MOBILE_GESTURE_PREF_KEY = 'ct_dispatch_mobile_gesture_v1';
 const VALID_MOBILE_TABS = new Set(['booking', 'queue', 'map', 'messages', 'phone', 'drivers', 'comms', 'email']);
 const SIDEBAR_WIDTH_STORAGE_KEY = 'ct_dispatch_sidebar_width';
 const QUEUE_HEIGHT_STORAGE_KEY = 'ct_dispatch_queue_height';
@@ -977,10 +978,80 @@ export default function DispatchRoute() {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [openTripActionId, setOpenTripActionId] = useState<string | null>(null);
 
+  // Mobile-native card gesture preference ('action_sheet' = hold for actions; 'multi_select' = tap for actions, hold for multi-select)
+  const [mobileCardGestureMode, setMobileCardGestureMode] = useState<'action_sheet' | 'multi_select'>('action_sheet');
+  const [mobileActionSheetTrip, setMobileActionSheetTrip] = useState<Trip | null>(null);
+  const [driverPickerTrip, setDriverPickerTrip] = useState<Trip | null>(null);
+  const [driverPickerSearch, setDriverPickerSearch] = useState('');
+  const [driverPickerFilter, setDriverPickerFilter] = useState<'all' | 'available' | 'busy'>('all');
+  const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggeredTripIdRef = useRef<string | null>(null);
+
+  const cancelTripCardLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartPosRef.current = null;
+    setLongPressingTripId(null);
+  }, []);
+
+  const handleTripCardTouchStart = useCallback(
+    (trip: Trip, e: React.TouchEvent<HTMLDivElement>) => {
+      if (isDesktop) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, select, input, a')) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      cancelTripCardLongPress();
+      longPressStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      setLongPressingTripId(trip.id);
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        longPressStartPosRef.current = null;
+        longPressTriggeredTripIdRef.current = trip.id;
+        setLongPressingTripId(null);
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          try {
+            navigator.vibrate(15);
+          } catch {}
+        }
+        if (mobileCardGestureMode === 'action_sheet') {
+          setMobileActionSheetTrip(trip);
+        } else {
+          setSelectedTripIds((prev) =>
+            prev.includes(trip.id) ? prev.filter((id) => id !== trip.id) : [...prev, trip.id]
+          );
+        }
+      }, 380);
+    },
+    [isDesktop, mobileCardGestureMode, cancelTripCardLongPress]
+  );
+
+  const handleTripCardTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!longPressStartPosRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      const dx = Math.abs(touch.clientX - longPressStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - longPressStartPosRef.current.y);
+      if (dx > 10 || dy > 10) {
+        cancelTripCardLongPress();
+      }
+    },
+    [cancelTripCardLongPress]
+  );
+
   // Client-only hydration for open tabs & mobile tab so page refresh preserves exact mobile workspace & unsaved booking work
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      const savedGesture = localStorage.getItem(MOBILE_GESTURE_PREF_KEY);
+      if (savedGesture === 'action_sheet' || savedGesture === 'multi_select') {
+        setMobileCardGestureMode(savedGesture);
+      }
       const rawTabs = localStorage.getItem(DISPATCH_TABS_STORAGE_KEY);
       if (rawTabs) {
         const parsed = JSON.parse(rawTabs);
@@ -1018,6 +1089,13 @@ export default function DispatchRoute() {
       localStorage.setItem(MOBILE_TAB_STORAGE_KEY, activeMobileTab);
     } catch {}
   }, [activeMobileTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasHydratedClientTabsRef.current) return;
+    try {
+      localStorage.setItem(MOBILE_GESTURE_PREF_KEY, mobileCardGestureMode);
+    } catch {}
+  }, [mobileCardGestureMode]);
 
   // Indicator dot on Mobile Booking tab whenever any open draft or edit tab has work in progress
   const hasUnsavedDraftWork = useMemo(() => {
@@ -1865,6 +1943,167 @@ export default function DispatchRoute() {
       });
     } finally {
       setIsProcessingReview(false);
+    }
+  };
+
+  const getContextualEmailMeta = (status?: string): { label: string; shortLabel: string; kind: 'receipt' | 'status' | 'confirmation' } => {
+    const norm = (status || '').toLowerCase();
+    if (norm === 'completed') return { label: 'Send Receipt Email', shortLabel: 'Send Receipt', kind: 'receipt' };
+    if (norm === 'en_route') return { label: 'Send En Route Email', shortLabel: 'En Route Email', kind: 'status' };
+    if (norm === 'arrived') return { label: 'Send Arrived Email', shortLabel: 'Arrived Email', kind: 'status' };
+    if (norm === 'in_progress') return { label: 'Send Status Update', shortLabel: 'Status Email', kind: 'status' };
+    if (norm === 'cancelled' || norm === 'declined') {
+      return { label: 'Send Cancellation Notice', shortLabel: 'Cancel Notice', kind: 'status' };
+    }
+    return { label: 'Send Confirmation Email', shortLabel: 'Send Confirmation', kind: 'confirmation' };
+  };
+
+  const handleSendContextualTripEmail = async (explicitTrip?: Trip) => {
+    const targetTrip = explicitTrip || reviewTrip;
+    if (!targetTrip) return;
+
+    const metaInfo = getContextualEmailMeta(targetTrip.status);
+    if (metaInfo.kind === 'confirmation' && !explicitTrip) {
+      await handleResendConfirmation();
+      return;
+    }
+
+    const targetOverride =
+      !explicitTrip && isOverrideEmailEnabled && overrideRecipientEmail.trim()
+        ? overrideRecipientEmail.trim()
+        : undefined;
+    const recipientEmail = targetOverride || targetTrip.passenger?.email;
+
+    if (!recipientEmail) {
+      const msg = 'No passenger email on file. Add an email or enable alternate recipient override.';
+      if (!explicitTrip) setReviewAlert({ type: 'error', message: msg });
+      showDispatchToast(msg, 'error');
+      return;
+    }
+
+    if (!explicitTrip) {
+      setIsProcessingReview(true);
+      setReviewAlert(null);
+    }
+    try {
+      const emailService = getEmailDispatchService();
+      const tripMeta = (targetTrip.metadata || {}) as Record<string, any>;
+      const assignedDriver = targetTrip.assignedDriverId
+        ? drivers.find((d) => d.id === targetTrip.assignedDriverId)
+        : undefined;
+      const vehicleDisplayName =
+        (typeof tripMeta.vehicleDisplayName === 'string' && tripMeta.vehicleDisplayName) ||
+        formatVehicleTierDisplay(
+          (tripMeta.vehicleTypeId as string) || targetTrip.vehicleTier,
+          settings.vehicles,
+          tripMeta.vehicleDisplayName
+        );
+      const pickupTimeStr =
+        targetTrip.actualPickupTime || targetTrip.scheduledPickupTime
+          ? new Date(targetTrip.actualPickupTime || targetTrip.scheduledPickupTime!).toLocaleString()
+          : 'Immediate Ride (ASAP)';
+
+      let result: { success: boolean; error?: string } = { success: false, error: 'Unsupported email action' };
+
+      if (metaInfo.kind === 'receipt') {
+        const subtotalFare = targetTrip.pricing?.totalFare ?? 0;
+        const tipAmount = targetTrip.payment?.tipAmount ?? 0;
+        const grandTotal = Number((subtotalFare + tipAmount).toFixed(2));
+        const rawMethod = targetTrip.payment?.method;
+        const paymentMethod: 'cash' | 'card_terminal' | 'card_on_file' | 'corporate_account' =
+          rawMethod === 'corporate' || rawMethod === 'account'
+            ? 'corporate_account'
+            : rawMethod === 'card'
+            ? 'card_terminal'
+            : 'cash';
+
+        result = await emailService.sendTripReceipt({
+          tripId: targetTrip.id,
+          completedAt: new Date(targetTrip.completedAt || Date.now()).toLocaleString(),
+          passenger: {
+            firstName: targetTrip.passenger?.firstName || 'Valued',
+            lastName: targetTrip.passenger?.lastName || 'Passenger',
+            email: recipientEmail,
+            phone: targetTrip.passenger?.phone,
+          },
+          pickupAddress: targetTrip.pickupLocation?.address || '',
+          intermediateStops: targetTrip.intermediateStops?.map((s) => ({ address: s.address })),
+          dropoffAddress: targetTrip.dropoffLocation?.address || '',
+          pickupTime: pickupTimeStr,
+          vehicleTier: targetTrip.vehicleTier,
+          vehicleDisplayName,
+          driverName:
+            assignedDriver?.name ||
+            (typeof tripMeta.assignedDriverName === 'string' && tripMeta.assignedDriverName) ||
+            'Chesterfield Chauffeur',
+          vehicleUnit: assignedDriver?.cabNumber,
+          distanceMiles: targetTrip.pricing?.distanceMiles,
+          durationMinutes: targetTrip.pricing?.durationMinutes,
+          subtotalFare,
+          tipAmount,
+          grandTotal,
+          currency: targetTrip.pricing?.currency || 'USD',
+          breakdown: targetTrip.pricing?.breakdown,
+          paymentMethod,
+          cardLast4: targetTrip.payment?.cardLast4,
+          paymentStatus: paymentMethod === 'corporate_account' ? 'corporate_direct_bill' : 'paid',
+          corporateAccountName: tripMeta.corporateDetails?.corporateAccount || tripMeta.corporateOrgName,
+          poNumber: tripMeta.corporateDetails?.billingPo || tripMeta.billingPo,
+          companySettings: {
+            name: settings.company?.name,
+            phone: settings.company?.phone,
+            address: settings.company?.address,
+            email: settings.company?.email,
+          },
+        });
+      } else {
+        result = await emailService.sendStatusUpdateNotification({
+          tripId: targetTrip.id,
+          trackingToken: targetTrip.trackingToken,
+          passenger: {
+            firstName: targetTrip.passenger?.firstName || 'Valued',
+            lastName: targetTrip.passenger?.lastName || 'Passenger',
+            email: recipientEmail,
+            phone: targetTrip.passenger?.phone,
+          },
+          newStatus: targetTrip.status,
+          pickupAddress: targetTrip.pickupLocation?.address || '',
+          dropoffAddress: targetTrip.dropoffLocation?.address || '',
+          pickupTime: pickupTimeStr,
+          vehicleTier: targetTrip.vehicleTier,
+          vehicleDisplayName,
+          driverInfo: assignedDriver
+            ? {
+                name: assignedDriver.name,
+                phone: assignedDriver.phone,
+                vehicleModel: assignedDriver.vehicle,
+              }
+            : undefined,
+          companySettings: {
+            name: settings.company?.name,
+            phone: settings.company?.phone,
+            address: settings.company?.address,
+            email: settings.company?.email,
+          },
+        });
+      }
+
+      if (!result.success) {
+        const errMsg = result.error || `Failed to send ${metaInfo.shortLabel.toLowerCase()}.`;
+        if (!explicitTrip) setReviewAlert({ type: 'error', message: errMsg });
+        showDispatchToast(errMsg, 'error');
+        return;
+      }
+
+      const successMsg = `${metaInfo.label.replace(/^Send /, '')} sent to ${recipientEmail}.`;
+      if (!explicitTrip) setReviewAlert({ type: 'success', message: successMsg });
+      showDispatchToast(successMsg, 'success');
+    } catch (err: any) {
+      const errMsg = err?.message || 'Failed to send email.';
+      if (!explicitTrip) setReviewAlert({ type: 'error', message: errMsg });
+      showDispatchToast(errMsg, 'error');
+    } finally {
+      if (!explicitTrip) setIsProcessingReview(false);
     }
   };
 
@@ -3719,9 +3958,20 @@ export default function DispatchRoute() {
         `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${savedTrip.multiCarGroupId}) — assign each car individually.`,
         'success'
       );
+    } else if (isEdit) {
+      panelCallbacksRef.current.showDispatchToast(
+        `Trip #${savedTrip.id.slice(-6).toUpperCase()} updated.`,
+        'success'
+      );
     }
     if (isEdit) {
-      panelCallbacksRef.current.closeDraft(draftId, { stopPropagation: () => {} } as any);
+      // Keep the edit tab open so the dispatcher can review, copy, or make follow-up tweaks; refresh its live trip record
+      try {
+        localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`);
+      } catch {}
+      setDrafts((prev) =>
+        prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item))
+      );
     }
   }, []);
 
@@ -4691,6 +4941,44 @@ export default function DispatchRoute() {
                 {workspaceLayout === 'compact' && 'Minimal desktop: floating caller HUD + full queue space.'}
                 {workspaceLayout === 'split' && 'Multi-tasking: side-by-side dock with dialer & roster.'}
                 {workspaceLayout === 'popout' && 'Multi-monitor: detached windows with cross-window sync.'}
+              </p>
+            </div>
+
+            {/* Mobile Card Gesture Preferences (Mobile Only) */}
+            <div className="lg:hidden py-3 border-b border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Preferences · Trip Card Gesture
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 bg-slate-950/80 p-1 rounded-xl text-center text-[11px] font-bold border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setMobileCardGestureMode('action_sheet')}
+                  className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                    mobileCardGestureMode === 'action_sheet'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Hold → Actions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileCardGestureMode('multi_select')}
+                  className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                    mobileCardGestureMode === 'multi_select'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Hold → Select
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 px-1 leading-snug">
+                {mobileCardGestureMode === 'action_sheet'
+                  ? 'Tap a trip card for Trip Details & context actions. Touch & hold for Quick Actions.'
+                  : 'Tap a trip card for Trip Details & context actions. Touch & hold to multi-select.'}
               </p>
             </div>
 
@@ -5750,16 +6038,55 @@ export default function DispatchRoute() {
                       })}`
                     : 'ASAP';
 
+                  const assignedDriverObj = trip.assignedDriverId
+                    ? drivers.find((d) => d.id === trip.assignedDriverId)
+                    : undefined;
+                  const assignedDriverLabel = assignedDriverObj
+                    ? assignedDriverObj.formattedLabel || formatDriverAssignmentLabel(assignedDriverObj)
+                    : trip.assignedDriverId
+                    ? 'Assigned Driver'
+                    : null;
+                  const assignedDriverStatusPalette = assignedDriverObj
+                    ? FLEET_STATUS_COLORS[assignedDriverObj.mapStatus] || FLEET_STATUS_COLORS.offline
+                    : null;
+                  const isLongPressing = longPressingTripId === trip.id;
+
                   return (
                     <div
                       key={trip.id}
+                      onTouchStart={(e) => handleTripCardTouchStart(trip, e)}
+                      onTouchMove={handleTripCardTouchMove}
+                      onTouchEnd={cancelTripCardLongPress}
+                      onTouchCancel={cancelTripCardLongPress}
+                      onContextMenu={(e) => {
+                        if (!isDesktop) e.preventDefault();
+                      }}
                       onClick={() => {
+                        if (longPressTriggeredTripIdRef.current === trip.id) {
+                          longPressTriggeredTripIdRef.current = null;
+                          return;
+                        }
+                        if (!isDesktop) {
+                          if (selectedTripIds.length > 0) {
+                            handleToggleSelectTrip(trip.id);
+                            return;
+                          }
+                          setSelectedQueueTripId(trip.id);
+                          setSelectedMapTrip(trip);
+                          setShouldZoomMap(false);
+                          handleOpenReviewModal(trip, 'details');
+                          return;
+                        }
                         setSelectedQueueTripId(trip.id);
                         setSelectedMapTrip(trip);
                         setShouldZoomMap(false);
                       }}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs min-w-0 ${
-                        isUnconfirmedTrip
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs min-w-0 select-none ${
+                        isLongPressing ? 'scale-[0.985] ring-2 ring-blue-500/40' : ''
+                      } ${
+                        isChecked
+                          ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-400'
+                          : isUnconfirmedTrip
                           ? 'border-amber-400 bg-amber-50/50 hover:bg-amber-50 ring-1 ring-amber-300'
                           : isSelected
                           ? 'border-blue-500 bg-blue-50/40 ring-2 ring-blue-400'
@@ -5768,24 +6095,47 @@ export default function DispatchRoute() {
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleToggleSelectTrip(trip.id);
-                              }}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                            <span className="font-mono font-bold text-xs text-slate-800">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {(isDesktop || selectedTripIds.length > 0) && (
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSelectTrip(trip.id);
+                                }}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                              />
+                            )}
+                            <span className="font-mono font-bold text-xs text-slate-800 shrink-0">
                               #{trip.id.slice(-6).toUpperCase()}
                             </span>
-                            <span className="text-[11px] font-semibold text-slate-500">
+                            <span className="text-[11px] font-semibold text-slate-500 truncate">
                               {pickupTimeStr}
                             </span>
                           </div>
-                          <div>{getStatusBadge(trip.status)}</div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {getStatusBadge(trip.status)}
+                            {!isDesktop && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMobileActionSheetTrip(trip);
+                                }}
+                                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                                title="Trip actions"
+                                aria-label="Open trip actions"
+                              >
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                                  <circle cx="12" cy="5" r="1.75" />
+                                  <circle cx="12" cy="12" r="1.75" />
+                                  <circle cx="12" cy="19" r="1.75" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="mb-2.5">
@@ -5845,14 +6195,14 @@ export default function DispatchRoute() {
                         </div>
                       </div>
 
-                      <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
-                        {/* Row 1: Price + Vehicle Tier + Quick Actions (never overflows 375px cards) */}
-                        <div className="flex items-center justify-between gap-2 min-w-0">
+                      {!isDesktop ? (
+                        /* Mobile-Native Card Footer: Fare + Vehicle + Tappable Driver Picker Chip (+ Review if Unconfirmed) */
+                        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
                               ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                             </span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[125px]">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[105px]">
                               {formatVehicleTierDisplay(
                                 (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
                                 settings.vehicles,
@@ -5862,6 +6212,30 @@ export default function DispatchRoute() {
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDriverPickerSearch('');
+                                setDriverPickerFilter('all');
+                                setDriverPickerTrip(trip);
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all active:scale-95 cursor-pointer max-w-[140px] ${
+                                assignedDriverLabel
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                              }`}
+                              title="Tap to assign or change driver"
+                            >
+                              {assignedDriverStatusPalette ? (
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${assignedDriverStatusPalette.dotClass}`} />
+                              ) : (
+                                <CarIcon className="w-3 h-3 text-amber-600 shrink-0" />
+                              )}
+                              <span className="truncate">{assignedDriverLabel || 'Unassigned'}</span>
+                              <ChevronDownIcon className="w-3 h-3 opacity-60 shrink-0" />
+                            </button>
+
                             {isUnconfirmedTrip && (
                               <button
                                 type="button"
@@ -5869,75 +6243,108 @@ export default function DispatchRoute() {
                                   e.stopPropagation();
                                   handleOpenReviewModal(trip);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse"
+                                className="px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse shrink-0"
                                 title="Review customer web booking"
                               >
                                 Review
                               </button>
                             )}
-                            <TripActionDropdown
-                              trip={trip}
-                              isUnconfirmed={isUnconfirmedTrip}
-                              isOpen={openTripActionId === trip.id}
-                              isDesktop={isDesktop}
-                              onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
-                              onClose={() => setOpenTripActionId(null)}
-                              onReview={() => handleOpenReviewModal(trip, 'details')}
-                              onEdit={() => {
-                                setSelectedQueueTripId(trip.id);
-                                setSelectedMapTrip(trip);
-                                setShouldZoomMap(true);
-                                handleOpenEditTrip(trip);
-                                setActiveMobileTab('booking');
-                              }}
-                              onFare={() => handleOpenDriverModal(trip)}
-                              onAudit={() => handleOpenReviewModal(trip, 'audit')}
-                              onClone={() => {
-                                handleCloneBooking(trip);
-                                setActiveMobileTab('booking');
-                              }}
-                              onFocusMap={() => {
-                                setSelectedQueueTripId(trip.id);
-                                setSelectedMapTrip(trip);
-                                setShouldZoomMap(true);
-                                setActiveMobileTab('map');
-                              }}
-                              onCompleteTrip={() => handleOpenCompleteTripModal(trip)}
-                              onCancelTrip={() => handlePromptCancelTrip(trip)}
-                              onReactivateTrip={() => handleReactivateTrip(trip)}
-                            />
                           </div>
                         </div>
+                      ) : (
+                        /* Desktop Card Footer: Price + Vehicle + Inline Driver Select + Actions Dropdown */
+                        <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
+                          <div className="flex items-center justify-between gap-2 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
+                                ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                              </span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[125px]">
+                                {formatVehicleTierDisplay(
+                                  (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
+                                  settings.vehicles,
+                                  (trip.metadata as any)?.vehicleDisplayName
+                                )}
+                              </span>
+                            </div>
 
-                        {/* Row 2: Full-width Driver Assignment Select (readable names, zero clipping) */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <select
-                            value={trip.assignedDriverId || 'unassigned'}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleQuickAssignDriver(trip.id, e.target.value);
-                            }}
-                            className={`w-full text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
-                              trip.assignedDriverId
-                                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
-                            }`}
-                            title="Quick-assign driver"
-                          >
-                            <option value="unassigned">Unassigned Driver</option>
-                            {drivers.map((drv) => (
-                              <option
-                                key={drv.id}
-                                value={drv.id}
-                                disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                              >
-                                {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-                              </option>
-                            ))}
-                          </select>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isUnconfirmedTrip && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenReviewModal(trip);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse"
+                                  title="Review customer web booking"
+                                >
+                                  Review
+                                </button>
+                              )}
+                              <TripActionDropdown
+                                trip={trip}
+                                isUnconfirmed={isUnconfirmedTrip}
+                                isOpen={openTripActionId === trip.id}
+                                isDesktop={isDesktop}
+                                onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                                onClose={() => setOpenTripActionId(null)}
+                                onReview={() => handleOpenReviewModal(trip, 'details')}
+                                onEdit={() => {
+                                  setSelectedQueueTripId(trip.id);
+                                  setSelectedMapTrip(trip);
+                                  setShouldZoomMap(true);
+                                  handleOpenEditTrip(trip);
+                                  setActiveMobileTab('booking');
+                                }}
+                                onFare={() => handleOpenDriverModal(trip)}
+                                onAudit={() => handleOpenReviewModal(trip, 'audit')}
+                                onClone={() => {
+                                  handleCloneBooking(trip);
+                                  setActiveMobileTab('booking');
+                                }}
+                                onFocusMap={() => {
+                                  setSelectedQueueTripId(trip.id);
+                                  setSelectedMapTrip(trip);
+                                  setShouldZoomMap(true);
+                                  setActiveMobileTab('map');
+                                }}
+                                onCompleteTrip={() => handleOpenCompleteTripModal(trip)}
+                                onCancelTrip={() => handlePromptCancelTrip(trip)}
+                                onReactivateTrip={() => handleReactivateTrip(trip)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 min-w-0">
+                            <select
+                              value={trip.assignedDriverId || 'unassigned'}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleQuickAssignDriver(trip.id, e.target.value);
+                              }}
+                              className={`w-full text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
+                                trip.assignedDriverId
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                  : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
+                              }`}
+                              title="Quick-assign driver"
+                            >
+                              <option value="unassigned">Unassigned Driver</option>
+                              {drivers.map((drv) => (
+                                <option
+                                  key={drv.id}
+                                  value={drv.id}
+                                  disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                                >
+                                  {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -8435,26 +8842,29 @@ export default function DispatchRoute() {
                     >
                       View Booking Details
                     </button>
-                    {!isUnconfirmedTrip && (
-                      <button
-                        type="button"
-                        disabled={isProcessingReview}
-                        onClick={handleResendConfirmation}
-                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {isProcessingReview ? (
-                          <>
-                            <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                            <span>Resending...</span>
-                          </>
-                        ) : (
-                          <>
-                            <MailIcon className="w-3.5 h-3.5 shrink-0" />
-                            <span>Resend Confirmation Email</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                    {!isUnconfirmedTrip && (() => {
+                      const ctxEmail = getContextualEmailMeta(reviewTrip.status);
+                      return (
+                        <button
+                          type="button"
+                          disabled={isProcessingReview}
+                          onClick={() => handleSendContextualTripEmail()}
+                          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isProcessingReview ? (
+                            <>
+                              <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                              <span>Sending...</span>
+                            </>
+                          ) : (
+                            <>
+                              <MailIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>{ctxEmail.label}</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
@@ -8508,30 +8918,98 @@ export default function DispatchRoute() {
                               )}
                             </button>
                           </>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={isProcessingReview}
-                            onClick={handleResendConfirmation}
-                            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                          >
-                            {isProcessingReview ? (
-                              <>
-                                <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                                <span>Resending...</span>
-                              </>
-                            ) : (
-                              <>
-                                <MailIcon className="w-3.5 h-3.5 shrink-0" />
-                                <span>
-                                  {isOverrideEmailEnabled && overrideRecipientEmail.trim()
-                                    ? `Resend to ${overrideRecipientEmail.trim()}`
-                                    : 'Resend Confirmation Email'}
-                                </span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                        ) : (() => {
+                          const normStatus = (reviewTrip.status || '').toLowerCase();
+                          const isCancelledOrDeclined = normStatus === 'cancelled' || normStatus === 'declined';
+                          const isCompletedStatus = normStatus === 'completed';
+                          const isInProgressStatus = normStatus === 'in_progress';
+                          const ctxEmail = getContextualEmailMeta(reviewTrip.status);
+                          return (
+                            <>
+                              {isCancelledOrDeclined ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingReview}
+                                    onClick={() => handleReactivateTrip(reviewTrip)}
+                                    className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <RefreshCwIcon className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Reactivate Trip</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingReview}
+                                    onClick={() => {
+                                      handleCloneBooking(reviewTrip);
+                                      setReviewTrip(null);
+                                      setActiveMobileTab('booking');
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <CopyIcon className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Copy Booking</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingReview}
+                                    onClick={() => {
+                                      const target = reviewTrip;
+                                      setReviewTrip(null);
+                                      setSelectedQueueTripId(target.id);
+                                      setSelectedMapTrip(target);
+                                      setShouldZoomMap(true);
+                                      handleOpenEditTrip(target);
+                                      setActiveMobileTab('booking');
+                                    }}
+                                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <PencilIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                    <span>{isCompletedStatus ? 'Edit Details' : 'Edit Trip'}</span>
+                                  </button>
+
+                                  {isInProgressStatus && (
+                                    <button
+                                      type="button"
+                                      disabled={isProcessingReview}
+                                      onClick={() => handleOpenCompleteTripModal(reviewTrip)}
+                                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                      <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                                      <span>Complete Trip</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    disabled={isProcessingReview}
+                                    onClick={() => handleSendContextualTripEmail()}
+                                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    {isProcessingReview ? (
+                                      <>
+                                        <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MailIcon className="w-3.5 h-3.5 shrink-0" />
+                                        <span>
+                                          {isOverrideEmailEnabled && overrideRecipientEmail.trim()
+                                            ? `${ctxEmail.shortLabel} → ${overrideRecipientEmail.trim()}`
+                                            : ctxEmail.label}
+                                        </span>
+                                      </>
+                                    )}
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                       </>
                     ) : reviewDeclineMode ? (
                       <>
@@ -9051,6 +9529,504 @@ export default function DispatchRoute() {
                       <span>Complete Trip</span>
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Mobile-Native Trip Quick Action Bottom Sheet ─── */}
+      {mobileActionSheetTrip && (() => {
+        const sheetTrip = trips.find((t) => t.id === mobileActionSheetTrip.id) || mobileActionSheetTrip;
+        const isCompleted = sheetTrip.status === 'completed';
+        const isCancelled = sheetTrip.status === 'cancelled';
+        const isUnconfirmed = sheetTrip.status === 'UNCONFIRMED' || sheetTrip.status === 'unconfirmed';
+        const assignedDrv = sheetTrip.assignedDriverId
+          ? drivers.find((d) => d.id === sheetTrip.assignedDriverId)
+          : undefined;
+        return (
+          <div
+            className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+            onClick={() => setMobileActionSheetTrip(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[90dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            >
+              {/* Sheet Header */}
+              <div className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0">
+                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono font-black text-xs text-blue-400">
+                        #{sheetTrip.id.slice(-6).toUpperCase()}
+                      </span>
+                      <span className="text-sm font-extrabold text-white truncate">
+                        {sheetTrip.passenger?.firstName} {sheetTrip.passenger?.lastName}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {sheetTrip.pickupLocation?.address} → {sheetTrip.dropoffLocation?.address}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 text-[11px]">
+                      <span className="font-mono font-black text-emerald-400">
+                        ${sheetTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                      </span>
+                      <span className="text-slate-600">•</span>
+                      <span className="capitalize text-slate-300 font-semibold">
+                        {sheetTrip.status.replace(/_/g, ' ')}
+                      </span>
+                      {assignedDrv && (
+                        <>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-blue-300 font-semibold truncate">
+                            {assignedDrv.formattedLabel || formatDriverAssignmentLabel(assignedDrv)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileActionSheetTrip(null)}
+                    className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                    aria-label="Close trip actions"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Sheet Actions */}
+              <div className="p-4 space-y-3 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+                {/* Primary 2x2 Thumb Grid (Context-aware, zero duplicate options) */}
+                <div className="grid grid-cols-2 gap-2">
+                  {isCompleted ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleSendContextualTripEmail(sheetTrip);
+                      }}
+                      className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <MailIcon className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-extrabold">Send Receipt</span>
+                    </button>
+                  ) : isCancelled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleReactivateTrip(sheetTrip);
+                      }}
+                      className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <RefreshCwIcon className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-extrabold">Reactivate Trip</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        setDriverPickerSearch('');
+                        setDriverPickerFilter('all');
+                        setDriverPickerTrip(sheetTrip);
+                      }}
+                      className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <CarIcon className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-extrabold">Assign Driver</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      setSelectedQueueTripId(sheetTrip.id);
+                      setSelectedMapTrip(sheetTrip);
+                      setShouldZoomMap(true);
+                      handleOpenEditTrip(sheetTrip);
+                      setActiveMobileTab('booking');
+                    }}
+                    className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <PencilIcon className="w-4 h-4 text-slate-600" />
+                    <span className="text-xs font-extrabold">
+                      {isCompleted ? 'Edit Details' : isCancelled ? 'Edit Notes' : 'Edit Trip'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      handleCloneBooking(sheetTrip);
+                      setActiveMobileTab('booking');
+                    }}
+                    className="p-3 rounded-2xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <CopyIcon className="w-4 h-4 text-cyan-700" />
+                    <span className="text-xs font-extrabold">Copy Booking</span>
+                  </button>
+
+                  {!isCompleted && !isCancelled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleOpenCompleteTripModal(sheetTrip);
+                      }}
+                      className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <CheckIcon className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-extrabold">Complete Trip</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleOpenReviewModal(sheetTrip, 'audit');
+                      }}
+                      className="p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <ShieldCheckIcon className="w-4 h-4 text-purple-600" />
+                      <span className="text-xs font-extrabold">Audit Trail</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Secondary Action List */}
+                <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden bg-white">
+                  {sheetTrip.passenger?.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleStartCall(
+                          sheetTrip.passenger.phone,
+                          `${sheetTrip.passenger.firstName} ${sheetTrip.passenger.lastName}`
+                        );
+                        setCommsInitialTab('phone');
+                        setActiveDockTab('phone');
+                        setActiveMobileTab('phone');
+                      }}
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-emerald-50 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <PhoneIcon className="w-4 h-4 text-emerald-600" />
+                        <span>Call Passenger</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-500">{sheetTrip.passenger.phone}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      handleOpenReviewModal(sheetTrip, 'details');
+                    }}
+                    className={`w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold cursor-pointer ${
+                      isUnconfirmed
+                        ? 'bg-amber-50/80 text-amber-900 hover:bg-amber-100'
+                        : 'text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <DocumentTextIcon className={`w-4 h-4 ${isUnconfirmed ? 'text-amber-600' : 'text-blue-600'}`} />
+                      <span>{isUnconfirmed ? 'Review & Confirm Booking' : 'Trip Details & Status Override'}</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      handleOpenDriverModal(sheetTrip);
+                    }}
+                    className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <BoltIcon className="w-4 h-4 text-amber-500" />
+                      <span>Fare &amp; Pricing Rules</span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      setSelectedQueueTripId(sheetTrip.id);
+                      setSelectedMapTrip(sheetTrip);
+                      setShouldZoomMap(true);
+                      setActiveMobileTab('map');
+                    }}
+                    className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <MapPinIcon className="w-4 h-4 text-emerald-600" />
+                      <span>View Route on Map</span>
+                    </span>
+                  </button>
+
+                  {!isCompleted && !isCancelled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetTrip(null);
+                        handleOpenReviewModal(sheetTrip, 'audit');
+                      }}
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <ShieldCheckIcon className="w-4 h-4 text-purple-600" />
+                        <span>Audit Trail Log</span>
+                      </span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      setSelectedTripIds((prev) =>
+                        prev.includes(sheetTrip.id) ? prev : [...prev, sheetTrip.id]
+                      );
+                    }}
+                    className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <CheckIcon className="w-4 h-4 text-blue-600" />
+                      <span>Select Multiple Trips</span>
+                    </span>
+                  </button>
+                </div>
+
+                {/* Destructive Footer Action (Active trips only — Cancelled already has Reactivate in grid) */}
+                {!isCompleted && !isCancelled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetTrip(null);
+                      handlePromptCancelTrip(sheetTrip);
+                    }}
+                    className="w-full py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <BanIcon className="w-4 h-4" />
+                    <span>Cancel Trip</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Mobile-Native Driver Picker Bottom Sheet ─── */}
+      {driverPickerTrip && (() => {
+        const targetTrip = trips.find((t) => t.id === driverPickerTrip.id) || driverPickerTrip;
+        const q = driverPickerSearch.trim().toLowerCase();
+        const statusRank: Record<string, number> = {
+          available: 0,
+          en_route: 1,
+          busy: 2,
+          break: 3,
+          offline: 4,
+        };
+        const filteredPickerDrivers = [...drivers]
+          .filter((d) => {
+            if (driverPickerFilter === 'available' && d.mapStatus !== 'available') return false;
+            if (driverPickerFilter === 'busy' && d.mapStatus !== 'busy' && d.mapStatus !== 'en_route') return false;
+            if (!q) return true;
+            const label = (d.formattedLabel || formatDriverAssignmentLabel(d)).toLowerCase();
+            return (
+              label.includes(q) ||
+              (d.name || '').toLowerCase().includes(q) ||
+              (d.cabNumber || '').toLowerCase().includes(q) ||
+              (d.vehicle || '').toLowerCase().includes(q)
+            );
+          })
+          .sort((a, b) => (statusRank[a.mapStatus] ?? 9) - (statusRank[b.mapStatus] ?? 9));
+
+        return (
+          <div
+            className="fixed inset-0 z-[124] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+            onClick={() => setDriverPickerTrip(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            >
+              {/* Header */}
+              <div className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0">
+                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black tracking-tight flex items-center gap-2">
+                      <CarIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span>Assign Driver</span>
+                      <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                        #{targetTrip.id.slice(-6).toUpperCase()}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {targetTrip.passenger?.firstName} {targetTrip.passenger?.lastName} · ${targetTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDriverPickerTrip(null)}
+                    className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                    aria-label="Close driver picker"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Filter */}
+              <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={driverPickerSearch}
+                    onChange={(e) => setDriverPickerSearch(e.target.value)}
+                    placeholder="Search driver name or cab #..."
+                    className="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  {driverPickerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDriverPickerSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      aria-label="Clear driver search"
+                    >
+                      <XIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                  {(
+                    [
+                      { id: 'all', label: `All (${drivers.length})` },
+                      { id: 'available', label: `Available (${drivers.filter((d) => d.mapStatus === 'available').length})` },
+                      { id: 'busy', label: `On Trip (${drivers.filter((d) => d.mapStatus === 'busy' || d.mapStatus === 'en_route').length})` },
+                    ] as const
+                  ).map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setDriverPickerFilter(f.id)}
+                      className={`px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                        driverPickerFilter === f.id
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Driver List */}
+              <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-2">
+                {filteredPickerDrivers.length === 0 ? (
+                  <div className="py-10 text-center text-xs text-slate-400 font-semibold">
+                    No drivers match this filter.
+                  </div>
+                ) : (
+                  filteredPickerDrivers.map((drv) => {
+                    const isCurrent = targetTrip.assignedDriverId === drv.id;
+                    const isDisabled = Boolean(drv.isBlacklisted || drv.zone === 'Suspended');
+                    const palette = FLEET_STATUS_COLORS[drv.mapStatus] || FLEET_STATUS_COLORS.offline;
+                    const statusLabel = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
+                    const initials = (drv.name || 'DR')
+                      .split(' ')
+                      .map((p) => p[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase();
+                    return (
+                      <button
+                        key={drv.id}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          handleQuickAssignDriver(targetTrip.id, drv.id);
+                          setDriverPickerTrip(null);
+                        }}
+                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
+                          isCurrent
+                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="relative shrink-0">
+                            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
+                              {initials}
+                            </div>
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ring-2 ring-white absolute -bottom-0.5 -right-0.5 ${palette.dotClass}`}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-xs text-slate-900 truncate">
+                              {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">
+                              {drv.name} {drv.vehicle && drv.vehicle !== 'Unassigned' ? `· ${drv.vehicle}` : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${palette.badgeClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
+                            <span>{statusLabel}</span>
+                          </span>
+                          {isCurrent && (
+                            <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                              <CheckIcon className="w-3 h-3" />
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Sticky Footer: Unassign if currently assigned */}
+              <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+                {targetTrip.assignedDriverId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleQuickAssignDriver(targetTrip.id, 'unassigned');
+                      setDriverPickerTrip(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs cursor-pointer"
+                  >
+                    Unassign Driver
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-500 font-medium">Tap any driver to assign</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDriverPickerTrip(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer ml-auto"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
