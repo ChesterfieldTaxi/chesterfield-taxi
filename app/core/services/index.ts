@@ -15,3 +15,4 @@ export * from './telephony.service';
 export * from './corporate-account.service';
 export * from './operator.service';
 export * from './dispatch';
+export * from './payments';

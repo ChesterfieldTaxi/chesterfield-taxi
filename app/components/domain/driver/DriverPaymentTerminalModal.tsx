@@ -3,7 +3,15 @@ import type { Trip } from '../../../core/types/trip';
 import type { DriverPayoutRecord, DriverSettlementMethod } from '../../../core/types/payment';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
 import type { RideFareSnapshot } from '../../../core/utils/driver-ui.util';
-import { CheckIcon, ShieldCheckIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
+import {
+  ChatBubbleLeftRightIcon,
+  CheckIcon,
+  CopyIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
+  SpinnerIcon,
+  XIcon,
+} from '../../ui/Icons';
 
 export interface DriverPaymentTerminalModalProps {
   isOpen: boolean;
@@ -18,6 +26,10 @@ export interface DriverPaymentTerminalModalProps {
   completedPayoutReceipt: DriverPayoutRecord | null;
   sheetStyle: React.CSSProperties;
   dragHandlers: BottomSheetDragHandlers;
+  payLinkUrl?: string | null;
+  payLinkStatus?: 'none' | 'open' | 'paid';
+  isSendingPayLink?: boolean;
+  payLinkFeedback?: string | null;
   onClose: () => void;
   onReturnToShift: () => void;
   onSetSettlementMethod: (method: DriverSettlementMethod) => void;
@@ -25,6 +37,8 @@ export interface DriverPaymentTerminalModalProps {
   onSetTipSelection: (tip: number | 'custom') => void;
   onSetCustomTipValue: (value: string) => void;
   onProcessPayment: () => void;
+  onRequestPayLink?: (mode: 'show' | 'sms') => void;
+  onRefreshPayLinkStatus?: () => void;
 }
 
 export const DriverPaymentTerminalModal = React.memo(function DriverPaymentTerminalModal({
@@ -40,6 +54,10 @@ export const DriverPaymentTerminalModal = React.memo(function DriverPaymentTermi
   completedPayoutReceipt,
   sheetStyle,
   dragHandlers,
+  payLinkUrl,
+  payLinkStatus = 'none',
+  isSendingPayLink = false,
+  payLinkFeedback,
   onClose,
   onReturnToShift,
   onSetSettlementMethod,
@@ -47,6 +65,8 @@ export const DriverPaymentTerminalModal = React.memo(function DriverPaymentTermi
   onSetTipSelection,
   onSetCustomTipValue,
   onProcessPayment,
+  onRequestPayLink,
+  onRefreshPayLinkStatus,
 }: DriverPaymentTerminalModalProps) {
   if (!isOpen || !modalTrip) return null;
 
@@ -301,6 +321,80 @@ export const DriverPaymentTerminalModal = React.memo(function DriverPaymentTermi
                     <span className="block text-[11px] text-purple-300/80 mt-0.5">
                       No payment collected in the car — billed to the corporate account.
                     </span>
+                  </div>
+                )}
+
+                {/* 1-Tap Passenger Pay Link Fallback (Apple Pay / Google Pay / Card on Passenger Phone) */}
+                {onRequestPayLink && settlementMethod !== 'corporate_account' && (
+                  <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[11px] font-extrabold text-sky-300 block">
+                          Text / Show 1-Tap Pay Link
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Passenger pays on their phone (Apple Pay, Google Pay, Card)
+                        </span>
+                      </div>
+                      {payLinkStatus === 'paid' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                          Paid Online
+                        </span>
+                      ) : payLinkStatus === 'open' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-sky-500/20 text-sky-300 border border-sky-500/40 shrink-0">
+                          Link Open
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={isSendingPayLink || isProcessingPayment}
+                        onClick={() => onRequestPayLink('sms')}
+                        className="py-2 px-2.5 min-h-[40px] rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
+                      >
+                        {isSendingPayLink ? (
+                          <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span>Text Pay Link</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSendingPayLink || isProcessingPayment}
+                        onClick={() => onRequestPayLink('show')}
+                        className="py-2 px-2.5 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-slate-200 font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
+                      >
+                        <CopyIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span>Show / Copy Link</span>
+                      </button>
+                    </div>
+
+                    {payLinkUrl && (
+                      <div className="space-y-2 pt-0.5">
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-700 font-mono text-[11px] text-sky-200 break-all select-all">
+                          {payLinkUrl}
+                        </div>
+                        {onRefreshPayLinkStatus && payLinkStatus !== 'paid' && (
+                          <button
+                            type="button"
+                            disabled={isSendingPayLink}
+                            onClick={onRefreshPayLinkStatus}
+                            className="w-full py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-emerald-300 font-bold text-[11px] cursor-pointer inline-flex items-center justify-center gap-1.5"
+                          >
+                            <RefreshCwIcon className="w-3 h-3" />
+                            <span>Check If Passenger Paid Online</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {payLinkFeedback && (
+                      <div className="text-[11px] font-semibold text-sky-300">{payLinkFeedback}</div>
+                    )}
                   </div>
                 )}
               </div>

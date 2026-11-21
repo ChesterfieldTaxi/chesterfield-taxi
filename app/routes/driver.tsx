@@ -27,6 +27,7 @@ import { formatLocalDateStr } from '../core/services/pricing/vehicle-matching';
 import type { TariffProfile } from '../core/types/tariff';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { getPaymentService } from '../core/services/payment.service';
+import { getPayLinkService } from '../core/services/payments/pay-link.service';
 import { getTelephonyService } from '../core/services/telephony.service';
 import { getInvoicingService } from '../core/services/invoicing.service';
 import { getEmailDispatchService } from '../core/services/email';
@@ -179,6 +180,11 @@ export default function DriverAppRoute() {
   const [customTipValue, setCustomTipValue] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [completedPayoutReceipt, setCompletedPayoutReceipt] = useState<DriverPayoutRecord | null>(null);
+  const [driverPayLinkToken, setDriverPayLinkToken] = useState<string | null>(null);
+  const [driverPayLinkUrl, setDriverPayLinkUrl] = useState<string | null>(null);
+  const [driverPayLinkStatus, setDriverPayLinkStatus] = useState<'none' | 'open' | 'paid'>('none');
+  const [isSendingDriverPayLink, setIsSendingDriverPayLink] = useState(false);
+  const [driverPayLinkFeedback, setDriverPayLinkFeedback] = useState<string | null>(null);
 
   const driverSheetDrag = useBottomSheetDragToClose({
     onClose: () => {
@@ -1168,6 +1174,129 @@ export default function DriverAppRoute() {
     refreshPayoutHistory,
   ]);
 
+  useEffect(() => {
+    const cachedToken = getPayLinkService().getTripCachedPayToken(modalTrip);
+    setDriverPayLinkToken(cachedToken || null);
+    setDriverPayLinkUrl(cachedToken ? getPayLinkService().buildPayUrl(cachedToken) : null);
+    const displayState = getPayLinkService().getTripPayLinkDisplayState(modalTrip);
+    setDriverPayLinkStatus(
+      displayState === 'paid' ? 'paid' : displayState === 'open' ? 'open' : 'none'
+    );
+    setDriverPayLinkFeedback(null);
+  }, [modalTrip?.id, showTerminalModal]);
+
+  const handleRequestDriverPayLink = useCallback(
+    async (mode: 'show' | 'sms') => {
+      if (!modalTrip || !driver) return;
+      setIsSendingDriverPayLink(true);
+      setDriverPayLinkFeedback(null);
+      try {
+        const fareSnap = computeRideFareSnapshot(modalTrip);
+        if (!fareSnap.isQuotedLocked) {
+          await driverService.updateLiveMeter(
+            modalTrip.id,
+            meterDistance,
+            Number((meterSeconds / 60).toFixed(1)),
+            fareSnap.baseRideFare,
+            { lockQuotedFare: false }
+          );
+        }
+
+        const updatedTripForLink: Trip = {
+          ...modalTrip,
+          pricing: {
+            ...modalTrip.pricing,
+            totalFare: fareSnap.subtotalFare,
+          },
+        };
+
+        const res = await getPayLinkService().createOrGetTripPayLink(updatedTripForLink, {
+          sendSms: mode === 'sms',
+          recipientPhone: modalTrip.passenger?.phone,
+        });
+
+        if (!res.success || !res.payLink || !res.payUrl) {
+          setDriverPayLinkFeedback(res.error || 'Could not generate Pay Link.');
+          return;
+        }
+
+        setDriverPayLinkToken(res.payLink.payToken);
+        setDriverPayLinkUrl(res.payUrl);
+        setDriverPayLinkStatus(res.payLink.status === 'paid' ? 'paid' : 'open');
+
+        if (mode === 'show') {
+          await navigator.clipboard?.writeText(res.payUrl).catch(() => {});
+          setDriverPayLinkFeedback('Pay Link ready & copied — passenger can scan or open URL.');
+        } else if (res.smsResult?.sent) {
+          setDriverPayLinkFeedback(`Sent 1-tap Pay Link via SMS to ${maskPhoneForDisplay(modalTrip.passenger?.phone)}.`);
+        } else {
+          await navigator.clipboard?.writeText(res.payUrl).catch(() => {});
+          setDriverPayLinkFeedback('SMS offline — Pay Link shown above & copied to clipboard.');
+        }
+      } catch (err: any) {
+        setDriverPayLinkFeedback(err?.message || 'Unable to generate Pay Link.');
+      } finally {
+        setIsSendingDriverPayLink(false);
+      }
+    },
+    [modalTrip, driver, computeRideFareSnapshot, driverService, meterDistance, meterSeconds]
+  );
+
+  const handleRefreshDriverPayLinkStatus = useCallback(async () => {
+    if (!modalTrip || !driver) return;
+    const token =
+      driverPayLinkToken || getPayLinkService().getTripCachedPayToken(modalTrip) || '';
+    if (!token) return;
+
+    setIsSendingDriverPayLink(true);
+    try {
+      const check = await getPayLinkService().fetchPublicPayLink(token);
+      if (!check.success || !check.payLink) {
+        setDriverPayLinkFeedback(check.error || 'Could not check Pay Link status.');
+        return;
+      }
+
+      if (check.payLink.status === 'paid') {
+        setDriverPayLinkStatus('paid');
+        const fareSnap = computeRideFareSnapshot(modalTrip);
+        const onlineTip = Number(check.payLink.tipAmount || 0);
+        const effectiveCommissionRate =
+          typeof driver.commissionRate === 'number' ? driver.commissionRate : globalCommissionRate;
+        const payout = await getPaymentService().calculateDriverPayout(
+          modalTrip.id,
+          driver.id,
+          fareSnap.baseRideFare,
+          onlineTip,
+          fareSnap.tollsTotal,
+          fareSnap.nonTollExtrasTotal,
+          effectiveCommissionRate,
+          'card_terminal'
+        );
+        await getTelephonyService().closeMaskedSession(modalTrip.id).catch(() => {});
+        await driverService.transitionTrip(modalTrip.id, 'completed', driver.id);
+        setCompletedPayoutReceipt(payout);
+        await refreshPayoutHistory();
+        setSuccessNotice(
+          `Passenger paid $${(check.payLink.totalPaidAmount || fareSnap.subtotalFare + onlineTip).toFixed(2)} online! Your net payout: $${payout.netPayout.toFixed(2)}.`
+        );
+      } else {
+        setDriverPayLinkFeedback('Awaiting passenger online payment...');
+      }
+    } catch (err: any) {
+      setDriverPayLinkFeedback(err?.message || 'Error refreshing Pay Link status.');
+    } finally {
+      setIsSendingDriverPayLink(false);
+    }
+  }, [
+    modalTrip,
+    driver,
+    driverPayLinkToken,
+    computeRideFareSnapshot,
+    globalCommissionRate,
+    driverService,
+    refreshPayoutHistory,
+  ]);
+
   // Append Extra Fee (pinned to modalTrip + clears inputs cleanly!)
   const handleAddExtra = useCallback(
     async (extra: DriverMeterExtra) => {
@@ -1676,6 +1805,10 @@ export default function DriverAppRoute() {
         completedPayoutReceipt={completedPayoutReceipt}
         sheetStyle={driverSheetDrag.sheetStyle}
         dragHandlers={driverSheetDrag.dragHandlers}
+        payLinkUrl={driverPayLinkUrl}
+        payLinkStatus={driverPayLinkStatus}
+        isSendingPayLink={isSendingDriverPayLink}
+        payLinkFeedback={driverPayLinkFeedback}
         onClose={handleCloseTerminalModal}
         onReturnToShift={handleReturnToShift}
         onSetSettlementMethod={setSettlementMethod}
@@ -1683,6 +1816,8 @@ export default function DriverAppRoute() {
         onSetTipSelection={setTipSelection}
         onSetCustomTipValue={setCustomTipValue}
         onProcessPayment={handleProcessTerminalPayment}
+        onRequestPayLink={handleRequestDriverPayLink}
+        onRefreshPayLinkStatus={handleRefreshDriverPayLinkStatus}
       />
     </div>
   );

@@ -278,6 +278,7 @@ export interface CorporateInvoiceEmailPayload {
   discountAmount?: number;
   totalAmount: number;
   notes?: string;
+  payLinkUrl?: string;
   companySettings?: {
     name?: string;
     phone?: string;

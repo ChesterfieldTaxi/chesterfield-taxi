@@ -6,6 +6,7 @@ import type {
   InvoiceRecord,
 } from '../../../../core/types/config';
 import { getInvoicingService } from '../../../../core/services/invoicing.service';
+import { getPayLinkService } from '../../../../core/services/payments/pay-link.service';
 import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
 import { getEmailDispatchService } from '../../../../core/services/email';
 import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
@@ -97,6 +98,7 @@ export function AdminInvoicingSubpage({
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isEmailingInvoice, setIsEmailingInvoice] = useState(false);
+  const [payLinkInvoiceBusyId, setPayLinkInvoiceBusyId] = useState<string | null>(null);
 
   // New Corporate Account Form State
   const [newCorpName, setNewCorpName] = useState('');
@@ -279,14 +281,46 @@ export function AdminInvoicingSubpage({
     if (selectedInvoice) {
       const fetchPrintable = async () => {
         const invoicingService = getInvoicingService();
-        const data = await invoicingService.getPrintableInvoice(selectedInvoice.id);
-        setPrintableData(data);
+        let activeInv = selectedInvoice;
+
+        // Auto-provision 1-tap Pay Link token for open corporate invoices so PDF remittance footer always includes it
+        if (activeInv.status !== 'paid' && !activeInv.payToken) {
+          const linkRes = await getPayLinkService().createOrGetInvoicePayLink(activeInv);
+          if (linkRes.success && linkRes.payToken && linkRes.payUrl) {
+            activeInv = {
+              ...activeInv,
+              payToken: linkRes.payToken,
+              payLinkUrl: linkRes.payUrl,
+            };
+            if (invoicingService.saveInvoice) {
+              await invoicingService.saveInvoice(activeInv).catch(() => null);
+            }
+            setFirestoreInvoices((prev) => [
+              activeInv,
+              ...prev.filter((item) => item.id !== activeInv.id),
+            ]);
+            setSelectedInvoice((curr) =>
+              curr && curr.id === activeInv.id ? activeInv : curr
+            );
+          }
+        }
+
+        const data = await invoicingService.getPrintableInvoice(activeInv.id);
+        setPrintableData(
+          data
+            ? {
+                ...data,
+                payToken: activeInv.payToken || data.payToken,
+                payLinkUrl: activeInv.payLinkUrl || data.payLinkUrl,
+              }
+            : null
+        );
       };
       fetchPrintable();
     } else {
       setPrintableData(null);
     }
-  }, [selectedInvoice]);
+  }, [selectedInvoice?.id]);
 
   const handleExport = async (format: AccountingExportFormat) => {
     try {
@@ -311,6 +345,75 @@ export function AdminInvoicingSubpage({
     }
   };
 
+  const handleInvoicePayLink = async (inv: InvoiceRecord, mode: 'copy' | 'email') => {
+    try {
+      setPayLinkInvoiceBusyId(`${inv.id}:${mode}`);
+      setActionErrorMessage(null);
+
+      if (mode === 'email' && !inv.customerEmail) {
+        setActionErrorMessage('No billing email address is configured on this invoice.');
+        setTimeout(() => setActionErrorMessage(null), 4000);
+        return;
+      }
+
+      const res = await getPayLinkService().createOrGetInvoicePayLink(inv, {
+        sendEmail: mode === 'email',
+        recipientEmail: inv.customerEmail,
+      });
+
+      if (!res.success || !res.payToken || !res.payUrl) {
+        setActionErrorMessage(res.error || 'Failed to generate corporate invoice Pay Link.');
+        setTimeout(() => setActionErrorMessage(null), 5000);
+        return;
+      }
+
+      const patchedInv: InvoiceRecord = {
+        ...inv,
+        payToken: res.payToken,
+        payLinkUrl: res.payUrl,
+      };
+
+      const invoicingService = getInvoicingService();
+      if (invoicingService.saveInvoice) {
+        await invoicingService.saveInvoice(patchedInv).catch(() => null);
+      }
+      const nextInvoices = invoices.map((item) => (item.id === inv.id ? patchedInv : item));
+      setFirestoreInvoices(nextInvoices);
+      await onSave({ invoices: nextInvoices }).catch(() => null);
+
+      if (selectedInvoice?.id === inv.id) {
+        setSelectedInvoice(patchedInv);
+        setPrintableData((prev) =>
+          prev ? { ...prev, payToken: res.payToken, payLinkUrl: res.payUrl } : prev
+        );
+      }
+
+      await navigator.clipboard?.writeText(res.payUrl).catch(() => {});
+
+      if (mode === 'email') {
+        if (res.emailResult?.sent) {
+          setSaveSuccessMessage(
+            `1-tap Pay Link emailed to ${inv.customerEmail} (and copied to clipboard).`
+          );
+        } else {
+          setActionErrorMessage(
+            res.emailResult?.error || 'Pay Link generated & copied, but email delivery failed.'
+          );
+        }
+      } else {
+        setSaveSuccessMessage(
+          `Copied 1-tap Pay Link for Invoice ${inv.invoiceNumber} (${res.payUrl}).`
+        );
+      }
+      setTimeout(() => setSaveSuccessMessage(null), 4500);
+    } catch (err: any) {
+      setActionErrorMessage(err?.message || 'Error generating invoice Pay Link.');
+      setTimeout(() => setActionErrorMessage(null), 5000);
+    } finally {
+      setPayLinkInvoiceBusyId(null);
+    }
+  };
+
   const handleEmailInvoice = async (inv: InvoiceRecord) => {
     if (!inv.customerEmail) {
       setActionErrorMessage('No billing email address is set on this invoice.');
@@ -320,6 +423,14 @@ export function AdminInvoicingSubpage({
     try {
       setIsEmailingInvoice(true);
       setActionErrorMessage(null);
+      let resolvedPayUrl = inv.payLinkUrl;
+      if (inv.status !== 'paid' && !resolvedPayUrl) {
+        const payRes = await getPayLinkService().createOrGetInvoicePayLink(inv);
+        if (payRes.success && payRes.payUrl) {
+          resolvedPayUrl = payRes.payUrl;
+        }
+      }
+
       const emailService = getEmailDispatchService();
       const res = await emailService.sendCorporateInvoice({
         invoiceId: inv.id,
@@ -341,6 +452,7 @@ export function AdminInvoicingSubpage({
         discountAmount: inv.discountAmount ?? 0,
         totalAmount: inv.totalAmount,
         notes: inv.notes,
+        payLinkUrl: inv.status !== 'paid' ? resolvedPayUrl : undefined,
         companySettings: {
           name: settings.company?.name,
           phone: settings.company?.phone,
@@ -1703,16 +1815,36 @@ export function AdminInvoicingSubpage({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
                         {inv.status !== 'paid' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
-                            className="flex-1 text-xs py-1.5 h-auto text-emerald-700 bg-emerald-50 border-emerald-300 font-bold justify-center cursor-pointer"
-                          >
-                            Mark Paid
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={payLinkInvoiceBusyId !== null}
+                              onClick={() => handleInvoicePayLink(inv, 'copy')}
+                              className="text-xs py-1.5 h-auto text-blue-700 bg-blue-50 border-blue-200 font-bold justify-center cursor-pointer"
+                            >
+                              {payLinkInvoiceBusyId === `${inv.id}:copy` ? 'Copying...' : 'Copy Pay Link'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={payLinkInvoiceBusyId !== null}
+                              onClick={() => handleInvoicePayLink(inv, 'email')}
+                              className="text-xs py-1.5 h-auto text-indigo-700 bg-indigo-50 border-indigo-200 font-bold justify-center cursor-pointer"
+                            >
+                              {payLinkInvoiceBusyId === `${inv.id}:email` ? 'Sending...' : 'Send Pay Link'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
+                              className="text-xs py-1.5 h-auto text-emerald-700 bg-emerald-50 border-emerald-300 font-bold justify-center cursor-pointer"
+                            >
+                              Mark Paid
+                            </Button>
+                          </>
                         )}
                         <Button
                           size="sm"
@@ -1775,14 +1907,34 @@ export function AdminInvoicingSubpage({
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             {inv.status !== 'paid' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
-                                className="text-[10px] px-2 py-1 text-emerald-700 bg-emerald-50 border-emerald-300 font-bold cursor-pointer"
-                              >
-                                Mark Paid
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={payLinkInvoiceBusyId !== null}
+                                  onClick={() => handleInvoicePayLink(inv, 'copy')}
+                                  className="text-[10px] px-2 py-1 text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 font-bold cursor-pointer"
+                                >
+                                  {payLinkInvoiceBusyId === `${inv.id}:copy` ? '...' : 'Pay Link'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={payLinkInvoiceBusyId !== null}
+                                  onClick={() => handleInvoicePayLink(inv, 'email')}
+                                  className="text-[10px] px-2 py-1 text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 font-bold cursor-pointer"
+                                >
+                                  {payLinkInvoiceBusyId === `${inv.id}:email` ? 'Sending...' : 'Send Pay Link'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
+                                  className="text-[10px] px-2 py-1 text-emerald-700 bg-emerald-50 border-emerald-300 font-bold cursor-pointer"
+                                >
+                                  Mark Paid
+                                </Button>
+                              </>
                             )}
                             <Button
                               size="sm"
@@ -3317,6 +3469,46 @@ export function AdminInvoicingSubpage({
                   Mail checks to: {settings.company?.name || COMPANY_CONFIG.legalName}, {settings.company?.address || COMPANY_CONFIG.address.formatted}
                 </p>
               </div>
+
+              {/* 1-Tap Online Pay Link Remittance Footer (Printable PDF) */}
+              {(printableData?.payLinkUrl || selectedInvoice.payLinkUrl || selectedInvoice.payToken) && (
+                <div className="sm:col-span-2 p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0 space-y-0.5">
+                    <span className="text-[10px] font-extrabold text-blue-800 uppercase tracking-wider block">
+                      1-Tap Online Card / Apple Pay / Google Pay Settlement
+                    </span>
+                    <div className="font-mono text-[11px] font-bold text-blue-950 break-all select-all">
+                      {printableData?.payLinkUrl ||
+                        selectedInvoice.payLinkUrl ||
+                        getPayLinkService().buildPayUrl(selectedInvoice.payToken!)}
+                    </div>
+                  </div>
+                  {selectedInvoice.status !== 'paid' && (
+                    <div className="flex items-center gap-1.5 shrink-0 print:hidden">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={payLinkInvoiceBusyId !== null}
+                        onClick={() => handleInvoicePayLink(selectedInvoice, 'copy')}
+                        className="text-[11px] px-2.5 py-1 h-auto bg-white border-blue-300 text-blue-800 font-bold cursor-pointer"
+                      >
+                        Copy Link
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={payLinkInvoiceBusyId !== null}
+                        onClick={() => handleInvoicePayLink(selectedInvoice, 'email')}
+                        className="text-[11px] px-2.5 py-1 h-auto bg-blue-600 border-blue-600 text-white hover:bg-blue-700 font-bold cursor-pointer"
+                      >
+                        Email Pay Link
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Modal Controls (Hidden in Print Mode) */}

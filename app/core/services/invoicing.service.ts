@@ -462,6 +462,14 @@ class InvoicingService implements IInvoicingService {
         (targetCorp ? targetCorp.companyName : 'Accounts Payable'),
       status: targetInvoice.status,
       paidDate: targetInvoice.paidDate,
+      paidAt: targetInvoice.paidAt,
+      paymentReference: targetInvoice.paymentReference,
+      payToken: targetInvoice.payToken,
+      payLinkUrl:
+        targetInvoice.payLinkUrl ||
+        (targetInvoice.payToken
+          ? `${typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://chesterfieldtaxi.com'}/pay/${targetInvoice.payToken}`
+          : undefined),
       lineItems,
       subtotal,
       discountAmount: recordedDiscount,

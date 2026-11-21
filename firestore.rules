@@ -290,6 +290,32 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // 2C. Zero-PII 1-Tap Pay Link Projections & Webhook Idempotency
+    // ─────────────────────────────────────────────────────────────
+    match /payLinks/{payToken} {
+      // Unguessable high-entropy pay_... token required; collection listing strictly forbidden
+      allow get: if true;
+      allow list: if false;
+
+      // Only authenticated staff (Dispatchers/Admins) or Drivers can create/update sanitized PayLinkProjections
+      allow create, update: if (isDispatcher() || isDriver()) &&
+        request.resource.data.payToken == payToken &&
+        request.resource.data.keys().hasOnly([
+          'payToken', 'targetType', 'targetId', 'referenceNumber', 'customerLabel',
+          'summaryLabel', 'pickupDisplay', 'dropoffDisplay', 'serviceDate', 'billingPeriod',
+          'lineItems', 'baseAmount', 'tipAmount', 'totalPaidAmount', 'currency',
+          'allowTip', 'status', 'expiresAt', 'paidAt', 'receiptNumber',
+          'cardBrand', 'cardLast4', 'createdAt', 'updatedAt'
+        ]);
+
+      allow delete: if isDispatcher();
+    }
+
+    match /paymentWebhookEvents/{eventId} {
+      allow read, write: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // 3. Driver Shift Tracking & Vehicle Assignments (/vehicleAssignments)
     // ─────────────────────────────────────────────────────────────
     match /vehicleAssignments/{assignmentId} {

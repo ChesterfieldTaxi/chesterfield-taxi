@@ -504,6 +504,29 @@
   - [x] 35.6.1 Create `scripts/test-auto-dispatch-sla.ts` covering all 3 ranking strategies, exclusion filters, multi-step cascade rollover & exhaustion, and SLA urgency math (including STL/SUS airport buffer).
   - [x] 35.6.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-auto-dispatch-sla.ts`, `npm run test:e2e`, and `npm run test:stress`, then mark Phase 35 complete in `tasks.md`.
 
+## Phase 36: Complete Payment & Invoicing Loop (Stripe Webhooks + 1-Tap Pay Links)
+- [x] 36.0 Commit Phase 35 Baseline & Align Hobby Cron Schedule:
+  - [x] 36.0.1 Commit Phase 35 SLA & Auto-Dispatch baseline cleanly before Phase 36 changes.
+  - [x] 36.0.2 Update `vercel.json` `/api/cron/sla-dispatch` schedule to `"0 10 * * *"` and update `scripts/test-auto-dispatch-sla.ts` assertion.
+- [x] 36.1 Documentation First (SDD Convention):
+  - [x] 36.1.1 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 36 scope and architecture before modifying application code.
+- [x] 36.2 Verified Stripe Webhook Engine:
+  - [x] 36.2.1 Create server-isolated `app/core/services/payments/stripe-webhook.server.ts` implementing `verifyStripeWebhookSignature` (`HMAC-SHA256`, multi-`v1` rotation, `timingSafeEqual`, timestamp replay window), `/paymentWebhookEvents/{event.id}` idempotency, shared `pi_${paymentIntentId}` settlement deduplication, event reconciliation (`payment_intent.amount_capturable_updated`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`, `charge.refunded`), and staff diagnostics.
+  - [x] 36.2.2 Create `app/routes/api.payments.webhook.ts` (`POST` raw body webhook handler + authenticated staff `GET` diagnostics loader) and register `api/payments/webhook` in `app/routes.ts`.
+- [x] 36.3 Zero-PII Tokenized 1-Tap Pay Links:
+  - [x] 36.3.1 Create `app/core/utils/pay-token.util.ts` (`pay_...` token generation, zero-PII `PayLinkProjection` builders/sanitizers, expiry evaluation, and server-authoritative `baseAmount + tip` anti-tamper math).
+  - [x] 36.3.2 Update `firestore.rules` with `/payLinks/{payToken}` zero-PII rules and `/paymentWebhookEvents/{eventId}` staff lockdown, and extend `TripPayment` / `InvoiceRecord` / `PrintableInvoiceData` types with optional pay-link & settlement fields.
+  - [x] 36.3.3 Create `app/core/services/payments/pay-link.server.ts`, `app/core/services/payments/pay-link.service.ts`, and `app/routes/api.pay.ts` (`GET` public lookup + auto-expiry, `POST` `create_link` with SMS/Email delivery, `create_checkout_intent`, and `confirm_payment` verified against Stripe REST API), registered as `api/pay` in `app/routes.ts`.
+- [x] 36.4 Public Checkout Page & Staff Triggers:
+  - [x] 36.4.1 Create `app/routes/pay.$payToken.tsx` (mobile-first Executive Clean standalone checkout page with itemized breakdown, tip presets, live Stripe Payment Element `js.stripe.com/v3/`, graceful fallback notice, instant Paid Receipt view, and Print Receipt button) and register `pay/:payToken` in `app/routes.ts`.
+  - [x] 36.4.2 Add **Copy / Send Pay Link (SMS / Email)** controls and live `Open` / `Paid` status badge to `DispatchTripDetailsDrawer.tsx`.
+  - [x] 36.4.3 Add **Text / Show Pay Link** fallback option in `DriverPaymentTerminalModal.tsx` (wired in `app/routes/driver.tsx`).
+  - [x] 36.4.4 Add **Generate / Send Pay Link** action on open corporate invoices in `AdminInvoicingSubpage.tsx` and include the 1-tap Pay Link URL in printable PDF invoice remittance footers and statement emails.
+  - [x] 36.4.5 Update `AdminIntegrationsSubpage.tsx` (`webhooks` sub-tab) with live Stripe Webhook configuration status, copyable `/api/payments/webhook` URL, subscribed event list, and recent processed webhook events log.
+- [x] 36.5 Verification Gate:
+  - [x] 36.5.1 Create `scripts/test-payment-webhooks-and-links.ts` testing HMAC signature validation/tamper/replay/multi-`v1` rotation, webhook idempotency, trip & corporate invoice reconciliation (`payment_intent.succeeded` & `charge.refunded`), zero-PII pay link sanitization, expiry, and anti-tamper fare calculation.
+  - [x] 36.5.2 Run `npm run typecheck`, `npm run build` (confirming `api.payments.webhook` client chunk is `0.00 kB`), `npx tsx scripts/test-payment-webhooks-and-links.ts`, `npm run test:e2e`, and `npm run test:stress`, then mark Phase 36 complete in `tasks.md`.
+
 
 
 

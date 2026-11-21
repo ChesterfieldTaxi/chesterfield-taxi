@@ -13,9 +13,15 @@ import {
   CheckIcon,
   LockIcon,
   ChatBubbleLeftRightIcon,
+  CopyIcon,
+  RefreshCwIcon,
 } from '../../../ui/Icons';
 import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
+import {
+  getPayLinkService,
+  type WebhookDiagnosticsSummary,
+} from '../../../../core/services/payments/pay-link.service';
 
 
 export type IntegrationsSubTab = 'gateways' | 'telephony' | 'webhooks';
@@ -167,6 +173,27 @@ export function AdminIntegrationsSubpage({
   const [testSmsBody, setTestSmsBody] = useState('Chesterfield Taxi Test: Your dispatch gateway is operational.');
   const [testSmsStatus, setTestSmsStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [testSmsMsg, setTestSmsMsg] = useState<string | null>(null);
+
+  // Stripe Webhook Diagnostics State
+  const [webhookDiag, setWebhookDiag] = useState<WebhookDiagnosticsSummary | null>(null);
+  const [isLoadingWebhookDiag, setIsLoadingWebhookDiag] = useState<boolean>(false);
+  const [copiedWebhookEndpoint, setCopiedWebhookEndpoint] = useState<boolean>(false);
+
+  const refreshWebhookDiagnostics = async () => {
+    setIsLoadingWebhookDiag(true);
+    try {
+      const diag = await getPayLinkService().fetchWebhookDiagnostics();
+      setWebhookDiag(diag);
+    } finally {
+      setIsLoadingWebhookDiag(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSub === 'webhooks') {
+      void refreshWebhookDiagnostics();
+    }
+  }, [activeSub]);
 
   // Save Gateways Handler (Only persists public/non-secret identifiers; secrets live in server env)
   const handleSaveGateways = async () => {
@@ -1041,49 +1068,243 @@ export function AdminIntegrationsSubpage({
       )}
 
       {/* ─── TAB 3: WEBHOOKS & APIS ─── */}
-      {activeSub === 'webhooks' && (
-        <Card className="rounded-2xl border-slate-200">
-          <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="text-base font-extrabold text-slate-900">
-              System Webhooks &amp; Third-Party API Keys
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Configure incoming webhooks for dispatch telemetry and outbound ride events for hotel/concierge integrations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 space-y-4">
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-              <span className="text-xs font-bold text-slate-800 block">Inbound Twilio Webhook URL:</span>
-              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
-                https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_call
-              </code>
-              <p className="text-[11px] text-slate-500">
-                Paste this URL into your Twilio Console under Phone Numbers &gt; Active Numbers &gt; Voice &amp; Fax configuration.
-              </p>
-            </div>
+      {activeSub === 'webhooks' && (() => {
+        const currentOrigin =
+          typeof window !== 'undefined' && window.location?.origin
+            ? window.location.origin
+            : 'https://chesterfield-taxi.vercel.app';
+        const stripeWebhookEndpointUrl = `${currentOrigin}/api/payments/webhook`;
+        const subscribedList = webhookDiag?.subscribedEvents?.length
+          ? webhookDiag.subscribedEvents
+          : [
+              'payment_intent.amount_capturable_updated',
+              'payment_intent.succeeded',
+              'payment_intent.payment_failed',
+              'payment_intent.canceled',
+              'charge.refunded',
+            ];
 
-            <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/50 space-y-2">
-              <span className="text-xs font-bold text-slate-800 block">TwiML App Voice Request URL (WebRTC Softphone):</span>
-              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-sky-300 block text-sky-800 select-all break-all">
-                https://chesterfield-taxi.vercel.app/api/telephony?action=voice_client_twiml
-              </code>
-              <p className="text-[11px] text-slate-500">
-                In Twilio Console &gt; Voice &gt; TwiML Apps, create an App named &ldquo;Dispatch Softphone&rdquo; and paste this URL into the <strong>Voice Request URL</strong> field (HTTP POST or GET). Then paste the App SID (<code>AP...</code>) into the Telephony tab above.
-              </p>
-            </div>
+        return (
+          <div className="space-y-6">
+            {/* Card 1: Verified Stripe Payment & Invoicing Webhook Engine */}
+            <Card className="rounded-2xl border-slate-200">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      <CreditCardIcon className="w-5 h-5 text-indigo-600 shrink-0" />
+                      <span>Stripe Payment &amp; Corporate Invoice Webhook</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500">
+                      Cryptographic HMAC-SHA256 verified webhook endpoint reconciling pre-auth holds, 1-tap Pay Links, B2B invoices, and general ledger entries.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <Badge
+                      variant={webhookDiag?.webhookSecretConfigured ? 'success' : 'warning'}
+                      className="font-bold"
+                    >
+                      {webhookDiag?.webhookSecretConfigured
+                        ? 'Signing Secret Ready'
+                        : 'Missing STRIPE_WEBHOOK_SECRET'}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isLoadingWebhookDiag}
+                      onClick={refreshWebhookDiagnostics}
+                      className="text-xs font-bold px-2.5 py-1.5 cursor-pointer"
+                    >
+                      {isLoadingWebhookDiag ? (
+                        <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCwIcon className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
 
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-              <span className="text-xs font-bold text-slate-800 block">Inbound SMS Webhook URL:</span>
-              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
-                https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_sms
-              </code>
-              <p className="text-[11px] text-slate-500">
-                Paste this URL into your Twilio Console under Messaging configuration to receive passenger text replies into the Dispatch console.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              <CardContent className="p-4 sm:p-6 space-y-5">
+                {/* Copyable Endpoint URL */}
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-slate-900">
+                      Stripe Webhook Endpoint URL (POST):
+                    </span>
+                    <span className="text-[11px] font-mono text-indigo-700">
+                      Replay Protection: {webhookDiag?.toleranceSeconds ?? 300}s &middot; Mode:{' '}
+                      {(webhookDiag?.stripeMode || 'unconfigured').toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <code className="flex-1 text-xs font-mono bg-white p-2.5 rounded-lg border border-indigo-200 text-slate-800 select-all break-all">
+                      {stripeWebhookEndpointUrl}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(stripeWebhookEndpointUrl);
+                        setCopiedWebhookEndpoint(true);
+                        setTimeout(() => setCopiedWebhookEndpoint(false), 2000);
+                      }}
+                      className="bg-white border-indigo-300 text-indigo-800 font-bold text-xs px-3 py-2 cursor-pointer shrink-0 justify-center"
+                    >
+                      {copiedWebhookEndpoint ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700">
+                          <CheckIcon className="w-3.5 h-3.5" />
+                          <span>Copied</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <CopyIcon className="w-3.5 h-3.5" />
+                          <span>Copy URL</span>
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600">
+                    In Stripe Dashboard &gt; Developers &gt; Webhooks, add this endpoint URL and set the{' '}
+                    <code className="font-mono font-bold">STRIPE_WEBHOOK_SECRET</code> (<code>whsec_...</code>) server environment variable.
+                  </p>
+                </div>
+
+                {/* Subscribed Events List */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Subscribed Stripe Events ({subscribedList.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {subscribedList.map((evtName) => (
+                      <span
+                        key={evtName}
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-mono text-[11px] font-semibold text-slate-800"
+                      >
+                        {evtName}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Processed Webhook Events Log */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">
+                      Recent Processed Webhook Events ({webhookDiag?.totalProcessedCount ?? 0})
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Deduplicated via /paymentWebhookEvents
+                    </span>
+                  </div>
+
+                  {!webhookDiag?.recentEvents || webhookDiag.recentEvents.length === 0 ? (
+                    <div className="p-6 rounded-xl border border-slate-200 bg-slate-50/50 text-center text-xs text-slate-500">
+                      {isLoadingWebhookDiag
+                        ? 'Loading processed webhook log...'
+                        : 'No Stripe webhook deliveries recorded yet.'}
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                      <table className="w-full text-left text-xs min-w-[620px]">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="px-3.5 py-2.5">Processed At</th>
+                            <th className="px-3.5 py-2.5">Event ID</th>
+                            <th className="px-3.5 py-2.5">Event Type</th>
+                            <th className="px-3.5 py-2.5">Target</th>
+                            <th className="px-3.5 py-2.5 text-right">Amount</th>
+                            <th className="px-3.5 py-2.5">Outcome</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {webhookDiag.recentEvents.map((ev) => (
+                            <tr key={ev.id} className="hover:bg-slate-50/70">
+                              <td className="px-3.5 py-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                                {ev.processedAt
+                                  ? new Date(ev.processedAt).toLocaleString()
+                                  : '—'}
+                              </td>
+                              <td className="px-3.5 py-2 font-mono text-[11px] font-bold text-slate-800 whitespace-nowrap">
+                                {ev.id}
+                              </td>
+                              <td className="px-3.5 py-2 font-mono text-[11px] text-indigo-700 whitespace-nowrap">
+                                {ev.eventType}
+                              </td>
+                              <td className="px-3.5 py-2 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                                {ev.targetType && ev.targetId
+                                  ? `${ev.targetType.toUpperCase()}: ${ev.targetId}`
+                                  : '—'}
+                              </td>
+                              <td className="px-3.5 py-2 font-mono font-bold text-right text-slate-900 whitespace-nowrap">
+                                {typeof ev.amount === 'number'
+                                  ? `$${ev.amount.toFixed(2)}`
+                                  : '—'}
+                              </td>
+                              <td className="px-3.5 py-2">
+                                <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-[10px]">
+                                  {ev.outcome.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: Telephony & Softphone Webhooks */}
+            <Card className="rounded-2xl border-slate-200">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <CardTitle className="text-base font-extrabold text-slate-900">
+                  Telephony &amp; Dispatch Relay Webhooks
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Configure incoming Twilio webhooks for PSTN calls, WebRTC softphone routing, and two-way passenger SMS.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">Inbound Twilio Webhook URL:</span>
+                  <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
+                    {currentOrigin}/api/telephony?action=incoming_call
+                  </code>
+                  <p className="text-[11px] text-slate-500">
+                    Paste this URL into your Twilio Console under Phone Numbers &gt; Active Numbers &gt; Voice &amp; Fax configuration.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/50 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">TwiML App Voice Request URL (WebRTC Softphone):</span>
+                  <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-sky-300 block text-sky-800 select-all break-all">
+                    {currentOrigin}/api/telephony?action=voice_client_twiml
+                  </code>
+                  <p className="text-[11px] text-slate-500">
+                    In Twilio Console &gt; Voice &gt; TwiML Apps, create an App named &ldquo;Dispatch Softphone&rdquo; and paste this URL into the <strong>Voice Request URL</strong> field (HTTP POST or GET). Then paste the App SID (<code>AP...</code>) into the Telephony tab above.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 block">Inbound SMS Webhook URL:</span>
+                  <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
+                    {currentOrigin}/api/telephony?action=incoming_sms
+                  </code>
+                  <p className="text-[11px] text-slate-500">
+                    Paste this URL into your Twilio Console under Messaging configuration to receive passenger text replies into the Dispatch console.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
     </div>
   );
 }

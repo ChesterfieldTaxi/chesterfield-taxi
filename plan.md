@@ -736,7 +736,7 @@ export interface PassengerAccount {
   - `startOfferCascade`, `advanceOrExpireOfferCascade`, `cancelOfferCascade`: Sequential 1-driver-at-a-time offer coordinator (`status: 'offered'`, `offeredToIds: [candidate.driverId]`, `offerExpiresAt`), logging `DISPATCH_OFFERED` / `STATUS_CHANGED` audit events, triggering optional `/api/push` `send_push`, rolling over on decline/timeout, and marking `offerCascade.state = 'exhausted'` (reverting `status` to `'CONFIRMED'` or `'pending'` and `offeredToIds: []`) after `maxCascadeAttempts` or zero remaining candidates.
 
 ### 24.4 Serverless Scheduled SLA Cron (`app/routes/api.cron.sla-dispatch.ts`, `app/routes.ts`, `vercel.json`)
-- Register `api/cron/sla-dispatch` (`GET` & `POST`) in `app/routes.ts` and configure `"crons": [{ "path": "/api/cron/sla-dispatch", "schedule": "*/5 * * * *" }]` in `vercel.json`.
+- Register `api/cron/sla-dispatch` (`GET` & `POST`) in `app/routes.ts` and configure `"crons": [{ "path": "/api/cron/sla-dispatch", "schedule": "0 10 * * *" }]` in `vercel.json` (daily 4:00 AM Central pre-dawn airport sweep).
 - Authenticate via `Authorization: Bearer ${CRON_SECRET}`, `x-admin-secret`, or verified Admin/Dispatcher token (`verifyServerRequestAuth`).
 - Support Google Service Account Firestore REST (`FIREBASE_SERVICE_ACCOUNT_JSON`), staff-token Firestore REST, and `IBookingService` local fallback; idempotently stamp `slaStatus.criticalNotifiedAt` and send alert email/SMS to dispatch operations when unattended scheduled rides enter the `critical` / `overdue` window.
 
@@ -748,6 +748,46 @@ export interface PassengerAccount {
   - Isolated 1s countdown badge & progress bar (`Accept within Xs · Step k/N`) whenever `offerCascade?.offerExpiresAt` is present on an incoming offer.
 - **Admin Console (`AdminRulesTab.tsx`)**:
   - **Dispatch Automation & Scheduled SLA** card bound to `settings.dispatchAutomation`.
+
+## 25. Phase 36 Architecture: Complete Payment & Invoicing Loop (Stripe Webhooks + 1-Tap Pay Links)
+
+### 25.1 Architectural & Security Guardrails
+- **Server-Only Cryptographic & Reconciliation Isolation (`constitution.md`)**:
+  - Keep all `node:crypto` HMAC-SHA256 verification, Firestore REST reconciliation, and Stripe REST settlement logic inside server-isolated `*.server.ts` modules (`app/core/services/payments/stripe-webhook.server.ts` and `app/core/services/payments/pay-link.server.ts`), ensuring `api.payments.webhook.ts` and `api.pay.ts` emit `0.00 kB` client chunks.
+  - Keep pure token/projection sanitization and anti-tamper fare math in `app/core/utils/pay-token.util.ts` (using Web Crypto / pure TypeScript with zero Node-only imports) and client service methods in `app/core/services/payments/pay-link.service.ts` so React components never embed raw API or domain logic.
+- **Anti-Tamper Server Authority**:
+  - `create_checkout_intent` ignores any client-supplied base fare or invoice total, reading `baseAmount` exclusively from the persisted `PayLinkProjection`, validating `tipAmount >= 0` (and `0` when `allowTip === false`), and computing `chargeAmount = baseAmount + validatedTipAmount` on the server.
+  - `confirm_payment` queries `GET https://api.stripe.com/v1/payment_intents/{id}` on the server and verifies `status` (`succeeded` | `requires_capture`), `metadata.payToken === payToken`, and `amount >= Math.round(baseAmount * 100)` before marking any link, trip, or invoice paid.
+- **Zero-PII Public Token Projection (`firestore.rules` & `/payLinks/{payToken}`)**:
+  - Mirror `/tripTracking/{trackingToken}`: `/payLinks/{payToken}` permits `get: if true; list: if false; create, update: if isDispatcher() || isDriver(); delete: if isDispatcher();` with a strict `keys().hasOnly([...])` allowlist containing only masked customer/company labels, reference `#`, sanitized route/period summary, sanitized line items, amounts, currency, `allowTip`, `status`, timestamps, and `receiptNumber`.
+  - `/paymentWebhookEvents/{eventId}` is locked down to `allow read, write: if isDispatcher();`.
+
+### 25.2 Verified Stripe Webhook Engine (`stripe-webhook.server.ts` & `api.payments.webhook.ts`)
+- **`verifyStripeWebhookSignature(rawBody, signatureHeader, webhookSecret, toleranceSeconds = 300)`**:
+  - Parses `t=<unix_sec>` and all `v1=<hex_hmac>` values from `Stripe-Signature`.
+  - Rejects missing/malformed headers or `|now - t| > toleranceSeconds` (`400`).
+  - Computes `HMAC-SHA256(webhookSecret, "${timestamp}.${rawBody}")` and compares against every `v1` signature via `crypto.timingSafeEqual` to support zero-downtime webhook secret rotation.
+- **Dual-Layer Idempotency**:
+  - Event-level lock `/paymentWebhookEvents/{event.id}` prevents duplicate Stripe webhook deliveries (`200 { received: true, duplicate: true }`).
+  - Settlement-level lock `pi_${paymentIntentId}` (plus deterministic ledger entry IDs) prevents double-posting between synchronous `confirm_payment` and asynchronous `payment_intent.succeeded` webhooks.
+- **Event Reconciliation**:
+  - `payment_intent.amount_capturable_updated` -> trip `payment.status = 'authorized'` + `TripAuditEvent`.
+  - `payment_intent.succeeded` -> reconciles `trip` (`payment.status = 'captured'`, `tipAmount`, `payLink.status = 'paid'`, balanced `fare_revenue`, `tip_collected`, `platform_commission`, `driver_payout` ledger entries) or `invoice` (`status = 'paid'`, `paidAt`, `paymentReference`, AR transaction settlement, `payLink.status = 'paid'`, balanced `invoice_settlement` ledger entry).
+  - `payment_intent.payment_failed` / `payment_intent.canceled` -> appends failure/cancellation audit trail without corrupting open balances.
+  - `charge.refunded` -> records `refund` ledger entry and stamps refund audit metadata on the linked trip/invoice/payLink.
+- **Staff Diagnostics (`GET /api/payments/webhook`)**:
+  - Authenticated via `verifyServerRequestAuth` (Dispatcher/Admin only), returning `{ webhookSecretConfigured, stripeConfigured, endpointPath: '/api/payments/webhook', subscribedEvents, recentEvents }`.
+
+### 25.3 Tokenized Pay Links & Public Checkout (`pay-link.server.ts`, `pay-link.service.ts`, `api.pay.ts`, `pay.$payToken.tsx`)
+- **`app/routes/api.pay.ts`**:
+  - `GET /api/pay?token=pay_...`: IP rate-limited lookup auto-expiring stale `open` links (`now > expiresAt`) and returning sanitized `PayLinkProjection` + `{ stripeConfigured, stripePublishableKey }`.
+  - `POST /api/pay`:
+    - `create_link`: Staff/Driver authenticated creation/reuse of `/payLinks/{payToken}` for `trip` or `invoice` targets, caching `payToken` on the target record and optionally sending SMS (Twilio) and/or Executive Clean payment-request email (`ResendEmailService`).
+    - `create_checkout_intent`: Rate-limited server-authoritative Stripe `PaymentIntent` creation (`automatic_payment_methods[enabled]=true`) with clean `{ stripeConfigured: false, message }` fallback when Stripe is unconfigured.
+    - `confirm_payment`: Rate-limited server-verified `PaymentIntent` confirmation sharing `pi_${paymentIntentId}` idempotency with the webhook engine.
+- **Public Checkout & Staff Surface Integration**:
+  - `app/routes/pay.$payToken.tsx`: Mobile-first Executive Clean standalone checkout route (`/pay/:payToken`) with itemized summary, tip presets (`15%`, `20%`, `25%`, `Custom`, `No Tip`), Stripe Payment Element (`js.stripe.com/v3/`), graceful fallback notice, instant Paid Receipt view, and Print Receipt button.
+  - Staff triggers wired into `DispatchTripDetailsDrawer.tsx`, `DriverPaymentTerminalModal.tsx` (`driver.tsx`), `AdminInvoicingSubpage.tsx` (including PDF invoice remittance footer), and `AdminIntegrationsSubpage.tsx` (`webhooks` sub-tab).
 
 
 

@@ -474,6 +474,13 @@ export interface InvoiceRecord {
   dueDate: string;
   issuedDate: string;
   paidDate?: string;
+  paidAt?: string;
+  paymentReference?: string;
+  receiptNumber?: string;
+  payToken?: string;
+  payLinkUrl?: string;
+  refundedAmount?: number;
+  refundedAt?: string;
   lineItems: InvoiceLineItemRecord[];
   notes?: string;
 }

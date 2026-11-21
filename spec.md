@@ -665,12 +665,36 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Rank eligible candidates deterministically via `nearest_in_zone` (geofence containment + Haversine miles), `longest_idle_in_zone`, or `highest_driver_score`.
   - Offer sequentially to one active target driver per step (`status: 'offered'`, `offeredToIds: [candidate.driverId]`), automatically rolling over to the next candidate on driver decline or `offerExpiresAt` timeout up to `maxCascadeAttempts`, and reverting cleanly to `'CONFIRMED'` (or `'pending'`) with `offerCascade.state = 'exhausted'` and audit logging if exhausted.
 - **Unattended Serverless SLA Cron (`/api/cron/sla-dispatch` & `vercel.json`)**:
-  - Scheduled every 5 minutes (`*/5 * * * *`) and secured via `CRON_SECRET`, `x-admin-secret`, or authenticated Dispatcher/Admin token.
+  - Scheduled daily at `"0 10 * * *"` (4:00 AM Central pre-dawn airport sweep on Vercel Hobby) and secured via `CRON_SECRET`, `x-admin-secret`, or authenticated Dispatcher/Admin token.
   - Idempotently stamps `slaStatus.criticalNotifiedAt` on unattended critical/overdue unassigned scheduled trips, dispatches operations email/SMS alerts via `ResendEmailService` / Twilio, advances expired cascades, and optionally initiates `autoOffer` when `autoOfferOnConfirm` is enabled.
 - **Dispatch, Driver & Admin UI Integration**:
   - **Dispatch Console (`/app/dispatch`)**: Periodic SLA & cascade coordinator tick playing `playSlaWarningChime()` + `notifyDispatchAlert` once per threshold transition; compact **SLA Urgency Banner** with 1-click filter/jump; color-coded SLA countdown badges (`Due in 42m`, `CRITICAL • 18m`, `OVERDUE`) and live cascade pills (`Offering Car #204 • 31s · 1/3`, `Cascade Exhausted`); 1-tap **Auto-Offer** and **Cancel Cascade** controls across queue cards/rows, `TripActionDropdown`, and `DispatchTripDetailsDrawer`.
   - **Driver App (`/app/driver`)**: Live 1-second countdown badge & progress bar (`Accept within 34s · Step 1/3`) in `DriverOfferSheet` and `DriverLiveMeterCard` whenever `offerCascade.offerExpiresAt` is active.
   - **Admin Console (`/app/admin`)**: **Dispatch Automation & Scheduled SLA** configuration card in `AdminRulesTab` controlling trigger mode, ranking strategy, timeout, max cascade attempts, and SLA warning/critical/airport lead buffers.
+
+## 36. Phase 36: Complete Payment & Invoicing Loop (Stripe Webhooks + 1-Tap Pay Links)
+- **Cryptographic Stripe Webhook Engine (`/api/payments/webhook`)**:
+  - Server-isolated HMAC-SHA256 webhook verification (`verifyStripeWebhookSignature`) reading raw request payloads (`await request.text()`) prior to JSON parsing, supporting multi-`v1` signature rotation, constant-time `crypto.timingSafeEqual`, and configurable timestamp replay protection (`toleranceSeconds = 300`).
+  - Strict event-level idempotency via `/paymentWebhookEvents/{event.id}` (Firestore + server cache) returning `200 { received: true, duplicate: true }` on duplicate deliveries without double-posting ledger entries or double-updating trips/invoices, paired with settlement-level idempotency (`pi_${paymentIntentId}`).
+  - Automated financial & operational reconciliation across Stripe lifecycle events:
+    - `payment_intent.amount_capturable_updated`: Marks linked trip payment hold `status: 'authorized'` and appends a `TripAuditEvent`.
+    - `payment_intent.succeeded`: Reconciles `trip` targets (captured payment status, gratuity, `payToken` `'paid'` transition, and balanced `FinancialLedgerEntry` postings for `fare_revenue`, `tip_collected`, `platform_commission`, and `driver_payout`) and corporate `invoice` targets (`status: 'paid'`, `paidAt`, `paymentReference`, linked AR row settlement, `payToken` `'paid'` transition, and balanced `invoice_settlement` ledger entry).
+    - `payment_intent.payment_failed` / `payment_intent.canceled`: Logs payment failure/cancellation status and audit trail without corrupting open balances or settled records.
+    - `charge.refunded`: Posts `refund` entry in `financialLedger` and appends refund metadata/audit trail onto the linked trip or corporate invoice.
+  - Authenticated staff `GET /api/payments/webhook` diagnostics endpoint (Dispatcher/Admin only via `verifyServerRequestAuth`) reporting signing-secret readiness, endpoint path, subscribed events, and recent processed webhook deliveries.
+- **Zero-PII Tokenized 1-Tap Pay Links (`/payLinks/{payToken}`, `/api/pay`, `/pay/:payToken`)**:
+  - High-entropy URL-safe tokens matching `/^pay_[a-zA-Z0-9_-]{24,80}$/` (`pay-token.util.ts`).
+  - Strict Zero-PII public projection mirroring `/tripTracking`: exposes only masked customer/company label, reference `#`, sanitized pickup/dropoff or invoice period summary, sanitized itemized line items, authoritative `baseAmount`, `currency`, `allowTip`, `status`, `expiresAt`, `paidAt`, and `receiptNumber` — never exposing full passenger phone/email, gate codes, or corporate PO history to unauthenticated callers.
+  - Anti-tamper server-authoritative checkout (`POST /api/pay`):
+    - `create_link` (authenticated Dispatcher/Admin/Driver): Creates or reuses an active `PayLinkProjection` for `targetType: 'trip' | 'invoice'`, persists to `/payLinks/{payToken}`, caches token metadata on the target record, and optionally dispatches SMS (Twilio) and/or Executive Clean payment-request email (`ResendEmailService`).
+    - `create_checkout_intent` (rate-limited public): Validates `open` & unexpired link state, computes authoritative `chargeAmount = baseAmount + validatedTipAmount` strictly from server-stored `baseAmount` (never trusting client fare totals), creates a Stripe `PaymentIntent` (`automatic_payment_methods[enabled]=true`), and cleanly returns `{ stripeConfigured: false, message }` directing callers to pay in-car or call `(314) 738-0100` when Stripe is unconfigured.
+    - `confirm_payment` (rate-limited public): Verifies `PaymentIntent` status (`succeeded` or `requires_capture`), metadata token match, and amount directly against the Stripe REST API before marking the pay link and target trip/invoice paid using shared idempotency key `pi_${paymentIntentId}`.
+- **Public Checkout Experience & Staff Triggers**:
+  - **Standalone Public Checkout (`/pay/:payToken`)**: Mobile-first Executive Clean page with Chesterfield Taxi header, security badge, itemized ride or corporate invoice breakdown, tip selector (`15%`, `20%`, `25%`, `Custom`, `No Tip` when `allowTip` is enabled), live Stripe Payment Element (`js.stripe.com/v3/`) supporting Apple Pay / Google Pay / cards, graceful unconfigured fallback card, instant Paid Receipt view, and Print Receipt action.
+  - **Dispatch Console (`DispatchTripDetailsDrawer.tsx`)**: 1-tap **Copy / Send Pay Link (SMS / Email)** controls and live `Open` / `Paid` link status indicator on trips.
+  - **Driver Mobile App (`DriverPaymentTerminalModal.tsx`)**: **Text / Show Pay Link** fallback in the in-cab settlement modal so passengers can pay from their own device.
+  - **Admin Corporate Invoicing (`AdminInvoicingSubpage.tsx`)**: **Generate / Send Pay Link** action on open corporate invoices plus 1-tap Pay Link remittance URL on printable PDF statements.
+  - **Admin Integrations (`AdminIntegrationsSubpage.tsx` — `webhooks` sub-tab)**: Live Stripe Webhook configuration status, copyable `/api/payments/webhook` endpoint URL, subscribed event catalog, and recent processed webhook event log.
 
 
 

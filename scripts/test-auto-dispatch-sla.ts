@@ -793,9 +793,9 @@ async function runTests() {
   assert(
     Array.isArray(vercelConfig.crons) &&
       vercelConfig.crons.some(
-        (c: any) => c.path === '/api/cron/sla-dispatch' && c.schedule === '*/5 * * * *'
+        (c: any) => c.path === '/api/cron/sla-dispatch' && c.schedule === '0 10 * * *'
       ),
-    'vercel.json registers /api/cron/sla-dispatch on a 5-minute cron schedule'
+    'vercel.json registers /api/cron/sla-dispatch on daily pre-dawn 4:00 AM Central ("0 10 * * *") cron schedule'
   );
 
   console.log(`\n🎉 ALL ${passed}/${total} PHASE 35 ASSERTIONS PASSED!\n`);

@@ -2269,6 +2269,25 @@ export function renderCorporateInvoiceEmail(
         : ''
     }
 
+    ${
+      payload.payLinkUrl
+        ? `<div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; text-align: center; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #1d4ed8; margin-bottom: 6px;">
+              Instant 1-Tap Online Settlement
+            </div>
+            <div style="font-size: 13px; color: #334155; margin-bottom: 12px;">
+              Pay Invoice <strong>${escapeHtml(payload.invoiceNumber)}</strong> securely online via Card, Apple Pay, or Google Pay.
+            </div>
+            <a href="${escapeHtml(payload.payLinkUrl)}" style="display: inline-block; background-color: #1d4ed8; color: #ffffff; font-size: 14px; font-weight: 800; text-decoration: none; padding: 11px 24px; border-radius: 10px;">
+              Pay $${payload.totalAmount.toFixed(2)} Online &rarr;
+            </a>
+            <div style="font-size: 11px; color: #64748b; margin-top: 8px; word-break: break-all;">
+              ${escapeHtml(payload.payLinkUrl)}
+            </div>
+          </div>`
+        : ''
+    }
+
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px;">
       <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
         Remittance &amp; Billing Inquiries
@@ -2311,7 +2330,7 @@ ${linesText}
 Subtotal: $${payload.subtotal.toFixed(2)}
 ${discountAmt > 0 ? `Contract Discount: -$${discountAmt.toFixed(2)}\n` : ''}Total Balance Due: $${payload.totalAmount.toFixed(2)}
 
-${payload.notes ? `Notes: ${payload.notes}\n` : ''}REMITTANCE:
+${payload.notes ? `Notes: ${payload.notes}\n` : ''}${payload.payLinkUrl ? `Pay Online (1-Tap): ${payload.payLinkUrl}\n\n` : ''}REMITTANCE:
 Please reference ${payload.invoiceNumber} payable to ${companyName}, ${companyAddress}.
 Questions? Email ${companyEmail} or call ${companyPhone}.
 ========================================

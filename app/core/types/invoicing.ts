@@ -64,6 +64,10 @@ export interface PrintableInvoiceData {
   billingAddress?: string;
   status: 'draft' | 'issued' | 'paid' | 'overdue';
   paidDate?: string;
+  paidAt?: string;
+  paymentReference?: string;
+  payToken?: string;
+  payLinkUrl?: string;
   lineItems: PdfInvoiceLineItem[];
   subtotal: number;
   discountAmount?: number;

@@ -211,6 +211,12 @@ export interface TripPayment {
   payoutStatus?: 'pending' | 'settled' | 'withheld';
   cardBrand?: string;
   cardLast4?: string;
+  // Phase 36: 1-Tap Pay Links & Webhook Settlement Metadata
+  payToken?: string;
+  payLinkStatus?: 'open' | 'paid' | 'expired' | 'cancelled' | 'refunded';
+  receiptNumber?: string;
+  refundedAmount?: number;
+  refundedAt?: string;
 }
 
 export interface TripStatusHistoryEntry {
