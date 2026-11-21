@@ -982,6 +982,11 @@ export default function DispatchRoute() {
   // Mobile-native card gesture preference ('action_sheet' = hold for actions; 'multi_select' = tap for actions, hold for multi-select)
   const [mobileCardGestureMode, setMobileCardGestureMode] = useState<'action_sheet' | 'multi_select'>('action_sheet');
   const [mobileActionSheetTrip, setMobileActionSheetTrip] = useState<Trip | null>(null);
+  const [mobileActionSheetDriver, setMobileActionSheetDriver] = useState<LiveFleetDriver | null>(null);
+  const [longPressingDriverId, setLongPressingDriverId] = useState<string | null>(null);
+  const driverLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const driverLongPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const driverLongPressTriggeredIdRef = useRef<string | null>(null);
   const [driverPickerTrip, setDriverPickerTrip] = useState<Trip | null>(null);
   const [driverPickerSearch, setDriverPickerSearch] = useState('');
   const [driverPickerFilter, setDriverPickerFilter] = useState<'all' | 'available' | 'busy'>('all');
@@ -989,6 +994,56 @@ export default function DispatchRoute() {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredTripIdRef = useRef<string | null>(null);
+
+  const cancelDriverCardLongPress = useCallback(() => {
+    if (driverLongPressTimerRef.current) {
+      clearTimeout(driverLongPressTimerRef.current);
+      driverLongPressTimerRef.current = null;
+    }
+    driverLongPressStartPosRef.current = null;
+    setLongPressingDriverId(null);
+  }, []);
+
+  const handleDriverCardTouchStart = useCallback(
+    (driver: LiveFleetDriver, e: React.TouchEvent<HTMLDivElement>) => {
+      if (isDesktop) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, select, input, a')) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      cancelDriverCardLongPress();
+      driverLongPressStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      setLongPressingDriverId(driver.id);
+      driverLongPressTimerRef.current = setTimeout(() => {
+        driverLongPressTimerRef.current = null;
+        driverLongPressStartPosRef.current = null;
+        driverLongPressTriggeredIdRef.current = driver.id;
+        setLongPressingDriverId(null);
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          try {
+            navigator.vibrate(15);
+          } catch {}
+        }
+        setMobileActionSheetDriver(driver);
+      }, 380);
+    },
+    [isDesktop, cancelDriverCardLongPress]
+  );
+
+  const handleDriverCardTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (!driverLongPressStartPosRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      if (
+        Math.abs(touch.clientX - driverLongPressStartPosRef.current.x) > 10 ||
+        Math.abs(touch.clientY - driverLongPressStartPosRef.current.y) > 10
+      ) {
+        cancelDriverCardLongPress();
+      }
+    },
+    [cancelDriverCardLongPress]
+  );
 
   // Shared drag-down-to-close gesture for mobile bottom sheets in Dispatch
   const handleDismissActiveDispatchSheet = useCallback(() => {
@@ -998,12 +1053,14 @@ export default function DispatchRoute() {
       setCompleteTripTarget(null);
     } else if (isBatchAssignOpen) {
       setIsBatchAssignOpen(false);
+    } else if (mobileActionSheetDriver) {
+      setMobileActionSheetDriver(null);
     } else if (mobileActionSheetTrip) {
       setMobileActionSheetTrip(null);
     } else if (driverModalTrip) {
       setDriverModalTrip(null);
     }
-  }, [driverPickerTrip, completeTripTarget, isCompletingTrip, isBatchAssignOpen, mobileActionSheetTrip, driverModalTrip]);
+  }, [driverPickerTrip, completeTripTarget, isCompletingTrip, isBatchAssignOpen, mobileActionSheetDriver, mobileActionSheetTrip, driverModalTrip]);
 
   const dispatchSheetDrag = useBottomSheetDragToClose({
     onClose: handleDismissActiveDispatchSheet,
@@ -6767,62 +6824,50 @@ export default function DispatchRoute() {
         </div>
 
         {/* ─── FULL-SCREEN MOBILE OPERATIONS TABS (lg:hidden) ─── */}
-        {/* 1. Mobile Drivers Roster Page */}
+        {/* 1. Mobile Drivers Roster Page (Beautified Native Cards + Touch & Hold Actions) */}
         {activeMobileTab === 'drivers' && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden">
-            {/* Header */}
-            <div className="py-3 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-2xs">
-                  <UsersIcon className="w-5 h-5" />
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/70 lg:hidden">
+            {/* Compact Search & Status Filter Toolbar */}
+            <div className="px-3 pt-2.5 pb-2 bg-white border-b border-slate-200/90 space-y-2 shrink-0 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search driver, cab #, zone..."
+                    value={driverSearch}
+                    onChange={(e) => setDriverSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  />
+                  {driverSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDriverSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      aria-label="Clear driver search"
+                    >
+                      <XIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-slate-900 tracking-tight">Drivers Roster</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      {drivers.filter((d) => d.status === 'available').length} Avail
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium">Fleet availability &amp; live assignment</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Search & Filter Toolbar */}
-            <div className="p-3 bg-white border-b border-slate-200 space-y-2.5 shrink-0 shadow-2xs">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <MagnifyingGlassIcon className="w-4 h-4" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>{drivers.filter((d) => d.mapStatus === 'available').length} Avail</span>
                 </span>
-                <input
-                  type="text"
-                  placeholder="Search drivers by name, vehicle, zone, phone..."
-                  value={driverSearch}
-                  onChange={(e) => setDriverSearch(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-2xs"
-                />
-                {driverSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setDriverSearch('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
 
-              {/* Status Segmented Tabs (Option C Fleet Palette) */}
-              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/80 overflow-x-auto no-scrollbar">
+              {/* Status Segmented Pills */}
+              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl overflow-x-auto no-scrollbar">
                 {(
                   [
                     { key: 'all', label: 'All' },
-                    { key: 'available', label: 'Available' },
+                    { key: 'available', label: 'Avail' },
                     { key: 'en_route', label: 'En Route' },
                     { key: 'busy', label: 'Busy' },
                     { key: 'break', label: 'Break' },
-                    { key: 'offline', label: 'Offline' },
+                    { key: 'offline', label: 'Off' },
                   ] as const
                 ).map((tab) => {
                   const count =
@@ -6835,16 +6880,16 @@ export default function DispatchRoute() {
                       key={tab.key}
                       type="button"
                       onClick={() => setDriverFilter(tab.key)}
-                      className={`flex-1 min-w-[64px] shrink-0 py-1.5 text-center rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      className={`flex-1 min-w-[58px] shrink-0 py-1.5 px-1.5 text-center rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                         isActive
-                          ? 'bg-white text-blue-700 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                          ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                          : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
                       <span>{tab.label}</span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                          isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-200/70 text-slate-600'
+                        className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-black ${
+                          isActive ? 'bg-blue-600 text-white' : 'bg-slate-200/80 text-slate-600'
                         }`}
                       >
                         {count}
@@ -6855,147 +6900,172 @@ export default function DispatchRoute() {
               </div>
             </div>
 
-            {/* Drivers List */}
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-3 text-xs pb-24">
-              {drivers
-                .filter((d) => {
+            {/* Drivers Card Stream (1-tap → Queue Sheet; Touch & Hold or ⋮ → Quick Actions & Duty Status) */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
+              {(() => {
+                const visibleMobileDrivers = drivers.filter((d) => {
                   if (driverFilter !== 'all' && d.mapStatus !== driverFilter) return false;
                   if (driverSearch.trim()) {
                     const q = driverSearch.toLowerCase();
                     return (
                       d.name.toLowerCase().includes(q) ||
+                      (d.cabNumber || '').toLowerCase().includes(q) ||
                       d.vehicle.toLowerCase().includes(q) ||
                       d.zone.toLowerCase().includes(q) ||
                       d.phone.toLowerCase().includes(q)
                     );
                   }
                   return true;
-                })
-                .map((driver) => {
-                  const statusPalette = FLEET_STATUS_COLORS[driver.mapStatus];
+                });
+
+                if (visibleMobileDrivers.length === 0) {
+                  return (
+                    <div className="py-12 text-center text-slate-400 font-semibold text-xs">
+                      No drivers match this filter.
+                    </div>
+                  );
+                }
+
+                return visibleMobileDrivers.map((driver) => {
+                  const statusPalette = FLEET_STATUS_COLORS[driver.mapStatus] || FLEET_STATUS_COLORS.offline;
                   const statusLabel = getMapStatusLabel(driver.mapStatus, driver.activeTripStatus);
+                  const totalAssignedCount = driver.queuedTripsCount + (driver.activeTrip ? 1 : 0);
+                  const isHolding = longPressingDriverId === driver.id;
+                  const initials = (driver.name || 'DR')
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase();
+
                   return (
                     <div
                       key={driver.id}
-                      className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-blue-300 transition-all space-y-3 shadow-2xs"
+                      onTouchStart={(e) => handleDriverCardTouchStart(driver, e)}
+                      onTouchMove={handleDriverCardTouchMove}
+                      onTouchEnd={cancelDriverCardLongPress}
+                      onTouchCancel={cancelDriverCardLongPress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (driverLongPressTriggeredIdRef.current === driver.id) {
+                          driverLongPressTriggeredIdRef.current = null;
+                          return;
+                        }
+                        setQueueDriver(driver);
+                      }}
+                      className={`p-3.5 rounded-2xl border bg-white transition-all cursor-pointer select-none shadow-2xs space-y-2.5 ${
+                        isHolding
+                          ? 'scale-[0.985] border-blue-400 ring-2 ring-blue-500/30'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
                     >
+                      {/* Top Row: Avatar + Name + Status Chip + More */}
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-10 h-10 rounded-xl text-white font-black text-sm flex items-center justify-center shadow-2xs shrink-0"
-                            style={{ backgroundColor: statusPalette.hex }}
-                          >
-                            {driver.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .slice(0, 2)}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="relative shrink-0">
+                            <div
+                              className="w-10 h-10 rounded-xl text-white font-black text-xs flex items-center justify-center shadow-2xs"
+                              style={{ backgroundColor: statusPalette.hex }}
+                            >
+                              {initials}
+                            </div>
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ring-2 ring-white absolute -bottom-0.5 -right-0.5 ${statusPalette.dotClass}`}
+                            />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-extrabold text-slate-900 text-sm truncate">
+                                {driver.name}
+                              </span>
                               {driver.driverScore !== undefined && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-                                  <StarIcon className="w-3 h-3 text-amber-500 shrink-0" />
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                  <StarIcon className="w-2.5 h-2.5 text-amber-500 shrink-0" />
                                   <span>{driver.driverScore}</span>
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-slate-500 font-medium">
-                              {driver.vehicle} • <span className="font-semibold text-slate-700">{driver.tier}</span>
+                            <div className="text-[11px] text-slate-500 font-medium truncate">
+                              {driver.vehicle && driver.vehicle !== 'Unassigned' ? `${driver.vehicle} · ` : ''}
+                              <span className="font-semibold text-slate-700">{driver.tier}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="shrink-0">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusPalette.badgeClass}`}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileActionSheetDriver(driver);
+                            }}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all active:scale-95 cursor-pointer ${statusPalette.badgeClass}`}
+                            title="Tap to change duty status or open driver actions"
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${statusPalette.dotClass}`} />
-                            {statusLabel}
-                          </span>
+                            <span>{statusLabel}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMobileActionSheetDriver(driver);
+                            }}
+                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+                            aria-label="Open driver actions"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                              <circle cx="12" cy="5" r="1.75" />
+                              <circle cx="12" cy="12" r="1.75" />
+                              <circle cx="12" cy="19" r="1.75" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-slate-600 py-1.5 px-3 bg-slate-50/80 rounded-xl border border-slate-100">
-                        <div className="flex items-center gap-1.5">
+                      {/* Bottom Compact Meta Strip: Zone/GPS + Queue Pill + 1-Tap Call */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                        <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
                           <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-bold text-slate-800">{driver.zone}</span>
+                          <span className="font-semibold text-slate-700 truncate">{driver.zone}</span>
                           {driver.telemetry && (
-                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 rounded">
-                              GPS Live
+                            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0">
+                              GPS
                             </span>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveMobileTab('phone');
-                            handleStartCall(driver.phone);
-                          }}
-                          className="font-mono text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                        >
-                          <PhoneIcon className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{driver.phone}</span>
-                        </button>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setQueueDriver(driver)}
-                          className="py-2 px-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                          title="Open driver's full assigned schedule & queue"
-                        >
-                          <span>Queue</span>
-                          {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0) > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-blue-700 font-black">
-                              {driver.queuedTripsCount + (driver.activeTrip ? 1 : 0)}
-                            </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10.5px] font-bold border ${
+                              totalAssignedCount > 0
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-slate-50 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            <span>{totalAssignedCount > 0 ? `${totalAssignedCount} Queued` : 'No Queue'}</span>
+                          </span>
+                          {driver.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMobileTab('phone');
+                                handleStartCall(driver.phone, driver.name);
+                              }}
+                              className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                              title={`Call ${driver.name}`}
+                              aria-label={`Call ${driver.name}`}
+                            >
+                              <PhoneIcon className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFocusedMapDriverId(driver.id);
-                            setActiveMobileTab('map');
-                          }}
-                          className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                          title="Locate car icon on live fleet map"
-                        >
-                          <span className="inline-flex items-center gap-1">
-                        <MapPinIcon className="w-3.5 h-3.5" />
-                        <span>Map</span>
-                      </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextDuty =
-                              driver.dutyStatus === 'on_duty'
-                                ? 'on_break'
-                                : driver.dutyStatus === 'on_break'
-                                ? 'off_duty'
-                                : 'on_duty';
-                            try {
-                              await setDriverDutyStatus(driver.id, nextDuty);
-                              showDispatchToast(
-                                `${driver.name} set to ${nextDuty === 'on_break' ? 'On Break' : nextDuty === 'off_duty' ? 'Offline' : 'Available'}.`,
-                                'success'
-                              );
-                            } catch {
-                              showDispatchToast('Failed to update driver status.', 'error');
-                            }
-                          }}
-                          className="py-2 px-2 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                          title="Cycle status: Available → Break → Offline (persisted to Firestore)"
-                        >
-                          <span>Cycle</span>
-                        </button>
+                        </div>
                       </div>
                     </div>
                   );
-                })}
+                });
+              })()}
             </div>
           </div>
         )}
@@ -10069,6 +10139,158 @@ export default function DispatchRoute() {
                 >
                   Cancel
                 </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Mobile-Native Driver Quick Action Bottom Sheet (Touch & Hold / Status Pill) ─── */}
+      {mobileActionSheetDriver && (() => {
+        const liveDriver = drivers.find((d) => d.id === mobileActionSheetDriver.id) || mobileActionSheetDriver;
+        const statusPalette = FLEET_STATUS_COLORS[liveDriver.mapStatus] || FLEET_STATUS_COLORS.offline;
+        const statusLabel = getMapStatusLabel(liveDriver.mapStatus, liveDriver.activeTripStatus);
+        const totalAssignedCount = liveDriver.queuedTripsCount + (liveDriver.activeTrip ? 1 : 0);
+        return (
+          <div
+            className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+            onClick={() => setMobileActionSheetDriver(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={dispatchSheetDrag.sheetStyle}
+              className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            >
+              {/* Drag-down Header */}
+              <div
+                {...dispatchSheetDrag.dragHandlers}
+                className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
+              >
+                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-extrabold text-white truncate">{liveDriver.name}</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusPalette.badgeClass}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusPalette.dotClass}`} />
+                        <span>{statusLabel}</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {liveDriver.vehicle && liveDriver.vehicle !== 'Unassigned' ? `${liveDriver.vehicle} · ` : ''}
+                      {liveDriver.tier} · {liveDriver.zone}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileActionSheetDriver(null)}
+                    className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                    aria-label="Close driver actions"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3.5 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+                {/* Direct Duty Status Switcher */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                    Set Duty Status
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { id: 'on_duty', label: 'Available', dot: 'bg-emerald-500', active: 'bg-emerald-600 text-white border-emerald-600' },
+                        { id: 'on_break', label: 'On Break', dot: 'bg-amber-400', active: 'bg-amber-500 text-slate-950 border-amber-500' },
+                        { id: 'off_duty', label: 'Offline', dot: 'bg-slate-400', active: 'bg-slate-800 text-white border-slate-800' },
+                      ] as const
+                    ).map((opt) => {
+                      const isCurrent = liveDriver.dutyStatus === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await setDriverDutyStatus(liveDriver.id, opt.id);
+                              showDispatchToast(`${liveDriver.name} set to ${opt.label}.`, 'success');
+                              setMobileActionSheetDriver(null);
+                            } catch {
+                              showDispatchToast('Failed to update driver status.', 'error');
+                            }
+                          }}
+                          className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            isCurrent
+                              ? `${opt.active} shadow-xs`
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-white/90' : opt.dot}`} />
+                          <span>{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Primary 2x2 Thumb Grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetDriver(null);
+                      setQueueDriver(liveDriver);
+                    }}
+                    className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <CalendarIcon className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-extrabold">
+                      Schedule &amp; Queue {totalAssignedCount > 0 ? `(${totalAssignedCount})` : ''}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetDriver(null);
+                      setFocusedMapDriverId(liveDriver.id);
+                      setActiveMobileTab('map');
+                    }}
+                    className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <MapPinIcon className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-extrabold">Locate on Map</span>
+                  </button>
+
+                  {liveDriver.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileActionSheetDriver(null);
+                        setActiveMobileTab('phone');
+                        handleStartCall(liveDriver.phone, liveDriver.name);
+                      }}
+                      className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <PhoneIcon className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-extrabold">Call Driver</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileActionSheetDriver(null);
+                      handleAssignDriverToDraft(liveDriver);
+                      setActiveMobileTab('booking');
+                    }}
+                    className="p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <PlusIcon className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-extrabold">Assign Active Draft</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

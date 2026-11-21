@@ -542,7 +542,8 @@ function CommsHubComponent({
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 1.5 | 2>(1);
 
-  // Mobile long-press multi-select gesture for Comms rows (scroll-safe)
+  // Mobile long-press quick action sheet & multi-select gesture for Comms rows (scroll-safe)
+  const [commsActionSheetEvent, setCommsActionSheetEvent] = useState<InteractionEvent | null>(null);
   const commsLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commsLongPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const commsLongPressTriggeredIdRef = useRef<string | null>(null);
@@ -553,7 +554,7 @@ function CommsHubComponent({
     }
     commsLongPressStartRef.current = null;
   };
-  const handleCommsRowTouchStart = (id: string, e: React.TouchEvent<HTMLDivElement>) => {
+  const handleCommsRowTouchStart = (event: InteractionEvent, e: React.TouchEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | null;
     if (target?.closest('button, input, select, a')) return;
     const touch = e.touches[0];
@@ -563,18 +564,22 @@ function CommsHubComponent({
     commsLongPressTimerRef.current = setTimeout(() => {
       commsLongPressTimerRef.current = null;
       commsLongPressStartRef.current = null;
-      commsLongPressTriggeredIdRef.current = id;
+      commsLongPressTriggeredIdRef.current = event.id;
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         try {
           navigator.vibrate(15);
         } catch {}
       }
-      setSelectedItemIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
+      if (selectedItemIds.size > 0) {
+        setSelectedItemIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(event.id)) next.delete(event.id);
+          else next.add(event.id);
+          return next;
+        });
+      } else {
+        setCommsActionSheetEvent(event);
+      }
     }, 380);
   };
   const handleCommsRowTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -600,7 +605,9 @@ function CommsHubComponent({
 
   const commsSheetDrag = useBottomSheetDragToClose({
     onClose: () => {
-      if (isNewMessageModalOpen) {
+      if (commsActionSheetEvent) {
+        setCommsActionSheetEvent(null);
+      } else if (isNewMessageModalOpen) {
         setIsNewMessageModalOpen(false);
       } else if (isContactEditOpen) {
         setIsCorpDropdownOpen(false);
@@ -2594,10 +2601,11 @@ function CommsHubComponent({
                   return (
                     <div
                       key={event.id}
-                      onTouchStart={(e) => handleCommsRowTouchStart(event.id, e)}
+                      onTouchStart={(e) => handleCommsRowTouchStart(event, e)}
                       onTouchMove={handleCommsRowTouchMove}
                       onTouchEnd={cancelCommsLongPress}
                       onTouchCancel={cancelCommsLongPress}
+                      onContextMenu={(e) => e.preventDefault()}
                       onClick={() => {
                         if (commsLongPressTriggeredIdRef.current === event.id) {
                           commsLongPressTriggeredIdRef.current = null;
@@ -2657,8 +2665,8 @@ function CommsHubComponent({
                             </div>
                           )}
                           {event.type === 'call_missed' && (
-                            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs shadow-2xs">
-                              ✕
+                            <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
+                              <PhoneOffIcon className="w-4 h-4" />
                             </div>
                           )}
                           {event.type.startsWith('sms_') && (
@@ -5716,6 +5724,167 @@ function CommsHubComponent({
                       <span>Send SMS</span>
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── Mobile Floating Compose SMS Button (All / SMS stream views) ─── */}
+      {!selectedContactPhone && (activeTab === 'all' || activeTab === 'messages') && (
+        <button
+          type="button"
+          onClick={() => {
+            setNewMsgError(null);
+            setIsNewMessageModalOpen(true);
+          }}
+          className="lg:hidden fixed bottom-16 right-4 z-30 w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-600/30 flex items-center justify-center transition-all cursor-pointer"
+          title="Compose New Text Message"
+          aria-label="Compose New Text Message"
+        >
+          <PlusIcon className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* ─── Mobile-Native Comms Row Quick Action Bottom Sheet (Touch & Hold) ─── */}
+      {commsActionSheetEvent && (
+        <div
+          className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setCommsActionSheetEvent(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={commsSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[85dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            {/* Header with drag-down-to-close */}
+            <div
+              {...commsSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-extrabold text-white truncate">
+                    {commsActionSheetEvent.contactName}
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+                    {commsActionSheetEvent.contactPhone} · {commsActionSheetEvent.timestamp}
+                  </div>
+                  {commsActionSheetEvent.snippet && (
+                    <p className="text-[11px] text-slate-300 line-clamp-1 mt-1">
+                      {commsActionSheetEvent.snippet}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCommsActionSheetEvent(null)}
+                  className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                  aria-label="Close communication actions"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-3 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    handleStartCall(target.contactPhone, target.contactName);
+                  }}
+                  className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                >
+                  <PhoneIcon className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-extrabold">Call Back</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    setSelectedContactPhone(target.contactPhone);
+                  }}
+                  className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                >
+                  <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-extrabold">Open Thread</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    if (target.suggestedBooking) {
+                      handleConvertVoicemailToBooking(target.suggestedBooking);
+                    } else if (onPopulateBooking) {
+                      onPopulateBooking({
+                        passengerName: target.contactName,
+                        passengerPhone: target.contactPhone,
+                      });
+                    }
+                  }}
+                  className="p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                >
+                  <CarIcon className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-extrabold">Book Trip</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    setInteractions((prev) =>
+                      prev.map((item) =>
+                        item.id === target.id ? { ...item, isUnread: !item.isUnread } : item
+                      )
+                    );
+                  }}
+                  className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                >
+                  <CheckIcon className="w-4 h-4 text-slate-600" />
+                  <span className="text-xs font-extrabold">
+                    {commsActionSheetEvent.isUnread ? 'Mark Read' : 'Mark Unread'}
+                  </span>
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden bg-white">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    setSelectedItemIds((prev) => {
+                      const next = new Set(prev);
+                      next.add(target.id);
+                      return next;
+                    });
+                  }}
+                  className="w-full px-3.5 py-3 flex items-center gap-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                >
+                  <CheckIcon className="w-4 h-4 text-blue-600" />
+                  <span>Select Multiple</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = commsActionSheetEvent;
+                    setCommsActionSheetEvent(null);
+                    setInteractions((prev) => prev.filter((item) => item.id !== target.id));
+                  }}
+                  className="w-full px-3.5 py-3 flex items-center gap-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 cursor-pointer"
+                >
+                  <TrashIcon className="w-4 h-4 text-rose-600" />
+                  <span>Archive Communication</span>
                 </button>
               </div>
             </div>
