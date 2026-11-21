@@ -456,6 +456,32 @@
   - [x] 33.6.3 Run `npm run test:e2e` and `npm run test:stress` (all assertions pass).
   - [x] 33.6.4 Mark Phase 33 tasks complete in `tasks.md` and report before/after file sizes and line counts.
 
+## Phase 34: Driver & Dispatch PWA Hardening (Service Worker, Web Push & Screen Wake Lock)
+- [x] 34.0 Baseline Hygiene & Hook Referential Stability:
+  - [x] 34.0.1 Commit Phase 33 refactor baseline cleanly before starting Phase 34 changes.
+  - [x] 34.0.2 Memoize `sheetStyle` and `dragHandlers` in `app/core/hooks/useBottomSheetDragToClose.ts` for `React.memo` consumers.
+- [x] 34.1 Documentation First (SDD Convention):
+  - [x] 34.1.1 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 34 scope and architecture before writing feature code.
+- [x] 34.2 Manifest & PWA Scope Alignment:
+  - [x] 34.2.1 Update `public/manifest-driver.json` so `id`, `start_url`, and `scope` point to `"/app/driver"`.
+  - [x] 34.2.2 Dynamically switch `<link rel="manifest">` in `app/root.tsx` using `useLocation()` for `/app/driver` (and `/driver`) vs `/manifest.json`.
+- [x] 34.3 Root Service Worker & Background Notification Routing:
+  - [x] 34.3.1 Create `public/sw.js` with network-first HTML navigation fallback, stale-while-revalidate icon/manifest caching (never caching `/api/*` or Firestore), `push` & `SHOW_LOCAL_NOTIFICATION` handlers, and `notificationclick` window focus/open routing.
+  - [x] 34.3.2 Safely register `/sw.js` on the client in `app/root.tsx` via encapsulated notification/SW hook with SSR guards.
+- [x] 34.4 Screen Wake Lock Hook:
+  - [x] 34.4.1 Implement `app/core/hooks/useWakeLock.ts` (`isSupported`, `isActive`, `error`, `requestLock`, `releaseLock`) with `visibilitychange` auto-reacquisition and graceful unsupported fallback.
+- [x] 34.5 Push Notification & Acoustic Alert Services:
+  - [x] 34.5.1 Implement `app/core/services/notifications/push-notification.service.ts` (`ct_push_alerts_enabled`, permission state, optional FCM `/users/{uid}.fcmTokens` sync, `notifyIncomingDriverOffer`, `notifyDispatchAlert`, haptic vibration) and `app/core/hooks/usePushNotifications.ts`.
+  - [x] 34.5.2 Implement authenticated `/api/push` server route (`app/routes/api.push.ts`) and register in `app/routes.ts`.
+  - [x] 34.5.3 Extend `app/core/services/sound-notification.service.ts` with `playDriverOfferAlert()`, `stopDriverOfferAlert()`, and `playSlaWarningChime()`.
+- [x] 34.6 Driver & Dispatch UI Integration:
+  - [x] 34.6.1 Wire automatic `useWakeLock` (`dutyStatus === 'on_duty'`), incoming offer repeating alert + push notification, and `DriverShiftControls` **Screen Awake** status + 1-tap **Enable Push Alerts** UI in `app/routes/driver.tsx` and `app/components/domain/driver/DriverShiftControls.tsx`.
+  - [x] 34.6.2 Wire **Keep Screen Awake** (`ct_dispatch_wake_lock`) and **Browser Push Alerts** controls + background `UNCONFIRMED`/`ASAP` ride push alerts in `app/routes/dispatch.tsx`.
+- [x] 34.7 Verification Gate:
+  - [x] 34.7.1 Create `scripts/test-pwa-notifications.ts` testing payload formatting, SW syntax & event handlers, manifest `/app/driver` scope, and SSR/unsupported fallbacks.
+  - [x] 34.7.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-pwa-notifications.ts`, and `npm run test:e2e`, then mark Phase 34 complete in `tasks.md`.
+
+
 
 
 

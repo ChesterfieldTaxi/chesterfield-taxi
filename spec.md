@@ -621,6 +621,28 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Shared Booking Hooks & Pure Helpers**:
   - Consolidate duplicated pure booking logic shared between `DispatchBookingEngine.tsx` and `BookingEngineV2.tsx` into `app/core/hooks/booking/` (multi-stop waypoint manipulation, return-trip state sync, corporate PO verification helpers).
 
+## 34. Phase 34: Driver & Dispatch PWA Hardening (Service Worker, Web Push & Screen Wake Lock)
+- **Manifest & PWA Scope Alignment**:
+  - Align `public/manifest-driver.json` so `id`, `start_url`, and `scope` target `"/app/driver"` (replacing legacy `"/driver"`).
+  - Dynamically switch `<link rel="manifest">` in `app/root.tsx` via `useLocation()` to serve `/manifest-driver.json` on `/app/driver` (and legacy `/driver`) paths and `/manifest.json` on all other routes.
+- **Root Service Worker & Background Notification Routing (`public/sw.js`)**:
+  - Zero-build-step Service Worker registered at root scope (`/`), strictly guarded for client-only/supported browser environments.
+  - Caching policies: Network-first strategy with offline HTML fallback for navigation requests; stale-while-revalidate for static `/icon-*.svg` and `/manifest*.json` assets; strict bypass (never caching) for `/api/*`, single-fetch `.data` payloads, and cross-origin Firestore/Auth/Maps/Stripe traffic.
+  - Background & local notifications: Handles Web Push (`push` event parsing `{ title, body, url, tag, requireInteraction, vibrate }`) and client-dispatched Service Worker messages (`{ type: 'SHOW_LOCAL_NOTIFICATION', payload }`) via `self.registration.showNotification(...)`.
+  - Interactive click routing (`notificationclick`): Closes notification, focuses an existing `/app/driver` or `/app/dispatch` window client and posts a `NOTIFICATION_CLICK` message, or opens `targetUrl` via `clients.openWindow(targetUrl)` when no matching workspace tab is open.
+- **Screen Wake Lock Management (`useWakeLock`)**:
+  - Encapsulated `useWakeLock({ enabled })` hook acquiring `navigator.wakeLock.request('screen')` when enabled and releasing cleanly when disabled or unmounted.
+  - Automatic re-acquisition on `document` `visibilitychange` when returning to `visibilityState === 'visible'` (ensuring driver dash-mounted phones remain awake after switching back from Google Maps, Apple Maps, or Waze).
+  - Graceful no-throw degradation on unsupported browsers, WebViews, or SSR.
+- **Push Notification & Acoustic Alert Services**:
+  - `PushNotificationService` (`app/core/services/notifications/push-notification.service.ts`) managing `Notification` permission states (`default` | `granted` | `denied` | `unsupported`), persisted opt-in preference (`ct_push_alerts_enabled`), haptic vibration (`[200, 100, 200]`), Service Worker notification dispatch (`notifyIncomingDriverOffer`, `notifyDispatchAlert`), and optional Firebase Cloud Messaging (FCM) token sync to `/users/{uid}.fcmTokens` when `VITE_FIREBASE_VAPID_KEY` and Firebase are configured.
+  - Authenticated serverless resource route `/api/push` (`app/routes/api.push.ts`) supporting token registration/removal, status diagnostics, and FCM HTTP v1 / stubbed push dispatch.
+  - Extended `SoundNotificationService` (`app/core/services/sound-notification.service.ts`) providing `playDriverOfferAlert()` / `stopDriverOfferAlert()` (urgent repeating chime cadence with auto-timeout and instant stop on accept/decline) and `playSlaWarningChime()` (double-pulse warning tone).
+- **Driver & Dispatch Operational Integration**:
+  - **Driver Console (`/app/driver`)**: Automatically activates Screen Wake Lock whenever `dutyStatus === 'on_duty'`; triggers repeating offer chime + background push alert on newly unseen `offeredTrips` and stops immediately on accept/decline or empty offers; displays compact **Screen Awake** status and 1-tap **Enable Push Alerts** control in `DriverShiftControls`.
+  - **Dispatch Console (`/app/dispatch`)**: Provides optional **Keep Screen Awake** toggle (`ct_dispatch_wake_lock` in `localStorage`) and **Browser Push Alerts** opt-in control in the Dispatch header/settings menu, firing `notifyDispatchAlert` for incoming `UNCONFIRMED` / `ASAP` rides when the Dispatch tab is backgrounded (`document.hidden`).
+
+
 
 
 

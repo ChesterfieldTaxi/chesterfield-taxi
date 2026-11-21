@@ -38,11 +38,19 @@ import {
   InfoIcon,
   VolumeXIcon,
   ClockIcon,
+  SunIcon,
+  SettingsIcon,
 } from '../components/ui/Icons';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
 import { formatVehicleTier, formatVehicleTierDisplay } from '../core/services/email/email-templates';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
+import { useWakeLock } from '../core/hooks/useWakeLock';
+import { usePushNotifications } from '../core/hooks/usePushNotifications';
+import {
+  pushNotificationService,
+  formatDispatchNewRideAlert,
+} from '../core/services/notifications/push-notification.service';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
 import { EmailDock } from '../components/domain/dispatch/EmailDock';
 import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher';
@@ -101,6 +109,7 @@ const VALID_MOBILE_TABS = new Set(['booking', 'queue', 'map', 'messages', 'phone
 const SIDEBAR_WIDTH_STORAGE_KEY = 'ct_dispatch_sidebar_width';
 const QUEUE_HEIGHT_STORAGE_KEY = 'ct_dispatch_queue_height';
 const DOCK_WIDTH_STORAGE_KEY = 'ct_dispatch_dock_width';
+const DISPATCH_WAKE_LOCK_STORAGE_KEY = 'ct_dispatch_wake_lock';
 
 export type DesktopDockTab = 'none' | 'phone' | 'email' | 'drivers' | 'comms' | 'alerts';
 
@@ -288,6 +297,33 @@ export default function DispatchRoute() {
       soundNotificationService.playAsapRideChime();
     }
   }, []);
+
+  // Phase 34: Optional Keep Screen Awake (`ct_dispatch_wake_lock`) & Browser Push Alerts
+  const [showDeviceSettingsMenu, setShowDeviceSettingsMenu] = useState(false);
+  const deviceSettingsMenuRef = useRef<HTMLDivElement>(null);
+  const [keepScreenAwake, setKeepScreenAwake] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(DISPATCH_WAKE_LOCK_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleKeepScreenAwake = useCallback(() => {
+    setKeepScreenAwake((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(DISPATCH_WAKE_LOCK_STORAGE_KEY, next ? 'true' : 'false');
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const dispatchWakeLock = useWakeLock({ enabled: keepScreenAwake });
+  const dispatchPush = usePushNotifications({ uid: user?.uid });
 
   // Live Unified Fleet State (OperatorService + Firestore `drivers` dutyStatus/GPS + Trips + WorkspaceBus)
   const { fleet: drivers, setDriverDutyStatus } = useDispatchFleet(trips);
@@ -700,14 +736,29 @@ export default function DispatchRoute() {
       if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(target)) {
         setIsLayoutDropdownOpen(false);
       }
+      if (deviceSettingsMenuRef.current && !deviceSettingsMenuRef.current.contains(target)) {
+        setShowDeviceSettingsMenu(false);
+      }
     };
-    if (isViewsDropdownOpen || isTabOverflowOpen || isAddFilterOpen || isLayoutDropdownOpen) {
+    if (
+      isViewsDropdownOpen ||
+      isTabOverflowOpen ||
+      isAddFilterOpen ||
+      isLayoutDropdownOpen ||
+      showDeviceSettingsMenu
+    ) {
       document.addEventListener('mousedown', handleOutsideClick);
     }
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
-  }, [isViewsDropdownOpen, isTabOverflowOpen, isAddFilterOpen, isLayoutDropdownOpen]);
+  }, [
+    isViewsDropdownOpen,
+    isTabOverflowOpen,
+    isAddFilterOpen,
+    isLayoutDropdownOpen,
+    showDeviceSettingsMenu,
+  ]);
 
   // Auth Guard
   useEffect(() => {
@@ -796,6 +847,7 @@ export default function DispatchRoute() {
         setActiveDockTab('none');
         setIsMobileDrawerOpen(false);
         setShowAlertsDropdown(false);
+        setShowDeviceSettingsMenu(false);
         setIsSearchExpanded(false);
       } else if (e.key === 'm' || e.key === 'M') {
         setActiveDockTab('none');
@@ -1287,15 +1339,17 @@ export default function DispatchRoute() {
       // Check for incoming new trips
       const newTrips = updatedTrips.filter((t) => !knownTripIdsRef.current!.has(t.id));
       if (newTrips.length > 0) {
-        const hasAsapOrPending = newTrips.some(
+        const urgentNewTrips = newTrips.filter(
           (t) =>
             t.bookingType === 'asap' ||
             t.status === 'unconfirmed' ||
             t.status === 'UNCONFIRMED' ||
             t.status === 'pending'
         );
-        if (hasAsapOrPending) {
+        if (urgentNewTrips.length > 0) {
           soundNotificationService.playAsapRideChime();
+          const alertInput = formatDispatchNewRideAlert(urgentNewTrips);
+          void pushNotificationService.notifyDispatchAlert(alertInput, { requireHidden: true });
         }
         newTrips.forEach((t) => knownTripIdsRef.current!.add(t.id));
       }
@@ -2808,6 +2862,152 @@ export default function DispatchRoute() {
             )}
           </button>
 
+          {/* Phase 34: Workstation Wake Lock & Browser Push Alerts Settings Menu */}
+          <div className="relative" ref={deviceSettingsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowDeviceSettingsMenu((prev) => !prev)}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+                showDeviceSettingsMenu
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : keepScreenAwake && dispatchWakeLock.isActive
+                  ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+              }`}
+              title="Console Settings: Keep Screen Awake & Browser Push Alerts"
+              aria-label="Console Settings"
+            >
+              <SettingsIcon className="w-4 h-4 shrink-0" />
+              {(keepScreenAwake || dispatchPush.alertsEnabled) && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500" />
+              )}
+            </button>
+
+            {showDeviceSettingsMenu && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <SettingsIcon className="w-4 h-4 text-blue-400" />
+                    <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
+                      Console &amp; Alert Settings
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeviceSettingsMenu(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    aria-label="Close settings menu"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3 space-y-2.5 text-xs">
+                  {/* Keep Screen Awake Toggle */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <SunIcon
+                        className={`w-4 h-4 shrink-0 ${
+                          keepScreenAwake && dispatchWakeLock.isActive
+                            ? 'text-amber-500'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 block leading-tight">
+                          Keep Screen Awake
+                        </span>
+                        <span className="text-[11px] text-slate-500 block">
+                          {!dispatchWakeLock.isSupported
+                            ? 'Not supported in this browser'
+                            : keepScreenAwake
+                            ? dispatchWakeLock.isActive
+                              ? 'Active — screen lock prevented'
+                              : 'Enabled — re-acquires on focus'
+                            : 'Prevent display sleep on shift'}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!dispatchWakeLock.isSupported}
+                      onClick={handleToggleKeepScreenAwake}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                        !dispatchWakeLock.isSupported
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : keepScreenAwake
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer'
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer'
+                      }`}
+                    >
+                      {keepScreenAwake ? 'Active' : 'Off'}
+                    </button>
+                  </div>
+
+                  {/* Browser Push Alerts Opt-In / Toggle */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <BellIcon
+                        className={`w-4 h-4 shrink-0 ${
+                          dispatchPush.permission === 'granted' && dispatchPush.alertsEnabled
+                            ? 'text-blue-600'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 block leading-tight">
+                          Browser Push Alerts
+                        </span>
+                        <span className="text-[11px] text-slate-500 block">
+                          {!dispatchPush.isSupported
+                            ? 'Notifications unsupported'
+                            : dispatchPush.permission === 'denied'
+                            ? 'Blocked in browser permissions'
+                            : dispatchPush.permission === 'granted'
+                            ? dispatchPush.alertsEnabled
+                              ? 'Notifies on background ASAP/Unconfirmed rides'
+                              : 'Background push notifications paused'
+                            : 'Alert when new rides arrive in background'}
+                        </span>
+                      </div>
+                    </div>
+                    {!dispatchPush.isSupported ? (
+                      <span className="px-2 py-1 rounded-lg bg-slate-200 text-slate-500 text-[10px] font-bold shrink-0">
+                        N/A
+                      </span>
+                    ) : dispatchPush.permission === 'denied' ? (
+                      <span className="px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-[10px] font-bold shrink-0">
+                        Blocked
+                      </span>
+                    ) : dispatchPush.permission === 'default' ? (
+                      <button
+                        type="button"
+                        disabled={dispatchPush.isRequesting}
+                        onClick={() => void dispatchPush.enableAlerts()}
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold shrink-0 cursor-pointer transition-colors"
+                      >
+                        {dispatchPush.isRequesting ? 'Enabling...' : 'Enable'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={dispatchPush.isRequesting}
+                        onClick={() => void dispatchPush.toggleAlerts()}
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
+                          dispatchPush.alertsEnabled
+                            ? 'bg-blue-600 text-white hover:bg-blue-500'
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                      >
+                        {dispatchPush.alertsEnabled ? 'Enabled' : 'Paused'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* App Suite Launcher (9-Dot Grid) */}
           <AppSuiteLauncher />
         </div>
@@ -3196,6 +3396,82 @@ export default function DispatchRoute() {
                   ? 'Tap a trip card for Trip Details & context actions. Touch & hold for Quick Actions.'
                   : 'Tap a trip card for Trip Details & context actions. Touch & hold to multi-select.'}
               </p>
+            </div>
+
+            {/* Phase 34: Workstation Screen Awake & Browser Push Alerts (Drawer Controls) */}
+            <div className="py-3 border-b border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                Device &amp; Push Alerts
+              </span>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <SunIcon
+                    className={`w-4 h-4 shrink-0 ${
+                      keepScreenAwake && dispatchWakeLock.isActive
+                        ? 'text-emerald-400'
+                        : 'text-slate-400'
+                    }`}
+                  />
+                  <span className="font-semibold text-slate-200 truncate">Keep Screen Awake</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!dispatchWakeLock.isSupported}
+                  onClick={handleToggleKeepScreenAwake}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 transition-colors ${
+                    !dispatchWakeLock.isSupported
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      : keepScreenAwake
+                      ? 'bg-emerald-600 text-white cursor-pointer'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer'
+                  }`}
+                >
+                  {!dispatchWakeLock.isSupported ? 'N/A' : keepScreenAwake ? 'Active' : 'Off'}
+                </button>
+              </div>
+
+              {dispatchPush.isSupported && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <BellIcon
+                      className={`w-4 h-4 shrink-0 ${
+                        dispatchPush.permission === 'granted' && dispatchPush.alertsEnabled
+                          ? 'text-blue-400'
+                          : 'text-slate-400'
+                      }`}
+                    />
+                    <span className="font-semibold text-slate-200 truncate">Browser Push Alerts</span>
+                  </div>
+                  {dispatchPush.permission === 'denied' ? (
+                    <span className="px-2 py-0.5 rounded-lg bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-bold shrink-0">
+                      Blocked
+                    </span>
+                  ) : dispatchPush.permission === 'default' ? (
+                    <button
+                      type="button"
+                      disabled={dispatchPush.isRequesting}
+                      onClick={() => void dispatchPush.enableAlerts()}
+                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                    >
+                      {dispatchPush.isRequesting ? '...' : 'Enable'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={dispatchPush.isRequesting}
+                      onClick={() => void dispatchPush.toggleAlerts()}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 cursor-pointer ${
+                        dispatchPush.alertsEnabled
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {dispatchPush.alertsEnabled ? 'On' : 'Off'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Quick Links */}

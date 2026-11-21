@@ -5,6 +5,7 @@ import type { VehicleTierConfig } from '../../../core/types/config';
 import type { PhysicalFleetAsset } from '../../../core/types/fleet';
 import type { UseDriverTelemetryResult } from '../../../core/hooks/useDriverTelemetry';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
+import type { PushPermissionState } from '../../../core/services/notifications/push-notification.service';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
 import {
   formatCabUnitLabel,
@@ -12,12 +13,14 @@ import {
   type LastStepUndoState,
 } from '../../../core/utils/driver-ui.util';
 import {
+  BellIcon,
   CarIcon,
   CheckIcon,
   LogOutIcon,
   RadioIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
+  SunIcon,
   UserIcon,
   XIcon,
 } from '../../ui/Icons';
@@ -29,6 +32,12 @@ export interface DriverShiftControlsProps {
   fleetAssets: PhysicalFleetAsset[];
   preferredNavApp: PreferredNavApp;
   telemetry: UseDriverTelemetryResult;
+  wakeLockSupported: boolean;
+  wakeLockActive: boolean;
+  pushSupported: boolean;
+  pushPermission: PushPermissionState;
+  pushAlertsEnabled: boolean;
+  isRequestingPush: boolean;
   actionLoading: string | null;
   lastStepUndo: LastStepUndoState | null;
   successNotice: string | null;
@@ -42,6 +51,8 @@ export interface DriverShiftControlsProps {
   onToggleDuty: (newStatus: DriverDutyStatus) => void;
   onSelectFleetVehicle: (asset: PhysicalFleetAsset) => void;
   onChangeNavApp: (app: PreferredNavApp) => void;
+  onEnablePushAlerts: () => void;
+  onTogglePushAlerts: () => void;
   onRevertStatus: (tripId: string, previousStatus: TripStatus) => void;
   onNavigateWorkspace: (path: string) => void;
   onSignOut: () => void;
@@ -54,6 +65,12 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
   fleetAssets,
   preferredNavApp,
   telemetry,
+  wakeLockSupported,
+  wakeLockActive,
+  pushSupported,
+  pushPermission,
+  pushAlertsEnabled,
+  isRequestingPush,
   actionLoading,
   lastStepUndo,
   successNotice,
@@ -67,6 +84,8 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
   onToggleDuty,
   onSelectFleetVehicle,
   onChangeNavApp,
+  onEnablePushAlerts,
+  onTogglePushAlerts,
   onRevertStatus,
   onNavigateWorkspace,
   onSignOut,
@@ -115,7 +134,7 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
                   : ''}
               </p>
             </div>
-            <div className="shrink-0 text-slate-400 pl-2">
+            <div className="shrink-0 text-slate-400 pl-1">
               <svg
                 className={`w-5 h-5 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
                 viewBox="0 0 20 20"
@@ -129,6 +148,47 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
               </svg>
             </div>
           </button>
+
+          {/* Compact Header Status Pills: Screen Awake (when on duty) & 1-Tap Push Opt-In */}
+          <div className="shrink-0 flex items-center gap-1.5">
+            {driver?.dutyStatus === 'on_duty' && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold ${
+                  wakeLockActive
+                    ? 'bg-emerald-950/80 border-emerald-500/35 text-emerald-300'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                }`}
+                title={
+                  wakeLockActive
+                    ? 'Screen Awake: Active while On-Duty'
+                    : wakeLockSupported
+                    ? 'Screen Awake: Re-acquiring on foreground'
+                    : 'Screen Wake Lock not supported by this browser'
+                }
+              >
+                <SunIcon
+                  className={`w-3 h-3 shrink-0 ${
+                    wakeLockActive ? 'text-emerald-400' : 'text-slate-400'
+                  }`}
+                />
+                <span className="hidden sm:inline">Screen Awake</span>
+                <span className="sm:hidden">{wakeLockActive ? 'Awake' : 'Shift'}</span>
+              </span>
+            )}
+
+            {pushSupported && pushPermission === 'default' && (
+              <button
+                type="button"
+                disabled={isRequestingPush}
+                onClick={onEnablePushAlerts}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[34px] rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 text-blue-300 text-[10px] font-bold cursor-pointer transition-colors"
+                title="Enable background push notifications for incoming trip offers"
+              >
+                <BellIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>{isRequestingPush ? 'Enabling...' : 'Enable Push Alerts'}</span>
+              </button>
+            )}
+          </div>
 
           {/* Profile Dropdown Menu */}
           {showProfileMenu && (
@@ -188,6 +248,110 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
                     Off-Duty (End Shift)
                   </button>
                 </div>
+              </div>
+
+              {/* Screen Wake Lock & Background Push Alerts */}
+              <div className="p-3 border-b border-slate-800 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-1">
+                  Device &amp; Alert Readiness
+                </span>
+
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <SunIcon
+                      className={`w-4 h-4 shrink-0 ${
+                        driver?.dutyStatus === 'on_duty' && wakeLockActive
+                          ? 'text-emerald-400'
+                          : 'text-slate-400'
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <span className="font-semibold text-slate-200 block leading-tight">
+                        Screen Awake
+                      </span>
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        {!wakeLockSupported
+                          ? 'Managed by OS settings'
+                          : driver?.dutyStatus === 'on_duty'
+                          ? 'Auto-enabled while On-Duty'
+                          : 'Activates automatically On-Duty'}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                      driver?.dutyStatus === 'on_duty' && wakeLockActive
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : driver?.dutyStatus === 'on_duty'
+                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    {driver?.dutyStatus === 'on_duty'
+                      ? wakeLockActive
+                        ? 'Active'
+                        : wakeLockSupported
+                        ? 'Standby'
+                        : 'OS Default'
+                      : 'Off-Duty'}
+                  </span>
+                </div>
+
+                {pushSupported && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <BellIcon
+                        className={`w-4 h-4 shrink-0 ${
+                          pushPermission === 'granted' && pushAlertsEnabled
+                            ? 'text-blue-400'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <span className="font-semibold text-slate-200 block leading-tight">
+                          Push Trip Alerts
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {pushPermission === 'denied'
+                            ? 'Blocked in browser site settings'
+                            : pushPermission === 'granted'
+                            ? pushAlertsEnabled
+                              ? 'Background offer alerts active'
+                              : 'Background offer alerts paused'
+                            : 'Get notified while using Maps/Waze'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {pushPermission === 'default' ? (
+                      <button
+                        type="button"
+                        disabled={isRequestingPush}
+                        onClick={onEnablePushAlerts}
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0 cursor-pointer transition-colors"
+                      >
+                        {isRequestingPush ? 'Enabling...' : 'Enable Push Alerts'}
+                      </button>
+                    ) : pushPermission === 'granted' ? (
+                      <button
+                        type="button"
+                        disabled={isRequestingPush}
+                        onClick={onTogglePushAlerts}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 cursor-pointer border transition-colors ${
+                          pushAlertsEnabled
+                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {pushAlertsEnabled ? 'Active' : 'Paused'}
+                      </button>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-950/80 border border-rose-800/60 text-rose-300 text-[10px] font-bold shrink-0">
+                        Blocked
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Shift Vehicle Picker + Navigation App Preference */}

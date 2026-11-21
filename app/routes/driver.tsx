@@ -31,6 +31,7 @@ import { getTelephonyService } from '../core/services/telephony.service';
 import { getInvoicingService } from '../core/services/invoicing.service';
 import { getEmailDispatchService } from '../core/services/email';
 import { soundNotificationService } from '../core/services/sound-notification.service';
+import { pushNotificationService } from '../core/services/notifications/push-notification.service';
 import type { DriverPayoutRecord, DriverSettlementMethod } from '../core/types/payment';
 import {
   SpinnerIcon,
@@ -40,6 +41,8 @@ import {
   DollarSignIcon,
 } from '../components/ui/Icons';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
+import { useWakeLock } from '../core/hooks/useWakeLock';
+import { usePushNotifications } from '../core/hooks/usePushNotifications';
 import { validatePhoneNumber } from '../core/utils/phone';
 import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
@@ -368,25 +371,6 @@ export default function DriverAppRoute() {
         return t.assignedDriverId === driver.id || (t.status === 'offered' && t.offeredToIds?.includes(driver.id));
       });
 
-      // Audible alert when new broadcast offers arrive while on_duty
-      if (driver.dutyStatus === 'on_duty') {
-        const incomingOffers = myLiveTrips.filter(
-          (t) => t.status === 'offered' && !t.assignedDriverId && t.offeredToIds?.includes(driver.id)
-        );
-        let hasBrandNewOffer = false;
-        for (const o of incomingOffers) {
-          if (!seenOfferIdsRef.current.has(o.id)) {
-            seenOfferIdsRef.current.add(o.id);
-            hasBrandNewOffer = true;
-          }
-        }
-        if (hasBrandNewOffer) {
-          try {
-            soundNotificationService.playAsapRideChime();
-          } catch {}
-        }
-      }
-
       // Close pinned modals safely if dispatch cancels or reassigns that trip
       if (modalTripId && !completedPayoutReceipt) {
         const stillMine = myLiveTrips.some((t) => t.id === modalTripId);
@@ -511,6 +495,63 @@ export default function DriverAppRoute() {
           (activeTrip && ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(activeTrip.status)))
     ),
   });
+
+  // Phase 34: Screen Wake Lock (automatically enabled whenever driver is On-Duty) & Web Push Alerts
+  const wakeLock = useWakeLock({
+    enabled: driver?.dutyStatus === 'on_duty',
+  });
+
+  const handleNotificationFocus = useCallback((url: string) => {
+    if (url.startsWith('/app/driver')) {
+      setCurrentTab('offers');
+    }
+  }, []);
+
+  const pushNotifications = usePushNotifications({
+    uid: authUserUid,
+    onNavigate: handleNotificationFocus,
+  });
+
+  const handleEnablePushAlerts = useCallback(() => {
+    void pushNotifications.enableAlerts();
+  }, [pushNotifications]);
+
+  const handleTogglePushAlerts = useCallback(() => {
+    void pushNotifications.toggleAlerts();
+  }, [pushNotifications]);
+
+  // Phase 34: Repeating Offer Alert Chime + Background Push Notification Lifecycle
+  useEffect(() => {
+    if (driver?.dutyStatus !== 'on_duty' || offeredTrips.length === 0) {
+      soundNotificationService.stopDriverOfferAlert();
+      if (offeredTrips.length === 0) {
+        seenOfferIdsRef.current.clear();
+      }
+      return;
+    }
+
+    const currentOfferIds = new Set(offeredTrips.map((o) => o.id));
+    seenOfferIdsRef.current.forEach((id) => {
+      if (!currentOfferIds.has(id)) {
+        seenOfferIdsRef.current.delete(id);
+      }
+    });
+
+    const unseenOffers = offeredTrips.filter((o) => !seenOfferIdsRef.current.has(o.id));
+    if (unseenOffers.length > 0) {
+      for (const offer of unseenOffers) {
+        seenOfferIdsRef.current.add(offer.id);
+        void pushNotificationService.notifyIncomingDriverOffer(offer);
+      }
+      soundNotificationService.playDriverOfferAlert();
+    }
+  }, [offeredTrips, driver?.dutyStatus]);
+
+  useEffect(() => {
+    return () => {
+      soundNotificationService.stopDriverOfferAlert();
+    };
+  }, []);
 
   // Keep fresh speedMph in a ref so the 1s meter interval NEVER captures a stale closure!
   const speedMphRef = useRef<number>(0);
@@ -702,6 +743,7 @@ export default function DriverAppRoute() {
   const handleAcceptOffer = useCallback(
     async (offerId: string) => {
       if (!driver) return;
+      soundNotificationService.stopDriverOfferAlert();
       try {
         setActionLoading(`accept-${offerId}`);
         await driverService.acceptOffer(offerId, driver.id);
@@ -722,6 +764,7 @@ export default function DriverAppRoute() {
   const handleDeclineOffer = useCallback(
     async (offerId: string) => {
       if (!driver) return;
+      soundNotificationService.stopDriverOfferAlert();
       try {
         setActionLoading(`decline-${offerId}`);
         await driverService.declineOffer(offerId, driver.id, 'Driver declined trip offer');
@@ -1400,6 +1443,12 @@ export default function DriverAppRoute() {
         fleetAssets={fleetAssets}
         preferredNavApp={preferredNavApp}
         telemetry={telemetry}
+        wakeLockSupported={wakeLock.isSupported}
+        wakeLockActive={wakeLock.isActive}
+        pushSupported={pushNotifications.isSupported}
+        pushPermission={pushNotifications.permission}
+        pushAlertsEnabled={pushNotifications.alertsEnabled}
+        isRequestingPush={pushNotifications.isRequesting}
         actionLoading={actionLoading}
         lastStepUndo={lastStepUndo}
         successNotice={successNotice}
@@ -1413,6 +1462,8 @@ export default function DriverAppRoute() {
         onToggleDuty={handleToggleDuty}
         onSelectFleetVehicle={handleSelectFleetVehicle}
         onChangeNavApp={handleChangeNavApp}
+        onEnablePushAlerts={handleEnablePushAlerts}
+        onTogglePushAlerts={handleTogglePushAlerts}
         onRevertStatus={handleRevertStatus}
         onNavigateWorkspace={handleNavigateWorkspace}
         onSignOut={handleSignOut}

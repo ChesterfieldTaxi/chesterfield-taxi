@@ -6,9 +6,11 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigate,
 } from "react-router";
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
+import { useRootPwaServiceWorker } from "./core/hooks/usePushNotifications";
 import type { BrandingConfig } from "./core/types/config";
 import { MapPinIcon, AlertTriangleIcon } from "./components/ui/Icons";
 import "./app.css";
@@ -44,6 +46,12 @@ export async function loader() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const isDriverRoute =
+    location.pathname.startsWith('/app/driver') || location.pathname.startsWith('/driver');
+  const manifestHref = isDriverRoute ? '/manifest-driver.json' : '/manifest.json';
+  const appIconHref = isDriverRoute ? '/icon-driver-192.svg' : '/icon-192.svg';
+
   const clientMapsKey =
     (typeof process !== 'undefined' && (process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY)) ||
     DEFAULT_GOOGLE_MAPS_KEY;
@@ -87,9 +95,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lexend:wght@500;600;700;800&display=swap"
         />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
-        <link rel="apple-touch-icon" href="/icon-192.svg" />
+        <link rel="manifest" href={manifestHref} />
+        <link rel="icon" type="image/svg+xml" href={appIconHref} />
+        <link rel="apple-touch-icon" href={appIconHref} />
         <Meta />
         <Links />
         {COMPANY_CONFIG.cms?.customCss && (
@@ -190,7 +198,9 @@ function useDynamicBrandingSync() {
 }
 
 export default function App() {
+  const navigate = useNavigate();
   useDynamicBrandingSync();
+  useRootPwaServiceWorker(navigate);
   return <Outlet />;
 }
 

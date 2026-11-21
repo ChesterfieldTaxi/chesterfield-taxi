@@ -678,6 +678,41 @@ export interface PassengerAccount {
   - Return-trip address/route synchronization helpers.
   - Corporate account / PO verification state and API helper hook.
 
+## 23. Phase 34 Architecture: Driver & Dispatch PWA Hardening (Service Worker, Web Push & Screen Wake Lock)
+
+### 23.1 Architectural Guardrails & SSR Encapsulation
+- Strictly isolate all browser Web APIs (`navigator.serviceWorker`, `navigator.wakeLock`, `navigator.vibrate`, `Notification`, `document.visibilityState`, `AudioContext`) inside dedicated hooks (`app/core/hooks/`) and services (`app/core/services/notifications/`, `app/core/services/sound-notification.service.ts`), keeping React JSX components declarative and free of raw browser plumbing per `constitution.md`.
+- Guard every browser global access behind runtime checks (`typeof window !== 'undefined'`, `typeof navigator !== 'undefined'`, `typeof document !== 'undefined'`) for React Router v7 SSR compatibility.
+
+### 23.2 Manifest & Root Service Worker Architecture (`public/manifest-driver.json`, `public/sw.js`, `app/root.tsx`)
+- **Driver Manifest Scope**: `public/manifest-driver.json` sets `id: "/app/driver"`, `start_url: "/app/driver"`, and `scope: "/app/driver"`.
+- **Dynamic Manifest Link**: `Layout` in `app/root.tsx` inspects `useLocation().pathname` to emit `/manifest-driver.json` on `/app/driver*` and `/driver*`, and `/manifest.json` on all other paths.
+- **Zero-Build Root Service Worker (`public/sw.js`)**:
+  - **Caching**: Stale-while-revalidate for static `/icon-*.svg` and `/manifest*.json`; network-first with cached/offline fallback for HTML navigation requests; strict pass-through (zero caching) for `/api/*`, `.data` loader payloads, and cross-origin Firebase/Maps/Stripe endpoints.
+  - **Notification Dispatch**: Handles `push` events (JSON `{ title, body, url, tag, requireInteraction, vibrate }`) and `message` events (`{ type: 'SHOW_LOCAL_NOTIFICATION', payload }`) via `self.registration.showNotification(...)`.
+  - **Window Focus & Deep-Link Handoff**: `notificationclick` closes the notification, queries `clients.matchAll({ type: 'window', includeUncontrolled: true })` for an open `/app/driver` or `/app/dispatch` client, focuses it and posts `{ type: 'NOTIFICATION_CLICK', payload }`, or opens `clients.openWindow(targetUrl)` if none exists.
+
+### 23.3 Screen Wake Lock Lifecycle (`app/core/hooks/useWakeLock.ts`)
+- `useWakeLock({ enabled: boolean })` returns `{ isSupported, isActive, error, requestLock, releaseLock }`.
+- Acquires a `WakeLockSentinel` via `navigator.wakeLock.request('screen')` when `enabled` is `true` and `document.visibilityState === 'visible'`; releases cleanly when `enabled` flips to `false` or on component unmount.
+- Subscribes to `document` `visibilitychange` to automatically re-request the sentinel whenever the driver or dispatcher returns to the foreground tab while `enabled` remains `true`.
+
+### 23.4 Push Notification Service, Server Endpoint & Acoustic Cadences
+- **`app/core/services/notifications/push-notification.service.ts`**:
+  - Pure payload builders (`formatDriverOfferNotificationPayload`, `formatDispatchAlertPayload`) decoupled from browser globals for deterministic unit testing.
+  - Tracks `Notification.permission`, persists user opt-in (`ct_push_alerts_enabled` in `localStorage`), lazily initializes `firebase/messaging` when `VITE_FIREBASE_VAPID_KEY` + Firebase are configured, and syncs device tokens onto `/users/{uid}` (`fcmTokens` array).
+  - Exposes `notifyIncomingDriverOffer(trip)` and `notifyDispatchAlert({ title, body, url, tag })` routing through `ServiceWorkerRegistration.showNotification` / SW `postMessage` + `navigator.vibrate([200, 100, 200])`.
+- **`app/routes/api.push.ts`** (registered at `api/push` in `app/routes.ts`):
+  - Verifies caller identity via `verifyServerRequestAuth`.
+  - Supports `register_token` and `remove_token` mutations on `/users/{uid}.fcmTokens`, `status` diagnostics, and `send_push` via FCM HTTP v1 (when server credentials are configured) with clean stub diagnostics otherwise.
+- **`app/core/services/sound-notification.service.ts`**:
+  - `playDriverOfferAlert()` / `stopDriverOfferAlert()`: Repeating urgent multi-tone offer chime on a 2.6s cadence with 30s safety auto-stop and immediate cancellation on accept/decline/mute.
+  - `playSlaWarningChime()`: Distinct double-pulse warning tone for SLA threshold alerts.
+- **UI Hook Integration (`usePushNotifications`, `driver.tsx`, `DriverShiftControls.tsx`, `dispatch.tsx`)**:
+  - `driver.tsx` binds `useWakeLock({ enabled: driver?.dutyStatus === 'on_duty' })`, triggers offer sound + push notification on unseen `offeredTrips`, stops offer alert when offers clear or on accept/decline, and passes memoized wake-lock and push props to `DriverShiftControls`.
+  - `dispatch.tsx` persists `ct_dispatch_wake_lock` in `localStorage`, exposes **Keep Screen Awake** and **Browser Push Alerts** controls in the Dispatch header settings popover & operations drawer, and invokes `notifyDispatchAlert` for new `UNCONFIRMED` / `ASAP` trips arriving while backgrounded.
+
+
 
 
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import type React from 'react';
 
 export interface UseBottomSheetDragOptions {
@@ -30,6 +30,8 @@ export function useBottomSheetDragToClose({
   const startYRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
   const currentYRef = useRef<number>(0);
+  const onCloseRef = useRef<() => void>(onClose);
+  onCloseRef.current = onClose;
 
   const reset = useCallback(() => {
     startYRef.current = null;
@@ -73,29 +75,37 @@ export function useBottomSheetDragToClose({
     const shouldClose = delta >= thresholdPx || (delta >= 32 && velocity > 0.45);
     reset();
     if (shouldClose && !disabled) {
-      onClose();
+      onCloseRef.current();
     }
-  }, [disabled, onClose, reset, thresholdPx]);
+  }, [disabled, reset, thresholdPx]);
 
-  const sheetStyle: React.CSSProperties =
-    dragY > 0
-      ? {
-          transform: `translateY(${dragY}px)`,
-          transition: isDragging ? 'none' : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
-        }
-      : {
-          transition: isDragging ? 'none' : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
-        };
+  const sheetStyle = useMemo<React.CSSProperties>(
+    () =>
+      dragY > 0
+        ? {
+            transform: `translateY(${dragY}px)`,
+            transition: isDragging ? 'none' : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }
+        : {
+            transition: isDragging ? 'none' : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+          },
+    [dragY, isDragging]
+  );
+
+  const dragHandlers = useMemo<BottomSheetDragHandlers>(
+    () => ({
+      onTouchStart,
+      onTouchMove,
+      onTouchEnd,
+      onTouchCancel: reset,
+    }),
+    [onTouchStart, onTouchMove, onTouchEnd, reset]
+  );
 
   return {
     dragY,
     isDragging,
     sheetStyle,
-    dragHandlers: {
-      onTouchStart,
-      onTouchMove,
-      onTouchEnd,
-      onTouchCancel: reset,
-    } satisfies BottomSheetDragHandlers,
+    dragHandlers,
   };
 }
