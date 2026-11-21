@@ -7,8 +7,8 @@ export interface QuickBookingCardSectionProps {
 }
 
 export const QuickBookingCardSection: React.FC<QuickBookingCardSectionProps> = ({
-  title = 'Quick Booking',
-  description = 'Book a ride instantly with our automated system.'
+  title = 'Book a Ride',
+  description = 'Get an upfront fare estimate and book your pickup in seconds.'
 }) => {
   return (
     <section className="py-12 bg-slate-50">

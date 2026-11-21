@@ -462,11 +462,11 @@ export function WebsiteFormControlsTab({
               </span>
             </div>
             <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
-              Curbside doors, terminal baggage claim instructions, or specific chauffeur meetup points shown to passengers on the confirmation screen and transactional emails when pickup is STL Lambert Airport.
+              Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers on the confirmation screen and emails when pickup is STL Lambert Airport.
             </p>
             <textarea
               rows={3}
-              value={formConfig.lambertPickupInstructions ?? 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.'}
+              value={formConfig.lambertPickupInstructions ?? 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.'}
               onChange={(e) =>
                 setFormConfig((prev) => ({
                   ...prev,
@@ -485,10 +485,10 @@ export function WebsiteFormControlsTab({
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <ShieldCheckIcon className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>Equipment Add-ons, Child Safety Seats &amp; Cancellation Terms</span>
+            <span>Child Seats, Round Trips &amp; Payment Options</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500">
-            Child seat inventory fees, return trip incentives, and cancellation thresholds.
+            Child seat options, round-trip bookings, and accepted payment methods.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 space-y-5">
@@ -512,7 +512,7 @@ export function WebsiteFormControlsTab({
                 <p className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500">
                   Per-seat fee is managed in{' '}
                   <a href="/app/admin?tab=rates&sub=extras" className="text-blue-600 font-semibold hover:underline">
-                    Rates &amp; Tariffs → Extras
+                    Rates &amp; Pricing → Extras
                   </a>.
                 </p>
               )}
@@ -545,9 +545,9 @@ export function WebsiteFormControlsTab({
                 No-Show &amp; Cancellation Policy
               </label>
               <p className="text-[11px] text-slate-500 leading-snug">
-                Managed per Service Rate in{' '}
+                Managed per rate in{' '}
                 <a href="/app/admin?tab=rates&sub=rates" className="text-blue-600 font-semibold hover:underline">
-                  Rates &amp; Tariffs → Rates
+                  Rates &amp; Pricing → Rates
                 </a>.
               </p>
             </div>
@@ -586,7 +586,7 @@ export function WebsiteFormControlsTab({
                   className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span>Credit / Debit Card (Online Pre-Auth)</span>
+                <span>Credit / Debit Card (Online)</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
@@ -596,7 +596,7 @@ export function WebsiteFormControlsTab({
                   className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>Cash to Driver in Cab</span>
+                <span>Pay Driver in Car (Cash or Card)</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
@@ -606,7 +606,7 @@ export function WebsiteFormControlsTab({
                   className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Corporate Direct Billing Account</span>
+                <span>Corporate Account</span>
               </label>
             </div>
           </div>

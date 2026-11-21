@@ -47,13 +47,13 @@ const PILLARS = [
     icon: <ClockIcon className="w-6 h-6 text-blue-600" />,
     title: 'Upfront Fare Guarantee',
     description:
-      'We reject predatory surge algorithms. When bad weather strikes or flights arrive late, our rates remain transparent and predictable. What you are quoted in our booking system is what you pay.',
+      'No surge pricing — ever. When bad weather hits or flights arrive late, our rates stay clear and predictable. The fare you see when booking is the fare you pay.',
   },
   {
     icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
-    title: 'Executive & Group Transportation',
+    title: 'Personal, Family & Business Rides',
     description:
-      'From single-passenger airport transfers to group travel in spacious SUVs, our fleet accommodates all personal, family, and corporate transit needs with distinction.',
+      'From solo airport trips to family travel in spacious SUVs, our fleet handles everyday local rides, airport pickups, and corporate accounts comfortably.',
   },
 ];
 
@@ -68,11 +68,11 @@ export default function AboutRoute() {
             About {COMPANY_CONFIG.name}
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
-            West County&apos;s Trusted Private Car Service
+            West County&apos;s Trusted Taxi &amp; Car Service
           </h1>
           <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
-            Founded on the simple principle that ground transit should be punctual, transparent, and
-            driven by courteous local professionals.
+            Built on a simple idea: every ride should be on time, fairly priced, and driven by
+            courteous local professionals.
           </p>
         </div>
 
@@ -175,10 +175,10 @@ export default function AboutRoute() {
         <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
             <h3 className="text-2xl font-extrabold tracking-tight">
-              Ready to experience dependable transit?
+              Ready to book your next ride?
             </h3>
             <p className="text-slate-400 text-sm">
-              Book your next airport transfer or local ride with our easy online reservation tool.
+              Book your airport ride or local pickup online in seconds, or call our 24/7 dispatch team.
             </p>
           </div>
 

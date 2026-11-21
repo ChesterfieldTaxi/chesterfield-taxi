@@ -110,7 +110,7 @@ export class DriverService {
             username,
             phone: uData.phone || '',
             dutyStatus: (uData.status === 'suspended' ? 'off_duty' : 'off_duty') as DriverDutyStatus,
-            vehicleUnit: uData.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : ''),
+            vehicleUnit: uData.assignedUnit ? String(uData.assignedUnit).replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : ''),
             vehicleTier: uData.vehicleTier || 'standard',
             commissionRate:
               typeof uData.commissionRate === 'number' ? uData.commissionRate : undefined,
@@ -140,7 +140,7 @@ export class DriverService {
         username: op.username,
         phone: op.phone || '',
         dutyStatus: (op.status === 'suspended' ? 'off_duty' : 'on_duty') as DriverDutyStatus,
-        vehicleUnit: op.assignedUnit || (op.cabNumber ? `Cab #${op.cabNumber}` : ''),
+        vehicleUnit: op.assignedUnit ? String(op.assignedUnit).replace(/^Cab\s*#?/i, 'Car #') : (op.cabNumber ? `Car #${op.cabNumber}` : ''),
         vehicleTier: 'standard',
         zone: op.status === 'suspended' ? 'Suspended' : 'Chesterfield Valley',
         schedule: DEFAULT_SCHEDULE,
@@ -472,7 +472,7 @@ export class DriverService {
 
     const cleanExtra: DriverMeterExtra = {
       ...extra,
-      name: extra.name.trim() || 'In-Cab Extra',
+      name: extra.name.trim() || 'In-Car Extra',
       amount: cleanAmount,
     };
 
@@ -504,7 +504,7 @@ export class DriverService {
       label: cleanExtra.name,
       amount: cleanExtra.amount,
       category: cleanExtra.category === 'toll' ? 'surcharge' : 'extra',
-      detail: cleanExtra.category === 'toll' ? 'In-Cab Toll' : `In-Cab ${cleanExtra.category}`,
+      detail: cleanExtra.category === 'toll' ? 'In-Car Toll' : `In-Car ${cleanExtra.category}`,
     };
 
     const updatedPricing = {

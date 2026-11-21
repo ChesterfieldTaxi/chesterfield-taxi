@@ -60,8 +60,8 @@ import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClo
 
 export function meta() {
   return [
-    { title: 'Driver Console – Chesterfield Taxi' },
-    { name: 'description', content: 'Mobile-first driver console, trip manifest, and in-cab settlement app' },
+    { title: 'Driver App – Chesterfield Taxi' },
+    { name: 'description', content: 'Mobile driver app for trips, navigation, and in-car checkout' },
   ];
 }
 
@@ -82,10 +82,11 @@ const PRESET_EXTRAS: Array<{ name: string; amount: number; category: DriverMeter
 
 export function formatCabUnitLabel(vehicleUnit?: string | null): string {
   const raw = (vehicleUnit || '').trim();
-  if (!raw) return 'No Vehicle Assigned';
-  if (/^cab\s*#/i.test(raw)) return raw;
-  if (/^#/.test(raw)) return `Cab ${raw}`;
-  return `Cab #${raw}`;
+  if (!raw) return 'No Car Assigned';
+  if (/^car\s*#/i.test(raw)) return raw;
+  if (/^cab\s*#/i.test(raw)) return raw.replace(/^cab\s*#/i, 'Car #');
+  if (/^#/.test(raw)) return `Car ${raw}`;
+  return `Car #${raw}`;
 }
 
 export function openMapNavigation(
@@ -865,7 +866,7 @@ export default function DriverAppRoute() {
             passengerPhone: targetTrip.passenger.phone,
             driverName: driver.firstName || driver.name.split(' ')[0],
             vehicleUnit: cleanUnitNum || undefined,
-            vehicleModel: driver.vehicleModel || 'Chauffeur Vehicle',
+            vehicleModel: driver.vehicleModel || 'Car',
             trackingToken: targetTrip.trackingToken,
           });
         } else if (targetStatus === 'in_progress') {
@@ -1588,7 +1589,7 @@ export default function DriverAppRoute() {
                       >
                         <div className="flex items-center gap-2">
                           <RadioIcon className="w-4 h-4 text-blue-400" />
-                          <span>Dispatch Console</span>
+                          <span>Dispatch</span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono">/app/dispatch</span>
                       </button>
@@ -1605,7 +1606,7 @@ export default function DriverAppRoute() {
                       >
                         <div className="flex items-center gap-2">
                           <UserIcon className="w-4 h-4 text-emerald-400" />
-                          <span>Passenger Portal</span>
+                          <span>Client Portal</span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono">/app/passenger</span>
                       </button>
@@ -1622,7 +1623,7 @@ export default function DriverAppRoute() {
                       >
                         <div className="flex items-center gap-2">
                           <ShieldCheckIcon className="w-4 h-4 text-purple-400" />
-                          <span>Admin Console</span>
+                          <span>Admin</span>
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono">/app/admin</span>
                       </button>
@@ -1895,11 +1896,11 @@ export default function DriverAppRoute() {
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 flex-wrap">
                       <span className="flex items-center gap-1">
                         <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                        {activeTrip.passenger?.passengerCount || 1} Pax
+                        {activeTrip.passenger?.passengerCount || 1} {(activeTrip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}
                       </span>
                       <span className="flex items-center gap-1">
                         <LuggageIcon className="w-3.5 h-3.5 text-slate-400" />
-                        {activeTrip.passenger?.luggageCount || 0} Bags
+                        {activeTrip.passenger?.luggageCount || 0} {(activeTrip.passenger?.luggageCount || 0) === 1 ? 'Bag' : 'Bags'}
                       </span>
                     </div>
                   </div>
@@ -2131,7 +2132,7 @@ export default function DriverAppRoute() {
                     {activeTrip.pricing?.driverExtras && activeTrip.pricing.driverExtras.length > 0 && (
                       <div className="mt-2.5 pt-2 border-t border-slate-800">
                         <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                          Appended In-Cab Extras:
+                          Added Trip Extras:
                         </span>
                         <div className="space-y-1">
                           {activeTrip.pricing.driverExtras.map((ex, i) => (
@@ -2382,7 +2383,7 @@ export default function DriverAppRoute() {
                             {offer.passenger?.firstName} {offer.passenger?.lastName}
                           </span>
                           <span className="text-[11px] text-slate-400">
-                            {offer.passenger?.passengerCount || 1} Pax · {offer.passenger?.luggageCount || 0} Bags ·{' '}
+                            {offer.passenger?.passengerCount || 1} {(offer.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'} · {offer.passenger?.luggageCount || 0} {(offer.passenger?.luggageCount || 0) === 1 ? 'Bag' : 'Bags'} ·{' '}
                             {offer.bookingType === 'asap' ? 'Immediate' : pickupTime}
                           </span>
                         </div>
@@ -2500,9 +2501,9 @@ export default function DriverAppRoute() {
                             {trip.passenger?.firstName} {trip.passenger?.lastName}
                           </h4>
                           <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                            <span>{trip.passenger?.passengerCount || 1} Pax</span>
+                            <span>{trip.passenger?.passengerCount || 1} {(trip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}</span>
                             <span>·</span>
-                            <span>{trip.passenger?.luggageCount || 0} Bags</span>
+                            <span>{trip.passenger?.luggageCount || 0} {(trip.passenger?.luggageCount || 0) === 1 ? 'Bag' : 'Bags'}</span>
                             <span>·</span>
                             <strong className="uppercase text-blue-300">{trip.status.replace('_', ' ')}</strong>
                           </div>
@@ -3193,9 +3194,9 @@ export default function DriverAppRoute() {
 
             <div className="grid grid-cols-1 gap-1.5">
               {[
-                { title: 'En Route', text: 'Chesterfield Taxi: Your driver is en route to your pickup location.' },
-                { title: 'Arrived Outside', text: 'Chesterfield Taxi: Your driver has arrived outside at your pickup location.' },
-                { title: 'Waiting at Curb', text: 'Chesterfield Taxi: Your chauffeur is waiting at the curb for you.' },
+                { title: 'En Route', text: 'Chesterfield Taxi: Your driver is on the way to your pickup location.' },
+                { title: 'Arrived Outside', text: 'Chesterfield Taxi: Your driver has arrived outside your pickup location.' },
+                { title: 'Waiting at Curb', text: 'Chesterfield Taxi: Your driver is waiting at the curb for you.' },
               ].map((preset, idx) => (
                 <button
                   key={idx}
@@ -3444,7 +3445,7 @@ export default function DriverAppRoute() {
                       Cash Ride Settlement
                     </span>
                     <div className="flex justify-between items-baseline">
-                      <span className="text-slate-300">Cash Collected in Cab:</span>
+                      <span className="text-slate-300">Cash Collected in Car:</span>
                       <span className="text-base font-black text-white font-mono">
                         ${(completedPayoutReceipt.driverCashCollected || completedPayoutReceipt.totalFare).toFixed(2)}
                       </span>
@@ -3491,16 +3492,16 @@ export default function DriverAppRoute() {
                   }}
                   className="w-full py-3.5 min-h-[48px] bg-blue-600 hover:bg-blue-500 text-white font-black text-sm rounded-2xl shadow-lg cursor-pointer"
                 >
-                  Return to Shift Roster
+                  Return to Shift
                 </button>
               </div>
             ) : (
-              /* PAY-IN-CAB SETTLEMENT PROMPT */
+              /* PAY-IN-CAR SETTLEMENT PROMPT */
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div>
-                    <h4 className="font-black text-base text-white">In-Cab Settlement &amp; Checkout</h4>
-                    <p className="text-[11px] text-slate-400">Trip {modalTrip.id} · Select payment &amp; gratuity</p>
+                    <h4 className="font-black text-base text-white">Trip Checkout</h4>
+                    <p className="text-[11px] text-slate-400">Trip {modalTrip.id} · Select payment &amp; tip</p>
                   </div>
                   <button
                     type="button"
@@ -3541,7 +3542,7 @@ export default function DriverAppRoute() {
                         </div>
                         {snap.nonTollExtrasTotal > 0 && (
                           <div className="flex justify-between text-slate-400">
-                            <span>In-Cab Extras (Split):</span>
+                            <span>Added Extras (Split):</span>
                             <span className="font-mono text-white">+${snap.nonTollExtrasTotal.toFixed(2)}</span>
                           </div>
                         )}
@@ -3557,10 +3558,10 @@ export default function DriverAppRoute() {
                         </div>
                       </div>
 
-                      {/* Settlement Mode Selector (Pay-in-Cab Priority) */}
+                      {/* Payment Method Selector */}
                       <div className="space-y-2">
                         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Settlement Method:
+                          Payment Method:
                         </span>
                         <div className="grid grid-cols-3 gap-2">
                           <button
@@ -3572,7 +3573,7 @@ export default function DriverAppRoute() {
                                 : 'bg-slate-800 border-slate-700 text-slate-300'
                             }`}
                           >
-                            Card Terminal
+                            Card (In Car)
                           </button>
                           <button
                             type="button"
@@ -3583,7 +3584,7 @@ export default function DriverAppRoute() {
                                 : 'bg-slate-800 border-slate-700 text-slate-300'
                             }`}
                           >
-                            Cash in Cab
+                            Cash (In Car)
                           </button>
                           <button
                             type="button"
@@ -3594,7 +3595,7 @@ export default function DriverAppRoute() {
                                 : 'bg-slate-800 border-slate-700 text-slate-300'
                             }`}
                           >
-                            Corp Account
+                            Corporate Account
                           </button>
                         </div>
 
@@ -3608,7 +3609,7 @@ export default function DriverAppRoute() {
                                 : 'bg-slate-800 border-slate-700 text-indigo-300'
                             }`}
                           >
-                            Capture Online Stripe Pre-Auth Hold
+                            Capture Online Card Hold
                             {modalTrip.payment?.cardLast4 ? ` (•••• ${modalTrip.payment.cardLast4})` : ''}
                           </button>
                         )}
@@ -3630,13 +3631,13 @@ export default function DriverAppRoute() {
 
                         {settlementMethod === 'corporate_account' && (
                           <div className="bg-purple-950/40 border border-purple-800/60 rounded-xl p-3 text-xs text-purple-200">
-                            <strong>B2B Direct Bill:</strong>{' '}
+                            <strong>Corporate Account:</strong>{' '}
                             {meta.corporateOrgName || meta.corporateDetails?.companyName || 'Corporate Account'}
                             {meta.billingPo || meta.corporateDetails?.billingPo
                               ? ` · PO #${meta.billingPo || meta.corporateDetails?.billingPo}`
                               : ''}
                             <span className="block text-[11px] text-purple-300/80 mt-0.5">
-                              No card charged in cab — logged to Corporate AR for monthly invoicing.
+                              No payment collected in the car — billed to the corporate account.
                             </span>
                           </div>
                         )}

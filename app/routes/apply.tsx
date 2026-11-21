@@ -88,24 +88,24 @@ export default function Apply() {
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
-            Careers &amp; Fleet Recruiting
+            Drive &amp; Work With Us
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
             Join Our Team
           </h1>
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            We are always looking for professional drivers, experienced dispatchers, and reliable office staff to join the Chesterfield Taxi family.
+            We are always looking for reliable drivers, experienced dispatchers, and office staff to join Chesterfield Taxi.
           </p>
         </div>
 
         <Card className="shadow-xs border-slate-200/90 rounded-2xl overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-white">
-            <CardTitle>Employment Application</CardTitle>
+            <CardTitle>Job Application</CardTitle>
           </CardHeader>
           <CardContent className="p-6 md:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
-                <Alert variant="error" title="Submission Error">
+                <Alert variant="error" title="Could Not Submit">
                   {error}
                 </Alert>
               )}
@@ -120,11 +120,11 @@ export default function Apply() {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="driver">Professional Driver (Company Unit)</option>
-                    <option value="owner_operator">Driver (Owner-Operator)</option>
+                    <option value="driver">Driver (Company Car)</option>
+                    <option value="owner_operator">Driver (Own Vehicle)</option>
                     <option value="dispatcher">Dispatcher</option>
-                    <option value="accountant">Accountant / Clerical</option>
-                    <option value="field_supervisor">Field Supervisor</option>
+                    <option value="accountant">Billing &amp; Office Staff</option>
+                    <option value="field_supervisor">Supervisor</option>
                   </select>
                 </div>
 

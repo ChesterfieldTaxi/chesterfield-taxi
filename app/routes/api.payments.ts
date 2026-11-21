@@ -247,7 +247,7 @@ export async function action({ request }: ActionFunctionArgs) {
             stripeDisabled: true,
             fallback: 'pay_in_cab',
             error:
-              'Online card pre-authorization is currently disabled. Please select "Pay Driver in Cab (Cash / Terminal)".',
+              'Online card pre-authorization is currently disabled. Please select "Pay Driver in Car".',
           },
           { status: 503 }
         );
@@ -320,7 +320,7 @@ export async function action({ request }: ActionFunctionArgs) {
             stripeDisabled: true,
             fallback: 'pay_in_cab',
             error:
-              'Online Stripe capture is not configured on the server. Settle via Pay-in-Cab (Cash, External Card Terminal, or Corporate Account).',
+              'Online Stripe capture is not configured on the server. Settle in the car (Cash, Card Reader, or Corporate Account).',
           },
           { status: 503 }
         );

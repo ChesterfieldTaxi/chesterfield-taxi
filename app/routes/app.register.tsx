@@ -13,7 +13,7 @@ import { CarIcon, LockIcon, MailIcon, UserIcon } from '../components/ui/Icons';
 export function meta() {
   return [
     { title: `Create Account – ${COMPANY_CONFIG.name}` },
-    { name: 'description', content: 'Register for a Chesterfield Taxi passenger account.' },
+    { name: 'description', content: 'Create a Chesterfield Taxi client account.' },
   ];
 }
 
@@ -141,9 +141,9 @@ export default function UnifiedAppRegisterRoute() {
           >
             <CarIcon className="w-8 h-8" />
           </Link>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Create Passenger Account</h1>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Create Your Account</h1>
           <p className="text-sm text-slate-500 mt-1.5">
-            Save favorite pickup spots, view digital receipts, and rebook in two taps
+            Save favorite pickup spots, view trip receipts, and rebook in seconds
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export default function UnifiedAppRegisterRoute() {
           <form onSubmit={handleSubmit}>
             <CardContent className="p-6 space-y-4 bg-white">
               {claimTripId && (
-                <Alert variant="info" title="Link Your Reservation">
+                <Alert variant="info" title="Link Your Trip">
                   Create your account to attach Trip <strong>#{claimTripId}</strong> to your ride history.
                 </Alert>
               )}

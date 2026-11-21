@@ -707,7 +707,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-3 px-1">
                       <span className="capitalize font-bold text-slate-700">
-                        {trip.vehicleTier || 'standard'} ({trip.passenger?.passengerCount || 1} Pax)
+                        {trip.vehicleTier || 'standard'} ({trip.passenger?.passengerCount || 1} {(trip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'})
                       </span>
                       {trip.assignedDriverId ? (
                         <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
@@ -916,7 +916,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                           {trip.vehicleTier || 'standard'}
                         </span>
                         <span className="text-[10px] text-slate-400 block mt-0.5">
-                          {trip.passenger?.passengerCount || 1} Pax • {trip.passenger?.luggageCount || 0} Bags
+                          {trip.passenger?.passengerCount || 1} {(trip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'} • {trip.passenger?.luggageCount || 0} {(trip.passenger?.luggageCount || 0) === 1 ? 'Bag' : 'Bags'}
                         </span>
                         {trip.assignedDriverId && (
                           <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded mt-1 inline-block">

@@ -9,7 +9,7 @@ const DEFAULT_DEMO_SHIFTS: VehicleAssignmentShift[] = [
     id: 'shift-demo-1',
     driverId: 'drv-101',
     vehicleId: 'asset-101',
-    vehicleNumber: 'Cab #101',
+    vehicleNumber: 'Car #101',
     startedAt: '2026-09-14T06:00:00.000Z',
     endedAt: '2026-09-14T14:30:00.000Z',
     status: 'completed',

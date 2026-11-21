@@ -908,7 +908,7 @@ export class FirebaseBookingService implements IBookingService {
           if (!driverName && rosterMatch.name) driverName = rosterMatch.name;
           if (!driverPhone && rosterMatch.phone) driverPhone = rosterMatch.phone;
           if (!matchedFleetUnit && (rosterMatch.cabNumber || rosterMatch.vehicle)) {
-            matchedFleetUnit = rosterMatch.cabNumber ? `Cab #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
+            matchedFleetUnit = rosterMatch.cabNumber ? `Car #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
           }
         }
       } catch {}
@@ -934,9 +934,9 @@ export class FirebaseBookingService implements IBookingService {
       if (matchedFleetUnit || matchedFleetModel || matchedFleetPlate) {
         vehicle = {
           vehicleId: matchedFleetId || `unit-${driverId}`,
-          vehicleNumber: matchedFleetUnit || 'Assigned Cab',
+          vehicleNumber: matchedFleetUnit || 'Assigned Car',
           licensePlate: matchedFleetPlate || '',
-          model: matchedFleetModel || 'Chauffeur Vehicle',
+          model: matchedFleetModel || 'Assigned Car',
         };
       }
     } catch {}

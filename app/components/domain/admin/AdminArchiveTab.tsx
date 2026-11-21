@@ -274,17 +274,17 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
       case 'staff':
         return <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">Staff</Badge>;
       case 'vehicle':
-        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-800">Fleet Car</Badge>;
+        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-800">Car</Badge>;
       case 'vehicle_type':
-        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 font-bold">Vehicle Class</Badge>;
+        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 font-bold">Vehicle Type</Badge>;
       case 'zone':
-        return <Badge variant="danger" size="sm" className="bg-rose-100 text-rose-800">Geofence Zone</Badge>;
+        return <Badge variant="danger" size="sm" className="bg-rose-100 text-rose-800">Zone</Badge>;
       case 'zone_group':
-        return <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">Zone Corridor</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">Zone Group</Badge>;
       case 'collection':
-        return <Badge variant="success" size="sm" className="bg-teal-100 text-teal-800">POI Collection</Badge>;
+        return <Badge variant="success" size="sm" className="bg-teal-100 text-teal-800">Places</Badge>;
       case 'tariff':
-        return <Badge variant="primary" size="sm" className="bg-purple-100 text-purple-800">Unified Tariff</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-purple-100 text-purple-800">Rate</Badge>;
       default:
         return <Badge variant="neutral" size="sm">{type}</Badge>;
     }

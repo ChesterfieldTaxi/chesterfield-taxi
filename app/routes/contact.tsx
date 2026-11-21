@@ -138,7 +138,7 @@ export default function ContactRoute() {
 
       if (!response.ok) {
         const errPayload = await response.json().catch(() => ({}));
-        throw new Error(errPayload.error || 'Could not transmit inquiry. Please call dispatch directly.');
+        throw new Error(errPayload.error || 'Could not send message. Please call dispatch directly.');
       }
 
       setSubmitted(true);
@@ -153,7 +153,7 @@ export default function ContactRoute() {
       setSubmitError(
         err instanceof Error
           ? err.message
-          : `Unable to submit inquiry right now. Please call ${phoneDisplay} directly.`
+          : `Unable to send message right now. Please call ${phoneDisplay} directly.`
       );
     } finally {
       setIsSubmitting(false);
@@ -167,14 +167,14 @@ export default function ContactRoute() {
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
-            24/7 Operations Desk
+            24/7 Dispatch &amp; Support
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
-            Contact &amp; Customer Support
+            Contact Us
           </h1>
           <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
-            Need immediate dispatch, have questions regarding an upcoming trip, or looking to set up
-            a corporate account? Our local team is here around the clock.
+            Need a pickup right away, have a question about an upcoming ride, or want to set up a
+            corporate account? Our local team is here 24/7.
           </p>
         </div>
 
@@ -268,10 +268,10 @@ export default function ContactRoute() {
             <Card variant="elevated" className="border-slate-200/80 rounded-3xl p-6 sm:p-8 bg-white shadow-xs">
               <CardHeader className="p-0 pb-6 border-b border-slate-100">
                 <CardTitle className="text-xl font-extrabold text-slate-950">
-                  Send a Message to Dispatch
+                  Send Us a Message
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
-                  Fill out the form below and an operations dispatcher will respond promptly.
+                  Fill out the form below and our local team will get back to you shortly.
                 </CardDescription>
               </CardHeader>
 
@@ -280,10 +280,10 @@ export default function ContactRoute() {
                   <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                     <CheckIcon className="w-7 h-7 stroke-[3]" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Message Received!</h3>
+                  <h3 className="text-xl font-bold text-slate-900">Message Sent!</h3>
                   <p className="text-sm text-slate-600 max-w-md mx-auto">
-                    Thank you for reaching out. A {companyName} dispatch representative has received
-                    your inquiry and will respond within 1 business hour.
+                    Thanks for reaching out. Our {companyName} team has received your message and
+                    will reply shortly.
                   </p>
                   <Button
                     type="button"
@@ -292,13 +292,13 @@ export default function ContactRoute() {
                     onClick={() => setSubmitted(false)}
                     className="mt-2"
                   >
-                    Send Another Inquiry
+                    Send Another Message
                   </Button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="pt-6 space-y-4">
                   {submitError && (
-                    <Alert variant="error" title="Transmission Error">
+                    <Alert variant="error" title="Couldn't Send Message">
                       {submitError}
                     </Alert>
                   )}
@@ -349,18 +349,18 @@ export default function ContactRoute() {
 
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Inquiry Nature
+                        How Can We Help?
                       </label>
                       <select
                         value={formData.inquiryType}
                         onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
                         className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="general">General Inquiry</option>
-                        <option value="airport">Airport Transfer Question</option>
-                        <option value="corporate">Corporate Billing Account</option>
+                        <option value="general">General Question</option>
+                        <option value="airport">Airport Pickup / Dropoff</option>
+                        <option value="corporate">Corporate Account</option>
                         <option value="lost_found">Lost &amp; Found Item</option>
-                        <option value="group">Event / Multi-Vehicle Group</option>
+                        <option value="group">Event / Multiple Vehicles</option>
                       </select>
                     </div>
                   </div>
@@ -374,7 +374,7 @@ export default function ContactRoute() {
                       rows={4}
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      placeholder="Please include trip dates, estimated times, passenger counts, or specific instructions..."
+                      placeholder="Include trip dates, pickup times, passenger counts, or any questions..."
                       className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -394,10 +394,10 @@ export default function ContactRoute() {
                       {isSubmitting ? (
                         <span className="flex items-center gap-2">
                           <SpinnerIcon className="w-4 h-4 animate-spin text-white" />
-                          <span>Transmitting Message...</span>
+                          <span>Sending...</span>
                         </span>
                       ) : (
-                        'Submit Inquiry'
+                        'Send Message'
                       )}
                     </Button>
                   </div>
@@ -411,25 +411,25 @@ export default function ContactRoute() {
             <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                  Careers at {companyName}
+                  Work With {companyName}
                 </span>
                 <h3 className="text-xl font-extrabold text-slate-950 tracking-tight mt-1">
-                  Join Our Professional Team
+                  Join Our Local Team
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  We are always looking for reliable drivers, dispatchers, and support staff to join our growing company.
+                  We are always looking for reliable drivers, dispatchers, and office staff to join our growing team.
                 </p>
               </div>
 
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
                 <CarIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="text-xs text-slate-700 space-y-2">
-                  <span className="font-bold block">Current Openings</span>
+                  <span className="font-bold block">Open Positions</span>
                   <ul className="space-y-1 ml-4 list-disc text-slate-600">
-                    <li>Professional Drivers (Company Unit)</li>
-                    <li>Owner-Operator Affiliates</li>
-                    <li>24/7 Operations Dispatchers</li>
-                    <li>Field Supervisors</li>
+                    <li>Drivers (Company Cars)</li>
+                    <li>Drivers (Own Vehicle)</li>
+                    <li>24/7 Dispatchers</li>
+                    <li>Supervisors &amp; Office Staff</li>
                   </ul>
                 </div>
               </div>

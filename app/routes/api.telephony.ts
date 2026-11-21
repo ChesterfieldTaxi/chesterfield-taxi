@@ -369,7 +369,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     const VoiceResponse = twilio.twiml.VoiceResponse;
     const response = new VoiceResponse();
-    response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
+    response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi. Connecting your call to dispatch.');
 
     const dial = response.dial({
       timeout: 30,
@@ -825,7 +825,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
       const VoiceResponse = twilio.twiml.VoiceResponse;
       const response = new VoiceResponse();
-      response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi and Car Service. Connecting your call to our dispatch desk.');
+      response.say({ voice: 'alice' }, 'Thank you for calling Chesterfield Taxi. Connecting your call to dispatch.');
 
       const dial = response.dial({
         timeout: 30,

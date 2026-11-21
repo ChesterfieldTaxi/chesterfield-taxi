@@ -182,24 +182,24 @@ export function StripePaymentInput({
       <div className="flex items-center justify-between text-xs px-1">
         <div className="flex items-center gap-1.5 font-bold text-slate-700">
           <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
-          <span>{isLiveStripeActive ? '100% Encrypted & Secure Payment' : 'In-Vehicle Payment Fallback'}</span>
+          <span>{isLiveStripeActive ? 'Secure Card Payment' : 'Pay in Car'}</span>
         </div>
         <div className="flex items-center gap-1">
           {isLiveStripeActive ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Stripe Hosted Elements
+              Encrypted
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
               <CreditCardIcon className="w-3 h-3" />
-              Pay Driver in Cab
+              Pay Driver in Car
             </span>
           )}
         </div>
       </div>
 
-      {/* Live Stripe Hosted Iframe OR Explicit "Pay Driver in Cab (Cash / Terminal)" Fallback */}
+      {/* Live Stripe Hosted Iframe OR Explicit "Pay Driver in Car" Fallback */}
       {isLiveStripeActive ? (
         <div className="p-3.5 bg-white border border-slate-300 rounded-xl shadow-2xs focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
           <div ref={mountRef} id="stripe-card-element" className="min-h-[28px]" />
@@ -211,13 +211,13 @@ export function StripePaymentInput({
           </div>
           <div className="space-y-1 text-xs">
             <div className="font-bold text-slate-900 flex items-center gap-2">
-              <span>Pay Driver in Cab (Cash / Terminal)</span>
+              <span>Pay Driver in Car (Card or Cash)</span>
               <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
                 No Upfront Charge
               </span>
             </div>
             <p className="text-slate-600 text-[11px] leading-relaxed">
-              Online card pre-authorization is currently disabled. Pay your driver directly in the cab using cash, contactless tap (Apple Pay / Google Pay), or chip/swipe card terminal upon arrival.
+              Pay your driver directly in the car using contactless tap (Apple Pay / Google Pay), chip or swipe card, or cash upon arrival.
             </p>
           </div>
         </div>

@@ -353,7 +353,7 @@ export function RatesPanel({
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Pure base-fare calculation formula, rounding behavior, and no-show / cancellation policy. Routing &amp; surcharges are synthesized in <strong>Rules &amp; Routing</strong>.
+                  Base fare formula, rounding settings, and no-show or cancellation fees. Zone rules and surcharges are managed in <strong>Pricing Rules</strong>.
                 </p>
               </div>
 

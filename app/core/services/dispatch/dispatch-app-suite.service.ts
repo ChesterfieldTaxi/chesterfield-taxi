@@ -118,7 +118,7 @@ const INITIAL_NOTES: DispatchNote[] = [
 • Richmond Int'l Airport (RIC) construction on lower arrivals loop; direct inbound drivers to Baggage Door 3.
 • Corporate account #CP-8821 (Capital One) has 2 executive sedans requested tomorrow morning.
 • Tarrington gated community entrance code: #4492 (call guard box if callbox offline).
-• Cab #12 scheduled for fleet safety inspection & oil service at 2:00 PM.
+• Car #12 scheduled for fleet safety inspection & oil service at 2:00 PM.
 • VCU Health discharge gate: use 12th St ambulance bay ramp for non-emergency wheelchair transports.`,
     createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
     updatedAt: new Date(Date.now() - 1800000).toISOString(),

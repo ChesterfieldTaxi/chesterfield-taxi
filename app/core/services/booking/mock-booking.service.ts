@@ -780,7 +780,7 @@ export class MockBookingService implements IBookingService {
       if (options.assignedDriverId && (status === 'assigned' || status === 'accepted')) {
         let vehicleSnapshot: TripAssignedVehicle = {
           vehicleId: 'veh-' + options.assignedDriverId,
-          vehicleNumber: 'Cab #204',
+          vehicleNumber: 'Car #204',
           licensePlate: 'MO-7TX91',
           model: 'Toyota Camry Hybrid',
         };
@@ -877,7 +877,7 @@ export class MockBookingService implements IBookingService {
           driverName = rosterMatch.name;
           driverPhone = rosterMatch.phone;
           if (!vehicleUnit && (rosterMatch.cabNumber || rosterMatch.vehicle)) {
-            vehicleUnit = rosterMatch.cabNumber ? `Cab #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
+            vehicleUnit = rosterMatch.cabNumber ? `Car #${rosterMatch.cabNumber}` : rosterMatch.vehicle;
           }
         }
       } catch {}

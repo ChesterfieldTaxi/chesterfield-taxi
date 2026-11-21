@@ -147,8 +147,8 @@ class TelephonyService implements ITelephonyService {
     }
   ): Promise<SmsNotification> {
     let message = '';
-    const cleanUnit = (context.vehicleUnit || '').replace(/^cab\s*#?/i, '').trim();
-    const unitLabel = cleanUnit ? `Cab #${cleanUnit}` : 'Your chauffeur';
+    const cleanUnit = (context.vehicleUnit || '').replace(/^(?:cab|car)\s*#?/i, '').trim();
+    const unitLabel = cleanUnit ? `Car #${cleanUnit}` : 'Your driver';
     const driver = context.driverName ? ` (${context.driverName})` : '';
     const origin =
       typeof window !== 'undefined' && window.location?.origin
@@ -165,7 +165,7 @@ class TelephonyService implements ITelephonyService {
         message = `Chesterfield Taxi: ${unitLabel}${driver} is on the way! Est. arrival ${context.etaMinutes || 7} min. Track live: ${liveTrackUrl}`;
         break;
       case 'driver_arrived':
-        message = `Chesterfield Taxi: Your chauffeur has arrived outside in a ${context.vehicleModel || 'vehicle'} (${unitLabel}). Live status: ${liveTrackUrl}`;
+        message = `Chesterfield Taxi: Your driver has arrived outside in a ${context.vehicleModel || 'car'}${cleanUnit ? ` (Car #${cleanUnit})` : ''}. Live status: ${liveTrackUrl}`;
         break;
       case 'trip_started':
         message = `Chesterfield Taxi: Your trip has started. Safe travels with Chesterfield Taxi!`;

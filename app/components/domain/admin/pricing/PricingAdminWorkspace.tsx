@@ -276,19 +276,19 @@ export function PricingAdminWorkspace({
       <div className="bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-xs text-slate-600">
           <span className="font-bold text-slate-900 mr-1.5">
-            {activeTab === 'rates' && '1. Service Rates:'}
-            {activeTab === 'extras' && '2. Extras & Services:'}
-            {activeTab === 'surcharges' && '3. Surcharges (Firewall):'}
-            {activeTab === 'rules' && '4. Rules & Synthesis:'}
+            {activeTab === 'rates' && '1. Rates:'}
+            {activeTab === 'extras' && '2. Extras:'}
+            {activeTab === 'surcharges' && '3. Surcharges:'}
+            {activeTab === 'rules' && '4. Pricing Rules:'}
           </span>
           {activeTab === 'rates' &&
-            'Pure base-fare formulas, per-rate rounding settings, and no-show / cancellation policies.'}
+            'Base fare formulas, per-rate rounding settings, and no-show or cancellation fees.'}
           {activeTab === 'extras' &&
-            'User-chosen services (car seats, extra riders, stops, cargo, add-ons) and pickup curb wait time.'}
+            'Optional rider add-ons (car seats, extra passengers, stops, oversized items) and pickup wait time.'}
           {activeTab === 'surcharges' &&
-            'Master On/Off switch + Default Policy (Universal vs Rule-Only) for every surcharge.'}
+            'Master On/Off switch and default behavior (All Trips vs Rule-Only) for every surcharge.'}
           {activeTab === 'rules' &&
-            'Single IF → THEN synthesis layer connecting conditions to Rates, Surcharges, and Extras.'}
+            'Automatic pricing rules connecting trip conditions to Rates, Surcharges, and Extras.'}
         </p>
 
         <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
@@ -309,7 +309,7 @@ export function PricingAdminWorkspace({
             className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
           >
             <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
-            <span>Test Fare Simulator</span>
+            <span>Live Fare Preview</span>
           </Button>
         </div>
       </div>
@@ -365,12 +365,12 @@ export function PricingAdminWorkspace({
         )}
       </div>
 
-      {/* On-Demand Live Fare Simulator Slide-Over Drawer (previews live unsaved drafts!) */}
+      {/* On-Demand Live Fare Preview Slide-Over Drawer (previews live unsaved drafts!) */}
       <AdminSlideOverDrawer
         isOpen={isSimulatorOpen}
         onClose={() => setIsSimulatorOpen(false)}
-        title="Live Fare Simulator"
-        subtitle="Real-time firewall preview across Rates, Extras, Surcharges & Rules"
+        title="Live Fare Preview"
+        subtitle="Test live fares across Rates, Extras, Surcharges & Pricing Rules"
         size="md"
       >
         <div className="-mx-4 -my-4 sm:-mx-6 sm:-my-5 h-full">

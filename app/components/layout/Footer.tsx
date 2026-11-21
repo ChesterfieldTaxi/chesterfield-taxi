@@ -15,10 +15,10 @@ import type { AppSettings, CompanyConfig } from '../../core/types/config';
 const QUICK_LINKS = [
   { label: 'Home', path: '/' },
   { label: 'Book a Ride', path: '/book' },
-  { label: 'Services Overview', path: '/services' },
+  { label: 'Services & Rates', path: '/services' },
   { label: 'About Us', path: '/about' },
-  { label: 'Contact & Support', path: '/contact' },
-  { label: 'Careers & Applications', path: '/apply' },
+  { label: 'Contact Us', path: '/contact' },
+  { label: 'Drive With Us', path: '/apply' },
 ];
 
 export function Footer() {
@@ -154,7 +154,7 @@ export function Footer() {
                   <PhoneIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 block">Instant Phone Dispatch</span>
+                  <span className="text-[11px] text-slate-400 block">24/7 Dispatch</span>
                   <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
                     {phoneDisplay}
                   </span>
@@ -190,9 +190,9 @@ export function Footer() {
           <p>
             &copy; {currentYear} {COMPANY_CONFIG.legalName}. All rights reserved. Registered in Missouri.
           </p>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-6">
             <Link to="/book" className="hover:text-blue-400 transition-colors">
-              Online Booking
+              Book a Ride
             </Link>
             <Link to="/services" className="hover:text-blue-400 transition-colors">
               Airport Rates

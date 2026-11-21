@@ -165,7 +165,7 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     role: 'driver',
     phone: '(314) 915-1800',
     driverLicense: '',
-    assignedUnit: 'Cab #947',
+    assignedUnit: 'Car #947',
     status: 'active',
     createdAt: '2026-09-18T15:56:03.337Z',
     driverScore: 98,
@@ -181,7 +181,7 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     role: 'driver',
     phone: '(314) 683-0585',
     driverLicense: '',
-    assignedUnit: 'Cab #982',
+    assignedUnit: 'Car #982',
     status: 'active',
     createdAt: '2026-09-18T15:56:48.271Z',
     driverScore: 98,
@@ -197,7 +197,7 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     role: 'driver',
     phone: '(314) 224-0008',
     driverLicense: '',
-    assignedUnit: 'Cab #47',
+    assignedUnit: 'Car #47',
     status: 'active',
     createdAt: '2026-09-18T15:58:13.900Z',
     driverScore: 98,
@@ -214,7 +214,7 @@ export const LEGACY_DEFAULT_DRIVERS: DriverRosterItem[] = [
     username: 'zakharyar947',
     formattedLabel: '#947, Zakharya',
     status: 'available',
-    vehicle: 'Cab #947',
+    vehicle: 'Car #947',
     tier: 'Sedan',
     phone: '(314) 915-1800',
     zone: 'Chesterfield Valley',
@@ -230,7 +230,7 @@ export const LEGACY_DEFAULT_DRIVERS: DriverRosterItem[] = [
     username: 'michaelv982',
     formattedLabel: '#982, Michael',
     status: 'available',
-    vehicle: 'Cab #982',
+    vehicle: 'Car #982',
     tier: 'Sedan',
     phone: '(314) 683-0585',
     zone: 'Chesterfield Valley',
@@ -246,7 +246,7 @@ export const LEGACY_DEFAULT_DRIVERS: DriverRosterItem[] = [
     username: 'wagnehum47',
     formattedLabel: '#47, Wagnehu',
     status: 'available',
-    vehicle: 'Cab #47',
+    vehicle: 'Car #47',
     tier: 'Sedan',
     phone: '(314) 224-0008',
     zone: 'Chesterfield Valley',
@@ -373,7 +373,7 @@ export class OperatorService {
             roles,
             phone: data.phone || data.phoneNumber || '',
             driverLicense: data.driverLicense || '',
-            assignedUnit: data.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : ''),
+            assignedUnit: data.assignedUnit ? String(data.assignedUnit).replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : ''),
             status: data.status || 'active',
             createdAt: data.createdAt,
             lastLogin: data.lastLogin,
@@ -440,7 +440,7 @@ export class OperatorService {
       const lastName = op.lastName || (op.displayName ? op.displayName.split(' ').slice(1).join(' ') : '');
       const cabNumber = op.cabNumber || (op.assignedUnit ? (op.assignedUnit.match(/#?(\d+)/)?.[1] || op.assignedUnit) : '');
       const username = op.username || generateDriverUsername(firstName, lastName, cabNumber);
-      const vehicle = op.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : 'Unassigned');
+      const vehicle = op.assignedUnit ? op.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : 'Unassigned');
       const formattedLabel = formatDriverAssignmentLabel({
         name: op.displayName,
         firstName,
@@ -539,7 +539,7 @@ export class OperatorService {
                 roles,
                 phone: data.phone || data.phoneNumber || '',
                 driverLicense: data.driverLicense || '',
-                assignedUnit: data.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : ''),
+                assignedUnit: data.assignedUnit ? String(data.assignedUnit).replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : ''),
                 status: data.status || 'active',
                 createdAt: data.createdAt,
                 lastLogin: data.lastLogin,
@@ -583,7 +583,7 @@ export class OperatorService {
     const cabNumber = operator.cabNumber || (operator.assignedUnit ? (operator.assignedUnit.match(/#?(\d+)/)?.[1] || operator.assignedUnit) : '');
     const username = operator.username || generateDriverUsername(firstName, lastName, cabNumber);
     const displayName = operator.displayName || (firstName ? `${firstName} ${lastName}`.trim() : '');
-    const assignedUnit = operator.assignedUnit || (cabNumber ? `Cab #${cabNumber}` : '');
+    const assignedUnit = operator.assignedUnit ? operator.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : '');
 
     const completeOperator: OperatorUser = {
       ...operator,

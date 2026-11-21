@@ -726,7 +726,7 @@ export function AdminDashboardTab({
                 <div className="space-y-3 text-xs">
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="font-bold text-slate-700">Standard Sedan (4-Pax)</span>
+                      <span className="font-bold text-slate-700">Standard Sedan (Up to 4 Passengers)</span>
                       <span className="font-black text-slate-900">{stdPct}% ({tierCounts.standard})</span>
                     </div>
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -735,7 +735,7 @@ export function AdminDashboardTab({
                   </div>
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="font-bold text-slate-700">Premium Executive Sedan</span>
+                      <span className="font-bold text-slate-700">Premium Sedan / SUV</span>
                       <span className="font-black text-slate-900">{execPct}% ({tierCounts.executive})</span>
                     </div>
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -744,7 +744,7 @@ export function AdminDashboardTab({
                   </div>
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="font-bold text-slate-700">XL Minivan / SUV (6-Pax)</span>
+                      <span className="font-bold text-slate-700">XL Minivan / SUV (Up to 6 Passengers)</span>
                       <span className="font-black text-slate-900">{xlPct}% ({tierCounts.xl})</span>
                     </div>
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">

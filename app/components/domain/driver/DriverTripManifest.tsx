@@ -57,13 +57,13 @@ export function resolveTripPaymentBadge(trip: Trip): {
 
   if (method === 'account' || method === 'corporate') {
     return {
-      label: 'Corporate Direct Bill',
+      label: 'Corporate Account',
       tone: 'purple',
       subtext: [corpOrg, billingPo ? `PO: ${billingPo}` : null].filter(Boolean).join(' · ') || undefined,
     };
   }
   if (method === 'cash') {
-    return { label: 'Cash in Cab', tone: 'emerald' };
+    return { label: 'Cash (In Car)', tone: 'emerald' };
   }
   if (trip.payment?.status === 'authorized' && trip.payment?.paymentIntentId?.startsWith('pi_')) {
     return {
@@ -71,7 +71,7 @@ export function resolveTripPaymentBadge(trip: Trip): {
       tone: 'blue',
     };
   }
-  return { label: 'Pay in Cab (Card / Cash)', tone: 'amber' };
+  return { label: 'Pay in Car (Card or Cash)', tone: 'amber' };
 }
 
 export function DriverTripManifest({ trip, adminVehicles, compact = false }: DriverTripManifestProps) {

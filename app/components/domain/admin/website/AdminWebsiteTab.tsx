@@ -42,13 +42,13 @@ const WEBSITE_SUB_TABS: Array<{
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { id: 'pages', label: 'Pages Directory', icon: FileTextIcon },
-  { id: 'themes', label: 'Themes & Livery', icon: PaletteIcon },
-  { id: 'form', label: 'Form Controls', icon: SlidersIcon },
-  { id: 'layout', label: 'Section Canvas', icon: LayersIcon },
+  { id: 'pages', label: 'Pages', icon: FileTextIcon },
+  { id: 'themes', label: 'Themes', icon: PaletteIcon },
+  { id: 'form', label: 'Booking Form', icon: SlidersIcon },
+  { id: 'layout', label: 'Page Sections', icon: LayersIcon },
   { id: 'navigation', label: 'Header & Footer', icon: CompassIcon },
   { id: 'seo', label: 'SEO & Analytics', icon: SearchIcon },
-  { id: 'css', label: 'Monaco CSS Editor', icon: CodeIcon },
+  { id: 'css', label: 'Custom CSS', icon: CodeIcon },
 ];
 
 export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
@@ -313,14 +313,14 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                 }
                 rows={3}
                 className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                placeholder="Reliable 24-hour taxi and chauffeured car service in Chesterfield, Ballwin, and West County..."
+                placeholder="Reliable 24-hour taxi and airport car service in Chesterfield, Ballwin, and West County..."
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Head Scripts (GTM, Meta Pixel, Telemetry)
+                  Head Scripts (Google Tag Manager, Meta Pixel, Analytics)
                 </label>
                 <textarea
                   value={scripts.head}

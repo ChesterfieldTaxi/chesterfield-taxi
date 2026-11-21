@@ -284,7 +284,7 @@ export function PersistentFareSimulator({
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
-              <span>Fare Simulator</span>
+              <span>Live Fare Preview</span>
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                 LIVE
               </span>
@@ -294,7 +294,7 @@ export function PersistentFareSimulator({
                 </span>
               )}
             </h3>
-            <p className="text-[11px] text-slate-500">Real-time 4-pillar firewall engine</p>
+            <p className="text-[11px] text-slate-500">Test fares across Rates, Extras, Surcharges &amp; Rules</p>
           </div>
         </div>
       </div>
@@ -725,7 +725,7 @@ export function PersistentFareSimulator({
           </div>
         </div>
 
-        {/* Firewall Decision Trace (Explain This Fare) */}
+        {/* Applied Rules & Surcharges (Explain This Fare) */}
         {ctx?.firewallTrace && (
           <div className="pt-1">
             <button
@@ -735,7 +735,7 @@ export function PersistentFareSimulator({
             >
               <span className="flex items-center gap-1.5 font-bold text-blue-900">
                 <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
-                Firewall Decision Trace ({ctx.firewallTrace.ruleDecisions.filter((r) => r.matched).length} rules matched)
+                Applied Rules &amp; Surcharges ({ctx.firewallTrace.ruleDecisions.filter((r) => r.matched).length} matched)
               </span>
               <ChevronRightIcon
                 className={`w-3.5 h-3.5 text-blue-600 transform transition-transform ${showFirewallTrace ? 'rotate-90' : ''}`}
@@ -746,7 +746,7 @@ export function PersistentFareSimulator({
               <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-2.5">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                    Rules Evaluated (Top-Down)
+                    Pricing Rules Checked (Top-Down)
                   </span>
                   <div className="space-y-1">
                     {ctx.firewallTrace.ruleDecisions.map((rd) => (
@@ -770,7 +770,7 @@ export function PersistentFareSimulator({
 
                 <div className="pt-2 border-t border-slate-200">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                    Surcharges Firewall Status
+                    Surcharges Status
                   </span>
                   <div className="space-y-1">
                     {ctx.firewallTrace.surchargeDecisions.map((sd) => (

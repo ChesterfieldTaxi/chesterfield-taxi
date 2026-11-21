@@ -1838,7 +1838,7 @@ export function BookingEngineV2({
 
     if (form.paymentMethod === 'card' && stripeOnlineEnabled && form.cardPaymentType === 'manual') {
       if (!form.paymentToken || form.paymentToken === 'pay_in_cab') {
-        newErrors.paymentToken = 'Please enter complete card details or select "Pay Driver in Cab (Terminal)".';
+        newErrors.paymentToken = 'Please enter complete card details or choose "Pay Driver in Car".';
       }
     }
 
@@ -3122,7 +3122,8 @@ export function BookingEngineV2({
                   </h2>
                 </div>
                 <span className="text-xs text-slate-500 font-semibold">
-                  {form.passengers} Pax &bull; {form.carryOnBags + form.checkedBags} Bags
+                  {form.passengers} {form.passengers === 1 ? 'Passenger' : 'Passengers'} &bull;{' '}
+                  {form.carryOnBags + form.checkedBags} {form.carryOnBags + form.checkedBags === 1 ? 'Bag' : 'Bags'}
                 </span>
               </div>
 
@@ -3138,7 +3139,7 @@ export function BookingEngineV2({
                   >
                     <div className="flex items-center justify-center sm:justify-start gap-1 text-slate-700 text-[11px] sm:text-xs min-w-0">
                       <UserIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500 shrink-0" />
-                      <span className="font-bold text-slate-800 truncate">Pax</span>
+                      <span className="font-bold text-slate-800 truncate">Passengers</span>
                     </div>
                     <div className="flex items-center justify-between gap-1">
                       <button
@@ -3278,7 +3279,7 @@ export function BookingEngineV2({
                           }}
                           className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span>Oversized Cargo (Golf / Skis)</span>
+                        <span>Oversized Items (Golf / Skis)</span>
                       </span>
                       {form.hasOversizedLuggage && totalOversizedCount > 0 && (
                         <span className="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200">
@@ -3314,11 +3315,11 @@ export function BookingEngineV2({
                   )}
                 </div>
 
-                {/* Expanded Oversized Cargo Panel */}
+                {/* Expanded Oversized Items Panel */}
                 {bookingConfig.allowOversizedLuggage !== false && form.hasOversizedLuggage && (
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
                     <div className="text-[11px] text-slate-600 font-medium">
-                      Select oversized equipment so we dispatch the right cargo space:
+                      Select oversized items so we send a car with enough space:
                     </div>
 
                     <div className="space-y-1.5">
@@ -3556,11 +3557,11 @@ export function BookingEngineV2({
                 )}
               </div>
 
-              {/* Vehicle Preference Subsection */}
+              {/* Vehicle Selection Subsection */}
               <div className="pt-3 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-slate-800">
-                    Select Vehicle Tier {bookingConfig.allowMultiVehicle && `(${form.selectedVehicles.length} vehicle${form.selectedVehicles.length > 1 ? 's' : ''})`}
+                    Choose Vehicle {bookingConfig.allowMultiVehicle && `(${form.selectedVehicles.length} vehicle${form.selectedVehicles.length > 1 ? 's' : ''})`}
                   </span>
                   {bookingConfig.allowMultiVehicle && (
                     <button
@@ -3579,7 +3580,7 @@ export function BookingEngineV2({
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
                       <span className="text-slate-600 font-medium">
-                        Combined Fleet Capacity: <strong className="text-slate-900">{totalMaxPassengers} Pax</strong> &bull; <strong className="text-slate-900">{totalMaxBags} Bags</strong>
+                        Total Capacity: <strong className="text-slate-900">{totalMaxPassengers} Passengers</strong> &bull; <strong className="text-slate-900">{totalMaxBags} Bags</strong>
                       </span>
                       <span className="text-[11px] text-slate-500">
                         {form.selectedVehicles.length} of max {bookingConfig.maxVehiclesAllowed || 3} vehicle(s)
@@ -3596,7 +3597,7 @@ export function BookingEngineV2({
                             <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">
                               #{idx + 1}
                             </span>
-                            <span className="font-bold text-xs text-slate-800">Vehicle #{idx + 1} Tier</span>
+                            <span className="font-bold text-xs text-slate-800">Vehicle #{idx + 1}</span>
                           </div>
                           {idx > 0 && (
                             <button
@@ -3604,7 +3605,7 @@ export function BookingEngineV2({
                               onClick={() => handleRemoveVehicle(idx)}
                               className="text-xs text-red-600 hover:text-red-800 font-semibold cursor-pointer"
                             >
-                              ✕ Remove
+                              Remove
                             </button>
                           )}
                         </div>
@@ -3639,7 +3640,7 @@ export function BookingEngineV2({
                                   ) : null}
                                 </div>
                                 <div className="text-[11px] text-slate-500 font-medium">
-                                  {tier.maxPassengers}p / {tier.maxLuggage}b
+                                  {tier.maxPassengers} Passengers &bull; {tier.maxLuggage} Bags
                                 </div>
                               </button>
                             );
@@ -3652,8 +3653,8 @@ export function BookingEngineV2({
                   <>
                     {oversizedRequiresUpgrade && (
                       <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center gap-2">
-                        <span className="font-bold">Automatic Vehicle Upgrade:</span>
-                        <span>Selected oversized cargo requires SUV or Minivan capacity.</span>
+                        <span className="font-bold">Vehicle Upgrade:</span>
+                        <span>Oversized items require SUV or Minivan space.</span>
                       </div>
                     )}
 
@@ -3672,7 +3673,7 @@ export function BookingEngineV2({
 
                         let restrictionReason = '';
                         if (isOversizedRestricted) {
-                          restrictionReason = 'Requires SUV/Van (Oversized cargo)';
+                          restrictionReason = 'Requires SUV/Van (Oversized items)';
                         } else if (isCarSeatRestricted) {
                           restrictionReason = 'Requires SUV/Van (Car seats)';
                         } else if (isPaxRestricted) {
@@ -3743,7 +3744,7 @@ export function BookingEngineV2({
                                         ${liveTierPrice}
                                       </span>
                                       <span className="text-[9px] text-slate-500 font-semibold uppercase">
-                                        est.{form.returnTrip ? '/leg' : ''}
+                                        est.{form.returnTrip ? '/trip' : ''}
                                       </span>
                                     </div>
                                   ) : null}
@@ -3760,7 +3761,7 @@ export function BookingEngineV2({
                                 <div className="flex items-center gap-2">
                                   <span className="inline-flex items-center gap-1">
                                     <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                                    {tier.maxPassengers} Pax
+                                    {tier.maxPassengers} Passengers
                                   </span>
                                   <span>&bull;</span>
                                   <span className="inline-flex items-center gap-1">
@@ -4097,7 +4098,7 @@ export function BookingEngineV2({
                         >
                           <div className="flex items-center justify-center sm:justify-start gap-1 text-slate-700 text-[11px] sm:text-xs min-w-0">
                             <UserIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500 shrink-0" />
-                            <span className="font-bold text-slate-800 truncate">Pax</span>
+                            <span className="font-bold text-slate-800 truncate">Passengers</span>
                           </div>
                           <div className="flex items-center justify-between gap-1">
                             <button
@@ -4275,7 +4276,7 @@ export function BookingEngineV2({
                                 }}
                                 className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                               />
-                              <span>Oversized Cargo (Golf / Skis)</span>
+                              <span>Oversized Items (Golf / Skis)</span>
                             </span>
                             {form.returnHasOversizedLuggage && returnTotalOversizedCount > 0 && (
                               <span className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
@@ -4311,11 +4312,11 @@ export function BookingEngineV2({
                         )}
                       </div>
 
-                      {/* Expanded Return Oversized Cargo Panel */}
+                      {/* Expanded Return Oversized Items Panel */}
                       {bookingConfig.allowOversizedLuggage !== false && form.returnHasOversizedLuggage && (
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
                           <div className="text-[11px] text-slate-600 font-medium">
-                            Select return oversized equipment so we dispatch the right cargo space:
+                            Select return oversized items so we send a car with enough space:
                           </div>
 
                           <div className="space-y-1.5">
@@ -4586,7 +4587,7 @@ export function BookingEngineV2({
                       <div className="pt-3 border-t border-slate-100 space-y-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-extrabold text-slate-800">
-                            Select Return Vehicle Tier {bookingConfig.allowMultiVehicle && `(${form.returnSelectedVehicles.length} vehicle${form.returnSelectedVehicles.length > 1 ? 's' : ''})`}
+                            Choose Return Vehicle {bookingConfig.allowMultiVehicle && `(${form.returnSelectedVehicles.length} vehicle${form.returnSelectedVehicles.length > 1 ? 's' : ''})`}
                           </span>
                           {bookingConfig.allowMultiVehicle && (
                             <button
@@ -4605,7 +4606,7 @@ export function BookingEngineV2({
                           <div className="space-y-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
                               <span className="text-slate-600 font-medium">
-                                Return Fleet Capacity: <strong className="text-slate-900">{returnTotalMaxPassengers} Pax</strong> &bull; <strong className="text-slate-900">{returnTotalMaxBags} Bags</strong>
+                                Return Capacity: <strong className="text-slate-900">{returnTotalMaxPassengers} Passengers</strong> &bull; <strong className="text-slate-900">{returnTotalMaxBags} Bags</strong>
                               </span>
                               <span className="text-[11px] text-slate-500">
                                 {form.returnSelectedVehicles.length} of max {bookingConfig.maxVehiclesAllowed || 3} vehicle(s)
@@ -4666,7 +4667,7 @@ export function BookingEngineV2({
                                           )}
                                         </div>
                                         <div className="text-[10px] text-slate-500">
-                                          {tier.maxPassengers} Pax &bull; {tier.maxLuggage} Bags
+                                          {tier.maxPassengers} Passengers &bull; {tier.maxLuggage} Bags
                                         </div>
                                       </button>
                                     );
@@ -4680,8 +4681,8 @@ export function BookingEngineV2({
 
                         {returnOversizedRequiresUpgrade && (
                           <div className="p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
-                            <span className="font-bold">Automatic Vehicle Upgrade:</span>
-                            <span>Selected return oversized cargo requires SUV or Minivan capacity.</span>
+                            <span className="font-bold">Vehicle Upgrade:</span>
+                            <span>Return oversized items require SUV or Minivan space.</span>
                           </div>
                         )}
 
@@ -4819,9 +4820,9 @@ export function BookingEngineV2({
                       </div>
                     )}
 
-                    {/* Return Leg Fare Bar */}
+                    {/* Return Trip Fare Bar */}
                     <div className="flex items-center justify-between text-xs font-semibold text-indigo-950 bg-indigo-50/70 px-3 py-2 rounded-xl border border-indigo-200/80">
-                      <span>Return Leg Estimated Fare</span>
+                      <span>Return Trip Estimated Fare</span>
                       <span className="font-mono font-extrabold text-sm">
                         {isReturnQuoteLoading
                           ? 'Calculating...'
@@ -5093,7 +5094,7 @@ export function BookingEngineV2({
                 )}
               </div>
 
-              {/* Collapsible Special Requests, Gate Code & Chauffeur Notes */}
+              {/* Collapsible Special Requests, Gate Code & Driver Notes */}
               <div className="pt-2.5 border-t border-slate-100 space-y-3">
                 <button
                   type="button"
@@ -5101,7 +5102,7 @@ export function BookingEngineV2({
                   className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-blue-700 cursor-pointer"
                 >
                   <span>
-                    Special Requests, Gate Code &amp; Chauffeur Notes{' '}
+                    Special Requests, Gate Code &amp; Driver Notes{' '}
                     <span className="font-normal text-slate-400">(Optional)</span>
                   </span>
                   <span className="text-blue-600 font-bold">
@@ -5149,7 +5150,7 @@ export function BookingEngineV2({
                       </div>
                       <div className="sm:col-span-2">
                         <label htmlFor="driverNotes" className="block text-[11px] text-slate-600 font-semibold mb-1">
-                          Chauffeur Instructions
+                          Notes for Driver
                         </label>
                         <input
                           id="driverNotes"
@@ -5178,7 +5179,7 @@ export function BookingEngineV2({
                   </h2>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  {stripeOnlineEnabled ? 'Online or In-Cab' : 'Pay in Vehicle'}
+                  {stripeOnlineEnabled ? 'Online or In Car' : 'Pay in Car'}
                 </span>
               </div>
 
@@ -5190,10 +5191,10 @@ export function BookingEngineV2({
                 const allMethods = [
                   {
                     key: 'card' as const,
-                    label: stripeOnlineEnabled ? 'Card' : 'Card (In Cab)',
+                    label: stripeOnlineEnabled ? 'Card' : 'Card (In Car)',
                     Icon: CreditCardIcon,
                   },
-                  { key: 'cash' as const, label: 'Cash (In Cab)', Icon: DollarSignIcon },
+                  { key: 'cash' as const, label: 'Cash (In Car)', Icon: DollarSignIcon },
                   { key: 'account' as const, label: 'Corporate', Icon: BuildingIcon },
                 ];
                 const methodsToRender = allMethods.filter((m) => allowed.includes(m.key));
@@ -5252,7 +5253,7 @@ export function BookingEngineV2({
                               : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
                           }`}
                         >
-                          Pay Driver in Cab (Terminal)
+                          Pay Driver in Car
                         </button>
                         <button
                           type="button"
@@ -5268,7 +5269,7 @@ export function BookingEngineV2({
                               : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
                           }`}
                         >
-                          Pre-Authorize Card Online
+                          Pay Online by Card
                         </button>
                       </div>
 
@@ -5307,13 +5308,13 @@ export function BookingEngineV2({
                           <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                           <div className="space-y-1">
                             <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
-                              <span>Pay Driver in Cab (Contactless / Chip / Tap / Square)</span>
+                              <span>Pay Driver in Car (Tap, Chip, or Swipe)</span>
                               <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
                                 No Upfront Charge
                               </span>
                             </div>
                             <p className="text-slate-600 text-[11px] leading-relaxed">
-                              Pay inside the vehicle using Apple Pay, Google Pay, or any major card. Nothing is charged upfront.
+                              Pay inside the car using Apple Pay, Google Pay, or any major card. Nothing is charged upfront.
                             </p>
                           </div>
                         </div>
@@ -5324,13 +5325,13 @@ export function BookingEngineV2({
                       <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
-                          <span>Pay Driver in Cab (Contactless / Chip / Tap / Square)</span>
+                          <span>Pay Driver in Car (Tap, Chip, or Swipe)</span>
                           <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
                             No Upfront Charge
                           </span>
                         </div>
                         <p className="text-slate-600 text-[11px] leading-relaxed">
-                          Pay securely inside the vehicle using Apple Pay, Google Pay, or any major credit/debit card on our Square / contactless terminal. No payment is charged upfront.
+                          Pay securely inside the car using Apple Pay, Google Pay, or any major credit or debit card. Nothing is charged upfront.
                         </p>
                       </div>
                     </div>
@@ -5342,7 +5343,7 @@ export function BookingEngineV2({
               {form.paymentMethod === 'cash' && (
                 <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-center gap-2.5">
                   <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Pay cash directly to your chauffeur upon completion of your trip. Exact change is appreciated.</span>
+                  <span>Pay cash directly to your driver at the end of your ride. Exact change is appreciated.</span>
                 </div>
               )}
 
@@ -5350,7 +5351,7 @@ export function BookingEngineV2({
               {form.paymentMethod === 'account' && (
                 <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-3 animate-in fade-in duration-150">
                   <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide block">
-                    Corporate Account Direct Billing
+                    Corporate Account
                   </span>
 
                   <div className="text-[11px] bg-white p-3 rounded-xl border border-amber-200 text-amber-900 flex items-start gap-2 shadow-2xs">
@@ -5492,8 +5493,8 @@ export function BookingEngineV2({
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
                     <span className="font-semibold text-slate-800">
                       {bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1
-                        ? `${form.selectedVehicles.length} Vehicles (${form.selectedVehicles.map((v) => getFriendlyVehicleName(v)).join(', ')}) • ${form.passengers} Pax • ${form.bags} Bags`
-                        : `${getFriendlyVehicleName(form.vehicleChoice)} • ${form.passengers} Pax • ${form.bags} Bags`}
+                        ? `${form.selectedVehicles.length} Vehicles (${form.selectedVehicles.map((v) => getFriendlyVehicleName(v)).join(', ')}) • ${form.passengers} ${form.passengers === 1 ? 'Passenger' : 'Passengers'} • ${form.bags} ${form.bags === 1 ? 'Bag' : 'Bags'}`
+                        : `${getFriendlyVehicleName(form.vehicleChoice)} • ${form.passengers} ${form.passengers === 1 ? 'Passenger' : 'Passengers'} • ${form.bags} ${form.bags === 1 ? 'Bag' : 'Bags'}`}
                     </span>
                   </div>
                 </div>
@@ -5536,8 +5537,8 @@ export function BookingEngineV2({
                         <span className="text-[10px] text-indigo-600 font-bold uppercase block">Return Vehicle</span>
                         <span className="font-semibold text-slate-800">
                           {bookingConfig.allowMultiVehicle && form.returnSelectedVehicles.length > 1
-                            ? `${form.returnSelectedVehicles.length} Vehicles (${form.returnSelectedVehicles.map((v) => getFriendlyVehicleName(v)).join(', ')}) • ${form.returnPassengers} Pax • ${form.returnBags} Bags`
-                            : `${getFriendlyVehicleName(form.returnVehicleChoice)} • ${form.returnPassengers} Pax • ${form.returnBags} Bags`}
+                            ? `${form.returnSelectedVehicles.length} Vehicles (${form.returnSelectedVehicles.map((v) => getFriendlyVehicleName(v)).join(', ')}) • ${form.returnPassengers} ${form.returnPassengers === 1 ? 'Passenger' : 'Passengers'} • ${form.returnBags} ${form.returnBags === 1 ? 'Bag' : 'Bags'}`
+                            : `${getFriendlyVehicleName(form.returnVehicleChoice)} • ${form.returnPassengers} ${form.returnPassengers === 1 ? 'Passenger' : 'Passengers'} • ${form.returnBags} ${form.returnBags === 1 ? 'Bag' : 'Bags'}`}
                         </span>
                       </div>
                     </div>
@@ -5556,9 +5557,9 @@ export function BookingEngineV2({
                       <div className="flex items-start gap-2">
                         <LuggageIcon className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
                         <div>
-                          <span className="text-[10px] text-indigo-700 font-bold uppercase block">Return Oversized Cargo</span>
+                          <span className="text-[10px] text-indigo-700 font-bold uppercase block">Return Oversized Items</span>
                           <span className="font-semibold text-slate-800">
-                            {returnOversizedItemsSummary || 'Special Equipment'}
+                            {returnOversizedItemsSummary || 'Oversized Items'}
                             {form.returnOversizedLuggageNotes ? ` (${form.returnOversizedLuggageNotes})` : ''}
                           </span>
                         </div>
@@ -5581,9 +5582,9 @@ export function BookingEngineV2({
                   <div className="flex items-start gap-2">
                     <LuggageIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
                     <div>
-                      <span className="text-[10px] text-blue-700 font-bold uppercase block">Oversized Cargo</span>
+                      <span className="text-[10px] text-blue-700 font-bold uppercase block">Oversized Items</span>
                       <span className="font-semibold text-slate-800">
-                        {oversizedItemsSummary || 'Special Equipment'}
+                        {oversizedItemsSummary || 'Oversized Items'}
                         {form.oversizedLuggageNotes ? ` (${form.oversizedLuggageNotes})` : ''}
                       </span>
                     </div>
@@ -5656,7 +5657,7 @@ export function BookingEngineV2({
                     className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
                   />
                   <span className="text-[11px] text-slate-600 leading-tight group-hover:text-slate-900">
-                    Receive transactional SMS dispatch &amp; chauffeur arrival updates.
+                    Send me text updates when my driver is on the way and arrives.
                   </span>
                 </label>
 

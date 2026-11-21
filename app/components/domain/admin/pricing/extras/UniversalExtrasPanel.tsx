@@ -291,17 +291,17 @@ export function UniversalExtrasPanel({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Extra Passengers</h3>
-                <p className="text-[11px] text-slate-500">Per-head surcharge above included riders</p>
+                <p className="text-[11px] text-slate-500">Per-person fee above included passengers</p>
               </div>
             </div>
             <span className="text-base font-bold font-mono text-emerald-700">
-              +${(workingCopy.extraPassengerFeePerHead ?? 1).toFixed(2)}/pax
+              +${(workingCopy.extraPassengerFeePerHead ?? 1).toFixed(2)}/person
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Included Free Riders</label>
+              <label className="text-xs font-medium text-slate-700 block mb-1">Included Passengers</label>
               <Input
                 type="number"
                 step="1"
@@ -314,7 +314,7 @@ export function UniversalExtrasPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Fee per Extra Pax ($)</label>
+              <label className="text-xs font-medium text-slate-700 block mb-1">Fee per Extra Passenger ($)</label>
               <Input
                 type="number"
                 step="0.50"

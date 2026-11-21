@@ -208,7 +208,7 @@ export function SurchargesPanel({
       <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-bold text-slate-900">Surcharges Catalog (Firewall Policy)</h2>
+            <h2 className="text-base font-bold text-slate-900">Surcharges</h2>
             {isDirty && (
               <Badge
                 variant="warning"
@@ -220,9 +220,9 @@ export function SurchargesPanel({
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Each surcharge has a <strong>Master Switch</strong> and a <strong>Default Policy</strong>: either{' '}
-            <strong>Universal (All Rides)</strong> unless waived by a Rule, or{' '}
-            <strong>Rule-Only</strong> (off unless applied by a Rule).
+            Each surcharge has an <strong>On/Off Switch</strong> and a <strong>Default Behavior</strong>: either{' '}
+            <strong>All Trips</strong> (unless waived by a Pricing Rule) or{' '}
+            <strong>Rule-Only</strong> (off unless turned on by a Pricing Rule).
           </p>
         </div>
 
@@ -272,9 +272,9 @@ export function SurchargesPanel({
           <div className="flex items-start gap-2.5 text-xs text-blue-950">
             <ShieldCheckIcon className="w-4.5 h-4.5 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">Upgrade Existing Surcharges to Firewall Rules</span>
+              <span className="font-bold block">Update Legacy Surcharges to Pricing Rules</span>
               <span className="text-blue-800">
-                Your live database is still using legacy surcharge conditions. Click upgrade to save the clean v2 Surcharges Catalog and create matching Rules (Airport Transfer, SUV/Minivan Upgrade, Out-of-Area &gt; 15 mi) in one click.
+                Your live database is using older surcharge conditions. Click update to save your surcharges and create matching Pricing Rules (Airport Transfer, SUV/Minivan Upgrade, Out-of-Area &gt; 15 mi) in one click.
               </span>
             </div>
           </div>
@@ -415,10 +415,10 @@ export function SurchargesPanel({
 
               {/* Middle Row: Firewall Default Policy + Calculation Mode + Amount */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-3 border-t border-slate-100 items-end">
-                {/* Firewall Default Policy */}
+                {/* Default Behavior */}
                 <div className="lg:col-span-6">
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Firewall Default Policy (when Enabled)
+                    Default Behavior (when Enabled)
                   </label>
                   <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200/80">
                     <button
@@ -430,7 +430,7 @@ export function SurchargesPanel({
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      Universal (All Rides)
+                      All Trips
                     </button>
                     <button
                       type="button"
@@ -638,15 +638,15 @@ export function SurchargesPanel({
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Default Firewall Policy
+                  Default Behavior
                 </label>
                 <select
                   value={formPolicy}
                   onChange={(e) => setFormPolicy(e.target.value as SurchargeDefaultPolicy)}
                   className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold"
                 >
-                  <option value="universal">Universal — Applies to ALL rides (unless waived by a Rule)</option>
-                  <option value="rule_only">Rule-Only — OFF by default (applies only when attached by a Rule)</option>
+                  <option value="universal">All Trips — Applies to every trip (unless waived by a Rule)</option>
+                  <option value="rule_only">Rule-Only — OFF by default (applies only when turned on by a Rule)</option>
                 </select>
               </div>
 

@@ -211,7 +211,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       username: uname,
       roles: activeRoles,
       cabNumber: cab,
-      assignedUnit: op.assignedUnit || (cab ? `Cab #${cab}` : ''),
+      assignedUnit: op.assignedUnit ? op.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : (cab ? `Car #${cab}` : ''),
       driverLicense: op.driverLicense || '',
       driverScore: typeof op.driverScore === 'number' ? op.driverScore : 98,
       deskExtension: op.deskExtension || '',
@@ -314,7 +314,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       editForm.username.trim().toLowerCase() ||
       generateDriverUsername(editForm.firstName, editForm.lastName, cleanCab);
     const assignedUnit =
-      editForm.assignedUnit.trim() || (cleanCab ? `Cab #${cleanCab}` : '');
+      editForm.assignedUnit.trim() || (cleanCab ? `Car #${cleanCab}` : '');
     const clampedScore = Math.max(0, Math.min(100, Number(editForm.driverScore) || 0));
     const effectiveStatus: 'active' | 'suspended' = editForm.isBlacklisted
       ? 'suspended'
@@ -424,7 +424,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       createForm.username.trim().toLowerCase() ||
       generateDriverUsername(createForm.firstName, createForm.lastName, cleanCab);
     const assignedUnit =
-      createForm.assignedUnit.trim() || (cleanCab ? `Cab #${cleanCab}` : '');
+      createForm.assignedUnit.trim() || (cleanCab ? `Car #${cleanCab}` : '');
 
     try {
       let createdUid = `user-${Date.now().toString(36)}`;
@@ -729,7 +729,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
             <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search name, cab #, email, phone..."
+              placeholder="Search name, car #, email, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -1292,7 +1292,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                           ),
                         })
                       }
-                      title="Auto-generate username from name & cab #"
+                      title="Auto-generate username from name & car #"
                       className="h-10 px-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
                     >
                       <RefreshCwIcon className="w-3.5 h-3.5" />
@@ -1381,7 +1381,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <Input
-                    label="Cab Number"
+                    label="Car Number"
                     placeholder="e.g. 947"
                     value={editForm.cabNumber}
                     onChange={(e) => {
@@ -1389,14 +1389,14 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                       setEditForm({
                         ...editForm,
                         cabNumber: cab,
-                        assignedUnit: cab.trim() ? `Cab #${cab.trim().replace(/^#/, '')}` : editForm.assignedUnit,
+                        assignedUnit: cab.trim() ? `Car #${cab.trim().replace(/^#/, '')}` : editForm.assignedUnit,
                       });
                     }}
-                    helperText="Displayed on dispatch board as #Cab"
+                    helperText="Displayed on dispatch board as Car #..."
                   />
                   <Input
-                    label="Assigned Vehicle Unit"
-                    placeholder="e.g. Cab #947 (Sedan)"
+                    label="Assigned Car"
+                    placeholder="e.g. Car #947 (Sedan)"
                     value={editForm.assignedUnit}
                     onChange={(e) =>
                       setEditForm({ ...editForm, assignedUnit: e.target.value })
@@ -1765,7 +1765,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <Input
-                  label="Cab / Unit Number"
+                  label="Car Number"
                   placeholder="e.g. 400"
                   value={createForm.cabNumber}
                   onChange={(e) => {
@@ -1773,7 +1773,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                     setCreateForm((prev) => ({
                       ...prev,
                       cabNumber: val,
-                      assignedUnit: val.trim() ? `Cab #${val.trim().replace(/^#/, '')}` : prev.assignedUnit,
+                      assignedUnit: val.trim() ? `Car #${val.trim().replace(/^#/, '')}` : prev.assignedUnit,
                       username: generateDriverUsername(prev.firstName, prev.lastName, val),
                     }));
                   }}
@@ -1790,8 +1790,8 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
               </div>
 
               <Input
-                label="Assigned Vehicle Unit"
-                placeholder="e.g. Cab #400 (Standard Sedan)"
+                label="Assigned Car"
+                placeholder="e.g. Car #400 (Standard Sedan)"
                 value={createForm.assignedUnit}
                 onChange={(e) =>
                   setCreateForm({ ...createForm, assignedUnit: e.target.value })

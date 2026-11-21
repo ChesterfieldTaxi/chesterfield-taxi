@@ -1050,7 +1050,7 @@ export function BookingEngine({
           title: 'Payment Flexibility',
           icon: <DollarSignIcon className="w-4 h-4 text-amber-500" />,
           content:
-            'Secure credit card on file, cash payment to driver in-cab, or direct corporate invoice. All digital transactions are protected with TLS 256-bit encryption.',
+            'Secure credit card on file, cash or card payment in the car, or corporate account billing. All digital payments are encrypted.',
         };
       case 'isRecurring':
       case 'recurringFrequency':
@@ -1813,8 +1813,8 @@ export function BookingEngine({
                           value={formValues.bypassReason as string}
                           onChange={(e) => handleFieldChange('bypassReason', e.target.value)}
                           options={[
-                            { value: 'cash_in_cab', label: 'Driver Collects Cash / Card in Cab' },
-                            { value: 'account_billing', label: 'Direct Monthly Corporate Invoicing (Net 30)' },
+                            { value: 'cash_in_cab', label: 'Driver Collects Cash / Card in Car' },
+                            { value: 'account_billing', label: 'Corporate Account Billing (Net 30)' },
                             { value: 'complimentary', label: 'Complimentary / Management Courtesy Ride' },
                           ]}
                         />
@@ -1947,17 +1947,17 @@ export function BookingEngine({
                     {
                       value: 'card',
                       label: 'Credit or Debit Card',
-                      description: 'Pay securely online or tap card in-cab with the driver.',
+                      description: 'Pay securely online or tap card in the car with the driver.',
                     },
                     {
                       value: 'cash',
                       label: 'Pay Driver in Cash',
-                      description: 'Exact change appreciated; driver issues printed or digital receipt.',
+                      description: 'Exact change appreciated; driver provides a printed or emailed receipt.',
                     },
                     {
                       value: 'corporate',
-                      label: 'Corporate Account Billing',
-                      description: 'Direct Net-30 monthly invoicing for registered corporate clients.',
+                      label: 'Corporate Account',
+                      description: 'Monthly invoicing for approved corporate accounts.',
                     },
                   ]}
                 />

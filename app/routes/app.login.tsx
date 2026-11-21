@@ -16,7 +16,7 @@ export function meta() {
     { title: `Sign In – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
-      content: 'Sign in to Chesterfield Taxi for Passenger Portal, Chauffeur HUD, Dispatch, or Administration.',
+      content: 'Sign in to your Chesterfield Taxi account to book rides, view trips, and manage saved places.',
     },
   ];
 }
@@ -54,9 +54,9 @@ export default function UnifiedAppLoginRoute() {
   useEffect(() => {
     const message = searchParams.get('message');
     if (message === 'unauthenticated') {
-      setError('Please sign in to access your workspace.');
+      setError('Please sign in to continue.');
     } else if (message === 'unauthorized') {
-      setError('Your account does not have permission to view that console.');
+      setError('Your account does not have access to that page.');
     } else if (message === 'logged_out') {
       setInfoMessage('You have been signed out safely.');
       if (typeof window !== 'undefined') {
@@ -187,10 +187,10 @@ export default function UnifiedAppLoginRoute() {
             <CarIcon className="w-8 h-8" />
           </Link>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {COMPANY_CONFIG.name} Portal
+            Sign In
           </h1>
           <p className="text-sm text-slate-500 mt-1.5">
-            Sign in for Passenger Portal, Chauffeur HUD, or Dispatch
+            Sign in to book rides, view trips, and manage your {COMPANY_CONFIG.name} account
           </p>
         </div>
 
@@ -324,7 +324,7 @@ export default function UnifiedAppLoginRoute() {
 
             <CardFooter className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex flex-col gap-2.5 items-center text-center">
               <p className="text-xs sm:text-sm text-slate-600">
-                New passenger?{' '}
+                Don&apos;t have an account?{' '}
                 <Link to={registerHref} className="font-bold text-blue-600 hover:underline">
                   Create an account
                 </Link>

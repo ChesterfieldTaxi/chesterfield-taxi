@@ -47,9 +47,9 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: 'executive_midnight_gold',
-    name: 'Executive Midnight & Champagne Gold',
-    badge: 'Chauffeur Luxury',
-    description: 'Opulent executive limousine aesthetic featuring rich warm amber gold accents against an ultra-dark midnight obsidian canvas.',
+    name: 'Midnight & Warm Gold',
+    badge: 'Classic Dark',
+    description: 'Warm amber gold accents against a dark midnight background.',
     previewColors: ['#d97706', '#090d16', '#fef3c7', '#f59e0b'],
     tokens: {
       primaryColor: '#d97706',
@@ -116,9 +116,9 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: 'vintage_metro_amber',
-    name: 'Vintage Metro Taxi (Amber & Slate)',
-    badge: 'Iconic Fleet',
-    description: 'Traditional American metered cab visual identity with unmistakable yellow-amber livery and bold black typography.',
+    name: 'Classic Metro Taxi (Amber & Slate)',
+    badge: 'Classic Taxi',
+    description: 'Traditional American taxi look with warm yellow-amber highlights and bold black typography.',
     previewColors: ['#f59e0b', '#0f172a', '#18181b', '#fef08a'],
     tokens: {
       primaryColor: '#f59e0b',
@@ -139,9 +139,9 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: 'monochrome_obsidian',
-    name: 'Monochrome Obsidian Minimalist',
+    name: 'Monochrome Minimalist',
     badge: 'High Contrast',
-    description: 'Stark, razor-sharp architectural layout with zero-radius corners, pure black buttons, and graphite accents.',
+    description: 'Clean high-contrast layout with sharp corners, black buttons, and slate accents.',
     previewColors: ['#000000', '#18181b', '#ffffff', '#71717a'],
     tokens: {
       primaryColor: '#000000',
@@ -196,7 +196,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       branding,
       updatedAt: new Date().toISOString(),
     });
-    setSaveMessage('Theme and dynamic branding tokens successfully published!');
+    setSaveMessage('Theme and brand colors published!');
     setTimeout(() => setSaveMessage(null), 3500);
   };
 
@@ -206,13 +206,13 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
-            Dynamic Branding &amp; Livery Engine
+            Website Themes &amp; Brand Colors
           </span>
           <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
-            Website Theme Gallery &amp; CSS Token Studio
+            Theme Presets &amp; Custom Colors
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Choose from curated luxury presets or customize individual colors, typography, and button styles in real-time.
+            Pick a preset theme or customize brand colors, fonts, and button styles in real time.
           </p>
         </div>
 
@@ -238,7 +238,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       <div className="space-y-4">
         <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
           <PaletteIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span>Curated Theme Presets</span>
+          <span>Theme Presets</span>
           <span className="text-xs font-semibold text-slate-500 lowercase">({THEME_PRESETS.length} available)</span>
         </h3>
 
@@ -319,10 +319,10 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
         <div className="lg:col-span-7 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
           <div className="border-b border-slate-100 pb-4">
             <h3 className="text-base font-extrabold text-slate-900">
-              Fine-Grained Color &amp; Style Overrides
+              Colors, Fonts &amp; Buttons
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Adjust individual CSS variables to fine-tune your bespoke white-label identity.
+              Customize individual brand colors, fonts, and button corners.
             </p>
           </div>
 
@@ -343,7 +343,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   className="font-mono text-xs uppercase min-w-0"
                 />
               </div>
-              <span className="text-[10px] text-slate-500 block">Used for main CTAs, active highlights &amp; icons</span>
+              <span className="text-[10px] text-slate-500 block">Used for main buttons, active highlights &amp; icons</span>
             </div>
 
             {/* Secondary Color */}
@@ -441,7 +441,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
           <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-              Live Real-Time Rendering Preview
+              Live Preview
             </span>
 
             {/* Mock Header */}
@@ -477,7 +477,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
             <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 space-y-3">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                <span>Premier 24/7 Car Service</span>
+                <span>24/7 Local Car &amp; Taxi Service</span>
               </div>
 
               <h4
@@ -487,7 +487,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                 }}
                 className="text-lg font-black leading-tight"
               >
-                Dependable, Professional Taxi &amp; Executive Travel
+                Dependable Local Taxi &amp; Airport Rides
               </h4>
 
               <p
@@ -497,7 +497,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                 }}
                 className="text-xs leading-relaxed"
               >
-                Guaranteed upfront pricing, licensed chauffeurs, and instant airport dispatch to STL Lambert.
+                Upfront pricing, professional local drivers, and 24/7 airport service to STL Lambert.
               </p>
 
               <div className="pt-2 flex flex-wrap items-center gap-2">

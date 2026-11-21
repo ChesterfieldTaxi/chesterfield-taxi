@@ -39,20 +39,14 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
       <div className="bg-amber-500/10 px-4 py-2.5 border-b border-amber-200/60 flex items-center justify-between text-xs">
         <span className="font-semibold text-amber-950 flex items-center gap-1.5">
           <ShieldCheckIcon className="w-4 h-4 text-amber-600" />
-          Guaranteed Fare Quote
+          Estimated Fare
         </span>
-        <span className="text-[11px] font-medium">
-          {quote.isLiveGoogleResult ? (
-            <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full font-semibold text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              Google Maps Live
-            </span>
-          ) : (
-            <span className="text-amber-800 bg-amber-100/60 px-2 py-0.5 rounded-full text-[10px]">
-              Regional Road Matrix
-            </span>
-          )}
-        </span>
+        {quote.isLiveGoogleResult && (
+          <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+            Live Route
+          </span>
+        )}
       </div>
 
       <CardContent className="p-4 sm:p-5 space-y-4">
@@ -79,7 +73,7 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
         {/* Fare Breakdown Items */}
         <div className="space-y-1.5 text-xs text-slate-600">
           <div className="flex justify-between">
-            <span>Base Dispatch Fare</span>
+            <span>Base Fare</span>
             <span className="font-medium text-slate-900">${pricing.baseFare.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
@@ -90,7 +84,7 @@ export function QuoteSummary({ quote, isLoading = false, className = '' }: Quote
           </div>
           {pricing.vehicleMultiplier !== 1 && (
             <div className="flex justify-between text-slate-600">
-              <span>Vehicle Tier Multiplier</span>
+              <span>Vehicle Type</span>
               <span className="font-medium text-slate-900">{pricing.vehicleMultiplier}x</span>
             </div>
           )}

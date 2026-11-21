@@ -134,7 +134,7 @@ Mobile: (636) 555-0112`,
     isUnread: false,
     body: `Hello Dispatch,
 
-My husband took Cab #104 yesterday afternoon from Clarkson Rd to Spirit of St. Louis Airport (SUS) (dropped off around 2:15 PM).
+My husband took Car #104 yesterday afternoon from Clarkson Rd to Spirit of St. Louis Airport (SUS) (dropped off around 2:15 PM).
 
 He believes he left his grey iPad in a charcoal magnetic folio case in the back seat.
 

@@ -18,19 +18,19 @@ import { formatVehicleTierDisplay } from '../core/services/email/email-templates
 
 export function meta() {
   return [
-    { title: 'Live Trip Status & Tracking – Chesterfield Taxi' },
-    { name: 'description', content: 'Track your ride in real-time with live GPS status updates.' },
+    { title: 'Track Your Ride – Chesterfield Taxi' },
+    { name: 'description', content: 'Track your ride live with driver ETA and status updates.' },
   ];
 }
 
 const LIFECYCLE_STEPS: Array<{ key: TripStatus; label: string; desc: string }> = [
-  { key: 'UNCONFIRMED', label: 'Requested', desc: 'Booking received, pending dispatch desk confirmation' },
-  { key: 'CONFIRMED', label: 'Confirmed', desc: 'Confirmed & matching nearest available chauffeur' },
-  { key: 'assigned', label: 'Chauffeur Assigned', desc: 'Your chauffeur and vehicle have been assigned' },
-  { key: 'en_route', label: 'Chauffeur En Route', desc: 'Vehicle is travelling to your pickup address' },
-  { key: 'arrived', label: 'Chauffeur Arrived', desc: 'Chauffeur is waiting outside at pickup location' },
-  { key: 'in_progress', label: 'On Trip', desc: 'Trip is currently in progress' },
-  { key: 'completed', label: 'Completed', desc: 'Trip safely completed. Thank you for riding!' },
+  { key: 'UNCONFIRMED', label: 'Requested', desc: 'Ride request received, awaiting dispatch confirmation' },
+  { key: 'CONFIRMED', label: 'Confirmed', desc: 'Confirmed and matching nearest available driver' },
+  { key: 'assigned', label: 'Driver Assigned', desc: 'Your driver and car have been assigned' },
+  { key: 'en_route', label: 'Driver En Route', desc: 'Your driver is on the way to your pickup address' },
+  { key: 'arrived', label: 'Driver Arrived', desc: 'Your driver is waiting outside at pickup' },
+  { key: 'in_progress', label: 'On Trip', desc: 'Your ride is in progress' },
+  { key: 'completed', label: 'Completed', desc: 'Trip completed. Thank you for riding with us!' },
 ];
 
 const TOKEN_PATTERN = /^trk_[a-zA-Z0-9_-]{16,80}$/;
@@ -248,11 +248,11 @@ export default function BookingStatusRoute() {
     const last4 = digits.slice(-4);
 
     if (!cleanId) {
-      setVerifyError('Please enter your Trip Confirmation ID (e.g., CT-1234-5678).');
+      setVerifyError('Please enter your Trip # (e.g., CT-1234-5678).');
       return;
     }
     if (last4.length !== 4) {
-      setVerifyError('Please enter the last 4 digits of the passenger phone number.');
+      setVerifyError('Please enter the last 4 digits of the phone number on the booking.');
       return;
     }
 
@@ -275,11 +275,11 @@ export default function BookingStatusRoute() {
       } else {
         setVerifyError(
           json?.error ||
-            'Reservation not found or the last 4 phone digits did not match. Please double-check and try again.'
+            'Trip not found or the last 4 phone digits did not match. Please double-check and try again.'
         );
       }
     } catch {
-      setVerifyError('Network error verifying reservation. Please try again or call dispatch.');
+      setVerifyError('Could not look up trip right now. Please try again or call dispatch.');
     } finally {
       setIsVerifying(false);
     }
@@ -289,8 +289,8 @@ export default function BookingStatusRoute() {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
         <SpinnerIcon className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-        <h2 className="text-xl font-bold text-slate-800">Connecting to Live Dispatch...</h2>
-        <p className="text-sm text-slate-500 mt-1">Retrieving secure real-time ride telemetry.</p>
+        <h2 className="text-xl font-bold text-slate-800">Loading Live Trip Status...</h2>
+        <p className="text-sm text-slate-500 mt-1">Getting the latest driver and ETA updates.</p>
       </div>
     );
   }
@@ -312,13 +312,13 @@ export default function BookingStatusRoute() {
             ? 'Tracking Link Unavailable'
             : isVerifyingSpecificId
             ? 'Verify Last 4 Phone Digits'
-            : 'Track Your Ride Live'}
+            : 'Track Your Ride'}
         </h1>
         <p className="text-xs text-slate-600 mt-2 mb-6 leading-relaxed">
           {error ||
             (isVerifyingSpecificId
-              ? `To protect privacy for reservation ${normalizedTripId}, enter the last 4 digits of the passenger phone number (or use the direct tracking link from your confirmation email/SMS).`
-              : 'Enter your Trip Confirmation ID and the last 4 digits of the passenger phone number to view live driver tracking and ETA.')}
+              ? `To protect your privacy for Trip #${normalizedTripId}, enter the last 4 digits of the phone number on the booking (or open the tracking link from your text or email).`
+              : 'Enter your Trip # and the last 4 digits of the phone number on the booking to view live driver tracking and ETA.')}
         </p>
 
         {verifyError && (
@@ -330,7 +330,7 @@ export default function BookingStatusRoute() {
         <form onSubmit={handleGuestLookupSubmit} className="mb-6 space-y-3 text-left">
           <div>
             <label htmlFor="track-trip-id" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Confirmation Code / Trip ID
+              Trip #
             </label>
             <input
               id="track-trip-id"
@@ -344,7 +344,7 @@ export default function BookingStatusRoute() {
           </div>
           <div>
             <label htmlFor="track-phone-last4" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Last 4 Digits of Passenger Phone
+              Last 4 Digits of Phone Number
             </label>
             <input
               id="track-phone-last4"
@@ -445,7 +445,7 @@ export default function BookingStatusRoute() {
           <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-blue-400 flex items-center gap-1.5 min-w-0 truncate">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate">{trip ? 'Live Ride Status' : 'Verified Guest Tracking'}</span>
+              <span className="truncate">{trip ? 'Live Ride Status' : 'Live Trip Tracking'}</span>
             </span>
             <span className="px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shrink-0">
               {displayStatus.replace(/_/g, ' ')}
@@ -479,7 +479,7 @@ export default function BookingStatusRoute() {
           )}
           {driverFirstName && (
             <p className="text-xs text-emerald-300 mt-1 font-semibold">
-              Assigned Chauffeur: {driverFirstName}
+              Driver: {driverFirstName}
               {(trip?.assignedVehicle?.vehicleNumber || publicTracking?.assignedVehicle?.vehicleNumber)
                 ? ` · ${trip?.assignedVehicle?.vehicleNumber || publicTracking?.assignedVehicle?.vehicleNumber}`
                 : ''}
@@ -500,14 +500,14 @@ export default function BookingStatusRoute() {
               </div>
             ) : (
               <div className="text-right">
-                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Privacy Mode</span>
+                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Privacy</span>
                 <span className="text-xs font-bold text-emerald-400">Personal Info Protected</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Live Customer Telemetry Map & Road Route HUD */}
+        {/* Live Driver Map */}
         <CustomerTelemetryMap
           trip={trip}
           tracking={publicTracking}
@@ -521,7 +521,7 @@ export default function BookingStatusRoute() {
             <span>Ride Progress</span>
             <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold normal-case">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              Live Sync
+              Live
             </span>
           </h2>
 

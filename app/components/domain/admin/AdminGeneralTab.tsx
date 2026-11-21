@@ -76,8 +76,8 @@ const PALETTE_PRESETS: PalettePreset[] = [
   },
   {
     id: 'midnight_navy',
-    name: 'Executive Midnight Blue',
-    description: 'Sophisticated corporate luxury livery with modern Outfit typography and sapphire highlights.',
+    name: 'Midnight Blue',
+    description: 'Clean navy and royal blue palette with modern Outfit typography.',
     tokens: {
       primaryColor: '#2563eb',
       secondaryColor: '#0f172a',
@@ -97,11 +97,11 @@ const PALETTE_PRESETS: PalettePreset[] = [
   },
   {
     id: 'gold_charcoal',
-    name: 'Luxury Gold & Charcoal',
-    description: 'Premium black-car aesthetic with elegant Cinzel serif headings and gold metallic buttons.',
+    name: 'Warm Gold & Charcoal',
+    description: 'Dark charcoal theme with Cinzel serif headings and warm gold buttons.',
     tokens: {
       primaryColor: '#d97706',
-      secondaryColor: '#18181b',
+      secondaryColor: '#18182b'.replace('2b', '1b'),
       headingFont: 'Cinzel',
       bodyFont: 'Lato',
       headingColor: '#18181b',
@@ -118,8 +118,8 @@ const PALETTE_PRESETS: PalettePreset[] = [
   },
   {
     id: 'emerald_fleet',
-    name: 'Modern Emerald & Platinum',
-    description: 'Eco-forward electric livery featuring rounded buttons and vivid emerald green styling.',
+    name: 'Modern Emerald & Slate',
+    description: 'Fresh emerald green buttons and clean rounded cards.',
     tokens: {
       primaryColor: '#059669',
       secondaryColor: '#111827',

@@ -297,7 +297,7 @@ class PaymentService implements IPaymentService {
       if (!resp.ok || !result?.success) {
         throw new Error(
           result?.error ||
-            'Online Stripe capture failed. Please settle via In-Cab Card Terminal or Cash.'
+            'Online Stripe capture failed. Please settle in the car via Card Reader or Cash.'
         );
       }
       resolvedPaymentIntentId = result.paymentIntentId || options.paymentIntentId;

@@ -538,10 +538,10 @@ export function AdminIntegrationsSubpage({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="min-w-0">
                   <CardTitle className="text-base font-extrabold text-slate-900">
-                    Payment Gateway &amp; Terminal Processing
+                    Card Payment Processing
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Configure online card vaults, pre-authorization holds, and driver in-cab terminal surcharges.
+                    Configure online card payments, authorization holds, and in-car card readers.
                   </CardDescription>
                 </div>
                 <Badge variant={stripeMode === 'live' ? 'success' : 'warning'} className="self-start sm:self-auto shrink-0">
@@ -554,8 +554,8 @@ export function AdminIntegrationsSubpage({
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-slate-900">Stripe In-Cab Reader</h4>
-                      <p className="text-xs text-slate-500">Allow drivers to accept contactless EMV tap</p>
+                      <h4 className="text-sm font-bold text-slate-900">Stripe In-Car Reader</h4>
+                      <p className="text-xs text-slate-500">Allow drivers to accept contactless tap and chip cards</p>
                     </div>
                     <input
                       type="checkbox"
@@ -571,7 +571,7 @@ export function AdminIntegrationsSubpage({
                   <p className="text-xs text-slate-500">
                     All client-facing surcharges are configured centrally in{' '}
                     <a href="/app/admin?tab=rates&sub=surcharges" className="text-blue-600 font-semibold hover:underline">
-                      Rates &amp; Tariffs / Surcharges
+                      Rates &amp; Pricing → Surcharges
                     </a>.
                   </p>
                 </div>

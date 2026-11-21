@@ -122,7 +122,7 @@ export function FlightAssistanceCard({
         <div className="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-lg p-2.5 flex items-start gap-1.5">
           <span className="font-bold text-amber-800 shrink-0">Note:</span>
           <span>
-            Your chauffeur arrives at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.
+            Your driver arrives at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.
           </span>
         </div>
       )}
@@ -260,7 +260,7 @@ export function FlightAssistanceCard({
               <>
                 <span className="font-bold text-slate-800">Private Aviation FBO Pickup: </span>
                 <span>
-                  Your chauffeur coordinates directly with the FBO front desk for ramp-side or lobby greeting.
+                  Your driver coordinates directly with the FBO front desk for ramp-side or lobby pickup.
                 </span>
               </>
             ) : detection.isPickupAirport ? (

@@ -1,7 +1,7 @@
 {
   "name": "Chesterfield Taxi",
   "short_name": "Chesterfield Taxi",
-  "description": "Unified Chesterfield Taxi portal for passengers, chauffeurs, and dispatch.",
+  "description": "Book rides, track your driver, and manage trips with Chesterfield Taxi.",
   "id": "/app",
   "start_url": "/app",
   "scope": "/app",

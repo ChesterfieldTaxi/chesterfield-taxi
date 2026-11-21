@@ -584,7 +584,7 @@ export function AdminVehiclesTab({
                           }
                           className="w-14 h-7 text-xs text-center font-bold"
                         />
-                        <span className="text-xs font-semibold text-slate-500">pax</span>
+                        <span className="text-xs font-semibold text-slate-500">passengers</span>
                       </div>
                     </div>
 

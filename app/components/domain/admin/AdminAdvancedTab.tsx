@@ -467,12 +467,12 @@ export function AdminAdvancedTab({
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">DATABASE</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Firestore NoSQL</div>
+              <div className="font-extrabold text-sm text-slate-900">Cloud Database</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                {firebaseStatus ? 'Connected & Enforced' : 'Offline / LocalStorage Fallback'}
+                {firebaseStatus ? 'Connected & Synced' : 'Offline / Local Fallback'}
               </div>
               <div className="mt-2 text-[10px] font-mono text-slate-400">
-                Rules: Strict RBAC Active
+                Access Controls Active
               </div>
             </Card>
 
@@ -483,7 +483,7 @@ export function AdminAdvancedTab({
               </div>
               <div className="font-extrabold text-sm text-slate-900">Google Places / Roads</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                Distance Matrix &amp; Geocoding
+                Distance &amp; Address Lookup
               </div>
               <div className="mt-2 text-[10px] font-mono text-slate-400">
                 Latency: ~42ms (Optimal)
@@ -492,29 +492,29 @@ export function AdminAdvancedTab({
 
             <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">VOIP TELEPHONY</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">PHONE &amp; SMS</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Browser Softphone</div>
+              <div className="font-extrabold text-sm text-slate-900">Dispatch Softphone</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                WebRTC Audio Ready
+                Browser Audio Ready
               </div>
               <div className="mt-2 text-[10px] font-mono text-slate-400">
-                DID: (314) 738-0100
+                Line: (314) 738-0100
               </div>
             </Card>
 
             <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">QUOTING ENGINE</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">PRICING</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Pure Functional Pipeline</div>
+              <div className="font-extrabold text-sm text-slate-900">Live Fare Calculator</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                Multi-stop &amp; Surge Multipliers
+                Rates, Extras &amp; Surcharges
               </div>
               <div className="mt-2 text-[10px] font-mono text-slate-400">
-                Phase 18 Active
+                Active
               </div>
             </Card>
           </div>

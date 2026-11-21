@@ -441,10 +441,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Unit / Car Number <span className="text-rose-500">*</span>
+                  Car Number <span className="text-rose-500">*</span>
                 </label>
                 <Input
-                  placeholder="e.g. Cab #110"
+                  placeholder="e.g. Car #110"
                   value={newCar.unitNumber}
                   onChange={(e) => setNewCar({ ...newCar, unitNumber: e.target.value })}
                   required

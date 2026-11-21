@@ -233,8 +233,8 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
               )}
               {(multiCarTotalPax > 0 || multiCarTotalBags > 0) && (
                 <span className="text-[11px] font-semibold text-violet-800">
-                  Party Total: {multiCarTotalPax || trip.passenger?.passengerCount || 1} Pax
-                  {multiCarTotalBags > 0 ? ` · ${multiCarTotalBags} Bags` : ''}
+                  Party Total: {multiCarTotalPax || trip.passenger?.passengerCount || 1} {(multiCarTotalPax || trip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}
+                  {multiCarTotalBags > 0 ? ` · ${multiCarTotalBags} ${multiCarTotalBags === 1 ? 'Bag' : 'Bags'}` : ''}
                 </span>
               )}
             </div>

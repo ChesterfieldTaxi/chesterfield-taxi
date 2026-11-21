@@ -74,10 +74,10 @@ export default function TermsPage() {
             Cancellation & Modification Policy
           </h2>
           <p>
-            We understand that travel schedules change unexpectedly. Scheduled reservations can be modified or cancelled without penalty up to two (2) hours prior to your scheduled pickup time directly via your Passenger Portal or by calling our 24/7 dispatch office.
+            We understand that travel schedules change unexpectedly. Scheduled trips can be modified or cancelled without penalty up to two (2) hours prior to your scheduled pickup time directly via your Client Portal or by calling our 24/7 dispatch office.
           </p>
           <p>
-            Cancellations made within two hours of scheduled pickup, or passenger no-shows once the driver has arrived on site, may incur a standard dispatch cancellation fee to compensate the driver for fuel and dedicated transit time.
+            Cancellations made within two hours of scheduled pickup, or no-shows once the driver has arrived on site, may incur a standard cancellation fee to compensate the driver for fuel and travel time.
           </p>
         </section>
 
@@ -88,10 +88,10 @@ export default function TermsPage() {
             Passenger Conduct & Vehicle Safety
           </h2>
           <p>
-            All passengers are required to wear seatbelts at all times during transit in compliance with Missouri state law. Smoking, vaping, and consumption of open alcoholic beverages are strictly prohibited inside all fleet vehicles.
+            All passengers are required to wear seatbelts at all times during the ride in compliance with Missouri state law. Smoking, vaping, and consumption of open alcoholic beverages are strictly prohibited inside all fleet vehicles.
           </p>
           <p>
-            Drivers reserve the right to decline or terminate transportation if a passenger exhibits unruly, aggressive, or unsafe behavior towards the chauffeur, other passengers, or other road users.
+            Drivers reserve the right to decline or end a ride if a passenger exhibits unruly, aggressive, or unsafe behavior towards the driver, other passengers, or other road users.
           </p>
         </section>
 

@@ -172,7 +172,7 @@ export function CustomerTelemetryMap({
       : normalized.status === 'en_route'
       ? 'en_route'
       : 'available';
-  const carShortLabel = (normalized.assignedUnit || 'CAB').replace(/Cab\s*/i, '');
+  const carShortLabel = (normalized.assignedUnit || 'CAR').replace(/^(?:Cab|Car)\s*/i, '');
 
   // Fallback Haversine ETA when live GPS exists before DirectionsResult arrives
   const fallbackEta = useMemo(() => {
@@ -324,7 +324,7 @@ export function CustomerTelemetryMap({
         markerVehicleRef.current = new gMaps.Marker({
           position: liveVehicleCoord,
           map,
-          title: normalized.assignedUnit || 'Assigned Chauffeur',
+          title: normalized.assignedUnit || 'Assigned Driver',
           icon: iconSpec,
           zIndex: 250,
           optimized: false,
@@ -449,16 +449,16 @@ export function CustomerTelemetryMap({
 
   const statusHeadline =
     normalized.status === 'en_route'
-      ? 'Chauffeur En Route to Pickup'
+      ? 'Driver on the Way to Pickup'
       : normalized.status === 'arrived'
-      ? 'Chauffeur Arrived at Pickup'
+      ? 'Driver Arrived at Pickup'
       : normalized.status === 'in_progress'
-      ? 'Trip In Progress to Destination'
+      ? 'Ride in Progress'
       : normalized.status === 'completed'
       ? 'Trip Completed'
       : normalized.status === 'assigned' || normalized.status === 'accepted'
-      ? 'Chauffeur Assigned — Preparing for Pickup'
-      : 'Dispatch Monitoring Active';
+      ? 'Driver Assigned — Getting Ready'
+      : 'Dispatch Tracking Active';
 
   const gpsTimestampDisplay = normalized.telemetry?.timestamp
     ? new Date(normalized.telemetry.timestamp).toLocaleTimeString([], {
@@ -473,7 +473,7 @@ export function CustomerTelemetryMap({
 
   return (
     <div className={`relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-xl ${className}`}>
-      {/* Real-time Telemetry HUD Header */}
+      {/* Live Tracking Header */}
       <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-900/92 backdrop-blur-md px-4 py-2.5 border border-slate-700/60 shadow-lg text-white">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="relative flex h-3 w-3 shrink-0">
@@ -502,10 +502,10 @@ export function CustomerTelemetryMap({
             >
               <RadioIcon className="w-3 h-3" />
               {!hasLiveGps
-                ? 'Awaiting Live Driver GPS'
+                ? 'Waiting for Live GPS'
                 : isGpsStale
-                ? 'GPS Signal Delayed / Buffering'
-                : 'Live GPS Tracking'}
+                ? 'GPS Updating...'
+                : 'Live GPS'}
             </div>
             <div className="text-xs font-bold text-slate-100 truncate">{statusHeadline}</div>
           </div>
@@ -532,7 +532,7 @@ export function CustomerTelemetryMap({
               <div>
                 <div className="text-xs font-black text-slate-100">
                   {normalized.driverFirstName ? `${normalized.driverFirstName} · ` : ''}
-                  {normalized.assignedUnit || 'Assigned Unit'}
+                  {normalized.assignedUnit || 'Assigned Car'}
                 </div>
                 <div className="text-[10px] text-slate-400">
                   {normalized.assignedModel}
@@ -592,15 +592,15 @@ export function CustomerTelemetryMap({
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400" />
               <span>
                 {hasLiveGps
-                  ? `Live GPS Fix${displayedEta ? ` • ETA ${displayedEta}` : ''}`
-                  : 'Waiting for chauffeur GPS telemetry'}
+                  ? `Live GPS${displayedEta ? ` • ETA ${displayedEta}` : ''}`
+                  : 'Waiting for live driver location'}
               </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Telemetry Status Footer */}
+      {/* Live Tracking Footer */}
       <div className="bg-slate-950 px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
         <div className="flex items-center gap-1.5 min-w-0">
           <MapPinIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -613,14 +613,10 @@ export function CustomerTelemetryMap({
               <a
                 href={`tel:${normalized.proxyPhone}`}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
-                title={
-                  isDispatchNumber
-                    ? 'Call Dispatch Bridge to connect with your chauffeur'
-                    : 'Call your chauffeur via masked relay'
-                }
+                title={isDispatchNumber ? 'Call 24/7 dispatch' : 'Call your driver'}
               >
                 <PhoneIcon className="w-3.5 h-3.5 text-blue-400" />
-                <span>{isDispatchNumber ? 'Call Dispatch Bridge' : 'Call Chauffeur'}</span>
+                <span>{isDispatchNumber ? 'Call Dispatch' : 'Call Driver'}</span>
               </a>
               <a
                 href={`sms:${normalized.proxyPhone}?body=${encodeURIComponent(`Trip #${normalized.tripId}: `)}`}

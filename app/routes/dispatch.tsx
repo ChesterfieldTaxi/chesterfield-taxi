@@ -2114,7 +2114,7 @@ export default function DispatchRoute() {
           driverName:
             assignedDriver?.name ||
             (typeof tripMeta.assignedDriverName === 'string' && tripMeta.assignedDriverName) ||
-            'Chesterfield Chauffeur',
+            'Assigned Driver',
           vehicleUnit: assignedDriver?.cabNumber,
           distanceMiles: targetTrip.pricing?.distanceMiles,
           durationMinutes: targetTrip.pricing?.durationMinutes,
@@ -2981,7 +2981,7 @@ export default function DispatchRoute() {
             driverName:
               assignedDriver?.name ||
               (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName) ||
-              'Chesterfield Chauffeur',
+              'Assigned Driver',
             vehicleUnit: assignedDriver?.cabNumber,
             distanceMiles: updatedPricing.distanceMiles,
             durationMinutes: updatedPricing.durationMinutes,
@@ -5748,7 +5748,7 @@ export default function DispatchRoute() {
                             >
                               <option value="all">All Methods ▾</option>
                               <option value="card">Credit Card</option>
-                              <option value="cash">Cash in Cab</option>
+                              <option value="cash">Cash (In Car)</option>
                               <option value="account">Corporate Account</option>
                             </select>
                             <button
@@ -6954,7 +6954,7 @@ export default function DispatchRoute() {
                   </span>
                   <input
                     type="text"
-                    placeholder="Search driver, cab #, zone..."
+                    placeholder="Search driver, car #, zone..."
                     value={driverSearch}
                     onChange={(e) => setDriverSearch(e.target.value)}
                     className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
@@ -7429,7 +7429,7 @@ export default function DispatchRoute() {
                           type="text"
                           value={driverSearch}
                           onChange={(e) => setDriverSearch(e.target.value)}
-                          placeholder="Search driver, cab #, or zone..."
+                          placeholder="Search driver, car #, or zone..."
                           className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-400"
                         />
                         {driverSearch && (
@@ -7978,7 +7978,7 @@ export default function DispatchRoute() {
               {driverFareTab === 'rule' ? (
                 <div className="space-y-3">
                   <p className="text-slate-600 text-xs">
-                    Select an authorized pricing rule permitted for in-cab or on-trip driver selection:
+                    Select an authorized pricing rule permitted for in-car or on-trip driver selection:
                   </p>
 
                   {driverPermittedRules.length === 0 ? (
@@ -8280,8 +8280,8 @@ export default function DispatchRoute() {
                             )}
                             {(totalPax > 0 || totalBags > 0) && (
                               <span className="text-[11px] font-semibold text-violet-800">
-                                Combined Party: {totalPax || reviewTrip.passenger?.passengerCount || 1} Pax
-                                {totalBags > 0 ? ` · ${totalBags} Bags` : ''}
+                                Combined Party: {totalPax || reviewTrip.passenger?.passengerCount || 1} {(totalPax || reviewTrip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}
+                                {totalBags > 0 ? ` · ${totalBags} ${totalBags === 1 ? 'Bag' : 'Bags'}` : ''}
                               </span>
                             )}
                           </div>
@@ -9658,10 +9658,10 @@ export default function DispatchRoute() {
                   <div className="grid grid-cols-2 gap-2">
                     {(
                       [
-                        { id: 'cash', label: 'Cash Collected', icon: CashIcon },
-                        { id: 'card_terminal', label: 'Card (In-Cab)', icon: CreditCardIcon },
+                        { id: 'cash', label: 'Cash (In Car)', icon: CashIcon },
+                        { id: 'card_terminal', label: 'Card (In Car)', icon: CreditCardIcon },
                         { id: 'card_on_file', label: 'Card on File', icon: CreditCardIcon },
-                        { id: 'corporate_account', label: 'Corporate Bill', icon: BuildingIcon },
+                        { id: 'corporate_account', label: 'Corporate Account', icon: BuildingIcon },
                       ] as const
                     ).map((opt) => {
                       const IconComp = opt.icon;
@@ -10127,7 +10127,7 @@ export default function DispatchRoute() {
                     type="text"
                     value={driverPickerSearch}
                     onChange={(e) => setDriverPickerSearch(e.target.value)}
-                    placeholder="Search driver name or cab #..."
+                    placeholder="Search driver name or car #..."
                     className="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
                   {driverPickerSearch && (

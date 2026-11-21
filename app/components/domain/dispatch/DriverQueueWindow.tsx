@@ -245,9 +245,9 @@ export function DriverQueueWindow({
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
-          <span>Driver Schedule & Queue: {driver.name}</span>
+          <span>Driver Schedule &amp; Queue: {driver.name}</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-800 text-blue-200 font-mono font-bold">
-            Cab #{driver.cabNumber || driver.vehicle}
+            Car #{String(driver.cabNumber || driver.vehicle || '').replace(/^(Cab|Car)\s*#?/i, '')}
           </span>
         </div>
       }

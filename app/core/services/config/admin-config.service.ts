@@ -53,7 +53,7 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   requireFlightNumberForAirport: false,
   airportMeetAndGreetOptions: 'curbside',
   flightDelayGraceMinutes: 45,
-  lambertPickupInstructions: 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.',
+  lambertPickupInstructions: 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.',
   allowRoundTrip: true,
   roundTripDiscountPercent: 5,
   allowChildSafetySeats: true,
@@ -72,7 +72,7 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   oversizedBags: [...DEFAULT_OVERSIZED_BAG_CATEGORIES],
   publicFormBanner: {
     enabled: false,
-    text: '24/7 Airport & Regional Chauffeur Service across Greater St. Louis.',
+    text: '24/7 Airport & Local Taxi Service across Greater St. Louis.',
     type: 'info',
   },
 };
@@ -91,7 +91,7 @@ export const DEFAULT_CORPORATE_ACCOUNTS: CorporateAccountConfig[] = [
     poRequired: true,
     isActive: true,
     authorizedBookers: ['laura.vance@bayer.example.com', 'traveldesk@bayer.example.com'],
-    notes: 'Executive transfers and weekly guest airport shuttles.',
+    notes: 'Airport pickups and weekly guest shuttles.',
     createdAt: '2026-01-15T09:00:00Z',
   },
   {
@@ -107,7 +107,7 @@ export const DEFAULT_CORPORATE_ACCOUNTS: CorporateAccountConfig[] = [
     poRequired: false,
     isActive: true,
     authorizedBookers: ['transport.billing@mercy.example.com'],
-    notes: 'Priority discharge and non-emergency medical transit.',
+    notes: 'Patient discharge and medical appointment rides.',
     createdAt: '2026-02-01T10:30:00Z',
   },
   {
@@ -123,7 +123,7 @@ export const DEFAULT_CORPORATE_ACCOUNTS: CorporateAccountConfig[] = [
     poRequired: false,
     isActive: true,
     authorizedBookers: ['guestservices.valley@druryhotels.example.com'],
-    notes: 'Direct guest airport billing and local corporate transfers.',
+    notes: 'Direct guest airport billing and local hotel rides.',
     createdAt: '2026-03-10T14:15:00Z',
   },
 ];
@@ -142,8 +142,8 @@ export const DEFAULT_INVOICES: InvoiceRecord[] = [
     dueDate: '2026-09-30',
     paidDate: '2026-09-08',
     lineItems: [
-      { description: 'STL Lambert Airport Shuttle (3 transfers)', amount: 255.00 },
-      { description: 'Chesterfield Valley to Downtown Chauffeur', amount: 129.50 },
+      { description: 'STL Lambert Airport Rides (3 trips)', amount: 255.00 },
+      { description: 'Chesterfield Valley to Downtown Ride', amount: 129.50 },
     ],
     notes: 'Paid via Corporate Wire Transfer',
   },
@@ -304,7 +304,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   fleet: [
     {
       id: 'fleet-101',
-      unitNumber: 'Cab #101',
+      unitNumber: 'Car #101',
       vehicleTypeId: 'standard',
       make: 'Toyota',
       model: 'Camry Hybrid',
@@ -332,7 +332,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     {
       id: 'fleet-104',
-      unitNumber: 'Cab #104',
+      unitNumber: 'Car #104',
       vehicleTypeId: 'xl',
       make: 'Chevrolet',
       model: 'Suburban LT',
@@ -360,7 +360,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     {
       id: 'fleet-108',
-      unitNumber: 'Cab #108',
+      unitNumber: 'Car #108',
       vehicleTypeId: 'xl',
       make: 'Ford',
       model: 'Transit 350 Passenger',

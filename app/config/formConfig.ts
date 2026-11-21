@@ -550,7 +550,7 @@ export const bookingFormConfig: FormSchema = {
       stepNumber: 5,
       title: 'Payment & Confirmation',
       subtitle: 'Review details and select payment method',
-      description: 'Your fare will be calculated using our pure functional pricing engine.',
+      description: 'Review your fare estimate and choose how you would like to pay.',
       fields: [
         {
           id: 'paymentMethod',
@@ -569,17 +569,17 @@ export const bookingFormConfig: FormSchema = {
             {
               label: 'Pay by Credit / Debit Card',
               value: 'card',
-              description: 'Secure card authorization. You will only be charged upon trip completion.',
+              description: 'Secure card authorization. You will only be charged after your trip is completed.',
             },
             {
-              label: 'Pay in Vehicle (Cash / Card Terminal)',
+              label: 'Pay in Car (Cash or Card)',
               value: 'cash',
-              description: 'Pay directly to your driver when you arrive at your destination.',
+              description: 'Pay your driver directly when you arrive at your destination.',
             },
             {
-              label: 'Corporate Account Billing',
+              label: 'Corporate Account',
               value: 'corporate',
-              description: 'Bill directly to an approved corporate business account.',
+              description: 'Bill directly to an approved corporate account.',
             },
           ],
         },

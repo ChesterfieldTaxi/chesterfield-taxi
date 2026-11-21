@@ -118,7 +118,7 @@ export async function action({ request }: ActionFunctionArgs) {
             verified: false,
             poStatus: 'expired_revoked',
             error:
-              'FRAUD ALERT: This Purchase Order (PO) number has been revoked or rotated. Please contact your corporate accounting desk for the active PO number.',
+              'This PO number is no longer active. Please check with your company administrator for a current PO number.',
           },
           { status: 403 }
         );
@@ -130,7 +130,7 @@ export async function action({ request }: ActionFunctionArgs) {
             verified: false,
             poStatus: 'mismatch',
             error:
-              'The entered Purchase Order (PO) number does not match the active authorization code on file for this corporate account.',
+              'The PO number entered does not match the active PO number on file for this corporate account.',
           },
           { status: 403 }
         );
@@ -140,7 +140,7 @@ export async function action({ request }: ActionFunctionArgs) {
         {
           verified: false,
           poStatus: 'missing_po',
-          error: 'A valid Corporate Purchase Order (PO) number is strictly required for this account.',
+          error: 'A valid Purchase Order (PO) number is required for this corporate account.',
         },
         { status: 400 }
       );

@@ -44,10 +44,10 @@ export default function PrivacyPage() {
             To fulfill your transportation requests and maintain passenger safety, {COMPANY_CONFIG.name} collects the following categories of information:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li><strong>Contact Details:</strong> Your name, phone number, and email address used for booking confirmations, chauffeur arrival notices, and digital receipts.</li>
-            <li><strong>Trip & Routing Data:</strong> Pickup addresses, destinations, intermediate waypoints, flight numbers for airport tracking, and date/time schedules.</li>
-            <li><strong>Payment & Billing Data:</strong> Payment card tokens, transaction IDs, or corporate account numbers processed securely through encrypted, PCI-compliant payment gateways. We never store raw credit card CVV codes.</li>
-            <li><strong>Special Transit Notes:</strong> Child safety seat requirements, gate access codes, and luggage notes.</li>
+            <li><strong>Contact Details:</strong> Your name, phone number, and email address used for booking confirmations, driver arrival notices, and trip receipts.</li>
+            <li><strong>Trip & Routing Data:</strong> Pickup addresses, destinations, intermediate stops, flight numbers for airport tracking, and date/time schedules.</li>
+            <li><strong>Payment & Billing Data:</strong> Payment card tokens, transaction IDs, or corporate account numbers processed securely through encrypted, PCI-compliant payment processors. We never store raw credit card CVV codes.</li>
+            <li><strong>Ride Notes:</strong> Child safety seat requests, gate access codes, and luggage notes.</li>
           </ul>
         </section>
 
@@ -58,13 +58,13 @@ export default function PrivacyPage() {
             How We Use Your Information
           </h2>
           <p>
-            Your information is strictly utilized to deliver and improve professional transportation services:
+            Your information is used strictly to provide and improve your ride experience:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li>Dispatching closest available fleet vehicles to your designated pickup point.</li>
-            <li>Providing assigned chauffeurs with your pickup address and passenger contact details for seamless coordination.</li>
-            <li>Calculating transparent, fixed upfront fares and issuing itemized digital receipts.</li>
-            <li>Continuously monitoring flight arrival timings at St. Louis Lambert International (STL) to adjust dispatch schedules for flight delays.</li>
+            <li>Dispatching the closest available vehicle to your pickup location.</li>
+            <li>Sharing your pickup address and contact details with your assigned driver so they can meet you smoothly.</li>
+            <li>Calculating upfront fares and sending itemized trip receipts.</li>
+            <li>Monitoring flight arrival times at St. Louis Lambert International (STL) to adjust pickup times for flight delays.</li>
           </ul>
         </section>
 
@@ -75,15 +75,15 @@ export default function PrivacyPage() {
             SMS & Automated Text Messaging Disclosure
           </h2>
           <p>
-            By checking the SMS notification agreement during the booking process or creating a Passenger Portal account, you consent to receive non-marketing transactional SMS alerts related strictly to your requested transportation.
+            By checking the text update option during booking or creating a Client Portal account, you agree to receive non-marketing text updates about your ride.
           </p>
           <p>
             These messages include:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-600">
-            <li>Booking confirmation and review status updates.</li>
-            <li>Chauffeur dispatch and real-time live vehicle tracking links.</li>
-            <li>Driver arrival notifications when the vehicle reaches your curb.</li>
+            <li>Booking confirmation and status updates.</li>
+            <li>Driver assignment and live ride tracking links.</li>
+            <li>Driver arrival alerts when your car reaches pickup.</li>
           </ul>
           <p>
             You may opt out of SMS messages at any time by replying <strong>STOP</strong> to any dispatch message or by calling our office. Standard message and data rates may apply.

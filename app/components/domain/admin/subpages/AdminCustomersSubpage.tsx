@@ -971,7 +971,7 @@ export function AdminCustomersSubpage({
         subtitle={
           selectedCustomer
             ? isEditingCustomer
-              ? 'Update client details, chauffeur preferences, and dispatcher notes'
+              ? 'Update client details, vehicle preferences, and dispatcher notes'
               : selectedCustomer.email
             : ''
         }
@@ -1164,14 +1164,14 @@ export function AdminCustomersSubpage({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className="font-semibold text-slate-700 block mb-1">Preferred Chauffeur Class</label>
+                      <label className="font-semibold text-slate-700 block mb-1">Preferred Vehicle</label>
                       <select
                         value={editForm.preferredVehicle || 'Standard Sedan'}
                         onChange={(e) => setEditForm((f) => ({ ...f, preferredVehicle: e.target.value }))}
                         className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800"
                       >
                         <option value="Standard Sedan">Standard Sedan</option>
-                        <option value="Premium Executive">Premium Executive</option>
+                        <option value="Premium Executive">Premium Sedan / SUV</option>
                         <option value="XL Minivan / SUV">XL Minivan / SUV</option>
                         <option value="Wheelchair Accessible (WAV)">Wheelchair Accessible (WAV)</option>
                       </select>
@@ -1209,13 +1209,13 @@ export function AdminCustomersSubpage({
                   <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
-                        Dual-Scoring Engine
+                        Reliability Score
                       </span>
                       <div className="text-sm font-black text-slate-900 mt-0.5">
                         Client Score: {selectedCustomer.customerScore ?? 90} / 100
                       </div>
                       <div className="text-[10px] text-slate-500 mt-0.5">
-                        Evaluated from ride frequency, completion fidelity, and cancellations.
+                        Based on trip history, completed rides, and cancellations.
                       </div>
                     </div>
                     <div
@@ -1236,10 +1236,10 @@ export function AdminCustomersSubpage({
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
                       <div className="font-black flex items-center gap-1.5">
                         <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
-                        <span>BLACKLISTED CLIENT</span>
+                        <span>BLOCKED CLIENT</span>
                       </div>
                       <p className="text-[11px] text-rose-700">
-                        Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
+                        Reason: {selectedCustomer.blacklistReason || 'Blocked by Admin'}
                       </p>
                     </div>
                   )}
@@ -1250,7 +1250,7 @@ export function AdminCustomersSubpage({
                       <span className="text-base font-black text-slate-900">{selectedCustomer.tripCount} Trips</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Volume</span>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Spend</span>
                       <span className="text-base font-black text-emerald-600">${selectedCustomer.totalSpend.toFixed(2)}</span>
                     </div>
                   </div>
@@ -1276,7 +1276,7 @@ export function AdminCustomersSubpage({
                   )}
 
                   <div>
-                    <span className="font-semibold text-slate-600 block mb-1">Preferred Chauffeur Class</span>
+                    <span className="font-semibold text-slate-600 block mb-1">Preferred Vehicle</span>
                     <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl capitalize">
                       {selectedCustomer.preferredVehicle || 'Standard Sedan'}
                     </p>

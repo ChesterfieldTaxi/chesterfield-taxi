@@ -1,7 +1,7 @@
 {
   "name": "Chesterfield Driver",
   "short_name": "CT Driver",
-  "description": "Driver Console for Chesterfield Taxi.",
+  "description": "Driver App for Chesterfield Taxi.",
   "id": "/driver",
   "start_url": "/driver",
   "scope": "/driver",

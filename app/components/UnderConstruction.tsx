@@ -34,8 +34,7 @@ export default function UnderConstruction() {
   const displayPhone = companySettings?.phone || COMPANY_CONFIG.phone.dispatch || COMPANY_CONFIG.phone.primary || '(314) 738-0100';
   const digits = displayPhone.replace(/\D/g, '');
   const telHref = digits.length === 10 ? `tel:+1${digits}` : digits.length > 10 ? `tel:+${digits}` : `tel:${displayPhone}`;
-  const companyName = companySettings?.name || COMPANY_CONFIG.name || 'Chesterfield Taxi';
-  const brandTitle = companyName.includes('Car Service') ? companyName : `${companyName} & Car Service`;
+  const brandTitle = companySettings?.name || COMPANY_CONFIG.name || 'Chesterfield Taxi';
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between p-6 font-sans">
@@ -54,21 +53,21 @@ export default function UnderConstruction() {
       {/* Main Content Card */}
       <main className="max-w-2xl mx-auto w-full my-auto py-12 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-400/10 text-amber-400 text-sm font-semibold mb-6 border border-amber-400/20">
-          <Clock className="w-4 h-4" /> System Upgrade In Progress
+          <Clock className="w-4 h-4" /> Scheduled Maintenance
         </div>
 
         <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight mb-4">
-          We’re upgrading your dispatch experience.
+          Online booking will be right back.
         </h1>
 
         <p className="text-slate-400 text-lg mb-8 max-w-lg mx-auto">
-          Our online booking system is currently undergoing scheduled maintenance. Direct phone dispatch remains fully operational 24/7.
+          We&apos;re making a quick update to our website. Our 24/7 phone dispatch is open as usual.
         </p>
 
         {/* Primary Call to Action */}
         <div className="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-6 shadow-xl mb-8">
           <p className="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-2">
-            Need a ride immediately?
+            Need a ride right now?
           </p>
           <a
             href={telHref}
@@ -78,7 +77,7 @@ export default function UnderConstruction() {
             {displayPhone}
           </a>
           <p className="text-xs text-slate-400 mt-3">
-            Click to call dispatch directly from your mobile device
+            Tap to call 24/7 dispatch directly
           </p>
         </div>
 
@@ -87,17 +86,17 @@ export default function UnderConstruction() {
           <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800">
             <ShieldCheck className="w-5 h-5 text-amber-400 mb-2" />
             <h2 className="text-sm font-semibold text-slate-200">24/7 Dispatch</h2>
-            <p className="text-xs text-slate-400 mt-1">Live operators ready to confirm your pickup instantly.</p>
+            <p className="text-xs text-slate-400 mt-1">Local dispatchers ready to book your pickup right away.</p>
           </div>
           <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800">
             <MapPin className="w-5 h-5 text-amber-400 mb-2" />
             <h2 className="text-sm font-semibold text-slate-200">Airport &amp; Local</h2>
-            <p className="text-xs text-slate-400 mt-1">Reliable transit across St. Louis &amp; Lambert Airport.</p>
+            <p className="text-xs text-slate-400 mt-1">Rides across West County, St. Louis &amp; Lambert Airport.</p>
           </div>
           <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800">
             <Clock className="w-5 h-5 text-amber-400 mb-2" />
-            <h2 className="text-sm font-semibold text-slate-200">On-Time Guarantee</h2>
-            <p className="text-xs text-slate-400 mt-1">Pre-scheduled bookings serviced as normal.</p>
+            <h2 className="text-sm font-semibold text-slate-200">On-Time Pickups</h2>
+            <p className="text-xs text-slate-400 mt-1">All scheduled rides are running on time as planned.</p>
           </div>
         </div>
       </main>

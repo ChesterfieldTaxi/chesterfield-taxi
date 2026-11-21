@@ -19,11 +19,11 @@ export async function loader() {
 
 export function meta() {
   return [
-    { title: `Book a Ride – ${COMPANY_CONFIG.name} Online Reservation Portal` },
+    { title: `Book a Ride – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
       content:
-        'Reserve your taxi or executive car in Chesterfield, MO. Single-page booking with live upfront estimated fare calculation, instant ASAP dispatch, or scheduled airport transfers.',
+        'Book your taxi or car in Chesterfield, MO. Upfront fare estimates, immediate pickups, or scheduled airport rides.',
     },
   ];
 }
@@ -42,12 +42,12 @@ export default function BookRoute() {
               Book Your Ride
             </h1>
             <p className="text-sm text-slate-600 max-w-xl mx-auto">
-              Upfront estimated fares, 24/7 live Chesterfield dispatch, and real-time STL flight tracking.
+              Upfront fare estimates, 24/7 local Chesterfield dispatch, and STL flight tracking.
             </p>
           </div>
         )}
 
-        {/* Customer Booking Engine */}
+        {/* Client Booking Engine */}
         <div className={isConfirmed ? '' : 'mt-4'}>
           <BookingEngineV2 onConfirmedChange={setIsConfirmed} initialSettings={initialSettings} />
         </div>
@@ -55,10 +55,10 @@ export default function BookRoute() {
         {/* Live Support Footnote */}
         <div className="mt-10 text-center text-xs text-slate-500 space-y-1">
           <p>
-            Need immediate roadside assistance or specialized group dispatch?
+            Need a pickup right away or booking for a large group?
           </p>
           <p className="font-semibold text-slate-700">
-            Call our 24/7 {COMPANY_CONFIG.name} Dispatch Desk at{' '}
+            Call {COMPANY_CONFIG.name} 24/7 at{' '}
             <a
               href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
               className="text-blue-600 hover:text-blue-700 underline font-bold"

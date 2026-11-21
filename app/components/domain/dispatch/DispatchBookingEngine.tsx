@@ -3238,7 +3238,7 @@ function DispatchBookingEngineComponent({
                     driverName: selectedDriverInfo.name,
                     driverPhone: selectedDriverInfo.phone,
                     vehicleUnit: selectedDriverInfo.cabNumber
-                      ? `Cab #${selectedDriverInfo.cabNumber}`
+                      ? `Car #${selectedDriverInfo.cabNumber}`
                       : selectedDriverInfo.vehicle,
                   }
                 : undefined
@@ -3507,7 +3507,7 @@ function DispatchBookingEngineComponent({
                     driverName: selectedDriverInfo.name,
                     driverPhone: selectedDriverInfo.phone,
                     vehicleUnit: selectedDriverInfo.cabNumber
-                      ? `Cab #${selectedDriverInfo.cabNumber}`
+                      ? `Car #${selectedDriverInfo.cabNumber}`
                       : selectedDriverInfo.vehicle,
                   }
                 : undefined
@@ -4708,18 +4708,18 @@ function DispatchBookingEngineComponent({
               Trip Details
             </label>
             <span className="text-[10px] text-slate-500 font-medium">
-              Capacity: Max {totalMaxPassengers} Pax • {totalMaxBags} Bags
+              Capacity: Max {totalMaxPassengers} {totalMaxPassengers === 1 ? 'Passenger' : 'Passengers'} • {totalMaxBags} {totalMaxBags === 1 ? 'Bag' : 'Bags'}
             </span>
           </div>
 
           <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2.5">
-            {/* Compact 3-Column Steppers: Pax, Carry-on & Checked (100% parity with Customer Form) */}
+            {/* Compact 3-Column Steppers: Passengers, Carry-on & Checked */}
             <div className="grid grid-cols-3 gap-1.5">
               {/* Passengers */}
               <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
                 <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
                   <UserIcon className="w-3 h-3 text-slate-500 shrink-0" />
-                  <span className="font-bold text-slate-800 truncate">Pax</span>
+                  <span className="font-bold text-slate-800 truncate">Passengers</span>
                 </div>
                 <div className="flex items-center justify-between gap-1">
                   <button
@@ -5291,7 +5291,7 @@ function DispatchBookingEngineComponent({
                   }`}
                 >
                   <CreditCardIcon className="w-3 h-3 shrink-0" />
-                  <span>Pay in Cab (Terminal)</span>
+                  <span>Pay in Car (Card)</span>
                 </button>
                 <button
                   type="button"
@@ -5309,7 +5309,7 @@ function DispatchBookingEngineComponent({
 
               {(cardPaymentType === 'terminal' || cardPaymentType === 'payment_link') && (
                 <div className="p-2 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-900">
-                  Passenger will pay inside the vehicle via the chauffeur&apos;s contactless chip/tap card terminal upon completion.
+                  Passenger will pay in the car using the driver&apos;s card reader at dropoff.
                 </div>
               )}
 
@@ -6021,23 +6021,23 @@ function DispatchBookingEngineComponent({
                     </div>
                   </div>
 
-                  {/* Return Trip Details: Compact 3-Column Pax, Carry-on & Checked Steppers */}
+                  {/* Return Trip Details: Compact 3-Column Passengers, Carry-on & Checked Steppers */}
                   <div className="p-2 bg-white border border-indigo-200 rounded-xl space-y-2">
                     <div className="flex items-center justify-between text-[10px]">
                       <span className="font-bold text-indigo-900 uppercase tracking-wide">
-                        Return Pax &amp; Luggage
+                        Return Passengers &amp; Luggage
                       </span>
                       <span className="text-slate-500 font-medium">
-                        Max {returnTotalMaxPassengers} Pax • {returnTotalMaxBags} Bags
+                        Max {returnTotalMaxPassengers} {returnTotalMaxPassengers === 1 ? 'Passenger' : 'Passengers'} • {returnTotalMaxBags} {returnTotalMaxBags === 1 ? 'Bag' : 'Bags'}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-3 gap-1.5">
-                      {/* Return Pax */}
+                      {/* Return Passengers */}
                       <div className="p-1.5 bg-indigo-50/40 border border-indigo-100 rounded-lg flex flex-col justify-between gap-1 min-w-0">
                         <div className="flex items-center justify-center gap-1 text-indigo-950 text-[10.5px] min-w-0">
                           <UserIcon className="w-3 h-3 text-indigo-500 shrink-0" />
-                          <span className="font-bold truncate">Pax</span>
+                          <span className="font-bold truncate">Passengers</span>
                         </div>
                         <div className="flex items-center justify-between gap-0.5">
                           <button

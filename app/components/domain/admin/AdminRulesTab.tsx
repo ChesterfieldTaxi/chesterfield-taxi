@@ -686,7 +686,7 @@ export function AdminRulesTab() {
     const cached = getAdminConfigService().getCachedSettings();
     return (
       cached.customerBookingConfig?.lambertPickupInstructions ||
-      'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time.'
+      'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.'
     );
   });
 
@@ -843,9 +843,9 @@ export function AdminRulesTab() {
               <SlidersIcon className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-xl font-black text-slate-900">3-Tier Conditional Booking Rules Engine</h2>
+              <h2 className="text-xl font-black text-slate-900">Booking Rules</h2>
               <p className="text-xs text-slate-500 font-medium">
-                Unified, identical modular controls across Auto-Confirm, Review Holds, and Security Blocks.
+                Set conditions for Auto-Confirm, Dispatcher Review, and Blocked Bookings.
               </p>
             </div>
           </div>
@@ -858,7 +858,7 @@ export function AdminRulesTab() {
             className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
           >
             {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
-            Save All Rule Tiers
+            Save Booking Rules
           </Button>
         </div>
       </div>
@@ -881,8 +881,8 @@ export function AdminRulesTab() {
         <ModularTierCard
           tierKey="tier1"
           tierNumber={1}
-          title="Tier 1: Auto-Confirm Direct Pass-Through"
-          subtitle="Trips satisfying all Tier 1 criteria bypass dispatcher review and dispatch automatically."
+          title="Tier 1: Auto-Confirm"
+          subtitle="Trips meeting all Tier 1 rules are confirmed automatically without dispatcher review."
           colorTheme="emerald"
           config={config.tier1}
           zones={zones}
@@ -893,8 +893,8 @@ export function AdminRulesTab() {
         <ModularTierCard
           tierKey="tier2"
           tierNumber={2}
-          title="Tier 2: Require Human Review &amp; Dispatch Queue"
-          subtitle="Trips triggering any Tier 2 criteria are placed in the review queue for dispatcher manual clearance."
+          title="Tier 2: Require Dispatcher Review"
+          subtitle="Trips matching any Tier 2 rule are placed in the dispatch review queue."
           colorTheme="amber"
           config={config.tier2}
           zones={zones}
@@ -905,8 +905,8 @@ export function AdminRulesTab() {
         <ModularTierCard
           tierKey="tier3"
           tierNumber={3}
-          title="Tier 3: Universal Hard Blacklist &amp; Security Block"
-          subtitle="Zero-tolerance safety controls. Immediate 403 rejection with immutable audit logging."
+          title="Tier 3: Block Booking"
+          subtitle="Trips matching any Tier 3 rule are automatically blocked and logged."
           colorTheme="rose"
           config={config.tier3}
           zones={zones}
@@ -922,10 +922,10 @@ export function AdminRulesTab() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  STL Lambert Airport Curbside Pickup Location Description
+                  STL Lambert Airport Curbside Pickup Instructions
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Curbside doors, terminal baggage claim instructions, or specific chauffeur meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
+                  Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
                 </p>
               </div>
             </div>
@@ -938,11 +938,11 @@ export function AdminRulesTab() {
             rows={3}
             value={lambertInstructions}
             onChange={(e) => setLambertInstructions(e.target.value)}
-            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time."
+            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
             className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
           />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
-            <span>Synced automatically with Website Studio / Form Controls / Airport Rules.</span>
+            <span>Synced automatically with Website → Booking Form → Airport Rules.</span>
             <Button
               size="sm"
               variant="outline"

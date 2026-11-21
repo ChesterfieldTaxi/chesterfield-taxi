@@ -4049,18 +4049,18 @@ function CommsHubComponent({
                   {drivers.length > 0 && (
                     <div className="pt-2 border-t border-slate-100 space-y-1.5">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Cab Speed Dials
+                        Driver Speed Dials
                       </span>
                       <div className="grid grid-cols-2 gap-1.5">
                         {drivers.slice(0, 4).map((drv) => (
                           <button
                             key={drv.id}
                             type="button"
-                            onClick={() => handleStartCall(drv.phone, `Cab #${drv.cabNumber}`)}
+                            onClick={() => handleStartCall(drv.phone, `Car #${drv.cabNumber}`)}
                             className="p-2 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/30 text-left text-xs transition-colors cursor-pointer flex items-center justify-between"
                           >
                             <span className="font-bold text-slate-800 truncate">
-                              Cab #{drv.cabNumber}
+                              Car #{drv.cabNumber}
                             </span>
                             <PhoneIcon className="w-3 h-3 text-emerald-600 shrink-0" />
                           </button>
@@ -5149,7 +5149,7 @@ function CommsHubComponent({
                     className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
                   />
                   <span className="text-slate-700 font-semibold text-xs">
-                    Send automated SMS dispatch &amp; chauffeur arrival notifications to primary mobile
+                    Send automated text dispatch &amp; driver arrival updates to primary mobile
                   </span>
                 </label>
               </div>
@@ -5160,7 +5160,7 @@ function CommsHubComponent({
                   <div className="flex items-center gap-2">
                     <BuildingIcon className="w-4 h-4 text-slate-600" />
                     <span className="text-[11px] font-black tracking-wide text-slate-700 uppercase">
-                      Corporate Direct Billing
+                      Corporate Account
                     </span>
                   </div>
                   {(contactEditForm.corporateAccountNumber || contactEditForm.corporateAccountName) && (
@@ -5193,11 +5193,11 @@ function CommsHubComponent({
                           {contactEditForm.corporateAccountNumber || 'CUSTOM-ACCT'}
                         </span>
                         <span className="font-bold text-blue-900 text-xs">
-                          {contactEditForm.corporateAccountName || 'Corporate Billing'}
+                          {contactEditForm.corporateAccountName || 'Corporate Account'}
                         </span>
                       </div>
                       <p className="text-[10px] text-blue-700 mt-0.5">
-                        Linked for monthly invoicing &amp; corporate discounted chauffeur rates.
+                        Linked for monthly invoicing &amp; corporate account rates.
                       </p>
                     </div>
                   </div>
@@ -5485,7 +5485,7 @@ function CommsHubComponent({
               {/* ── Section 7: Dispatcher & Driver Instructions ── */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
                 <label className="block text-[11px] font-bold text-slate-700">
-                  Internal Dispatcher &amp; Chauffeur Instructions
+                  Dispatcher &amp; Driver Notes
                 </label>
                 <textarea
                   rows={3}
@@ -5510,8 +5510,8 @@ function CommsHubComponent({
                 className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <ExternalLinkIcon className="w-3.5 h-3.5 shrink-0" />
-                <span className="sm:inline hidden">Open in Admin Customer Directory</span>
-                <span className="sm:hidden">Admin Directory</span>
+                <span className="sm:inline hidden">Open in Admin Client Directory</span>
+                <span className="sm:hidden">Client Directory</span>
               </a>
 
               <div className="flex items-center gap-2 ml-auto">
@@ -5671,10 +5671,10 @@ function CommsHubComponent({
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    'Your driver is arriving shortly in a black sedan.',
-                    'Your reservation has been confirmed with Chesterfield Taxi.',
-                    'Please meet your chauffeur outside baggage claim.',
-                    'Driver is waiting at pickup location.',
+                    'Your driver is arriving shortly.',
+                    'Your trip has been confirmed with Chesterfield Taxi.',
+                    'Please meet your driver outside baggage claim.',
+                    'Your driver is waiting at the pickup location.',
                   ].map((preset) => (
                     <button
                       key={preset}

@@ -50,11 +50,11 @@ import { formatVehicleTierDisplay } from '../core/services/email/email-templates
 
 export function meta() {
   return [
-    { title: 'Passenger App & Saved Places – Chesterfield Taxi' },
+    { title: 'Client Portal – Chesterfield Taxi' },
     {
       name: 'description',
       content:
-        'Manage your frequent pickup addresses, review past ride receipts, track live trips in real time, and rebook rides in two taps.',
+        'Manage saved pickup places, view trip receipts, track live rides, and rebook in seconds.',
     },
   ];
 }
@@ -328,7 +328,7 @@ export default function PassengerAppRoute() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
         <SpinnerIcon className="w-9 h-9 text-blue-600 animate-spin mb-3" />
-        <p className="text-sm font-bold text-slate-700">Loading your passenger portal...</p>
+        <p className="text-sm font-bold text-slate-700">Loading your account...</p>
       </div>
     );
   }
@@ -410,10 +410,10 @@ export default function PassengerAppRoute() {
     showToast(`Editing Trip #${trip.id} — save your changes below.`);
   };
 
-  // Cancel reservation (blocks en_route/arrived/in_progress; warns on <2h policy)
+  // Cancel trip (blocks en_route/arrived/in_progress; warns on <2h policy)
   const handleCancelTrip = async (trip: Trip) => {
     if (['en_route', 'arrived', 'in_progress'].includes(trip.status)) {
-      showToast('Your chauffeur is already on the way. Please call dispatch to cancel.');
+      showToast('Your driver is already on the way. Please call dispatch to cancel.');
       return;
     }
     const isWithinTwoHours =
@@ -421,15 +421,15 @@ export default function PassengerAppRoute() {
       new Date(trip.scheduledPickupTime).getTime() - Date.now() < 2 * 60 * 60 * 1000 &&
       new Date(trip.scheduledPickupTime).getTime() > Date.now();
     const confirmMsg = isWithinTwoHours
-      ? `Reservation #${trip.id} is within 2 hours of pickup (late cancellation policy may apply). Cancel anyway?`
-      : `Are you sure you want to cancel reservation #${trip.id}?`;
+      ? `Trip #${trip.id} is within 2 hours of pickup (a late cancellation fee may apply). Cancel anyway?`
+      : `Are you sure you want to cancel Trip #${trip.id}?`;
     if (!window.confirm(confirmMsg)) {
       return;
     }
     try {
       const bookingService = getBookingService();
       if (bookingService.cancelBooking) {
-        await bookingService.cancelBooking(trip.id, 'Cancelled by passenger', 'passenger');
+        await bookingService.cancelBooking(trip.id, 'Cancelled by client', 'passenger');
       }
       setTrips((prev) =>
         prev.map((t) => (t.id === trip.id ? { ...t, status: 'cancelled' as TripStatus } : t))
@@ -437,10 +437,10 @@ export default function PassengerAppRoute() {
       if (activeTrip?.id === trip.id) {
         setActiveTrip(null);
       }
-      showToast(`Reservation #${trip.id} has been cancelled.`);
+      showToast(`Trip #${trip.id} has been cancelled.`);
     } catch (err) {
       console.error('Error cancelling trip:', err);
-      showToast('Could not cancel trip. Please contact dispatch.');
+      showToast('Could not cancel trip. Please call dispatch.');
     }
   };
 
@@ -449,7 +449,7 @@ export default function PassengerAppRoute() {
       passengerService.clearLocalSession();
       await getAdminAuthService().signOut();
     } catch {}
-    showToast('Signed out of Passenger Portal.');
+    showToast('Signed out.');
     setTimeout(() => navigate('/app/login?message=logged_out'), 500);
   };
 
@@ -683,7 +683,7 @@ export default function PassengerAppRoute() {
 
   const resolveTripDriverName = (trip: Trip): string => {
     const meta = (trip.metadata || {}) as Record<string, any>;
-    return String(meta.assignedDriverName || meta.driverName || (trip.assignedDriverId ? 'Assigned Chauffeur' : 'Pending Assignment'));
+    return String(meta.assignedDriverName || meta.driverName || (trip.assignedDriverId ? 'Assigned Driver' : 'Pending Assignment'));
   };
 
   return (
@@ -719,7 +719,7 @@ export default function PassengerAppRoute() {
                 {displayCompanyName}
               </span>
               <p className="text-[11px] text-slate-500 font-medium leading-none mt-1 truncate">
-                Hi, {account.firstName || fullName || 'Passenger'}
+                Hi, {account.firstName || fullName || 'there'}
               </p>
             </div>
           </div>
@@ -729,8 +729,8 @@ export default function PassengerAppRoute() {
               type="button"
               onClick={() => setIsHelpMenuOpen(true)}
               className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 flex items-center justify-center transition-all cursor-pointer"
-              aria-label="Help and 24/7 Dispatch Desk"
-              title="Assistance & 24/7 Dispatch Desk"
+              aria-label="Help and 24/7 Dispatch"
+              title="Help & 24/7 Dispatch"
             >
               <InfoIcon className="w-4 h-4" />
             </button>
@@ -759,7 +759,7 @@ export default function PassengerAppRoute() {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                 </span>
                 <span className="text-xs font-black uppercase tracking-wider text-blue-200">
-                  Active Live Ride
+                  Active Ride
                 </span>
               </div>
               <span className="text-xs font-mono font-bold bg-white/20 px-2 py-0.5 rounded-lg">
@@ -769,16 +769,16 @@ export default function PassengerAppRoute() {
 
             <h3 className="text-lg font-extrabold leading-snug">
               {activeTrip.status === 'en_route'
-                ? 'Chauffeur is en route to you'
+                ? 'Your driver is on the way'
                 : activeTrip.status === 'arrived'
-                ? 'Chauffeur arrived at pickup!'
+                ? 'Your driver has arrived at pickup!'
                 : activeTrip.status === 'in_progress'
-                ? 'Your trip is in progress'
+                ? 'Your ride is in progress'
                 : activeTrip.status === 'assigned' || activeTrip.status === 'accepted'
-                ? 'Chauffeur Assigned to Your Ride'
+                ? 'Driver assigned to your ride'
                 : activeTrip.status === 'CONFIRMED' || activeTrip.status === 'confirmed'
-                ? 'Reservation Confirmed'
-                : 'Booking Requested'}
+                ? 'Trip Confirmed'
+                : 'Ride Requested'}
             </h3>
 
             <div className="mt-3 text-xs text-blue-100 space-y-1">
@@ -1051,12 +1051,12 @@ export default function PassengerAppRoute() {
                           </div>
                         </div>
 
-                        {/* Driver & Unit Details */}
+                        {/* Driver & Car Details */}
                         {Boolean(trip.metadata?.assignedDriverName || trip.metadata?.driverName || trip.assignedDriverId) && (
                           <div className="text-[11px] bg-slate-50 px-3 py-1.5 rounded-xl text-slate-600 flex items-center justify-between">
-                            <span>Chauffeur: {resolveTripDriverName(trip)}</span>
+                            <span>Driver: {resolveTripDriverName(trip)}</span>
                             <span className="font-semibold text-slate-700">
-                              {String(trip.metadata?.vehicleUnit || 'Assigned Fleet Unit')}
+                              {String(trip.metadata?.vehicleUnit || 'Assigned Car')}
                             </span>
                           </div>
                         )}
@@ -1278,10 +1278,10 @@ export default function PassengerAppRoute() {
             >
               <div>
                 <h2 className="text-base font-extrabold text-slate-900">
-                  Customer Profile &amp; Preferences
+                  Profile &amp; Preferences
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Manage contact info, driver notes, and dispatch notifications
+                  Manage contact info, driver notes, and ride notifications
                 </p>
               </div>
 
@@ -1317,7 +1317,7 @@ export default function PassengerAppRoute() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mobile Phone (for SMS updates)
+                    Mobile Phone (for text updates)
                   </label>
                   <input
                     type="tel"
@@ -1344,7 +1344,7 @@ export default function PassengerAppRoute() {
               {/* Default Vehicle Tier */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Default Preferred Vehicle Class
+                  Preferred Vehicle
                 </label>
                 <select
                   value={profileVehicleTier}
@@ -1356,7 +1356,7 @@ export default function PassengerAppRoute() {
                       <option value="any">Any Available Vehicle (Best Value)</option>
                       {adminVehicles.map((v) => (
                         <option key={v.id} value={v.id}>
-                          {v.name} (Up to {v.maxPassengers} pax / {v.maxLuggage} bags)
+                          {v.name} (Up to {v.maxPassengers} {v.maxPassengers === 1 ? 'passenger' : 'passengers'} · {v.maxLuggage} {v.maxLuggage === 1 ? 'bag' : 'bags'})
                         </option>
                       ))}
                     </>
@@ -1364,8 +1364,8 @@ export default function PassengerAppRoute() {
                     <>
                       <option value="any">Any Available Vehicle</option>
                       <option value="standard">Standard Sedan</option>
-                      <option value="premium">Executive SUV</option>
-                      <option value="xl">XL Group Transport</option>
+                      <option value="premium">Premium SUV</option>
+                      <option value="xl">XL Minivan / SUV</option>
                     </>
                   )}
                 </select>
@@ -1374,7 +1374,7 @@ export default function PassengerAppRoute() {
               {/* Permanent Driver Notes */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Permanent Pickup Instructions &amp; Gate Codes
+                  Default Pickup Instructions &amp; Gate Codes
                 </label>
                 <textarea
                   rows={2}
@@ -1384,14 +1384,14 @@ export default function PassengerAppRoute() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  These instructions are automatically attached to your bookings for the driver.
+                  Automatically added to your bookings for your driver.
                 </p>
               </div>
 
               {/* Communication Preferences */}
               <div className="pt-2 border-t border-slate-100">
                 <label className="block text-xs font-bold text-slate-800 mb-2">
-                  Communication Preferences
+                  Notifications
                 </label>
                 <div className="space-y-2.5">
                   <label className="flex items-center gap-2.5 cursor-pointer">
@@ -1402,7 +1402,7 @@ export default function PassengerAppRoute() {
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
                     />
                     <span className="text-xs font-semibold text-slate-700">
-                      SMS text message dispatch &amp; arrival alerts
+                      Text message updates when my driver is on the way and arrives
                     </span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
@@ -1413,7 +1413,7 @@ export default function PassengerAppRoute() {
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
                     />
                     <span className="text-xs font-semibold text-slate-700">
-                      Automated digital itemized receipts by email
+                      Email me trip receipts automatically
                     </span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
@@ -1424,7 +1424,7 @@ export default function PassengerAppRoute() {
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
                     />
                     <span className="text-xs font-semibold text-slate-700">
-                      Driver arrival courtesy phone calls
+                      Phone call when my driver arrives
                     </span>
                   </label>
                 </div>
@@ -1459,10 +1459,10 @@ export default function PassengerAppRoute() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">
-                            Dispatch Console
+                            Dispatch
                           </span>
                           <span className="text-[10px] text-slate-500 block">
-                            Operations &amp; Booking
+                            Trips &amp; Booking
                           </span>
                         </div>
                       </div>
@@ -1481,10 +1481,10 @@ export default function PassengerAppRoute() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 block">
-                            Driver Portal
+                            Driver App
                           </span>
                           <span className="text-[10px] text-slate-500 block">
-                            Shifts &amp; Navigation
+                            Shifts &amp; Trips
                           </span>
                         </div>
                       </div>
@@ -1503,10 +1503,10 @@ export default function PassengerAppRoute() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-slate-900 group-hover:text-purple-700 block">
-                            Admin Console
+                            Admin
                           </span>
                           <span className="text-[10px] text-slate-500 block">
-                            System Configuration
+                            Settings &amp; Billing
                           </span>
                         </div>
                       </div>
@@ -1520,7 +1520,7 @@ export default function PassengerAppRoute() {
             {/* Portal Account Actions */}
             <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
               <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
-                Account Actions
+                Account
               </span>
               <div>
                 <button
@@ -1534,10 +1534,10 @@ export default function PassengerAppRoute() {
                     </div>
                     <div>
                       <span className="text-xs font-bold text-rose-900 block">
-                        Sign Out of Portal
+                        Sign Out
                       </span>
                       <span className="text-[10px] text-rose-500 block">
-                        Clear local session
+                        Sign out of your account
                       </span>
                     </div>
                   </div>
@@ -1702,7 +1702,7 @@ export default function PassengerAppRoute() {
           ? 'Paid'
           : selectedReceiptTrip.payment?.status === 'authorized'
           ? 'Authorized (Pending)'
-          : 'Pay in Cab / Pending';
+          : 'Pay in Car / Pending';
         const paymentStatusColor = isCancelledTrip
           ? 'text-rose-600'
           : isSettled || isCorporateBill
@@ -1798,12 +1798,12 @@ export default function PassengerAppRoute() {
                   <span className="text-slate-500 block">{selectedReceiptTrip.passenger.phone}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-400 font-semibold block">VEHICLE &amp; CHAUFFEUR</span>
+                  <span className="text-slate-400 font-semibold block">DRIVER &amp; CAR</span>
                   <span className="font-bold text-slate-800">
                     {resolveTripDriverName(selectedReceiptTrip)}
                   </span>
                   <span className="text-slate-500 block">
-                    {selectedReceiptTrip.metadata?.vehicleUnit ? `${String(selectedReceiptTrip.metadata.vehicleUnit)} • ` : ''}
+                    {selectedReceiptTrip.metadata?.vehicleUnit ? `${String(selectedReceiptTrip.metadata.vehicleUnit).replace(/^Cab\s*#?/i, 'Car #')} • ` : ''}
                     {resolveTripVehicleName(selectedReceiptTrip)}
                   </span>
                 </div>
@@ -1811,7 +1811,7 @@ export default function PassengerAppRoute() {
 
               {/* Route Summary */}
               <div className="py-3 border-b border-slate-100 text-xs space-y-1.5">
-                <span className="text-slate-400 font-semibold block">ROUTING</span>
+                <span className="text-slate-400 font-semibold block">ROUTE</span>
                 <div className="flex items-start gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
                   <div>
@@ -1865,7 +1865,7 @@ export default function PassengerAppRoute() {
 
                 {tipAmount > 0 && (
                   <div className="flex justify-between text-xs text-slate-700 px-1">
-                    <span>Chauffeur Gratuity (Tip)</span>
+                    <span>Driver Tip</span>
                     <span className="font-bold tabular-nums">${tipAmount.toFixed(2)}</span>
                   </div>
                 )}
@@ -1882,8 +1882,15 @@ export default function PassengerAppRoute() {
               <div className="py-3 text-xs text-slate-500 flex items-center justify-between gap-2 flex-wrap">
                 <span>
                   Payment:{' '}
-                  <span className="font-bold uppercase text-slate-800">
-                    {(selectedReceiptTrip.payment?.method || 'pay_in_cab').replace(/_/g, ' ')}
+                  <span className="font-bold text-slate-800">
+                    {(() => {
+                      const raw = (selectedReceiptTrip.payment?.method || 'pay_in_cab').toLowerCase();
+                      if (raw === 'pay_in_cab' || raw === 'card_terminal') return 'Pay in Car';
+                      if (raw === 'cash') return 'Pay in Car (Cash)';
+                      if (raw === 'card' || raw === 'stripe_preauth') return 'Card';
+                      if (raw === 'corporate' || raw === 'account' || raw === 'corporate_account') return 'Corporate Account';
+                      return raw.replace(/_/g, ' ').toUpperCase();
+                    })()}
                     {selectedReceiptTrip.payment?.cardLast4 ? ` •••• ${selectedReceiptTrip.payment.cardLast4}` : ''}
                   </span>
                 </span>
@@ -2290,7 +2297,7 @@ export default function PassengerAppRoute() {
                   <span>Child Car Seats Available</span>
                 </h4>
                 <p className="text-slate-600 leading-relaxed">
-                  Safety is our priority. Rear-facing infant, forward-facing toddler, and booster seats can be requested in the booking engine notes for a nominal sanitized equipment fee.
+                  Safety is our priority. Rear-facing infant, forward-facing toddler, and booster seats can be added directly on the booking form when choosing passengers and bags.
                 </p>
               </div>
 
@@ -2300,7 +2307,7 @@ export default function PassengerAppRoute() {
                   <span>Luggage &amp; Vehicle Capacities</span>
                 </h4>
                 <p className="text-slate-600 leading-relaxed">
-                  Sedans comfortably accommodate up to 4 passengers with 3 standard checked suitcases. For groups or extra luggage, our Premium SUV and XL Vans accommodate up to 6 passengers with 6+ large bags.
+                  Sedans comfortably fit up to 4 passengers with 3 standard suitcases. For groups or extra luggage, our SUVs and Minivans fit up to 6 passengers with 6+ large bags.
                 </p>
               </div>
 
@@ -2310,7 +2317,7 @@ export default function PassengerAppRoute() {
                   <span>Cancellation &amp; Changes Policy</span>
                 </h4>
                 <p className="text-slate-600 leading-relaxed">
-                  Reservations can be modified or cancelled free of penalty up to 2 hours prior to scheduled pickup. For immediate dispatch updates, please call the 24/7 desk directly.
+                  Bookings can be changed or cancelled at no charge up to 2 hours before scheduled pickup. For last-minute updates, call our 24/7 dispatch desk directly.
                 </p>
               </div>
 

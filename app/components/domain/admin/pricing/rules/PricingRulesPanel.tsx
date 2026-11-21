@@ -292,8 +292,8 @@ export function PricingRulesPanel({
     const newId = `rule-${Date.now()}`;
     const newRule: NamedPricingRule = {
       id: newId,
-      name: `New Firewall Rule #${rules.length + 1}`,
-      description: 'Synthesize Rate, Surcharges, and Extras when conditions match',
+      name: `New Pricing Rule #${rules.length + 1}`,
+      description: 'Set Rate, Surcharges, and Extras when trip conditions match',
       isActive: true,
       priority: 60,
       allowDriverSelection: false,
@@ -512,7 +512,7 @@ export function PricingRulesPanel({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-600" />
-              Firewall Rules ({rules.length})
+              Pricing Rules ({rules.length})
             </h3>
             <Button
               type="button"
@@ -536,7 +536,7 @@ export function PricingRulesPanel({
             />
           </div>
           <p className="text-[10px] text-slate-400">
-            Evaluated top-to-bottom. Highest priority wins on conflicts.
+            Checked top-to-bottom. Highest priority wins on conflicts.
           </p>
         </div>
 
@@ -630,7 +630,7 @@ export function PricingRulesPanel({
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Synthesize which <strong>Rate</strong>, <strong>Surcharges</strong> (include/waive/override), and <strong>Extras</strong> apply when conditions match.
+                  Choose which <strong>Rate</strong>, <strong>Surcharges</strong> (apply/waive/override), and <strong>Extras</strong> apply when trip conditions match.
                 </p>
               </div>
 
@@ -763,7 +763,7 @@ export function PricingRulesPanel({
                     }
                     className="rounded border-slate-300 text-rose-600"
                   />
-                  <span>Stop processing lower-priority rules on match (Firewall Final Rule)</span>
+                  <span>Stop checking lower-priority rules when matched</span>
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
@@ -1127,14 +1127,14 @@ export function PricingRulesPanel({
               </div>
             </div>
 
-            {/* 2. THEN — SYNTHESIS ACTIONS */}
+            {/* 2. THEN — PRICING ACTIONS */}
             <div className="p-3.5 sm:p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <span className="px-1.5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[10px] shrink-0">
                     THEN
                   </span>
-                  <span>Synthesize Rate, Surcharges, Extras &amp; Adjustments</span>
+                  <span>Set Rate, Surcharges, Extras &amp; Adjustments</span>
                 </h3>
                 <span className="text-[11px] text-slate-500">Combine any actions in one rule</span>
               </div>
@@ -1218,16 +1218,16 @@ export function PricingRulesPanel({
                 )}
               </div>
 
-              {/* B. Firewall Surcharge Directives (APPLY / WAIVE / OVERRIDE) */}
+              {/* B. Surcharge Actions (APPLY / WAIVE / OVERRIDE) */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <ZapIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Surcharge Directives (Firewall Exceptions)</span>
+                      <span>Surcharge Rules &amp; Exceptions</span>
                     </span>
                     <p className="text-[11px] text-slate-500">
-                      Attach <strong>Rule-Only</strong> surcharges (APPLY), exclude <strong>Universal</strong> surcharges (WAIVE), or override their rate.
+                      Turn on <strong>Rule-Only</strong> surcharges (APPLY), waive <strong>All-Trips</strong> surcharges (WAIVE), or override their amount.
                     </p>
                   </div>
                   <Button

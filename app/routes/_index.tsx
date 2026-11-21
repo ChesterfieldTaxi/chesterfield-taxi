@@ -100,7 +100,7 @@ const VALUE_PROPOSITIONS = [
   },
   {
     icon: <SparklesIcon className="w-6 h-6 text-blue-600" />,
-    title: 'Professional Chauffeurs',
+    title: 'Professional Local Drivers',
     description:
       'Fully licensed, background-checked, and commercially insured drivers with thorough local knowledge of West County and St. Louis metro.',
   },
@@ -119,7 +119,7 @@ const POPULAR_DESTINATIONS = [
     bookAddress: 'Spirit of St. Louis Airport (SUS), Chesterfield, MO',
     type: 'Private & Corporate Aviation',
     time: 'Approx. 5-10 min from Chesterfield Valley',
-    badge: 'Executive Hub',
+    badge: 'West County',
   },
   {
     destination: 'Downtown St. Louis & Busch Stadium',
@@ -131,17 +131,17 @@ const POPULAR_DESTINATIONS = [
   {
     destination: 'West County Center & Plaza Frontenac',
     bookAddress: 'West County Center, Des Peres, MO',
-    type: 'Shopping & Dining Corridors',
+    type: 'Shopping & Dining',
     time: 'Approx. 15-20 min',
     badge: 'Local',
   },
 ];
 
 const HIGHLIGHTS = [
-  'Instant dispatch or scheduled future bookings',
-  'Lambert STL flight tracking — we wait as long as it takes',
-  'Executive accounts with monthly invoicing',
-  'Local and regional door-to-door transportation',
+  'Instant dispatch or scheduled advance bookings',
+  'Lambert STL flight tracking — we wait if your flight is delayed',
+  'Corporate accounts with monthly invoicing',
+  'Local and regional door-to-door rides',
 ];
 
 export default function IndexRoute() {
@@ -252,19 +252,19 @@ export default function IndexRoute() {
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-950 tracking-tight leading-[1.12]">
-                Dependable, Professional{' '}
+                Dependable, Local{' '}
                 <span
                   style={{ color: 'var(--brand-primary, #2563eb)' }}
                   className="underline decoration-blue-300 decoration-wavy underline-offset-8"
                 >
-                  Taxi &amp; Executive
+                  Taxi &amp; Private
                 </span>{' '}
                 Car Service
               </h1>
 
               <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Book your ride in seconds. Transparent upfront fare estimates, licensed &amp; insured
-                chauffeurs, and 24/7 dispatch across West St. Louis County.
+                Book your ride in seconds. Clear upfront fare estimates, licensed &amp; insured
+                local drivers, and 24/7 dispatch across West St. Louis County.
               </p>
 
               {/* Action Buttons */}
@@ -528,11 +528,11 @@ export default function IndexRoute() {
               Why Choose Chesterfield Taxi
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight mt-1">
-              Engineered for Reliability &amp; Comfort
+              Dependable, Comfortable Local Service
             </h2>
             <p className="text-slate-600 text-base mt-3">
-              We combine modern booking technology with the seasoned accountability of a dedicated,
-              locally-owned car service.
+              Easy online booking backed by the reliability of a locally owned St. Louis car and
+              taxi service.
             </p>
           </div>
 
@@ -620,12 +620,12 @@ export default function IndexRoute() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Ready to experience professional transit?
+            Ready to book your ride?
           </h2>
 
           <p className="text-slate-400 max-w-xl mx-auto text-base">
-            Book now for immediate dispatch or schedule your upcoming reservation in advance with
-            transparent upfront fare estimates.
+            Request a pickup right now or schedule your upcoming ride in advance with clear upfront
+            fare estimates.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
@@ -637,7 +637,7 @@ export default function IndexRoute() {
               }}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-base font-extrabold px-8 py-3.5 rounded-xl shadow-lg hover:opacity-95 transition-all"
             >
-              <span>Book Your Trip Online</span>
+              <span>Book a Ride Online</span>
               <ChevronRightIcon className="w-4 h-4 stroke-[3]" />
             </Link>
 

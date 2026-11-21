@@ -25,7 +25,7 @@ const FLEET_STORAGE_KEY = 'chesterfield_taxi_fleet_assets';
 export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
   {
     id: 'asset-101',
-    unitNumber: 'Cab #101',
+    unitNumber: 'Car #101',
     vehicleTypeId: 'standard',
     make: 'Toyota',
     model: 'Camry Hybrid',
@@ -53,7 +53,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
   },
   {
     id: 'asset-104',
-    unitNumber: 'Cab #104',
+    unitNumber: 'Car #104',
     vehicleTypeId: 'xl',
     make: 'Chevrolet',
     model: 'Suburban LT',
@@ -81,7 +81,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
   },
   {
     id: 'asset-108',
-    unitNumber: 'Cab #108',
+    unitNumber: 'Car #108',
     vehicleTypeId: 'wheelchair',
     make: 'Toyota',
     model: 'Sienna BraunAbility WAV',
@@ -109,7 +109,7 @@ export const DEFAULT_FLEET_ASSETS: PhysicalFleetAsset[] = [
   },
   {
     id: 'asset-112',
-    unitNumber: 'Cab #112',
+    unitNumber: 'Car #112',
     vehicleTypeId: 'standard',
     make: 'Honda',
     model: 'Accord Touring',

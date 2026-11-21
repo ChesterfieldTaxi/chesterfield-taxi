@@ -24,10 +24,10 @@ import {
 
 export function meta() {
   return [
-    { title: `Workspace Hub – ${COMPANY_CONFIG.name}` },
+    { title: `Choose App – ${COMPANY_CONFIG.name}` },
     {
       name: 'description',
-      content: 'Unified portal for Chesterfield Taxi passengers, drivers, dispatchers, and administrators.',
+      content: 'Account switcher for Chesterfield Taxi staff and administrators.',
     },
   ];
 }
@@ -157,7 +157,7 @@ export default function UnifiedAppHubRoute() {
               {COMPANY_CONFIG.name}
             </span>
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block mt-1">
-              Unified Portal
+              Account Hub
             </span>
           </div>
         </Link>
@@ -167,7 +167,7 @@ export default function UnifiedAppHubRoute() {
             to="/"
             className="text-xs font-semibold text-slate-400 hover:text-white px-3 py-2 rounded-xl hover:bg-slate-800/80 transition-colors"
           >
-            Public Site
+            Website
           </Link>
           <button
             type="button"
@@ -186,14 +186,12 @@ export default function UnifiedAppHubRoute() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-semibold text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span>Signed in as {user.displayName || user.email}</span>
-            <span className="text-slate-500">&bull;</span>
-            <span className="text-blue-400 font-bold capitalize">{effectiveRoles.join(', ')}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            Choose Your Workspace
+            Choose Where to Go
           </h1>
           <p className="text-sm text-slate-400 max-w-lg mx-auto">
-            Your account has multi-role permissions. Select where you would like to start—you can switch workspaces anytime from the top bar.
+            Select which app you want to open. You can switch anytime from your account menu.
           </p>
         </div>
 

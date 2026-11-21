@@ -71,7 +71,7 @@ export function WebsiteNavigationTab({
   );
   const [licensingText, setLicensingText] = useState<string>(
     savedNav?.footer?.licensing ||
-      'Licensed Metropolitan Taxicab & Executive Livery Provider. STL Regional Permit #4029.'
+      'Licensed St. Louis Taxi & Car Service. STL Regional Permit #4029.'
   );
   const [facebookUrl, setFacebookUrl] = useState<string>(
     savedNav?.footer?.socials?.facebook || 'https://facebook.com/chesterfieldtaxi'

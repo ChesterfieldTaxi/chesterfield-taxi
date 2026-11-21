@@ -446,7 +446,7 @@ export function Navbar() {
                   <CarIcon className="w-7 h-7" />
                 </div>
                 <p className="text-sm text-slate-600 font-medium leading-relaxed">
-                  Install the {companySettings.name || COMPANY_CONFIG.name} Passenger Web App directly to your phone&apos;s home screen for faster bookings, live driver tracking, and digital receipts.
+                  Add the {companySettings.name || COMPANY_CONFIG.name} Client Portal to your phone&apos;s home screen for faster bookings, live driver tracking, and trip receipts.
                 </p>
               </div>
 
@@ -467,7 +467,7 @@ export function Navbar() {
                   className="w-full flex items-center justify-center gap-2 p-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors shadow-xs"
                 >
                   <CarIcon className="w-4 h-4" />
-                  <span>Open Passenger Portal Web App</span>
+                  <span>Open Client Portal</span>
                 </Link>
               </div>
             </div>

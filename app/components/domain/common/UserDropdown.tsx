@@ -221,7 +221,7 @@ export function UserDropdown({
                       <div className="w-6 h-6 rounded-lg bg-purple-100/80 flex items-center justify-center shrink-0">
                         <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-700" />
                       </div>
-                      <span>Admin Console</span>
+                      <span>Admin</span>
                     </div>
                     {currentPath === 'admin' ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
@@ -247,7 +247,7 @@ export function UserDropdown({
                       <div className="w-6 h-6 rounded-lg bg-blue-100/80 flex items-center justify-center shrink-0">
                         <RadioIcon className="w-3.5 h-3.5 text-blue-700" />
                       </div>
-                      <span>Dispatch Console</span>
+                      <span>Dispatch</span>
                     </div>
                     {currentPath === 'dispatch' ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
@@ -273,7 +273,7 @@ export function UserDropdown({
                       <div className="w-6 h-6 rounded-lg bg-amber-100/80 flex items-center justify-center shrink-0">
                         <CarIcon className="w-3.5 h-3.5 text-amber-700" />
                       </div>
-                      <span>Driver Console</span>
+                      <span>Driver App</span>
                     </div>
                     {currentPath === 'driver' ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
@@ -299,7 +299,7 @@ export function UserDropdown({
                       <div className="w-6 h-6 rounded-lg bg-emerald-100/80 flex items-center justify-center shrink-0">
                         <UserIcon className="w-3.5 h-3.5 text-emerald-700" />
                       </div>
-                      <span>Passenger Portal</span>
+                      <span>Client Portal</span>
                     </div>
                     {currentPath === 'app' || currentPath === 'customer' ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
