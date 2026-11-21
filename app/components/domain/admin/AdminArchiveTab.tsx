@@ -268,7 +268,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
       case 'trip':
         return <Badge variant="neutral" size="sm" className="bg-slate-100 text-slate-800">Trip</Badge>;
       case 'passenger':
-        return <Badge variant="info" size="sm" className="bg-blue-100 text-blue-800">Passenger</Badge>;
+        return <Badge variant="info" size="sm" className="bg-blue-100 text-blue-800">Client</Badge>;
       case 'driver':
         return <Badge variant="success" size="sm" className="bg-emerald-100 text-emerald-800">Driver</Badge>;
       case 'staff':
@@ -325,10 +325,10 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
         </Alert>
       )}
 
-      {/* ─── Single Clean Toolbar + Table Card ─── */}
-      <Card variant="elevated" className="border-slate-200/90 shadow-xs">
-        <CardContent className="p-4 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* ─── Single Clean Toolbar + Mobile Cards / Desktop Table ─── */}
+      <Card variant="elevated" className="border-slate-200/90 shadow-xs overflow-hidden">
+        <CardContent className="p-3 sm:p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
             <div className="w-full sm:w-80">
               <Input
                 placeholder="Search archive by ID, name, reason..."
@@ -337,7 +337,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                 className="text-xs h-9 bg-slate-50"
               />
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto shrink-0">
               <span className="text-xs font-semibold text-slate-500">
                 {filteredRecords.length} archived record{filteredRecords.length === 1 ? '' : 's'}
               </span>
@@ -352,8 +352,71 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
             </div>
           </div>
 
-          {/* ─── Unified Archive Table ─── */}
-          <div className="overflow-x-auto custom-scrollbar rounded-xl border border-slate-200 min-w-full">
+          {/* Mobile Archive Cards (< md) */}
+          <div className="md:hidden space-y-2.5">
+            {filteredRecords.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 rounded-xl border border-slate-200 bg-slate-50/40">
+                <ArchiveBoxIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                <div className="font-bold text-slate-600 text-sm">No Archived Items Found</div>
+                <div className="text-xs mt-1 px-4">
+                  {searchQuery
+                    ? 'No items matched your search filter.'
+                    : 'There are currently no records archived under this category.'}
+                </div>
+              </div>
+            ) : (
+              filteredRecords.map((item) => (
+                <div
+                  key={`${item.entityType}-${item.entityId}`}
+                  className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-2xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getTypeIcon(item.entityType)}
+                      {getTypeBadge(item.entityType)}
+                    </div>
+                    <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                      ARCHIVED
+                    </span>
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-slate-900 text-sm truncate">
+                      {item.displayName || item.entityId}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 truncate">
+                      ID: {item.entityId}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600 space-y-1">
+                    <div>{item.archiveReason || 'Archived by administrator'}</div>
+                    <div className="text-[10px] text-slate-400">
+                      {item.archivedAt ? new Date(item.archivedAt).toLocaleString() : 'Unknown date'}
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRestore(item)}
+                    disabled={isRestoring === item.entityId}
+                    className="w-full justify-center font-bold text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 shadow-2xs h-8 text-xs gap-1.5"
+                  >
+                    {isRestoring === item.entityId ? (
+                      <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckIcon className="w-3.5 h-3.5" />
+                    )}
+                    <span>Restore to Active</span>
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Archive Table (md+) */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar rounded-xl border border-slate-200 min-w-full">
             <table className="w-full text-left text-xs min-w-[700px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                 <tr>

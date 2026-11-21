@@ -17,6 +17,7 @@ import {
   type GovernanceEntityType,
   type EntityGovernanceRecord,
 } from '../../../core/services/governance/universal-governance.service';
+import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 
 export function ArchiveBoxIcon({ className = 'w-5 h-5', ...props }: React.SVGProps<SVGSVGElement>) {
   return (
@@ -125,28 +126,48 @@ export function UniversalArchiveDrawer({
     location_geofence: archivedRecords.filter((r) => r.entityType === 'location').length,
   };
 
+  const sheetDrag = useBottomSheetDragToClose({ onClose });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
-      <div className="w-full max-w-2xl h-full bg-white shadow-2xl flex flex-col border-l border-slate-200">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={sheetDrag.sheetStyle}
+        className="w-full sm:max-w-2xl max-h-[92dvh] sm:max-h-none sm:h-full bg-white rounded-t-3xl sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+      >
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-slate-200 text-slate-800 rounded-xl">
-              <ArchiveBoxIcon className="w-6 h-6" />
+        <div
+          {...sheetDrag.dragHandlers}
+          className="px-4 sm:px-5 pt-2.5 sm:pt-5 pb-3.5 sm:pb-5 border-b border-slate-200 bg-slate-50 shrink-0 touch-none"
+        >
+          <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 sm:p-2.5 bg-slate-200 text-slate-800 rounded-xl shrink-0">
+                <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                  Universal Archive &amp; Governance Center
+                </h3>
+                <p className="text-xs text-slate-500 font-medium truncate">
+                  Soft-deleted entities across Trips, Passengers, Fleet, Drivers, and Zones
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">Universal Archive & Governance Center</h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Soft-deleted entities across Trips, Passengers, Fleet, Drivers, and Zones
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close archive drawer"
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-          >
-            <XIcon className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Sub-Tabs */}

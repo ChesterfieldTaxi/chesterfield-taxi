@@ -258,7 +258,7 @@ export function RatesPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-2 custom-scrollbar">
+        <div className="flex-1 max-h-60 lg:max-h-none overflow-y-auto p-2.5 space-y-2 custom-scrollbar">
           {filteredTariffs.map((t) => {
             const isSelected = t.id === selectedTariffId;
             const modelBadge = getRateBadgeLabel(t);
@@ -565,11 +565,11 @@ export function RatesPanel({
             </div>
 
             {/* 3. Per-Rate Rounding Settings */}
-            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <SlidersIcon className="w-4 h-4 text-blue-600" />
-                  Rounding Settings
+                  <SlidersIcon className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Rounding Settings</span>
                 </h3>
                 <span className="text-[11px] text-slate-500">Applies specifically to trips billed on this Rate</span>
               </div>
@@ -627,11 +627,11 @@ export function RatesPanel({
             </div>
 
             {/* 4. Per-Rate No-Show & Late Cancellation Policy */}
-            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheckIcon className="w-4 h-4 text-rose-600" />
-                  No-Show &amp; Late Cancellation Policy
+                  <ShieldCheckIcon className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>No-Show &amp; Late Cancellation Policy</span>
                 </h3>
                 <span className="text-[11px] text-slate-500">Protection fees tied to this Rate</span>
               </div>

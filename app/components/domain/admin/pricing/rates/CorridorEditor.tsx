@@ -106,7 +106,7 @@ export function CorridorEditor({
             type="button"
             size="sm"
             onClick={() => setIsAdding((prev) => !prev)}
-            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 cursor-pointer"
+            className="w-full sm:w-auto justify-center text-xs bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 cursor-pointer"
           >
             <PlusIcon className="w-3.5 h-3.5 mr-1" />
             Add Corridor
@@ -183,24 +183,24 @@ export function CorridorEditor({
                 className="h-8 text-xs bg-white border-slate-300"
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 pt-4">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 pt-1 md:pt-4">
               <input
                 type="checkbox"
                 checked={allowReturn}
                 onChange={(e) => setAllowReturn(e.target.checked)}
-                className="rounded border-slate-300 text-indigo-600"
+                className="rounded border-slate-300 text-indigo-600 shrink-0"
               />
               <span>Bidirectional (applies in both directions)</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-indigo-200/70">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-indigo-200/70">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsAdding(false)}
-              className="text-xs bg-white"
+              className="w-full sm:w-auto justify-center text-xs bg-white"
             >
               Cancel
             </Button>
@@ -208,7 +208,7 @@ export function CorridorEditor({
               type="submit"
               size="sm"
               disabled={!fromZoneId && !toZoneId}
-              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="w-full sm:w-auto justify-center text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               Save Corridor
             </Button>
@@ -236,7 +236,7 @@ export function CorridorEditor({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 shrink-0">
                 <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
                   <input
                     type="checkbox"

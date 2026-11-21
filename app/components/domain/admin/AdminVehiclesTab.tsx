@@ -14,6 +14,7 @@ import {
   PlusIcon,
   TrashIcon,
   TagIcon,
+  SpinnerIcon,
 } from '../../ui/Icons';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
 import { AdminFleetTab } from './AdminFleetTab';
@@ -232,24 +233,25 @@ export function AdminVehiclesTab({
             </Alert>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div>
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm"><CarIcon className="w-4 h-4" /></span>
-                <h3 className="text-base font-extrabold text-slate-900">Vehicle Types (Service Classes)</h3>
+                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm shrink-0"><CarIcon className="w-4 h-4" /></span>
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900">Vehicle Types (Service Classes)</h3>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Define vehicle categories in service (e.g. Compact SUV, Midsize SUV, Minivan), capacities, and customer photos. Vehicle upgrade fees and tariffs are managed in <strong>Rates &amp; Tariffs</strong>.
+                Define vehicle categories in service (e.g. Compact SUV, Midsize SUV, Minivan), capacities, and client photos. Vehicle upgrade fees and tariffs are managed in <strong>Rates &amp; Tariffs</strong>.
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleResetDefaults}
                 disabled={isSaving}
+                className="justify-center"
               >
                 Reset Defaults
               </Button>
@@ -260,7 +262,7 @@ export function AdminVehiclesTab({
                 size="sm"
                 onClick={() => setShowAddForm(true)}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-sm active:scale-95"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs hover:shadow-sm active:scale-95 justify-center"
               >
                 Add Vehicle Type
               </Button>
@@ -272,7 +274,7 @@ export function AdminVehiclesTab({
             isOpen={showAddForm}
             onClose={() => setShowAddForm(false)}
             title="Add Vehicle Type"
-            subtitle="Create a new service class that customers can book and fleet vehicles map to"
+            subtitle="Create a new service class that clients can book and fleet vehicles map to"
             size="lg"
             footer={
               <>
@@ -409,7 +411,7 @@ export function AdminVehiclesTab({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Customer Description
+                    Client Description
                   </label>
                   <textarea
                     rows={3}
@@ -432,23 +434,23 @@ export function AdminVehiclesTab({
           </AdminSlideOverDrawer>
 
           {/* Vehicle Types Filter Bar */}
-          <div className="flex items-center justify-between gap-4 flex-wrap pb-2 border-b border-slate-200">
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-2 border-b border-slate-200">
+            <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setVehicleFilter('active')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'active'
                     ? 'bg-white text-blue-600 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Active Classes ({vehicles.filter((v) => !v.isArchived).length})
+                Active ({vehicles.filter((v) => !v.isArchived).length})
               </button>
               <button
                 type="button"
                 onClick={() => setVehicleFilter('archived')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'archived'
                     ? 'bg-amber-100 text-amber-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -459,7 +461,7 @@ export function AdminVehiclesTab({
               <button
                 type="button"
                 onClick={() => setVehicleFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'all'
                     ? 'bg-white text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -469,7 +471,7 @@ export function AdminVehiclesTab({
               </button>
             </div>
             <div className="text-xs text-slate-500 font-medium">
-              Archived vehicle classes are hidden from the passenger booking wizard.
+              Archived vehicle classes are hidden from the client booking wizard.
             </div>
           </div>
 
@@ -506,8 +508,8 @@ export function AdminVehiclesTab({
                   </div>
                 )}
 
-                <CardHeader className="p-4 pb-2 border-b border-slate-100 flex flex-row items-start justify-between">
-                  <div className="flex items-center gap-2.5">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                       {v.iconType === 'premium' ? (
                         <SparklesIcon className="w-5 h-5" />
@@ -515,16 +517,16 @@ export function AdminVehiclesTab({
                         <CarIcon className="w-5 h-5" />
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <CardTitle className="text-sm font-bold text-slate-900">{v.name}</CardTitle>
+                        <CardTitle className="text-sm font-bold text-slate-900 truncate">{v.name}</CardTitle>
                         {v.badge && !v.imageUrl && (
                           <Badge variant="warning" size="sm" className="text-[10px] py-0 px-1.5">
                             {v.badge}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <span className="text-[10px] font-mono text-slate-400">ID: {v.id}</span>
                         {v.isArchived && (
                           <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
@@ -535,7 +537,7 @@ export function AdminVehiclesTab({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(index)}
@@ -621,11 +623,11 @@ export function AdminVehiclesTab({
           </div>
 
           {/* Floating Save Actions Bar */}
-          <div className="sticky bottom-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-lg flex items-center justify-between z-20">
-            <div className="flex items-center gap-2">
-              <SparklesIcon className="w-4 h-4 text-amber-500" />
+          <div className="sticky bottom-16 lg:bottom-4 bg-white/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
+            <div className="flex items-center gap-2 min-w-0">
+              <SparklesIcon className="w-4 h-4 text-amber-500 shrink-0" />
               <span className="text-xs text-slate-600">
-                {vehicles.length} vehicle types configured. Changes take effect on next booking calculation.
+                {vehicles.length} vehicle types configured. Changes apply to new quotes.
               </span>
             </div>
 
@@ -635,9 +637,9 @@ export function AdminVehiclesTab({
               size="md"
               onClick={handleSaveVehicles}
               disabled={isSaving || isLoading}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md font-bold px-6"
+              className="w-full sm:w-auto justify-center flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md font-bold px-6 shrink-0"
             >
-              {isSaving ? <CheckIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+              {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
               {isSaving ? 'Saving...' : 'Save Vehicle Types'}
             </Button>
           </div>
@@ -649,7 +651,7 @@ export function AdminVehiclesTab({
         isOpen={Boolean(editingIndex !== null && editForm)}
         onClose={handleCloseEdit}
         title={editForm ? `Edit Vehicle Type: ${editForm.name}` : 'Edit Vehicle Type'}
-        subtitle="Update capacities, icon silhouette, description, and customer booking photo"
+        subtitle="Update capacities, icon silhouette, description, and client booking photo"
         size="lg"
         footer={
           <>
@@ -764,14 +766,14 @@ export function AdminVehiclesTab({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Customer Description
+                  Client Description
                 </label>
                 <textarea
                   rows={3}
                   className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
                   value={editForm.description || ''}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  placeholder="Details displayed to customers..."
+                  placeholder="Details displayed to clients..."
                 />
               </div>
             </section>

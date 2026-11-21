@@ -82,8 +82,8 @@ const ROLE_META: Record<
     iconClass: 'text-purple-600',
   },
   customer: {
-    label: 'Passenger',
-    description: 'Passenger booking portal',
+    label: 'Client',
+    description: 'Client booking portal',
     pillClass: 'bg-slate-100 text-slate-600 border-slate-200',
     cardActiveClass: 'border-slate-500 bg-slate-100/80 ring-1 ring-slate-400/30',
     iconClass: 'text-slate-600',
@@ -682,14 +682,14 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
       </div>
 
       {/* ─── Single Unified Filter & Action Toolbar ─── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 sm:px-4 sm:py-3 rounded-2xl border border-slate-200/90 shadow-xs">
+        <div className="w-full lg:w-auto">
           {/* Archive Filter */}
-          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/80 text-xs font-semibold">
+          <div className="grid grid-cols-3 sm:inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/80 text-xs font-semibold w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setArchiveFilter('active')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'active'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -700,19 +700,19 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
             <button
               type="button"
               onClick={() => setArchiveFilter('archived')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'archived'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+              <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>Archived ({stats.archived})</span>
             </button>
             <button
               type="button"
               onClick={() => setArchiveFilter('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'all'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -724,7 +724,7 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
         </div>
 
         {/* Search & Provision Action */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
           <div className="relative flex-1 sm:w-64">
             <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -744,16 +744,16 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
               setShowAddDrawer(true);
             }}
             leftIcon={<PlusIcon className="w-4 h-4" />}
-            className="text-xs font-bold h-9 shrink-0"
+            className="text-xs font-bold h-9 w-full sm:w-auto justify-center shrink-0"
           >
             Add Member
           </Button>
         </div>
       </div>
 
-      {/* ─── Operators Roster Table ─── */}
+      {/* ─── Operators Roster (Mobile Cards < md, Table md+) ─── */}
       <Card variant="elevated" className="border-slate-200/90 bg-white shadow-xs overflow-hidden rounded-2xl">
-        <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
+        <CardContent className="p-0 min-w-full">
           {isLoading ? (
             <div className="p-14 text-center text-slate-400 flex items-center justify-center gap-2.5">
               <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
@@ -770,7 +770,170 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
               </p>
             </div>
           ) : (
-            <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[820px]">
+            <>
+              {/* Mobile Roster Cards (< md) */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {filteredOperators.map((op) => {
+                  const opRoles: UserRole[] =
+                    op.roles && op.roles.length > 0 ? op.roles : [op.role || 'driver'];
+                  const isDriver = opRoles.includes('driver');
+                  const avatarTone = opRoles.includes('admin')
+                    ? 'bg-purple-100 text-purple-700'
+                    : opRoles.includes('dispatcher')
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-emerald-100 text-emerald-700';
+
+                  return (
+                    <div
+                      key={op.uid}
+                      onClick={() => openEditDrawer(op)}
+                      className="p-3.5 space-y-2.5 active:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${avatarTone}`}
+                          >
+                            {op.displayName ? (
+                              op.displayName.charAt(0).toUpperCase()
+                            ) : (
+                              <UserIcon className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                              <span className="truncate">{op.displayName || 'Unnamed Member'}</span>
+                              {op.cabNumber && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200/80 shrink-0">
+                                  #{op.cabNumber}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate">{op.email}</div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStatus(op);
+                          }}
+                          disabled={isSaving || op.email === 'admin@chesterfieldtaxi.com'}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 cursor-pointer disabled:opacity-60 ${
+                            op.status === 'suspended'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              op.status === 'suspended' ? 'bg-rose-500' : 'bg-emerald-500'
+                            }`}
+                          />
+                          <span>{op.status === 'suspended' ? 'Suspended' : 'Active'}</span>
+                        </button>
+                      </div>
+
+                      {/* Roles + Flags */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {opRoles.map((r) => {
+                          const meta = ROLE_META[r] || ROLE_META.customer;
+                          return (
+                            <span
+                              key={r}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold ${meta.pillClass}`}
+                            >
+                              <RoleIcon role={r} className="w-3 h-3 shrink-0" />
+                              <span>{meta.label}</span>
+                            </span>
+                          );
+                        })}
+                        {isDriver && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md tabular-nums">
+                            Score {op.driverScore ?? 100}
+                          </span>
+                        )}
+                        {op.isBlacklisted && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-900 text-white">
+                            <BanIcon className="w-2.5 h-2.5 text-rose-400" />
+                            <span>Blacklisted</span>
+                          </span>
+                        )}
+                        {op.isArchived && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            <ArchiveBoxIcon className="w-2.5 h-2.5" />
+                            <span>Archived</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Contact & Assignment Box */}
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                          <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{op.phone || 'No phone'}</span>
+                        </div>
+                        {isDriver ? (
+                          <div className="flex items-center gap-1.5 text-slate-600">
+                            {op.assignedUnit && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-semibold text-[10px]">
+                                <CarIcon className="w-3 h-3 text-slate-500" />
+                                {op.assignedUnit}
+                              </span>
+                            )}
+                            {op.driverLicense && (
+                              <span className="font-mono text-[10px] text-slate-500">DL: {op.driverLicense}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">
+                            {op.deskExtension ? `Ext. ${op.deskExtension}` : op.hireDate ? `Joined ${op.hireDate}` : 'Operations Staff'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div
+                        className="flex items-center gap-2 pt-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openEditDrawer(op)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <EditIcon className="w-3.5 h-3.5" />
+                          <span>Edit Profile</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendPasswordReset(op.email)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 hover:text-blue-600 hover:border-blue-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          title="Send password reset email"
+                        >
+                          <LockIcon className="w-3.5 h-3.5" />
+                          <span>Reset PW</span>
+                        </button>
+                        {op.email !== 'admin@chesterfieldtaxi.com' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOperator(op.uid, op.email)}
+                            className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
+                            title="Delete account"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table (md+) */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
+                <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[820px]">
               <thead className="bg-slate-50/90 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-5 py-3">Member</th>
@@ -971,6 +1134,8 @@ export function AdminOperatorsTab({ initialSubTab = 'roster' }: AdminOperatorsTa
                 })}
               </tbody>
             </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

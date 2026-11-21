@@ -25,7 +25,6 @@ import {
   ZapIcon,
 } from '../../../ui/Icons';
 import { UserDropdown } from '../../common/UserDropdown';
-import { RoleViewSwitcher } from '../../common/RoleViewSwitcher';
 
 export interface NavItemConfig {
   key: AdminTabKey;
@@ -65,9 +64,9 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
       },
       {
         key: 'customers',
-        label: 'Customers',
+        label: 'Clients',
         icon: UsersIcon,
-        subHint: 'Passenger Directory & CRM',
+        subHint: 'Client Directory & CRM',
       },
     ],
   },
@@ -283,11 +282,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               </div>
             </>
           )}
-        </div>
-
-        {/* Mobile Drawer Role View Switcher */}
-        <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-950/40 lg:hidden">
-          <RoleViewSwitcher variant="drawer" currentView="admin" user={user} onNavigate={onCloseMobile} />
         </div>
 
         {/* Navigation Group Items */}

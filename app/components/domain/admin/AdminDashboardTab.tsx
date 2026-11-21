@@ -166,13 +166,13 @@ export function AdminDashboardTab({
         <>
           {/* ─── Unassigned Booking Alert Banner (Executive Clean) ─── */}
           {pendingCount > 0 && (
-            <div className="bg-white border border-slate-200/90 border-l-4 border-l-amber-500 rounded-2xl p-4 shadow-xs">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3 min-w-0">
+            <div className="bg-white border border-slate-200/90 border-l-4 border-l-amber-500 rounded-2xl p-3.5 sm:p-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-start gap-3 min-w-0 w-full">
                   <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
                     <AlertTriangleIcon className="w-4 h-4" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-extrabold text-slate-950 text-sm tracking-tight">
                         {pendingCount} Unassigned Booking{pendingCount > 1 ? 's' : ''} Awaiting Dispatch
@@ -182,7 +182,7 @@ export function AdminDashboardTab({
                       </Badge>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 truncate">
-                      Latest request: <strong className="text-slate-700">{pendingTrips[0]?.passenger?.firstName || 'Customer'}</strong> from{' '}
+                      Latest request: <strong className="text-slate-700">{pendingTrips[0]?.passenger?.firstName || 'Client'}</strong> from{' '}
                       <span className="font-mono text-[11px] text-slate-700">{pendingTrips[0]?.pickupLocation?.address?.slice(0, 50) || 'Chesterfield, MO'}</span>
                     </p>
                   </div>
@@ -191,129 +191,129 @@ export function AdminDashboardTab({
                 <button
                   type="button"
                   onClick={() => onNavigateTab?.('trips')}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 text-center cursor-pointer"
                 >
-                  Open Active Queue →
+                  Open Active Queue
                 </button>
               </div>
             </div>
           )}
 
       {/* ─── High-Level KPI Summary Cards ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Metric 1: Total Trips */}
-        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-3 sm:p-4 min-w-0">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 truncate">
               Total Bookings
             </span>
-            <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600"><FileTextIcon className="w-4 h-4" /></span>
+            <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0"><FileTextIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
+          <div className="mt-2 sm:mt-3 flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="text-xl sm:text-3xl font-black text-slate-900 tabular-nums">
               {isLoading ? '...' : totalTripsCount}
             </span>
-            <span className="text-xs text-slate-400 font-medium">all-time</span>
+            <span className="text-[11px] sm:text-xs text-slate-400 font-medium">all-time</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            <strong className="text-emerald-600">{completedCount}</strong> completed &bull;{' '}
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-slate-500 truncate">
+            <strong className="text-emerald-600">{completedCount}</strong> done ·{' '}
             <strong className="text-amber-600">{pendingCount}</strong> pending
           </div>
         </Card>
 
         {/* Metric 2: Live Dispatched */}
-        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-3 sm:p-4 min-w-0">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 truncate">
               Active Trips
             </span>
-            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><CarIcon className="w-4 h-4" /></span>
+            <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0"><CarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-emerald-600">
+          <div className="mt-2 sm:mt-3 flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="text-xl sm:text-3xl font-black text-emerald-600 tabular-nums">
               {isLoading ? '...' : activeDispatchedCount}
             </span>
-            <span className="text-xs text-slate-400 font-medium">in progress</span>
+            <span className="text-[11px] sm:text-xs text-slate-400 font-medium">active</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Vehicles currently in transit</span>
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-slate-500 flex items-center gap-1 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="truncate">In transit now</span>
           </div>
         </Card>
 
         {/* Metric 3: Estimated Revenue */}
-        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-3 sm:p-4 min-w-0">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 truncate">
               Total Revenue
             </span>
-            <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600"><DollarSignIcon className="w-4 h-4" /></span>
+            <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600 shrink-0"><DollarSignIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
-              ${totalRevenue.toFixed(2)}
+          <div className="mt-2 sm:mt-3 flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5 min-w-0">
+            <span className="text-xl sm:text-3xl font-black text-slate-900 tabular-nums truncate">
+              ${totalRevenue.toFixed(0)}
             </span>
-            <span className="text-xs text-slate-400 font-medium">USD</span>
+            <span className="text-[11px] sm:text-xs text-slate-400 font-medium">USD</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Avg fare: <strong>${avgFare.toFixed(2)}</strong> &bull; Surge: <strong>{settings.pricing.surgeMultiplier}x</strong>
+          <div className="mt-1.5 sm:mt-2 text-[11px] text-slate-500 truncate">
+            Avg <strong>${avgFare.toFixed(0)}</strong> · Surge <strong>{settings.pricing.surgeMultiplier}x</strong>
           </div>
         </Card>
 
         {/* Metric 4: Fleet Utilization */}
-        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-3 sm:p-4 min-w-0">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 truncate">
               Fleet Capacity
             </span>
-            <span className="p-1.5 rounded-lg bg-purple-50 text-purple-600"><ZapIcon className="w-4 h-4" /></span>
+            <span className="p-1.5 rounded-lg bg-purple-50 text-purple-600 shrink-0"><ZapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></span>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">
+          <div className="mt-2 sm:mt-3 flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5">
+            <span className="text-xl sm:text-3xl font-black text-slate-900 tabular-nums">
               {utilizationPercent}%
             </span>
-            <span className="text-xs text-slate-400 font-medium">utilization</span>
+            <span className="text-[11px] sm:text-xs text-slate-400 font-medium">active</span>
           </div>
-          <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div className="mt-1.5 sm:mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
             />
           </div>
-          <div className="mt-1 text-[11px] text-slate-500">
-            <strong>{availableDrivers}</strong> available &bull; <strong>{totalDrivers}</strong> total
+          <div className="mt-1 text-[11px] text-slate-500 truncate">
+            <strong>{availableDrivers}</strong> open · <strong>{totalDrivers}</strong> total
           </div>
         </Card>
       </div>
 
       {/* ─── Revenue Charts & Active Trip Volume Section ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* 7-Day Revenue Trends Chart */}
-        <Card variant="elevated" className="lg:col-span-2 border-slate-200 bg-white shadow-xs p-5">
-          <CardHeader className="p-0 mb-4 flex flex-row items-center justify-between">
-            <div>
+        <Card variant="elevated" className="lg:col-span-2 border-slate-200 bg-white shadow-xs p-4 sm:p-5">
+          <CardHeader className="p-0 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="min-w-0">
               <CardTitle className="text-sm font-bold text-slate-900">
                 Weekly Revenue &amp; Trip Volume Trends
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Gross passenger fares across standard and scheduled airport dispatches
+                Gross fares across standard and scheduled airport dispatches
               </CardDescription>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            <div className="shrink-0 self-start sm:self-auto">
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
                 Live Firestore Ledger
               </span>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {/* Visual Bar Chart */}
-            <div className="h-44 flex items-end gap-3 pt-6 pb-2 px-2 border-b border-slate-100">
+            <div className="h-44 flex items-end gap-1.5 sm:gap-3 pt-4 pb-2 px-1 sm:px-2 border-b border-slate-100">
               {simulatedWeeklyData.map((d) => {
                 const barHeightPercent = d.revenue > 0 ? Math.max(12, Math.round((d.revenue / maxDayRevenue) * 100)) : 4;
                 return (
-                  <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5 group">
-                    <span className="text-[10px] font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">
-                      ${d.revenue}
+                  <div key={d.day} className="flex-1 flex flex-col items-center gap-1 group min-w-0">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity tabular-nums truncate max-w-full">
+                      {d.revenue > 0 ? `$${d.revenue}` : ''}
                     </span>
                     <div className="w-full bg-slate-100 rounded-t-lg h-32 flex items-end overflow-hidden">
                       <div
@@ -321,14 +321,14 @@ export function AdminDashboardTab({
                         style={{ height: `${barHeightPercent}%` }}
                       />
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-500">
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
                       {d.day}
                     </span>
                   </div>
                 );
               })}
             </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm bg-blue-600" />
                 <span>Gross Fares</span>
@@ -413,7 +413,7 @@ export function AdminDashboardTab({
       </div>
 
       {/* ─── Recent Bookings Activity ─── */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs flex flex-col">
+      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs flex flex-col overflow-hidden">
         <CardHeader className="border-b border-slate-100 p-4">
           <CardTitle className="text-sm font-bold text-slate-900">
             Recent Booking &amp; Trip Queue
@@ -422,7 +422,7 @@ export function AdminDashboardTab({
             Real-time reservations and operational trip status across Chesterfield and St. Louis.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
+        <CardContent className="p-0 min-w-full">
           {isLoading ? (
             <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
               <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
@@ -433,72 +433,145 @@ export function AdminDashboardTab({
               No bookings registered yet.
             </div>
           ) : (
-            <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[600px]">
-              <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="px-4 py-2.5">Trip ID</th>
-                  <th className="px-4 py-2.5">Passenger</th>
-                  <th className="px-4 py-2.5">Route</th>
-                  <th className="px-4 py-2.5">Fare</th>
-                  <th className="px-4 py-2.5 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+            <>
+              {/* Mobile Recent Trip Cards (< md) */}
+              <div className="md:hidden divide-y divide-slate-100">
                 {recentTrips.map((trip) => {
                   const fare = Number(trip.pricing?.totalFare || trip.payment?.amount || 0);
                   const passengerName = trip.passenger
-                    ? `${trip.passenger.firstName || ''} ${trip.passenger.lastName || ''}`.trim() || 'Anonymous Rider'
-                    : 'Anonymous Rider';
+                    ? `${trip.passenger.firstName || ''} ${trip.passenger.lastName || ''}`.trim() || 'Guest Client'
+                    : 'Guest Client';
                   const passengerPhone = trip.passenger?.phone || '';
-                  const pickup = trip.pickupLocation?.address || 'Pickup address not specified';
-                  const dropoff = trip.dropoffLocation?.address || 'Dropoff address not specified';
+                  const pickup = trip.pickupLocation?.address || 'Pickup not specified';
+                  const dropoff = trip.dropoffLocation?.address || 'Dropoff not specified';
 
                   return (
-                    <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                        #{trip.id.slice(0, 8)}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-slate-900">
-                        <div>{passengerName}</div>
-                        {passengerPhone && (
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {passengerPhone}
+                    <div
+                      key={trip.id}
+                      onClick={() => onNavigateTab?.('trips')}
+                      className="p-3.5 space-y-2 active:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-extrabold text-slate-900 text-xs truncate">
+                            {passengerName}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 max-w-sm space-y-1">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-800">
-                          <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 mt-0.5">
+                            <span>#{trip.id.slice(0, 8)}</span>
+                            {passengerPhone && (
+                              <>
+                                <span>·</span>
+                                <span className="text-slate-500">{passengerPhone}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-black text-xs text-slate-900 tabular-nums">
+                            ${fare > 0 ? fare.toFixed(2) : '--'}
+                          </span>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                              trip.status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : trip.status === 'assigned' || trip.status === 'offered'
+                                ? 'bg-blue-100 text-blue-800'
+                                : trip.status === 'pending'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {trip.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 text-[11px] bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-1.5 text-slate-800 font-medium">
+                          <MapPinIcon className="w-3 h-3 text-emerald-600 shrink-0" />
                           <span className="truncate">{pickup}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                          <FlagIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <FlagIcon className="w-3 h-3 text-rose-500 shrink-0" />
                           <span className="truncate">{dropoff}</span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                        ${fare > 0 ? fare.toFixed(2) : '--'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            trip.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : trip.status === 'assigned' || trip.status === 'offered'
-                              ? 'bg-blue-100 text-blue-800 animate-pulse'
-                              : trip.status === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {trip.status}
-                        </span>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop Table (md+) */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
+                <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[600px]">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="px-4 py-2.5">Trip ID</th>
+                      <th className="px-4 py-2.5">Client</th>
+                      <th className="px-4 py-2.5">Route</th>
+                      <th className="px-4 py-2.5">Fare</th>
+                      <th className="px-4 py-2.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {recentTrips.map((trip) => {
+                      const fare = Number(trip.pricing?.totalFare || trip.payment?.amount || 0);
+                      const passengerName = trip.passenger
+                        ? `${trip.passenger.firstName || ''} ${trip.passenger.lastName || ''}`.trim() || 'Guest Client'
+                        : 'Guest Client';
+                      const passengerPhone = trip.passenger?.phone || '';
+                      const pickup = trip.pickupLocation?.address || 'Pickup address not specified';
+                      const dropoff = trip.dropoffLocation?.address || 'Dropoff address not specified';
+
+                      return (
+                        <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            #{trip.id.slice(0, 8)}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            <div>{passengerName}</div>
+                            {passengerPhone && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {passengerPhone}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 max-w-sm space-y-1">
+                            <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                              <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{pickup}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                              <FlagIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                              <span className="truncate">{dropoff}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-900">
+                            ${fare > 0 ? fare.toFixed(2) : '--'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                trip.status === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : trip.status === 'assigned' || trip.status === 'offered'
+                                  ? 'bg-blue-100 text-blue-800 animate-pulse'
+                                  : trip.status === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {trip.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -557,29 +630,29 @@ export function AdminDashboardTab({
               <CardTitle className="text-sm font-bold text-slate-900">Active Service Health Check &amp; Latencies</CardTitle>
               <CardDescription className="text-xs text-slate-500">Live operational diagnostics across cloud connections</CardDescription>
             </CardHeader>
-            <CardContent className="p-0 space-y-3">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <div>
+            <CardContent className="p-0 space-y-2.5 sm:space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800">Google Maps Platform JavaScript SDK</p>
                   <p className="text-[11px] text-slate-500">DirectionsService, DistanceMatrix, Places Autocomplete</p>
                 </div>
-                <Badge variant="success" size="sm">200 OK (38ms)</Badge>
+                <Badge variant="success" size="sm" className="self-start sm:self-auto shrink-0">200 OK (38ms)</Badge>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800">Firebase Firestore WebSocket Stream</p>
                   <p className="text-[11px] text-slate-500">Real-time collections sync (/trips, /fleet, /config)</p>
                 </div>
-                <Badge variant="success" size="sm">Connected (12ms)</Badge>
+                <Badge variant="success" size="sm" className="self-start sm:self-auto shrink-0">Connected (12ms)</Badge>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800">Dispatch VoIP Gateway</p>
                   <p className="text-[11px] text-slate-500">Inbound caller ID &amp; browser WebRTC telephony</p>
                 </div>
-                <Badge variant="success" size="sm">SIP Ready</Badge>
+                <Badge variant="success" size="sm" className="self-start sm:self-auto shrink-0">SIP Ready</Badge>
               </div>
             </CardContent>
           </Card>
@@ -616,31 +689,31 @@ export function AdminDashboardTab({
               <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-5">
                 <CardTitle className="text-sm font-bold text-slate-900 mb-1">Top Trip Corridors</CardTitle>
                 <CardDescription className="text-xs text-slate-500 mb-4">Most frequent origination &amp; destination pairs</CardDescription>
-                <div className="space-y-3 text-xs">
-                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-slate-800 block">Chesterfield Valley ⇄ STL Lambert</span>
+                <div className="space-y-2.5 text-xs">
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center gap-2">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-800 block truncate">Chesterfield Valley ↔ STL Lambert</span>
                       <span className="text-[11px] text-slate-500">{stlAirportCount} trips recorded</span>
                     </div>
-                    <span className="font-black text-blue-600">
+                    <span className="font-black text-blue-600 shrink-0 tabular-nums">
                       {totalTripsCount > 0 ? `${Math.round((stlAirportCount / tierTotal) * 100)}%` : '0%'}
                     </span>
                   </div>
-                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-slate-800 block">Spirit Airport (SUS) ⇄ St. Louis Metro</span>
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center gap-2">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-800 block truncate">Spirit Airport (SUS) ↔ St. Louis Metro</span>
                       <span className="text-[11px] text-slate-500">{spiritCount} trips recorded</span>
                     </div>
-                    <span className="font-black text-blue-600">
+                    <span className="font-black text-blue-600 shrink-0 tabular-nums">
                       {totalTripsCount > 0 ? `${Math.round((spiritCount / tierTotal) * 100)}%` : '0%'}
                     </span>
                   </div>
-                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-slate-800 block">Local Chesterfield &amp; West County</span>
+                  <div className="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center gap-2">
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-800 block truncate">Local Chesterfield &amp; West County</span>
                       <span className="text-[11px] text-slate-500">{localCount} trips recorded</span>
                     </div>
-                    <span className="font-black text-blue-600">
+                    <span className="font-black text-blue-600 shrink-0 tabular-nums">
                       {totalTripsCount > 0 ? `${Math.round((localCount / tierTotal) * 100)}%` : '0%'}
                     </span>
                   </div>

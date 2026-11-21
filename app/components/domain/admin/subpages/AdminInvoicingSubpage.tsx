@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useBottomSheetDragToClose } from '../../../../core/hooks/useBottomSheetDragToClose';
 import type {
   AppSettings,
   CorporateAccountConfig,
@@ -38,6 +39,7 @@ import {
   LockIcon,
   CopyIcon,
   RefreshCwIcon,
+  XIcon,
 } from '../../../ui/Icons';
 import {
   RegeneratePoModal,
@@ -84,6 +86,13 @@ export function AdminInvoicingSubpage({
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null);
   const [isNewAccountModalOpen, setIsNewAccountModalOpen] = useState(false);
   const [isNewInvoiceModalOpen, setIsNewInvoiceModalOpen] = useState(false);
+
+  const dismissNewAccountModal = useCallback(() => setIsNewAccountModalOpen(false), []);
+  const dismissNewInvoiceModal = useCallback(() => setIsNewInvoiceModalOpen(false), []);
+  const dismissInvoicePreview = useCallback(() => setSelectedInvoice(null), []);
+  const newAccountSheetDrag = useBottomSheetDragToClose({ onClose: dismissNewAccountModal });
+  const newInvoiceSheetDrag = useBottomSheetDragToClose({ onClose: dismissNewInvoiceModal });
+  const invoicePreviewSheetDrag = useBottomSheetDragToClose({ onClose: dismissInvoicePreview });
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1031,7 +1040,7 @@ export function AdminInvoicingSubpage({
     <div className="space-y-5">
       {/* ─── Clean Sub-Tab Utility Bar (Only when Accounts or Accounting Sync needs top actions) ─── */}
       {(activeSub === 'accounts' || activeSub === 'accounting-sync') && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
             {activeSub === 'accounts' && (
               <>
@@ -1048,14 +1057,14 @@ export function AdminInvoicingSubpage({
           </div>
 
           {activeSub === 'accounts' && (
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsCsvModalOpen(true)}
                 leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
-                className="text-xs font-semibold"
+                className="text-xs font-semibold justify-center"
               >
                 Import CSV
               </Button>
@@ -1065,15 +1074,15 @@ export function AdminInvoicingSubpage({
                 size="sm"
                 onClick={() => setIsNewAccountModalOpen(true)}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="text-xs font-bold"
+                className="text-xs font-bold justify-center"
               >
-                Add Corporate Client
+                Add Client
               </Button>
             </div>
           )}
 
           {activeSub === 'accounting-sync' && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
@@ -1081,7 +1090,7 @@ export function AdminInvoicingSubpage({
                 disabled={isExporting}
                 onClick={() => handleExport('quickbooks_csv')}
                 leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="text-xs font-semibold"
+                className="text-xs font-semibold justify-center"
               >
                 QuickBooks CSV
               </Button>
@@ -1092,7 +1101,7 @@ export function AdminInvoicingSubpage({
                 disabled={isExporting}
                 onClick={() => handleExport('quickbooks_iif')}
                 leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="text-xs font-semibold"
+                className="text-xs font-semibold justify-center"
               >
                 QuickBooks IIF
               </Button>
@@ -1103,7 +1112,7 @@ export function AdminInvoicingSubpage({
                 disabled={isExporting}
                 onClick={() => handleExport('general_ledger_json')}
                 leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="text-xs font-bold"
+                className="col-span-2 sm:col-span-1 text-xs font-bold justify-center"
               >
                 Export GL JSON
               </Button>
@@ -1125,76 +1134,76 @@ export function AdminInvoicingSubpage({
 
       {/* ─── Metric KPI Summary (Scoped cleanly to Ledger sub-tab only) ─── */}
       {activeSub === 'ledger' && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Card 1: Total Unbilled AR */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
-              Total Unbilled AR
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider truncate">
+              Unbilled AR
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
-              Pending Statement
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+              Pending
             </span>
           </div>
-          <span className="text-2xl font-black text-slate-900 mt-1 block">
+          <span className="text-lg sm:text-2xl font-black text-slate-900 mt-1 block tabular-nums truncate">
             ${totalUnbilledAR.toFixed(2)}
           </span>
-          <span className="text-xs text-slate-500 font-medium">
-            {unbilledCount} unbilled corporate ride{unbilledCount === 1 ? '' : 's'}
+          <span className="text-[11px] sm:text-xs text-slate-500 font-medium block truncate">
+            {unbilledCount} unbilled ride{unbilledCount === 1 ? '' : 's'}
           </span>
         </div>
 
         {/* Card 2: Outstanding Invoices (>30 Days) */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">
-              Outstanding Invoices (&gt;30 Days)
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 transition-all min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider truncate">
+              Overdue (&gt;30d)
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
               Aging AR
             </span>
           </div>
-          <span className="text-2xl font-black text-rose-600 mt-1 block">
+          <span className="text-lg sm:text-2xl font-black text-rose-600 mt-1 block tabular-nums truncate">
             ${totalOverdue30Days.toFixed(2)}
           </span>
-          <span className="text-xs text-slate-500 font-medium">
-            {overdue30DaysInvoices.length} invoice{overdue30DaysInvoices.length === 1 ? '' : 's'} past 30 days
+          <span className="text-[11px] sm:text-xs text-slate-500 font-medium block truncate">
+            {overdue30DaysInvoices.length} past 30 days
           </span>
         </div>
 
         {/* Card 3: Settled Revenue This Month */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-              Settled Revenue This Month
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider truncate">
+              Settled (MTD)
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
               Reconciled
             </span>
           </div>
-          <span className="text-2xl font-black text-emerald-600 mt-1 block">
+          <span className="text-lg sm:text-2xl font-black text-emerald-600 mt-1 block tabular-nums truncate">
             ${settledRevenueThisMonth.toFixed(2)}
           </span>
-          <span className="text-xs text-slate-500 font-medium">
-            {settledThisMonthInvoices.length} corporate statement{settledThisMonthInvoices.length === 1 ? '' : 's'} collected
+          <span className="text-[11px] sm:text-xs text-slate-500 font-medium block truncate">
+            {settledThisMonthInvoices.length} collected
           </span>
         </div>
 
         {/* Card 4: Total Invoiced (All-Time) */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
-              Total Invoiced (All-Time)
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider truncate">
+              Total Invoiced
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-              Gross Invoiced
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+              All-Time
             </span>
           </div>
-          <span className="text-2xl font-black text-slate-900 mt-1 block">
+          <span className="text-lg sm:text-2xl font-black text-slate-900 mt-1 block tabular-nums truncate">
             ${totalInvoiced.toFixed(2)}
           </span>
-          <span className="text-xs text-slate-500 font-medium">
-            {invoices.length} statements (${totalPaid.toFixed(2)} paid)
+          <span className="text-[11px] sm:text-xs text-slate-500 font-medium block truncate">
+            {invoices.length} stmt · ${totalPaid.toFixed(0)} paid
           </span>
         </div>
       </div>
@@ -1204,45 +1213,48 @@ export function AdminInvoicingSubpage({
       {activeSub === 'ledger' && (
         <div className="space-y-4">
           {/* Sub-view toggle & Batch Action Toolbar */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
             {/* View Mode Pill Switcher */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setLedgerViewMode('ar_ledger')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                   ledgerViewMode === 'ar_ledger'
                     ? 'bg-white text-blue-600 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                AR Ledger &amp; Unbilled Trips ({unbilledTransactions.length})
+                <span className="sm:hidden">AR Ledger ({unbilledTransactions.length})</span>
+                <span className="hidden sm:inline">AR Ledger &amp; Unbilled Trips ({unbilledTransactions.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLedgerViewMode('invoices')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                   ledgerViewMode === 'invoices'
                     ? 'bg-white text-blue-600 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Generated Statements &amp; Invoices ({invoices.length})
+                <span className="sm:hidden">Invoices ({invoices.length})</span>
+                <span className="hidden sm:inline">Generated Statements &amp; Invoices ({invoices.length})</span>
               </button>
             </div>
 
             {/* AR Actions (when in ar_ledger mode) */}
             {ledgerViewMode === 'ar_ledger' && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={handleExportARForQuickBooks}
                   leftIcon={<DownloadIcon className="w-3.5 h-3.5 text-slate-600" />}
-                  className="text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300 hover:bg-slate-50 shadow-xs cursor-pointer"
+                  className="text-xs font-bold text-slate-700 hover:text-slate-900 border-slate-300 hover:bg-slate-50 shadow-xs justify-center cursor-pointer"
                 >
-                  Export CSV for QuickBooks
+                  <span className="sm:hidden">Export CSV</span>
+                  <span className="hidden sm:inline">Export CSV for QuickBooks</span>
                 </Button>
 
                 <Button
@@ -1252,9 +1264,10 @@ export function AdminInvoicingSubpage({
                   disabled={isSaving || (selectedTxIds.length === 0 && unbilledCount === 0)}
                   onClick={() => handleMarkARPaidSettled()}
                   leftIcon={<CheckIcon className="w-3.5 h-3.5 text-emerald-600" />}
-                  className="text-xs font-bold text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 shadow-xs cursor-pointer"
+                  className="text-xs font-bold text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 shadow-xs justify-center cursor-pointer"
                 >
-                  Mark as Paid / Settled {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}
+                  <span className="sm:hidden">Settle {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}</span>
+                  <span className="hidden sm:inline">Mark as Paid / Settled {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}</span>
                 </Button>
 
                 <Button
@@ -1264,7 +1277,7 @@ export function AdminInvoicingSubpage({
                   disabled={isSaving || (selectedTxIds.length === 0 && unbilledCount === 0)}
                   onClick={() => handleGenerateInvoiceFromAR()}
                   leftIcon={<FileTextIcon className="w-3.5 h-3.5 text-white" />}
-                  className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm cursor-pointer"
+                  className="col-span-2 sm:col-span-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs hover:shadow-sm justify-center cursor-pointer"
                 >
                   Generate PDF Invoice {selectedTxIds.length > 0 ? `(${selectedTxIds.length})` : ''}
                 </Button>
@@ -1279,7 +1292,7 @@ export function AdminInvoicingSubpage({
                 size="sm"
                 onClick={() => setIsNewInvoiceModalOpen(true)}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs w-full sm:w-auto justify-center cursor-pointer"
               >
                 Create Direct Invoice
               </Button>
@@ -1287,24 +1300,31 @@ export function AdminInvoicingSubpage({
           </div>
 
           {/* ──── VIEW 1: Accounts Receivable Transactions Ledger ──── */}
-          {ledgerViewMode === 'ar_ledger' && (
+          {ledgerViewMode === 'ar_ledger' && (() => {
+            const filteredArTxs = unbilledTransactions.filter((tx) =>
+              arFilter === 'all' ? true : tx.status === arFilter
+            );
+            const allVisibleSelected =
+              filteredArTxs.length > 0 && selectedTxIds.length === filteredArTxs.length;
+
+            return (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
               {/* Filter Sub-Tabs */}
-              <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-                <div className="flex items-center gap-1">
+              <div className="p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50/50">
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full sm:w-auto">
                   {(['all', 'unbilled', 'invoiced', 'settled'] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setArFilter(mode)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                         arFilter === mode
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'text-slate-600 hover:bg-slate-200/60'
                       }`}
                     >
-                      {mode === 'all' && `All Runs (${unbilledTransactions.length})`}
-                      {mode === 'unbilled' && `Unbilled AR (${unbilledCount})`}
+                      {mode === 'all' && `All (${unbilledTransactions.length})`}
+                      {mode === 'unbilled' && `Unbilled (${unbilledCount})`}
                       {mode === 'invoiced' &&
                         `Invoiced (${unbilledTransactions.filter((t) => t.status === 'invoiced').length})`}
                       {mode === 'settled' &&
@@ -1313,17 +1333,161 @@ export function AdminInvoicingSubpage({
                   ))}
                 </div>
 
-                <div className="text-xs font-medium text-slate-500">
-                  {selectedTxIds.length > 0 ? (
-                    <span className="font-bold text-blue-600">{selectedTxIds.length} trip(s) selected</span>
-                  ) : (
-                    <span>Select rides to batch invoice or settle</span>
-                  )}
+                <div className="flex items-center justify-between sm:justify-end gap-2 text-xs font-medium text-slate-500">
+                  <label className="md:hidden inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTxIds(filteredArTxs.map((t) => t.id));
+                        } else {
+                          setSelectedTxIds([]);
+                        }
+                      }}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>Select All</span>
+                  </label>
+                  <div>
+                    {selectedTxIds.length > 0 ? (
+                      <span className="font-bold text-blue-600">{selectedTxIds.length} trip(s) selected</span>
+                    ) : (
+                      <span>Select rides to batch invoice</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Transactions Table */}
-              <div className="overflow-x-auto custom-scrollbar min-w-full">
+              {/* Mobile AR Cards (< md) */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {filteredArTxs.length === 0 ? (
+                  <div className="py-10 px-4 text-center text-slate-400 text-xs font-medium">
+                    No corporate account transactions recorded yet.
+                  </div>
+                ) : (
+                  filteredArTxs.map((tx) => {
+                    const isSelected = selectedTxIds.includes(tx.id);
+                    return (
+                      <div
+                        key={tx.id}
+                        className={`p-3.5 space-y-2.5 transition-colors ${
+                          isSelected ? 'bg-blue-50/50' : 'bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select transaction ${tx.id}`}
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedTxIds([...selectedTxIds, tx.id]);
+                                } else {
+                                  setSelectedTxIds(selectedTxIds.filter((id) => id !== tx.id));
+                                }
+                              }}
+                              className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-slate-900 text-xs truncate">
+                                {tx.corporateAccountName}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500 mt-0.5">
+                                <span>{tx.pickupDate}</span>
+                                <span>·</span>
+                                <span>{tx.accountNumber || 'CORP-GEN'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-black font-mono text-slate-900 tabular-nums">
+                              ${tx.totalAmount.toFixed(2)}
+                            </div>
+                            <Badge
+                              variant={
+                                tx.status === 'settled'
+                                  ? 'success'
+                                  : tx.status === 'invoiced'
+                                  ? 'default'
+                                  : 'warning'
+                              }
+                              size="sm"
+                              className="font-bold uppercase text-[9px] mt-0.5"
+                            >
+                              {tx.status === 'unbilled' ? 'Unbilled' : tx.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="pl-6 space-y-1.5 text-xs">
+                          <div className="font-semibold text-slate-800">{tx.passengerName}</div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {tx.pickupAddress.split(',')[0]} → {tx.dropoffAddress.split(',')[0]}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] font-mono text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                            <span>Base ${tx.baseFare.toFixed(2)}</span>
+                            <span>Tip ${tx.gratuity.toFixed(2)}</span>
+                            <span>Tolls ${tx.tolls.toFixed(2)}</span>
+                            <span>Wait ${tx.waitTimeFee.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <span className="font-mono text-[10px]">
+                              {tx.invoiceId ? (
+                                <span className="font-bold text-blue-600">{tx.invoiceId}</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Unbilled</span>
+                              )}
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                              {tx.status !== 'settled' && tx.status !== 'invoiced' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleGenerateInvoiceFromAR([tx])}
+                                  className="text-[11px] px-2.5 py-1 h-auto text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 font-bold cursor-pointer"
+                                >
+                                  Invoice
+                                </Button>
+                              )}
+                              {tx.status !== 'settled' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleMarkARPaidSettled([tx.id])}
+                                  className="text-[11px] px-2.5 py-1 h-auto text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-bold cursor-pointer"
+                                >
+                                  Settle
+                                </Button>
+                              )}
+                              {tx.invoiceId && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const foundInv = invoices.find((inv) => inv.id === tx.invoiceId);
+                                    if (foundInv) setSelectedInvoice(foundInv);
+                                  }}
+                                  className="text-[11px] px-2.5 py-1 h-auto text-slate-700 border-slate-200 font-bold cursor-pointer"
+                                >
+                                  View
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Transactions Table (md+) */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
                 <table className="w-full text-left text-xs min-w-[900px]">
                   <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <tr>
@@ -1331,18 +1495,10 @@ export function AdminInvoicingSubpage({
                         <input
                           type="checkbox"
                           aria-label="Select all unbilled corporate transactions"
-                          checked={
-                            unbilledTransactions.length > 0 &&
-                            selectedTxIds.length ===
-                              unbilledTransactions.filter((t) => (arFilter === 'all' ? true : t.status === arFilter))
-                                .length
-                          }
+                          checked={allVisibleSelected}
                           onChange={(e) => {
-                            const filtered = unbilledTransactions.filter((t) =>
-                              arFilter === 'all' ? true : t.status === arFilter
-                            );
                             if (e.target.checked) {
-                              setSelectedTxIds(filtered.map((t) => t.id));
+                              setSelectedTxIds(filteredArTxs.map((t) => t.id));
                             } else {
                               setSelectedTxIds([]);
                             }
@@ -1352,7 +1508,7 @@ export function AdminInvoicingSubpage({
                       </th>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Corporate Account</th>
-                      <th className="px-4 py-3">Passenger &amp; Route</th>
+                      <th className="px-4 py-3">Client &amp; Route</th>
                       <th className="px-4 py-3">Fare Breakdown</th>
                       <th className="px-4 py-3 text-right">Net Total</th>
                       <th className="px-4 py-3 text-center">Status</th>
@@ -1361,9 +1517,7 @@ export function AdminInvoicingSubpage({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {unbilledTransactions
-                      .filter((tx) => (arFilter === 'all' ? true : tx.status === arFilter))
-                      .map((tx) => {
+                    {filteredArTxs.map((tx) => {
                         const isSelected = selectedTxIds.includes(tx.id);
                         return (
                           <tr
@@ -1402,8 +1556,8 @@ export function AdminInvoicingSubpage({
                               <span className="font-bold text-slate-800 block truncate">
                                 {tx.passengerName}
                               </span>
-                              <span className="text-[11px] text-slate-500 block truncate" title={`${tx.pickupAddress} ➔ ${tx.dropoffAddress}`}>
-                                {tx.pickupAddress.split(',')[0]} ➔ {tx.dropoffAddress.split(',')[0]}
+                              <span className="text-[11px] text-slate-500 block truncate" title={`${tx.pickupAddress} → ${tx.dropoffAddress}`}>
+                                {tx.pickupAddress.split(',')[0]} → {tx.dropoffAddress.split(',')[0]}
                               </span>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-slate-600">
@@ -1479,7 +1633,7 @@ export function AdminInvoicingSubpage({
                           </tr>
                         );
                       })}
-                    {unbilledTransactions.length === 0 && (
+                    {filteredArTxs.length === 0 && (
                       <tr>
                         <td colSpan={9} className="py-8 text-center text-slate-400 font-medium">
                           No corporate account transactions recorded yet.
@@ -1490,12 +1644,92 @@ export function AdminInvoicingSubpage({
                 </table>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ──── VIEW 2: Invoiced Statements & Reconciled Statements ──── */}
           {ledgerViewMode === 'invoices' && (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto custom-scrollbar min-w-full">
+              {/* Mobile Invoice Cards (< md) */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {invoices.length === 0 ? (
+                  <div className="py-10 px-4 text-center text-slate-400 text-xs font-medium">
+                    No statements or invoices issued yet.
+                  </div>
+                ) : (
+                  invoices.map((inv) => (
+                    <div key={inv.id} className="p-3.5 space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-extrabold text-xs text-blue-700">
+                              {inv.invoiceNumber}
+                            </span>
+                            <Badge
+                              variant={
+                                inv.status === 'paid'
+                                  ? 'success'
+                                  : inv.status === 'overdue'
+                                  ? 'error'
+                                  : 'warning'
+                              }
+                              size="sm"
+                              className="font-bold uppercase text-[9px]"
+                            >
+                              {inv.status}
+                            </Badge>
+                          </div>
+                          <div className="font-extrabold text-slate-900 text-sm mt-0.5 truncate">
+                            {inv.customerName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate">{inv.customerEmail}</div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-black text-slate-900 font-mono tabular-nums">
+                            ${inv.totalAmount.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 rounded-xl text-[11px]">
+                        <div>
+                          <span className="text-[9px] font-bold uppercase text-slate-400 block">Issued</span>
+                          <span className="font-mono font-semibold text-slate-700">{inv.issuedDate}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold uppercase text-slate-400 block">Due Date</span>
+                          <span className="font-mono font-semibold text-slate-700">{inv.dueDate}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        {inv.status !== 'paid' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleInvoiceStatusUpdate(inv.id, 'paid')}
+                            className="flex-1 text-xs py-1.5 h-auto text-emerald-700 bg-emerald-50 border-emerald-300 font-bold justify-center cursor-pointer"
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedInvoice(inv)}
+                          className="flex-1 text-xs py-1.5 h-auto text-slate-700 border-slate-200 hover:bg-slate-50 font-bold justify-center cursor-pointer"
+                        >
+                          View &amp; Print
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Invoices Table (md+) */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
                 <table className="w-full text-left text-xs min-w-[750px]">
                   <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <tr>
@@ -1602,7 +1836,7 @@ export function AdminInvoicingSubpage({
         return (
           <div className="space-y-4">
             {/* Search & Filter Bar */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
               <div className="relative w-full md:w-96">
                 <input
                   type="text"
@@ -1612,7 +1846,7 @@ export function AdminInvoicingSubpage({
                     setAccountSearchTerm(e.target.value);
                     setAccountPage(1);
                   }}
-                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
                 {accountSearchTerm && (
                   <button
@@ -1621,24 +1855,25 @@ export function AdminInvoicingSubpage({
                       setAccountSearchTerm('');
                       setAccountPage(1);
                     }}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                    aria-label="Clear account search"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
-                    ✕
+                    <XIcon className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
-                <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+              <div className="w-full md:w-auto">
+                <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => {
                       setAccountFilter('all');
                       setAccountPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
                       accountFilter === 'all'
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -1650,9 +1885,9 @@ export function AdminInvoicingSubpage({
                       setAccountFilter('po_enforced');
                       setAccountPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
                       accountFilter === 'po_enforced'
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -1664,9 +1899,9 @@ export function AdminInvoicingSubpage({
                       setAccountFilter('po_disabled');
                       setAccountPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
                       accountFilter === 'po_disabled'
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -1848,13 +2083,13 @@ export function AdminInvoicingSubpage({
 
             {/* Pagination Controls */}
             {totalAccountPages > 1 && (
-              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
-                <span className="text-slate-500 font-medium">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
+                <span className="text-slate-500 font-medium text-center sm:text-left">
                   Showing {((accountPage - 1) * ACCOUNTS_PER_PAGE) + 1}–
                   {Math.min(accountPage * ACCOUNTS_PER_PAGE, filteredCorporateAccounts.length)} of{' '}
                   {filteredCorporateAccounts.length} corporate accounts
                 </span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-center sm:justify-end gap-1.5">
                   <Button
                     size="sm"
                     variant="outline"
@@ -2121,13 +2356,13 @@ export function AdminInvoicingSubpage({
                 </div>
 
                 <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-xs">Pass Processing Surcharge to Customer</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-900 text-xs">Pass Processing Surcharge to Client</span>
                     <input
                       type="checkbox"
                       checked={passCardSurcharge}
                       onChange={(e) => setPassCardSurcharge(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600"
+                      className="w-4 h-4 rounded text-blue-600 shrink-0"
                     />
                   </div>
                   <p className="text-[11px] text-slate-500">
@@ -2464,8 +2699,64 @@ export function AdminInvoicingSubpage({
                 </select>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 pt-2">
-              <div className="overflow-x-auto custom-scrollbar">
+            <CardContent className="p-0 md:p-6 md:pt-2 space-y-4">
+              {/* Mobile General Ledger Cards (< md) */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {filteredLedgerEntries.length === 0 ? (
+                  <div className="py-10 px-4 text-center text-slate-400 text-xs font-medium">
+                    No ledger transactions recorded for the selected period.
+                  </div>
+                ) : (
+                  filteredLedgerEntries.map((entry) => {
+                    const isCredit = entry.type === 'fare_revenue' || entry.type === 'platform_commission';
+                    return (
+                      <div key={entry.id} className="p-3.5 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                entry.type === 'fare_revenue'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : entry.type === 'invoice_settlement'
+                                  ? 'bg-teal-100 text-teal-800'
+                                  : entry.type === 'driver_payout'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : entry.type === 'platform_commission'
+                                  ? 'bg-indigo-100 text-indigo-800'
+                                  : entry.type === 'tip_collected'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-slate-100 text-slate-800'
+                              }`}
+                            >
+                              {entry.type.replace(/_/g, ' ')}
+                            </span>
+                            <span className="font-mono text-[10px] text-slate-500">{entry.date}</span>
+                          </div>
+                          <span
+                            className={`font-mono text-xs font-black tabular-nums shrink-0 ${
+                              isCredit ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {isCredit ? '+' : '-'}${entry.amount.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-800 font-medium leading-snug">
+                          {entry.description}
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-mono text-slate-500">
+                          <span className="font-semibold text-slate-600">{entry.accountCode}</span>
+                          <span className="text-blue-600">{entry.tripId || entry.invoiceId || '—'}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Ledger Table (md+) */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left text-xs min-w-[750px]">
                   <thead className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <tr>
@@ -2530,22 +2821,37 @@ export function AdminInvoicingSubpage({
         </div>
       )}
 
-      {/* ─── Modal: New Corporate Account ─── */}
+      {/* ─── Modal: New Corporate Account (Drag-down sheet on mobile) ─── */}
       {isNewAccountModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
-            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-              <h3 className="font-black text-slate-900 text-base">Register Corporate Account</h3>
-              <button
-                type="button"
-                onClick={() => setIsNewAccountModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsNewAccountModalOpen(false);
+          }}
+        >
+          <div
+            style={newAccountSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...newAccountSheetDrag.dragHandlers}
+              className="px-5 pt-2.5 sm:pt-5 pb-3 border-b border-slate-200 shrink-0 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex justify-between items-center">
+                <h3 className="font-black text-slate-900 text-base">Register Corporate Account</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsNewAccountModalOpen(false)}
+                  aria-label="Close corporate account modal"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleAddCorporateAccount} className="space-y-3 text-xs">
+            <form onSubmit={handleAddCorporateAccount} className="p-5 overflow-y-auto space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Company / Organization Name</label>
                 <input
@@ -2653,22 +2959,37 @@ export function AdminInvoicingSubpage({
         </div>
       )}
 
-      {/* ─── Modal: New Invoice ─── */}
+      {/* ─── Modal: New Invoice (Drag-down sheet on mobile) ─── */}
       {isNewInvoiceModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95">
-            <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-              <h3 className="font-black text-slate-900 text-base">Generate Direct Invoice</h3>
-              <button
-                type="button"
-                onClick={() => setIsNewInvoiceModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsNewInvoiceModalOpen(false);
+          }}
+        >
+          <div
+            style={newInvoiceSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden shadow-2xl border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+          >
+            <div
+              {...newInvoiceSheetDrag.dragHandlers}
+              className="px-5 pt-2.5 sm:pt-5 pb-3 border-b border-slate-200 shrink-0 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex justify-between items-center">
+                <h3 className="font-black text-slate-900 text-base">Generate Direct Invoice</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsNewInvoiceModalOpen(false)}
+                  aria-label="Close invoice modal"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleCreateInvoice} className="space-y-3 text-xs">
+            <form onSubmit={handleCreateInvoice} className="p-5 overflow-y-auto space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Select Corporate Account (Optional)</label>
                 <select
@@ -2683,7 +3004,7 @@ export function AdminInvoicingSubpage({
                   }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                 >
-                  <option value="">Custom / Direct Customer</option>
+                  <option value="">Custom / Direct Client</option>
                   {corporateAccounts.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.companyName} ({c.accountNumber})
@@ -2693,7 +3014,7 @@ export function AdminInvoicingSubpage({
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Customer / Organization Name</label>
+                <label className="font-bold text-slate-700 block mb-1">Client / Organization Name</label>
                 <input
                   type="text"
                   required
@@ -2774,13 +3095,22 @@ export function AdminInvoicingSubpage({
         </div>
       )}
 
-      {/* ─── Modal: Printable PDF Invoice Preview ─── */}
+      {/* ─── Modal: Printable PDF Invoice Preview (Drag-down sheet on mobile) ─── */}
       {selectedInvoice && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedInvoice(null);
+          }}
+        >
           <div
             id="printable-invoice-modal"
-            className="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-6 animate-in zoom-in-95 my-8"
+            style={invoicePreviewSheetDrag.sheetStyle}
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-3xl w-full max-h-[92dvh] sm:max-h-none overflow-y-auto p-5 sm:p-8 shadow-2xl border-t sm:border border-slate-200 space-y-5 sm:space-y-6 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 sm:my-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-8 print:shadow-none print:border-none print:max-h-none"
           >
+            <div {...invoicePreviewSheetDrag.dragHandlers} className="touch-none sm:hidden print:hidden -mt-2 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto" aria-hidden="true" />
+            </div>
             {/* Header: Company & Invoice Metadata */}
             <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-5 gap-4">
               <div>

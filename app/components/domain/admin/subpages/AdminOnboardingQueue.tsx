@@ -7,6 +7,7 @@ import { Button } from '../../../ui/Button';
 import { Card, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
+import { XIcon } from '../../../ui/Icons';
 
 export interface Applicant {
   id: string;
@@ -207,16 +208,16 @@ export function AdminOnboardingQueue() {
   }, [applicants, statusFilter]);
 
   return (
-    <div className="flex gap-6">
-      <div className={`flex-1 ${selectedApplicant ? 'hidden lg:block lg:w-2/3' : 'w-full'}`}>
-        <div className="flex justify-between items-center mb-4">
-           <div className="flex gap-2">
+    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+      <div className={`flex-1 min-w-0 ${selectedApplicant ? 'hidden lg:block lg:w-2/3' : 'w-full'}`}>
+        <div className="flex justify-between items-center mb-3 sm:mb-4">
+           <div className="flex gap-1.5 overflow-x-auto no-scrollbar w-full pb-0.5">
              {['all', 'pending', 'reviewing', 'approved', 'rejected'].map(s => (
                <button
                  key={s}
                  onClick={() => setStatusFilter(s as any)}
-                 className={`px-3 py-1 text-xs rounded-full capitalize font-bold transition-all ${
-                   statusFilter === s ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                 className={`px-3 py-1.5 text-xs rounded-full capitalize font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                   statusFilter === s ? 'bg-slate-900 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                  }`}
                >
                  {s}
@@ -228,8 +229,47 @@ export function AdminOnboardingQueue() {
         {error && <Alert variant="error" title="Error">{error}</Alert>}
         {success && <Alert variant="success" title="Success">{success}</Alert>}
 
-        <Card variant="elevated">
-          <CardContent className="p-0 overflow-x-auto custom-scrollbar min-w-full">
+        <Card variant="elevated" className="rounded-2xl overflow-hidden">
+          <CardContent className="p-0 min-w-full">
+            {/* Mobile Applicant Cards (< md) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {isLoading ? (
+                <div className="p-8 text-center text-slate-500 text-xs">Loading...</div>
+              ) : filtered.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs">No applicants found.</div>
+              ) : filtered.map((a) => (
+                <div key={a.id} className="p-3.5 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-extrabold text-slate-900 text-sm truncate">
+                        {a.firstName} {a.lastName}
+                      </div>
+                      <div className="text-xs text-slate-500 truncate">{a.email}</div>
+                    </div>
+                    <Badge variant={a.status === 'approved' ? 'success' : a.status === 'rejected' ? 'error' : a.status === 'reviewing' ? 'info' : 'warning'}>
+                      {a.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="capitalize font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {a.role}
+                    </span>
+                    <span>Applied {new Date(a.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setSelectedApplicant(a); setSuccess(null); setError(null); }}
+                    className="w-full justify-center font-bold"
+                  >
+                    Review Dossier
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (md+) */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
             <table className="w-full text-left text-xs min-w-[650px]">
               <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
@@ -267,6 +307,7 @@ export function AdminOnboardingQueue() {
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -274,14 +315,21 @@ export function AdminOnboardingQueue() {
       {selectedApplicant && (
         <div className="w-full lg:w-1/3 flex flex-col gap-4">
            <Card className="border-blue-200 shadow-md">
-             <CardContent className="p-6 space-y-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">{selectedApplicant.firstName} {selectedApplicant.lastName}</h3>
-                    <p className="text-sm text-slate-500">{selectedApplicant.email} • {selectedApplicant.phone}</p>
+             <CardContent className="p-4 sm:p-6 space-y-5">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-black text-slate-900 truncate">{selectedApplicant.firstName} {selectedApplicant.lastName}</h3>
+                    <p className="text-xs sm:text-sm text-slate-500 break-words">{selectedApplicant.email} · {selectedApplicant.phone}</p>
                     <Badge className="mt-2 capitalize" variant="info">Target: {selectedApplicant.role}</Badge>
                   </div>
-                  <button onClick={() => setSelectedApplicant(null)} className="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedApplicant(null)}
+                    aria-label="Close applicant dossier"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div className="space-y-3">

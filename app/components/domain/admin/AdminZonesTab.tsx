@@ -41,6 +41,7 @@ import {
   BuildingIcon,
   LandmarkIcon,
   PlaneTakeoffIcon,
+  XIcon,
 } from '../../ui/Icons';
 import { SpecialPlacesAdminPanel } from './places/SpecialPlacesAdminPanel';
 import { InteractiveZoneGoogleMap } from './zones/InteractiveZoneGoogleMap';
@@ -710,36 +711,36 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
   return (
     <div className="space-y-6">
       {/* ─── Zones Top Action Bar ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="text-xs font-bold text-slate-700 px-2 flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="text-xs font-bold text-slate-700 px-1 flex items-center gap-2 min-w-0">
           {activeSubTab === 'zones' && (
             <>
               <MapPinIcon className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Operational Zones &amp; Geofences ({zones.length} active)</span>
+              <span className="truncate">Operational Zones &amp; Geofences ({zones.length})</span>
             </>
           )}
           {activeSubTab === 'groups' && (
             <>
               <LayersIcon className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>Zone Groups &amp; Pricing Corridors ({zoneGroups.length} groups)</span>
+              <span className="truncate">Zone Groups &amp; Corridors ({zoneGroups.length})</span>
             </>
           )}
           {activeSubTab === 'collections' && (
             <>
               <CompassIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>POI Location Collections ({locationCollections.length} collections)</span>
+              <span className="truncate">POI Location Collections ({locationCollections.length})</span>
             </>
           )}
           {activeSubTab === 'blacklists' && (
             <>
               <AlertTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
-              <span>Exclusion Zones &amp; Blacklists ({blacklistedLocations.length} active)</span>
+              <span className="truncate">Exclusion Zones &amp; Blacklists ({blacklistedLocations.length})</span>
             </>
           )}
         </div>
 
         {/* Action Button for Active SubTab */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
           {activeSubTab === 'zones' && (
             <>
               <Button
@@ -747,9 +748,9 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleResetZones}
-                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+                className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
-                Reset Presets
+                Reset
               </Button>
               <Button
                 type="button"
@@ -757,9 +758,9 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 size="sm"
                 onClick={handleStartCreateZone}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="text-xs font-bold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+                className="flex-1 sm:flex-none justify-center text-xs font-bold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
-                Create Radius Zone
+                Radius Zone
               </Button>
               <Button
                 type="button"
@@ -767,7 +768,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 size="sm"
                 onClick={handleStartDrawPolygonZone}
                 leftIcon={<EditIcon className="w-3.5 h-3.5" />}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
                 Draw Polygon Zone
               </Button>
@@ -781,7 +782,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleResetGroups}
-                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+                className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Reset Presets
               </Button>
@@ -791,7 +792,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 size="sm"
                 onClick={handleStartCreateGroup}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+                className="flex-1 sm:flex-none justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
                 Create Zone Group
               </Button>
@@ -805,7 +806,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleResetCollections}
-                className="text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+                className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Reset Presets
               </Button>
@@ -815,7 +816,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 size="sm"
                 onClick={handleStartCreateCollection}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+                className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
                 Create Collection
               </Button>
@@ -830,7 +831,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 size="sm"
                 onClick={handleStartCreateBlacklist}
                 leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
+                className="w-full sm:w-auto justify-center bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-95"
               >
                 Create Exclusion Zone
               </Button>
@@ -851,10 +852,10 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
         </Alert>
       )}
 
-      {/* ─── Main Content Split: Left Directory / Forms + Right Map Visualizer ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (5 cols): Directory & Drawers */}
-        <div className="lg:col-span-5 space-y-4">
+      {/* ─── Main Content Split: Map first on Mobile, Left Directory + Right Map on Desktop ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+        {/* Directory & Drawers (order-2 on mobile so Map appears at top, order-1 on desktop) */}
+        <div className="order-2 lg:order-1 lg:col-span-5 space-y-4">
           <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -917,7 +918,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
               <>
                 {/* --- SubTab 1: Zones Directory --- */}
                 {activeSubTab === 'zones' && (
-                  <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                     {filteredZones.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 text-xs">
                         No matching zones found. Click "Create Zone" to add one.
@@ -960,14 +961,14 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                     e.stopPropagation();
                                     handleToggleZoneActive(z);
                                   }}
-                                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                     z.isActive
                                       ? 'bg-emerald-500 text-white'
                                       : 'bg-slate-200 text-slate-500'
                                   }`}
                                   title={z.isActive ? 'Active Zone' : 'Disabled'}
                                 >
-                                  ✓
+                                  <CheckIcon className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
@@ -995,7 +996,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 {z.isArchived && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
                                     ARCHIVED
@@ -1048,7 +1049,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
 
                 {/* --- SubTab 2: Zone Groups Directory --- */}
                 {activeSubTab === 'groups' && (
-                  <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                     {filteredGroups.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 text-xs">
                         No matching zone groups. Click "Create Zone Group" to cluster zones.
@@ -1092,14 +1093,14 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                     e.stopPropagation();
                                     handleToggleGroupActive(g);
                                   }}
-                                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                     g.isActive
                                       ? 'bg-emerald-500 text-white'
                                       : 'bg-slate-200 text-slate-500'
                                   }`}
                                   title={g.isActive ? 'Active Group' : 'Disabled'}
                                 >
-                                  ✓
+                                  <CheckIcon className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
@@ -1143,7 +1144,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 {g.isArchived && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
                                     ARCHIVED
@@ -1196,7 +1197,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
 
                 {/* --- SubTab 3: Location Collections Directory --- */}
                 {activeSubTab === 'collections' && (
-                  <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                     {filteredCollections.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 text-xs">
                         No matching collections found. Click "Create Collection" to add POIs.
@@ -1238,14 +1239,14 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                     e.stopPropagation();
                                     handleToggleCollectionActive(c);
                                   }}
-                                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                     c.isActive
                                       ? 'bg-emerald-500 text-white'
                                       : 'bg-slate-200 text-slate-500'
                                   }`}
                                   title={c.isActive ? 'Active Collection' : 'Disabled'}
                                 >
-                                  ✓
+                                  <CheckIcon className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
@@ -1293,7 +1294,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                 ) : null}
                               </div>
 
-                              <div className="flex items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 {c.isArchived && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
                                     ARCHIVED
@@ -1368,7 +1369,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                                     : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
                                 }`}
-                                title="Toggle Customer Autocomplete Consolidation"
+                                title="Toggle Client Autocomplete Consolidation"
                               >
                                 {c.consolidateInAutocomplete ? 'Consolidating ON' : '+ Consolidate'}
                               </button>
@@ -1440,15 +1441,16 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                   {/* RADIUS GEOFENCE CONTROLS */}
                   {zoneFormData.type === 'radius' && (
                     <div className="p-3 rounded-xl bg-white border border-blue-200 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800">
-                          ⭕ Radius Center &amp; Perimeter
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 inline-flex items-center gap-1.5">
+                          <CompassIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Radius Center &amp; Perimeter</span>
                         </span>
                         <span className="text-[10px] font-medium text-slate-500">
-                          Click map or drag circle to reposition
+                          Tap map or drag circle to reposition
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         <Input
                           label="Center Lat"
                           type="number"
@@ -1523,7 +1525,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() =>
@@ -1938,8 +1940,8 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <h5 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                          <ZapIcon className="w-3.5 h-3.5 text-amber-600" />
-                          Customer Autocomplete Consolidation
+                          <ZapIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Client Autocomplete Consolidation</span>
                         </h5>
                         <p className="text-[11px] text-amber-800">
                           Collapse multiple Google Places suggestions (terminals, gates, cargo roads) into ONE canonical entry with deterministic coordinates so fares remain exact.
@@ -2228,7 +2230,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
 
           {/* --- SubTab 4: Blacklisted Locations Directory --- */}
           {activeSubTab === 'blacklists' && (
-            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
               {filteredBlacklists.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs">
                   No blacklisted locations found. Click "Create Exclusion Zone" to add one.
@@ -2270,14 +2272,14 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                               e.stopPropagation();
                               handleToggleBlacklistActive(c);
                             }}
-                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                            className={`w-5 h-5 rounded-full flex items-center justify-center ${
                               c.isActive
                                 ? 'bg-red-500 text-white'
                                 : 'bg-slate-200 text-slate-500'
                             }`}
                             title={c.isActive ? 'Active' : 'Disabled'}
                           >
-                            ✓
+                            <CheckIcon className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -2287,7 +2289,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                         </p>
                       )}
                       <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -2432,21 +2434,21 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
           )}
         </div>
 
-        {/* Right Column (7 cols): Interactive Regional Canvas */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Right Column (7 cols): Interactive Regional Canvas (shown first on mobile) */}
+        <div className="order-1 lg:order-2 lg:col-span-7 space-y-4">
           <Card variant="elevated" className="border-slate-200 bg-white shadow-xs overflow-hidden">
-            <CardHeader className="p-3.5 border-b border-slate-100 bg-slate-900 text-white flex flex-row flex-wrap items-center justify-between gap-2">
-              <div>
+            <CardHeader className="p-3 sm:p-3.5 border-b border-slate-100 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
                 <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
-                  <MapIcon className="w-4 h-4 text-blue-400" />
-                  <span>Chesterfield &amp; St. Louis Regional Geofence Map</span>
+                  <MapIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span className="truncate">Chesterfield &amp; St. Louis Geofence Map</span>
                 </CardTitle>
-                <CardDescription className="text-[10px] text-slate-400">
+                <CardDescription className="text-[10px] text-slate-400 mt-0.5">
                   {activeSubTab === 'zones' &&
                     (isEditingZone
                       ? zoneFormData.type === 'polygon'
-                        ? 'POLYGON DRAW MODE: Click anywhere on the map to add vertices, or drag existing handles'
-                        : 'RADIUS EDIT MODE: Click on the map or drag center to position radius circle'
+                        ? 'POLYGON DRAW MODE: Tap map to add vertices, or drag existing handles'
+                        : 'RADIUS EDIT MODE: Tap map or drag center to position radius circle'
                       : 'Spatial visualization of polygon geofences & radius perimeters')}
                   {activeSubTab === 'groups' && 'Cluster visualization of unified Zone Groups'}
                   {activeSubTab === 'collections' && 'Points of Interest with interactive proximity buffers'}
@@ -2454,7 +2456,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 </CardDescription>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {/* Map Engine Toggle: Live Google Map vs Schematic Grid */}
                 <div className="inline-flex rounded-lg bg-slate-800 p-0.5 border border-slate-700 text-[11px]">
                   <button
@@ -2533,7 +2535,7 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                 </div>
 
                 {zoneFormData.type === 'polygon' && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() =>
@@ -2543,9 +2545,9 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                         }))
                       }
                       disabled={(zoneFormData.vertices?.length || 0) === 0}
-                      className="px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 text-[11px] font-bold text-indigo-100 border border-indigo-700"
+                      className="px-2 py-1 rounded bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 text-[11px] font-bold text-indigo-100 border border-indigo-700 cursor-pointer"
                     >
-                      ↩ Undo Last Point
+                      Undo Last Point
                     </button>
                     <button
                       type="button"
@@ -2557,24 +2559,25 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
                           ),
                         }))
                       }
-                      className="px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-[11px] font-bold text-white"
+                      className="px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-[11px] font-bold text-white cursor-pointer"
                     >
-                      ⬛ 4-Point Box
+                      4-Point Box
                     </button>
                     <button
                       type="button"
                       onClick={() => setZoneFormData((prev) => ({ ...prev, vertices: [] }))}
                       disabled={(zoneFormData.vertices?.length || 0) === 0}
-                      className="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 disabled:opacity-40 text-[11px] font-bold text-rose-100 border border-rose-700"
+                      className="px-2 py-1 rounded bg-rose-900/80 hover:bg-rose-800 disabled:opacity-40 text-[11px] font-bold text-rose-100 border border-rose-700 inline-flex items-center gap-1 cursor-pointer"
                     >
-                      ✕ Clear Points
+                      <XIcon className="w-3 h-3" />
+                      <span>Clear Points</span>
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            <CardContent className="p-0 relative bg-slate-950 h-[520px] overflow-hidden">
+            <CardContent className="p-0 relative bg-slate-950 h-[300px] sm:h-[420px] lg:h-[520px] overflow-hidden">
               {mapMode === 'google' ? (
                 <InteractiveZoneGoogleMap
                   zones={zones}
@@ -3047,32 +3050,32 @@ export function AdminZonesTab({ initialSubTab = 'zones' }: AdminZonesTabProps) {
               )}
 
               {/* Bottom Canvas Overlay Legend */}
-              <div className="absolute bottom-2 left-2 right-2 z-10 bg-slate-900/90 backdrop-blur-xs p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between pointer-events-none">
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-white">
-                    {activeSubTab === 'zones' && (isEditingZone ? 'Editing Geofence:' : 'Active Zone:')}
-                    {activeSubTab === 'groups' && 'Active Zone Group:'}
-                    {activeSubTab === 'collections' && 'Active POI / Collection:'}
-                    {activeSubTab === 'blacklists' && 'Active Exclusion Zone:'}
+              <div className="absolute bottom-2 left-2 right-2 z-10 bg-slate-900/90 backdrop-blur-xs px-2.5 py-2 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between gap-2 pointer-events-none">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-bold text-white shrink-0">
+                    {activeSubTab === 'zones' && (isEditingZone ? 'Editing:' : 'Selected:')}
+                    {activeSubTab === 'groups' && 'Group:'}
+                    {activeSubTab === 'collections' && 'Collection:'}
+                    {activeSubTab === 'blacklists' && 'Exclusion:'}
                   </span>
-                  <span className="text-blue-400 font-semibold">
+                  <span className="text-blue-400 font-semibold truncate">
                     {activeSubTab === 'zones' &&
                       (isEditingZone
-                        ? `${zoneFormData.name || 'Untitled'} (${zoneFormData.type === 'polygon' ? `${zoneFormData.vertices?.length || 0} polygon vertices` : `${zoneFormData.radiusMiles || 3} mi radius`})`
+                        ? `${zoneFormData.name || 'Untitled'} (${zoneFormData.type === 'polygon' ? `${zoneFormData.vertices?.length || 0} pts` : `${zoneFormData.radiusMiles || 3} mi`})`
                         : selectedZone?.name || 'None')}
                     {activeSubTab === 'groups' && (selectedGroup?.name || 'None')}
                     {activeSubTab === 'collections' && (selectedCollection?.name || 'None')}
                     {activeSubTab === 'blacklists' && (selectedBlacklist?.name || 'None')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 shrink-0">
                   <span className="text-slate-400">
                     {activeSubTab === 'zones' &&
                       (isEditingZone
                         ? zoneFormData.type === 'polygon'
                           ? 'Click map to add vertices • Drag vertices to adjust'
                           : 'Click map to reposition radius center'
-                        : 'Click a zone to inspect or click "Draw Polygon Zone"')}
+                        : 'Click a zone to inspect or draw a polygon')}
                     {activeSubTab === 'groups' && `${selectedGroup?.zoneIds.length || 0} zones in cluster`}
                     {activeSubTab === 'collections' && `${selectedCollection?.locations?.length || 0} POIs in collection`}
                     {activeSubTab === 'blacklists' && 'Click an exclusion zone to view radius'}

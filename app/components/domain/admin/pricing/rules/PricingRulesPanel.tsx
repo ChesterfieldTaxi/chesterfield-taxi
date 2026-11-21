@@ -540,7 +540,7 @@ export function PricingRulesPanel({
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2.5 space-y-2 custom-scrollbar">
+        <div className="flex-1 max-h-60 lg:max-h-none overflow-y-auto p-2.5 space-y-2 custom-scrollbar">
           {filteredRules.map((rule) => {
             const isSelected = rule.id === selectedRuleId;
             const targetRate = tariffs.find((t) => t.id === rule.modifier.targetTariffId);
@@ -781,13 +781,13 @@ export function PricingRulesPanel({
             </div>
 
             {/* 1. IF — CONDITIONS */}
-            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="p-3.5 sm:p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 inline-flex items-center justify-center text-[11px]">
+                  <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 inline-flex items-center justify-center text-[11px] shrink-0">
                     IF
                   </span>
-                  Conditions (All configured conditions must match)
+                  <span>Conditions (All configured conditions must match)</span>
                 </h3>
                 <span className="text-[11px] text-slate-500">Leave a condition empty to match any</span>
               </div>
@@ -796,11 +796,11 @@ export function PricingRulesPanel({
               <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
-                    Location / Service Zones
+                    <MapPinIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Location / Service Zones</span>
                   </span>
 
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-blue-900 cursor-pointer bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
                       <input
                         type="checkbox"
@@ -814,7 +814,7 @@ export function PricingRulesPanel({
                             },
                           })
                         }
-                        className="rounded border-blue-300 text-blue-600"
+                        className="rounded border-blue-300 text-blue-600 shrink-0"
                       />
                       <span>Airport Transfer Only (STL / SUS)</span>
                     </label>
@@ -822,7 +822,7 @@ export function PricingRulesPanel({
                     <select
                       value={currentZoneMode}
                       onChange={(e) => handleZoneModeChange(e.target.value as any)}
-                      className="h-8 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold text-slate-800"
+                      className="w-full sm:w-auto max-w-full h-8 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold text-slate-800"
                     >
                       <option value="none">Any Location (No Zone Filter)</option>
                       <option value="any_end">Either Pickup or Dropoff in Zone(s)</option>
@@ -997,7 +997,7 @@ export function PricingRulesPanel({
                     <span>Restrict to Time Window (24h, supports overnight e.g. 22:00 → 05:00)</span>
                   </label>
                   {activeTimeWindow && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <Input
                         type="time"
                         value={activeTimeWindow.start}
@@ -1012,7 +1012,7 @@ export function PricingRulesPanel({
                         }
                         className="h-8 text-xs bg-white font-mono"
                       />
-                      <span className="text-xs text-slate-400 font-semibold">to</span>
+                      <span className="text-xs text-slate-400 font-semibold text-center shrink-0">to</span>
                       <Input
                         type="time"
                         value={activeTimeWindow.end}
@@ -1128,13 +1128,13 @@ export function PricingRulesPanel({
             </div>
 
             {/* 2. THEN — SYNTHESIS ACTIONS */}
-            <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div className="p-3.5 sm:p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span className="px-1.5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[10px]">
+                  <span className="px-1.5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[10px] shrink-0">
                     THEN
                   </span>
-                  Synthesize Rate, Surcharges, Extras &amp; Adjustments
+                  <span>Synthesize Rate, Surcharges, Extras &amp; Adjustments</span>
                 </h3>
                 <span className="text-[11px] text-slate-500">Combine any actions in one rule</span>
               </div>
@@ -1220,11 +1220,11 @@ export function PricingRulesPanel({
 
               {/* B. Firewall Surcharge Directives (APPLY / WAIVE / OVERRIDE) */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <ZapIcon className="w-3.5 h-3.5 text-emerald-600" />
-                      Surcharge Directives (Firewall Exceptions)
+                      <ZapIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Surcharge Directives (Firewall Exceptions)</span>
                     </span>
                     <p className="text-[11px] text-slate-500">
                       Attach <strong>Rule-Only</strong> surcharges (APPLY), exclude <strong>Universal</strong> surcharges (WAIVE), or override their rate.
@@ -1235,7 +1235,7 @@ export function PricingRulesPanel({
                     variant="outline"
                     size="sm"
                     onClick={handleAddSurchargeAction}
-                    className="h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
                   >
                     <PlusIcon className="w-3 h-3 mr-1 text-emerald-600" />
                     Add Surcharge Rule
@@ -1258,7 +1258,7 @@ export function PricingRulesPanel({
                           onChange={(e) =>
                             handleUpdateSurchargeAction(idx, { surchargeId: e.target.value })
                           }
-                          className="flex-1 min-w-[180px] h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
+                          className="w-full sm:w-auto flex-1 sm:min-w-[180px] max-w-full h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
                         >
                           {catalogSurcharges.map((s) => (
                             <option key={s.id} value={s.id}>
@@ -1309,25 +1309,27 @@ export function PricingRulesPanel({
                               <option value="percent">%</option>
                               <option value="multiplier">× Mult</option>
                             </select>
-                            <Input
-                              type="number"
-                              step="0.25"
-                              min="0"
-                              value={act.overrideAmount ?? 0}
-                              onChange={(e) =>
-                                handleUpdateSurchargeAction(idx, {
-                                  overrideAmount: parseFloat(e.target.value) || 0,
-                                })
-                              }
-                              className="w-24 h-8 text-xs font-mono font-bold bg-white"
-                            />
+                            <div className="w-24 shrink-0">
+                              <Input
+                                type="number"
+                                step="0.25"
+                                min="0"
+                                value={act.overrideAmount ?? 0}
+                                onChange={(e) =>
+                                  handleUpdateSurchargeAction(idx, {
+                                    overrideAmount: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="h-8 text-xs font-mono font-bold bg-white px-2"
+                              />
+                            </div>
                           </>
                         )}
 
                         <button
                           type="button"
                           onClick={() => handleRemoveSurchargeAction(idx)}
-                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer ml-auto sm:ml-0"
                           title="Remove surcharge action"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
@@ -1340,11 +1342,11 @@ export function PricingRulesPanel({
 
               {/* C. Extra Overrides & Waivers */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <SparklesIcon className="w-3.5 h-3.5 text-amber-600" />
-                      Extra Overrides &amp; Waivers
+                      <SparklesIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Extra Overrides &amp; Waivers</span>
                     </span>
                     <p className="text-[11px] text-slate-500">
                       Optionally waive or customize Car Seat, Extra Passenger, Stop, or Curb Wait pricing when this rule matches.
@@ -1355,7 +1357,7 @@ export function PricingRulesPanel({
                     variant="outline"
                     size="sm"
                     onClick={handleAddExtraAction}
-                    className="h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
                   >
                     <PlusIcon className="w-3 h-3 mr-1 text-amber-600" />
                     Add Extra Override
@@ -1380,7 +1382,7 @@ export function PricingRulesPanel({
                               extraKey: e.target.value as RuleExtraTarget,
                             })
                           }
-                          className="flex-1 min-w-[180px] h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
+                          className="w-full sm:w-auto flex-1 sm:min-w-[180px] max-w-full h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
                         >
                           {EXTRA_TARGETS.map((et) => (
                             <option key={et.id} value={et.id}>
@@ -1409,24 +1411,26 @@ export function PricingRulesPanel({
                         </select>
 
                         {act.action === 'override' && (
-                          <Input
-                            type="number"
-                            step="0.50"
-                            min="0"
-                            value={act.overrideAmount ?? 0}
-                            onChange={(e) =>
-                              handleUpdateExtraAction(idx, {
-                                overrideAmount: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            className="w-24 h-8 text-xs font-mono font-bold bg-white"
-                          />
+                          <div className="w-24 shrink-0">
+                            <Input
+                              type="number"
+                              step="0.50"
+                              min="0"
+                              value={act.overrideAmount ?? 0}
+                              onChange={(e) =>
+                                handleUpdateExtraAction(idx, {
+                                  overrideAmount: parseFloat(e.target.value) || 0,
+                                })
+                              }
+                              className="h-8 text-xs font-mono font-bold bg-white px-2"
+                            />
+                          </div>
                         )}
 
                         <button
                           type="button"
                           onClick={() => handleRemoveExtraAction(idx)}
-                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer ml-auto sm:ml-0"
                           title="Remove extra override"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />

@@ -291,7 +291,7 @@ export function PricingAdminWorkspace({
             'Single IF → THEN synthesis layer connecting conditions to Rates, Surcharges, and Extras.'}
         </p>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
           {hasUnsavedDraft && (
             <Badge
               variant="warning"
@@ -306,7 +306,7 @@ export function PricingAdminWorkspace({
             variant="outline"
             size="sm"
             onClick={() => setIsSimulatorOpen(true)}
-            className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer"
+            className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
           >
             <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
             <span>Test Fare Simulator</span>
@@ -373,7 +373,7 @@ export function PricingAdminWorkspace({
         subtitle="Real-time firewall preview across Rates, Extras, Surcharges & Rules"
         size="md"
       >
-        <div className="-m-5 h-full">
+        <div className="-mx-4 -my-4 sm:-mx-6 sm:-my-5 h-full">
           <PersistentFareSimulator
             tariffs={simulatedTariffs}
             rules={simulatedRules}

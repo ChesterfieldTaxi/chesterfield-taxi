@@ -161,13 +161,13 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
       {/* 4. HOMEPAGE SECTION CANVAS */}
       {activeSubTab === 'layout' && (
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-5 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
+            <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
                 Visual Section Pipeline
               </span>
-              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
                 Homepage Layout Reordering Canvas
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -178,7 +178,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
             <button
               onClick={handleSaveLayout}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+              className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm cursor-pointer"
             >
               {isLoading ? 'Saving...' : 'Save Section Order'}
             </button>
@@ -190,7 +190,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                 <div
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  className="space-y-3"
+                  className="space-y-2.5 sm:space-y-3"
                 >
                   {layout.map((item: any, index: number) => (
                     <Draggable
@@ -203,40 +203,37 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                          className={`flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border transition-all ${
                             snapshot.isDragging
                               ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-500'
                               : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/70'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="cursor-grab text-slate-400 text-base">
-                              ☰
-                            </span>
-                            <span className="font-mono text-xs font-bold text-slate-400">
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <span className="cursor-grab text-slate-400 font-mono text-xs font-bold shrink-0">
                               #{index + 1}
                             </span>
-                            <div>
-                              <span className="font-bold text-slate-900 text-sm block">
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 text-sm block truncate">
                                 {item.type}
                               </span>
-                              <span className="text-[11px] text-slate-500">
+                              <span className="text-[11px] text-slate-500 block leading-snug">
                                 {item.type === 'HeroBanner' && 'High-impact value proposition & quick CTAs'}
                                 {item.type === 'QuickBookingCard' && 'Instant quote calculation & pickup inputs'}
                                 {item.type === 'FleetShowcase' && 'Vehicle service tiers, amenities & capacities'}
                                 {item.type === 'FlatTariffMatrix' && 'Fixed-rate airport & regional transfer pricing'}
                                 {item.type === 'ServiceAreaList' && 'Coverage map & neighborhood directory'}
-                                {item.type === 'TestimonialCarousel' && 'Verified customer reviews & passenger ratings'}
+                                {item.type === 'TestimonialCarousel' && 'Verified client reviews & ratings'}
                                 {item.type === 'ContactBar' && '24/7 direct telephone dispatch badge'}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center shrink-0">
                             <button
                               type="button"
                               onClick={() => toggleSectionEnable(item.id)}
-                              className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${
+                              className={`text-xs px-3 py-1 rounded-full font-bold transition-colors cursor-pointer ${
                                 item.isEnabled
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   : 'bg-slate-200 text-slate-600'
@@ -268,13 +265,13 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
       {/* 6. SEO & SCRIPTS TAB */}
       {activeSubTab === 'seo' && (
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-5 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
+            <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
                 Search Engine Optimization
               </span>
-              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
                 Global SEO &amp; Analytics Script Injector
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -285,7 +282,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
             <button
               onClick={handleSaveSeo}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+              className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm cursor-pointer"
             >
               {isLoading ? 'Saving...' : 'Save SEO & Scripts'}
             </button>
@@ -357,9 +354,9 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
       {/* 7. MONACO CSS EDITOR */}
       {activeSubTab === 'css' && (
-        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
+            <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
                 Developer Customization
               </span>
@@ -374,13 +371,13 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
             <button
               onClick={handleSaveSeo}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+              className="w-full sm:w-auto shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm cursor-pointer"
             >
               {isLoading ? 'Saving...' : 'Publish Custom CSS'}
             </button>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-hidden h-[540px]">
+          <div className="border border-slate-200 rounded-xl overflow-hidden h-[340px] sm:h-[540px]">
             <Suspense
               fallback={
                 <div className="h-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-mono">

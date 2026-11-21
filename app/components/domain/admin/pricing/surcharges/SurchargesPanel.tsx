@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useBottomSheetDragToClose } from '~/core/hooks/useBottomSheetDragToClose';
 import type {
   SurchargesConfig,
   SurchargeCatalogItem,
@@ -19,6 +20,7 @@ import {
   EditIcon,
   AlertTriangleIcon,
   SlidersIcon,
+  XIcon,
 } from '~/components/ui/Icons';
 
 export interface SurchargesPanelProps {
@@ -57,6 +59,8 @@ export function SurchargesPanel({
 
   // Add / Edit Surcharge Modal State (pure catalog definition — zero triggers/tariffs!)
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const dismissSurchargeModal = useCallback(() => setIsModalOpen(false), []);
+  const surchargeSheetDrag = useBottomSheetDragToClose({ onClose: dismissSurchargeModal });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -544,24 +548,37 @@ export function SurchargesPanel({
         })}
       </div>
 
-      {/* Add / Edit Surcharge Modal */}
+      {/* Add / Edit Surcharge Modal (Drag-down bottom sheet on mobile) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+        >
           <form
             onSubmit={handleModalSubmit}
-            className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+            style={surchargeSheetDrag.sheetStyle}
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
           >
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingId ? 'Edit Surcharge' : 'New Surcharge'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 text-lg leading-none cursor-pointer"
-              >
-                ×
-              </button>
+            <div
+              {...surchargeSheetDrag.dragHandlers}
+              className="px-5 pt-2.5 sm:pt-4 pb-3.5 sm:pb-4 border-b border-slate-200 shrink-0 touch-none"
+            >
+              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">
+                  {editingId ? 'Edit Surcharge' : 'New Surcharge'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  aria-label="Close surcharge dialog"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="p-5 space-y-4">

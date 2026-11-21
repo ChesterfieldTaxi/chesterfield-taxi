@@ -535,8 +535,8 @@ export function AdminIntegrationsSubpage({
           {/* Surcharge & Terminal Settings */}
           <Card className="rounded-2xl border-slate-200">
             <CardHeader className="border-b border-slate-100 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="min-w-0">
                   <CardTitle className="text-base font-extrabold text-slate-900">
                     Payment Gateway &amp; Terminal Processing
                   </CardTitle>
@@ -544,16 +544,16 @@ export function AdminIntegrationsSubpage({
                     Configure online card vaults, pre-authorization holds, and driver in-cab terminal surcharges.
                   </CardDescription>
                 </div>
-                <Badge variant={stripeMode === 'live' ? 'success' : 'warning'}>
+                <Badge variant={stripeMode === 'live' ? 'success' : 'warning'} className="self-start sm:self-auto shrink-0">
                   {stripeMode === 'live' ? 'Live Production Mode' : 'Test / Sandbox Mode'}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-6 space-y-6">
+            <CardContent className="p-4 sm:p-6 space-y-5 sm:space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <h4 className="text-sm font-bold text-slate-900">Stripe In-Cab Reader</h4>
                       <p className="text-xs text-slate-500">Allow drivers to accept contactless EMV tap</p>
                     </div>
@@ -561,7 +561,7 @@ export function AdminIntegrationsSubpage({
                       type="checkbox"
                       checked={stripeTerminalEnabled}
                       onChange={(e) => setStripeTerminalEnabled(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600"
+                      className="w-4 h-4 rounded text-blue-600 shrink-0"
                     />
                   </div>
                 </div>
@@ -569,27 +569,27 @@ export function AdminIntegrationsSubpage({
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5">
                   <h4 className="text-sm font-bold text-slate-900">Surcharges &amp; Convenience Fees</h4>
                   <p className="text-xs text-slate-500">
-                    All customer-facing surcharges are configured centrally in{' '}
+                    All client-facing surcharges are configured centrally in{' '}
                     <a href="/app/admin?tab=rates&sub=surcharges" className="text-blue-600 font-semibold hover:underline">
-                      Rates &amp; Tariffs → Surcharges
+                      Rates &amp; Tariffs / Surcharges
                     </a>.
                   </p>
                 </div>
               </div>
 
               {/* Mode Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-white">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-white">
+                <div className="min-w-0">
                   <h4 className="text-sm font-bold text-slate-900">Gateway Processing Mode</h4>
                   <p className="text-xs text-slate-500">
                     Switch between Stripe Test Keys and Live Production Processing.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+                <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-full sm:w-auto shrink-0">
                   <button
                     type="button"
                     onClick={() => setStripeMode('test')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                    className={`px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap cursor-pointer ${
                       stripeMode === 'test' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-600'
                     }`}
                   >
@@ -598,7 +598,7 @@ export function AdminIntegrationsSubpage({
                   <button
                     type="button"
                     onClick={() => setStripeMode('live')}
-                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                    className={`px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap cursor-pointer ${
                       stripeMode === 'live' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600'
                     }`}
                   >
@@ -608,13 +608,13 @@ export function AdminIntegrationsSubpage({
               </div>
 
               {/* Stripe Credentials Section */}
-              <div className="p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CreditCardIcon className="w-5 h-5 text-indigo-600" />
+              <div className="p-4 sm:p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CreditCardIcon className="w-5 h-5 text-indigo-600 shrink-0" />
                     <h3 className="font-extrabold text-slate-900 text-sm">Stripe Gateway API Keys</h3>
                   </div>
-                  <Badge variant={stripeStatus === 'connected' ? 'success' : stripeStatus === 'error' ? 'danger' : 'neutral'}>
+                  <Badge variant={stripeStatus === 'connected' ? 'success' : stripeStatus === 'error' ? 'danger' : 'neutral'} className="shrink-0">
                     {stripeStatus === 'connected' ? 'Connected' : stripeStatus === 'error' ? 'Connection Error' : 'Unverified'}
                   </Badge>
                 </div>
@@ -664,19 +664,19 @@ export function AdminIntegrationsSubpage({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleTestStripe}
                     disabled={stripeStatus === 'checking' || !stripeSk.trim()}
-                    className="text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                    className="w-full sm:w-auto justify-center text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50"
                   >
                     {stripeStatus === 'checking' ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                     Verify Stripe API Connection
                   </Button>
                   {stripeStatusMsg && (
-                    <span className={`text-xs font-medium ${stripeStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    <span className={`text-xs font-medium break-words ${stripeStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
                       {stripeStatusMsg}
                     </span>
                   )}
@@ -684,13 +684,13 @@ export function AdminIntegrationsSubpage({
               </div>
 
               {/* Square Credentials Section */}
-              <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CreditCardIcon className="w-5 h-5 text-slate-700" />
-                    <h3 className="font-extrabold text-slate-900 text-sm">Square Gateway API Keys (Optional Fallback)</h3>
+              <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CreditCardIcon className="w-5 h-5 text-slate-700 shrink-0" />
+                    <h3 className="font-extrabold text-slate-900 text-sm">Square Gateway API Keys</h3>
                   </div>
-                  <Badge variant={squareStatus === 'connected' ? 'success' : squareStatus === 'error' ? 'danger' : 'neutral'}>
+                  <Badge variant={squareStatus === 'connected' ? 'success' : squareStatus === 'error' ? 'danger' : 'neutral'} className="shrink-0">
                     {squareStatus === 'connected' ? 'Connected' : squareStatus === 'error' ? 'Connection Error' : 'Unverified'}
                   </Badge>
                 </div>
@@ -733,19 +733,19 @@ export function AdminIntegrationsSubpage({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleTestSquare}
                     disabled={squareStatus === 'checking' || !squareToken.trim()}
-                    className="text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-100"
+                    className="w-full sm:w-auto justify-center text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-100"
                   >
                     {squareStatus === 'checking' ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                     Verify Square Connection
                   </Button>
                   {squareStatusMsg && (
-                    <span className={`text-xs font-medium ${squareStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    <span className={`text-xs font-medium break-words ${squareStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
                       {squareStatusMsg}
                     </span>
                   )}
@@ -758,7 +758,7 @@ export function AdminIntegrationsSubpage({
                   type="button"
                   onClick={handleSaveGateways}
                   disabled={isSaving}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
+                  className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
                 >
                   {isSaving ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                   Save Payment Gateway Settings
@@ -774,26 +774,26 @@ export function AdminIntegrationsSubpage({
         <div className="space-y-6">
           <Card className="rounded-2xl border-slate-200">
             <CardHeader className="border-b border-slate-100 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="min-w-0">
                   <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                    <PhoneIcon className="w-5 h-5 text-rose-600" />
+                    <PhoneIcon className="w-5 h-5 text-rose-600 shrink-0" />
                     <span>Twilio Telephony &amp; Softphone Gateway</span>
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Connect your Twilio Account to enable real outbound calling to mobile phones, two-way passenger/driver SMS, and number masking.
+                    Connect your Twilio Account to enable real outbound calling, two-way client/driver SMS, and number masking.
                   </CardDescription>
                 </div>
                 <Badge
                   variant={twilioStatus === 'connected' ? 'success' : twilioStatus === 'error' ? 'danger' : 'neutral'}
-                  className="gap-1 font-bold"
+                  className="gap-1 font-bold self-start sm:self-auto shrink-0"
                 >
                   {twilioStatus === 'connected' && <CheckIcon className="w-3 h-3 inline text-emerald-700" />}
                   {twilioStatus === 'connected' ? 'Connected' : twilioStatus === 'error' ? 'Connection Error' : 'Unverified'}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-6 space-y-6">
+            <CardContent className="p-4 sm:p-6 space-y-5 sm:space-y-6">
               {/* Credentials Form */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
@@ -851,19 +851,19 @@ export function AdminIntegrationsSubpage({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleTestTwilioCreds}
                   disabled={twilioStatus === 'checking' || !twilioSid.trim()}
-                  className="text-xs font-bold text-rose-700 border-rose-200 hover:bg-rose-50"
+                  className="w-full sm:w-auto justify-center text-xs font-bold text-rose-700 border-rose-200 hover:bg-rose-50"
                 >
                   {twilioStatus === 'checking' ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                   Verify Twilio Credentials
                 </Button>
                 {twilioStatusMsg && (
-                  <span className={`text-xs font-medium ${twilioStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  <span className={`text-xs font-medium break-words ${twilioStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
                     {twilioStatusMsg}
                   </span>
                 )}
@@ -871,16 +871,16 @@ export function AdminIntegrationsSubpage({
 
               {/* WebRTC In-Browser Softphone Section */}
               <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/40 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PhoneIcon className="w-4 h-4 text-sky-600" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <PhoneIcon className="w-4 h-4 text-sky-600 shrink-0" />
                     <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                      In-Browser WebRTC Softphone (Computer Mic &amp; Headset)
+                      In-Browser WebRTC Softphone
                     </h4>
                   </div>
                   <Badge
                     variant={twilioApiKey.trim() && twilioApiSecret.trim() && twilioTwimlAppSid.trim() ? 'success' : 'neutral'}
-                    className="text-[11px]"
+                    className="text-[11px] self-start sm:self-auto shrink-0"
                   >
                     {twilioApiKey.trim() && twilioApiSecret.trim() && twilioTwimlAppSid.trim()
                       ? 'WebRTC Softphone Ready'
@@ -944,26 +944,26 @@ export function AdminIntegrationsSubpage({
                 <p className="text-xs text-slate-600">
                   Enter your physical cell phone number below and press "Ring My Cell Phone Now". Twilio will place an outbound call and bridge the call directly to your cell.
                 </p>
-                <div className="flex items-center gap-2 max-w-md">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-md">
                   <input
                     type="tel"
                     value={testCallPhone}
                     onChange={(e) => setTestCallPhone(e.target.value)}
                     placeholder="+1 (314) 555-0123"
-                    className="flex-1 px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 bg-white"
+                    className="flex-1 min-w-0 px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 bg-white"
                   />
                   <Button
                     type="button"
                     onClick={handleTriggerTestCall}
                     disabled={testCallStatus === 'calling'}
-                    className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
+                    className="w-full sm:w-auto justify-center bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer shrink-0"
                   >
                     {testCallStatus === 'calling' ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
                         <PhoneIcon className="w-3.5 h-3.5" />
-                        <span>Ring My Cell Phone Now</span>
+                        <span>Ring My Cell Phone</span>
                       </span>
                     )}
                   </Button>
@@ -999,12 +999,12 @@ export function AdminIntegrationsSubpage({
                     className="px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
                   />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <Button
                     type="button"
                     onClick={handleTriggerTestSms}
                     disabled={testSmsStatus === 'sending'}
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
+                    className="w-full sm:w-auto justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer shrink-0"
                   >
                     {testSmsStatus === 'sending' ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />
@@ -1016,7 +1016,7 @@ export function AdminIntegrationsSubpage({
                     )}
                   </Button>
                   {testSmsMsg && (
-                    <span className={`text-xs font-medium ${testSmsStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    <span className={`text-xs font-medium break-words ${testSmsStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>
                       {testSmsMsg}
                     </span>
                   )}
@@ -1029,7 +1029,7 @@ export function AdminIntegrationsSubpage({
                   type="button"
                   onClick={handleSaveTelephony}
                   disabled={isSaving}
-                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
+                  className="w-full sm:w-auto justify-center bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
                 >
                   {isSaving ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
                   Save Telephony Credentials
@@ -1051,10 +1051,10 @@ export function AdminIntegrationsSubpage({
               Configure incoming webhooks for dispatch telemetry and outbound ride events for hotel/concierge integrations.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-6 space-y-4">
+          <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">Inbound Twilio Webhook URL:</span>
-              <code className="text-xs font-mono bg-white p-2 rounded-lg border border-slate-200 block text-slate-700 select-all">
+              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
                 https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_call
               </code>
               <p className="text-[11px] text-slate-500">
@@ -1064,17 +1064,17 @@ export function AdminIntegrationsSubpage({
 
             <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/50 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">TwiML App Voice Request URL (WebRTC Softphone):</span>
-              <code className="text-xs font-mono bg-white p-2 rounded-lg border border-sky-300 block text-sky-800 select-all">
+              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-sky-300 block text-sky-800 select-all break-all">
                 https://chesterfield-taxi.vercel.app/api/telephony?action=voice_client_twiml
               </code>
               <p className="text-[11px] text-slate-500">
-                In Twilio Console &gt; Voice &gt; TwiML Apps, create an App named "Dispatch Softphone" and paste this URL into the <strong>Voice Request URL</strong> field (HTTP POST or GET). Then paste the App SID (<code>AP...</code>) into the Telephony tab above.
+                In Twilio Console &gt; Voice &gt; TwiML Apps, create an App named &ldquo;Dispatch Softphone&rdquo; and paste this URL into the <strong>Voice Request URL</strong> field (HTTP POST or GET). Then paste the App SID (<code>AP...</code>) into the Telephony tab above.
               </p>
             </div>
 
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
               <span className="text-xs font-bold text-slate-800 block">Inbound SMS Webhook URL:</span>
-              <code className="text-xs font-mono bg-white p-2 rounded-lg border border-slate-200 block text-slate-700 select-all">
+              <code className="text-xs font-mono bg-white p-2.5 rounded-lg border border-slate-200 block text-slate-700 select-all break-all">
                 https://chesterfield-taxi.vercel.app/api/telephony?action=incoming_sms
               </code>
               <p className="text-[11px] text-slate-500">

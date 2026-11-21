@@ -203,12 +203,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
             Dynamic Branding &amp; Livery Engine
           </span>
-          <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
             Website Theme Gallery &amp; CSS Token Studio
           </h2>
           <p className="text-xs text-slate-500 mt-1">
@@ -220,7 +220,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           type="button"
           onClick={handleSaveTheme}
           disabled={isLoading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
+          className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
         >
           <SparklesIcon className="w-4 h-4" />
           <span>{isLoading ? 'Publishing Changes...' : 'Save & Publish Theme'}</span>
@@ -259,12 +259,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <span className="text-xs font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors min-w-0">
                       {preset.name}
                     </span>
                     {preset.badge && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                         {preset.badge}
                       </span>
                     )}
@@ -275,29 +275,36 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   </p>
 
                   {/* Swatch Previews */}
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
                     {preset.previewColors.map((hex, idx) => (
                       <div
                         key={idx}
-                        className="w-7 h-7 rounded-lg border border-black/10 shadow-xs"
+                        className="w-7 h-7 rounded-lg border border-black/10 shadow-xs shrink-0"
                         style={{ backgroundColor: hex }}
                         title={hex}
                       />
                     ))}
-                    <div className="text-[11px] font-mono text-slate-400 ml-2">
+                    <div className="text-[11px] font-mono text-slate-400 sm:ml-2">
                       {preset.tokens.btnBorderRadius} radius
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-medium">Font: {preset.tokens.headingFont}</span>
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-400 font-medium truncate">Font: {preset.tokens.headingFont}</span>
                   <span
-                    className={`font-bold inline-flex items-center gap-1 ${
+                    className={`font-bold inline-flex items-center gap-1 shrink-0 ${
                       isSelected ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-800'
                     }`}
                   >
-                    {isSelected ? '✓ Active Theme' : 'Apply Preset →'}
+                    {isSelected ? (
+                      <>
+                        <CheckIcon className="w-3.5 h-3.5" />
+                        <span>Active Theme</span>
+                      </>
+                    ) : (
+                      'Apply Preset →'
+                    )}
                   </span>
                 </div>
               </div>
@@ -307,9 +314,9 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       </div>
 
       {/* Dynamic Branding Studio: Live Token Customizer */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
         {/* Left: Fine-Grained Controls */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+        <div className="lg:col-span-7 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
           <div className="border-b border-slate-100 pb-4">
             <h3 className="text-base font-extrabold text-slate-900">
               Fine-Grained Color &amp; Style Overrides
@@ -328,12 +335,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   type="color"
                   value={branding.primaryColor || '#2563eb'}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value, btnPrimaryBg: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                 />
                 <Input
                   value={branding.primaryColor || '#2563eb'}
                   onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value, btnPrimaryBg: e.target.value })}
-                  className="font-mono text-xs uppercase"
+                  className="font-mono text-xs uppercase min-w-0"
                 />
               </div>
               <span className="text-[10px] text-slate-500 block">Used for main CTAs, active highlights &amp; icons</span>
@@ -347,12 +354,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   type="color"
                   value={branding.secondaryColor || '#0f172a'}
                   onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                 />
                 <Input
                   value={branding.secondaryColor || '#0f172a'}
                   onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
-                  className="font-mono text-xs uppercase"
+                  className="font-mono text-xs uppercase min-w-0"
                 />
               </div>
               <span className="text-[10px] text-slate-500 block">Used for contrast panels, badges &amp; subheaders</span>
@@ -366,12 +373,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   type="color"
                   value={branding.navbarBg || '#0f172a'}
                   onChange={(e) => setBranding({ ...branding, navbarBg: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                 />
                 <Input
                   value={branding.navbarBg || '#0f172a'}
                   onChange={(e) => setBranding({ ...branding, navbarBg: e.target.value })}
-                  className="font-mono text-xs uppercase"
+                  className="font-mono text-xs uppercase min-w-0"
                 />
               </div>
               <span className="text-[10px] text-slate-500 block">Top navigation bar background tint</span>
@@ -431,8 +438,8 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
         </div>
 
         {/* Right: Live Interactive Card Preview */}
-        <div className="lg:col-span-5 space-y-4 sticky top-6">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
               Live Real-Time Rendering Preview
             </span>
@@ -440,19 +447,19 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
             {/* Mock Header */}
             <div
               style={{ backgroundColor: branding.navbarBg || '#0f172a' }}
-              className="p-3.5 rounded-xl text-white flex items-center justify-between mb-4 shadow-xs"
+              className="p-3.5 rounded-xl text-white flex items-center justify-between gap-2 mb-4 shadow-xs"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <div
                   style={{
                     backgroundColor: branding.primaryColor || '#2563eb',
                     borderRadius: branding.btnBorderRadius || '8px',
                   }}
-                  className="w-7 h-7 flex items-center justify-center text-white text-xs font-bold"
+                  className="w-7 h-7 flex items-center justify-center text-white text-xs font-bold shrink-0"
                 >
                   <CarIcon className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold">{COMPANY_CONFIG.name}</span>
+                <span className="text-xs font-bold truncate">{COMPANY_CONFIG.name}</span>
               </div>
               <span
                 style={{
@@ -460,7 +467,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   borderRadius: branding.btnBorderRadius || '8px',
                   color: branding.btnPrimaryText || '#ffffff',
                 }}
-                className="text-[10px] font-bold px-2.5 py-1"
+                className="text-[10px] font-bold px-2.5 py-1 shrink-0"
               >
                 Book Now
               </span>
@@ -493,7 +500,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                 Guaranteed upfront pricing, licensed chauffeurs, and instant airport dispatch to STL Lambert.
               </p>
 
-              <div className="pt-2 flex items-center gap-2">
+              <div className="pt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   style={{
@@ -517,9 +524,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
               <span>Tokens will sync to <code>root.tsx</code></span>
-              <span className="font-mono text-emerald-600 font-bold">● Active Sync</span>
+              <span className="font-mono text-emerald-600 font-bold inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Active Sync
+              </span>
             </div>
           </div>
         </div>

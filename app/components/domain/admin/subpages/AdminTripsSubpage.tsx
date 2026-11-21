@@ -654,12 +654,13 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-xs text-slate-900">
-                          #{trip.id.slice(-6).toUpperCase()}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-900 truncate">
+                          <ClockIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="truncate">{pickupTimeStr}</span>
                         </span>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {pickupTimeStr}
+                        <span className="font-mono font-semibold text-[10.5px] text-slate-400 shrink-0">
+                          #{trip.id.slice(-6).toUpperCase()}
                         </span>
                       </div>
                       <Badge

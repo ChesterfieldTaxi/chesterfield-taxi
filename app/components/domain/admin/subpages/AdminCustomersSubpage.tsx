@@ -21,6 +21,9 @@ import {
   PlusIcon,
   EditIcon,
   CarIcon,
+  PhoneIcon,
+  MailIcon,
+  XIcon,
 } from '../../../ui/Icons';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawer';
@@ -70,6 +73,8 @@ export function AdminCustomersSubpage({
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [editForm, setEditForm] = useState<Partial<CustomerProfile>>({});
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [showBlacklistInput, setShowBlacklistInput] = useState(false);
+  const [blacklistReasonDraft, setBlacklistReasonDraft] = useState('');
   const [governanceRefreshKey, setGovernanceRefreshKey] = useState(0);
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived' | 'all'>('active');
   const [isArchiveDrawerOpen, setIsArchiveDrawerOpen] = useState(false);
@@ -139,11 +144,13 @@ export function AdminCustomersSubpage({
       notes: cust.notes || '',
     });
     setSaveSuccessMessage(null);
+    setShowBlacklistInput(false);
+    setBlacklistReasonDraft('');
   };
 
   const handleSaveCustomer = () => {
     if (!editForm.name?.trim() || !editForm.phone?.trim()) {
-      alert('Passenger Name and Phone Number are required.');
+      alert('Client Name and Phone Number are required.');
       return;
     }
     const service = getContactService();
@@ -177,7 +184,7 @@ export function AdminCustomersSubpage({
         : null
     );
     setIsEditingCustomer(false);
-    setSaveSuccessMessage('Contact profile saved successfully.');
+    setSaveSuccessMessage('Client profile saved successfully.');
     setGovernanceRefreshKey((k) => k + 1);
     setTimeout(() => setSaveSuccessMessage(null), 3500);
   };
@@ -366,23 +373,33 @@ export function AdminCustomersSubpage({
     <div className="space-y-4">
       {/* ─── Unified Directory Toolbar (only shown on Directory sub-tab; Corporate has its own toolbar) ─── */}
       {activeSub === 'directory' && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="w-full sm:w-64">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
+            <div className="relative w-full sm:w-64 lg:w-72">
               <input
                 type="text"
-                placeholder="Search passenger by name, phone, email..."
+                placeholder="Search clients by name, phone, email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Clear client search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+            <div className="grid grid-cols-3 sm:inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setArchiveFilter('active')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                   archiveFilter === 'active'
                     ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
@@ -393,19 +410,19 @@ export function AdminCustomersSubpage({
               <button
                 type="button"
                 onClick={() => setArchiveFilter('archived')}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
                   archiveFilter === 'archived'
                     ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
-                <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+                <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Archived ({archivedCustomers.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setArchiveFilter('all')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                   archiveFilter === 'all'
                     ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-900'
@@ -434,97 +451,154 @@ export function AdminCustomersSubpage({
                 preferredVehicle: 'Standard Sedan',
               }, true);
             }}
-            className="text-xs font-bold shrink-0"
+            className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
           >
-            Add Contact
+            Add Client
           </Button>
         </div>
       )}
 
-      {/* ─── Directory Table ─── */}
+      {/* ─── Client Directory Cards (matching Corporate card layout) ─── */}
       {activeSub === 'directory' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar min-w-full">
-            <table className="w-full text-left text-xs min-w-[800px]">
-              <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Passenger</th>
-                  <th className="px-4 py-3">Customer Score</th>
-                  <th className="px-4 py-3">Phone & Email</th>
-                  <th className="px-4 py-3">Affiliation</th>
-                  <th className="px-4 py-3">Total Rides</th>
-                  <th className="px-4 py-3">Lifetime Spend</th>
-                  <th className="px-4 py-3">Preferred Class</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredCustomers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-4 py-3 font-bold text-slate-900">
-                      <div className="flex items-center gap-2">
-                        <span>{cust.name}</span>
-                        {cust.isVip && (
-                          <Badge variant="warning" size="sm" className="text-[9px] px-1 py-0 font-black">
-                            VIP
-                          </Badge>
-                        )}
-                        {cust.isBlacklisted && (
-                          <Badge variant="error" size="sm" className="text-[9px] px-1.5 py-0 font-extrabold">
-                            BLACKLISTED
-                          </Badge>
-                        )}
-                        {cust.isArchived && (
-                          <Badge variant="neutral" size="sm" className="text-[9px] px-1.5 py-0 font-extrabold">
-                            ARCHIVED
-                          </Badge>
-                        )}
-                      </div>
-                      {cust.blacklistReason && (
-                        <p className="text-[10px] text-rose-600 font-semibold mt-0.5">
-                          Reason: {cust.blacklistReason}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 font-black text-xs px-2.5 py-0.5 rounded-full border ${
-                          (cust.customerScore ?? 90) >= 80
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : (cust.customerScore ?? 90) >= 60
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                        title="Phase 29 Dual-Scoring Engine: Customer Metric"
-                      >
-                        <StarIcon className="w-3 h-3 shrink-0" />
-                        <span>{cust.customerScore ?? 90} / 100</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-slate-700 block">{cust.phone}</span>
-                      <span className="text-[11px] text-slate-500 block truncate max-w-[180px]">
-                        {cust.email}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {cust.corporateAccountName ? (
-                        <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                          {cust.corporateAccountName}
+        isLoading ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-12 flex items-center justify-center gap-2 text-slate-400">
+            <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
+            <span className="text-xs font-semibold">Loading clients...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+            {filteredCustomers.map((cust) => {
+              const score = cust.customerScore ?? 90;
+              const scoreTone =
+                score >= 80
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : score >= 60
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200';
+              const initial = (cust.name || 'C').trim().charAt(0).toUpperCase();
+
+              return (
+                <Card
+                  key={cust.id}
+                  onClick={() => handleOpenCustomer(cust, false)}
+                  className="border border-slate-200/90 shadow-xs flex flex-col justify-between hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                >
+                  <div>
+                    <CardHeader className="pb-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                              cust.isBlacklisted
+                                ? 'bg-rose-100 text-rose-700'
+                                : cust.isVip
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}
+                          >
+                            {initial}
+                          </div>
+                          <div className="min-w-0">
+                            <CardTitle className="text-sm font-black text-slate-900 truncate">
+                              {cust.name}
+                            </CardTitle>
+                            <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                              {cust.corporateAccountName ? (
+                                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-1.5 py-0.2 rounded-md truncate max-w-[160px]">
+                                  {cust.corporateAccountName}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400">Direct Client</span>
+                              )}
+                              {cust.isVip && (
+                                <Badge variant="warning" size="sm" className="text-[9px] px-1.5 py-0 font-black">
+                                  VIP
+                                </Badge>
+                              )}
+                              {cust.isBlacklisted && (
+                                <Badge variant="error" size="sm" className="text-[9px] px-1.5 py-0 font-extrabold">
+                                  BLACKLISTED
+                                </Badge>
+                              )}
+                              {cust.isArchived && (
+                                <Badge variant="neutral" size="sm" className="text-[9px] px-1.5 py-0 font-extrabold">
+                                  ARCHIVED
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`inline-flex items-center gap-1 font-black text-[11px] px-2 py-0.5 rounded-full border shrink-0 tabular-nums ${scoreTone}`}
+                          title="Client Score"
+                        >
+                          <StarIcon className="w-3 h-3 shrink-0" />
+                          <span>{score}</span>
                         </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">Direct Retail</span>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-2.5 text-xs">
+                      {cust.blacklistReason && (
+                        <div className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-700 font-semibold">
+                          Block reason: {cust.blacklistReason}
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-800">{cust.tripCount} trips</td>
-                    <td className="px-4 py-3 font-black text-slate-900">
-                      ${cust.totalSpend.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-slate-600">
-                      {cust.preferredVehicle || 'Standard'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+
+                      {/* Contact Box */}
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                        <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                          <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono text-[11px] truncate">{cust.phone}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <MailIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="text-[11px] truncate">{cust.email || 'No email on file'}</span>
+                        </div>
+                      </div>
+
+                      {/* Metrics Row */}
+                      <div className="grid grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-xl text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block text-[9px] uppercase font-bold">Rides</span>
+                          <span className="font-extrabold text-slate-900 tabular-nums">{cust.tripCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[9px] uppercase font-bold">Spend</span>
+                          <span className="font-extrabold text-emerald-700 tabular-nums">
+                            ${cust.totalSpend.toFixed(0)}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-slate-400 block text-[9px] uppercase font-bold">Class</span>
+                          <span className="font-bold text-slate-700 capitalize truncate block">
+                            {cust.preferredVehicle || 'Standard'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Footer */}
+                      <div
+                        className="flex items-center gap-1.5 pt-2 border-t border-slate-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenCustomer(cust, false)}
+                          className="text-[11px] font-bold flex-1 py-1.5 h-auto text-slate-700 border-slate-200 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Details
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenCustomer(cust, true)}
+                          className="text-[11px] font-bold flex-1 py-1.5 h-auto text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 cursor-pointer"
+                        >
+                          Edit
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -537,7 +611,7 @@ export function AdminCustomersSubpage({
                             }
                             setGovernanceRefreshKey((k) => k + 1);
                           }}
-                          className={`text-[11px] px-2 py-1 font-bold flex items-center gap-1 ${
+                          className={`text-[11px] px-2.5 py-1.5 h-auto font-bold flex items-center gap-1 cursor-pointer ${
                             cust.isArchived
                               ? 'text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100'
                               : 'text-slate-600 border-slate-200 hover:bg-slate-100'
@@ -555,30 +629,26 @@ export function AdminCustomersSubpage({
                             </>
                           )}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleOpenCustomer(cust, false)}
-                          className="text-[11px] px-2 py-1 text-slate-600 hover:text-slate-900 font-bold cursor-pointer"
-                        >
-                          Details
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleOpenCustomer(cust, true)}
-                          className="text-[11px] px-2 py-1 text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
-                        >
-                          Edit
-                        </Button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </CardContent>
+                  </div>
+                </Card>
+              );
+            })}
+
+            {filteredCustomers.length === 0 && (
+              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
+                <UsersIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                <p className="text-slate-600 font-bold text-sm">No clients found</p>
+                <p className="text-slate-400 font-medium text-xs mt-1">
+                  {searchTerm
+                    ? `No clients matched "${searchTerm}".`
+                    : 'Add a client or switch the filter above.'}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        )
       )}
 
       {/* ─── Corporate Subpage ─── */}
@@ -605,75 +675,78 @@ export function AdminCustomersSubpage({
         return (
           <div className="space-y-4">
             {/* Search and Filter */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="relative w-full sm:w-80">
-                <input
-                  type="text"
-                  placeholder={`Search ${corporateClients.length} corporate accounts...`}
-                  value={corpSearchTerm}
-                  onChange={(e) => {
-                    setCorpSearchTerm(e.target.value);
-                    setCorpPage(1);
-                  }}
-                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-                {corpSearchTerm && (
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
+                <div className="relative w-full sm:w-64 lg:w-80">
+                  <input
+                    type="text"
+                    placeholder={`Search ${corporateClients.length} corporate accounts...`}
+                    value={corpSearchTerm}
+                    onChange={(e) => {
+                      setCorpSearchTerm(e.target.value);
+                      setCorpPage(1);
+                    }}
+                    className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                  {corpSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCorpSearchTerm('');
+                        setCorpPage(1);
+                      }}
+                      aria-label="Clear corporate search"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <XIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => {
-                      setCorpSearchTerm('');
+                      setCorpFilter('all');
                       setCorpPage(1);
                     }}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
+                      corpFilter === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    ✕
+                    All ({corporateClients.length})
                   </button>
-                )}
-              </div>
-
-              <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCorpFilter('all');
-                    setCorpPage(1);
-                  }}
-                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-                    corpFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All ({corporateClients.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCorpFilter('po_enforced');
-                    setCorpPage(1);
-                  }}
-                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-                    corpFilter === 'po_enforced'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  PO Enforced ({corporateClients.filter((a) => a.poRequired).length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCorpFilter('po_disabled');
-                    setCorpPage(1);
-                  }}
-                  className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-                    corpFilter === 'po_disabled'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  PO Optional ({corporateClients.filter((a) => !a.poRequired).length})
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCorpFilter('po_enforced');
+                      setCorpPage(1);
+                    }}
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
+                      corpFilter === 'po_enforced'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    PO Enforced ({corporateClients.filter((a) => a.poRequired).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCorpFilter('po_disabled');
+                      setCorpPage(1);
+                    }}
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
+                      corpFilter === 'po_disabled'
+                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    PO Optional ({corporateClients.filter((a) => !a.poRequired).length})
+                  </button>
+                </div>
               </div>
 
               {onSave && (
@@ -683,7 +756,7 @@ export function AdminCustomersSubpage({
                   size="sm"
                   leftIcon={<PlusIcon className="w-4 h-4" />}
                   onClick={handleOpenNewCorp}
-                  className="text-xs font-bold shrink-0"
+                  className="text-xs font-bold w-full lg:w-auto justify-center shrink-0"
                 >
                   Add Corporate Account
                 </Button>
@@ -844,13 +917,13 @@ export function AdminCustomersSubpage({
 
             {/* Pagination */}
             {totalCorpPages > 1 && (
-              <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
-                <span className="text-slate-500 font-medium">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
+                <span className="text-slate-500 font-medium text-center sm:text-left">
                   Showing {((corpPage - 1) * CORP_PAGE_SIZE) + 1}–
                   {Math.min(corpPage * CORP_PAGE_SIZE, filteredCorp.length)} of{' '}
                   {filteredCorp.length} corporate accounts
                 </span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-center sm:justify-end gap-1.5">
                   <Button
                     size="sm"
                     variant="outline"
@@ -890,15 +963,15 @@ export function AdminCustomersSubpage({
           selectedCustomer
             ? isEditingCustomer
               ? selectedCustomer.id?.startsWith('cust_new_')
-                ? 'Add Contact'
-                : `Edit Contact: ${selectedCustomer.name || 'Passenger'}`
+                ? 'Add Client'
+                : `Edit Client: ${selectedCustomer.name || 'Client'}`
               : selectedCustomer.name
-            : 'Contact'
+            : 'Client'
         }
         subtitle={
           selectedCustomer
             ? isEditingCustomer
-              ? 'Update contact details, chauffeur preferences, and dispatcher notes'
+              ? 'Update client details, chauffeur preferences, and dispatcher notes'
               : selectedCustomer.email
             : ''
         }
@@ -930,7 +1003,7 @@ export function AdminCustomersSubpage({
                   }}
                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-slate-700 transition-colors cursor-pointer"
                 >
-                  {isEditingCustomer ? 'View Profile' : 'Edit Contact'}
+                  {isEditingCustomer ? 'View Profile' : 'Edit Client'}
                 </button>
               )}
             </div>
@@ -967,7 +1040,7 @@ export function AdminCustomersSubpage({
                 }
                 className="font-bold"
               >
-                {selectedCustomer.id?.startsWith('cust_new_') ? 'Add Contact' : 'Save Contact'}
+                {selectedCustomer.id?.startsWith('cust_new_') ? 'Add Client' : 'Save Client'}
               </Button>
             </>
           ) : (
@@ -990,7 +1063,7 @@ export function AdminCustomersSubpage({
                 }}
                 leftIcon={<EditIcon className="w-4 h-4" />}
               >
-                Edit Contact
+                Edit Client
               </Button>
               <Button
                 type="button"
@@ -1112,7 +1185,7 @@ export function AdminCustomersSubpage({
                           onChange={(e) => setEditForm((f) => ({ ...f, isVip: e.target.checked }))}
                           className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
                         />
-                        <span className="font-bold text-slate-800">VIP Priority Passenger</span>
+                        <span className="font-bold text-slate-800">VIP Priority Client</span>
                       </label>
                     </div>
                   </div>
@@ -1133,13 +1206,13 @@ export function AdminCustomersSubpage({
               /* ─── VIEW MODE ─── */
               <div className="space-y-4 text-xs">
                 <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-                  <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between">
-                    <div>
+                  <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <span className="text-[10px] uppercase font-black text-blue-700 tracking-wider block">
                         Dual-Scoring Engine
                       </span>
                       <div className="text-sm font-black text-slate-900 mt-0.5">
-                        Customer Score: {selectedCustomer.customerScore ?? 90} / 100
+                        Client Score: {selectedCustomer.customerScore ?? 90} / 100
                       </div>
                       <div className="text-[10px] text-slate-500 mt-0.5">
                         Evaluated from ride frequency, completion fidelity, and cancellations.
@@ -1163,7 +1236,7 @@ export function AdminCustomersSubpage({
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-1">
                       <div className="font-black flex items-center gap-1.5">
                         <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
-                        <span>BLACKLISTED PASSENGER</span>
+                        <span>BLACKLISTED CLIENT</span>
                       </div>
                       <p className="text-[11px] text-rose-700">
                         Reason: {selectedCustomer.blacklistReason || 'Administrative Block'}
@@ -1182,7 +1255,7 @@ export function AdminCustomersSubpage({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <span className="font-semibold text-slate-600 block mb-1">Phone Number</span>
                       <p className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono">{selectedCustomer.phone}</p>
@@ -1235,17 +1308,8 @@ export function AdminCustomersSubpage({
                         const gov = getUniversalGovernanceService();
                         const isCurrentlyBl = !!selectedCustomer.isBlacklisted;
                         if (!isCurrentlyBl) {
-                          const reason = window.prompt(`Enter blacklist reason for ${selectedCustomer.name}:`);
-                          if (reason === null) return;
-                          await gov.setBlacklistStatus('passenger', selectedCustomer.phone, true, reason || 'Blacklisted by Admin');
-                          if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
-                            await gov.setBlacklistStatus('passenger', selectedCustomer.email, true, reason || 'Blacklisted by Admin');
-                          }
-                          setSelectedCustomer({
-                            ...selectedCustomer,
-                            isBlacklisted: true,
-                            blacklistReason: reason || 'Blacklisted by Admin',
-                          });
+                          setShowBlacklistInput((v) => !v);
+                          return;
                         } else {
                           await gov.setBlacklistStatus('passenger', selectedCustomer.phone, false);
                           if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
@@ -1256,8 +1320,8 @@ export function AdminCustomersSubpage({
                             isBlacklisted: false,
                             blacklistReason: undefined,
                           });
+                          setGovernanceRefreshKey((k) => k + 1);
                         }
-                        setGovernanceRefreshKey((k) => k + 1);
                       }}
                       className={`text-xs font-bold cursor-pointer ${
                         selectedCustomer.isBlacklisted
@@ -1269,12 +1333,12 @@ export function AdminCustomersSubpage({
                         {selectedCustomer.isBlacklisted ? (
                           <>
                             <CheckIcon className="w-3.5 h-3.5" />
-                            <span>Restore Passenger</span>
+                            <span>Restore Client</span>
                           </>
                         ) : (
                           <>
                             <BanIcon className="w-3.5 h-3.5" />
-                            <span>Blacklist</span>
+                            <span>{showBlacklistInput ? 'Cancel Blacklist' : 'Blacklist'}</span>
                           </>
                         )}
                       </span>
@@ -1299,6 +1363,58 @@ export function AdminCustomersSubpage({
                       {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
                     </Button>
                   </div>
+
+                  {showBlacklistInput && !selectedCustomer.isBlacklisted && (
+                    <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2 animate-in fade-in duration-150">
+                      <label className="block text-[11px] font-bold text-rose-900">
+                        Reason for blacklisting {selectedCustomer.name}
+                      </label>
+                      <input
+                        type="text"
+                        value={blacklistReasonDraft}
+                        onChange={(e) => setBlacklistReasonDraft(e.target.value)}
+                        placeholder="e.g. Repeated no-shows, unpaid balance..."
+                        className="w-full px-3 py-2 text-xs bg-white border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowBlacklistInput(false);
+                            setBlacklistReasonDraft('');
+                          }}
+                          className="text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={async () => {
+                            const gov = getUniversalGovernanceService();
+                            const reason = blacklistReasonDraft.trim() || 'Blacklisted by Admin';
+                            await gov.setBlacklistStatus('passenger', selectedCustomer.phone, true, reason);
+                            if (selectedCustomer.email && selectedCustomer.email !== 'N/A') {
+                              await gov.setBlacklistStatus('passenger', selectedCustomer.email, true, reason);
+                            }
+                            setSelectedCustomer({
+                              ...selectedCustomer,
+                              isBlacklisted: true,
+                              blacklistReason: reason,
+                            });
+                            setShowBlacklistInput(false);
+                            setBlacklistReasonDraft('');
+                            setGovernanceRefreshKey((k) => k + 1);
+                          }}
+                          className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                        >
+                          Confirm Blacklist
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </div>
             )}

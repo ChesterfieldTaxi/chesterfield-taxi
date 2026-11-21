@@ -288,29 +288,29 @@ export function SpecialPlacesAdminPanel() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner */}
-      <div className="p-4.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <MapPinIcon className="w-4 h-4 text-emerald-600" />
-              Special Places & Landmarks
+      <div className="p-3.5 sm:p-4.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              <MapPinIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Special Places &amp; Landmarks</span>
             </h2>
             <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px]">
-              Site-Wide Autocomplete Suggestions
+              Site-Wide Autocomplete
             </Badge>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            User-friendly landmarks, regional airports, hospitals, venues, and corporate pickup zones. Automatically displayed at the top of location inputs site-wide.
+            Landmarks, airports, hospitals, venues, and corporate pickup zones displayed at the top of location inputs site-wide.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleResetDefaults}
-            className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+            className="flex-1 sm:flex-none justify-center text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
           >
             Reset Defaults
           </Button>
@@ -319,7 +319,7 @@ export function SpecialPlacesAdminPanel() {
             variant="outline"
             size="sm"
             onClick={handleSyncFirestore}
-            className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+            className="flex-1 sm:flex-none justify-center text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
           >
             Cloud Sync
           </Button>
@@ -327,7 +327,7 @@ export function SpecialPlacesAdminPanel() {
             type="button"
             size="sm"
             onClick={handleStartCreate}
-            className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
+            className="w-full sm:w-auto justify-center text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
           >
             <PlusIcon className="w-3.5 h-3.5 mr-1" />
             Add Special Place
@@ -543,7 +543,7 @@ export function SpecialPlacesAdminPanel() {
               className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
             />
             <span className="text-[11px] text-slate-500 mt-1 block">
-              When a customer types any of these aliases, this place will match automatically.
+              When a client types any of these aliases, this place will match automatically.
             </span>
           </div>
 

@@ -275,16 +275,16 @@ export function PersistentFareSimulator({
   const breakdownItems = pricing?.breakdown || [];
 
   return (
-    <div className={`flex flex-col h-full bg-white border-l border-slate-200 text-slate-900 ${className}`}>
+    <div className={`flex flex-col h-full bg-white lg:border-l border-slate-200 text-slate-900 ${className}`}>
       {/* Simulator Header */}
-      <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white/95 backdrop-blur sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+      <div className="p-3.5 sm:p-4 border-b border-slate-200 flex items-center justify-between bg-white/95 backdrop-blur sticky top-0 z-10">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
             <SparklesIcon className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              Fare Simulator
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
+              <span>Fare Simulator</span>
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
                 LIVE
               </span>
@@ -567,7 +567,7 @@ export function PersistentFareSimulator({
             </select>
           </div>
 
-          <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+          <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <label className="text-xs text-slate-700 font-medium flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -578,16 +578,18 @@ export function PersistentFareSimulator({
               Hourly Dedicated Charter
             </label>
             {isHourly && (
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min="1"
-                  value={hourlyHours}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setHourlyHours(parseInt(e.target.value, 10) || 1)
-                  }
-                  className="w-16 h-7 text-xs bg-white border-slate-300 text-slate-900 text-center font-bold"
-                />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="w-16">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={hourlyHours}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setHourlyHours(parseInt(e.target.value, 10) || 1)
+                    }
+                    className="h-7 text-xs bg-white border-slate-300 text-slate-900 text-center font-bold px-1.5"
+                  />
+                </div>
                 <span className="text-[11px] text-slate-500">hrs</span>
               </div>
             )}
@@ -675,30 +677,30 @@ export function PersistentFareSimulator({
                   className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
                 />
               </div>
-              <div>
+              <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Date</label>
                 <Input
                   type="date"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                  className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono px-2"
                 />
               </div>
-              <div>
+              <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Time</label>
                 <Input
                   type="time"
                   value={pickupTime}
                   onChange={(e) => setPickupTime(e.target.value)}
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                  className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono px-2"
                 />
               </div>
-              <div>
+              <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Zone</label>
                 <select
                   value={originZoneId}
                   onChange={(e) => setOriginZoneId(e.target.value)}
-                  className="w-full h-7 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
+                  className="w-full h-8 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
                 >
                   <option value="">Any Zone</option>
                   {availableZones.map((z) => (
@@ -706,12 +708,12 @@ export function PersistentFareSimulator({
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Dropoff Zone</label>
                 <select
                   value={destinationZoneId}
                   onChange={(e) => setDestinationZoneId(e.target.value)}
-                  className="w-full h-7 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
+                  className="w-full h-8 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
                 >
                   <option value="">Any Zone</option>
                   {availableZones.map((z) => (
@@ -817,10 +819,10 @@ export function PersistentFareSimulator({
             <div className="mt-2 p-3 rounded-xl bg-slate-900 border border-slate-800 font-mono text-[10px] space-y-2 max-h-56 overflow-y-auto custom-scrollbar text-slate-300">
               {ctx.auditTrail.map((step, idx: number) => (
                 <div key={idx} className="border-b border-slate-800 pb-1.5 last:border-0 last:pb-0">
-                  <div className="text-emerald-400 font-semibold">
+                  <div className="text-emerald-400 font-semibold break-words">
                     Step {step.stepNumber}: {step.stepName}
                   </div>
-                  <div className="text-slate-400 whitespace-pre-wrap">{step.description}</div>
+                  <div className="text-slate-400 whitespace-pre-wrap break-words">{step.description}</div>
                   <div className="text-slate-500 text-[9px] mt-0.5 flex justify-between">
                     <span>
                       Delta: {step.appliedDelta >= 0 ? `+$${step.appliedDelta.toFixed(2)}` : `-$${Math.abs(step.appliedDelta).toFixed(2)}`}

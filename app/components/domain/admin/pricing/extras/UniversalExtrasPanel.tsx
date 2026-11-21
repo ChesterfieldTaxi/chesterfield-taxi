@@ -199,10 +199,10 @@ export function UniversalExtrasPanel({
   return (
     <div className="space-y-5">
       {/* Header Save Bar */}
-      <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-900">Extras &amp; User-Selected Services</h2>
+      <div className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Extras &amp; User-Selected Services</h2>
             {isDirty && (
               <Badge
                 variant="warning"
@@ -214,11 +214,11 @@ export function UniversalExtrasPanel({
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Single source of truth for optional services passengers choose on <code>/book</code> &amp; Dispatch, plus pickup curb wait time. Any Extra can be waived or overridden per condition in <strong>Rules</strong>.
+            Single source of truth for optional services clients choose on <code>/book</code> &amp; Dispatch, plus pickup curb wait time. Any Extra can be waived or overridden per condition in <strong>Rules</strong>.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end shrink-0">
           {saveSuccess && (
             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
               <CheckIcon className="w-3.5 h-3.5" />
@@ -231,7 +231,7 @@ export function UniversalExtrasPanel({
             size="sm"
             disabled={!isDirty}
             onClick={() => setWorkingCopy(JSON.parse(JSON.stringify(extras)))}
-            className="h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
+            className="flex-1 sm:flex-none justify-center h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
           >
             Discard
           </Button>
@@ -240,7 +240,7 @@ export function UniversalExtrasPanel({
             size="sm"
             onClick={handleSave}
             disabled={isSaving || !isDirty}
-            className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer"
+            className="flex-1 sm:flex-none justify-center h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-2xs cursor-pointer"
           >
             <CheckIcon className="w-3.5 h-3.5 mr-1" />
             {isSaving ? 'Saving...' : 'Save Extras'}
@@ -299,7 +299,7 @@ export function UniversalExtrasPanel({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Included Free Riders</label>
               <Input
@@ -378,7 +378,7 @@ export function UniversalExtrasPanel({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Free Grace Window (min)</label>
               <Input
@@ -448,7 +448,7 @@ export function UniversalExtrasPanel({
         {isAddingCargo && (
           <form
             onSubmit={handleAddCargoCategory}
-            className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-end gap-2.5"
+            className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5"
           >
             <div className="flex-1 w-full">
               <label className="text-[11px] font-medium text-slate-700 block mb-1">Item Name</label>
@@ -481,7 +481,7 @@ export function UniversalExtrasPanel({
               />
               <span>Requires SUV/Van</span>
             </label>
-            <Button type="submit" size="sm" className="h-8 text-xs bg-indigo-600 text-white shrink-0">
+            <Button type="submit" size="sm" className="h-8 w-full sm:w-auto justify-center text-xs bg-indigo-600 text-white shrink-0">
               Add
             </Button>
           </form>
@@ -502,19 +502,21 @@ export function UniversalExtrasPanel({
                 />
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 sm:gap-3 shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-slate-500">Fee ($):</span>
-                  <Input
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={cat.fee}
-                    onChange={(e) =>
-                      handleUpdateOversizedCategory(idx, { fee: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-20 h-7.5 text-xs font-mono font-bold text-right bg-white"
-                  />
+                  <span className="text-[11px] text-slate-500 shrink-0">Fee ($):</span>
+                  <div className="w-20 shrink-0">
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={cat.fee}
+                      onChange={(e) =>
+                        handleUpdateOversizedCategory(idx, { fee: parseFloat(e.target.value) || 0 })
+                      }
+                      className="h-7.5 text-xs font-mono font-bold text-right bg-white px-2"
+                    />
+                  </div>
                 </div>
 
                 <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">

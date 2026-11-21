@@ -5,7 +5,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Alert } from '../../ui/Alert';
-import { InfoIcon, CarIcon, CreditCardIcon, CashIcon, BuildingIcon, PlaneIcon, StarIcon } from '../../ui/Icons';
+import {
+  InfoIcon,
+  CarIcon,
+  CreditCardIcon,
+  CashIcon,
+  BuildingIcon,
+  StarIcon,
+  ExternalLinkIcon,
+} from '../../ui/Icons';
 
 interface AdminLayoutTabProps {
   settings: AppSettings;
@@ -66,7 +74,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save customer form settings.');
+      setSaveError(err instanceof Error ? err.message : 'Failed to save client form settings.');
     } finally {
       setIsSavingConfig(false);
     }
@@ -87,11 +95,11 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* ─── Header ─── */}
       <div>
-        <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
-          Public Customer Booking Form Settings
+        <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+          Public Client Booking Form Settings
         </h3>
         <p className="text-xs text-slate-500 mt-1">
           Configure form features, multi-vehicle dispatch capabilities, group transport notes, and layout architecture for riders on <code>/book</code>.
@@ -105,23 +113,23 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
           : 'bg-white border-slate-200/80 shadow-xs'
       }`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
               settings.constructionMode !== false ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-100 text-slate-600'
             }`}>
               <InfoIcon className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-black text-slate-900">System Maintenance &amp; Construction Mode</h3>
-                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
                   settings.constructionMode !== false ? 'bg-amber-500 text-slate-950' : 'bg-emerald-100 text-emerald-800'
                 }`}>
                   {settings.constructionMode !== false ? 'Active (ON)' : 'Disabled (Live)'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                When enabled, all customer booking routes show the Under Construction screen with direct phone dispatch ((314) 738-9921).
+                When enabled, all client booking routes show the Under Construction screen with direct phone dispatch ((314) 738-9921).
               </p>
             </div>
           </div>
@@ -135,7 +143,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 updatedAt: new Date().toISOString(),
               });
             }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+            className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
               settings.constructionMode !== false
                 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black'
                 : 'bg-slate-900 hover:bg-slate-800 text-white'
@@ -148,7 +156,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
 
       {saveSuccess && (
         <Alert variant="success" title="Settings Saved Successfully">
-          Configuration has been saved and synchronized across all active customer booking portals.
+          Configuration has been saved and synchronized across all active client booking portals.
         </Alert>
       )}
 
@@ -161,30 +169,30 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
       {/* ─── Section 1: Form Feature Controls & Multi-Vehicle Engine ─── */}
       <form onSubmit={handleSaveFeatureConfig} className="space-y-6">
         <Card variant="elevated" className="border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <CardHeader className="border-b border-slate-100 bg-slate-50/60 p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="p-2 bg-blue-100 text-blue-700 rounded-lg"><CarIcon className="w-5 h-5" /></span>
-                <div>
+          <CardHeader className="border-b border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                <span className="p-2 bg-blue-100 text-blue-700 rounded-lg shrink-0"><CarIcon className="w-5 h-5" /></span>
+                <div className="min-w-0">
                   <CardTitle className="text-base text-slate-900 font-bold">
                     Multi-Vehicle &amp; Group Booking Engine
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500">
-                    Control whether customers can reserve multiple vehicles or see a call/email inquiry notice.
+                    Control whether clients can reserve multiple vehicles or see a call/email inquiry notice.
                   </CardDescription>
                 </div>
               </div>
-              <Badge variant={formConfig.allowMultiVehicle ? 'info' : 'neutral'} size="sm">
+              <Badge variant={formConfig.allowMultiVehicle ? 'info' : 'neutral'} size="sm" className="self-start sm:self-auto shrink-0">
                 {formConfig.allowMultiVehicle ? 'Multi-Vehicle Enabled' : 'Single Vehicle (Call Notice)'}
               </Badge>
             </div>
           </CardHeader>
 
-          <CardContent className="p-5 space-y-6">
+          <CardContent className="p-4 sm:p-5 space-y-6">
             {/* Toggle: Multi-Vehicle Enabled */}
-            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <div className="space-y-0.5">
-                <label className="text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2">
+            <div className="flex items-start justify-between gap-3 sm:gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+              <div className="space-y-0.5 min-w-0">
+                <label className="text-sm font-bold text-slate-900 cursor-pointer flex flex-wrap items-center gap-2">
                   <span>Enable Multi-Vehicle Booking (+ Add Vehicle)</span>
                   {formConfig.allowMultiVehicle && (
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
@@ -193,7 +201,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                   )}
                 </label>
                 <p className="text-xs text-slate-500 max-w-xl">
-                  When enabled, customers see the <strong>+ Add Vehicle</strong> selector matching the dispatch console, allowing them to reserve multiple cars in one booking. When disabled, customers select 1 vehicle and see a call/email assistance notice for groups.
+                  When enabled, clients see the <strong>+ Add Vehicle</strong> selector matching the dispatch console, allowing them to reserve multiple cars in one booking. When disabled, clients select 1 vehicle and see a call/email assistance notice for groups.
                 </p>
               </div>
 
@@ -216,7 +224,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 </div>
                 <div className="max-w-xs">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Maximum Vehicles Allowed per Customer Booking
+                    Maximum Vehicles Allowed per Client Booking
                   </label>
                   <select
                     value={formConfig.maxVehiclesAllowed}
@@ -229,7 +237,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     <option value={5}>5 Vehicles</option>
                   </select>
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    Caps the number of cars a single customer can add on the web portal.
+                    Caps the number of cars a single client can add on the web portal.
                   </span>
                 </div>
               </div>
@@ -243,7 +251,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                   </span>
                 </div>
                 <p className="text-xs text-amber-900/80">
-                  Because multi-vehicle self-serve is disabled, customers viewing vehicle preferences will see this contact card directing them to call or email dispatch for group/event bookings.
+                  Because multi-vehicle self-serve is disabled, clients viewing vehicle preferences will see this contact card directing them to call or email dispatch for group/event bookings.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -286,24 +294,24 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                   />
                 </div>
 
-                {/* Live Customer Preview */}
+                {/* Live Client Preview */}
                 <div className="pt-2">
                   <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                    Customer Form Live Preview:
+                    Client Form Live Preview:
                   </span>
                   <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
                     <InfoIcon className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-bold">
+                    <div className="min-w-0">
+                      <p className="font-bold break-words">
                         {formConfig.multiVehicleCustomNote || 'Need more than one vehicle for your party or event?'}
                       </p>
-                      <p className="text-[11px] text-blue-700 mt-0.5">
+                      <p className="text-[11px] text-blue-700 mt-0.5 break-words">
                         Please contact our dispatch desk directly at{' '}
                         <span className="font-bold underline">
                           {formConfig.multiVehicleCallPhone || settings.company.phone || '(314) 738-9000'}
                         </span>{' '}
                         or{' '}
-                        <span className="font-bold underline">
+                        <span className="font-bold underline break-all">
                           {formConfig.multiVehicleCallEmail || settings.company.email || 'dispatch@chesterfieldtaxi.com'}
                         </span>{' '}
                         to coordinate multi-vehicle transport.
@@ -314,16 +322,16 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
               </div>
             )}
 
-            {/* ─── Other Customer Form Feature Toggles ─── */}
+            {/* ─── Other Client Form Feature Toggles ─── */}
             <div className="pt-4 border-t border-slate-200/80 space-y-4">
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
-                Other Customer Form Feature Configurations
+                Other Client Form Feature Configurations
               </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Allow Immediate ASAP */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="min-w-0">
                     <label className="text-xs font-bold text-slate-900 block">
                       Immediate On-Demand (ASAP) Dispatch
                     </label>
@@ -335,13 +343,13 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     type="checkbox"
                     checked={formConfig.allowImmediateAsap}
                     onChange={(e) => setFormConfig((prev) => ({ ...prev, allowImmediateAsap: e.target.checked }))}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0"
                   />
                 </div>
 
                 {/* Round Trip Booking */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="min-w-0">
                     <label className="text-xs font-bold text-slate-900 block">
                       Round Trip / Return Trip Booking
                     </label>
@@ -353,13 +361,13 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     type="checkbox"
                     checked={formConfig.allowRoundTrip}
                     onChange={(e) => setFormConfig((prev) => ({ ...prev, allowRoundTrip: e.target.checked }))}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0"
                   />
                 </div>
 
                 {/* Child Safety Seats */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="min-w-0">
                     <label className="text-xs font-bold text-slate-900 block">
                       Child Safety Seats Option
                     </label>
@@ -371,13 +379,13 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     type="checkbox"
                     checked={formConfig.allowChildSafetySeats}
                     onChange={(e) => setFormConfig((prev) => ({ ...prev, allowChildSafetySeats: e.target.checked }))}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0"
                   />
                 </div>
 
                 {/* Airport Flight Number Requirement */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                  <div>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  <div className="min-w-0">
                     <label className="text-xs font-bold text-slate-900 block">
                       Require Flight Number for Airport Pickups
                     </label>
@@ -389,15 +397,15 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                     type="checkbox"
                     checked={formConfig.requireFlightNumberForAirport}
                     onChange={(e) => setFormConfig((prev) => ({ ...prev, requireFlightNumberForAirport: e.target.checked }))}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0"
                   />
                 </div>
               </div>
 
               {/* Sitewide "Get App" Buttons Toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white">
-                <div>
-                  <div className="flex items-center gap-2">
+              <div className="flex items-start sm:items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="text-xs font-bold text-slate-900 block">
                       Sitewide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
                     </label>
@@ -424,7 +432,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       console.error('Failed to update enableGetAppButtons:', err);
                     }
                   }}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 ml-3 cursor-pointer"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0 cursor-pointer mt-0.5 sm:mt-0"
                 />
               </div>
 
@@ -434,15 +442,15 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                   Accepted Public Payment Methods
                 </span>
                 <span className="text-[11px] text-slate-500 block mb-2">
-                  Select which payment options are presented to web customers on the public booking portal:
+                  Select which payment options are presented to web clients on the public booking portal:
                 </span>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3 sm:gap-4">
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
                     <input
                       type="checkbox"
                       checked={formConfig.acceptedPaymentMethods.includes('card')}
                       onChange={() => togglePaymentMethod('card')}
-                      className="rounded border-slate-300 text-blue-600"
+                      className="rounded border-slate-300 text-blue-600 shrink-0"
                     />
                     <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span>Credit / Debit Card (In-Vehicle Terminal or Card on File)</span>
@@ -452,7 +460,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       type="checkbox"
                       checked={formConfig.acceptedPaymentMethods.includes('cash')}
                       onChange={() => togglePaymentMethod('cash')}
-                      className="rounded border-slate-300 text-blue-600"
+                      className="rounded border-slate-300 text-blue-600 shrink-0"
                     />
                     <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>Cash on Arrival</span>
@@ -462,7 +470,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                       type="checkbox"
                       checked={formConfig.acceptedPaymentMethods.includes('account')}
                       onChange={() => togglePaymentMethod('account')}
-                      className="rounded border-slate-300 text-blue-600"
+                      className="rounded border-slate-300 text-blue-600 shrink-0"
                     />
                     <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>Corporate Account Invoicing</span>
@@ -472,7 +480,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
             </div>
           </CardContent>
 
-          <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center">
+          <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <span className="text-[11px] text-slate-500">
               Changes sync immediately to all visitors on <code>/book</code>.
             </span>
@@ -482,8 +490,9 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
               size="sm"
               isLoading={isSavingConfig}
               disabled={isSavingConfig}
+              className="w-full sm:w-auto justify-center"
             >
-              Save Customer Form Configuration
+              Save Client Form Configuration
             </Button>
           </CardFooter>
         </Card>
@@ -510,14 +519,15 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 : 'border-slate-200 hover:border-slate-300 bg-white'
             }`}
           >
-            <CardHeader className="border-b border-slate-100 bg-white p-5">
-              <div className="flex items-center justify-between">
+            <CardHeader className="border-b border-slate-100 bg-white p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded-md">
                   Layout V2 (Recommended)
                 </span>
                 {selectedVersion === 'v2' ? (
-                  <Badge variant="success" size="sm">
-                    ● Currently Active
+                  <Badge variant="success" size="sm" className="inline-flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Currently Active
                   </Badge>
                 ) : (
                   <span className="text-xs text-slate-400 font-medium">Inactive</span>
@@ -530,7 +540,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 Modern single-page card architecture matching dispatch booking with real-time upfront fare preview and vehicle controls.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-5 space-y-3 text-xs text-slate-600">
+            <CardContent className="p-4 sm:p-5 space-y-3 text-xs text-slate-600">
               <ul className="space-y-1.5 list-disc pl-4 text-slate-700">
                 <li>Segmented [Now] / [Schedule] pickup control with 12h AM/PM</li>
                 <li>Pickup / dropoff card with Flight Information subcard</li>
@@ -547,13 +557,14 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                   rel="noopener noreferrer"
                   className="text-xs font-bold text-blue-600 hover:underline inline-flex items-center gap-1"
                 >
-                  Open Live Customer Booking in New Tab ↗
+                  <span>Open Live Client Booking in New Tab</span>
+                  <ExternalLinkIcon className="w-3.5 h-3.5 shrink-0" />
                 </a>
               </div>
             </CardContent>
-            <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center">
+            <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2.5">
               <span className="text-[11px] font-semibold text-emerald-600">
-                <span className="inline-flex items-center gap-1"><StarIcon className="w-3.5 h-3.5 text-emerald-500" />Standard for Customers</span>
+                <span className="inline-flex items-center gap-1"><StarIcon className="w-3.5 h-3.5 text-emerald-500" />Standard for Clients</span>
               </span>
               <Button
                 type="button"
@@ -562,6 +573,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 isLoading={isLoading && selectedVersion === 'v2'}
                 onClick={() => handleSwitchLayout('v2')}
                 disabled={selectedVersion === 'v2' || isLoading}
+                className="w-full sm:w-auto justify-center"
               >
                 {selectedVersion === 'v2' ? 'Active Version' : 'Activate Layout V2'}
               </Button>
@@ -577,14 +589,15 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 : 'border-slate-200 hover:border-slate-300 bg-white'
             }`}
           >
-            <CardHeader className="border-b border-slate-100 bg-white p-5">
-              <div className="flex items-center justify-between">
+            <CardHeader className="border-b border-slate-100 bg-white p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">
                   Layout V1
                 </span>
                 {selectedVersion === 'v1' ? (
-                  <Badge variant="success" size="sm">
-                    ● Currently Active
+                  <Badge variant="success" size="sm" className="inline-flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Currently Active
                   </Badge>
                 ) : (
                   <span className="text-xs text-slate-400 font-medium">Inactive</span>
@@ -594,10 +607,10 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 4-Step Linear Wizard Flow
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Traditional multi-step booking engine with step tabs (1: Route &rarr; 2: Vehicle &rarr; 3: Details &rarr; 4: Payment).
+                Traditional multi-step booking engine with step tabs (1: Route → 2: Vehicle → 3: Details → 4: Payment).
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-5 space-y-3 text-xs text-slate-600">
+            <CardContent className="p-4 sm:p-5 space-y-3 text-xs text-slate-600">
               <ul className="space-y-1.5 list-disc pl-4 text-slate-700">
                 <li>Step indicator bar at top (4 sequential steps)</li>
                 <li>Separate screens for route selection and vehicle choice</li>
@@ -605,7 +618,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 <li>Standard form inputs with validation</li>
               </ul>
             </CardContent>
-            <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center">
+            <CardFooter className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2.5">
               <span className="text-[11px] text-slate-500">
                 Legacy Linear Wizard
               </span>
@@ -616,6 +629,7 @@ export function AdminLayoutTab({ settings, onSave, isLoading }: AdminLayoutTabPr
                 isLoading={isLoading && selectedVersion === 'v1'}
                 onClick={() => handleSwitchLayout('v1')}
                 disabled={selectedVersion === 'v1' || isLoading}
+                className="w-full sm:w-auto justify-center"
               >
                 {selectedVersion === 'v1' ? 'Active Version' : 'Activate Layout V1'}
               </Button>

@@ -19,6 +19,7 @@ import {
   CalendarIcon,
   BuildingIcon,
   ActivityIcon,
+  SpinnerIcon,
 } from '../../ui/Icons';
 import { ShiftHistoryModal } from './ShiftHistoryModal';
 import { DEFAULT_APP_SETTINGS } from '../../../core/services/config/admin-config.service';
@@ -90,6 +91,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
   // Shift History Modal state
   const [showShiftHistory, setShowShiftHistory] = useState(false);
   const [shiftHistoryVehicleId, setShiftHistoryVehicleId] = useState<string | undefined>(undefined);
+  const [groundingCarId, setGroundingCarId] = useState<string | null>(null);
+  const [groundReasonDraft, setGroundReasonDraft] = useState('');
 
   // Helpers
   const getVehicleTypeName = (typeId: string) => {
@@ -309,64 +312,66 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       )}
 
       {/* Header and Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Total Fleet</span>
-          <div className="text-2xl font-black text-slate-900 mt-1">{fleet.length} <span className="text-xs font-semibold text-slate-500">vehicles</span></div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Total Fleet</span>
+          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1 tabular-nums">{fleet.length} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">cars</span></div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Active in Service</span>
-          <div className="text-2xl font-black text-emerald-600 mt-1">{activeCount} <span className="text-xs font-semibold text-slate-500">ready</span></div>
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Active</span>
+          <div className="text-xl sm:text-2xl font-black text-emerald-600 mt-1 tabular-nums">{activeCount} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">ready</span></div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">In Maintenance</span>
-          <div className="text-2xl font-black text-amber-600 mt-1">{maintenanceCount} <span className="text-xs font-semibold text-slate-500">shop</span></div>
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Maintenance</span>
+          <div className="text-xl sm:text-2xl font-black text-amber-600 mt-1 tabular-nums">{maintenanceCount} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">shop</span></div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Avg Fleet Odometer</span>
-          <div className="text-2xl font-black text-blue-600 mt-1">{avgMileage.toLocaleString()} <span className="text-xs font-semibold text-slate-500">mi</span></div>
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Avg Odometer</span>
+          <div className="text-xl sm:text-2xl font-black text-blue-600 mt-1 tabular-nums truncate">{avgMileage.toLocaleString()} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">mi</span></div>
         </div>
       </div>
 
       {/* Control bar: Filters & Add Car */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <div className="relative">
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          <div className="relative w-full sm:w-56">
             <Input
               placeholder="Search unit #, make, plate, VIN..."
               value={searchCar}
               onChange={(e) => setSearchCar(e.target.value)}
-              className="w-56 h-9 text-xs pl-3"
+              className="w-full h-9 text-xs pl-3"
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="maintenance">In Maintenance</option>
-            <option value="out_of_service">Out of Service</option>
-            <option value="inspecting">Inspecting</option>
-          </select>
+          <div className="grid grid-cols-2 sm:flex items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-9 px-2.5 sm:px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 w-full sm:w-auto"
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="maintenance">In Maintenance</option>
+              <option value="out_of_service">Out of Service</option>
+              <option value="inspecting">Inspecting</option>
+            </select>
 
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="h-9 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
-          >
-            <option value="all">All Vehicle Types</option>
-            {settings.vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="h-9 px-2.5 sm:px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 w-full sm:w-auto"
+            >
+              <option value="all">All Classes</option>
+              {settings.vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto sm:justify-end">
           <Button
             type="button"
             variant="outline"
@@ -375,10 +380,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               setShiftHistoryVehicleId(undefined);
               setShowShiftHistory(true);
             }}
-            className="flex items-center gap-1.5 border-slate-300 font-bold whitespace-nowrap shrink-0 px-3.5 text-slate-700 hover:bg-slate-50"
+            className="flex items-center justify-center gap-1.5 border-slate-300 font-bold whitespace-nowrap px-3 text-slate-700 hover:bg-slate-50"
           >
             <HistoryIcon className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>Shift Search Tool</span>
+            <span>Shift Search</span>
           </Button>
 
           <Button
@@ -386,7 +391,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             variant="primary"
             size="sm"
             onClick={() => setShowAddCarModal(true)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold whitespace-nowrap shrink-0 px-3.5"
+            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 font-bold whitespace-nowrap px-3"
           >
             <PlusIcon className="w-4 h-4 shrink-0" />
             <span>Add Fleet Car</span>
@@ -612,10 +617,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             return (
               <div
                 key={car.id}
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-sm transition-all p-5 space-y-4"
+                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-sm transition-all p-3.5 sm:p-5 space-y-3.5 sm:space-y-4"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3 min-w-0">
                     {car.imageUrl ? (
                       <div className="w-14 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
                         <img
@@ -629,27 +634,27 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         <CarIcon className="w-5 h-5" />
                       </div>
                     )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-base font-extrabold text-slate-900">{car.unitNumber}</h4>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <h4 className="text-sm sm:text-base font-extrabold text-slate-900">{car.unitNumber}</h4>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                           {getVehicleTypeName(car.vehicleTypeId)}
                         </span>
                         {car.status === 'active' && !car.isBlacklisted && <Badge variant="success">Active</Badge>}
                         {car.status === 'maintenance' && !car.isBlacklisted && <Badge variant="warning">In Maintenance</Badge>}
                         {car.status === 'out_of_service' && !car.isBlacklisted && <Badge variant="neutral">Out of Service</Badge>}
                         {car.status === 'inspecting' && !car.isBlacklisted && <Badge variant="info">Inspecting</Badge>}
-                        {car.isBlacklisted && <Badge variant="error">BLACKLISTED / GROUNDED</Badge>}
+                        {car.isBlacklisted && <Badge variant="error">GROUNDED</Badge>}
                         {car.isArchived && <Badge variant="neutral">ARCHIVED</Badge>}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {car.year} {car.make} {car.model} • <span className="font-mono text-slate-700">{car.color}</span>
+                        {car.year} {car.make} {car.model} · <span className="font-mono text-slate-700">{car.color}</span>
                         {car.blacklistReason && <span className="text-rose-600 font-bold ml-2">Reason: {car.blacklistReason}</span>}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <select
                       value={car.status}
                       onChange={(e) => handleUpdateCar(car.id, { status: e.target.value as any })}
@@ -668,14 +673,13 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       onClick={() => {
                         const isCurrentlyBlacklisted = !!car.isBlacklisted;
                         if (!isCurrentlyBlacklisted) {
-                          const reason = window.prompt(`Enter ground/blacklist reason for ${car.unitNumber}:`);
-                          if (reason === null) return;
-                          handleUpdateCar(car.id, {
-                            isBlacklisted: true,
-                            blacklistReason: reason || 'Grounded by Fleet Admin',
-                            groundedReason: reason || 'Grounded by Fleet Admin',
-                            status: 'out_of_service',
-                          });
+                          if (groundingCarId === car.id) {
+                            setGroundingCarId(null);
+                            setGroundReasonDraft('');
+                          } else {
+                            setGroundingCarId(car.id);
+                            setGroundReasonDraft('');
+                          }
                         } else {
                           handleUpdateCar(car.id, {
                             isBlacklisted: false,
@@ -685,7 +689,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                           });
                         }
                       }}
-                      className={`text-xs h-8 flex items-center gap-1.5 ${
+                      className={`text-xs h-8 flex items-center gap-1.5 cursor-pointer ${
                         car.isBlacklisted
                           ? 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
                           : 'text-rose-600 border-rose-200 hover:bg-rose-50'
@@ -756,13 +760,57 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                     <button
                       type="button"
                       onClick={() => handleDeleteCar(car.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                       title="Delete car from fleet"
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
+
+                {groundingCarId === car.id && !car.isBlacklisted && (
+                  <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row sm:items-center gap-2 animate-in fade-in duration-150">
+                    <input
+                      type="text"
+                      value={groundReasonDraft}
+                      onChange={(e) => setGroundReasonDraft(e.target.value)}
+                      placeholder={`Reason to ground / blacklist ${car.unitNumber}...`}
+                      className="flex-1 px-3 py-1.5 text-xs bg-white border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                    <div className="flex items-center justify-end gap-1.5 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setGroundingCarId(null);
+                          setGroundReasonDraft('');
+                        }}
+                        className="text-xs h-8 cursor-pointer"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          const reason = groundReasonDraft.trim() || 'Grounded by Fleet Admin';
+                          handleUpdateCar(car.id, {
+                            isBlacklisted: true,
+                            blacklistReason: reason,
+                            groundedReason: reason,
+                            status: 'out_of_service',
+                          });
+                          setGroundingCarId(null);
+                          setGroundReasonDraft('');
+                        }}
+                        className="text-xs h-8 bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                      >
+                        Confirm Ground
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Grid of Car Specs and Tracking */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
@@ -956,9 +1004,9 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 selectedCarForMaintenance.maintenanceHistory.map((rec) => (
                   <div
                     key={rec.id}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between text-xs"
+                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start justify-between gap-3 text-xs"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-bold text-slate-900">{rec.description}</div>
                       <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-3">
                         <span className="inline-flex items-center gap-1">
@@ -980,7 +1028,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       </div>
                     </div>
                     {rec.cost !== undefined && (
-                      <div className="font-mono font-bold text-slate-900 text-sm">
+                      <div className="font-mono font-bold text-slate-900 text-sm shrink-0">
                         ${rec.cost.toFixed(2)}
                       </div>
                     )}
@@ -993,11 +1041,11 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       </AdminSlideOverDrawer>
 
       {/* Floating Save Actions Bar */}
-      <div className="sticky bottom-4 bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 shadow-lg flex items-center justify-between z-20">
-        <div className="flex items-center gap-2">
-          <SparklesIcon className="w-4 h-4 text-amber-500" />
+      <div className="sticky bottom-16 lg:bottom-4 bg-white/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
+        <div className="flex items-center gap-2 min-w-0">
+          <SparklesIcon className="w-4 h-4 text-amber-500 shrink-0" />
           <span className="text-xs text-slate-600">
-            {fleet.length} fleet cars registered. Updates sync to dispatch operations and fleet database.
+            {fleet.length} fleet cars registered. Syncs to dispatch and fleet database.
           </span>
         </div>
 
@@ -1007,9 +1055,9 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
           size="md"
           onClick={handleSaveFleet}
           disabled={isSaving || isLoading}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md font-bold px-6"
+          className="w-full sm:w-auto justify-center flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md font-bold px-6 shrink-0"
         >
-          {isSaving ? <CheckIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+          {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
           {isSaving ? 'Saving...' : 'Save Fleet Inventory'}
         </Button>
       </div>

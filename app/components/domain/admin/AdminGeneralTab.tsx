@@ -335,24 +335,24 @@ export function AdminGeneralTab({
     <div className="space-y-6">
       {/* Contextual Action Bar */}
       {activeSubTab === 'studio' && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-2 px-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2 px-1 sm:px-2">
             <SparklesIcon className="w-4 h-4 text-blue-600 shrink-0" />
             <span className="text-xs font-bold text-slate-700">Dynamic Branding Studio</span>
             {hasUnpublishedChanges ? (
               <Badge variant="warning" size="sm" className="inline-flex items-center gap-1">
                 <AlertTriangleIcon className="w-3 h-3" />
-                <span>Live Canvas (Draft Isolating)</span>
+                <span>Draft Preview</span>
               </Badge>
             ) : (
               <Badge variant="success" size="sm" className="inline-flex items-center gap-1">
                 <CheckIcon className="w-3 h-3" />
-                <span>Published &amp; Synced Site-Wide</span>
+                <span>Synced Site-Wide</span>
               </Badge>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               type="button"
               variant="primary"
@@ -361,20 +361,21 @@ export function AdminGeneralTab({
               onClick={handlePublishBranding}
               disabled={!hasUnpublishedChanges && isSaving}
               leftIcon={<CheckIcon className="w-4 h-4" />}
+              className="w-full sm:w-auto justify-center"
             >
-              Publish Changes to Site-Wide
+              Publish Changes Site-Wide
             </Button>
           </div>
         </div>
       )}
 
       {activeSubTab === 'profile' && (
-        <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-2 px-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-3 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2 px-1 sm:px-2 min-w-0">
             <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700">Business Profile &amp; Localization Settings</span>
+            <span className="text-xs font-bold text-slate-700 truncate">Business Profile &amp; Localization Settings</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
             <Button
               type="button"
               variant="primary"
@@ -382,6 +383,7 @@ export function AdminGeneralTab({
               isLoading={isSaving || isLoading}
               onClick={handleSaveProfile}
               leftIcon={<CheckIcon className="w-4 h-4" />}
+              className="w-full sm:w-auto justify-center"
             >
               Save Business Profile
             </Button>
@@ -501,7 +503,7 @@ export function AdminGeneralTab({
                 </div>
 
                 {/* Text Colors */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-2 pt-2 border-t border-slate-100">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">
                       Heading Color
@@ -511,13 +513,13 @@ export function AdminGeneralTab({
                         type="color"
                         value={draftBranding.headingColor || '#0f172a'}
                         onChange={(e) => updateDraft({ headingColor: e.target.value })}
-                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                       />
                       <input
                         type="text"
                         value={draftBranding.headingColor || '#0f172a'}
                         onChange={(e) => updateDraft({ headingColor: e.target.value })}
-                        className="w-full h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
+                        className="w-full min-w-0 h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
                       />
                     </div>
                   </div>
@@ -531,13 +533,13 @@ export function AdminGeneralTab({
                         type="color"
                         value={draftBranding.bodyTextColor || '#334155'}
                         onChange={(e) => updateDraft({ bodyTextColor: e.target.value })}
-                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                       />
                       <input
                         type="text"
                         value={draftBranding.bodyTextColor || '#334155'}
                         onChange={(e) => updateDraft({ bodyTextColor: e.target.value })}
-                        className="w-full h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
+                        className="w-full min-w-0 h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
                       />
                     </div>
                   </div>
@@ -551,13 +553,13 @@ export function AdminGeneralTab({
                         type="color"
                         value={draftBranding.mutedTextColor || '#64748b'}
                         onChange={(e) => updateDraft({ mutedTextColor: e.target.value })}
-                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white"
+                        className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
                       />
                       <input
                         type="text"
                         value={draftBranding.mutedTextColor || '#64748b'}
                         onChange={(e) => updateDraft({ mutedTextColor: e.target.value })}
-                        className="w-full h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
+                        className="w-full min-w-0 h-8 px-1.5 rounded border border-slate-300 text-[11px] font-mono"
                       />
                     </div>
                   </div>
@@ -787,17 +789,17 @@ export function AdminGeneralTab({
           </div>
 
           {/* RIGHT COLUMN: ISOLATED LIVE PREVIEW CANVAS (7 COLS) */}
-          <div className="lg:col-span-7 sticky top-24 space-y-3">
+          <div className="lg:col-span-7 lg:sticky lg:top-24 space-y-3">
             {/* Canvas Header Bar */}
-            <div className="bg-slate-900 text-white px-4 py-2.5 rounded-t-2xl flex items-center justify-between text-xs shadow-md">
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1.5">
+            <div className="bg-slate-900 text-white px-3.5 sm:px-4 py-2.5 rounded-t-2xl flex flex-wrap items-center justify-between gap-2 text-xs shadow-md">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex gap-1.5 shrink-0">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 </div>
-                <span className="text-slate-400 font-mono text-[11px] ml-2">
-                  Live Preview Canvas (Isolated Scope)
+                <span className="text-slate-400 font-mono text-[11px] ml-1 truncate">
+                  Live Preview Canvas
                 </span>
               </div>
 
@@ -933,7 +935,7 @@ export function AdminGeneralTab({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 min-w-0">
                       <span
                         className="text-[9px] uppercase font-bold block"
                         style={{ color: 'var(--color-text-muted)' }}
@@ -947,7 +949,7 @@ export function AdminGeneralTab({
                         Chesterfield Mall
                       </span>
                     </div>
-                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 min-w-0">
                       <span
                         className="text-[9px] uppercase font-bold block"
                         style={{ color: 'var(--color-text-muted)' }}
@@ -1042,16 +1044,16 @@ export function AdminGeneralTab({
 
             {/* Floating Publish Banner */}
             {hasUnpublishedChanges && (
-              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-900 shadow-sm animate-in fade-in duration-200">
-                <div className="flex items-center gap-2">
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-900 shadow-sm animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 min-w-0">
                   <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>You have unpublished style changes in this preview.</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={handleDiscardDraft}
-                    className="px-2.5 py-1 text-slate-700 hover:text-red-700 font-bold text-[11px]"
+                    className="px-2.5 py-1 text-slate-700 hover:text-red-700 font-bold text-[11px] cursor-pointer"
                   >
                     Discard
                   </button>
@@ -1115,7 +1117,7 @@ export function AdminGeneralTab({
                       required
                     />
                     <Input
-                      label="Customer Support Email"
+                      label="Client Support Email"
                       type="email"
                       value={company.email}
                       onChange={(e) => setCompany((prev) => ({ ...prev, email: e.target.value }))}
@@ -1142,6 +1144,7 @@ export function AdminGeneralTab({
                   size="md"
                   isLoading={isSaving || isLoading}
                   leftIcon={<CheckIcon className="w-4 h-4" />}
+                  className="w-full sm:w-auto justify-center"
                 >
                   Save Company Details &amp; Address
                 </Button>
@@ -1150,28 +1153,28 @@ export function AdminGeneralTab({
               {/* Operating Hours */}
               <Card variant="elevated" className="border-slate-200 shadow-xs">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <CardTitle className="text-base text-slate-900 flex items-center gap-2">
-                        <ClockIcon className="w-4 h-4 text-amber-500" />
+                        <ClockIcon className="w-4 h-4 text-amber-500 shrink-0" />
                         Operating Hours &amp; Availability
                       </CardTitle>
                       <CardDescription className="text-xs text-slate-500">
-                        Fleet operational hours displayed to riders.
+                        Fleet operational hours displayed to clients.
                       </CardDescription>
                     </div>
-                    <Badge variant="success" size="sm">
+                    <Badge variant="success" size="sm" className="self-start sm:self-auto shrink-0">
                       24/7/365 Continuous
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
-                        ✓
+                <CardContent className="p-4 sm:p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <CheckIcon className="w-4 h-4" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="text-xs font-extrabold text-slate-900">
                           Continuous 24-Hour Operations
                         </h4>
@@ -1180,7 +1183,7 @@ export function AdminGeneralTab({
                         </p>
                       </div>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
                       <input
                         type="checkbox"
                         checked={operatingSchedule.is24x7}

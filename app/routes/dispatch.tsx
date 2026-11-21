@@ -71,7 +71,6 @@ import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '..
 import { TripAuditModal, TripAuditTimeline } from '../components/domain/admin/TripAuditModal';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../components/ui/LayoutToggle';
-import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import { CommsHub } from '../components/domain/dispatch/CommsHub';
 import { EmailDock } from '../components/domain/dispatch/EmailDock';
 import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher';

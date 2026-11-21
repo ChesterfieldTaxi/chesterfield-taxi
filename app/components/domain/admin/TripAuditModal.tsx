@@ -284,9 +284,9 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
       )}
 
       {/* Timeline Content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-white">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 space-y-4 bg-white">
         {hideSummaryBar && (
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <span className="text-xs font-semibold text-slate-500">
               {sortedEntries.length} total event(s) recorded
             </span>
@@ -316,13 +316,13 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
             <p className="font-bold">No Audit Log Entries Recorded</p>
           </div>
         ) : (
-          <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-5">
+          <div className="relative border-l-2 border-slate-200 ml-2.5 sm:ml-4 pl-4 sm:pl-6 space-y-4 sm:space-y-5">
             {sortedEntries.map((event, idx) => (
               <div key={idx} className="relative group">
                 {/* Timeline dot */}
-                <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
+                <div className="absolute -left-[23px] sm:-left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
@@ -363,7 +363,7 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
                   </div>
 
                   {event.context && (
-                    <p className="text-xs text-slate-700 font-medium leading-relaxed mt-1">
+                    <p className="text-xs text-slate-700 font-medium leading-relaxed mt-1 break-words">
                       {event.context}
                     </p>
                   )}
@@ -374,15 +374,15 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         Field Changes Recorded:
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         {event.fieldChanges.map((change, cIdx) => (
-                          <div key={cIdx} className="flex items-center gap-2 text-[11px] font-mono flex-wrap">
+                          <div key={cIdx} className="flex items-center gap-1.5 text-[11px] font-mono flex-wrap min-w-0">
                             <span className="font-bold text-slate-700">{change.label}:</span>
-                            <span className="text-rose-600 line-through bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            <span className="text-rose-600 line-through bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 break-all">
                               {String(change.oldValue ?? 'None')}
                             </span>
-                            <span className="text-slate-400 font-bold">➔</span>
-                            <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            <span className="text-slate-400 font-bold">→</span>
+                            <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 break-all">
                               {String(change.newValue ?? 'None')}
                             </span>
                           </div>

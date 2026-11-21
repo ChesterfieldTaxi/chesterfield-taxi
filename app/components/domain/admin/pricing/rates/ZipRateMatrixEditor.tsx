@@ -139,29 +139,29 @@ export function ZipRateMatrixEditor({
   return (
     <div className="space-y-4">
       {/* Contract Policy Header Banner */}
-      <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        <div className="space-y-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
-              <ShieldCheckIcon className="w-4 h-4 text-amber-700" />
-              Postal / Zip Flat-Rate Matrix
+              <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>Postal / Zip Flat-Rate Matrix</span>
             </span>
             <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-[10px]">
               Flat Zip Pricing
             </Badge>
           </div>
           <p className="text-xs text-slate-600">
-            Define fixed customer fares by destination or pickup ZIP code. Route corporate accounts or specific regions to this Rate in <strong>Rules &amp; Routing</strong> (and waive universal surcharges there if contracted).
+            Define fixed client fares by destination or pickup ZIP code. Route corporate accounts or specific regions to this Rate in <strong>Rules &amp; Routing</strong>.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
-            className="text-xs border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
+            className="flex-1 md:flex-none justify-center text-xs border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
           >
             <DownloadIcon className="w-3.5 h-3.5 mr-1 text-slate-500" />
             Export CSV
@@ -171,7 +171,7 @@ export function ZipRateMatrixEditor({
               type="button"
               size="sm"
               onClick={() => setIsAddingNew(!isAddingNew)}
-              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs"
+              className="flex-1 md:flex-none justify-center text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs"
             >
               <PlusIcon className="w-3.5 h-3.5 mr-1" />
               Add Zip Rate
@@ -207,7 +207,7 @@ export function ZipRateMatrixEditor({
             <PlusIcon className="w-3.5 h-3.5 text-emerald-600" />
             Add Agreed Zip Code Rate
           </h4>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 text-xs">
             <div>
               <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Zip Code</label>
               <Input
@@ -249,8 +249,8 @@ export function ZipRateMatrixEditor({
                 className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono"
               />
             </div>
-            <div>
-              <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Agreed Price / Flat Rate ($)</label>
+            <div className="sm:col-span-2 md:col-span-1">
+              <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Agreed Flat Rate ($)</label>
               <Input
                 type="number"
                 step="0.5"
@@ -294,10 +294,91 @@ export function ZipRateMatrixEditor({
           />
         </div>
 
-        {/* Scrollable Matrix Table */}
+        {/* Mobile Zip Rate Cards (< md) + Desktop Matrix Table (md+) */}
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
-          <div className="max-h-[480px] overflow-y-auto custom-scrollbar">
-            <table className="w-full text-left text-xs">
+          {/* Mobile Cards (< md) */}
+          <div className="md:hidden max-h-[480px] overflow-y-auto divide-y divide-slate-100">
+            {filteredEntries.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                No matching zip codes found for &ldquo;{searchQuery}&rdquo;
+              </div>
+            ) : (
+              filteredEntries.map((row) => {
+                const isEditing = editingZip === row.zip;
+                return (
+                  <div key={row.zip} className="p-3 space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-extrabold text-slate-900 text-sm">{row.zip}</span>
+                          {!isEditing && (
+                            <span className="text-slate-700 font-medium truncate">{row.city}</span>
+                          )}
+                        </div>
+                        {isEditing && (
+                          <div className="mt-1.5 grid grid-cols-2 gap-2">
+                            <Input
+                              type="text"
+                              value={row.city}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleUpdateField(row.zip, 'city', e.target.value)
+                              }
+                              className="h-7 text-xs bg-white border-slate-300"
+                              placeholder="City"
+                            />
+                            <Input
+                              type="number"
+                              step="0.5"
+                              value={row.customerCharge}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleUpdateField(row.zip, 'customerCharge', parseFloat(e.target.value) || 0)
+                              }
+                              className="h-7 text-xs bg-white border-emerald-400 font-mono font-bold text-right"
+                              placeholder="Flat $"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {!isEditing && (
+                        <span className="font-mono font-black text-emerald-700 text-sm shrink-0 tabular-nums">
+                          ${row.customerCharge.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-lg">
+                      <span>Base ${row.car.toFixed(2)} · Tip ${row.tip.toFixed(2)} · Tot ${row.total.toFixed(2)}</span>
+                      {!readOnly && (
+                        <div className="flex items-center gap-1 font-sans shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingZip(isEditing ? null : row.zip)}
+                            className="p-1 rounded bg-white border border-slate-200 text-slate-600 hover:text-blue-600 cursor-pointer"
+                            title={isEditing ? 'Done' : 'Edit Rate'}
+                          >
+                            {isEditing ? <CheckIcon className="w-3.5 h-3.5 text-emerald-600" /> : <EditIcon className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEntry(row.zip)}
+                            className="p-1 rounded bg-white border border-slate-200 text-slate-400 hover:text-rose-600 cursor-pointer"
+                            title="Delete Row"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Scrollable Table (md+) */}
+          <div className="hidden md:block max-h-[480px] overflow-auto custom-scrollbar">
+            <table className="w-full text-left text-xs min-w-[600px]">
               <thead className="bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
                 <tr>
                   <th className="py-2.5 px-3">Zip Code</th>

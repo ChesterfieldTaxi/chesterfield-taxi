@@ -149,12 +149,12 @@ function ModularTierCard({
     <Card className={`border-2 shadow-xs transition-all ${themeClasses.border} overflow-hidden`}>
       {/* ─── Card Header ─── */}
       <div className={`p-4 sm:p-5 ${themeClasses.headerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
-        <div className="flex items-start sm:items-center gap-3">
-          <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md ${themeClasses.badgeBg}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+          <span className={`self-start sm:self-auto shrink-0 whitespace-nowrap text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md ${themeClasses.badgeBg}`}>
             Tier {tierNumber} Controls
           </span>
-          <div>
-            <h3 className="text-base font-black text-slate-900">{title}</h3>
+          <div className="min-w-0">
+            <h3 className="text-sm sm:text-base font-black text-slate-900">{title}</h3>
             <p className="text-xs text-slate-500 font-medium">{subtitle}</p>
           </div>
         </div>
@@ -172,17 +172,17 @@ function ModularTierCard({
       </div>
 
       <CardContent className="p-4 sm:p-6 space-y-6 bg-white">
-        {/* ─── 1. Customer Score & Rider Verification ─── */}
+        {/* ─── 1. Client Score & Rider Verification ─── */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
             <UserIcon className="w-4 h-4 text-slate-500" />
-            <span>1. Customer Score &amp; Rider Profile</span>
+            <span>1. Client Score &amp; Rider Profile</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-700">Customer Score Floor (Min)</span>
+                <span className="text-xs font-semibold text-slate-700">Client Score Floor (Min)</span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
                   <StarIcon className="w-3 h-3 text-amber-500" />
                   <span>{config.customerScoreMin}</span>
@@ -205,7 +205,7 @@ function ModularTierCard({
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-700">Customer Score Ceiling (Max)</span>
+                <span className="text-xs font-semibold text-slate-700">Client Score Ceiling (Max)</span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
                   <StarIcon className="w-3 h-3 text-amber-500" />
                   <span>{config.customerScoreMax}</span>
@@ -254,13 +254,13 @@ function ModularTierCard({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Pickup Location Control */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                   Pickup Location Scope
                 </span>
-                <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
+                <Badge variant="neutral" size="sm" className="font-mono text-[10px] shrink-0">
                   {config.pickupLocationMode.toUpperCase()}
                 </Badge>
               </div>
@@ -309,13 +309,13 @@ function ModularTierCard({
             </div>
 
             {/* Dropoff Location Control */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
                   Dropoff Location Scope
                 </span>
-                <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
+                <Badge variant="neutral" size="sm" className="font-mono text-[10px] shrink-0">
                   {config.dropoffLocationMode.toUpperCase()}
                 </Badge>
               </div>
@@ -850,12 +850,12 @@ export function AdminRulesTab() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button
             variant="primary"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
+            className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
           >
             {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
             Save All Rule Tiers
@@ -941,14 +941,14 @@ export function AdminRulesTab() {
             placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Chauffeur tracks flight arrival in real-time."
             className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
           />
-          <div className="flex items-center justify-between text-[11px] text-slate-500">
-            <span>Also synced automatically with Website Studio &rarr; Form Controls &rarr; Airport Rules.</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>Synced automatically with Website Studio / Form Controls / Airport Rules.</span>
             <Button
               size="sm"
               variant="outline"
               disabled={isSaving}
               onClick={handleSave}
-              className="text-xs font-bold"
+              className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
             >
               Save Airport Description
             </Button>
@@ -960,17 +960,17 @@ export function AdminRulesTab() {
       <Card className="border-2 border-indigo-200 shadow-md overflow-hidden bg-slate-50/60">
         <div className="p-4 sm:p-5 bg-indigo-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="p-2 bg-indigo-800 rounded-xl text-indigo-200">
+            <span className="p-2 bg-indigo-800 rounded-xl text-indigo-200 shrink-0">
               <SparklesIcon className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-base font-black">Live 3-Tier Evaluation Sandbox &amp; Simulator</h3>
+              <h3 className="text-sm sm:text-base font-black">Live 3-Tier Evaluation Sandbox &amp; Simulator</h3>
               <p className="text-xs text-indigo-200">
                 Test ride parameters instantly against all configured tiers in real time.
               </p>
             </div>
           </div>
-          <Badge variant="primary" size="sm" className="bg-indigo-700 text-indigo-100 border-indigo-500 font-mono">
+          <Badge variant="primary" size="sm" className="self-start sm:self-auto shrink-0 bg-indigo-700 text-indigo-100 border-indigo-500 font-mono">
             REAL-TIME EXECUTION
           </Badge>
         </div>
@@ -978,10 +978,10 @@ export function AdminRulesTab() {
         <CardContent className="p-4 sm:p-6 space-y-6">
           {/* Simulator Controls Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
-            {/* Customer Score */}
+            {/* Client Score */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Customer Score</span>
+                <span className="text-xs font-bold text-slate-700">Client Score</span>
                 <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
                   {simIsUnratedGuest ? 'Unrated' : (
                     <>

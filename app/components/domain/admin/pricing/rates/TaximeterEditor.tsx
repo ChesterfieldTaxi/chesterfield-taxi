@@ -89,11 +89,11 @@ export function TaximeterEditor({
       </div>
 
       {/* 1. Flag Drop & Included Allowances */}
-      <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 inline-flex items-center justify-center text-[11px]">1</span>
-            Base Flag Drop & Included Allowances
+            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 inline-flex items-center justify-center text-[11px] shrink-0">1</span>
+            <span>Base Flag Drop &amp; Included Allowances</span>
           </h4>
           <span className="text-[11px] text-slate-500">Initial meter start configuration</span>
         </div>
@@ -130,23 +130,23 @@ export function TaximeterEditor({
       </div>
 
       {/* 2. Stepped Distance Rate Tiers */}
-      <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[11px]">2</span>
-            Stepped Distance Increments & Rate Tiers
+            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[11px] shrink-0">2</span>
+            <span>Stepped Distance Increments &amp; Rate Tiers</span>
           </h4>
-          <span className="text-[11px] text-slate-500">Distance increments (default 0.1 mi / 176 yd)</span>
+          <span className="text-[11px] text-slate-500">Distance increments (default 0.1 mi)</span>
         </div>
 
         {/* Tier 1 (First X miles) */}
         <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
             <span className="text-xs font-bold text-slate-800">
               Primary Tier (Up to {taximeter.primaryDistanceLimit} miles)
             </span>
-            <span className="text-xs font-semibold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              ${primaryPerMileRate} / mile (${taximeter.primaryDistanceRate.toFixed(3)} per {taximeter.primaryDistanceStep} mi)
+            <span className="self-start sm:self-auto text-[11px] sm:text-xs font-semibold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              ${primaryPerMileRate}/mi (${taximeter.primaryDistanceRate.toFixed(3)}/{taximeter.primaryDistanceStep} mi)
             </span>
           </div>
 
@@ -197,12 +197,12 @@ export function TaximeterEditor({
 
         {/* Tier 2 (Open-ended "Then" rate) */}
         <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
             <span className="text-xs font-bold text-slate-800">
-              Secondary "Then" Tier (Beyond {taximeter.primaryDistanceLimit} miles)
+              Secondary &ldquo;Then&rdquo; Tier (Beyond {taximeter.primaryDistanceLimit} miles)
             </span>
-            <span className="text-xs font-semibold text-blue-700 font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-              ${thenPerMileRate} / mile (${taximeter.thenDistanceRate.toFixed(3)} per {taximeter.thenDistanceStep} mi)
+            <span className="self-start sm:self-auto text-[11px] sm:text-xs font-semibold text-blue-700 font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+              ${thenPerMileRate}/mi (${taximeter.thenDistanceRate.toFixed(3)}/{taximeter.thenDistanceStep} mi)
             </span>
           </div>
 
@@ -239,11 +239,11 @@ export function TaximeterEditor({
       </div>
 
       {/* 3. Traffic Delays, Waiting Rates & Minimum Price Floor */}
-      <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center justify-center text-[11px]">3</span>
-            Traffic Delays, Waiting Rates & Minimum Price Floor
+            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center justify-center text-[11px] shrink-0">3</span>
+            <span>Traffic Delays, Waiting Rates &amp; Price Floor</span>
           </h4>
           <span className="text-[11px] text-slate-500">Wait times and bottom floor protection</span>
         </div>

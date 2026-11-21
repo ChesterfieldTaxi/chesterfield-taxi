@@ -68,33 +68,33 @@ export function WebsiteFormControlsTab({
         updatedAt: new Date().toISOString(),
       });
 
-      setSaveSuccessMessage('Customer booking form configurations successfully published.');
+      setSaveSuccessMessage('Client booking form configurations successfully published.');
       setTimeout(() => setSaveSuccessMessage(null), 4000);
     } catch (err: any) {
-      setSaveError(err.message || 'Failed to save customer form settings.');
+      setSaveError(err.message || 'Failed to save client form settings.');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
             Online Booking Engine Rules
           </span>
-          <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">
-            Customer Booking Form Controls &amp; Policies
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
+            Client Booking Form Controls &amp; Policies
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Govern passenger self-service capabilities, fleet selection limits, lead times, and airport flight tracking.
+            Govern client self-service capabilities, fleet selection limits, lead times, and airport flight tracking.
           </p>
         </div>
 
         <Button
           type="submit"
           disabled={isLoading}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
+          className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
         >
           <CheckIcon className="w-4 h-4" />
           <span>{isLoading ? 'Saving...' : 'Save Form Controls'}</span>
@@ -115,35 +115,35 @@ export function WebsiteFormControlsTab({
 
       {/* Card 1: Multi-Vehicle & Group Transport Policy */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-4">
+            <div className="min-w-0">
               <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <CarIcon className="w-5 h-5 text-blue-600" />
-                Multi-Vehicle Dispatch &amp; Large Party Assistance
+                <CarIcon className="w-5 h-5 text-blue-600 shrink-0" />
+                <span>Multi-Vehicle Dispatch &amp; Large Party Assistance</span>
               </CardTitle>
               <CardDescription className="text-xs text-slate-500 mt-0.5">
-                Configure customer self-service vehicle addition or automatic routing to dispatch for group transport.
+                Configure client self-service vehicle addition or automatic routing to dispatch for group transport.
               </CardDescription>
             </div>
             <Badge
               variant={formConfig.allowMultiVehicle ? 'success' : 'default'}
               size="sm"
-              className="font-bold text-[10px]"
+              className="font-bold text-[10px] self-start shrink-0"
             >
               {formConfig.allowMultiVehicle ? 'Multi-Vehicle Allowed' : 'Dispatch Assistance Notice'}
             </Badge>
           </div>
         </CardHeader>
 
-        <CardContent className="p-6 space-y-6">
-          <div className="flex items-start justify-between p-4 rounded-xl border border-blue-200/80 bg-blue-50/30">
-            <div className="space-y-1 pr-4">
+        <CardContent className="p-4 sm:p-6 space-y-6">
+          <div className="flex items-start justify-between gap-3 p-4 rounded-xl border border-blue-200/80 bg-blue-50/30">
+            <div className="space-y-1 min-w-0">
               <h4 className="text-xs font-extrabold text-slate-900">
-                Allow Customers to Select Multiple Vehicles on <code>/book</code>
+                Allow Clients to Select Multiple Vehicles on <code>/book</code>
               </h4>
               <p className="text-[11px] text-slate-600">
-                When enabled, riders see the <strong>&ldquo;+ Add Vehicle&rdquo;</strong> button to book multiple sedans/SUVs simultaneously in a single reservation. When disabled, customers see an advisory note to call or email dispatch.
+                When enabled, riders see the <strong>&ldquo;+ Add Vehicle&rdquo;</strong> button to book multiple sedans/SUVs simultaneously in a single reservation. When disabled, clients see an advisory note to call or email dispatch.
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
@@ -164,7 +164,7 @@ export function WebsiteFormControlsTab({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-extrabold text-slate-900">
-                    Maximum Vehicles per Customer Booking
+                    Maximum Vehicles per Client Booking
                   </h4>
                   <p className="text-[11px] text-slate-500">
                     Limits simultaneous fleet allocation per single checkout.
@@ -256,17 +256,17 @@ export function WebsiteFormControlsTab({
 
               <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
-                  Live Customer Notice Preview (Rendered on <code>/book</code>)
+                  Live Client Notice Preview (Rendered on <code>/book</code>)
                 </span>
                 <div className="flex items-start gap-2.5 text-xs text-amber-900">
                   <InfoIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold">
+                  <div className="min-w-0">
+                    <p className="font-semibold break-words">
                       {formConfig.multiVehicleCustomNote || (
                         <>
                           Need more than 1 vehicle? For group travel or multi-car bookings, please call our 24/7 dispatch at{' '}
                           <strong className="underline">{displayPhone}</strong> or email{' '}
-                          <strong className="underline">{displayEmail}</strong>.
+                          <strong className="underline break-all">{displayEmail}</strong>.
                         </>
                       )}
                     </p>
@@ -280,16 +280,16 @@ export function WebsiteFormControlsTab({
 
       {/* Card 2: Scheduling Windows & Airport Rules */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <ClockIcon className="w-5 h-5 text-amber-600" />
-            Scheduling Windows, Lead Times &amp; Flight Tracking
+            <ClockIcon className="w-5 h-5 text-amber-600 shrink-0" />
+            <span>Scheduling Windows, Lead Times &amp; Flight Tracking</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500">
             Operational boundaries for immediate ASAP requests, scheduled advance pickups, and airport delay grace periods.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 space-y-5">
+        <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-xs font-bold text-slate-800 block mb-1">
@@ -303,7 +303,7 @@ export function WebsiteFormControlsTab({
                   onChange={(e) =>
                     setFormConfig((prev) => ({ ...prev, allowImmediateAsap: e.target.checked }))
                   }
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
               </div>
             </div>
@@ -324,7 +324,7 @@ export function WebsiteFormControlsTab({
                     minAdvanceNoticeMinutes: Number(e.target.value),
                   }))
                 }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Lead time for scheduled trips</span>
             </div>
@@ -344,7 +344,7 @@ export function WebsiteFormControlsTab({
                     maxAdvanceBookingDays: Number(e.target.value),
                   }))
                 }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Future calendar limit</span>
             </div>
@@ -364,7 +364,7 @@ export function WebsiteFormControlsTab({
                     asapSearchRadiusMiles: Number(e.target.value),
                   }))
                 }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Geographic limit for ASAP calls</span>
             </div>
@@ -375,24 +375,24 @@ export function WebsiteFormControlsTab({
 
       {/* Card 3: STL Lambert Airport Rules & Curbside Description */}
       <Card variant="elevated" className="border-blue-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-blue-100 bg-blue-50/50 p-5">
+        <CardHeader className="border-b border-blue-100 bg-blue-50/50 p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <CardTitle className="text-base font-extrabold text-blue-950 flex items-center gap-2">
-              <PlaneLandingIcon className="w-5 h-5 text-blue-600" />
-              STL Lambert Airport Rules &amp; Curbside Pickup Description
+              <PlaneLandingIcon className="w-5 h-5 text-blue-600 shrink-0" />
+              <span>STL Lambert Airport Rules &amp; Curbside Pickup Description</span>
             </CardTitle>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider self-start sm:self-auto">
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider self-start sm:self-auto shrink-0">
               Airport Automation
             </span>
           </div>
           <CardDescription className="text-xs text-blue-800/80">
-            Configure automated flight tracking, complimentary grace windows, terminal pickup meet points, and customer confirmation email instructions.
+            Configure automated flight tracking, complimentary grace windows, terminal pickup meet points, and client confirmation email instructions.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 space-y-5">
+        <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-bold text-slate-800">Require Flight # for Airports</label>
                 <input
                   type="checkbox"
@@ -403,7 +403,7 @@ export function WebsiteFormControlsTab({
                       requireFlightNumberForAirport: e.target.checked,
                     }))
                   }
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
               </div>
               <span className="text-[10px] text-slate-500 block mt-1">STL Lambert &amp; Spirit transfers</span>
@@ -425,7 +425,7 @@ export function WebsiteFormControlsTab({
               >
                 <option value="curbside">Curbside Pickup Only</option>
                 <option value="baggage_claim">Baggage Claim Inside Escort</option>
-                <option value="both">Customer Choice at Booking</option>
+                <option value="both">Client Choice at Booking</option>
               </select>
             </div>
 
@@ -445,7 +445,7 @@ export function WebsiteFormControlsTab({
                     flightDelayGraceMinutes: Number(e.target.value),
                   }))
                 }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
               <span className="text-[10px] text-slate-400 block mt-0.5">Complimentary airport wait time</span>
             </div>
@@ -453,11 +453,11 @@ export function WebsiteFormControlsTab({
 
           {/* Lambert Airport Pickup Location Description */}
           <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
               <label className="text-xs font-bold text-blue-950 block">
                 STL Lambert Airport Pickup Location Description (Curbside &amp; Baggage Claim)
               </label>
-              <span className="text-[10px] text-blue-700 font-bold bg-white px-2.5 py-0.5 rounded border border-blue-200 shadow-2xs">
+              <span className="text-[10px] text-blue-700 font-bold bg-white px-2.5 py-0.5 rounded border border-blue-200 shadow-2xs self-start sm:self-auto shrink-0">
                 Email &amp; Confirmation Notice
               </span>
             </div>
@@ -482,19 +482,19 @@ export function WebsiteFormControlsTab({
 
       {/* Card 3: Equipment, Child Seats & Cancellation Penalties */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <ShieldCheckIcon className="w-5 h-5 text-emerald-600" />
-            Equipment Add-ons, Child Safety Seats &amp; Cancellation Terms
+            <ShieldCheckIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>Equipment Add-ons, Child Safety Seats &amp; Cancellation Terms</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500">
             Child seat inventory fees, return trip incentives, and cancellation thresholds.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 space-y-5">
+        <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-bold text-slate-800">Child Safety Seats</label>
                 <input
                   type="checkbox"
@@ -505,7 +505,7 @@ export function WebsiteFormControlsTab({
                       allowChildSafetySeats: e.target.checked,
                     }))
                   }
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
               </div>
               {formConfig.allowChildSafetySeats && (
@@ -519,7 +519,7 @@ export function WebsiteFormControlsTab({
             </div>
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-bold text-slate-800">Round Trip Booking</label>
                 <input
                   type="checkbox"
@@ -530,7 +530,7 @@ export function WebsiteFormControlsTab({
                       allowRoundTrip: e.target.checked,
                     }))
                   }
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
               </div>
               {formConfig.allowRoundTrip && (
@@ -567,7 +567,7 @@ export function WebsiteFormControlsTab({
                     cardPreAuthThresholdAmount: Number(e.target.value),
                   }))
                 }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Fares above require card on file</span>
             </div>
@@ -575,15 +575,15 @@ export function WebsiteFormControlsTab({
 
           <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl">
             <span className="text-xs font-bold text-slate-800 block mb-2">
-              Accepted Customer Payment Methods:
+              Accepted Client Payment Methods:
             </span>
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formConfig.acceptedPaymentMethods.includes('card')}
                   onChange={() => togglePaymentMethod('card')}
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Credit / Debit Card (Online Pre-Auth)</span>
@@ -593,7 +593,7 @@ export function WebsiteFormControlsTab({
                   type="checkbox"
                   checked={formConfig.acceptedPaymentMethods.includes('cash')}
                   onChange={() => togglePaymentMethod('cash')}
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Cash to Driver in Cab</span>
@@ -603,7 +603,7 @@ export function WebsiteFormControlsTab({
                   type="checkbox"
                   checked={formConfig.acceptedPaymentMethods.includes('account')}
                   onChange={() => togglePaymentMethod('account')}
-                  className="w-4 h-4 rounded text-blue-600"
+                  className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>Corporate Direct Billing Account</span>
@@ -617,9 +617,9 @@ export function WebsiteFormControlsTab({
             type="submit"
             variant="primary"
             disabled={isLoading}
-            className="text-xs font-bold"
+            className="w-full sm:w-auto justify-center text-xs font-bold"
           >
-            {isLoading ? 'Saving Changes...' : 'Save Customer Booking Form Controls'}
+            {isLoading ? 'Saving Changes...' : 'Save Client Booking Form Controls'}
           </Button>
         </CardFooter>
       </Card>
