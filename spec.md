@@ -603,5 +603,24 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Anti-tamper pricing validation: Rejection and deterministic recalculation of tampered client fare submissions.
   - Bot mitigation verification: Automated rejection of submissions with populated honeypot fields.
 
+## 33. Phase 33: Codebase Modularization, Shared Hooks & Dead-Code Cleanup
+- **Zero-Regression Structural Refactoring**:
+  - Strictly preserve all runtime behavior: pricing calculations, Firestore schemas/queries, trip state transitions, visual styling, mobile gestures, `React.memo` boundaries, `WorkspaceBus` event subscriptions (`POPULATE_BOOKING`, etc.), and `localStorage`/`sessionStorage` contracts (`ct_dispatch_*`, `ct_driver_*`, `ct_comms_*`, `ct_display_layout_*`).
+  - Preserve config-driven architecture (`app/config/formConfig.ts`, `app/config/roleFormConfig.ts`) and public exports such as `formatUsPhone` from `app/components/domain/BookingEngineV2.tsx`.
+- **Dead-Code Removal & Git Hygiene**:
+  - Retire unused legacy V1 booking components (`app/components/domain/BookingEngine.tsx` and `app/components/domain/BookingForm.tsx`) and clean barrel re-exports in `app/components/domain/index.ts`.
+  - Exclude `.vercel/` build artifacts via `.gitignore` and untrack `.vercel/react-router-build-result.json` from Git index.
+- **Dispatch Console Decomposition (`/dispatch`)**:
+  - Decompose `app/routes/dispatch.tsx` into cohesive, strongly typed domain panes under `app/components/domain/dispatch/` (`TripActionDropdown`, `MemoizedDraftBookingPane`, `DispatchTripQueuePane`, `DispatchLiveMapPane`, `DispatchDriverRosterPane`, `DispatchTripDetailsDrawer`), keeping `dispatch.tsx` focused on workspace state and layout orchestration.
+- **Driver Mobile PWA Decomposition (`/driver`)**:
+  - Extract pure formatting/navigation/fare helpers (`formatCabUnitLabel`, `openMapNavigation`, `isTripQuotedLocked`, `splitDriverExtras`, `maskPhoneForDisplay`) into `app/core/utils/driver-ui.util.ts`.
+  - Decompose `app/routes/driver.tsx` into focused UI components under `app/components/domain/driver/` (`DriverShiftControls`, `DriverOfferSheet`, `DriverLiveMeterCard`, `DriverPaymentTerminalModal`, `DriverEarningsHistoryPane`).
+- **Communications Hub Modularization & Lazy WebRTC Loading**:
+  - Split `app/components/domain/dispatch/CommsHub.tsx` into modular sub-panes under `app/components/domain/dispatch/comms/` (`CommsFilterToolbar`, `CommsBatchActionBar`, `SoftphoneDialerPane`, `SmsThreadPane`, `VoicemailCallLogPane`).
+  - Lazy-load `@twilio/voice-sdk` dynamically upon softphone initialization so WebRTC voice dependencies do not block initial bundle parsing.
+- **Shared Booking Hooks & Pure Helpers**:
+  - Consolidate duplicated pure booking logic shared between `DispatchBookingEngine.tsx` and `BookingEngineV2.tsx` into `app/core/hooks/booking/` (multi-stop waypoint manipulation, return-trip state sync, corporate PO verification helpers).
+
+
 
 

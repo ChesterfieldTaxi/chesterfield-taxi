@@ -432,5 +432,30 @@
   - [x] 32.4.2 Add `"test:stress"` script to `package.json`.
   - [x] 32.4.3 Execute stress test suite, verify assertions pass, and confirm zero regressions.
 
+## Phase 33: Codebase Modularization, Shared Hooks & Dead-Code Cleanup
+- [x] 33.1 Documentation First (SDD Convention):
+  - [x] 33.1.1 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 33 scope before modifying application code.
+- [x] 33.2 Dead-Code Removal & Git Hygiene:
+  - [x] 33.2.1 Verify zero active imports and remove legacy V1 `app/components/domain/BookingEngine.tsx` and `app/components/domain/BookingForm.tsx`, cleaning up `app/components/domain/index.ts`.
+  - [x] 33.2.2 Add `.vercel/` to `.gitignore` and run `git rm --cached -r .vercel` so `.vercel/react-router-build-result.json` no longer dirties `git status`.
+- [x] 33.3 Decompose `app/routes/dispatch.tsx`:
+  - [x] 33.3.1 Extract `TripActionDropdown.tsx` and `MemoizedDraftBookingPane.tsx` under `app/components/domain/dispatch/`.
+  - [x] 33.3.2 Extract `DispatchTripQueuePane.tsx` (table, card, and compact queue renderers + search/filter toolbar).
+  - [x] 33.3.3 Extract `DispatchLiveMapPane.tsx` (Google Maps fleet telemetry, markers, zone overlays & route polylines).
+  - [x] 33.3.4 Extract `DispatchDriverRosterPane.tsx` (driver shift list, driver picker sheet & touch-and-hold quick-action sheets).
+  - [x] 33.3.5 Extract `DispatchTripDetailsDrawer.tsx` (trip details/inspection, unconfirmed review modal & audit triggers) and keep `app/routes/dispatch.tsx` as clean workspace orchestrator.
+- [x] 33.4 Decompose `app/routes/driver.tsx`:
+  - [x] 33.4.1 Extract pure helper functions (`formatCabUnitLabel`, `openMapNavigation`, `isTripQuotedLocked`, `splitDriverExtras`, `maskPhoneForDisplay`) into `app/core/utils/driver-ui.util.ts` and re-export from `driver.tsx`.
+  - [x] 33.4.2 Extract `DriverShiftControls.tsx`, `DriverOfferSheet.tsx`, `DriverLiveMeterCard.tsx`, `DriverPaymentTerminalModal.tsx`, and `DriverEarningsHistoryPane.tsx` under `app/components/domain/driver/`.
+- [x] 33.5 Modularize `CommsHub.tsx` & Shared Booking Hooks:
+  - [x] 33.5.1 Split `app/components/domain/dispatch/CommsHub.tsx` into `app/components/domain/dispatch/comms/` (`CommsFilterToolbar.tsx`, `CommsBatchActionBar.tsx`, `SoftphoneDialerPane.tsx`, `SmsThreadPane.tsx`, `VoicemailCallLogPane.tsx`) and lazy-load `@twilio/voice-sdk` on softphone initialization.
+  - [x] 33.5.2 Extract shared pure hooks/helpers between `DispatchBookingEngine.tsx` and `BookingEngineV2.tsx` into `app/core/hooks/booking/` (multi-stop waypoint manipulation, return-trip state sync, corporate PO verification helpers).
+- [x] 33.6 Verification Gate & Summary:
+  - [x] 33.6.1 Run `npm run typecheck` (0 errors).
+  - [x] 33.6.2 Run `npm run build` (clean client + SSR bundles).
+  - [x] 33.6.3 Run `npm run test:e2e` and `npm run test:stress` (all assertions pass).
+  - [x] 33.6.4 Mark Phase 33 tasks complete in `tasks.md` and report before/after file sizes and line counts.
+
+
 
 

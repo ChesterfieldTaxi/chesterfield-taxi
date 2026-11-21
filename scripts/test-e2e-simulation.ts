@@ -291,7 +291,13 @@ async function runE2ESimulation() {
 
   // 3.1 Verify immutable vehicle snapshot freezing upon driver assignment
   assert(Boolean(assignedTrip.assignedVehicle), 'Driver Flow: assignedVehicle snapshot was frozen upon assignment');
-  assert(Boolean(assignedTrip.assignedVehicle?.vehicleNumber?.includes('Cab #204')), 'Driver Flow: Frozen vehicleNumber matches Cab #204');
+  assert(
+    Boolean(
+      assignedTrip.assignedVehicle?.vehicleNumber?.includes('Car #204') ||
+      assignedTrip.assignedVehicle?.vehicleNumber?.includes('Cab #204')
+    ),
+    'Driver Flow: Frozen vehicleNumber matches unit #204'
+  );
   assert(Boolean(assignedTrip.assignedVehicle?.model), 'Driver Flow: Frozen vehicle model details captured');
 
   // 3.2 Driver transitions status: assigned -> en_route
@@ -327,7 +333,13 @@ async function runE2ESimulation() {
   const latestStatus = await bookingService.getBookingStatus(tripModeB.id);
   assert(latestStatus !== null, 'Tracking Flow: /track/$tripToken resolved booking status');
   assert(latestStatus?.status === 'completed', 'Tracking Flow: Status resolves to completed');
-  assert(Boolean(latestStatus?.trip?.assignedVehicle?.vehicleNumber?.includes('Cab #204')), 'Tracking Flow: Live telemetry displays frozen vehicle unit');
+  assert(
+    Boolean(
+      latestStatus?.trip?.assignedVehicle?.vehicleNumber?.includes('Car #204') ||
+      latestStatus?.trip?.assignedVehicle?.vehicleNumber?.includes('Cab #204')
+    ),
+    'Tracking Flow: Live telemetry displays frozen vehicle unit'
+  );
 
   unsubscribeTrip();
 

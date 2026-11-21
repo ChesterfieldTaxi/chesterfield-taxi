@@ -632,5 +632,52 @@ export interface PassengerAccount {
 - **Anti-Tamper Pricing Verification**: Verifying that client attempts to manipulate fares (e.g. `$0.01` or negative sums) are rejected and re-calculated deterministically by the server/core pricing engine.
 - **Bot Honeypot Validation**: Testing automated rejection of spam payloads containing populated honeypot values.
 
+## 22. Phase 33 Architecture: Codebase Modularization, Shared Hooks & Dead-Code Cleanup
+
+### 22.1 Architectural Guardrails & Non-Functional Invariants
+- **Zero Behavior Change**: All pricing algorithms, Firestore collections/queries, trip lifecycle transitions, Tailwind CSS styles, mobile touch/drag gestures, and UX workflows remain strictly identical.
+- **Config-Driven Preservation**: `app/config/formConfig.ts` and `app/config/roleFormConfig.ts` remain untouched.
+- **Memoization, Event Bus & Storage Contracts**:
+  - Preserve `React.memo` boundaries (`MemoizedDraftBookingPane`, `DispatchBookingEngine`, `CommsHub`), stable `useCallback`/`useMemo` references, and `WorkspaceBus` event subscriptions (`POPULATE_BOOKING`, etc.).
+  - Preserve all `localStorage` and `sessionStorage` keys (`ct_dispatch_*`, `ct_driver_*`, `ct_comms_*`, `ct_display_layout_*`).
+  - Keep `formatUsPhone` exported from `app/components/domain/BookingEngineV2.tsx` for compatibility with `scripts/stress-test-web-booking.ts`.
+
+### 22.2 Dead-Code Retirement & Repository Hygiene
+- Verify zero active route or script consumers for legacy V1 `app/components/domain/BookingEngine.tsx` and `app/components/domain/BookingForm.tsx`, remove both files, and prune barrel re-exports from `app/components/domain/index.ts`.
+- Add `.vercel/` to `.gitignore` and execute `git rm --cached -r .vercel` so `.vercel/react-router-build-result.json` no longer pollutes working tree status during builds.
+
+### 22.3 Dispatch Workspace Module Architecture (`app/components/domain/dispatch/`)
+- **`TripActionDropdown.tsx`**: Portal/positioned row-action dropdown menu for trip lifecycle overrides, driver assignment, cloning, and audit inspection.
+- **`MemoizedDraftBookingPane.tsx`**: Isolated `React.memo` wrapper around `DispatchBookingEngine` preserving multi-draft tab performance.
+- **`DispatchTripQueuePane.tsx`**: Search/filter/layout toolbar plus Table, Card Grid, and Compact List queue renderers.
+- **`DispatchLiveMapPane.tsx`**: Fleet telemetry map panel, Google Maps markers, geo-zone overlays, route polylines, and map layer controls.
+- **`DispatchDriverRosterPane.tsx`**: Active driver shift list, candidate driver picker sheet, and mobile touch-and-hold quick-action sheets.
+- **`DispatchTripDetailsDrawer.tsx`**: Trip inspection drawer, unconfirmed Mode B review modal, and audit log inspector triggers.
+- **`app/routes/dispatch.tsx`**: Streamlined route orchestrator coordinating Firestore subscriptions, state synchronization, split-pane layout, and mobile 3-tab navigation.
+
+### 22.4 Driver PWA Module Architecture (`app/components/domain/driver/` & `app/core/utils/driver-ui.util.ts`)
+- **`app/core/utils/driver-ui.util.ts`**: Pure deterministic utilities (`formatCabUnitLabel`, `openMapNavigation`, `isTripQuotedLocked`, `splitDriverExtras`, `maskPhoneForDisplay`), re-exported from `app/routes/driver.tsx` for backwards compatibility.
+- **`DriverShiftControls.tsx`**: Shift duty toggle, vehicle unit selector, and driver HUD header.
+- **`DriverOfferSheet.tsx`**: Real-time incoming trip offer sheet/card with countdown and accept/decline controls.
+- **`DriverLiveMeterCard.tsx`**: Active trip progression card, sequential lifecycle CTA flow (`en_route` -> `arrived` -> `in_progress` -> `completed`), live taximeter, and itemized extras controls.
+- **`DriverPaymentTerminalModal.tsx`**: In-cab payment settlement modal with tip presets (`15%`, `20%`, `25%`, `Custom`, `No Tip`) and card/cash completion.
+- **`DriverEarningsHistoryPane.tsx`**: Completed trip and shift earnings summary view.
+
+### 22.5 CommsHub Sub-Panes & Dynamic WebRTC Voice SDK Loading (`app/components/domain/dispatch/comms/`)
+- Extract focused sub-modules from `app/components/domain/dispatch/CommsHub.tsx`:
+  - `CommsFilterToolbar.tsx`: Channel tabs, search, unread/priority filters.
+  - `CommsBatchActionBar.tsx`: Multi-select batch read/archive/delete action bar.
+  - `SoftphoneDialerPane.tsx`: Embedded WebRTC numeric dialpad, DTMF keypad, active call controls, and call timer.
+  - `SmsThreadPane.tsx`: Two-way SMS conversation list, thread message view, quick templates, and booking population triggers.
+  - `VoicemailCallLogPane.tsx`: Inbound/outbound call history, voicemail playback, and callback triggers.
+- Convert static `@twilio/voice-sdk` imports to dynamic `import('@twilio/voice-sdk')` triggered only when the softphone initializes, keeping WebRTC SDK bytes out of the critical initial bundle parse.
+
+### 22.6 Shared Booking Hooks & Helpers (`app/core/hooks/booking/`)
+- Extract identical pure logic shared across `DispatchBookingEngine.tsx` and `BookingEngineV2.tsx` into `app/core/hooks/booking/`:
+  - Multi-stop waypoint array manipulation (add, remove, reorder/update stops).
+  - Return-trip address/route synchronization helpers.
+  - Corporate account / PO verification state and API helper hook.
+
+
 
 

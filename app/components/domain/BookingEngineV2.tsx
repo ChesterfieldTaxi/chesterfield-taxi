@@ -41,30 +41,56 @@ import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { formatVehicleTier } from '../../core/utils/trip-id.util';
 import { hasValidRoutePair } from '../../core/hooks/useDebounceRoute';
 import {
-  REGIONAL_AIRPORTS,
-  MAJOR_AIRLINES,
-  detectAirportInAddresses,
-} from '../../core/config/airports';
-export const COMMON_FBO_FACILITIES = [
-  'Signature Aviation - Lambert (STL)',
-  'Signature Aviation - Spirit (SUS)',
-  'TAC Air / Million Air - Spirit of St. Louis (SUS)',
-  'Jet Aviation - St. Louis Downtown (CPS)',
-  'Premier Jet Center (ALN)',
-  'West Star Aviation',
-  'Private Hangar / Other FBO',
-];
-
+  CUSTOMER_FBO_FACILITIES as COMMON_FBO_FACILITIES,
+  DEFAULT_BOOKER_ROLES,
+  formatUsPhone,
+  formatTime12h,
+  computeDefaultLeadDateTime,
+  mapCustomerChoiceToTier,
+  isVehicleChoiceSelected,
+  buildCustomerActiveVehicleTiers,
+  buildCustomerVehicleCapacities,
+  resolveFriendlyVehicleName,
+  computeCustomerFleetCapacity,
+  evaluateCustomerTierRestriction,
+  findCapableCustomerTiers,
+  computeTotalCarSeats,
+  computeCarSeatsToggleState,
+  stepLuggageCount,
+  countTotalOversizedBags,
+  doesOversizedRequireUpgrade,
+  formatOversizedItemsSummary,
+  formatCustomExtrasSummary,
+  resolveAirportZoneId,
+  useBookingWaypoints,
+  swapRouteEndpoints,
+  swapReturnRouteEndpoints,
+  buildReturnLegSeedFromOutbound,
+  checkSymmetricRoundTrip,
+  appendVehicleChoice,
+  removeVehicleChoiceAt,
+  updateVehicleChoiceAt,
+  useReturnTripBlankAddressSync,
+  useBookingAirportDetection,
+  useCorporatePoVerification,
+  type SpecialRequestKey,
+  type BookingVehicleChoice as CustomerVehicleChoice,
+  type BookingWaypointItem as WaypointItem,
+  type BookingAdditionalPassenger as AdditionalPassengerItem,
+} from '../../core/hooks/booking';
 import { sanitizeTextInput, isBotHoneypotTriggered } from '../../core/utils/security-sanitizer.util';
 import { DispatchLocationInput, type PlaceSelectedDetails } from './dispatch/DispatchLocationInput';
 import { BookingConfirmation, type EmailDeliveryFeedback } from './BookingConfirmation';
 
-export function formatUsPhone(val: string): string {
-  const digits = val.replace(/\D/g, '').slice(0, 10);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
-}
+export {
+  COMMON_FBO_FACILITIES,
+  formatUsPhone,
+  formatTime12h,
+  type SpecialRequestKey,
+  type CustomerVehicleChoice,
+  type WaypointItem,
+  type AdditionalPassengerItem,
+};
 
 import {
   SpinnerIcon,
@@ -126,41 +152,6 @@ export interface BookingEngineV2Props {
   onCancelEdit?: () => void;
   hideDispatchBanner?: boolean;
   embeddedInApp?: boolean;
-}
-
-function formatLocalDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-export type SpecialRequestKey = 'petFriendly' | 'quietRide' | 'musicOk';
-export type CustomerVehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});
-
-export function formatTime12h(time24: string): string {
-  if (!time24) return '';
-  const [hStr, mStr] = time24.split(':');
-  if (hStr === undefined || mStr === undefined) return time24;
-  let hour = parseInt(hStr, 10);
-  if (isNaN(hour)) return time24;
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  hour = hour % 12;
-  if (hour === 0) hour = 12;
-  const minute = mStr.padStart(2, '0');
-  return `${hour}:${minute} ${ampm}`;
-}
-
-export interface WaypointItem {
-  id: string;
-  address: string;
-  placeId?: string;
-  coordinates?: GeoPoint;
-}
-
-export interface AdditionalPassengerItem {
-  name: string;
-  phone?: string;
 }
 
 interface FormState {
@@ -279,15 +270,6 @@ interface FormState {
   invoicingTerms: string;
   botTrapField?: string;
 }
-
-const DEFAULT_BOOKER_ROLES = [
-  'Hotel Front Desk / Concierge',
-  'Corporate Travel / Executive Admin',
-  'Medical Coordinator / Clinic',
-  'Family Member / Caregiver',
-  'Event Organizer / Wedding Planner',
-  'Other',
-];
 
 export function BookingEngineV2({
   className = '',
@@ -551,19 +533,8 @@ export function BookingEngineV2({
 
   // Populate client-local default date & time (+45 min rounded up to next 5-min step) after hydration
   useEffect(() => {
-    const now = new Date();
-    const todayStr = formatLocalDate(now);
+    const { todayLocalDate: todayStr, defaultDate, defaultTime } = computeDefaultLeadDateTime();
     setTodayLocalDate(todayStr);
-
-    const future = new Date(now.getTime() + 45 * 60 * 1000);
-    const rem = future.getMinutes() % 5;
-    if (rem !== 0) {
-      future.setMinutes(future.getMinutes() + (5 - rem), 0, 0);
-    } else {
-      future.setSeconds(0, 0);
-    }
-    const defaultDate = formatLocalDate(future);
-    const defaultTime = `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`;
 
     setForm((prev) => ({
       ...prev,
@@ -645,133 +616,60 @@ export function BookingEngineV2({
     };
   }, []);
 
-  const activeVehicleTiers: VehicleTierConfig[] = useMemo(() => {
-    const anyTier: VehicleTierConfig = {
-      id: 'any',
-      name: 'Any Vehicle',
-      badge: 'Best Value',
-      baseMultiplier: 1.0,
-      maxPassengers: 4,
-      maxLuggage: 3,
-      description: 'Nearest available Sedan, SUV, or Minivan',
-      iconType: 'standard',
-    };
-
-    const baseTiers: VehicleTierConfig[] = vehicleTiers.length > 0 ? vehicleTiers : [
-      {
-        id: 'standard',
-        name: 'Sedan',
-        badge: 'Executive',
-        baseMultiplier: 1.0,
-        maxPassengers: 4,
-        maxLuggage: 3,
-        description: 'Executive Lincoln / Camry',
-        iconType: 'standard',
-      },
-      {
-        id: 'xl',
-        name: 'SUV',
-        badge: 'Full-Size XL',
-        baseMultiplier: 1.3,
-        maxPassengers: 6,
-        maxLuggage: 5,
-        description: 'Full-size Chevy Suburban / Tahoe',
-        iconType: 'xl',
-      },
-    ];
-
-    if (!baseTiers.some((t) => t.id === 'any')) {
-      return [anyTier, ...baseTiers];
-    }
-    return baseTiers;
-  }, [vehicleTiers]);
+  const activeVehicleTiers: VehicleTierConfig[] = useMemo(
+    () => buildCustomerActiveVehicleTiers(vehicleTiers),
+    [vehicleTiers]
+  );
 
   // Limits from company config
   const { carSeatLimits } = COMPANY_CONFIG;
 
   // Dynamic capacities derived from active vehicle tiers with fallback defaults
-  const vehicleCapacities = useMemo(() => {
-    const map: Record<string, { maxPassengers: number; maxBags: number; name?: string }> = {
-      sedan: { maxPassengers: 4, maxBags: 3, name: 'Sedan' },
-      suv: { maxPassengers: 6, maxBags: 5, name: 'SUV' },
-      van: { maxPassengers: 7, maxBags: 6, name: 'Passenger Van' },
-      any: { maxPassengers: 4, maxBags: 3, name: 'Any Available' },
-    };
-
-    for (const tier of activeVehicleTiers) {
-      map[tier.id] = {
-        maxPassengers: tier.maxPassengers,
-        maxBags: tier.maxLuggage,
-        name: tier.name,
-      };
-    }
-    return map;
-  }, [activeVehicleTiers]);
+  const vehicleCapacities = useMemo(
+    () => buildCustomerVehicleCapacities(activeVehicleTiers),
+    [activeVehicleTiers]
+  );
 
   const getFriendlyVehicleName = useCallback(
-    (choice: string): string => {
-      if (!choice) return 'Standard Fleet';
-      if (vehicleCapacities[choice]?.name) {
-        return vehicleCapacities[choice].name;
-      }
-      const found = activeVehicleTiers.find(
-        (t) =>
-          t.id === choice ||
-          (choice === 'any' && t.id === 'any') ||
-          (choice === 'sedan' && (t.id === 'standard' || t.id === 'sedan')) ||
-          (choice === 'suv' && (t.id === 'xl' || t.id === 'suv')) ||
-          (choice === 'van' && (t.id === 'xl' || t.id === 'van'))
-      );
-      if (found?.name) return found.name;
-      return formatVehicleTier(choice);
-    },
+    (choice: string): string =>
+      resolveFriendlyVehicleName(choice, vehicleCapacities, activeVehicleTiers),
     [activeVehicleTiers, vehicleCapacities]
   );
 
   // Fleet capacity based on selected vehicles (multi-vehicle mode) or single vehicle (max based on biggest vehicle in fleet)
-  const totalMaxPassengers = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1) {
-      return form.selectedVehicles.reduce(
-        (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-        0
-      );
-    }
-    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxPassengers || 4), 7);
-  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]);
-
-  const totalMaxBags = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1) {
-      return form.selectedVehicles.reduce(
-        (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
-        0
-      );
-    }
-    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxBags || 3), 6);
-  }, [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]);
+  const { maxPassengers: totalMaxPassengers, maxBags: totalMaxBags } = useMemo(
+    () =>
+      computeCustomerFleetCapacity(
+        bookingConfig.allowMultiVehicle,
+        form.selectedVehicles,
+        vehicleCapacities
+      ),
+    [bookingConfig.allowMultiVehicle, form.selectedVehicles, vehicleCapacities]
+  );
 
   // Return-leg fleet capacity (independent of outbound vehicles)
-  const returnTotalMaxPassengers = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.returnSelectedVehicles.length > 1) {
-      return form.returnSelectedVehicles.reduce(
-        (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-        0
-      );
-    }
-    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxPassengers || 4), 7);
-  }, [bookingConfig.allowMultiVehicle, form.returnSelectedVehicles, vehicleCapacities]);
+  const { maxPassengers: returnTotalMaxPassengers, maxBags: returnTotalMaxBags } = useMemo(
+    () =>
+      computeCustomerFleetCapacity(
+        bookingConfig.allowMultiVehicle,
+        form.returnSelectedVehicles,
+        vehicleCapacities
+      ),
+    [bookingConfig.allowMultiVehicle, form.returnSelectedVehicles, vehicleCapacities]
+  );
 
-  const returnTotalMaxBags = useMemo(() => {
-    if (bookingConfig.allowMultiVehicle && form.returnSelectedVehicles.length > 1) {
-      return form.returnSelectedVehicles.reduce(
-        (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
-        0
-      );
-    }
-    return Math.max(...Object.values(vehicleCapacities).map((v) => v.maxBags || 3), 6);
-  }, [bookingConfig.allowMultiVehicle, form.returnSelectedVehicles, vehicleCapacities]);
-
-  const totalCarSeats = form.carSeats ? (form.rearFacingCount + form.frontFacingCount + form.boosterCount) : 0;
-  const returnTotalCarSeats = form.returnCarSeats ? (form.returnRearFacing + form.returnFrontFacing + form.returnBooster) : 0;
+  const totalCarSeats = computeTotalCarSeats(
+    form.carSeats,
+    form.rearFacingCount,
+    form.frontFacingCount,
+    form.boosterCount
+  );
+  const returnTotalCarSeats = computeTotalCarSeats(
+    form.returnCarSeats,
+    form.returnRearFacing,
+    form.returnFrontFacing,
+    form.returnBooster
+  );
 
   const oversizedCategories: OversizedBagCategory[] = useMemo(() => {
     if (universalExtras.oversizedBagsConfig && universalExtras.oversizedBagsConfig.length > 0) {
@@ -788,144 +686,165 @@ export function BookingEngineV2({
     );
   }, [universalExtras.customExtras]);
 
-  const selectedCustomExtrasSummary = useMemo(() => {
-    return Object.entries(form.selectedCustomExtras || {})
-      .filter(([_, qty]) => qty > 0)
-      .map(([id, qty]) => {
-        const extra = bookableCustomExtras.find((ce) => ce.id === id);
-        return qty > 1 ? `${qty}x ${extra?.name || id}` : extra?.name || id;
-      })
-      .join(', ');
-  }, [form.selectedCustomExtras, bookableCustomExtras]);
+  const selectedCustomExtrasSummary = useMemo(
+    () => formatCustomExtrasSummary(form.selectedCustomExtras, bookableCustomExtras),
+    [form.selectedCustomExtras, bookableCustomExtras]
+  );
 
-  const totalOversizedCount = useMemo(() => {
-    return Object.values(form.oversizedBags || {}).reduce((sum, count) => sum + count, 0);
-  }, [form.oversizedBags]);
+  const totalOversizedCount = useMemo(
+    () => countTotalOversizedBags(form.oversizedBags),
+    [form.oversizedBags]
+  );
 
-  const oversizedRequiresUpgrade = useMemo(() => {
-    if (!form.hasOversizedLuggage) return false;
-    return Object.entries(form.oversizedBags || {}).some(([id, count]) => {
-      if (count <= 0) return false;
-      const cat = oversizedCategories.find((c) => c.id === id);
-      return cat ? cat.requiresUpgrade : true;
-    });
-  }, [form.hasOversizedLuggage, form.oversizedBags, oversizedCategories]);
+  const oversizedRequiresUpgrade = useMemo(
+    () =>
+      doesOversizedRequireUpgrade(
+        form.hasOversizedLuggage,
+        form.oversizedBags,
+        oversizedCategories
+      ),
+    [form.hasOversizedLuggage, form.oversizedBags, oversizedCategories]
+  );
 
-  const oversizedItemsSummary = useMemo(() => {
-    const items = Object.entries(form.oversizedBags || {})
-      .filter(([_, count]) => count > 0)
-      .map(([id, count]) => {
-        const cat = oversizedCategories.find((c) => c.id === id);
-        return `${count}x ${cat?.label || id}`;
-      });
-    return items.join(', ');
-  }, [form.oversizedBags, oversizedCategories]);
+  const oversizedItemsSummary = useMemo(
+    () => formatOversizedItemsSummary(form.oversizedBags, oversizedCategories),
+    [form.oversizedBags, oversizedCategories]
+  );
 
   // Return-leg oversized cargo & car seat helpers (100% parity with outbound)
-  const returnTotalOversizedCount = useMemo(() => {
-    return Object.values(form.returnOversizedBags || {}).reduce((sum, count) => sum + count, 0);
-  }, [form.returnOversizedBags]);
+  const returnTotalOversizedCount = useMemo(
+    () => countTotalOversizedBags(form.returnOversizedBags),
+    [form.returnOversizedBags]
+  );
 
-  const returnOversizedRequiresUpgrade = useMemo(() => {
-    if (!form.returnHasOversizedLuggage) return false;
-    return Object.entries(form.returnOversizedBags || {}).some(([id, count]) => {
-      if (count <= 0) return false;
-      const cat = oversizedCategories.find((c) => c.id === id);
-      return cat ? cat.requiresUpgrade : true;
-    });
-  }, [form.returnHasOversizedLuggage, form.returnOversizedBags, oversizedCategories]);
+  const returnOversizedRequiresUpgrade = useMemo(
+    () =>
+      doesOversizedRequireUpgrade(
+        form.returnHasOversizedLuggage,
+        form.returnOversizedBags,
+        oversizedCategories
+      ),
+    [form.returnHasOversizedLuggage, form.returnOversizedBags, oversizedCategories]
+  );
 
-  const returnOversizedItemsSummary = useMemo(() => {
-    const items = Object.entries(form.returnOversizedBags || {})
-      .filter(([_, count]) => count > 0)
-      .map(([id, count]) => {
-        const cat = oversizedCategories.find((c) => c.id === id);
-        return `${count}x ${cat?.label || id}`;
-      });
-    return items.join(', ');
-  }, [form.returnOversizedBags, oversizedCategories]);
+  const returnOversizedItemsSummary = useMemo(
+    () => formatOversizedItemsSummary(form.returnOversizedBags, oversizedCategories),
+    [form.returnOversizedBags, oversizedCategories]
+  );
 
-  const returnSelectedCustomExtrasSummary = useMemo(() => {
-    return Object.entries(form.returnSelectedCustomExtras || {})
-      .filter(([_, qty]) => qty > 0)
-      .map(([id, qty]) => {
-        const extra = bookableCustomExtras.find((ce) => ce.id === id);
-        return qty > 1 ? `${qty}x ${extra?.name || id}` : extra?.name || id;
-      })
-      .join(', ');
-  }, [form.returnSelectedCustomExtras, bookableCustomExtras]);
+  const returnSelectedCustomExtrasSummary = useMemo(
+    () => formatCustomExtrasSummary(form.returnSelectedCustomExtras, bookableCustomExtras),
+    [form.returnSelectedCustomExtras, bookableCustomExtras]
+  );
 
   // Symmetric round-trip check: reverse-route price balancing ONLY applies when both legs match
-  const isSymmetricRoundTrip = useMemo(() => {
-    if (!form.returnTrip) return false;
-    const outP = form.pickupAddress.trim().toLowerCase();
-    const outD = form.dropoffAddress.trim().toLowerCase();
-    const retP = (form.returnPickupAddress.trim() || form.dropoffAddress.trim()).toLowerCase();
-    const retD = (form.returnDropoffAddress.trim() || form.pickupAddress.trim()).toLowerCase();
-    const outStops = form.intermediateStops.filter((s) => s.address?.trim()).length;
-    const retStops = form.returnIntermediateStops.filter((s) => s.address?.trim()).length;
-    return (
-      Boolean(outP && outD) &&
-      retP === outD &&
-      retD === outP &&
-      outStops === retStops &&
-      form.returnPassengers === form.passengers &&
-      form.returnBags === form.bags &&
-      form.returnVehicleChoice === form.vehicleChoice &&
-      JSON.stringify(form.returnSelectedVehicles) === JSON.stringify(form.selectedVehicles) &&
-      form.returnCarSeats === form.carSeats &&
-      form.returnRearFacing === form.rearFacingCount &&
-      form.returnFrontFacing === form.frontFacingCount &&
-      form.returnBooster === form.boosterCount &&
-      form.returnHasOversizedLuggage === form.hasOversizedLuggage &&
-      JSON.stringify(form.returnOversizedBags || {}) === JSON.stringify(form.oversizedBags || {}) &&
-      JSON.stringify(form.returnSelectedCustomExtras || {}) === JSON.stringify(form.selectedCustomExtras || {})
-    );
-  }, [
-    form.returnTrip,
-    form.pickupAddress,
-    form.dropoffAddress,
-    form.returnPickupAddress,
-    form.returnDropoffAddress,
-    form.intermediateStops,
-    form.returnIntermediateStops,
-    form.passengers,
-    form.returnPassengers,
-    form.bags,
-    form.returnBags,
-    form.vehicleChoice,
-    form.returnVehicleChoice,
-    form.selectedVehicles,
-    form.returnSelectedVehicles,
-    form.carSeats,
-    form.returnCarSeats,
-    form.rearFacingCount,
-    form.returnRearFacing,
-    form.frontFacingCount,
-    form.returnFrontFacing,
-    form.boosterCount,
-    form.returnBooster,
-    form.hasOversizedLuggage,
-    form.returnHasOversizedLuggage,
-    form.oversizedBags,
-    form.returnOversizedBags,
-    form.selectedCustomExtras,
-    form.returnSelectedCustomExtras,
-  ]);
+  const isSymmetricRoundTrip = useMemo(
+    () =>
+      checkSymmetricRoundTrip({
+        returnTrip: form.returnTrip,
+        pickupAddress: form.pickupAddress,
+        dropoffAddress: form.dropoffAddress,
+        returnPickupAddress: form.returnPickupAddress,
+        returnDropoffAddress: form.returnDropoffAddress,
+        intermediateStops: form.intermediateStops,
+        returnIntermediateStops: form.returnIntermediateStops,
+        passengers: form.passengers,
+        returnPassengers: form.returnPassengers,
+        bags: form.bags,
+        returnBags: form.returnBags,
+        vehicleChoice: form.vehicleChoice,
+        returnVehicleChoice: form.returnVehicleChoice,
+        selectedVehicles: form.selectedVehicles,
+        returnSelectedVehicles: form.returnSelectedVehicles,
+        carSeats: form.carSeats,
+        returnCarSeats: form.returnCarSeats,
+        rearFacingCount: form.rearFacingCount,
+        returnRearFacing: form.returnRearFacing,
+        frontFacingCount: form.frontFacingCount,
+        returnFrontFacing: form.returnFrontFacing,
+        boosterCount: form.boosterCount,
+        returnBooster: form.returnBooster,
+        hasOversizedLuggage: form.hasOversizedLuggage,
+        returnHasOversizedLuggage: form.returnHasOversizedLuggage,
+        oversizedBags: form.oversizedBags,
+        returnOversizedBags: form.returnOversizedBags,
+        selectedCustomExtras: form.selectedCustomExtras,
+        returnSelectedCustomExtras: form.returnSelectedCustomExtras,
+        requireNonEmptyEndpoints: true,
+        ignoreBlankStops: true,
+      }),
+    [
+      form.returnTrip,
+      form.pickupAddress,
+      form.dropoffAddress,
+      form.returnPickupAddress,
+      form.returnDropoffAddress,
+      form.intermediateStops,
+      form.returnIntermediateStops,
+      form.passengers,
+      form.returnPassengers,
+      form.bags,
+      form.returnBags,
+      form.vehicleChoice,
+      form.returnVehicleChoice,
+      form.selectedVehicles,
+      form.returnSelectedVehicles,
+      form.carSeats,
+      form.returnCarSeats,
+      form.rearFacingCount,
+      form.returnRearFacing,
+      form.frontFacingCount,
+      form.returnFrontFacing,
+      form.boosterCount,
+      form.returnBooster,
+      form.hasOversizedLuggage,
+      form.returnHasOversizedLuggage,
+      form.oversizedBags,
+      form.returnOversizedBags,
+      form.selectedCustomExtras,
+      form.returnSelectedCustomExtras,
+    ]
+  );
+
+  const outboundWaypoints = useBookingWaypoints<WaypointItem>({
+    stops: form.intermediateStops,
+    onChange: (updater) =>
+      setForm((prev) => ({ ...prev, intermediateStops: updater(prev.intermediateStops) })),
+    maxStops: 5,
+    idPrefix: 'stop',
+  });
+
+  const returnWaypoints = useBookingWaypoints({
+    stops: form.returnIntermediateStops,
+    onChange: (updater) =>
+      setForm((prev) => ({
+        ...prev,
+        returnIntermediateStops: updater(prev.returnIntermediateStops),
+      })),
+    maxStops: 5,
+    idPrefix: 'ret-stop',
+  });
+
+  const { verifyCustomerAccount } = useCorporatePoVerification({
+    paymentMethod: form.paymentMethod,
+  });
 
   const handleAddReturnVehicle = () => {
     const maxAllowed = bookingConfig.maxVehiclesAllowed || 3;
-    if (form.returnSelectedVehicles.length >= maxAllowed) return;
     setForm((prev) => ({
       ...prev,
-      returnSelectedVehicles: [...prev.returnSelectedVehicles, 'sedan'],
+      returnSelectedVehicles: appendVehicleChoice(
+        prev.returnSelectedVehicles,
+        'sedan',
+        maxAllowed
+      ),
     }));
   };
 
   const handleRemoveReturnVehicle = (index: number) => {
     if (form.returnSelectedVehicles.length <= 1) return;
     setForm((prev) => {
-      const updated = prev.returnSelectedVehicles.filter((_, i) => i !== index);
+      const updated = removeVehicleChoiceAt(prev.returnSelectedVehicles, index);
       return {
         ...prev,
         returnSelectedVehicles: updated,
@@ -936,8 +855,7 @@ export function BookingEngineV2({
 
   const handleUpdateReturnVehicleChoice = (index: number, choice: CustomerVehicleChoice) => {
     setForm((prev) => {
-      const updated = [...prev.returnSelectedVehicles];
-      updated[index] = choice;
+      const updated = updateVehicleChoiceAt(prev.returnSelectedVehicles, index, choice) || prev.returnSelectedVehicles;
       return {
         ...prev,
         returnSelectedVehicles: updated,
@@ -948,20 +866,17 @@ export function BookingEngineV2({
 
   const handleToggleReturnCarSeats = (checked: boolean) => {
     setForm((prev) => {
-      if (!checked) {
-        return {
-          ...prev,
-          returnCarSeats: false,
-          returnRearFacing: 0,
-          returnFrontFacing: 0,
-          returnBooster: 0,
-        };
-      }
-      const hasExisting = prev.returnRearFacing > 0 || prev.returnFrontFacing > 0 || prev.returnBooster > 0;
+      const next = computeCarSeatsToggleState(checked, {
+        rearFacing: prev.returnRearFacing,
+        frontFacing: prev.returnFrontFacing,
+        booster: prev.returnBooster,
+      });
       return {
         ...prev,
-        returnCarSeats: true,
-        returnRearFacing: hasExisting ? prev.returnRearFacing : 1,
+        returnCarSeats: next.enabled,
+        returnRearFacing: next.rearFacing,
+        returnFrontFacing: next.frontFacing,
+        returnBooster: next.booster,
       };
     });
   };
@@ -976,74 +891,28 @@ export function BookingEngineV2({
       return {
         ...prev,
         returnTrip: true,
-        returnPickupAddress: prev.returnPickupAddress || prev.dropoffAddress,
-        returnPickupCoordinates: prev.returnPickupCoordinates || prev.dropoffCoordinates,
-        returnDropoffAddress: prev.returnDropoffAddress || prev.pickupAddress,
-        returnDropoffCoordinates: prev.returnDropoffCoordinates || prev.pickupCoordinates,
-        returnPassengers: prev.passengers,
-        returnCarryOnBags: prev.carryOnBags,
-        returnCheckedBags: prev.checkedBags,
-        returnBags: prev.bags,
-        returnHasOversizedLuggage: prev.hasOversizedLuggage,
-        returnOversizedBags: { ...prev.oversizedBags },
-        returnOversizedLuggageNotes: prev.oversizedLuggageNotes,
-        returnSelectedCustomExtras: { ...prev.selectedCustomExtras },
-        returnCarSeats: prev.carSeats,
-        returnRearFacing: prev.rearFacingCount,
-        returnFrontFacing: prev.frontFacingCount,
-        returnBooster: prev.boosterCount,
-        returnVehicleChoice: prev.vehicleChoice,
-        returnSelectedVehicles: [...prev.selectedVehicles],
+        ...buildReturnLegSeedFromOutbound(prev, prev),
       };
     });
   };
 
-  const handleAddReturnStop = () => {
-    if (form.returnIntermediateStops.length >= 5) return;
-    setForm((prev) => ({
-      ...prev,
-      returnIntermediateStops: [
-        ...prev.returnIntermediateStops,
-        { id: `ret-stop-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, address: '' },
-      ],
-    }));
-  };
-
-  const handleUpdateReturnStop = (
-    idx: number,
-    patch: { address?: string; coordinates?: GeoPoint; placeId?: string }
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      returnIntermediateStops: prev.returnIntermediateStops.map((s, i) =>
-        i === idx ? { ...s, ...patch } : s
-      ),
-    }));
-  };
-
-  const handleRemoveReturnStop = (idx: number) => {
-    setForm((prev) => ({
-      ...prev,
-      returnIntermediateStops: prev.returnIntermediateStops.filter((_, i) => i !== idx),
-    }));
-  };
+  const handleAddReturnStop = returnWaypoints.addStop;
+  const handleUpdateReturnStop = returnWaypoints.updateStopAt;
+  const handleRemoveReturnStop = returnWaypoints.removeStopAt;
 
   const handleToggleCarSeats = (checked: boolean) => {
     setForm((prev) => {
-      if (!checked) {
-        return {
-          ...prev,
-          carSeats: false,
-          rearFacingCount: 0,
-          frontFacingCount: 0,
-          boosterCount: 0,
-        };
-      }
-      const hasExisting = prev.rearFacingCount > 0 || prev.frontFacingCount > 0 || prev.boosterCount > 0;
+      const next = computeCarSeatsToggleState(checked, {
+        rearFacing: prev.rearFacingCount,
+        frontFacing: prev.frontFacingCount,
+        booster: prev.boosterCount,
+      });
       return {
         ...prev,
-        carSeats: true,
-        rearFacingCount: hasExisting ? prev.rearFacingCount : 1,
+        carSeats: next.enabled,
+        rearFacingCount: next.rearFacing,
+        frontFacingCount: next.frontFacing,
+        boosterCount: next.booster,
       };
     });
   };
@@ -1051,17 +920,16 @@ export function BookingEngineV2({
   // Multi-vehicle handlers
   const handleAddVehicle = () => {
     const maxAllowed = bookingConfig.maxVehiclesAllowed || 3;
-    if (form.selectedVehicles.length >= maxAllowed) return;
     setForm((prev) => ({
       ...prev,
-      selectedVehicles: [...prev.selectedVehicles, 'sedan'],
+      selectedVehicles: appendVehicleChoice(prev.selectedVehicles, 'sedan', maxAllowed),
     }));
   };
 
   const handleRemoveVehicle = (index: number) => {
     if (form.selectedVehicles.length <= 1) return;
     setForm((prev) => {
-      const updated = prev.selectedVehicles.filter((_, i) => i !== index);
+      const updated = removeVehicleChoiceAt(prev.selectedVehicles, index);
       return {
         ...prev,
         selectedVehicles: updated,
@@ -1072,8 +940,7 @@ export function BookingEngineV2({
 
   const handleUpdateVehicleChoice = (index: number, choice: CustomerVehicleChoice) => {
     setForm((prev) => {
-      const updated = [...prev.selectedVehicles];
-      updated[index] = choice;
+      const updated = updateVehicleChoiceAt(prev.selectedVehicles, index, choice) || prev.selectedVehicles;
       return {
         ...prev,
         selectedVehicles: updated,
@@ -1083,23 +950,32 @@ export function BookingEngineV2({
     });
   };
 
-  // Airport detection for outbound route
-  const airportDetection = useMemo(() => {
-    return detectAirportInAddresses(form.pickupAddress, form.dropoffAddress);
-  }, [form.pickupAddress, form.dropoffAddress]);
-
-  // Airport detection for return route
-  const returnAirportDetection = useMemo(() => {
-    return detectAirportInAddresses(form.returnPickupAddress || '', form.returnDropoffAddress || '');
-  }, [form.returnPickupAddress, form.returnDropoffAddress]);
+  // Airport detection and live flight-info toggle synchronization for outbound & return routes
+  const { airportDetection, returnAirportDetection } = useBookingAirportDetection({
+    pickupAddress: form.pickupAddress,
+    dropoffAddress: form.dropoffAddress,
+    returnPickupAddress: form.returnPickupAddress,
+    returnDropoffAddress: form.returnDropoffAddress,
+    returnTrip: form.returnTrip,
+    clearWhenNoAirport: true,
+    onSyncOutboundFlightInfo: (shouldEnable) => {
+      setForm((prev) =>
+        prev.provideFlightInfo === shouldEnable
+          ? prev
+          : { ...prev, provideFlightInfo: shouldEnable }
+      );
+    },
+    onSyncReturnFlightInfo: (shouldEnable) => {
+      setForm((prev) =>
+        prev.returnProvideFlightInfo === shouldEnable
+          ? prev
+          : { ...prev, returnProvideFlightInfo: shouldEnable }
+      );
+    },
+  });
 
   // Map vehicle choice to vehicleTier
-  const mapChoiceToTier = useCallback((choice: CustomerVehicleChoice): VehicleTier => {
-    if (choice === 'any') return 'any';
-    if (choice === 'suv' || choice === 'van') return 'xl';
-    if (choice === 'sedan') return 'standard';
-    return choice as VehicleTier;
-  }, []);
+  const mapChoiceToTier = mapCustomerChoiceToTier;
 
   // Enforce customer vehicle auto-selection and capacity restrictions (single-vehicle mode):
   // Automatically choose cheapest vehicle capable of carrying the requested passengers & luggage
@@ -1109,27 +985,20 @@ export function BookingEngineV2({
       const totalLuggage = form.carryOnBags + form.checkedBags;
       const requiresUpgradedVehicle = totalCarSeats > 0 || oversizedRequiresUpgrade;
 
-      // Find capable vehicles sorted by price multiplier ascending
-      const capableTiers = [...activeVehicleTiers]
-        .filter((tier) => {
-          if (form.passengers > tier.maxPassengers) return false;
-          if (totalLuggage > tier.maxLuggage) return false;
-          if (requiresUpgradedVehicle && (tier.id === 'sedan' || tier.id === 'standard' || tier.maxPassengers <= 4)) {
-            return false;
-          }
-          return true;
-        })
-        .sort((a, b) => {
-          if (a.id === 'any') return -1;
-          if (b.id === 'any') return 1;
-          return a.baseMultiplier - b.baseMultiplier;
-        });
+      const capableTiers = findCapableCustomerTiers({
+        activeVehicleTiers,
+        passengers: form.passengers,
+        totalLuggage,
+        requiresUpgradedVehicle,
+      });
 
       const bestTier = capableTiers[0] || activeVehicleTiers[0];
       const minVehicle = (bestTier?.id || 'any') as CustomerVehicleChoice;
 
       const currentCap = vehicleCapacities[form.vehicleChoice] || { maxPassengers: 4, maxBags: 3 };
-      const hasCarSeatConstraint = requiresUpgradedVehicle && (form.vehicleChoice === 'sedan' || form.vehicleChoice === 'standard');
+      const hasCarSeatConstraint =
+        requiresUpgradedVehicle &&
+        (form.vehicleChoice === 'sedan' || form.vehicleChoice === 'standard');
       const canFitCurrent =
         form.passengers <= currentCap.maxPassengers &&
         totalLuggage <= currentCap.maxBags &&
@@ -1142,7 +1011,11 @@ export function BookingEngineV2({
           selectedVehicles: [minVehicle],
           isVehicleAutoAssigned: true,
         }));
-      } else if (form.isVehicleAutoAssigned && form.vehicleChoice !== minVehicle && form.vehicleChoice !== 'any') {
+      } else if (
+        form.isVehicleAutoAssigned &&
+        form.vehicleChoice !== minVehicle &&
+        form.vehicleChoice !== 'any'
+      ) {
         setForm((prev) => ({
           ...prev,
           vehicleChoice: minVehicle,
@@ -1182,12 +1055,8 @@ export function BookingEngineV2({
     const retLuggage = form.returnCarryOnBags + form.returnCheckedBags;
     const requiresUpgradedReturn = returnTotalCarSeats > 0 || returnOversizedRequiresUpgrade;
 
-    const currentTier = activeVehicleTiers.find(
-      (t) =>
-        t.id === form.returnVehicleChoice ||
-        (form.returnVehicleChoice === 'sedan' && (t.id === 'standard' || t.id === 'sedan')) ||
-        (form.returnVehicleChoice === 'suv' && (t.id === 'xl' || t.id === 'suv')) ||
-        (form.returnVehicleChoice === 'van' && (t.id === 'xl' || t.id === 'van'))
+    const currentTier = activeVehicleTiers.find((t) =>
+      isVehicleChoiceSelected(form.returnVehicleChoice, t.id, 'xl')
     );
 
     const isCurrentInvalid =
@@ -1195,26 +1064,18 @@ export function BookingEngineV2({
       form.returnPassengers > currentTier.maxPassengers ||
       retLuggage > currentTier.maxLuggage ||
       (requiresUpgradedReturn &&
-        (currentTier.id === 'sedan' || currentTier.id === 'standard' || currentTier.id === 'any' || currentTier.maxPassengers <= 4));
+        (currentTier.id === 'sedan' ||
+          currentTier.id === 'standard' ||
+          currentTier.id === 'any' ||
+          currentTier.maxPassengers <= 4));
 
     if (isCurrentInvalid) {
-      const capableReturnTiers = [...activeVehicleTiers]
-        .filter((tier) => {
-          if (form.returnPassengers > tier.maxPassengers) return false;
-          if (retLuggage > tier.maxLuggage) return false;
-          if (
-            requiresUpgradedReturn &&
-            (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4)
-          ) {
-            return false;
-          }
-          return true;
-        })
-        .sort((a, b) => {
-          if (a.id === 'any') return -1;
-          if (b.id === 'any') return 1;
-          return a.baseMultiplier - b.baseMultiplier;
-        });
+      const capableReturnTiers = findCapableCustomerTiers({
+        activeVehicleTiers,
+        passengers: form.returnPassengers,
+        totalLuggage: retLuggage,
+        requiresUpgradedVehicle: requiresUpgradedReturn,
+      });
 
       if (capableReturnTiers.length > 0 && capableReturnTiers[0].id !== form.returnVehicleChoice) {
         setForm((prev) => ({
@@ -1237,8 +1098,15 @@ export function BookingEngineV2({
   ]);
 
   // Keep return pickup/dropoff seeded if returnTrip is active and those address inputs are still blank
-  useEffect(() => {
-    if (form.returnTrip && (!form.returnPickupAddress || !form.returnDropoffAddress)) {
+  useReturnTripBlankAddressSync({
+    returnTrip: form.returnTrip,
+    pickupAddress: form.pickupAddress,
+    pickupCoordinates: form.pickupCoordinates,
+    dropoffAddress: form.dropoffAddress,
+    dropoffCoordinates: form.dropoffCoordinates,
+    returnPickupAddress: form.returnPickupAddress,
+    returnDropoffAddress: form.returnDropoffAddress,
+    onSeedBlankAddresses: () => {
       setForm((prev) => ({
         ...prev,
         returnPickupAddress: prev.returnPickupAddress || prev.dropoffAddress,
@@ -1246,35 +1114,8 @@ export function BookingEngineV2({
         returnDropoffAddress: prev.returnDropoffAddress || prev.pickupAddress,
         returnDropoffCoordinates: prev.returnDropoffCoordinates || prev.pickupCoordinates,
       }));
-    }
-  }, [form.returnTrip, form.pickupAddress, form.dropoffAddress, form.pickupCoordinates, form.dropoffCoordinates]);
-
-  // Auto-sync outbound flight info toggle with live airport detection (clears when airport is removed)
-  useEffect(() => {
-    setForm((prev) => {
-      if (airportDetection.isAirportTrip && !prev.provideFlightInfo) {
-        return { ...prev, provideFlightInfo: true };
-      }
-      if (!airportDetection.isAirportTrip && prev.provideFlightInfo) {
-        return { ...prev, provideFlightInfo: false };
-      }
-      return prev;
-    });
-  }, [airportDetection.isAirportTrip]);
-
-  // Auto-sync return flight info toggle with live return airport detection
-  useEffect(() => {
-    setForm((prev) => {
-      const shouldEnable = Boolean(form.returnTrip && returnAirportDetection.isAirportTrip);
-      if (shouldEnable && !prev.returnProvideFlightInfo) {
-        return { ...prev, returnProvideFlightInfo: true };
-      }
-      if (!shouldEnable && prev.returnProvideFlightInfo) {
-        return { ...prev, returnProvideFlightInfo: false };
-      }
-      return prev;
-    });
-  }, [form.returnTrip, returnAirportDetection.isAirportTrip]);
+    },
+  });
 
   // Live Outbound Quote Calculation
   const fetchLiveQuote = useCallback(async () => {
@@ -1358,8 +1199,8 @@ export function BookingEngineV2({
               isAirportPickup: airportDetection.isPickupAirport,
               isAirportDropoff: airportDetection.isDropoffAirport,
               isAirportTrip: airportDetection.isAirportTrip,
-              originZoneId: airportDetection.isPickupAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
-              destinationZoneId: airportDetection.isDropoffAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+              originZoneId: resolveAirportZoneId(airportDetection.isPickupAirport, airportDetection.airport?.iataCode),
+              destinationZoneId: resolveAirportZoneId(airportDetection.isDropoffAirport, airportDetection.airport?.iataCode),
             })
           )
         );
@@ -1413,8 +1254,8 @@ export function BookingEngineV2({
           isAirportPickup: airportDetection.isPickupAirport,
           isAirportDropoff: airportDetection.isDropoffAirport,
           isAirportTrip: airportDetection.isAirportTrip,
-          originZoneId: airportDetection.isPickupAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
-          destinationZoneId: airportDetection.isDropoffAirport ? (airportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+          originZoneId: resolveAirportZoneId(airportDetection.isPickupAirport, airportDetection.airport?.iataCode),
+          destinationZoneId: resolveAirportZoneId(airportDetection.isDropoffAirport, airportDetection.airport?.iataCode),
         });
 
         setQuote(quoteRes);
@@ -1522,8 +1363,8 @@ export function BookingEngineV2({
               isAirportPickup: returnAirportDetection.isPickupAirport,
               isAirportDropoff: returnAirportDetection.isDropoffAirport,
               isAirportTrip: returnAirportDetection.isAirportTrip,
-              originZoneId: returnAirportDetection.isPickupAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
-              destinationZoneId: returnAirportDetection.isDropoffAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+              originZoneId: resolveAirportZoneId(returnAirportDetection.isPickupAirport, returnAirportDetection.airport?.iataCode),
+              destinationZoneId: resolveAirportZoneId(returnAirportDetection.isDropoffAirport, returnAirportDetection.airport?.iataCode),
             })
           )
         );
@@ -1574,8 +1415,8 @@ export function BookingEngineV2({
           isAirportPickup: returnAirportDetection.isPickupAirport,
           isAirportDropoff: returnAirportDetection.isDropoffAirport,
           isAirportTrip: returnAirportDetection.isAirportTrip,
-          originZoneId: returnAirportDetection.isPickupAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
-          destinationZoneId: returnAirportDetection.isDropoffAirport ? (returnAirportDetection.airport?.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport') : undefined,
+          originZoneId: resolveAirportZoneId(returnAirportDetection.isPickupAirport, returnAirportDetection.airport?.iataCode),
+          destinationZoneId: resolveAirportZoneId(returnAirportDetection.isDropoffAirport, returnAirportDetection.airport?.iataCode),
         });
 
         setReturnQuote(retQuoteRes);
@@ -1636,57 +1477,36 @@ export function BookingEngineV2({
   const handleSwapRoute = () => {
     setForm((prev) => ({
       ...prev,
-      pickupAddress: prev.dropoffAddress,
-      pickupPlaceId: prev.dropoffPlaceId,
-      pickupCoordinates: prev.dropoffCoordinates,
-      dropoffAddress: prev.pickupAddress,
-      dropoffPlaceId: prev.pickupPlaceId,
-      dropoffCoordinates: prev.pickupCoordinates,
+      ...swapRouteEndpoints(prev),
     }));
   };
 
   // Swap Return Route (and reverse any return intermediate stops)
   const handleSwapReturnRoute = () => {
-    setForm((prev) => ({
-      ...prev,
-      returnPickupAddress: prev.returnDropoffAddress,
-      returnPickupCoordinates: prev.returnDropoffCoordinates,
-      returnDropoffAddress: prev.returnPickupAddress,
-      returnDropoffCoordinates: prev.returnPickupCoordinates,
-      returnIntermediateStops: [...prev.returnIntermediateStops].reverse(),
-    }));
+    setForm((prev) => {
+      const swapped = swapReturnRouteEndpoints({
+        returnPickupAddress: prev.returnPickupAddress,
+        returnPickupCoordinates: prev.returnPickupCoordinates,
+        returnDropoffAddress: prev.returnDropoffAddress,
+        returnDropoffCoordinates: prev.returnDropoffCoordinates,
+        returnIntermediateStops: prev.returnIntermediateStops,
+        reverseStops: true,
+      });
+      return {
+        ...prev,
+        returnPickupAddress: swapped.returnPickupAddress,
+        returnPickupCoordinates: swapped.returnPickupCoordinates,
+        returnDropoffAddress: swapped.returnDropoffAddress,
+        returnDropoffCoordinates: swapped.returnDropoffCoordinates,
+        returnIntermediateStops: swapped.returnIntermediateStops || [],
+      };
+    });
   };
 
   // Intermediate Stops Management
-  const handleAddStop = () => {
-    if (form.intermediateStops.length >= 5) return;
-    setForm((prev) => ({
-      ...prev,
-      intermediateStops: [
-        ...prev.intermediateStops,
-        {
-          id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-          address: '',
-        },
-      ],
-    }));
-  };
-
-  const handleUpdateStop = (id: string, updates: Partial<WaypointItem>) => {
-    setForm((prev) => ({
-      ...prev,
-      intermediateStops: prev.intermediateStops.map((stop) =>
-        stop.id === id ? { ...stop, ...updates } : stop
-      ),
-    }));
-  };
-
-  const handleRemoveStop = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      intermediateStops: prev.intermediateStops.filter((stop) => stop.id !== id),
-    }));
-  };
+  const handleAddStop = outboundWaypoints.addStop;
+  const handleUpdateStop = outboundWaypoints.updateStopById;
+  const handleRemoveStop = outboundWaypoints.removeStopById;
 
   // Additional Passengers Management
   const handleAddPassenger = () => {
@@ -2031,32 +1851,15 @@ export function BookingEngineV2({
       // Verify Corporate Account # & PO anti-fraud via rate-limited server endpoint (never falls back to mock 'corp-1'!)
       let verifiedCorporateAccountId: string | undefined;
       if (form.paymentMethod === 'account') {
-        const acctNum = form.corporateAccountNumber.trim();
-        if (!acctNum) {
-          throw new Error('Please enter your Corporate Account Number to bill a corporate account.');
-        }
         const totalProjected = form.returnTrip
           ? effectivePricing.totalFare + returnEffectivePricing.totalFare
           : effectivePricing.totalFare;
-        const verifyResp = await fetch('/api/corporate/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accountNumber: acctNum,
-            poNumber: form.billingPo.trim(),
-            estimatedFare: totalProjected,
-          }),
+        const verification = await verifyCustomerAccount({
+          accountNumber: form.corporateAccountNumber,
+          poNumber: form.billingPo,
+          estimatedFare: totalProjected,
         });
-        const verifyData = (await verifyResp.json().catch(() => ({}))) as any;
-        if (!verifyResp.ok || !verifyData.verified) {
-          throw new Error(
-            verifyData.error ||
-              'Unable to verify Corporate Account / PO Number. Please check your details or call dispatch.'
-          );
-        }
-        if (verifyData.corporateAccountId) {
-          verifiedCorporateAccountId = String(verifyData.corporateAccountId);
-        }
+        verifiedCorporateAccountId = verification.corporateAccountId;
       }
 
       // Phase 31: PCI-Compliant Stripe Pre-authorization Hold (or In-Cab Payment Fallback)
@@ -3181,10 +2984,10 @@ export function BookingEngineV2({
                         aria-label="Decrease carry-on bags"
                         disabled={form.carryOnBags <= 0}
                         onClick={() =>
-                          setForm((prev) => {
-                            const nextCarry = Math.max(0, prev.carryOnBags - 1);
-                            return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
-                          })
+                          setForm((prev) => ({
+                            ...prev,
+                            ...stepLuggageCount(prev.carryOnBags, prev.checkedBags, 'carryOn', -1, totalMaxBags),
+                          }))
                         }
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-sm leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
@@ -3196,10 +2999,10 @@ export function BookingEngineV2({
                         aria-label="Increase carry-on bags"
                         disabled={(form.carryOnBags + form.checkedBags) >= totalMaxBags}
                         onClick={() =>
-                          setForm((prev) => {
-                            const nextCarry = Math.min(totalMaxBags - prev.checkedBags, prev.carryOnBags + 1);
-                            return { ...prev, carryOnBags: nextCarry, bags: nextCarry + prev.checkedBags };
-                          })
+                          setForm((prev) => ({
+                            ...prev,
+                            ...stepLuggageCount(prev.carryOnBags, prev.checkedBags, 'carryOn', 1, totalMaxBags),
+                          }))
                         }
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-sm leading-none cursor-pointer shrink-0"
                       >
@@ -3220,10 +3023,10 @@ export function BookingEngineV2({
                         aria-label="Decrease checked bags"
                         disabled={form.checkedBags <= 0}
                         onClick={() =>
-                          setForm((prev) => {
-                            const nextChecked = Math.max(0, prev.checkedBags - 1);
-                            return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
-                          })
+                          setForm((prev) => ({
+                            ...prev,
+                            ...stepLuggageCount(prev.carryOnBags, prev.checkedBags, 'checked', -1, totalMaxBags),
+                          }))
                         }
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-sm leading-none disabled:opacity-40 cursor-pointer shrink-0"
                       >
@@ -3235,10 +3038,10 @@ export function BookingEngineV2({
                         aria-label="Increase checked bags"
                         disabled={(form.carryOnBags + form.checkedBags) >= totalMaxBags}
                         onClick={() =>
-                          setForm((prev) => {
-                            const nextChecked = Math.min(totalMaxBags - prev.carryOnBags, prev.checkedBags + 1);
-                            return { ...prev, checkedBags: nextChecked, bags: prev.carryOnBags + nextChecked };
-                          })
+                          setForm((prev) => ({
+                            ...prev,
+                            ...stepLuggageCount(prev.carryOnBags, prev.checkedBags, 'checked', 1, totalMaxBags),
+                          }))
                         }
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40 text-sm leading-none cursor-pointer shrink-0"
                       >
@@ -3612,12 +3415,7 @@ export function BookingEngineV2({
 
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                           {activeVehicleTiers.map((tier) => {
-                            const isSelected =
-                              vChoice === tier.id ||
-                              (vChoice === 'any' && tier.id === 'any') ||
-                              (vChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
-                              (vChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                              (vChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
+                            const isSelected = isVehicleChoiceSelected(vChoice, tier.id, 'xl');
                             const liveTierPrice = estimateTierDisplayFare(tier);
 
                             return (
@@ -3660,35 +3458,15 @@ export function BookingEngineV2({
 
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {activeVehicleTiers.map((tier) => {
-                        const isCarSeatRestricted =
-                          totalCarSeats > 0 &&
-                          (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
-                        const isOversizedRestricted =
-                          oversizedRequiresUpgrade &&
-                          (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
-                        const isPaxRestricted = form.passengers > tier.maxPassengers;
-                        const isLuggageRestricted = (form.carryOnBags + form.checkedBags) > tier.maxLuggage;
-                        const isRestricted =
-                          isCarSeatRestricted || isOversizedRestricted || isPaxRestricted || isLuggageRestricted;
-
-                        let restrictionReason = '';
-                        if (isOversizedRestricted) {
-                          restrictionReason = 'Requires SUV/Van (Oversized items)';
-                        } else if (isCarSeatRestricted) {
-                          restrictionReason = 'Requires SUV/Van (Car seats)';
-                        } else if (isPaxRestricted) {
-                          restrictionReason = `Max ${tier.maxPassengers} passengers`;
-                        } else if (isLuggageRestricted) {
-                          restrictionReason = `Max ${tier.maxLuggage} bags`;
-                        }
-
-                        const isSelected =
-                          form.vehicleChoice === tier.id ||
-                          (form.vehicleChoice === 'any' && tier.id === 'any') ||
-                          (form.vehicleChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
-                          (form.vehicleChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                          (form.vehicleChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
-
+                        const { isRestricted, restrictionReason } = evaluateCustomerTierRestriction({
+                          tier,
+                          passengers: form.passengers,
+                          totalLuggage: form.carryOnBags + form.checkedBags,
+                          totalCarSeats,
+                          oversizedRequiresUpgrade,
+                          oversizedReasonLabel: 'Requires SUV/Van (Oversized items)',
+                        });
+                        const isSelected = isVehicleChoiceSelected(form.vehicleChoice, tier.id, 'xl');
                         const liveTierPrice = estimateTierDisplayFare(tier);
 
                         return (
@@ -4153,11 +3931,17 @@ export function BookingEngineV2({
                               disabled={form.returnCarryOnBags <= 0}
                               onClick={() =>
                                 setForm((prev) => {
-                                  const nextCarry = Math.max(0, prev.returnCarryOnBags - 1);
+                                  const stepped = stepLuggageCount(
+                                    prev.returnCarryOnBags,
+                                    prev.returnCheckedBags,
+                                    'carryOn',
+                                    -1,
+                                    returnTotalMaxBags
+                                  );
                                   return {
                                     ...prev,
-                                    returnCarryOnBags: nextCarry,
-                                    returnBags: nextCarry + prev.returnCheckedBags,
+                                    returnCarryOnBags: stepped.carryOnBags,
+                                    returnBags: stepped.bags,
                                   };
                                 })
                               }
@@ -4174,14 +3958,17 @@ export function BookingEngineV2({
                               disabled={(form.returnCarryOnBags + form.returnCheckedBags) >= returnTotalMaxBags}
                               onClick={() =>
                                 setForm((prev) => {
-                                  const nextCarry = Math.min(
-                                    returnTotalMaxBags - prev.returnCheckedBags,
-                                    prev.returnCarryOnBags + 1
+                                  const stepped = stepLuggageCount(
+                                    prev.returnCarryOnBags,
+                                    prev.returnCheckedBags,
+                                    'carryOn',
+                                    1,
+                                    returnTotalMaxBags
                                   );
                                   return {
                                     ...prev,
-                                    returnCarryOnBags: nextCarry,
-                                    returnBags: nextCarry + prev.returnCheckedBags,
+                                    returnCarryOnBags: stepped.carryOnBags,
+                                    returnBags: stepped.bags,
                                   };
                                 })
                               }
@@ -4205,11 +3992,17 @@ export function BookingEngineV2({
                               disabled={form.returnCheckedBags <= 0}
                               onClick={() =>
                                 setForm((prev) => {
-                                  const nextChecked = Math.max(0, prev.returnCheckedBags - 1);
+                                  const stepped = stepLuggageCount(
+                                    prev.returnCarryOnBags,
+                                    prev.returnCheckedBags,
+                                    'checked',
+                                    -1,
+                                    returnTotalMaxBags
+                                  );
                                   return {
                                     ...prev,
-                                    returnCheckedBags: nextChecked,
-                                    returnBags: prev.returnCarryOnBags + nextChecked,
+                                    returnCheckedBags: stepped.checkedBags,
+                                    returnBags: stepped.bags,
                                   };
                                 })
                               }
@@ -4226,14 +4019,17 @@ export function BookingEngineV2({
                               disabled={(form.returnCarryOnBags + form.returnCheckedBags) >= returnTotalMaxBags}
                               onClick={() =>
                                 setForm((prev) => {
-                                  const nextChecked = Math.min(
-                                    returnTotalMaxBags - prev.returnCarryOnBags,
-                                    prev.returnCheckedBags + 1
+                                  const stepped = stepLuggageCount(
+                                    prev.returnCarryOnBags,
+                                    prev.returnCheckedBags,
+                                    'checked',
+                                    1,
+                                    returnTotalMaxBags
                                   );
                                   return {
                                     ...prev,
-                                    returnCheckedBags: nextChecked,
-                                    returnBags: prev.returnCarryOnBags + nextChecked,
+                                    returnCheckedBags: stepped.checkedBags,
+                                    returnBags: stepped.bags,
                                   };
                                 })
                               }
@@ -4639,12 +4435,7 @@ export function BookingEngineV2({
 
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                                   {activeVehicleTiers.map((tier) => {
-                                    const isSelected =
-                                      vChoice === tier.id ||
-                                      (vChoice === 'any' && tier.id === 'any') ||
-                                      (vChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
-                                      (vChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                                      (vChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
+                                    const isSelected = isVehicleChoiceSelected(vChoice, tier.id, 'xl');
                                     const liveRetPrice = estimateReturnTierDisplayFare(tier);
 
                                     return (
@@ -4688,35 +4479,15 @@ export function BookingEngineV2({
 
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                           {activeVehicleTiers.map((tier) => {
-                            const isCarSeatRestricted =
-                              returnTotalCarSeats > 0 &&
-                              (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
-                            const isOversizedRestricted =
-                              returnOversizedRequiresUpgrade &&
-                              (tier.id === 'sedan' || tier.id === 'standard' || tier.id === 'any' || tier.maxPassengers <= 4);
-                            const isPaxRestricted = form.returnPassengers > tier.maxPassengers;
-                            const isLuggageRestricted = (form.returnCarryOnBags + form.returnCheckedBags) > tier.maxLuggage;
-                            const isRestricted =
-                              isCarSeatRestricted || isOversizedRestricted || isPaxRestricted || isLuggageRestricted;
-
-                            let restrictionReason = '';
-                            if (isOversizedRestricted) {
-                              restrictionReason = 'Requires SUV/Van (Oversized cargo)';
-                            } else if (isCarSeatRestricted) {
-                              restrictionReason = 'Requires SUV/Van (Car seats)';
-                            } else if (isPaxRestricted) {
-                              restrictionReason = `Max ${tier.maxPassengers} passengers`;
-                            } else if (isLuggageRestricted) {
-                              restrictionReason = `Max ${tier.maxLuggage} bags`;
-                            }
-
-                            const isSelected =
-                              form.returnVehicleChoice === tier.id ||
-                              (form.returnVehicleChoice === 'any' && tier.id === 'any') ||
-                              (form.returnVehicleChoice === 'sedan' && (tier.id === 'standard' || tier.id === 'sedan')) ||
-                              (form.returnVehicleChoice === 'suv' && (tier.id === 'xl' || tier.id === 'suv')) ||
-                              (form.returnVehicleChoice === 'van' && (tier.id === 'xl' || tier.id === 'van'));
-
+                            const { isRestricted, restrictionReason } = evaluateCustomerTierRestriction({
+                              tier,
+                              passengers: form.returnPassengers,
+                              totalLuggage: form.returnCarryOnBags + form.returnCheckedBags,
+                              totalCarSeats: returnTotalCarSeats,
+                              oversizedRequiresUpgrade: returnOversizedRequiresUpgrade,
+                              oversizedReasonLabel: 'Requires SUV/Van (Oversized cargo)',
+                            });
+                            const isSelected = isVehicleChoiceSelected(form.returnVehicleChoice, tier.id, 'xl');
                             const liveReturnTierPrice = estimateReturnTierDisplayFare(tier);
 
                             return (

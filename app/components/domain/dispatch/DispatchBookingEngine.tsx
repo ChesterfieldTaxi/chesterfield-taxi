@@ -10,8 +10,6 @@ import {
 import { getSurchargesService } from '../../../core/services/pricing/surcharges.service';
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
-import { getCorporateAccountService } from '../../../core/services/corporate-account.service';
-import { getInvoicingService } from '../../../core/services/invoicing.service';
 import { getEmailDispatchService } from '../../../core/services/email';
 import { getContactService, normalizePhone } from '../../../core/services/customer/contact.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
@@ -48,7 +46,7 @@ import {
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 import { ModernDatePicker, ModernTimePicker } from '../../ui/ModernDateTimePicker';
-import { detectAirportInAddresses, MAJOR_AIRLINES } from '../../../core/config/airports';
+import { MAJOR_AIRLINES } from '../../../core/config/airports';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../../../core/services/operator.service';
 import {
   generateMultiCarGroupId,
@@ -56,21 +54,52 @@ import {
   buildPerVehiclePricingSpecs,
   buildAssociateEntryFromTrip,
 } from '../../../core/services/booking/multi-car.util';
+import {
+  DISPATCH_FBO_FACILITIES as COMMON_FBO_FACILITIES,
+  DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
+  DEFAULT_CORPORATE_ACCOUNTS,
+  DAYS_OF_WEEK,
+  resolveVehicleEngineId,
+  generateRecurringDates,
+  getDriverStatusEmoji,
+  isVehicleChoiceSelected,
+  buildDispatchVehicleOptions,
+  buildDispatchVehicleCapacities,
+  sumSelectedVehicleCapacities,
+  computeTotalCarSeats,
+  computeCarSeatsToggleState,
+  stepLuggageCount,
+  countTotalOversizedBags,
+  cleanOversizedBagsPayload,
+  formatOversizedItemsSummary,
+  formatCustomExtrasSummary,
+  formatCarSeatSummaryLabel,
+  formatDispatchFlightNotesTag,
+  buildPersistedPricing,
+  useBookingWaypoints,
+  swapRouteEndpoints,
+  swapReturnRouteEndpoints,
+  buildReturnLegSeedFromOutbound,
+  checkSymmetricRoundTrip,
+  computeDispatchRoundTripFares,
+  appendVehicleChoice,
+  removeVehicleChoiceAt,
+  updateVehicleChoiceAt,
+  useBookingAirportDetection,
+  findMatchingCorporateAccount,
+  resolveEffectiveDiscountInputs,
+  useCorporatePoVerification,
+  type BookingAdditionalPassenger as AdditionalPassenger,
+  type CarSeatsBreakdown,
+  type BookingVehicleChoice as VehicleChoice,
+} from '../../../core/hooks/booking';
 
-export const COMMON_FBO_FACILITIES = [
-  'Signature Flight Support (STL - Hangar 2)',
-  'Signature Aviation (SUS - Spirit of St. Louis)',
-  'Million Air (SUS - Spirit of St. Louis)',
-  'TAC Air / Signature (CPS - St. Louis Downtown)',
-  'Premier Jet Center (SUS)',
-  'Helicopter / Private Ramp Area',
-  'Other / General Aviation Hangar',
-];
-
-export interface AdditionalPassenger {
-  name: string;
-  phone?: string;
-}
+export {
+  COMMON_FBO_FACILITIES,
+  type AdditionalPassenger,
+  type CarSeatsBreakdown,
+  type VehicleChoice,
+};
 
 export interface ContactPersonDetails {
   isBookerDifferent: boolean;
@@ -95,14 +124,6 @@ export interface CorporateAccountDetails {
   authorizedBy: string;
   invoicingTerms: string;
 }
-
-export interface CarSeatsBreakdown {
-  rearFacing: number;
-  frontFacing: number;
-  booster: number;
-}
-
-export type VehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});
 
 export interface ReturnTripDetails {
   returnTrip: boolean;
@@ -212,92 +233,6 @@ export interface DispatchBookingEngineProps {
   onCopyBooking?: (values: DispatchFormValues) => void;
   onOpenLinkedTrip?: (linkedTripId: string) => void;
 }
-
-/**
- * Resolves a dispatch vehicle choice into the exact Admin VehicleTierConfig ID
- * without flattening custom vehicles (compact_suv, midsize_suv, minivan, xl, etc.) to 'standard'.
- */
-function resolveVehicleEngineId(v: VehicleChoice, availableIds?: string[]): VehicleTier {
-  if (!v || v === 'any') return 'standard';
-  if (availableIds && availableIds.includes(v)) return v as VehicleTier;
-  if (v === 'sedan') return 'standard';
-  if (v === 'suv') return 'xl';
-  if (v === 'van') return availableIds?.includes('minivan') ? 'minivan' : 'wheelchair';
-  return v as VehicleTier;
-}
-
-/**
- * Generates subsequent local YYYY-MM-DD dates for recurring dispatch schedules (excludes first date).
- */
-function generateRecurringDates(
-  startDateStr: string,
-  frequency: 'daily' | 'weekdays' | 'weekly' | 'custom',
-  repeatDays: string[],
-  maxOccurrences: number,
-  untilDateStr?: string
-): string[] {
-  const results: string[] = [];
-  const cap = Math.min(Math.max(1, maxOccurrences), 20);
-  if (cap <= 1 || !startDateStr) return results;
-
-  const [y, m, d] = startDateStr.split('-').map(Number);
-  if (!y || !m || !d) return results;
-  const cursor = new Date(y, m - 1, d);
-  const untilDate = untilDateStr
-    ? (() => {
-        const [uy, um, ud] = untilDateStr.split('-').map(Number);
-        return uy && um && ud ? new Date(uy, um - 1, ud, 23, 59, 59) : null;
-      })()
-    : null;
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  let safety = 0;
-  while (results.length < cap - 1 && safety < 180) {
-    safety += 1;
-    cursor.setDate(cursor.getDate() + 1);
-    if (untilDate && cursor > untilDate) break;
-
-    const dow = cursor.getDay();
-    const dayName = dayNames[dow];
-    let include = false;
-    if (frequency === 'daily') include = true;
-    else if (frequency === 'weekdays') include = dow >= 1 && dow <= 5;
-    else if (frequency === 'weekly' || frequency === 'custom') {
-      include = repeatDays.length > 0 ? repeatDays.includes(dayName) : dow === new Date(y, m - 1, d).getDay();
-    }
-
-    if (include) {
-      results.push(formatLocalDateStr(cursor));
-    }
-  }
-  return results;
-}
-
-function getDriverStatusEmoji(d: DriverRosterItem): string {
-  const mapStatus = (d as any).mapStatus as string | undefined;
-  if (mapStatus === 'available') return '[Avail]';
-  if (mapStatus === 'en_route') return '[En Route]';
-  if (mapStatus === 'busy') return '[Busy]';
-  if (mapStatus === 'break') return '[Break]';
-  if (mapStatus === 'offline') return '[Off]';
-  if (d.status === 'available') return '[Avail]';
-  if (d.status === 'on_trip') return '[Busy]';
-  if (d.status === 'break') return '[Break]';
-  return '[Off]';
-}
-
-const DEFAULT_COMPANIES = ['Chesterfield Taxi', 'St. Louis Taxi', 'West County Express'];
-const DEFAULT_CORPORATE_ACCOUNTS = [
-  'Bayer Crop Science (St. Louis HQ)',
-  'Pfizer Chesterfield',
-  'Marriott St. Louis West',
-  'Mercy Hospital St. Louis',
-  "St. Luke's Hospital",
-  'Delmar Gardens Chesterfield',
-  'West County Orthopedics',
-  'Custom Direct Bill Account',
-];
-const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function DispatchBookingEngineComponent({
   draftId,
@@ -511,9 +446,7 @@ function DispatchBookingEngineComponent({
       if (settings?.corporateAccounts && settings.corporateAccounts.length > 0) {
         setCorporateAccountList(settings.corporateAccounts);
         setCorporateAccount((prev) => {
-          const exists = settings.corporateAccounts!.some(
-            (c) => c.companyName === prev || c.id === prev || c.accountNumber === prev
-          );
+          const exists = Boolean(findMatchingCorporateAccount(settings.corporateAccounts!, prev));
           return exists ? prev : settings.corporateAccounts![0].companyName;
         });
       }
@@ -565,28 +498,31 @@ function DispatchBookingEngineComponent({
   const [returnFboFacility, setReturnFboFacility] = useState('');
   const [returnHasCheckedLuggage, setReturnHasCheckedLuggage] = useState(false);
 
-  // Airport & Aviation auto-detection
-  const airportDetection = useMemo(() => {
-    return detectAirportInAddresses(pickupAddress, dropoffAddress);
-  }, [pickupAddress, dropoffAddress]);
+  // Airport & Aviation auto-detection and flight-info synchronization
+  const { airportDetection, returnAirportDetection } = useBookingAirportDetection({
+    pickupAddress,
+    dropoffAddress,
+    returnPickupAddress,
+    returnDropoffAddress,
+    returnTrip,
+    clearWhenNoAirport: false,
+    onSyncOutboundFlightInfo: (shouldEnable) => {
+      if (shouldEnable) setProvideFlightInfo(true);
+    },
+    onSyncReturnFlightInfo: (shouldEnable) => {
+      if (shouldEnable) setReturnProvideFlightInfo(true);
+    },
+  });
 
-  const returnAirportDetection = useMemo(() => {
-    return detectAirportInAddresses(returnPickupAddress || '', returnDropoffAddress || '');
-  }, [returnPickupAddress, returnDropoffAddress]);
+  const outboundWaypoints = useBookingWaypoints({
+    stops: intermediateStops,
+    onChange: setIntermediateStops,
+  });
 
-  // Auto-toggle flight info when airport address is detected on outbound
-  useEffect(() => {
-    if (airportDetection.isAirportTrip) {
-      setProvideFlightInfo(true);
-    }
-  }, [airportDetection.isAirportTrip]);
-
-  // Auto-toggle return flight info when return airport address is detected
-  useEffect(() => {
-    if (returnAirportDetection.isAirportTrip) {
-      setReturnProvideFlightInfo(true);
-    }
-  }, [returnAirportDetection.isAirportTrip]);
+  const returnWaypoints = useBookingWaypoints({
+    stops: returnIntermediateStops,
+    onChange: setReturnIntermediateStops,
+  });
 
   // Repeat / Recurring Schedule
   const [repeat, setRepeat] = useState(false);
@@ -639,68 +575,33 @@ function DispatchBookingEngineComponent({
     maxTotalCarSeats: 4,
   };
 
-  const dispatchVehicleOptions = useMemo(() => {
-    const options: Array<{ key: VehicleChoice; label: string; badge?: string; maxPassengers: number; maxBags: number }> = [
-      { key: 'any', label: 'Any', maxPassengers: 4, maxBags: 3 }
-    ];
+  const dispatchVehicleOptions = useMemo(
+    () => buildDispatchVehicleOptions(vehicleTiers),
+    [vehicleTiers]
+  );
 
-    if (vehicleTiers.length > 0) {
-      for (const tier of vehicleTiers) {
-        options.push({
-          key: tier.id as VehicleChoice,
-          label: tier.name,
-          badge: tier.badge,
-          maxPassengers: tier.maxPassengers,
-          maxBags: tier.maxLuggage,
-        });
-      }
-    } else {
-      options.push(
-        { key: 'sedan', label: 'Sedan', maxPassengers: 4, maxBags: 3 },
-        { key: 'suv', label: 'SUV', maxPassengers: 6, maxBags: 5 },
-        { key: 'van', label: 'Van', maxPassengers: 7, maxBags: 6 },
-      );
-    }
-    return options;
-  }, [vehicleTiers]);
-
-  const vehicleCapacities = useMemo(() => {
-    const map: Record<string, { maxPassengers: number; maxBags: number; name?: string }> = {
-      any: { maxPassengers: 4, maxBags: 3, name: 'Any' },
-      sedan: { maxPassengers: 4, maxBags: 3, name: 'Sedan' },
-      suv: { maxPassengers: 6, maxBags: 5, name: 'SUV' },
-      van: { maxPassengers: 7, maxBags: 6, name: 'Van' },
-    };
-
-    for (const opt of dispatchVehicleOptions) {
-      map[opt.key] = {
-        maxPassengers: opt.maxPassengers,
-        maxBags: opt.maxBags,
-        name: opt.label,
-      };
-    }
-    return map;
-  }, [dispatchVehicleOptions]);
+  const vehicleCapacities = useMemo(
+    () => buildDispatchVehicleCapacities(dispatchVehicleOptions),
+    [dispatchVehicleOptions]
+  );
 
   // Compute fleet capacities from sum of selected vehicles
-  const totalMaxPassengers = selectedVehicles.reduce(
-    (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-    0
+  const { maxPassengers: totalMaxPassengers, maxBags: totalMaxBags } =
+    sumSelectedVehicleCapacities(selectedVehicles, vehicleCapacities);
+  const { maxPassengers: returnTotalMaxPassengers, maxBags: returnTotalMaxBags } =
+    sumSelectedVehicleCapacities(returnVehicles, vehicleCapacities);
+  const totalCarSeats = computeTotalCarSeats(
+    carSeats,
+    rearFacingCount,
+    frontFacingCount,
+    boosterCount
   );
-  const totalMaxBags = selectedVehicles.reduce(
-    (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
-    0
+  const returnTotalCarSeats = computeTotalCarSeats(
+    returnCarSeats,
+    returnRearFacing,
+    returnFrontFacing,
+    returnBooster
   );
-  const returnTotalMaxPassengers = returnVehicles.reduce(
-    (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-    0
-  );
-  const returnTotalMaxBags = returnVehicles.reduce(
-    (acc, v) => acc + (vehicleCapacities[v]?.maxBags || 3),
-    0
-  );
-  const totalCarSeats = carSeats ? (rearFacingCount + frontFacingCount + boosterCount) : 0;
-  const returnTotalCarSeats = returnCarSeats ? (returnRearFacing + returnFrontFacing + returnBooster) : 0;
 
   // Hydrate ONCE per tab identity (prevents real-time Firestore ticks from clobbering unsaved edits
   // AND restores cached unsaved localStorage edits on top of Edit tabs across reloads!)
@@ -1266,8 +1167,10 @@ function DispatchBookingEngineComponent({
 
         const acct = payload.corporateAccount || payload.corporateAccountName || payload.accountNumber;
         if (acct) {
-          const matchedCorp = corporateAccountList.find(
-            (c) => c.id === acct || c.accountNumber === acct || c.companyName.toLowerCase() === String(acct).toLowerCase()
+          const matchedCorp = findMatchingCorporateAccount(
+            corporateAccountList,
+            String(acct),
+            { caseInsensitiveName: true }
           );
           setCorporateAccount(matchedCorp ? matchedCorp.companyName : acct);
           setPaymentMethod('account');
@@ -1306,26 +1209,53 @@ function DispatchBookingEngineComponent({
   // When return trip is enabled, prefill return pickup with dropoff and return dropoff with pickup if empty
   useEffect(() => {
     if (returnTrip) {
+      const seeded = buildReturnLegSeedFromOutbound(
+        {
+          pickupAddress,
+          pickupCoordinates,
+          dropoffAddress,
+          dropoffCoordinates,
+          passengers,
+          carryOnBags,
+          checkedBags,
+          bags,
+          hasOversizedLuggage,
+          oversizedBags,
+          oversizedLuggageNotes,
+          carSeats,
+          rearFacingCount,
+          frontFacingCount,
+          boosterCount,
+          selectedVehicles,
+        },
+        {
+          returnPickupAddress,
+          returnPickupCoordinates,
+          returnDropoffAddress,
+          returnDropoffCoordinates,
+        },
+        { preserveCoordsWhenAddressPresent: true }
+      );
       if (!returnPickupAddress && dropoffAddress) {
-        setReturnPickupAddress(dropoffAddress);
-        setReturnPickupCoordinates(dropoffCoordinates);
+        setReturnPickupAddress(seeded.returnPickupAddress);
+        setReturnPickupCoordinates(seeded.returnPickupCoordinates);
       }
       if (!returnDropoffAddress && pickupAddress) {
-        setReturnDropoffAddress(pickupAddress);
-        setReturnDropoffCoordinates(pickupCoordinates);
+        setReturnDropoffAddress(seeded.returnDropoffAddress);
+        setReturnDropoffCoordinates(seeded.returnDropoffCoordinates);
       }
-      setReturnPassengers(passengers);
-      setReturnCarryOnBags(carryOnBags);
-      setReturnCheckedBags(checkedBags);
-      setReturnBags(bags);
-      setReturnHasOversizedLuggage(hasOversizedLuggage);
-      setReturnOversizedBags({ ...oversizedBags });
-      setReturnOversizedLuggageNotes(oversizedLuggageNotes);
-      setReturnCarSeats(carSeats);
-      setReturnRearFacing(rearFacingCount);
-      setReturnFrontFacing(frontFacingCount);
-      setReturnBooster(boosterCount);
-      setReturnVehicles(selectedVehicles);
+      setReturnPassengers(seeded.returnPassengers);
+      setReturnCarryOnBags(seeded.returnCarryOnBags);
+      setReturnCheckedBags(seeded.returnCheckedBags);
+      setReturnBags(seeded.returnBags);
+      setReturnHasOversizedLuggage(seeded.returnHasOversizedLuggage);
+      setReturnOversizedBags(seeded.returnOversizedBags);
+      setReturnOversizedLuggageNotes(seeded.returnOversizedLuggageNotes);
+      setReturnCarSeats(seeded.returnCarSeats);
+      setReturnRearFacing(seeded.returnRearFacing);
+      setReturnFrontFacing(seeded.returnFrontFacing);
+      setReturnBooster(seeded.returnBooster);
+      setReturnVehicles(seeded.returnSelectedVehicles);
     }
   }, [returnTrip]);
 
@@ -1689,33 +1619,28 @@ function DispatchBookingEngineComponent({
     returnHasCheckedLuggage,
   ]);
 
-  // Matched corporate account & resolved pricing discount inputs
-  const matchedCorporateAccount = useMemo(() => {
-    if (paymentMethod !== 'account') return null;
-    return (
-      corporateAccountList.find(
-        (c) =>
-          c.companyName === corporateAccount ||
-          c.id === corporateAccount ||
-          c.accountNumber === corporateAccount
-      ) || null
-    );
-  }, [paymentMethod, corporateAccountList, corporateAccount]);
+  // Corporate account matching, anti-fraud PO verification & resolved pricing discount inputs
+  const {
+    selectedCorporateAccount,
+    matchedCorporateAccount,
+    poValidation,
+    validateDispatchAccount,
+  } = useCorporatePoVerification({
+    paymentMethod,
+    corporateAccountList,
+    corporateAccount,
+    billingPo,
+  });
 
-  const effectiveDiscountInputs = useMemo(() => {
-    const parsedDropdownPct =
-      discount && discount !== 'None' ? parseFloat(discount.replace('%', '')) || 0 : 0;
-    const corpPct = matchedCorporateAccount?.discountPercent || 0;
-    const pct = parsedDropdownPct > 0 ? parsedDropdownPct : corpPct;
-    const label =
-      parsedDropdownPct > 0
-        ? `Courtesy Discount (${parsedDropdownPct}%)`
-        : corpPct > 0
-        ? `${matchedCorporateAccount?.companyName || 'Corporate'} Discount (${corpPct}%)`
-        : undefined;
-    const flatDollars = manualDiscountDollars ? Math.max(0, parseFloat(manualDiscountDollars) || 0) : 0;
-    return { pct, label, flatDollars };
-  }, [discount, matchedCorporateAccount, manualDiscountDollars]);
+  const effectiveDiscountInputs = useMemo(
+    () =>
+      resolveEffectiveDiscountInputs({
+        discount,
+        matchedCorporateAccount,
+        manualDiscountDollars,
+      }),
+    [discount, matchedCorporateAccount, manualDiscountDollars]
+  );
 
   const activeAdminVehicleIds = useMemo(() => {
     const ids = new Set<string>(['standard']);
@@ -1733,61 +1658,120 @@ function DispatchBookingEngineComponent({
   }, [universalExtrasConfig]);
 
   const totalOversizedCount = useMemo(
-    () => Object.values(oversizedBags || {}).reduce((sum, count) => sum + (Number(count) || 0), 0),
+    () => countTotalOversizedBags(oversizedBags),
     [oversizedBags]
   );
 
-  const oversizedBagsPayload = useMemo<Record<string, number> | undefined>(() => {
-    if (!hasOversizedLuggage || totalOversizedCount <= 0) return undefined;
-    const cleaned: Record<string, number> = {};
-    for (const [id, count] of Object.entries(oversizedBags || {})) {
-      if (count > 0) cleaned[id] = count;
-    }
-    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
-  }, [hasOversizedLuggage, oversizedBags, totalOversizedCount]);
+  const oversizedBagsPayload = useMemo<Record<string, number> | undefined>(
+    () => cleanOversizedBagsPayload(hasOversizedLuggage && totalOversizedCount > 0, oversizedBags),
+    [hasOversizedLuggage, oversizedBags, totalOversizedCount]
+  );
 
-  const oversizedItemsSummary = useMemo(() => {
-    if (!hasOversizedLuggage) return undefined;
-    const parts = Object.entries(oversizedBags || {})
-      .filter(([, count]) => count > 0)
-      .map(([id, count]) => {
-        const cat = oversizedCategories.find((c) => c.id === id);
-        return `${count}x ${cat?.label || id}`;
-      });
-    if (oversizedLuggageNotes.trim()) {
-      parts.push(oversizedLuggageNotes.trim());
-    }
-    return parts.length > 0 ? parts.join(', ') : undefined;
-  }, [hasOversizedLuggage, oversizedBags, oversizedCategories, oversizedLuggageNotes]);
+  const oversizedItemsSummary = useMemo(
+    () =>
+      formatOversizedItemsSummary(oversizedBags, oversizedCategories, {
+        enabled: hasOversizedLuggage,
+        notes: oversizedLuggageNotes,
+        emptyAsUndefined: true,
+      }),
+    [hasOversizedLuggage, oversizedBags, oversizedCategories, oversizedLuggageNotes]
+  );
 
   // Return-leg oversized cargo helpers (100% parity with outbound & customer form)
   const returnTotalOversizedCount = useMemo(
-    () => Object.values(returnOversizedBags || {}).reduce((sum, count) => sum + (Number(count) || 0), 0),
+    () => countTotalOversizedBags(returnOversizedBags),
     [returnOversizedBags]
   );
 
-  const returnOversizedBagsPayload = useMemo<Record<string, number> | undefined>(() => {
-    if (!returnHasOversizedLuggage || returnTotalOversizedCount <= 0) return undefined;
-    const cleaned: Record<string, number> = {};
-    for (const [id, count] of Object.entries(returnOversizedBags || {})) {
-      if (count > 0) cleaned[id] = count;
-    }
-    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
-  }, [returnHasOversizedLuggage, returnOversizedBags, returnTotalOversizedCount]);
+  const returnOversizedBagsPayload = useMemo<Record<string, number> | undefined>(
+    () =>
+      cleanOversizedBagsPayload(
+        returnHasOversizedLuggage && returnTotalOversizedCount > 0,
+        returnOversizedBags
+      ),
+    [returnHasOversizedLuggage, returnOversizedBags, returnTotalOversizedCount]
+  );
 
-  const returnOversizedItemsSummary = useMemo(() => {
-    if (!returnHasOversizedLuggage) return undefined;
-    const parts = Object.entries(returnOversizedBags || {})
-      .filter(([, count]) => count > 0)
-      .map(([id, count]) => {
-        const cat = oversizedCategories.find((c) => c.id === id);
-        return `${count}x ${cat?.label || id}`;
-      });
-    if (returnOversizedLuggageNotes.trim()) {
-      parts.push(returnOversizedLuggageNotes.trim());
-    }
-    return parts.length > 0 ? parts.join(', ') : undefined;
-  }, [returnHasOversizedLuggage, returnOversizedBags, oversizedCategories, returnOversizedLuggageNotes]);
+  const returnOversizedItemsSummary = useMemo(
+    () =>
+      formatOversizedItemsSummary(returnOversizedBags, oversizedCategories, {
+        enabled: returnHasOversizedLuggage,
+        notes: returnOversizedLuggageNotes,
+        emptyAsUndefined: true,
+      }),
+    [returnHasOversizedLuggage, returnOversizedBags, oversizedCategories, returnOversizedLuggageNotes]
+  );
+
+  const isSymmetricRoundTrip = useMemo(
+    () =>
+      checkSymmetricRoundTrip({
+        returnTrip,
+        pickupAddress,
+        dropoffAddress,
+        returnPickupAddress,
+        returnDropoffAddress,
+        intermediateStops,
+        returnIntermediateStops,
+        passengers,
+        returnPassengers,
+        bags,
+        returnBags,
+        selectedVehicles,
+        returnSelectedVehicles: returnVehicles,
+        carSeats,
+        returnCarSeats,
+        rearFacingCount,
+        returnRearFacing,
+        frontFacingCount,
+        returnFrontFacing,
+        boosterCount,
+        returnBooster,
+        hasOversizedLuggage,
+        returnHasOversizedLuggage,
+        oversizedBags,
+        returnOversizedBags,
+      }),
+    [
+      returnTrip,
+      pickupAddress,
+      dropoffAddress,
+      returnPickupAddress,
+      returnDropoffAddress,
+      intermediateStops,
+      returnIntermediateStops,
+      passengers,
+      returnPassengers,
+      bags,
+      returnBags,
+      selectedVehicles,
+      returnVehicles,
+      carSeats,
+      returnCarSeats,
+      rearFacingCount,
+      returnRearFacing,
+      frontFacingCount,
+      returnFrontFacing,
+      boosterCount,
+      returnBooster,
+      hasOversizedLuggage,
+      returnHasOversizedLuggage,
+      oversizedBags,
+      returnOversizedBags,
+    ]
+  );
+
+  const displayRoundTripFares = useMemo(
+    () =>
+      computeDispatchRoundTripFares({
+        returnTrip,
+        isSymmetric: isSymmetricRoundTrip,
+        estimatedFare,
+        returnEstimatedFare,
+        isFareOverridden,
+        manualFare,
+      }),
+    [returnTrip, isSymmetricRoundTrip, estimatedFare, returnEstimatedFare, isFareOverridden, manualFare]
+  );
 
   // Instant zero-latency inline caller lookup (ContactService + loaded dispatch trips)
   const callerSuggestions = useMemo(() => {
@@ -1889,11 +1873,10 @@ function DispatchBookingEngineComponent({
     if (candidate.phone) setPhone(candidate.phone);
     if (candidate.email) setEmail(candidate.email);
     if (candidate.corporateAccount) {
-      const matched = corporateAccountList.find(
-        (c) =>
-          c.id === candidate.corporateAccount ||
-          c.accountNumber === candidate.corporateAccount ||
-          c.companyName.toLowerCase() === candidate.corporateAccount!.toLowerCase()
+      const matched = findMatchingCorporateAccount(
+        corporateAccountList,
+        candidate.corporateAccount,
+        { caseInsensitiveName: true }
       );
       setCorporateAccount(matched ? matched.companyName : candidate.corporateAccount);
       setPaymentMethod('account');
@@ -2240,32 +2223,46 @@ function DispatchBookingEngineComponent({
 
   // Swap outbound route
   const handleSwapRoute = () => {
-    const tmpAddr = pickupAddress;
-    const tmpCoords = pickupCoordinates;
-    const tmpPid = pickupPlaceId;
-    setPickupAddress(dropoffAddress);
-    setPickupCoordinates(dropoffCoordinates);
-    setPickupPlaceId(dropoffPlaceId);
-    setDropoffAddress(tmpAddr);
-    setDropoffCoordinates(tmpCoords);
-    setDropoffPlaceId(tmpPid);
+    const swapped = swapRouteEndpoints({
+      pickupAddress,
+      pickupCoordinates,
+      pickupPlaceId,
+      dropoffAddress,
+      dropoffCoordinates,
+      dropoffPlaceId,
+    });
+    setPickupAddress(swapped.pickupAddress);
+    setPickupCoordinates(swapped.pickupCoordinates);
+    setPickupPlaceId(swapped.pickupPlaceId);
+    setDropoffAddress(swapped.dropoffAddress);
+    setDropoffCoordinates(swapped.dropoffCoordinates);
+    setDropoffPlaceId(swapped.dropoffPlaceId);
   };
 
   // Swap return route
   const handleSwapReturnRoute = () => {
-    const currentReturnPickup = returnPickupAddress || dropoffAddress;
-    const currentReturnDropoff = returnDropoffAddress || pickupAddress;
-    const currentReturnPickupCoords = returnPickupCoordinates || dropoffCoordinates;
-    const currentReturnDropoffCoords = returnDropoffCoordinates || pickupCoordinates;
-    const currentReturnPickupPid = returnPickupPlaceId || dropoffPlaceId;
-    const currentReturnDropoffPid = returnDropoffPlaceId || pickupPlaceId;
-
-    setReturnPickupAddress(currentReturnDropoff);
-    setReturnPickupCoordinates(currentReturnDropoffCoords);
-    setReturnPickupPlaceId(currentReturnDropoffPid);
-    setReturnDropoffAddress(currentReturnPickup);
-    setReturnDropoffCoordinates(currentReturnPickupCoords);
-    setReturnDropoffPlaceId(currentReturnPickupPid);
+    const swapped = swapReturnRouteEndpoints({
+      returnPickupAddress,
+      returnPickupCoordinates,
+      returnPickupPlaceId,
+      returnDropoffAddress,
+      returnDropoffCoordinates,
+      returnDropoffPlaceId,
+      fallbackOutbound: {
+        pickupAddress,
+        pickupCoordinates,
+        pickupPlaceId,
+        dropoffAddress,
+        dropoffCoordinates,
+        dropoffPlaceId,
+      },
+    });
+    setReturnPickupAddress(swapped.returnPickupAddress);
+    setReturnPickupCoordinates(swapped.returnPickupCoordinates);
+    setReturnPickupPlaceId(swapped.returnPickupPlaceId);
+    setReturnDropoffAddress(swapped.returnDropoffAddress);
+    setReturnDropoffCoordinates(swapped.returnDropoffCoordinates);
+    setReturnDropoffPlaceId(swapped.returnDropoffPlaceId);
   };
 
   // Passenger increment with dynamic Admin vehicle tier auto-upgrade
@@ -2305,71 +2302,66 @@ function DispatchBookingEngineComponent({
 
   // Vehicle management
   const handleAddVehicle = () => {
-    setSelectedVehicles([...selectedVehicles, 'any']);
+    setSelectedVehicles((prev) => appendVehicleChoice(prev, 'any'));
   };
 
   const handleRemoveVehicle = (index: number) => {
     if (selectedVehicles.length <= 1) return;
-    const updated = selectedVehicles.filter((_, i) => i !== index);
-    setSelectedVehicles(updated);
+    setSelectedVehicles((prev) => removeVehicleChoiceAt(prev, index));
   };
 
   const handleUpdateVehicleChoice = (index: number, choice: VehicleChoice) => {
-    const updated = [...selectedVehicles];
-    updated[index] = choice;
-    const simCap = updated.reduce((acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4), 0);
-    if (simCap < passengers) {
-      return;
-    }
+    const updated = updateVehicleChoiceAt(selectedVehicles, index, choice, {
+      minRequiredPassengers: passengers,
+      vehicleCapacities,
+    });
+    if (!updated) return;
     setSelectedVehicles(updated);
   };
 
   // Return vehicles management
   const handleAddReturnVehicle = () => {
-    setReturnVehicles([...returnVehicles, 'any']);
+    setReturnVehicles((prev) => appendVehicleChoice(prev, 'any'));
   };
 
   const handleRemoveReturnVehicle = (index: number) => {
     if (returnVehicles.length <= 1) return;
-    setReturnVehicles(returnVehicles.filter((_, i) => i !== index));
+    setReturnVehicles((prev) => removeVehicleChoiceAt(prev, index));
   };
 
   const handleUpdateReturnVehicle = (index: number, choice: VehicleChoice) => {
-    const updated = [...returnVehicles];
-    updated[index] = choice;
-    const simCap = updated.reduce((acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4), 0);
-    if (simCap < returnPassengers) {
-      return;
-    }
+    const updated = updateVehicleChoiceAt(returnVehicles, index, choice, {
+      minRequiredPassengers: returnPassengers,
+      vehicleCapacities,
+    });
+    if (!updated) return;
     setReturnVehicles(updated);
   };
 
   // Toggle Car Seats master switch
   const handleToggleCarSeats = (checked: boolean) => {
-    setCarSeats(checked);
-    if (checked) {
-      if (rearFacingCount === 0 && frontFacingCount === 0 && boosterCount === 0) {
-        setRearFacingCount(1);
-      }
-    } else {
-      setRearFacingCount(0);
-      setFrontFacingCount(0);
-      setBoosterCount(0);
-    }
+    const next = computeCarSeatsToggleState(checked, {
+      rearFacing: rearFacingCount,
+      frontFacing: frontFacingCount,
+      booster: boosterCount,
+    });
+    setCarSeats(next.enabled);
+    setRearFacingCount(next.rearFacing);
+    setFrontFacingCount(next.frontFacing);
+    setBoosterCount(next.booster);
   };
 
   // Toggle Return Car Seats master switch
   const handleToggleReturnCarSeats = (checked: boolean) => {
-    setReturnCarSeats(checked);
-    if (checked) {
-      if (returnRearFacing === 0 && returnFrontFacing === 0 && returnBooster === 0) {
-        setReturnRearFacing(1);
-      }
-    } else {
-      setReturnRearFacing(0);
-      setReturnFrontFacing(0);
-      setReturnBooster(0);
-    }
+    const next = computeCarSeatsToggleState(checked, {
+      rearFacing: returnRearFacing,
+      frontFacing: returnFrontFacing,
+      booster: returnBooster,
+    });
+    setReturnCarSeats(next.enabled);
+    setReturnRearFacing(next.rearFacing);
+    setReturnFrontFacing(next.frontFacing);
+    setReturnBooster(next.booster);
   };
 
   // Toggle Repeat Day
@@ -2631,57 +2623,21 @@ function DispatchBookingEngineComponent({
     }
 
     if (paymentMethod === 'account') {
-      const selectedCorp = corporateAccountList.find(
-        (c) => c.companyName === corporateAccount || c.id === corporateAccount || c.accountNumber === corporateAccount
-      );
-      if (selectedCorp) {
-        if (selectedCorp.isActive === false) {
-          setSubmitError(
-            `Corporate account "${selectedCorp.companyName}" is currently PAUSED / INACTIVE and cannot accept new direct-bill rides.`
-          );
-          return;
-        }
-        const poCheck = getCorporateAccountService().validateCorporatePo(selectedCorp, billingPo);
-        if (poCheck.status === 'expired_revoked') {
-          setSubmitError(
-            `FRAUD ALERT: The PO number "${billingPo}" was revoked/rotated on ${
-              poCheck.revokedRecord?.rotatedAt ? poCheck.revokedRecord.rotatedAt.slice(0, 10) : 'previously'
-            }. Corporate booking cannot proceed with a revoked PO.`
-          );
-          return;
-        }
-        if (selectedCorp.poRequired && !billingPo.trim()) {
-          setSubmitError(`PO Number is strictly required for corporate client "${selectedCorp.companyName}".`);
-          return;
-        }
-        if (selectedCorp.poRequired && poCheck.status === 'mismatch' && !allowPoOverride) {
-          setSubmitError(
-            `PO MISMATCH BLOCK: "${billingPo}" does not match the active authorized PO (${selectedCorp.currentPoNumber || 'N/A'}) for "${selectedCorp.companyName}". Verify PO or check Supervisor Override below.`
-          );
-          return;
-        }
-        // Check corporate credit limit against live open AR balance
-        if (selectedCorp.creditLimit > 0) {
-          try {
-            const invService = getInvoicingService();
-            const openBalance = invService.getCorporateAccountBalance
-              ? await invService.getCorporateAccountBalance(selectedCorp.id)
-              : 0;
-            const projectedFare = isFareOverridden && manualFare
-              ? Math.max(0, Math.ceil(parseFloat(manualFare) || 0))
-              : returnTrip
-              ? Math.ceil(estimatedFare) + Math.ceil(returnEstimatedFare || estimatedFare)
-              : Math.ceil(estimatedFare);
-            if (openBalance + projectedFare > selectedCorp.creditLimit) {
-              setSubmitError(
-                `CREDIT LIMIT EXCEEDED: "${selectedCorp.companyName}" open AR ($${openBalance.toFixed(2)}) + this booking ($${projectedFare.toFixed(2)}) exceeds the $${selectedCorp.creditLimit.toLocaleString()} limit.`
-              );
-              return;
-            }
-          } catch {
-            // Non-blocking if offline
-          }
-        }
+      const projectedFare = isFareOverridden && manualFare
+        ? Math.max(0, Math.ceil(parseFloat(manualFare) || 0))
+        : returnTrip
+        ? Math.ceil(estimatedFare) + Math.ceil(returnEstimatedFare || estimatedFare)
+        : Math.ceil(estimatedFare);
+      const corpValidation = await validateDispatchAccount({
+        corporateAccountList,
+        corporateAccount,
+        billingPo,
+        allowPoOverride,
+        projectedFare,
+      });
+      if (!corpValidation.valid) {
+        setSubmitError(corpValidation.error);
+        return;
       }
     }
 
@@ -2702,135 +2658,17 @@ function DispatchBookingEngineComponent({
     if (paymentMethod === 'card') method = 'card';
     if (paymentMethod === 'account') method = 'corporate';
 
-    // Symmetric check: only equalize outbound/return when both legs match in route, stops, vehicles & pax
-    const retPickupResolved = (returnPickupAddress.trim() || dropoffAddress.trim()).toLowerCase();
-    const retDropoffResolved = (returnDropoffAddress.trim() || pickupAddress.trim()).toLowerCase();
-    const isSymmetricRoundTrip =
-      returnTrip &&
-      retPickupResolved === dropoffAddress.trim().toLowerCase() &&
-      retDropoffResolved === pickupAddress.trim().toLowerCase() &&
-      returnIntermediateStops.length === intermediateStops.length &&
-      returnPassengers === passengers &&
-      returnBags === bags &&
-      returnCarSeats === carSeats &&
-      returnRearFacing === rearFacingCount &&
-      returnFrontFacing === frontFacingCount &&
-      returnBooster === boosterCount &&
-      returnHasOversizedLuggage === hasOversizedLuggage &&
-      JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
-      JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
-
-    let outboundFare = Math.ceil(estimatedFare);
-    let returnLegFare = Math.ceil(returnEstimatedFare || estimatedFare);
-
-    if (isFareOverridden && manualFare) {
-      const overrideVal = Math.max(0, Math.ceil(parseFloat(manualFare) || 0));
-      if (returnTrip && autoCreateReturnTrip) {
-        // Override applies to combined round-trip total — split cleanly across legs (NEVER double!)
-        outboundFare = Math.ceil(overrideVal / 2);
-        returnLegFare = Math.max(0, overrideVal - outboundFare);
-      } else {
-        outboundFare = overrideVal;
-      }
-    } else if (returnTrip && isSymmetricRoundTrip) {
-      const balancedFare = Math.max(outboundFare, returnLegFare);
-      outboundFare = balancedFare;
-      returnLegFare = balancedFare;
-    }
-
+    const { outboundFare, returnLegFare } = computeDispatchRoundTripFares({
+      returnTrip,
+      autoCreateReturnTrip,
+      forSubmission: true,
+      isSymmetric: isSymmetricRoundTrip,
+      estimatedFare,
+      returnEstimatedFare,
+      isFareOverridden,
+      manualFare,
+    });
     const finalFare = outboundFare;
-    const totalCalculatedFare = returnTrip ? outboundFare + returnLegFare : outboundFare;
-
-    const buildPersistedPricing = (
-      enginePricing: TripPricing | null,
-      targetFare: number,
-      distMiles: number,
-      durMins: number,
-      overridden: boolean
-    ): TripPricing => {
-      if (overridden) {
-        return {
-          ...(enginePricing || {
-            baseFare: targetFare,
-            distanceMiles: distMiles,
-            durationMinutes: durMins,
-            distanceRate: 0,
-            timeRate: 0,
-            vehicleMultiplier: 1,
-            surgeMultiplier: 1,
-            discountAmount: 0,
-            subtotal: targetFare,
-            totalFare: targetFare,
-            currency: 'USD',
-          }),
-          distanceMiles: distMiles || enginePricing?.distanceMiles || 0,
-          durationMinutes: durMins || enginePricing?.durationMinutes || 0,
-          subtotal: targetFare,
-          totalFare: targetFare,
-          manualAdjustment: enginePricing ? Number((targetFare - enginePricing.totalFare).toFixed(2)) : 0,
-          breakdown: [
-            {
-              id: 'base-fare',
-              category: 'base',
-              label: 'Base Fare',
-              detail: 'Dispatcher agreed rate',
-              amount: targetFare,
-              sourceType: 'rule',
-            },
-          ],
-          currency: 'USD',
-        };
-      }
-
-      if (enginePricing) {
-        const diff = Number((targetFare - enginePricing.totalFare).toFixed(2));
-        const adjustedBreakdown =
-          Math.abs(diff) > 0.005 && enginePricing.breakdown && enginePricing.breakdown.length > 0
-            ? [
-                ...enginePricing.breakdown,
-                {
-                  id: 'round-trip-balance',
-                  category: 'rounding' as const,
-                  label: 'Round-Trip Balance Adjustment',
-                  amount: diff,
-                  sourceType: 'rounding' as const,
-                },
-              ]
-            : enginePricing.breakdown;
-        return {
-          ...enginePricing,
-          distanceMiles: distMiles || enginePricing.distanceMiles,
-          durationMinutes: durMins || enginePricing.durationMinutes,
-          totalFare: targetFare,
-          breakdown: adjustedBreakdown,
-          currency: enginePricing.currency || 'USD',
-        };
-      }
-
-      return {
-        baseFare: targetFare,
-        tariffBaseSubtotal: targetFare,
-        distanceMiles: distMiles,
-        durationMinutes: durMins,
-        distanceRate: 0,
-        timeRate: 0,
-        vehicleMultiplier: 1.0,
-        surgeMultiplier: 1.0,
-        discountAmount: 0,
-        subtotal: targetFare,
-        totalFare: targetFare,
-        currency: 'USD',
-        breakdown: [
-          {
-            id: 'base-fare',
-            category: 'base',
-            label: 'Base Fare',
-            amount: targetFare,
-            sourceType: 'tariff',
-          },
-        ],
-      };
-    };
 
     const persistedOutboundPricing = buildPersistedPricing(
       outboundPricing,
@@ -2840,14 +2678,11 @@ function DispatchBookingEngineComponent({
       Boolean(isFareOverridden && manualFare)
     );
 
-    const customExtrasSummaryParts: string[] = [];
-    for (const [extraId, qty] of Object.entries(selectedCustomExtras || {})) {
-      if (!qty || qty <= 0) continue;
-      const def = universalExtrasConfig?.customExtras?.find((e) => e.id === extraId);
-      customExtrasSummaryParts.push(`${qty}x ${def?.name || extraId}`);
-    }
-    const customExtrasSummary =
-      customExtrasSummaryParts.length > 0 ? customExtrasSummaryParts.join(', ') : undefined;
+    const customExtrasSummary = formatCustomExtrasSummary(
+      selectedCustomExtras,
+      universalExtrasConfig?.customExtras,
+      { alwaysPrefixQty: true, emptyAsUndefined: true }
+    );
 
     const names = passengerName.trim().split(/\s+/);
     const firstName = names[0] || 'Guest';
@@ -2858,11 +2693,11 @@ function DispatchBookingEngineComponent({
       scheduledPickupTime = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
     }
 
-    const carSeatSummaryParts = [
-      rearFacingCount > 0 ? `${rearFacingCount} Rear-Facing` : null,
-      frontFacingCount > 0 ? `${frontFacingCount} Front-Facing` : null,
-      boosterCount > 0 ? `${boosterCount} Booster` : null,
-    ].filter(Boolean);
+    const carSeatLabel = formatCarSeatSummaryLabel(carSeats, {
+      rearFacing: rearFacingCount,
+      frontFacing: frontFacingCount,
+      booster: boosterCount,
+    });
 
     const activeSpecialRequestLabels = [
       specialRequestFlags.petFriendly ? 'Pet-Friendly' : null,
@@ -2872,37 +2707,35 @@ function DispatchBookingEngineComponent({
 
     const specialRequestSections = [
       activeSpecialRequestLabels.length > 0 ? activeSpecialRequestLabels.join(', ') : null,
-      carSeats && carSeatSummaryParts.length > 0 ? `Car Seats: ${carSeatSummaryParts.join(', ')}` : null,
+      carSeatLabel || null,
     ].filter(Boolean);
 
     const specialRequests =
       specialRequestSections.length > 0 ? specialRequestSections.join(' · ') : undefined;
 
-    let outboundFlightNotes = '';
-    if (provideFlightInfo) {
-      if (airportDetection.isPrivateAviation) {
-        if (tailNumber || fboFacility) {
-          outboundFlightNotes = `[Private Aviation: Tail #${tailNumber || 'N/A'}, FBO: ${fboFacility || 'N/A'}${hasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
-        }
-      } else {
-        if (airline || flightNumber) {
-          outboundFlightNotes = `[Flight: ${airline || 'N/A'} #${flightNumber || 'N/A'}${flightOrigin ? ` from ${flightOrigin}` : ''}${hasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
-        }
-      }
-    }
+    const outboundFlightNotes = formatDispatchFlightNotesTag({
+      enabled: provideFlightInfo,
+      isPrivateAviation: airportDetection.isPrivateAviation,
+      isReturn: false,
+      airline,
+      flightNumber,
+      flightOrigin,
+      tailNumber,
+      fboFacility,
+      hasCheckedLuggage,
+    });
 
-    let returnLegFlightNotes = '';
-    if (returnProvideFlightInfo) {
-      if (returnAirportDetection.isPrivateAviation) {
-        if (returnTailNumber || returnFboFacility) {
-          returnLegFlightNotes = `[Return Private Aviation: Tail #${returnTailNumber || 'N/A'}, FBO: ${returnFboFacility || 'N/A'}${returnHasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
-        }
-      } else {
-        if (returnAirline || returnFlightNumber) {
-          returnLegFlightNotes = `[Return Flight: ${returnAirline || 'N/A'} #${returnFlightNumber || 'N/A'}${returnFlightOrigin ? ` from ${returnFlightOrigin}` : ''}${returnHasCheckedLuggage ? ' (Checked Luggage)' : ''}]`;
-        }
-      }
-    }
+    const returnLegFlightNotes = formatDispatchFlightNotesTag({
+      enabled: returnProvideFlightInfo,
+      isPrivateAviation: returnAirportDetection.isPrivateAviation,
+      isReturn: true,
+      airline: returnAirline,
+      flightNumber: returnFlightNumber,
+      flightOrigin: returnFlightOrigin,
+      tailNumber: returnTailNumber,
+      fboFacility: returnFboFacility,
+      hasCheckedLuggage: returnHasCheckedLuggage,
+    });
 
     const metadataPayload = {
       company,
@@ -3546,16 +3379,11 @@ function DispatchBookingEngineComponent({
             const retDropoffAddr = returnDropoffAddress.trim() || pickupAddress;
             const returnScheduledTimeIso = new Date(`${returnDate}T${returnTime}:00`).toISOString();
 
-            const returnCarSeatSummaryParts = [
-              returnRearFacing > 0 ? `${returnRearFacing} Rear-Facing` : null,
-              returnFrontFacing > 0 ? `${returnFrontFacing} Front-Facing` : null,
-              returnBooster > 0 ? `${returnBooster} Booster` : null,
-            ].filter(Boolean);
-
-            const returnSpecialRequests =
-              returnCarSeats && returnCarSeatSummaryParts.length > 0
-                ? `Car Seats: ${returnCarSeatSummaryParts.join(', ')}`
-                : undefined;
+            const returnSpecialRequests = formatCarSeatSummaryLabel(returnCarSeats, {
+              rearFacing: returnRearFacing,
+              frontFacing: returnFrontFacing,
+              booster: returnBooster,
+            });
 
             const isReturnMultiCar = returnVehicles.length > 1;
             const retCarCount = Math.max(1, returnVehicles.length);
@@ -4222,22 +4050,21 @@ function DispatchBookingEngineComponent({
                       value={stop.address}
                       variant="stop"
                       disabled={isCancelled}
-                      onChange={(val) => {
-                        const updated = [...intermediateStops];
-                        updated[idx].address = val;
-                        updated[idx].placeId = undefined;
-                        setIntermediateStops(updated);
-                      }}
-                      onPlaceSelected={(p) => {
-                        const updated = [...intermediateStops];
-                        updated[idx] = { address: p.address, coordinates: p.coordinates, placeId: p.placeId };
-                        setIntermediateStops(updated);
-                      }}
+                      onChange={(val) =>
+                        outboundWaypoints.updateStopAt(idx, { address: val, placeId: undefined })
+                      }
+                      onPlaceSelected={(p) =>
+                        outboundWaypoints.replaceStopAt(idx, {
+                          address: p.address,
+                          coordinates: p.coordinates,
+                          placeId: p.placeId,
+                        })
+                      }
                     />
                     <button
                       type="button"
                       disabled={isCancelled}
-                      onClick={() => setIntermediateStops(intermediateStops.filter((_, i) => i !== idx))}
+                      onClick={() => outboundWaypoints.removeStopAt(idx)}
                       className="text-slate-400 hover:text-red-500 px-1 disabled:opacity-30"
                     >
                       ✕
@@ -4283,7 +4110,7 @@ function DispatchBookingEngineComponent({
                 )}
                 <button
                   type="button"
-                  onClick={() => setIntermediateStops([...intermediateStops, { address: '' }])}
+                  onClick={outboundWaypoints.addStop}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
                 >
                   <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
@@ -4758,9 +4585,9 @@ function DispatchBookingEngineComponent({
                     aria-label="Decrease carry-on bags"
                     disabled={carryOnBags <= 0}
                     onClick={() => {
-                      const nextCarry = Math.max(0, carryOnBags - 1);
-                      setCarryOnBags(nextCarry);
-                      setBags(nextCarry + checkedBags);
+                      const stepped = stepLuggageCount(carryOnBags, checkedBags, 'carryOn', -1, totalMaxBags);
+                      setCarryOnBags(stepped.carryOnBags);
+                      setBags(stepped.bags);
                     }}
                     className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                   >
@@ -4774,9 +4601,9 @@ function DispatchBookingEngineComponent({
                     aria-label="Increase carry-on bags"
                     disabled={carryOnBags + checkedBags >= totalMaxBags}
                     onClick={() => {
-                      const nextCarry = Math.min(totalMaxBags - checkedBags, carryOnBags + 1);
-                      setCarryOnBags(nextCarry);
-                      setBags(nextCarry + checkedBags);
+                      const stepped = stepLuggageCount(carryOnBags, checkedBags, 'carryOn', 1, totalMaxBags);
+                      setCarryOnBags(stepped.carryOnBags);
+                      setBags(stepped.bags);
                     }}
                     className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                   >
@@ -4797,9 +4624,9 @@ function DispatchBookingEngineComponent({
                     aria-label="Decrease checked bags"
                     disabled={checkedBags <= 0}
                     onClick={() => {
-                      const nextChecked = Math.max(0, checkedBags - 1);
-                      setCheckedBags(nextChecked);
-                      setBags(carryOnBags + nextChecked);
+                      const stepped = stepLuggageCount(carryOnBags, checkedBags, 'checked', -1, totalMaxBags);
+                      setCheckedBags(stepped.checkedBags);
+                      setBags(stepped.bags);
                     }}
                     className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                   >
@@ -4813,9 +4640,9 @@ function DispatchBookingEngineComponent({
                     aria-label="Increase checked bags"
                     disabled={carryOnBags + checkedBags >= totalMaxBags}
                     onClick={() => {
-                      const nextChecked = Math.min(totalMaxBags - carryOnBags, checkedBags + 1);
-                      setCheckedBags(nextChecked);
-                      setBags(carryOnBags + nextChecked);
+                      const stepped = stepLuggageCount(carryOnBags, checkedBags, 'checked', 1, totalMaxBags);
+                      setCheckedBags(stepped.checkedBags);
+                      setBags(stepped.bags);
                     }}
                     className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                   >
@@ -5192,11 +5019,7 @@ function DispatchBookingEngineComponent({
                 <span className="text-[10px] font-bold text-slate-400 w-5">#{idx + 1}</span>
                 <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-slate-100 rounded">
                   {dispatchVehicleOptions.map((opt) => {
-                    const isSelected =
-                      vChoice === opt.key ||
-                      (vChoice === 'sedan' && (opt.key === 'standard' || opt.key === 'sedan')) ||
-                      (vChoice === 'suv' && (opt.key === 'xl' || opt.key === 'suv')) ||
-                      (vChoice === 'van' && (opt.key === 'wheelchair' || opt.key === 'van'));
+                    const isSelected = isVehicleChoiceSelected(vChoice, opt.key, 'wheelchair');
                     const simulatedVehicles = [...selectedVehicles];
                     simulatedVehicles[idx] = opt.key;
                     const simulatedCapacity = simulatedVehicles.reduce(
@@ -5351,12 +5174,7 @@ function DispatchBookingEngineComponent({
 
           {/* Corporate Account Sub-Panel */}
           {paymentMethod === 'account' && (() => {
-            const selectedCorp = corporateAccountList.find(
-              (c) => c.companyName === corporateAccount || c.id === corporateAccount || c.accountNumber === corporateAccount
-            );
-            const poValidation = selectedCorp
-              ? getCorporateAccountService().validateCorporatePo(selectedCorp, billingPo)
-              : null;
+            const selectedCorp = selectedCorporateAccount;
 
             return (
               <div className="p-2.5 mb-2 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2">
@@ -5777,20 +5595,19 @@ function DispatchBookingEngineComponent({
                               placeholder={`Return Stop #${idx + 1}`}
                               value={stop.address}
                               variant="stop"
-                              onChange={(val) => {
-                                const updated = [...returnIntermediateStops];
-                                updated[idx].address = val;
-                                setReturnIntermediateStops(updated);
-                              }}
-                              onPlaceSelected={(p) => {
-                                const updated = [...returnIntermediateStops];
-                                updated[idx] = { address: p.address, coordinates: p.coordinates };
-                                setReturnIntermediateStops(updated);
-                              }}
+                              onChange={(val) =>
+                                returnWaypoints.updateStopAt(idx, { address: val })
+                              }
+                              onPlaceSelected={(p) =>
+                                returnWaypoints.replaceStopAt(idx, {
+                                  address: p.address,
+                                  coordinates: p.coordinates,
+                                })
+                              }
                             />
                             <button
                               type="button"
-                              onClick={() => setReturnIntermediateStops(returnIntermediateStops.filter((_, i) => i !== idx))}
+                              onClick={() => returnWaypoints.removeStopAt(idx)}
                               className="text-slate-400 hover:text-red-500 px-1"
                             >
                               ✕
@@ -5832,7 +5649,7 @@ function DispatchBookingEngineComponent({
                         )}
                         <button
                           type="button"
-                          onClick={() => setReturnIntermediateStops([...returnIntermediateStops, { address: '' }])}
+                          onClick={returnWaypoints.addStop}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition-all shadow-2xs active:scale-95"
                         >
                           <PlusIcon className="w-3.5 h-3.5 text-indigo-600" />
@@ -6075,9 +5892,9 @@ function DispatchBookingEngineComponent({
                             aria-label="Decrease return carry-on bags"
                             disabled={returnCarryOnBags <= 0}
                             onClick={() => {
-                              const nextCarry = Math.max(0, returnCarryOnBags - 1);
-                              setReturnCarryOnBags(nextCarry);
-                              setReturnBags(nextCarry + returnCheckedBags);
+                              const stepped = stepLuggageCount(returnCarryOnBags, returnCheckedBags, 'carryOn', -1, returnTotalMaxBags);
+                              setReturnCarryOnBags(stepped.carryOnBags);
+                              setReturnBags(stepped.bags);
                             }}
                             className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 border border-indigo-200 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                           >
@@ -6091,9 +5908,9 @@ function DispatchBookingEngineComponent({
                             aria-label="Increase return carry-on bags"
                             disabled={returnCarryOnBags + returnCheckedBags >= returnTotalMaxBags}
                             onClick={() => {
-                              const nextCarry = Math.min(returnTotalMaxBags - returnCheckedBags, returnCarryOnBags + 1);
-                              setReturnCarryOnBags(nextCarry);
-                              setReturnBags(nextCarry + returnCheckedBags);
+                              const stepped = stepLuggageCount(returnCarryOnBags, returnCheckedBags, 'carryOn', 1, returnTotalMaxBags);
+                              setReturnCarryOnBags(stepped.carryOnBags);
+                              setReturnBags(stepped.bags);
                             }}
                             className="w-6 h-6 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                           >
@@ -6114,9 +5931,9 @@ function DispatchBookingEngineComponent({
                             aria-label="Decrease return checked bags"
                             disabled={returnCheckedBags <= 0}
                             onClick={() => {
-                              const nextChecked = Math.max(0, returnCheckedBags - 1);
-                              setReturnCheckedBags(nextChecked);
-                              setReturnBags(returnCarryOnBags + nextChecked);
+                              const stepped = stepLuggageCount(returnCarryOnBags, returnCheckedBags, 'checked', -1, returnTotalMaxBags);
+                              setReturnCheckedBags(stepped.checkedBags);
+                              setReturnBags(stepped.bags);
                             }}
                             className="w-6 h-6 rounded-md bg-white hover:bg-slate-100 border border-indigo-200 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                           >
@@ -6130,9 +5947,9 @@ function DispatchBookingEngineComponent({
                             aria-label="Increase return checked bags"
                             disabled={returnCarryOnBags + returnCheckedBags >= returnTotalMaxBags}
                             onClick={() => {
-                              const nextChecked = Math.min(returnTotalMaxBags - returnCarryOnBags, returnCheckedBags + 1);
-                              setReturnCheckedBags(nextChecked);
-                              setReturnBags(returnCarryOnBags + nextChecked);
+                              const stepped = stepLuggageCount(returnCarryOnBags, returnCheckedBags, 'checked', 1, returnTotalMaxBags);
+                              setReturnCheckedBags(stepped.checkedBags);
+                              setReturnBags(stepped.bags);
                             }}
                             className="w-6 h-6 rounded-md bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 font-bold flex items-center justify-center text-indigo-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                           >
@@ -6328,11 +6145,7 @@ function DispatchBookingEngineComponent({
                         <span className="text-slate-400 font-bold text-[9px]">#{rIdx + 1}</span>
                         <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-slate-100 rounded">
                           {dispatchVehicleOptions.map((opt) => {
-                            const isSelected =
-                              rv === opt.key ||
-                              (rv === 'sedan' && (opt.key === 'standard' || opt.key === 'sedan')) ||
-                              (rv === 'suv' && (opt.key === 'xl' || opt.key === 'suv')) ||
-                              (rv === 'van' && (opt.key === 'wheelchair' || opt.key === 'van'));
+                            const isSelected = isVehicleChoiceSelected(rv, opt.key, 'wheelchair');
                             const simulatedReturnVehicles = [...returnVehicles];
                             simulatedReturnVehicles[rIdx] = opt.key;
                             const simulatedReturnCapacity = simulatedReturnVehicles.reduce(
@@ -6533,37 +6346,9 @@ function DispatchBookingEngineComponent({
 
       {/* ─── Expandable Canonical Price Breakdown Drawer ─── */}
       {showPriceBreakdown && (() => {
-        const retP = (returnPickupAddress.trim() || dropoffAddress.trim()).toLowerCase();
-        const retD = (returnDropoffAddress.trim() || pickupAddress.trim()).toLowerCase();
-        const isSym =
-          returnTrip &&
-          retP === dropoffAddress.trim().toLowerCase() &&
-          retD === pickupAddress.trim().toLowerCase() &&
-          returnIntermediateStops.length === intermediateStops.length &&
-          returnPassengers === passengers &&
-          returnBags === bags &&
-          returnCarSeats === carSeats &&
-          returnRearFacing === rearFacingCount &&
-          returnFrontFacing === frontFacingCount &&
-          returnBooster === boosterCount &&
-          returnHasOversizedLuggage === hasOversizedLuggage &&
-          JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
-          JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
-        const leg1 = isFareOverridden && manualFare
-          ? returnTrip
-            ? Math.ceil((parseFloat(manualFare) || 0) / 2)
-            : Math.ceil(parseFloat(manualFare) || 0)
-          : isSym
-          ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare))
-          : Math.ceil(estimatedFare);
-        const leg2 = returnTrip
-          ? isFareOverridden && manualFare
-            ? Math.max(0, Math.ceil(parseFloat(manualFare) || 0) - leg1)
-            : isSym
-            ? leg1
-            : Math.ceil(returnEstimatedFare || estimatedFare)
-          : null;
-        const tot = returnTrip ? leg1 + (leg2 || 0) : leg1;
+        const leg1 = displayRoundTripFares.outboundFare;
+        const leg2 = returnTrip ? displayRoundTripFares.returnLegFare : null;
+        const tot = displayRoundTripFares.totalFare;
         const primaryOpt = dispatchVehicleOptions.find((o) => o.key === selectedVehicles[0]);
 
         return (
@@ -6602,41 +6387,9 @@ function DispatchBookingEngineComponent({
 
       {/* ─── Sticky Action Bar (Pinned Bottom) ─── */}
       {(() => {
-        const retP = (returnPickupAddress.trim() || dropoffAddress.trim()).toLowerCase();
-        const retD = (returnDropoffAddress.trim() || pickupAddress.trim()).toLowerCase();
-        const isSym =
-          returnTrip &&
-          retP === dropoffAddress.trim().toLowerCase() &&
-          retD === pickupAddress.trim().toLowerCase() &&
-          returnIntermediateStops.length === intermediateStops.length &&
-          returnPassengers === passengers &&
-          returnBags === bags &&
-          returnCarSeats === carSeats &&
-          returnRearFacing === rearFacingCount &&
-          returnFrontFacing === frontFacingCount &&
-          returnBooster === boosterCount &&
-          returnHasOversizedLuggage === hasOversizedLuggage &&
-          JSON.stringify(returnOversizedBags || {}) === JSON.stringify(oversizedBags || {}) &&
-          JSON.stringify(returnVehicles) === JSON.stringify(selectedVehicles);
-
-        const displayLeg1 =
-          isFareOverridden && manualFare
-            ? returnTrip
-              ? Math.ceil((parseFloat(manualFare) || 0) / 2)
-              : Math.ceil(parseFloat(manualFare) || 0)
-            : isSym
-            ? Math.max(Math.ceil(estimatedFare), Math.ceil(returnEstimatedFare || estimatedFare))
-            : Math.ceil(estimatedFare);
-
-        const displayLeg2 = returnTrip
-          ? isFareOverridden && manualFare
-            ? Math.max(0, Math.ceil(parseFloat(manualFare) || 0) - displayLeg1)
-            : isSym
-            ? displayLeg1
-            : Math.ceil(returnEstimatedFare || estimatedFare)
-          : 0;
-
-        const displayTotal = returnTrip ? displayLeg1 + displayLeg2 : displayLeg1;
+        const displayLeg1 = displayRoundTripFares.outboundFare;
+        const displayLeg2 = displayRoundTripFares.returnLegFare;
+        const displayTotal = displayRoundTripFares.totalFare;
 
         return (
           <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5 lg:py-2 flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] z-20 gap-2">
