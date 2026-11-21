@@ -49,6 +49,8 @@ import {
   RadioIcon,
   ShieldCheckIcon,
   DollarSignIcon,
+  ChevronLeftIcon,
+  RefreshCwIcon,
 } from '../components/ui/Icons';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { validatePhoneNumber } from '../core/utils/phone';
@@ -196,7 +198,13 @@ export default function DriverAppRoute() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
-  const [confirmStepKey, setConfirmStepKey] = useState<string | null>(null);
+  const [lastStepUndo, setLastStepUndo] = useState<{
+    tripId: string;
+    previousStatus: TripStatus;
+    toLabel: string;
+    fromLabel: string;
+  } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Preferred Navigation App
   const [preferredNavApp, setPreferredNavApp] = useState<PreferredNavApp>(() => {
@@ -776,10 +784,36 @@ export default function DriverAppRoute() {
     setShowTerminalModal(true);
   };
 
-  // Step-by-Step Status Transitions (looks up targetTripId explicitly — never stale activeTrip!)
+  const formatStepLabel = (status: TripStatus): string => {
+    switch (status) {
+      case 'assigned':
+      case 'accepted':
+        return 'Assigned';
+      case 'en_route':
+        return 'En Route';
+      case 'arrived':
+        return 'Arrived';
+      case 'in_progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      default:
+        return String(status).replace(/_/g, ' ');
+    }
+  };
+
+  const getPreviousStepStatus = (status: TripStatus): TripStatus | null => {
+    if (status === 'in_progress') return 'arrived';
+    if (status === 'arrived') return 'en_route';
+    if (status === 'en_route') return 'assigned';
+    return null;
+  };
+
+  // Single-Tap Status Transitions (looks up targetTripId explicitly — never stale activeTrip!)
   const handleStepAction = async (targetTripId: string, targetStatus: TripStatus, reason?: string) => {
     if (!driver) return;
     const targetTrip = liveEligibleTrips.find((t) => t.id === targetTripId) || null;
+    const previousStatus = targetTrip?.status || null;
 
     if (targetStatus === 'completed') {
       if (targetTrip) openCheckoutTerminalForTrip(targetTrip);
@@ -788,7 +822,6 @@ export default function DriverAppRoute() {
 
     try {
       setActionLoading(targetStatus);
-      setConfirmStepKey(null);
       await driverService.transitionTrip(targetTripId, targetStatus, driver.id, reason);
 
       const telephonyService = getTelephonyService();
@@ -821,10 +854,55 @@ export default function DriverAppRoute() {
         }
       }
 
-      setSuccessNotice('Status updated to ' + targetStatus.toUpperCase().replace('_', ' '));
-      setTimeout(() => setSuccessNotice(null), 3000);
+      const toLabel = formatStepLabel(targetStatus);
+      if (
+        previousStatus &&
+        previousStatus !== targetStatus &&
+        (targetStatus === 'en_route' || targetStatus === 'arrived' || targetStatus === 'in_progress')
+      ) {
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        const revertTarget: TripStatus =
+          previousStatus === 'en_route' || previousStatus === 'arrived' || previousStatus === 'accepted'
+            ? previousStatus
+            : 'assigned';
+        setLastStepUndo({
+          tripId: targetTripId,
+          previousStatus: revertTarget,
+          toLabel,
+          fromLabel: formatStepLabel(revertTarget),
+        });
+        setSuccessNotice(null);
+        undoTimerRef.current = setTimeout(() => setLastStepUndo(null), 6500);
+      } else {
+        setSuccessNotice('Status updated to ' + toLabel.toUpperCase());
+        setTimeout(() => setSuccessNotice(null), 3000);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Action failed';
+      setErrorNotice(msg);
+      setTimeout(() => setErrorNotice(null), 4000);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Revert Status (lets driver cleanly step back after an accidental tap without spamming duplicate SMS)
+  const handleRevertStatus = async (targetTripId: string, previousStatus: TripStatus) => {
+    if (!driver) return;
+    try {
+      setActionLoading('revert');
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setLastStepUndo(null);
+      await driverService.transitionTrip(
+        targetTripId,
+        previousStatus,
+        driver.id,
+        `Driver reverted status back to ${formatStepLabel(previousStatus)}`
+      );
+      setSuccessNotice(`Reverted status to ${formatStepLabel(previousStatus).toUpperCase()}`);
+      setTimeout(() => setSuccessNotice(null), 3000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to revert status';
       setErrorNotice(msg);
       setTimeout(() => setErrorNotice(null), 4000);
     } finally {
@@ -1613,17 +1691,40 @@ export default function DriverAppRoute() {
         </div>
       )}
 
-      {/* Notifications Toast */}
+      {/* Notifications & One-Tap Undo Toast */}
+      {lastStepUndo && (
+        <div className="px-4 pt-3 max-w-lg mx-auto w-full">
+          <div className="p-3 bg-blue-950/90 border border-blue-500/60 rounded-xl text-blue-100 text-xs font-semibold flex items-center justify-between gap-2 shadow-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <CheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Updated to {lastStepUndo.toLabel}</span>
+            </div>
+            <button
+              type="button"
+              disabled={Boolean(actionLoading)}
+              onClick={() => handleRevertStatus(lastStepUndo.tripId, lastStepUndo.previousStatus)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-blue-400/50 text-blue-200 font-bold text-[11px] shrink-0 cursor-pointer transition-colors"
+            >
+              <RefreshCwIcon className="w-3 h-3" />
+              <span>Undo</span>
+            </button>
+          </div>
+        </div>
+      )}
       {successNotice && (
-        <div className="mx-4 mt-3 p-3 bg-emerald-500/20 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-semibold flex items-center gap-2 max-w-lg sm:mx-auto w-full">
-          <CheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{successNotice}</span>
+        <div className="px-4 pt-3 max-w-lg mx-auto w-full">
+          <div className="p-3 bg-emerald-500/20 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-semibold flex items-center gap-2">
+            <CheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="min-w-0 break-words">{successNotice}</span>
+          </div>
         </div>
       )}
       {errorNotice && (
-        <div className="mx-4 mt-3 p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl text-rose-300 text-xs font-semibold flex items-center gap-2 max-w-lg sm:mx-auto w-full">
-          <XIcon className="w-4 h-4 text-rose-400 shrink-0" />
-          <span>{errorNotice}</span>
+        <div className="px-4 pt-3 max-w-lg mx-auto w-full">
+          <div className="p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl text-rose-300 text-xs font-semibold flex items-center gap-2">
+            <XIcon className="w-4 h-4 text-rose-400 shrink-0" />
+            <span className="min-w-0 break-words">{errorNotice}</span>
+          </div>
         </div>
       )}
 
@@ -1660,7 +1761,6 @@ export default function DriverAppRoute() {
                         key={trip.id}
                         type="button"
                         onClick={() => {
-                          setConfirmStepKey(null);
                           setActiveTripId(trip.id);
                         }}
                         className={`px-3 py-2 min-h-[44px] rounded-xl text-left border shrink-0 transition-all cursor-pointer flex flex-col gap-0.5 min-w-[136px] ${
@@ -2055,26 +2155,11 @@ export default function DriverAppRoute() {
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => {
-                          const key = `${activeTrip.id}:en_route`;
-                          if (confirmStepKey !== key) {
-                            setConfirmStepKey(key);
-                            return;
-                          }
-                          handleStepAction(activeTrip.id, 'en_route');
-                        }}
-                        className={`w-full py-4 min-h-[54px] font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
-                          confirmStepKey === `${activeTrip.id}:en_route`
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300'
-                            : 'bg-blue-600 hover:bg-blue-500 text-white'
-                        }`}
+                        onClick={() => handleStepAction(activeTrip.id, 'en_route')}
+                        className="w-full py-4 min-h-[54px] bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                       >
                         {actionLoading === 'en_route' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CarIcon className="w-5 h-5" />}
-                        <span>
-                          {confirmStepKey === `${activeTrip.id}:en_route`
-                            ? 'TAP AGAIN TO CONFIRM EN ROUTE & NOTIFY'
-                            : 'EN ROUTE TO PICKUP'}
-                        </span>
+                        <span>EN ROUTE TO PICKUP</span>
                       </button>
                       {activeTrip.status === 'assigned' && (
                         <button
@@ -2088,81 +2173,82 @@ export default function DriverAppRoute() {
                       )}
                     </div>
                   ) : activeTrip.status === 'en_route' ? (
-                    <>
+                    <div className="space-y-2">
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => {
-                          const key = `${activeTrip.id}:arrived`;
-                          if (confirmStepKey !== key) {
-                            setConfirmStepKey(key);
-                            return;
-                          }
-                          handleStepAction(activeTrip.id, 'arrived');
-                        }}
-                        className={`w-full py-4 min-h-[54px] font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
-                          confirmStepKey === `${activeTrip.id}:arrived`
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-300'
-                            : 'bg-blue-600 hover:bg-blue-500 text-white'
-                        }`}
+                        onClick={() => handleStepAction(activeTrip.id, 'arrived')}
+                        className="w-full py-4 min-h-[54px] bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                       >
                         {actionLoading === 'arrived' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <MapPinIcon className="w-5 h-5" />}
-                        <span>
-                          {confirmStepKey === `${activeTrip.id}:arrived`
-                            ? 'TAP AGAIN TO CONFIRM ARRIVAL & TEXT RIDER'
-                            : 'ARRIVED AT PICKUP'}
-                        </span>
+                        <span>ARRIVED AT PICKUP</span>
                       </button>
-                    </>
-                  ) : activeTrip.status === 'arrived' ? (
-                    <>
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => {
-                          const key = `${activeTrip.id}:in_progress`;
-                          if (confirmStepKey !== key) {
-                            setConfirmStepKey(key);
-                            return;
-                          }
-                          handleStepAction(activeTrip.id, 'in_progress');
-                        }}
-                        className={`w-full py-4 min-h-[54px] font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
-                          confirmStepKey === `${activeTrip.id}:in_progress`
-                            ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-300'
-                            : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                        }`}
+                        onClick={() => handleRevertStatus(activeTrip.id, 'assigned')}
+                        className="w-full py-2.5 min-h-[40px] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs rounded-xl border border-slate-800 cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <ChevronLeftIcon className="w-3.5 h-3.5" />
+                        <span>{actionLoading === 'revert' ? 'Reverting...' : 'Revert Status to Assigned'}</span>
+                      </button>
+                    </div>
+                  ) : activeTrip.status === 'arrived' ? (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => handleStepAction(activeTrip.id, 'in_progress')}
+                        className="w-full py-4 min-h-[54px] bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                       >
                         {actionLoading === 'in_progress' ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <ClockIcon className="w-5 h-5" />}
-                        <span>
-                          {confirmStepKey === `${activeTrip.id}:in_progress`
-                            ? 'TAP AGAIN TO START RIDE'
-                            : 'START RIDE'}
-                        </span>
+                        <span>START RIDE</span>
                       </button>
 
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={Boolean(actionLoading)}
+                          onClick={() => handleRevertStatus(activeTrip.id, 'en_route')}
+                          className="py-2.5 px-2 min-h-[42px] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs rounded-xl border border-slate-800 cursor-pointer flex items-center justify-center gap-1 transition-colors"
+                        >
+                          <ChevronLeftIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{actionLoading === 'revert' ? 'Reverting...' : 'Revert to En Route'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={Boolean(actionLoading)}
+                          onClick={() => {
+                            setModalTripId(activeTrip.id);
+                            setShowNoShowModal(true);
+                          }}
+                          className="py-2.5 px-2 min-h-[42px] bg-slate-900 hover:bg-rose-950/40 text-rose-400 font-bold text-xs rounded-xl border border-rose-900/50 cursor-pointer truncate"
+                        >
+                          No-Show / Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : activeTrip.status === 'in_progress' ? (
+                    <div className="space-y-2">
                       <button
                         type="button"
                         disabled={Boolean(actionLoading)}
-                        onClick={() => {
-                          setModalTripId(activeTrip.id);
-                          setShowNoShowModal(true);
-                        }}
-                        className="w-full py-3 min-h-[44px] bg-slate-900 hover:bg-rose-950/40 text-rose-400 font-bold text-xs rounded-xl border border-rose-900/50 cursor-pointer"
+                        onClick={() => handleStepAction(activeTrip.id, 'completed')}
+                        className="w-full py-4 min-h-[54px] bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                       >
-                        Report Passenger No-Show / Cancel
+                        <FlagIcon className="w-5 h-5" />
+                        <span>COMPLETE RIDE &amp; SETTLE FARE</span>
                       </button>
-                    </>
-                  ) : activeTrip.status === 'in_progress' ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(actionLoading)}
-                      onClick={() => handleStepAction(activeTrip.id, 'completed')}
-                      className="w-full py-4 min-h-[54px] bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base rounded-2xl shadow-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <FlagIcon className="w-5 h-5" />
-                      <span>COMPLETE RIDE &amp; SETTLE FARE</span>
-                    </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => handleRevertStatus(activeTrip.id, 'arrived')}
+                        className="w-full py-2.5 min-h-[40px] bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-semibold text-xs rounded-xl border border-slate-800 cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <ChevronLeftIcon className="w-3.5 h-3.5" />
+                        <span>{actionLoading === 'revert' ? 'Reverting...' : 'Revert Status to Arrived'}</span>
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </section>
@@ -2883,8 +2969,15 @@ export default function DriverAppRoute() {
 
       {/* SHIFT VEHICLE PICKER MODAL (Backed by `/fleet`) */}
       {showVehiclePickerModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setShowVehiclePickerModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Select Shift Vehicle</h4>
@@ -2893,9 +2986,10 @@ export default function DriverAppRoute() {
               <button
                 type="button"
                 onClick={() => setShowVehiclePickerModal(false)}
-                className="w-11 h-11 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer shrink-0"
+                aria-label="Close vehicle picker"
               >
-                ✕
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
 
@@ -2946,8 +3040,18 @@ export default function DriverAppRoute() {
 
       {/* PASSENGER NO-SHOW / CANCEL MODAL */}
       {showNoShowModal && modalTrip && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4">
+        <div
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setShowNoShowModal(false);
+            setModalTripId(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Report No-Show / Cancel Ride</h4>
@@ -2959,9 +3063,10 @@ export default function DriverAppRoute() {
                   setShowNoShowModal(false);
                   setModalTripId(null);
                 }}
-                className="w-11 h-11 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer shrink-0"
+                aria-label="Close no-show modal"
               >
-                ✕
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
 
@@ -3019,11 +3124,21 @@ export default function DriverAppRoute() {
 
       {/* PASSENGER SMS MODAL (Uses server relay without leaking raw passenger phone) */}
       {showSmsModal && modalTrip?.passenger?.phone && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4">
+        <div
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setShowSmsModal(false);
+            setModalTripId(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
                   <MailIcon className="w-4 h-4" />
                 </div>
                 <div>
@@ -3039,9 +3154,10 @@ export default function DriverAppRoute() {
                   setShowSmsModal(false);
                   setModalTripId(null);
                 }}
-                className="w-11 h-11 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer shrink-0"
+                aria-label="Close SMS modal"
               >
-                ✕
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
 
@@ -3104,8 +3220,18 @@ export default function DriverAppRoute() {
 
       {/* ADD POST-BOOKING TOLL / EXTRA MODAL (with Category Picker & Canonical Breakdown Sync) */}
       {showExtrasModal && modalTrip && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4 my-auto">
+        <div
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setShowExtrasModal(false);
+            setModalTripId(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Add Toll / Extra to Fare</h4>
@@ -3119,9 +3245,10 @@ export default function DriverAppRoute() {
                   setShowExtrasModal(false);
                   setModalTripId(null);
                 }}
-                className="w-11 h-11 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer shrink-0"
+                aria-label="Close extras modal"
               >
-                ✕
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
 
@@ -3213,8 +3340,20 @@ export default function DriverAppRoute() {
 
       {/* IN-CAB SETTLEMENT & CHECKOUT TERMINAL MODAL (Cash / External Card Terminal / Corporate / Stripe Pre-Auth) */}
       {showTerminalModal && modalTrip && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-5 text-white my-auto">
+        <div
+          className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            if (!isProcessingPayment && !completedPayoutReceipt) {
+              setShowTerminalModal(false);
+              setModalTripId(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 sm:px-6 pt-2.5 sm:pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-md shadow-2xl flex flex-col gap-5 text-white max-h-[92dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden shrink-0" aria-hidden="true" />
             {completedPayoutReceipt ? (
               /* RECONCILED RECEIPT & DRIVER SETTLEMENT SUMMARY (ZERO DOUBLE-COUNT!) */
               <div className="space-y-4 text-center">
@@ -3334,9 +3473,10 @@ export default function DriverAppRoute() {
                       setShowTerminalModal(false);
                       setModalTripId(null);
                     }}
-                    className="w-11 h-11 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer"
+                    className="w-10 h-10 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center hover:text-white cursor-pointer shrink-0"
+                    aria-label="Close checkout modal"
                   >
-                    ✕
+                    <XIcon className="w-4 h-4" />
                   </button>
                 </div>
 

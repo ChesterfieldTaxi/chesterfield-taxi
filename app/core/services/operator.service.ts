@@ -44,12 +44,18 @@ export function formatDriverAssignmentLabel(driver: {
   status?: string;
   isBlacklisted?: boolean;
 }): string {
-  // Extract cab number
-  let cab = driver.cabNumber;
-  if (!cab && driver.assignedUnit) {
-    const m = driver.assignedUnit.match(/#?(\d+)/);
-    if (m) cab = m[1];
-    else cab = driver.assignedUnit;
+  // Extract cab number (ignore placeholder strings like "Unassigned" or "N/A")
+  const isPlaceholderCab = (val?: string) => {
+    if (!val) return true;
+    const norm = val.trim().toLowerCase().replace(/^#/, '');
+    return !norm || norm === 'unassigned' || norm === 'none' || norm === 'n/a' || norm === 'tbd';
+  };
+
+  let cab = !isPlaceholderCab(driver.cabNumber) ? driver.cabNumber!.trim() : undefined;
+  if (!cab && !isPlaceholderCab(driver.assignedUnit)) {
+    const unit = driver.assignedUnit!.trim();
+    const m = unit.match(/#?(\d+)/);
+    cab = m ? m[1] : unit;
   }
   if (!cab && driver.vehicle) {
     const m = driver.vehicle.match(/#(\d+)/);
@@ -57,7 +63,7 @@ export function formatDriverAssignmentLabel(driver: {
   }
 
   // Extract first name
-  let first = driver.firstName;
+  let first = driver.firstName?.trim();
   if (!first && driver.name) {
     const parenMatch = driver.name.match(/\(([^)]+)\)/);
     if (parenMatch) {
@@ -67,7 +73,7 @@ export function formatDriverAssignmentLabel(driver: {
     }
   }
 
-  if (cab) {
+  if (cab && !isPlaceholderCab(cab)) {
     const cleanCab = cab.startsWith('#') ? cab : `#${cab}`;
     return first ? `${cleanCab}, ${first}` : cleanCab;
   }
@@ -440,7 +446,7 @@ export class OperatorService {
         firstName,
         lastName,
         cabNumber,
-        assignedUnit: vehicle,
+        assignedUnit: op.assignedUnit,
       });
 
       return {

@@ -65,6 +65,19 @@ export function FloatingWindow({
   const [isMaximized, setIsMaximized] = useState(false);
   const [preMaxState, setPreMaxState] = useState<{ position: { x: number; y: number }; size: { width: number; height: number } } | null>(null);
   const [activeZ, setActiveZ] = useState(zIndex);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const windowRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -191,7 +204,67 @@ export function FloatingWindow({
 
   if (!isOpen) return null;
 
-  // MINIMIZED FLOATING PILL AT BOTTOM OF SCREEN
+  // MOBILE BOTTOM SHEET PRESENTATION (< 768px): native edge-to-edge sheet with dimmed backdrop & safe-area footer
+  if (isMobileViewport) {
+    return (
+      <div
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end justify-center p-0 pointer-events-auto select-none animate-in fade-in duration-150"
+        style={{ zIndex: Math.max(activeZ, 120) }}
+        onClick={onClose}
+      >
+        <div
+          ref={windowRef}
+          onClick={(e) => e.stopPropagation()}
+          className={`w-full max-h-[92dvh] flex flex-col bg-white rounded-t-3xl shadow-2xl border-t border-slate-200/90 overflow-hidden select-text animate-in slide-in-from-bottom duration-200 ${className}`}
+        >
+          {/* Mobile Sheet Header with Drag Indicator */}
+          <div className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none">
+            <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5" aria-hidden="true" />
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {icon && <span className="text-blue-400 shrink-0">{icon}</span>}
+                <div className="min-w-0 flex-1">
+                  <div className="font-extrabold text-sm text-white truncate flex items-center gap-2">
+                    <span className="truncate">{title}</span>
+                  </div>
+                  {subtitle && <div className="text-[11px] text-slate-400 truncate mt-0.5">{subtitle}</div>}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white active:scale-95 flex items-center justify-center transition-all cursor-pointer shrink-0"
+                title="Close"
+                aria-label="Close modal"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            {headerExtra && (
+              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center flex-wrap gap-1.5">
+                {headerExtra}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Scrollable Body */}
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-slate-50/50 flex flex-col">
+            {children}
+          </div>
+
+          {/* Mobile Sticky Footer with Safe-Area Bottom Padding */}
+          {footer && (
+            <div className="shrink-0 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">
+              {footer}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // MINIMIZED FLOATING PILL AT BOTTOM OF SCREEN (Desktop)
   if (isMinimized) {
     return (
       <div
@@ -233,6 +306,19 @@ export function FloatingWindow({
     );
   }
 
+  const clampedWidth =
+    typeof window !== 'undefined' ? Math.min(size.width, window.innerWidth - 32) : size.width;
+  const clampedHeight =
+    typeof window !== 'undefined' ? Math.min(size.height, window.innerHeight - 32) : size.height;
+  const clampedX =
+    typeof window !== 'undefined'
+      ? Math.max(12, Math.min(position.x, window.innerWidth - clampedWidth - 12))
+      : position.x;
+  const clampedY =
+    typeof window !== 'undefined'
+      ? Math.max(12, Math.min(position.y, window.innerHeight - 80))
+      : position.y;
+
   return (
     <div
       className={`fixed inset-0 select-none ${
@@ -248,15 +334,15 @@ export function FloatingWindow({
         style={
           hasBackdrop
             ? {
-                width: Math.min(size.width, typeof window !== 'undefined' ? window.innerWidth - 32 : size.width),
+                width: clampedWidth,
                 maxHeight: autoHeight && !isMaximized ? '85vh' : undefined,
               }
             : {
                 position: 'fixed',
-                left: `${position.x}px`,
-                top: `${position.y}px`,
-                width: `${size.width}px`,
-                height: autoHeight && !isMaximized ? 'auto' : `${size.height}px`,
+                left: `${clampedX}px`,
+                top: `${clampedY}px`,
+                width: `${clampedWidth}px`,
+                height: autoHeight && !isMaximized ? 'auto' : `${clampedHeight}px`,
                 maxHeight: autoHeight && !isMaximized ? '85vh' : undefined,
               }
         }

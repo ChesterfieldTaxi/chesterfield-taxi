@@ -9,6 +9,10 @@ import {
   CarIcon,
   CalendarIcon,
   ChevronDownIcon,
+  StarIcon,
+  LuggageIcon,
+  SparklesIcon,
+  DocumentTextIcon,
 } from '../../ui/Icons';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import type { Trip, TripPassenger } from '../../../core/types/trip';
@@ -263,7 +267,7 @@ export function DriverQueueWindow({
         )
       }
       footer={
-        <div className="p-3 bg-white flex items-center justify-between gap-3 text-xs">
+        <div className="p-3 bg-white flex flex-wrap items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
             <span>
               Total Queue: <strong>${totalQueueFare.toFixed(2)}</strong>
@@ -274,7 +278,7 @@ export function DriverQueueWindow({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             {onAssignActiveDraft && (
               <button
                 type="button"
@@ -311,8 +315,9 @@ export function DriverQueueWindow({
                 <div className="flex items-center gap-2">
                   <span className="font-black text-slate-900 text-sm">{driver.name}</span>
                   {driver.driverScore !== undefined && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                      ★ {driver.driverScore}
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                      <StarIcon className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                      <span>{driver.driverScore}</span>
                     </span>
                   )}
                   {(() => {
@@ -343,10 +348,13 @@ export function DriverQueueWindow({
                     return <Badge variant="neutral">Offline</Badge>;
                   })()}
                 </div>
-                <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
                   <span>{driver.vehicle} ({driver.tier})</span>
                   <span>•</span>
-                  <span>📍 {driver.zone}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>{driver.zone}</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -463,23 +471,27 @@ export function DriverQueueWindow({
                 return (
                   <div className="flex flex-wrap items-center gap-1 text-[10px]">
                     {vehLabel && (
-                      <span className="px-1.5 py-0.5 rounded bg-white border border-emerald-200 font-bold text-slate-700">
-                        🚗 {String(vehLabel)}
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-emerald-200 font-bold text-slate-700">
+                        <CarIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span>{String(vehLabel)}</span>
                       </span>
                     )}
                     {oversized && (
-                      <span className="px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 font-bold text-rose-700">
-                        🧳 {oversized}
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 font-bold text-rose-700">
+                        <LuggageIcon className="w-3 h-3 text-rose-500 shrink-0" />
+                        <span>{oversized}</span>
                       </span>
                     )}
                     {customExtras && (
-                      <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 font-bold text-indigo-700">
-                        ✨ {customExtras}
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 font-bold text-indigo-700">
+                        <SparklesIcon className="w-3 h-3 text-indigo-500 shrink-0" />
+                        <span>{customExtras}</span>
                       </span>
                     )}
                     {specialReq && (
-                      <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 font-semibold text-amber-800">
-                        📝 {specialReq}
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 font-semibold text-amber-800">
+                        <DocumentTextIcon className="w-3 h-3 text-amber-600 shrink-0" />
+                        <span>{specialReq}</span>
                       </span>
                     )}
                   </div>
@@ -645,14 +657,15 @@ export function DriverQueueWindow({
 
                         {item.bufferMinutesAfterPrior !== undefined && (
                           <span
-                            className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded ${
                               item.bufferMinutesAfterPrior < 10
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-slate-200/70 text-slate-700'
                             }`}
                             title="Transit buffer between prior dropoff and this pickup"
                           >
-                            ⏱ {item.bufferMinutesAfterPrior}m buffer
+                            <ClockIcon className="w-2.5 h-2.5 shrink-0" />
+                            <span>{item.bufferMinutesAfterPrior}m buffer</span>
                           </span>
                         )}
                       </div>

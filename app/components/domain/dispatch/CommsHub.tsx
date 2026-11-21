@@ -34,6 +34,10 @@ import {
   BuildingIcon,
   MapPinIcon,
   WheelchairIcon,
+  HomeModernIcon,
+  AlertTriangleIcon,
+  ZapIcon,
+  StarIcon,
 } from '../../ui/Icons';
 import {
   getContactService,
@@ -217,21 +221,21 @@ function CommsFilterToolbar({
   placeholder = 'Filter communications...',
 }: CommsFilterToolbarProps) {
   return (
-    <div className="p-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50 shrink-0">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 bg-slate-50/50 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
         <input
           type="checkbox"
           ref={masterCheckboxRef}
           checked={isAllSelected}
           onChange={onToggleSelectAll}
-          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
           title="Select/Deselect all communications in this view"
         />
 
         <button
           type="button"
           onClick={onToggleUnreadOnly}
-          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border shrink-0 ${
             filterUnreadOnly
               ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
               : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
@@ -244,7 +248,7 @@ function CommsFilterToolbar({
           <select
             value={channelFilter}
             onChange={(e) => onChangeChannelFilter && onChangeChannelFilter(e.target.value)}
-            className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+            className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer flex-1 sm:flex-none min-w-[110px]"
           >
             {channelOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -257,7 +261,7 @@ function CommsFilterToolbar({
         <select
           value={contactFilter}
           onChange={(e) => onChangeContactFilter(e.target.value as ContactFilter)}
-          className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer"
+          className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer flex-1 sm:flex-none min-w-[110px]"
         >
           <option value="all">All contacts</option>
           <option value="passengers">Passengers &amp; VIPs</option>
@@ -266,14 +270,14 @@ function CommsFilterToolbar({
       </div>
 
       {/* Search input */}
-      <div className="relative">
-        <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+      <div className="relative w-full sm:w-48">
+        <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => onChangeSearchQuery(e.target.value)}
           placeholder={placeholder}
-          className="pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 w-44 focus:outline-blue-500"
+          className="w-full pl-8 pr-3 py-1.5 sm:py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-blue-500"
         />
       </div>
     </div>
@@ -2347,9 +2351,29 @@ function CommsHubComponent({
         </div>
       )}
 
-      {/* ─── Clean Sub-Navigation Bar (Calls | SMS | Voicemail | All) ─── */}
+      {/* ─── Clean Sub-Navigation Bar (All | Calls | SMS | VM) ─── */}
       <div className="bg-white border-b border-slate-200/80 px-2.5 py-2 shrink-0">
         <div className="grid grid-cols-4 gap-1 bg-slate-100/90 p-0.5 rounded-xl text-center">
+          <button
+            type="button"
+            onClick={() => {
+              handleSelectTab('all');
+              setSelectedContactPhone(null);
+            }}
+            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+              activeTab === 'all'
+                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span className="truncate">All</span>
+            {unreadCount > 0 && (
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-slate-700 text-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -2410,26 +2434,6 @@ function CommsHubComponent({
             {unreadCountVoicemail > 0 && (
               <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-amber-500 text-white">
                 {unreadCountVoicemail}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              handleSelectTab('all');
-              setSelectedContactPhone(null);
-            }}
-            className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
-              activeTab === 'all'
-                ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <span className="truncate">All</span>
-            {unreadCount > 0 && (
-              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black shrink-0 bg-slate-700 text-white">
-                {unreadCount}
               </span>
             )}
           </button>
@@ -2564,8 +2568,8 @@ function CommsHubComponent({
                         {/* Event Type Icon Badge */}
                         <div className="shrink-0 mt-0.5">
                           {event.type === 'voicemail' && (
-                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs shadow-2xs">
-                              🎙️
+                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-2xs">
+                              <MicIcon className="w-4 h-4" />
                             </div>
                           )}
                           {event.type === 'call_inbound' && (
@@ -2601,8 +2605,9 @@ function CommsHubComponent({
                               {event.contactPhone}
                             </span>
                             {event.homePhone && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
-                                🏠 Home Line
+                              <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
+                                <HomeModernIcon className="w-2.5 h-2.5 text-slate-500" />
+                                <span>Home Line</span>
                               </span>
                             )}
                             {event.contactType === 'driver' && (
@@ -2636,7 +2641,11 @@ function CommsHubComponent({
                                     }}
                                     className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
                                   >
-                                    {playingVoicemailId === event.id ? '⏸' : '▶'}
+                                    {playingVoicemailId === event.id ? (
+                                      <PauseIcon className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <PlayIcon className="w-3.5 h-3.5" />
+                                    )}
                                   </button>
                                   <span className="text-[11px] font-mono font-bold text-amber-900">
                                     {event.audioDuration}
@@ -2712,7 +2721,11 @@ function CommsHubComponent({
                                       }}
                                       className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
                                     >
-                                      {playingCallId === event.id ? '⏸' : '▶'}
+                                      {playingCallId === event.id ? (
+                                        <PauseIcon className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <PlayIcon className="w-3.5 h-3.5" />
+                                      )}
                                     </button>
                                     <span className="text-[11px] font-mono font-bold text-emerald-950">
                                       {event.audioDuration ||
@@ -2977,7 +2990,8 @@ function CommsHubComponent({
 
               {has10DlcBlockedMessages && (
                 <div className="flex items-center gap-1 text-[10px] text-amber-800 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md font-medium">
-                  <span className="font-bold text-amber-700">⚠ 10DLC Notice:</span>
+                  <AlertTriangleIcon className="w-3 h-3 text-amber-600 shrink-0" />
+                  <span className="font-bold text-amber-700">10DLC Notice:</span>
                   <span className="hidden sm:inline">Carrier requires A2P 10DLC campaign registration.</span>
                 </div>
               )}
@@ -3087,17 +3101,19 @@ function CommsHubComponent({
                               </span>
                             ) : evt.deliveryStatus === 'undelivered' ? (
                               <span
-                                className="text-amber-200 font-medium flex items-center gap-0.5"
+                                className="text-amber-200 font-medium flex items-center gap-1"
                                 title={evt.errorMessage || 'Carrier rejected delivery. US carriers require A2P 10DLC registration in Twilio Console.'}
                               >
-                                ⚠ Undelivered (10DLC blocked)
+                                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                                <span>Undelivered (10DLC blocked)</span>
                               </span>
                             ) : evt.deliveryStatus === 'failed' ? (
                               <span
-                                className="text-rose-200 font-medium flex items-center gap-0.5"
+                                className="text-rose-200 font-medium flex items-center gap-1"
                                 title={evt.errorMessage || 'SMS dispatch failed'}
                               >
-                                ⚠ Failed
+                                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                                <span>Failed</span>
                               </span>
                             ) : null}
                           </div>
@@ -3140,7 +3156,11 @@ function CommsHubComponent({
                               }
                               className="w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
                             >
-                              {playingCallId === evt.id ? '⏸' : '▶'}
+                              {playingCallId === evt.id ? (
+                                <PauseIcon className="w-3.5 h-3.5" />
+                              ) : (
+                                <PlayIcon className="w-3.5 h-3.5" />
+                              )}
                             </button>
                             <div className="h-2 w-24 bg-emerald-200 rounded-full overflow-hidden">
                               <div
@@ -3183,8 +3203,9 @@ function CommsHubComponent({
                     {evt.type === 'voicemail' && (
                       <div className="self-start max-w-[85%] bg-amber-50 border border-amber-200 rounded-2xl rounded-tl-sm p-3 shadow-xs space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-amber-900">
-                            🎙️ Voicemail • {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900">
+                            <MicIcon className="w-3 h-3 text-amber-700" />
+                            <span>Voicemail &middot; {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
                           </span>
                           <span className="text-[10px] font-mono text-amber-700 font-bold">{evt.audioDuration}</span>
                         </div>
@@ -3199,7 +3220,11 @@ function CommsHubComponent({
                               }
                               className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
                             >
-                              {playingVoicemailId === evt.id ? '⏸' : '▶'}
+                              {playingVoicemailId === evt.id ? (
+                                <PauseIcon className="w-3.5 h-3.5" />
+                              ) : (
+                                <PlayIcon className="w-3.5 h-3.5" />
+                              )}
                             </button>
                             <div className="h-2 w-24 bg-amber-200 rounded-full overflow-hidden">
                               <div
@@ -3272,23 +3297,26 @@ function CommsHubComponent({
                 <button
                   type="button"
                   onClick={() => setSmsReplyText('Your cab is 5 minutes away.')}
-                  className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
                 >
-                  ⚡ "Cab is 5 mins away"
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Cab is 5 mins away&rdquo;</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSmsReplyText('Your driver has arrived outside.')}
-                  className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
                 >
-                  ⚡ "Driver has arrived"
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Driver has arrived&rdquo;</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSmsReplyText('We have confirmed your airport reservation.')}
-                  className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
                 >
-                  ⚡ "Reservation confirmed"
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Reservation confirmed&rdquo;</span>
                 </button>
               </div>
 
@@ -3781,7 +3809,14 @@ function CommsHubComponent({
                           }`}
                           title="Configure forwarding cell/desk line to bridge live calls"
                         >
-                          {operatorPhoneInput ? `Agent Line: ${formatDisplayPhone(operatorPhoneInput)}` : '⚠️ Set Agent Line'}
+                          {operatorPhoneInput ? (
+                            `Agent Line: ${formatDisplayPhone(operatorPhoneInput)}`
+                          ) : (
+                            <>
+                              <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                              <span>Set Agent Line</span>
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
@@ -4521,8 +4556,8 @@ function CommsHubComponent({
             <div className="divide-y divide-slate-100">
             {messageConversations.length === 0 ? (
               <div className="text-center py-12 text-slate-400 space-y-3 px-4">
-                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-xl font-bold">
-                  💬
+                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                  <ChatBubbleLeftRightIcon className="w-6 h-6" />
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-700">No Messages Found</p>
@@ -4642,54 +4677,83 @@ function CommsHubComponent({
 
       {/* AGENT PHONE SETUP MODAL */}
       {showAgentSetupModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <PhoneIcon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Set Dispatcher Line</h3>
-                <p className="text-[11px] text-slate-500">Connect your phone to speak live</p>
+        <div
+          className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setShowAgentSetupModal(false);
+            setPendingCallTarget(null);
+            setSetupAgentPhoneError(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-sm w-full border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5">
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                    <PhoneIcon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">Set Dispatcher Line</h3>
+                    <p className="text-[11px] text-slate-400 truncate">Connect your phone to speak live</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAgentSetupModal(false);
+                    setPendingCallTarget(null);
+                    setSetupAgentPhoneError(null);
+                  }}
+                  className="w-8 h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center cursor-pointer shrink-0"
+                  aria-label="Close modal"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 mb-3 leading-relaxed">
-              To connect you with <strong className="text-slate-900">{pendingCallTarget?.name || pendingCallTarget?.phone}</strong>, enter your mobile or desk phone number. Twilio dials the recipient and simultaneously rings your phone so you speak together live.
-            </p>
+            <div className="p-4 sm:p-5">
+              <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+                To connect you with <strong className="text-slate-900">{pendingCallTarget?.name || pendingCallTarget?.phone}</strong>, enter your mobile or desk phone number. Twilio dials the recipient and simultaneously rings your phone so you speak together live.
+              </p>
 
-            <div className="space-y-1 mb-4">
-              <label className="text-[11px] font-bold text-slate-700 block">
-                Your Phone Number (Mobile or Desk):
-              </label>
-              <input
-                type="tel"
-                autoFocus
-                placeholder="(314) 555-0100"
-                value={setupAgentPhoneInput}
-                onChange={(e) => {
-                  setSetupAgentPhoneInput(e.target.value);
-                  if (setupAgentPhoneError) setSetupAgentPhoneError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveAgentAndCall();
-                  }
-                }}
-                className={`w-full px-3 py-2 text-sm rounded-xl border font-mono bg-slate-50 focus:bg-white focus:outline-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                  setupAgentPhoneError ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-                }`}
-              />
-              {setupAgentPhoneError ? (
-                <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
-              ) : (
-                <p className="text-[10px] text-slate-400">
-                  Tip: Want to speak through your computer microphone & headset without ringing your cell phone? Configure Twilio WebRTC keys in Admin &gt; Integrations.
-                </p>
-              )}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Your Phone Number (Mobile or Desk):
+                </label>
+                <input
+                  type="tel"
+                  autoFocus
+                  placeholder="(314) 555-0100"
+                  value={setupAgentPhoneInput}
+                  onChange={(e) => {
+                    setSetupAgentPhoneInput(e.target.value);
+                    if (setupAgentPhoneError) setSetupAgentPhoneError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveAgentAndCall();
+                    }
+                  }}
+                  className={`w-full px-3 py-2 text-sm rounded-xl border font-mono bg-slate-50 focus:bg-white focus:outline-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
+                    setupAgentPhoneError ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
+                  }`}
+                />
+                {setupAgentPhoneError ? (
+                  <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400">
+                    Tip: Want to speak through your computer microphone &amp; headset without ringing your cell phone? Configure Twilio WebRTC keys in Admin &gt; Integrations.
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -4697,17 +4761,17 @@ function CommsHubComponent({
                   setPendingCallTarget(null);
                   setSetupAgentPhoneError(null);
                 }}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl sm:rounded-lg hover:bg-slate-200/70 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveAgentAndCall}
-                className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 sm:py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
               >
                 <PhoneIcon className="w-3.5 h-3.5" />
-                <span>Save & Call Now</span>
+                <span>Save &amp; Call Now</span>
               </button>
             </div>
           </div>
@@ -4717,51 +4781,55 @@ function CommsHubComponent({
       {/* Contact Profile & Edit Modal */}
       {isContactEditOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
           onClick={() => {
             setIsCorpDropdownOpen(false);
             setIsContactEditOpen(false);
           }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh] overflow-hidden"
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-2xl w-full border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 flex flex-col max-h-[92dvh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
-                  <UserIcon className="w-5 h-5" />
+            <div className="bg-slate-900 text-white px-4 sm:px-6 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">Passenger &amp; Contact Profile</h3>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      Unified customer record across dispatch, booking &amp; directory
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Passenger &amp; Contact Profile</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Comprehensive customer record • Unified across dispatch, booking &amp; directory
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCorpDropdownOpen(false);
+                    setIsContactEditOpen(false);
+                  }}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  aria-label="Close contact profile modal"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCorpDropdownOpen(false);
-                  setIsContactEditOpen(false);
-                }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
             </div>
 
             {/* Save Toast Feedback */}
             {contactSaveFeedback && (
-              <div className="mx-6 mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
+              <div className="mx-4 sm:mx-6 mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
                 <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{contactSaveFeedback}</span>
               </div>
             )}
 
             {/* Scrollable Form Body */}
-            <div className="overflow-y-auto p-6 space-y-5 flex-1 text-xs">
+            <div className="overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 flex-1 text-xs">
               {/* ── Section 1: Passenger Name & VIP Status ── */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
@@ -4838,8 +4906,9 @@ function CommsHubComponent({
                 {/* Primary Phone */}
                 <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-blue-700 tracking-wider">
-                      ★ Primary Phone
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-blue-700 tracking-wider">
+                      <StarIcon className="w-3 h-3 text-blue-600" />
+                      <span>Primary Phone</span>
                     </span>
                     <span className="text-[10px] text-slate-400">Default dispatch &amp; SMS target</span>
                   </div>
@@ -5336,7 +5405,7 @@ function CommsHubComponent({
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+            <div className="px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 shrink-0 bg-slate-50/80">
               <a
                 href={`/app/admin?tab=customers&phone=${encodeURIComponent(
                   contactEditForm.phone || activeContactSummary?.contactPhone || ''
@@ -5345,25 +5414,26 @@ function CommsHubComponent({
                 rel="noopener noreferrer"
                 className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <ExternalLinkIcon className="w-3.5 h-3.5" />
-                <span>Open in Admin Customer Directory</span>
+                <ExternalLinkIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="sm:inline hidden">Open in Admin Customer Directory</span>
+                <span className="sm:hidden">Admin Directory</span>
               </a>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
                   onClick={() => {
                     setIsCorpDropdownOpen(false);
                     setIsContactEditOpen(false);
                   }}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl sm:rounded-lg hover:bg-slate-200/70 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveContactFromHub}
-                  className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 sm:py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <CheckIcon className="w-3.5 h-3.5" />
                   <span>Save Contact Profile</span>
@@ -5376,30 +5446,40 @@ function CommsHubComponent({
 
       {/* ─── NEW SMS MESSAGE MODAL ─── */}
       {isNewMessageModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setIsNewMessageModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 max-w-lg w-full max-h-[92dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                  <MailIcon className="w-4 h-4" />
+            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                    <MailIcon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">New Text Message</h3>
+                    <p className="text-[11px] text-slate-400 truncate">Send an SMS dispatch or chat with a passenger</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">New Text Message</h3>
-                  <p className="text-[11px] text-slate-500">Send an SMS dispatch or chat with a passenger</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsNewMessageModalOpen(false)}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  aria-label="Close new message modal"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsNewMessageModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
             </div>
 
             {/* Form */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
               {newMsgError && (
                 <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
                   {newMsgError}
@@ -5511,7 +5591,7 @@ function CommsHubComponent({
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between">
+            <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={handleOpenNewMessageThread}

@@ -35,6 +35,12 @@ import {
   VolumeXIcon,
   MusicNoteIcon,
   CopyIcon,
+  LockIcon,
+  BanIcon,
+  MapPinIcon,
+  CreditCardIcon,
+  RepeatIcon,
+  RefreshCwIcon,
 } from '../../ui/Icons';
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
@@ -259,15 +265,15 @@ function generateRecurringDates(
 
 function getDriverStatusEmoji(d: DriverRosterItem): string {
   const mapStatus = (d as any).mapStatus as string | undefined;
-  if (mapStatus === 'available') return '🟢';
-  if (mapStatus === 'en_route') return '🔵';
-  if (mapStatus === 'busy') return '🔴';
-  if (mapStatus === 'break') return '🟡';
-  if (mapStatus === 'offline') return '⚫';
-  if (d.status === 'available') return '🟢';
-  if (d.status === 'on_trip') return '🔵';
-  if (d.status === 'break') return '🟡';
-  return '⚫';
+  if (mapStatus === 'available') return '[Avail]';
+  if (mapStatus === 'en_route') return '[En Route]';
+  if (mapStatus === 'busy') return '[Busy]';
+  if (mapStatus === 'break') return '[Break]';
+  if (mapStatus === 'offline') return '[Off]';
+  if (d.status === 'available') return '[Avail]';
+  if (d.status === 'on_trip') return '[Busy]';
+  if (d.status === 'break') return '[Break]';
+  return '[Off]';
 }
 
 const DEFAULT_COMPANIES = ['Chesterfield Taxi', 'St. Louis Taxi', 'West County Express'];
@@ -3813,7 +3819,7 @@ function DispatchBookingEngineComponent({
         {isCompleted && (
           <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-              <span>🔒</span>
+              <LockIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
               <span>Completed Trip (Immutable Route Record)</span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-relaxed">
@@ -3825,7 +3831,7 @@ function DispatchBookingEngineComponent({
         {isCancelled && (
           <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 text-xs space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-rose-900">
-              <span>🚫</span>
+              <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
               <span>Cancelled Trip</span>
             </div>
             <p className="text-[11px] text-rose-800 leading-relaxed">
@@ -3839,7 +3845,7 @@ function DispatchBookingEngineComponent({
             ref={submitErrorRef}
             className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs font-semibold flex items-center gap-1.5"
           >
-            <span>⚠</span>
+            <AlertTriangleIcon className="w-3.5 h-3.5 text-red-600 shrink-0" />
             <span>{submitError}</span>
           </div>
         )}
@@ -4119,11 +4125,11 @@ function DispatchBookingEngineComponent({
                     <span>
                       {airportDetection.isPrivateAviation
                         ? (airportDetection.isPickupAirport
-                            ? `🛩️ ${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Arrival`
-                            : `🛩️ ${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Dropoff`)
+                            ? `${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Arrival`
+                            : `${airportDetection.airport?.iataCode || 'Private Airport'} Private Aviation Dropoff`)
                         : (airportDetection.isPickupAirport
-                            ? `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Arrival Details`
-                            : `✈️ ${airportDetection.airport?.iataCode || 'Airport'} Dropoff Details`)}
+                            ? `${airportDetection.airport?.iataCode || 'Airport'} Arrival Details`
+                            : `${airportDetection.airport?.iataCode || 'Airport'} Dropoff Details`)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -4140,10 +4146,15 @@ function DispatchBookingEngineComponent({
                           : (airportDetection.isPrivateAviation ? 'Provide Aviation Details' : 'Provide Airline')}
                       </span>
                     </label>
-                    <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold">
-                      {airportDetection.isPrivateAviation
-                        ? '🛩️ Private Aviation (FBO)'
-                        : (airportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing')}
+                    <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                      {airportDetection.isPrivateAviation ? (
+                        <>
+                          <PlaneIcon className="w-3 h-3 shrink-0" />
+                          <span>Private Aviation (FBO)</span>
+                        </>
+                      ) : (
+                        airportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing'
+                      )}
                     </span>
                   </div>
                 </div>
@@ -4407,10 +4418,11 @@ function DispatchBookingEngineComponent({
                           setPickupCoordinates(undefined);
                         }
                       }}
-                      className="max-w-full truncate px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 text-[10px] font-semibold border border-slate-200 transition-colors cursor-pointer"
+                      className="max-w-full inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 text-[10px] font-semibold border border-slate-200 transition-colors cursor-pointer"
                       title={addr}
                     >
-                      📍 {addr}
+                      <MapPinIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                      <span className="truncate">{addr}</span>
                     </button>
                   ))}
                 </div>
@@ -5035,24 +5047,26 @@ function DispatchBookingEngineComponent({
                 <button
                   type="button"
                   onClick={() => setCardPaymentType('terminal')}
-                  className={`py-1 text-center rounded text-[10.5px] font-bold transition-all ${
+                  className={`py-1 px-1.5 flex items-center justify-center gap-1 rounded text-[10.5px] font-bold transition-all ${
                     cardPaymentType === 'terminal' || cardPaymentType === 'payment_link'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-600'
                   }`}
                 >
-                  💳 Pay in Cab (Terminal)
+                  <CreditCardIcon className="w-3 h-3 shrink-0" />
+                  <span>Pay in Cab (Terminal)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setCardPaymentType('card_on_file')}
-                  className={`py-1 text-center rounded text-[10.5px] font-bold transition-all ${
+                  className={`py-1 px-1.5 flex items-center justify-center gap-1 rounded text-[10.5px] font-bold transition-all ${
                     cardPaymentType === 'card_on_file' || cardPaymentType === 'manual'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-600'
                   }`}
                 >
-                  🔒 Card On File Reference
+                  <LockIcon className="w-3 h-3 shrink-0" />
+                  <span>Card On File Reference</span>
                 </button>
               </div>
 
@@ -5382,7 +5396,7 @@ function DispatchBookingEngineComponent({
                 onChange={(e) => setDriverId(e.target.value)}
                 className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
               >
-                <option value="unassigned">⚠️ Unassigned</option>
+                <option value="unassigned">Unassigned</option>
                 {driverOptions.map((d) => (
                   <option
                     key={d.id}
@@ -5441,8 +5455,9 @@ function DispatchBookingEngineComponent({
                         {isReturnRide ? 'Return Leg (Round Trip)' : 'Outbound Leg (Round Trip)'}
                       </span>
                     </label>
-                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
-                      🔒 Linked Round-Trip
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 inline-flex items-center gap-1">
+                      <LockIcon className="w-3 h-3 shrink-0" />
+                      <span>Linked Round-Trip</span>
                     </span>
                   </div>
 
@@ -5490,8 +5505,9 @@ function DispatchBookingEngineComponent({
 
                   {returnTrip && (
                 <div className="mt-1.5 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg space-y-2.5">
-                  <div className="text-[10px] font-bold text-indigo-900 tracking-wide uppercase">
-                    🔁 RETURN LEG SPECIFICATIONS
+                  <div className="text-[10px] font-bold text-indigo-900 tracking-wide uppercase flex items-center gap-1">
+                    <RepeatIcon className="w-3 h-3 text-indigo-700 shrink-0" />
+                    <span>RETURN LEG SPECIFICATIONS</span>
                   </div>
 
                   {/* Return Route Locations - Identical layout to Outbound */}
@@ -5597,11 +5613,11 @@ function DispatchBookingEngineComponent({
                             <span>
                               {returnAirportDetection.isPrivateAviation
                                 ? (returnAirportDetection.isPickupAirport
-                                    ? `🛩️ ${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Arrival`
-                                    : `🛩️ ${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Dropoff`)
+                                    ? `${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Arrival`
+                                    : `${returnAirportDetection.airport?.iataCode || 'Private Airport'} Return Private Aviation Dropoff`)
                                 : (returnAirportDetection.isPickupAirport
-                                    ? `✈️ ${returnAirportDetection.airport?.iataCode || 'Airport'} Return Arrival Details`
-                                    : `✈️ ${returnAirportDetection.airport?.iataCode || 'Airport'} Return Dropoff Details`)}
+                                    ? `${returnAirportDetection.airport?.iataCode || 'Airport'} Return Arrival Details`
+                                    : `${returnAirportDetection.airport?.iataCode || 'Airport'} Return Dropoff Details`)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -5618,10 +5634,15 @@ function DispatchBookingEngineComponent({
                                   : (returnAirportDetection.isPrivateAviation ? 'Provide Aviation Details' : 'Provide Airline')}
                               </span>
                             </label>
-                            <span className="text-[10px] bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded font-bold">
-                              {returnAirportDetection.isPrivateAviation
-                                ? '🛩️ Private Aviation (FBO)'
-                                : (returnAirportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing')}
+                            <span className="text-[10px] bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                              {returnAirportDetection.isPrivateAviation ? (
+                                <>
+                                  <PlaneIcon className="w-3 h-3 shrink-0" />
+                                  <span>Private Aviation (FBO)</span>
+                                </>
+                              ) : (
+                                returnAirportDetection.isPickupAirport ? 'Arrival Tracking' : 'Terminal Routing'
+                              )}
                             </span>
                           </div>
                         </div>
@@ -5994,7 +6015,10 @@ function DispatchBookingEngineComponent({
               {repeat && (
                 <div className="mt-1.5 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2">
                   <div className="text-[10px] font-bold text-emerald-900 flex items-center justify-between">
-                    <span>🔄 RECURRING SCHEDULE</span>
+                    <span className="inline-flex items-center gap-1">
+                      <RefreshCwIcon className="w-3 h-3 text-emerald-700 shrink-0" />
+                      <span>RECURRING SCHEDULE</span>
+                    </span>
                     {returnTrip && (
                       <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">
                         Repeats Round Trip

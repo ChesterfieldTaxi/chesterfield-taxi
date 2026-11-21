@@ -48,6 +48,21 @@ import {
   AlertTriangleIcon,
   CheckIcon,
   CopyIcon,
+  FlagIcon,
+  GlobeIcon,
+  StarIcon,
+  BanIcon,
+  PlaneIcon,
+  LuggageIcon,
+  InfoIcon,
+  VolumeXIcon,
+  ClockIcon,
+  SparklesIcon,
+  AlertCircleIcon,
+  DollarSignIcon,
+  CreditCardIcon,
+  CashIcon,
+  BuildingIcon,
 } from '../components/ui/Icons';
 import { Badge } from '../components/ui/Badge';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
@@ -96,6 +111,8 @@ interface DraftTab {
 }
 
 const DISPATCH_TABS_STORAGE_KEY = 'ct_dispatch_open_tabs_v1';
+const MOBILE_TAB_STORAGE_KEY = 'ct_dispatch_mobile_tab_v1';
+const VALID_MOBILE_TABS = new Set(['booking', 'queue', 'map', 'messages', 'phone', 'drivers', 'comms', 'email']);
 const SIDEBAR_WIDTH_STORAGE_KEY = 'ct_dispatch_sidebar_width';
 const QUEUE_HEIGHT_STORAGE_KEY = 'ct_dispatch_queue_height';
 const DOCK_WIDTH_STORAGE_KEY = 'ct_dispatch_dock_width';
@@ -115,6 +132,7 @@ interface TripActionDropdownProps {
   onAudit: () => void;
   onClone: () => void;
   onFocusMap: () => void;
+  onCompleteTrip?: () => void;
   onCancelTrip?: () => void;
   onReactivateTrip?: () => void;
 }
@@ -132,6 +150,7 @@ function TripActionDropdown({
   onAudit,
   onClone,
   onFocusMap,
+  onCompleteTrip,
   onCancelTrip,
   onReactivateTrip,
 }: TripActionDropdownProps) {
@@ -265,6 +284,8 @@ function TripActionDropdown({
           }}
           className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl">
             <span className="font-mono text-slate-600">Trip #{trip.id.slice(0, 8)}</span>
@@ -366,6 +387,19 @@ function TripActionDropdown({
 
           {!isCompleted && (
             <div className="py-1">
+              {!isCancelled && onCompleteTrip && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onCompleteTrip();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                >
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Complete Trip</span>
+                </button>
+              )}
               {isCancelled ? (
                 onReactivateTrip && (
                   <button
@@ -390,7 +424,7 @@ function TripActionDropdown({
                     }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
                   >
-                    <span>✕</span>
+                    <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                     <span>Cancel Trip</span>
                   </button>
                 )
@@ -582,45 +616,18 @@ export default function DispatchRoute() {
     });
   }, []);
 
-  // Draft Tabs state — persisted across page reloads so dispatchers never lose open drafts or edit tabs
+  // Draft Tabs & Mobile Tab state — restored safely on client mount so SSR never clobbers saved tabs or booking drafts
   const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
-  const loadPersistedTabs = (): { drafts: DraftTab[]; activeDraftId: string; nextDraftIdx: number } => {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem(DISPATCH_TABS_STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed?.drafts) && parsed.drafts.length > 0) {
-            const restored: DraftTab[] = parsed.drafts.slice(0, maxDrafts).map((item: any) => ({
-              id: String(item.id),
-              isNew: Boolean(item.isNew),
-              tripId: item.tripId ? String(item.tripId) : undefined,
-            }));
-            const validActive = restored.some((d) => d.id === parsed.activeDraftId)
-              ? parsed.activeDraftId
-              : restored[0].id;
-            const nextIdx =
-              typeof parsed.nextDraftIdx === 'number' && parsed.nextDraftIdx >= 2
-                ? parsed.nextDraftIdx
-                : restored.length + 2;
-            return { drafts: restored, activeDraftId: validActive, nextDraftIdx: nextIdx };
-          }
-        }
-      } catch {}
-    }
-    return { drafts: [{ id: 'new-1', isNew: true }], activeDraftId: 'new-1', nextDraftIdx: 2 };
-  };
-
-  const initialTabsState = useMemo(() => loadPersistedTabs(), []);
-  const [drafts, setDrafts] = useState<DraftTab[]>(initialTabsState.drafts);
-  const [activeDraftId, setActiveDraftId] = useState<string>(initialTabsState.activeDraftId);
-  const [nextDraftIdx, setNextDraftIdx] = useState<number>(initialTabsState.nextDraftIdx);
+  const hasHydratedClientTabsRef = useRef(false);
+  const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', isNew: true }]);
+  const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
+  const [nextDraftIdx, setNextDraftIdx] = useState<number>(2);
   const [isTabOverflowOpen, setIsTabOverflowOpen] = useState(false);
   const tabOverflowRef = useRef<HTMLDivElement>(null);
 
-  // Persist open tabs metadata cleanly whenever tabs/active tab change
+  // Persist open tabs metadata cleanly only after client hydration restores saved tabs
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !hasHydratedClientTabsRef.current) return;
     try {
       const serializable = {
         drafts: drafts.map((d) => ({
@@ -656,8 +663,18 @@ export default function DispatchRoute() {
 
   // Operational Right Dock Tools (Unified Dock: Main / Phone / Email / Drivers)
   const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
-  const [commsInitialTab, setCommsInitialTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('phone');
-  const [commsActiveTab, setCommsActiveTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('phone');
+  const [commsInitialTab, setCommsInitialTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('all');
+  const [commsActiveTab, setCommsActiveTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('all');
+
+  // Dispatch Console Complete Trip & Manual Status Override state
+  const [completeTripTarget, setCompleteTripTarget] = useState<Trip | null>(null);
+  const [completeFareInput, setCompleteFareInput] = useState<string>('');
+  const [completeTipInput, setCompleteTipInput] = useState<string>('0.00');
+  const [completePaymentMethod, setCompletePaymentMethod] = useState<'cash' | 'card_terminal' | 'card_on_file' | 'corporate_account'>('cash');
+  const [completeSendReceipt, setCompleteSendReceipt] = useState<boolean>(true);
+  const [completeNotes, setCompleteNotes] = useState<string>('');
+  const [isCompletingTrip, setIsCompletingTrip] = useState<boolean>(false);
+  const [isOverridingStatus, setIsOverridingStatus] = useState<boolean>(false);
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -722,15 +739,15 @@ export default function DispatchRoute() {
   const getDriverDropdownDot = (d: LiveFleetDriver) => {
     switch (d.mapStatus) {
       case 'available':
-        return '🟢';
+        return '[Avail]';
       case 'en_route':
-        return '🔵';
+        return '[En Route]';
       case 'busy':
-        return '🔴';
+        return '[Busy]';
       case 'break':
-        return '🟡';
+        return '[Break]';
       default:
-        return '⚫';
+        return '[Off]';
     }
   };
 
@@ -955,10 +972,86 @@ export default function DispatchRoute() {
   const [displayLayout, setDisplayLayout] = useDisplayLayout('ct_dispatch_layout', 'table');
   const [workspaceLayout, setWorkspaceLayout] = useState<'compact' | 'split' | 'popout'>('compact');
   const [activeMobileTab, setActiveMobileTab] = useState<
-    'booking' | 'queue' | 'map' | 'messages' | 'phone' | 'drivers' | 'comms'
+    'booking' | 'queue' | 'map' | 'messages' | 'phone' | 'drivers' | 'comms' | 'email'
   >('queue');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [openTripActionId, setOpenTripActionId] = useState<string | null>(null);
+
+  // Client-only hydration for open tabs & mobile tab so page refresh preserves exact mobile workspace & unsaved booking work
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawTabs = localStorage.getItem(DISPATCH_TABS_STORAGE_KEY);
+      if (rawTabs) {
+        const parsed = JSON.parse(rawTabs);
+        if (Array.isArray(parsed?.drafts) && parsed.drafts.length > 0) {
+          const restored: DraftTab[] = parsed.drafts.slice(0, maxDrafts).map((item: any) => ({
+            id: String(item.id),
+            isNew: Boolean(item.isNew),
+            tripId: item.tripId ? String(item.tripId) : undefined,
+          }));
+          const validActive = restored.some((d) => d.id === parsed.activeDraftId)
+            ? parsed.activeDraftId
+            : restored[0].id;
+          const nextIdx =
+            typeof parsed.nextDraftIdx === 'number' && parsed.nextDraftIdx >= 2
+              ? parsed.nextDraftIdx
+              : restored.length + 2;
+          setDrafts(restored);
+          setActiveDraftId(validActive);
+          setNextDraftIdx(nextIdx);
+        }
+      }
+      if (!urlTripId) {
+        const savedMobileTab = localStorage.getItem(MOBILE_TAB_STORAGE_KEY);
+        if (savedMobileTab && VALID_MOBILE_TABS.has(savedMobileTab)) {
+          setActiveMobileTab(savedMobileTab as any);
+        }
+      }
+    } catch {}
+    hasHydratedClientTabsRef.current = true;
+  }, [maxDrafts, urlTripId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasHydratedClientTabsRef.current) return;
+    try {
+      localStorage.setItem(MOBILE_TAB_STORAGE_KEY, activeMobileTab);
+    } catch {}
+  }, [activeMobileTab]);
+
+  // Indicator dot on Mobile Booking tab whenever any open draft or edit tab has work in progress
+  const hasUnsavedDraftWork = useMemo(() => {
+    return drafts.some((d) => {
+      if (!d.isNew) return true;
+      if (
+        d.formValues?.pickupAddress?.trim() ||
+        d.formValues?.dropoffAddress?.trim() ||
+        d.formValues?.passengerName?.trim() ||
+        d.formValues?.phone?.trim() ||
+        d.formValues?.email?.trim()
+      ) {
+        return true;
+      }
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(`chesterfield_dispatch_draft_${d.id}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (
+              parsed?.pickupAddress?.trim() ||
+              parsed?.dropoffAddress?.trim() ||
+              parsed?.passengerName?.trim() ||
+              parsed?.phone?.trim() ||
+              parsed?.email?.trim()
+            ) {
+              return true;
+            }
+          }
+        } catch {}
+      }
+      return false;
+    });
+  }, [drafts]);
 
   // Dynamic height balance when panels change or keyboard toggles to guarantee NO sidebar container overflow
   const activeOperationalCount = activeDockTab === 'none' ? 0 : 1;
@@ -1083,7 +1176,8 @@ export default function DispatchRoute() {
         const key = e.key.toLowerCase();
         if (key === 'p' || key === 'c') {
           e.preventDefault();
-          setCommsInitialTab('phone');
+          setCommsInitialTab('all');
+          setCommsActiveTab('all');
           setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
         } else if (key === 'e') {
           e.preventDefault();
@@ -1112,7 +1206,8 @@ export default function DispatchRoute() {
       } else if (e.key === 'm' || e.key === 'M') {
         setActiveDockTab('none');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'c' || e.key === 'C') {
-        setCommsInitialTab('phone');
+        setCommsInitialTab('all');
+        setCommsActiveTab('all');
         setActiveDockTab((prev) => (prev === 'phone' || prev === 'comms' ? 'none' : 'phone'));
       } else if (e.key === 'e' || e.key === 'E') {
         setActiveDockTab((prev) => (prev === 'email' ? 'none' : 'email'));
@@ -2436,8 +2531,223 @@ export default function DispatchRoute() {
         await bookingService.updateTrip(trip.id, { status: 'pending' });
       }
       setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, status: 'pending' as TripStatus } : t)));
+      setReviewTrip((prev) => (prev && prev.id === trip.id ? { ...prev, status: 'pending' as TripStatus } : prev));
+      showDispatchToast(`Trip #${trip.id.slice(-6).toUpperCase()} reactivated to Pending.`, 'success');
     } catch (err) {
       console.error('Failed to reactivate trip:', err);
+      showDispatchToast('Failed to reactivate trip.', 'error');
+    }
+  };
+
+  const handleOpenCompleteTripModal = (trip: Trip) => {
+    setCompleteTripTarget(trip);
+    setCompleteFareInput((trip.pricing?.totalFare ?? 0).toFixed(2));
+    setCompleteTipInput((trip.payment?.tipAmount ?? 0).toFixed(2));
+    const rawMethod = trip.payment?.method;
+    if (rawMethod === 'corporate' || rawMethod === 'account') {
+      setCompletePaymentMethod('corporate_account');
+    } else if (rawMethod === 'card') {
+      setCompletePaymentMethod('card_terminal');
+    } else {
+      setCompletePaymentMethod('cash');
+    }
+    const autoReceipts = settings.billingSettings?.autoEmailReceipts !== false;
+    setCompleteSendReceipt(Boolean(trip.passenger?.email) && autoReceipts);
+    setCompleteNotes('');
+  };
+
+  const handleDispatchCompleteTrip = async () => {
+    if (!completeTripTarget) return;
+    const subtotalFare = Math.max(0, Number.parseFloat(completeFareInput) || 0);
+    const tipAmount = Math.max(0, Number.parseFloat(completeTipInput) || 0);
+    const grandTotal = Number((subtotalFare + tipAmount).toFixed(2));
+    const trip = completeTripTarget;
+    const nowIso = new Date().toISOString();
+    const mappedPaymentMethod: 'cash' | 'card' | 'corporate' =
+      completePaymentMethod === 'corporate_account'
+        ? 'corporate'
+        : completePaymentMethod === 'cash'
+        ? 'cash'
+        : 'card';
+    const paymentStatus: 'paid' | 'pending' =
+      completePaymentMethod === 'corporate_account' ? 'pending' : 'paid';
+
+    setIsCompletingTrip(true);
+    const bookingService = getBookingService();
+    try {
+      const updatedPricing = {
+        ...(trip.pricing || {
+          baseFare: subtotalFare,
+          distanceFare: 0,
+          timeFare: 0,
+          surcharges: 0,
+          distanceMiles: 0,
+          durationMinutes: 0,
+          currency: 'USD',
+        }),
+        totalFare: subtotalFare,
+      };
+      const updatedPayment = {
+        ...(trip.payment || {}),
+        method: mappedPaymentMethod,
+        status: paymentStatus,
+        amount: grandTotal,
+        tipAmount,
+        paidAt: nowIso,
+      };
+      const updatedMetadata = {
+        ...(trip.metadata || {}),
+        completedByDispatcher: user?.email || 'Dispatcher',
+        dispatchCompletionPaymentType: completePaymentMethod,
+        ...(completeNotes.trim() ? { dispatchCompletionNotes: completeNotes.trim() } : {}),
+      };
+
+      if (bookingService.updateTrip) {
+        await bookingService.updateTrip(trip.id, {
+          pricing: updatedPricing,
+          payment: updatedPayment,
+          completedAt: nowIso,
+          metadata: updatedMetadata,
+        } as any);
+      }
+
+      if (bookingService.updateTripStatus) {
+        const actorLabel = user?.email || 'Dispatcher';
+        await bookingService.updateTripStatus(trip.id, 'completed', {
+          actorRole: 'admin',
+          reason: completeNotes.trim()
+            ? `Completed via Dispatch Console (${actorLabel}): ${completeNotes.trim()}`
+            : `Completed manually via Dispatch Console (${actorLabel})`,
+        });
+      } else if (bookingService.updateTrip) {
+        await bookingService.updateTrip(trip.id, { status: 'completed' });
+      }
+
+      // Close masked telephony proxy if active
+      getTelephonyService()
+        .closeMaskedSession(trip.id)
+        .catch(() => {});
+
+      // Send official itemized receipt email if toggled and passenger has email
+      let receiptDispatched = false;
+      if (completeSendReceipt && trip.passenger?.email) {
+        const meta = updatedMetadata as Record<string, any>;
+        const assignedDriver = trip.assignedDriverId
+          ? drivers.find((d) => d.id === trip.assignedDriverId)
+          : undefined;
+        await getEmailDispatchService()
+          .sendTripReceipt({
+            tripId: trip.id,
+            completedAt: new Date(nowIso).toLocaleString(),
+            passenger: {
+              firstName: trip.passenger.firstName,
+              lastName: trip.passenger.lastName,
+              email: trip.passenger.email,
+              phone: trip.passenger.phone,
+            },
+            pickupAddress: trip.pickupLocation?.address || '',
+            intermediateStops: trip.intermediateStops?.map((s) => ({ address: s.address })),
+            dropoffAddress: trip.dropoffLocation?.address || '',
+            pickupTime:
+              trip.actualPickupTime || trip.scheduledPickupTime
+                ? new Date(trip.actualPickupTime || trip.scheduledPickupTime!).toLocaleString()
+                : new Date(trip.createdAt).toLocaleString(),
+            vehicleTier: trip.vehicleTier,
+            vehicleDisplayName:
+              (typeof meta.vehicleDisplayName === 'string' && meta.vehicleDisplayName) ||
+              formatVehicleTierDisplay(
+                (meta.vehicleTypeId as string) || trip.vehicleTier,
+                settings.vehicles,
+                meta.vehicleDisplayName
+              ),
+            driverName:
+              assignedDriver?.name ||
+              (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName) ||
+              'Chesterfield Chauffeur',
+            vehicleUnit: assignedDriver?.cabNumber,
+            distanceMiles: updatedPricing.distanceMiles,
+            durationMinutes: updatedPricing.durationMinutes,
+            subtotalFare,
+            tipAmount,
+            grandTotal,
+            currency: updatedPricing.currency || 'USD',
+            breakdown: updatedPricing.breakdown,
+            paymentMethod: completePaymentMethod,
+            cardLast4: trip.payment?.cardLast4,
+            paymentStatus:
+              completePaymentMethod === 'corporate_account' ? 'corporate_direct_bill' : 'paid',
+            corporateAccountName: meta.corporateDetails?.corporateAccount || meta.corporateOrgName,
+            poNumber: meta.corporateDetails?.billingPo || meta.billingPo,
+            companySettings: {
+              name: settings.company?.name,
+              phone: settings.company?.phone,
+              address: settings.company?.address,
+              email: settings.company?.email,
+            },
+          })
+          .then(() => {
+            receiptDispatched = true;
+          })
+          .catch((emailErr) => {
+            console.warn('[Dispatch] Receipt email failed:', emailErr);
+          });
+      }
+
+      const nextTripPatch: Partial<Trip> = {
+        status: 'completed',
+        pricing: updatedPricing,
+        payment: updatedPayment as any,
+        completedAt: nowIso,
+        metadata: updatedMetadata,
+      };
+      setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, ...nextTripPatch } : t)));
+      setReviewTrip((prev) => (prev && prev.id === trip.id ? { ...prev, ...nextTripPatch } : prev));
+      setCompleteTripTarget(null);
+      showDispatchToast(
+        `Trip #${trip.id.slice(-6).toUpperCase()} completed ($${grandTotal.toFixed(2)})${
+          receiptDispatched ? ' · Receipt emailed' : ''
+        }.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to complete trip from dispatch console:', err);
+      showDispatchToast('Failed to complete trip. Please try again.', 'error');
+    } finally {
+      setIsCompletingTrip(false);
+    }
+  };
+
+  const handleManualStatusOverride = async (trip: Trip, nextStatus: TripStatus) => {
+    if (trip.status === nextStatus) return;
+    if (nextStatus === 'completed') {
+      handleOpenCompleteTripModal(trip);
+      return;
+    }
+    if (nextStatus === 'cancelled') {
+      handlePromptCancelTrip(trip);
+      return;
+    }
+    setIsOverridingStatus(true);
+    const bookingService = getBookingService();
+    try {
+      if (bookingService.updateTripStatus) {
+        const actorLabel = user?.email || 'Dispatcher';
+        await bookingService.updateTripStatus(trip.id, nextStatus, {
+          actorRole: 'admin',
+          reason: `Manual status override by ${actorLabel} (${trip.status} -> ${nextStatus})`,
+        });
+      } else if (bookingService.updateTrip) {
+        await bookingService.updateTrip(trip.id, { status: nextStatus });
+      }
+      setTrips((prev) => prev.map((t) => (t.id === trip.id ? { ...t, status: nextStatus } : t)));
+      setReviewTrip((prev) => (prev && prev.id === trip.id ? { ...prev, status: nextStatus } : prev));
+      const pretty = nextStatus.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      showDispatchToast(`Trip #${trip.id.slice(-6).toUpperCase()} status set to ${pretty}.`, 'success');
+    } catch (err) {
+      console.error('Manual status override failed:', err);
+      showDispatchToast('Failed to update trip status.', 'error');
+    } finally {
+      setIsOverridingStatus(false);
     }
   };
 
@@ -2599,6 +2909,9 @@ export default function DispatchRoute() {
     };
     setDrafts((prev) => [...prev, newDraft]);
     setActiveDraftId(newId);
+    setReviewTrip(null);
+    setActiveMobileTab('booking');
+    showDispatchToast('Trip copied to new booking tab.', 'info');
   };
 
   // Close draft (cleans up its cached localStorage draft so stale data never resurfaces)
@@ -2679,17 +2992,17 @@ export default function DispatchRoute() {
       timingType: trip.scheduledPickupTime ? 'later' : 'asap',
       scheduledDate: formatLocalDateStr(pickupDate),
       scheduledTime: `${hh}:${mm}`,
-      pickupAddress: trip.pickupLocation.address,
-      pickupCoordinates: trip.pickupLocation.coordinates,
-      dropoffAddress: trip.dropoffLocation.address,
-      dropoffCoordinates: trip.dropoffLocation.coordinates,
+      pickupAddress: trip.pickupLocation?.address || '',
+      pickupCoordinates: trip.pickupLocation?.coordinates,
+      dropoffAddress: trip.dropoffLocation?.address || '',
+      dropoffCoordinates: trip.dropoffLocation?.coordinates,
       intermediateStops: (trip.intermediateStops || []).map((s) => ({
         address: s.address,
         coordinates: s.coordinates,
       })),
-      passengerName: `${trip.passenger.firstName} ${trip.passenger.lastName}`.trim(),
-      phone: trip.passenger.phone || '',
-      email: trip.passenger.email || '',
+      passengerName: `${trip.passenger?.firstName || ''} ${trip.passenger?.lastName || ''}`.trim(),
+      phone: trip.passenger?.phone || '',
+      email: trip.passenger?.email || '',
       additionalPassengers: Array.isArray(meta.additionalPassengers) ? meta.additionalPassengers : [],
       contactPerson: meta.contactPerson || {
         isBookerDifferent: false,
@@ -2698,8 +3011,8 @@ export default function DispatchRoute() {
         contactEmail: '',
         contactRole: '',
       },
-      passengers: trip.passenger.passengerCount || 1,
-      bags: trip.passenger.luggageCount || 0,
+      passengers: trip.passenger?.passengerCount || 1,
+      bags: trip.passenger?.luggageCount || 0,
       carSeats: Boolean(
         meta.carSeatsBreakdown &&
           ((meta.carSeatsBreakdown.rearFacing || 0) +
@@ -3337,7 +3650,8 @@ export default function DispatchRoute() {
       case 'en_route':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
-            🚗 En Route
+            <CarIcon className="w-3 h-3 text-blue-700 shrink-0" />
+            <span>En Route</span>
           </span>
         );
       case 'arrived':
@@ -3351,7 +3665,8 @@ export default function DispatchRoute() {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400 animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            ⏱️ In Progress
+            <ClockIcon className="w-3 h-3 text-emerald-700 shrink-0" />
+            <span>In Progress</span>
           </span>
         );
       case 'completed':
@@ -3424,11 +3739,13 @@ export default function DispatchRoute() {
     const linkedTrip = panelCallbacksRef.current.trips.find((t) => t.id === linkedTripId);
     if (linkedTrip) {
       panelCallbacksRef.current.handleOpenEditTrip(linkedTrip);
+      setActiveMobileTab('booking');
     } else {
       try {
         const statusRes = await getBookingService().getBookingStatus(linkedTripId);
         if (statusRes?.trip) {
           panelCallbacksRef.current.handleOpenEditTrip(statusRes.trip);
+          setActiveMobileTab('booking');
         }
       } catch (err) {
         console.error('Failed to load linked trip:', err);
@@ -3477,6 +3794,7 @@ export default function DispatchRoute() {
     }
   }, []);
   const stableCommsPopulateBooking = useCallback((payload: any) => {
+    setActiveMobileTab('booking');
     setDrafts((prev) => {
       const target = prev.find((d) => d.id === panelCallbacksRef.current.activeDraftId) || prev[0];
       if (!target) return prev;
@@ -3616,8 +3934,8 @@ export default function DispatchRoute() {
                 if (activeDockTab === 'phone' || activeDockTab === 'comms') {
                   setActiveDockTab('none');
                 } else {
-                  setCommsActiveTab('phone');
-                  setCommsInitialTab('phone');
+                  setCommsActiveTab('all');
+                  setCommsInitialTab('all');
                   setActiveDockTab('phone');
                 }
               }}
@@ -3712,20 +4030,14 @@ export default function DispatchRoute() {
             missedCallsCount={missedCallsCount}
             hideIdleButtonOnDesktop={true}
             isPhoneDockActive={
-              activeDockTab !== 'none' &&
-              (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-              commsActiveTab === 'phone'
+              activeDockTab === 'phone' || activeDockTab === 'comms'
             }
             onTogglePhoneDock={() => {
-              if (
-                activeDockTab !== 'none' &&
-                (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-                commsActiveTab === 'phone'
-              ) {
+              if (activeDockTab === 'phone' || activeDockTab === 'comms') {
                 setActiveDockTab('none');
               } else {
-                setCommsActiveTab('phone');
-                setCommsInitialTab('phone');
+                setCommsActiveTab('all');
+                setCommsInitialTab('all');
                 setActiveDockTab('phone');
                 setActiveMobileTab('comms');
               }
@@ -3909,7 +4221,8 @@ export default function DispatchRoute() {
                 {/* Quick Toolbar: Auto-Dismiss selector & Mark Read */}
                 <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[10px] text-slate-600">
                   <div className="flex items-center gap-1">
-                    <span>⏳ Auto-dismiss:</span>
+                    <ClockIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>Auto-dismiss:</span>
                     <select
                       value={alertDismissMinutes}
                       onChange={(e) => handleUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
@@ -4020,9 +4333,9 @@ export default function DispatchRoute() {
             aria-label="Sound Notification Toggle"
           >
             {isSoundMuted ? (
-              <span className="text-base select-none leading-none" role="img" aria-label="Muted">🔇</span>
+              <VolumeXIcon className="w-4 h-4 shrink-0" />
             ) : (
-              <span className="text-base select-none leading-none" role="img" aria-label="Sound Active">🔊</span>
+              <BellIcon className="w-4 h-4 shrink-0" />
             )}
             {!isSoundMuted && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
@@ -4139,10 +4452,11 @@ export default function DispatchRoute() {
               <button
                 type="button"
                 onClick={() => setIsMobileDrawerOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold cursor-pointer transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
                 title="Close drawer"
+                aria-label="Close navigation drawer"
               >
-                ✕
+                <XIcon className="w-4 h-4" />
               </button>
             </div>
 
@@ -4152,7 +4466,7 @@ export default function DispatchRoute() {
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
                   Operations
                 </span>
-                <span className="text-[10px] text-blue-400 font-bold">Detachable</span>
+                <span className="hidden lg:inline text-[10px] text-blue-400 font-bold">Detachable</span>
               </div>
 
               {/* Main Console */}
@@ -4164,7 +4478,7 @@ export default function DispatchRoute() {
                   setIsMobileDrawerOpen(false);
                 }}
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeDockTab === 'none'
+                  (isDesktop ? activeDockTab === 'none' : activeMobileTab === 'queue' || activeMobileTab === 'booking' || activeMobileTab === 'map')
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                 }`}
@@ -4176,18 +4490,19 @@ export default function DispatchRoute() {
                 <span className="text-[10px] opacity-80 font-bold">Booking • Map • Trips</span>
               </button>
 
-              {/* Phone Hub (Calls & SMS) with Pop-Out */}
+              {/* Phone Hub (Calls & SMS) with Desktop Pop-Out */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
-                    setCommsInitialTab('phone');
+                    setCommsInitialTab('all');
+                    setCommsActiveTab('all');
                     setActiveDockTab('phone');
                     setActiveMobileTab('comms');
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    (activeDockTab !== 'none' ? (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) : activeMobileTab === 'comms')
+                    (isDesktop ? (activeDockTab === 'phone' || activeDockTab === 'comms') : (activeMobileTab === 'comms' || activeMobileTab === 'phone' || activeMobileTab === 'messages'))
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
@@ -4198,7 +4513,7 @@ export default function DispatchRoute() {
                   </div>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      (activeDockTab !== 'none' ? (activeDockTab === 'phone' || (activeDockTab === 'comms' && commsInitialTab === 'phone')) : activeMobileTab === 'comms')
+                      (isDesktop ? (activeDockTab === 'phone' || activeDockTab === 'comms') : (activeMobileTab === 'comms' || activeMobileTab === 'phone' || activeMobileTab === 'messages'))
                         ? 'bg-white/20 text-white'
                         : 'bg-slate-800 text-slate-300 border border-slate-700'
                     }`}
@@ -4210,22 +4525,23 @@ export default function DispatchRoute() {
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('comms')}
                   title="Pop out Phone Hub to detached window"
-                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
               </div>
 
-              {/* Email Console with Pop-Out */}
+              {/* Email Console with Desktop Pop-Out */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
                     setActiveDockTab('email');
+                    setActiveMobileTab('email');
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    activeDockTab === 'email'
+                    (isDesktop ? activeDockTab === 'email' : activeMobileTab === 'email')
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
@@ -4236,7 +4552,7 @@ export default function DispatchRoute() {
                   </div>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      activeDockTab === 'email'
+                      (isDesktop ? activeDockTab === 'email' : activeMobileTab === 'email')
                         ? 'bg-white/20 text-white'
                         : 'bg-slate-800 text-slate-300 border border-slate-700'
                     }`}
@@ -4248,13 +4564,13 @@ export default function DispatchRoute() {
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('email')}
                   title="Pop out Email Console to detached window"
-                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
               </div>
 
-              {/* Drivers Roster with Pop-Out */}
+              {/* Drivers Roster with Desktop Pop-Out */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -4264,7 +4580,7 @@ export default function DispatchRoute() {
                     setIsMobileDrawerOpen(false);
                   }}
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    (activeDockTab !== 'none' ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
+                    (isDesktop ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
                   }`}
@@ -4275,7 +4591,7 @@ export default function DispatchRoute() {
                   </div>
                   <span
                     className={`text-[11px] font-bold ${
-                      (activeDockTab !== 'none' ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
+                      (isDesktop ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
                         ? 'text-white'
                         : 'text-slate-300'
                     }`}
@@ -4287,7 +4603,7 @@ export default function DispatchRoute() {
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('drivers')}
                   title="Pop out Drivers to detached window"
-                  className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -4297,7 +4613,11 @@ export default function DispatchRoute() {
               <button
                 type="button"
                 onClick={() => {
-                  setActiveDockTab('alerts');
+                  if (isDesktop) {
+                    setActiveDockTab('alerts');
+                  } else {
+                    setShowAlertsDropdown(true);
+                  }
                   setIsMobileDrawerOpen(false);
                 }}
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -4318,8 +4638,8 @@ export default function DispatchRoute() {
               </button>
             </div>
 
-            {/* Workspace Layout Preferences */}
-            <div className="py-3 border-b border-slate-800/80 space-y-2">
+            {/* Workspace Layout Preferences (Desktop Only — multi-pane dock & detached windows) */}
+            <div className="hidden lg:block py-3 border-b border-slate-800/80 space-y-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
                 Workspace Workflow Layout
               </span>
@@ -4385,7 +4705,7 @@ export default function DispatchRoute() {
                 onClick={() => setIsMobileDrawerOpen(false)}
               >
                 <span className="flex items-center gap-2">
-                  <span>👑</span>
+                  <ShieldCheckIcon className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Admin Console</span>
                 </span>
                 <span className="text-slate-500">→</span>
@@ -4398,7 +4718,7 @@ export default function DispatchRoute() {
                 onClick={() => setIsMobileDrawerOpen(false)}
               >
                 <span className="flex items-center gap-2">
-                  <span>🌐</span>
+                  <GlobeIcon className="w-4 h-4 text-blue-400 shrink-0" />
                   <span>Public Live Site</span>
                 </span>
                 <span className="text-slate-500">↗</span>
@@ -4538,7 +4858,11 @@ export default function DispatchRoute() {
                           }}
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm">{d.isNew ? '📝' : '✎'}</span>
+                            {d.isNew ? (
+                              <DocumentTextIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            ) : (
+                              <PencilIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            )}
                             <div className="min-w-0">
                               <div className="font-semibold truncate text-xs flex items-center gap-1.5">
                                 <span>{label}</span>
@@ -4758,7 +5082,7 @@ export default function DispatchRoute() {
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className={`h-7 pl-2 pr-6 bg-white border rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer max-w-[110px] sm:max-w-[140px] md:max-w-[170px] truncate ${
+                        className={`h-7 pl-2 pr-6 bg-white border rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer max-w-[125px] sm:max-w-[155px] md:max-w-[180px] truncate ${
                           statusFilter.toLowerCase() === 'unconfirmed'
                             ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold ring-1 ring-amber-300'
                             : unconfirmedCount > 0 && statusFilter === 'all'
@@ -4767,10 +5091,10 @@ export default function DispatchRoute() {
                         }`}
                       >
                         <option value="all">
-                          {unconfirmedCount > 0 ? `Status: All (${unconfirmedCount} unconfirmed)` : 'Status: All ▾'}
+                          {unconfirmedCount > 0 ? `All (${unconfirmedCount} new)` : 'All Status'}
                         </option>
                         <option value="unconfirmed">
-                          ⚡ Unconfirmed ({unconfirmedCount})
+                          Unconfirmed ({unconfirmedCount})
                         </option>
                         <option value="confirmed">Confirmed</option>
                         <option value="pending">Pending</option>
@@ -4989,60 +5313,8 @@ export default function DispatchRoute() {
                     </div>
                   </div>
 
-                  {/* Right Side: Selection Badge, Mobile Filter Toggle, Queue Layout Dropdown, Search Magnifier */}
+                  {/* Right Side: Mobile Filter Toggle, Desktop Queue Layout Dropdown, Search Magnifier */}
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    {selectedTripIds.length > 0 && (
-                      <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-900 text-white px-2 py-1 rounded-xl text-xs font-semibold shadow-md shrink-0 animate-in fade-in zoom-in-95 duration-100">
-                        <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 shrink-0">
-                          ✓ {selectedTripIds.length} <span className="hidden sm:inline">Selected</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleBatchConfirmTrips}
-                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                          title="Confirm all selected trips"
-                        >
-                          <BoltIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Confirm</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleBatchAssignDriver}
-                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                          title="Assign driver to selected trip"
-                        >
-                          <UsersIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Assign</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleBatchExportCsv}
-                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                          title="Export selected trips as CSV"
-                        >
-                          <DocumentTextIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Export</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleBatchCancelTrips}
-                          className="px-2 py-0.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                          title="Cancel selected trips"
-                        >
-                          <span>🚫</span>
-                          <span className="hidden sm:inline">Cancel</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTripIds([])}
-                          className="p-1 text-slate-400 hover:text-white rounded-md cursor-pointer ml-0.5 shrink-0"
-                          title="Clear selection"
-                        >
-                          <XIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-
                     {/* Mobile Filters Toggle Button */}
                     <button
                       type="button"
@@ -5062,8 +5334,8 @@ export default function DispatchRoute() {
                       )}
                     </button>
 
-                    {/* Queue Display Layout Dropdown */}
-                    <div className="relative shrink-0" ref={layoutDropdownRef}>
+                    {/* Queue Display Layout Dropdown (Desktop Only — Mobile always uses Cards view) */}
+                    <div className="hidden lg:block relative shrink-0" ref={layoutDropdownRef}>
                       <button
                         type="button"
                         onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
@@ -5394,9 +5666,76 @@ export default function DispatchRoute() {
               </div>
             )}
 
-            {/* ─── Queue Content (Cards vs Compact vs Table) ─── */}
-            {displayLayout === 'cards' ? (
-              <div className="flex-1 overflow-auto p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 bg-slate-50/50">
+            {/* ─── Dedicated Batch Selection Actions Bar (Never overlaps Date/Status filters) ─── */}
+            {selectedTripIds.length > 0 && (
+              <div className="px-3 py-2 bg-slate-900 text-white border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold shrink-0 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="flex items-center gap-2">
+                  <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 shrink-0">
+                    <CheckIcon className="w-3 h-3 shrink-0" />
+                    <span>{selectedTripIds.length} Selected</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    className="text-[11px] font-semibold text-slate-300 hover:text-white underline cursor-pointer"
+                  >
+                    {allFilteredSelected ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleBatchConfirmTrips}
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Confirm all selected trips"
+                  >
+                    <BoltIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Confirm</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchAssignDriver}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Assign driver to selected trips"
+                  >
+                    <UsersIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Assign</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchExportCsv}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Export selected trips as CSV"
+                  >
+                    <DocumentTextIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden xs:inline sm:inline">Export</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchCancelTrips}
+                    className="px-2.5 py-1 bg-rose-950/90 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Cancel selected trips"
+                  >
+                    <BanIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span>Cancel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTripIds([])}
+                    className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer shrink-0"
+                    title="Clear selection"
+                    aria-label="Clear selection"
+                  >
+                    <XIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Queue Content (Mobile always Cards; Desktop supports Cards / Compact / Table) ─── */}
+            {!isDesktop || displayLayout === 'cards' ? (
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 auto-rows-max content-start bg-slate-50/50">
                 {filteredTrips.map((trip) => {
                   const isSelected = selectedQueueTripId === trip.id;
                   const isChecked = selectedTripIds.includes(trip.id);
@@ -5419,7 +5758,7 @@ export default function DispatchRoute() {
                         setSelectedMapTrip(trip);
                         setShouldZoomMap(false);
                       }}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs min-w-0 ${
                         isUnconfirmedTrip
                           ? 'border-amber-400 bg-amber-50/50 hover:bg-amber-50 ring-1 ring-amber-300'
                           : isSelected
@@ -5479,6 +5818,7 @@ export default function DispatchRoute() {
                                   handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
                                   setCommsInitialTab('phone');
                                   setActiveDockTab('phone');
+                                  setActiveMobileTab('phone');
                                 }}
                                 className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
                                 title="Click-to-Call Passenger via WebRTC Softphone"
@@ -5490,14 +5830,14 @@ export default function DispatchRoute() {
                         </div>
 
                         <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
-                          <div className="flex items-start gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <div className="flex items-start gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
                             <span className="truncate font-medium" title={trip.pickupLocation.address}>
                               {trip.pickupLocation.address}
                             </span>
                           </div>
                           <div className="flex items-start gap-1.5">
-                            <MapPinIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <MapPinIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
                             <span className="truncate font-medium" title={trip.dropoffLocation.address}>
                               {trip.dropoffLocation.address}
                             </span>
@@ -5505,18 +5845,72 @@ export default function DispatchRoute() {
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-slate-900 text-sm">
-                            ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                            {formatVehicleTierDisplay(
-                              (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
-                              settings.vehicles,
-                              (trip.metadata as any)?.vehicleDisplayName
+                      <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
+                        {/* Row 1: Price + Vehicle Tier + Quick Actions (never overflows 375px cards) */}
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
+                              ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[125px]">
+                              {formatVehicleTierDisplay(
+                                (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
+                                settings.vehicles,
+                                (trip.metadata as any)?.vehicleDisplayName
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isUnconfirmedTrip && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenReviewModal(trip);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse"
+                                title="Review customer web booking"
+                              >
+                                Review
+                              </button>
                             )}
-                          </span>
+                            <TripActionDropdown
+                              trip={trip}
+                              isUnconfirmed={isUnconfirmedTrip}
+                              isOpen={openTripActionId === trip.id}
+                              isDesktop={isDesktop}
+                              onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
+                              onClose={() => setOpenTripActionId(null)}
+                              onReview={() => handleOpenReviewModal(trip, 'details')}
+                              onEdit={() => {
+                                setSelectedQueueTripId(trip.id);
+                                setSelectedMapTrip(trip);
+                                setShouldZoomMap(true);
+                                handleOpenEditTrip(trip);
+                                setActiveMobileTab('booking');
+                              }}
+                              onFare={() => handleOpenDriverModal(trip)}
+                              onAudit={() => handleOpenReviewModal(trip, 'audit')}
+                              onClone={() => {
+                                handleCloneBooking(trip);
+                                setActiveMobileTab('booking');
+                              }}
+                              onFocusMap={() => {
+                                setSelectedQueueTripId(trip.id);
+                                setSelectedMapTrip(trip);
+                                setShouldZoomMap(true);
+                                setActiveMobileTab('map');
+                              }}
+                              onCompleteTrip={() => handleOpenCompleteTripModal(trip)}
+                              onCancelTrip={() => handlePromptCancelTrip(trip)}
+                              onReactivateTrip={() => handleReactivateTrip(trip)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Row 2: Full-width Driver Assignment Select (readable names, zero clipping) */}
+                        <div className="flex items-center gap-2 min-w-0">
                           <select
                             value={trip.assignedDriverId || 'unassigned'}
                             onClick={(e) => e.stopPropagation()}
@@ -5524,14 +5918,14 @@ export default function DispatchRoute() {
                               e.stopPropagation();
                               handleQuickAssignDriver(trip.id, e.target.value);
                             }}
-                            className={`text-[11px] font-semibold rounded-md border py-0.5 px-1.5 cursor-pointer transition-colors max-w-[140px] truncate ${
+                            className={`w-full text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
                               trip.assignedDriverId
                                 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                                 : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
                             }`}
                             title="Quick-assign driver"
                           >
-                            <option value="unassigned">⚠️ Unassigned</option>
+                            <option value="unassigned">Unassigned Driver</option>
                             {drivers.map((drv) => (
                               <option
                                 key={drv.id}
@@ -5542,52 +5936,6 @@ export default function DispatchRoute() {
                               </option>
                             ))}
                           </select>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {isUnconfirmedTrip && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenReviewModal(trip);
-                              }}
-                              className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-[11px] shadow-xs cursor-pointer animate-pulse"
-                              title="Review customer web booking"
-                            >
-                              Review
-                            </button>
-                          )}
-                          <TripActionDropdown
-                            trip={trip}
-                            isUnconfirmed={isUnconfirmedTrip}
-                            isOpen={openTripActionId === trip.id}
-                            isDesktop={isDesktop}
-                            onToggle={() => setOpenTripActionId(openTripActionId === trip.id ? null : trip.id)}
-                            onClose={() => setOpenTripActionId(null)}
-                            onReview={() => handleOpenReviewModal(trip, 'details')}
-                            onEdit={() => {
-                              setSelectedQueueTripId(trip.id);
-                              setSelectedMapTrip(trip);
-                              setShouldZoomMap(true);
-                              handleOpenEditTrip(trip);
-                              setActiveMobileTab('booking');
-                            }}
-                            onFare={() => handleOpenDriverModal(trip)}
-                            onAudit={() => handleOpenReviewModal(trip, 'audit')}
-                            onClone={() => {
-                              handleCloneBooking(trip);
-                              setActiveMobileTab('booking');
-                            }}
-                            onFocusMap={() => {
-                              setSelectedQueueTripId(trip.id);
-                              setSelectedMapTrip(trip);
-                              setShouldZoomMap(true);
-                              setActiveMobileTab('map');
-                            }}
-                            onCancelTrip={() => handlePromptCancelTrip(trip)}
-                            onReactivateTrip={() => handleReactivateTrip(trip)}
-                          />
                         </div>
                       </div>
                     </div>
@@ -5682,7 +6030,7 @@ export default function DispatchRoute() {
                           }`}
                           title="Quick-assign driver"
                         >
-                          <option value="unassigned">⚠️ Unassigned</option>
+                          <option value="unassigned">Unassigned</option>
                           {drivers.map((drv) => (
                             <option
                               key={drv.id}
@@ -5738,6 +6086,7 @@ export default function DispatchRoute() {
                               setShouldZoomMap(true);
                               setActiveMobileTab('map');
                             }}
+                            onCompleteTrip={() => handleOpenCompleteTripModal(trip)}
                             onCancelTrip={() => handlePromptCancelTrip(trip)}
                             onReactivateTrip={() => handleReactivateTrip(trip)}
                           />
@@ -5867,6 +6216,7 @@ export default function DispatchRoute() {
                                       handleStartCall(trip.passenger.phone, `${trip.passenger.firstName} ${trip.passenger.lastName}`);
                                       setCommsInitialTab('phone');
                                       setActiveDockTab('phone');
+                                      setActiveMobileTab('phone');
                                     }}
                                     className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
                                     title="Click-to-Call Passenger via WebRTC Softphone"
@@ -5897,7 +6247,7 @@ export default function DispatchRoute() {
                                 }`}
                                 title="Quick-assign driver to this trip"
                               >
-                                  <option value="unassigned">⚠️ Unassigned</option>
+                                  <option value="unassigned">Unassigned</option>
                                   {drivers.map((drv) => (
                                     <option
                                       key={drv.id}
@@ -5935,7 +6285,6 @@ export default function DispatchRoute() {
                                     title="Review and Accept or Decline customer web booking"
                                   >
                                     <span>Review</span>
-                                    <CopyIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                   </button>
                                 )}
                                  <TripActionDropdown
@@ -5965,6 +6314,7 @@ export default function DispatchRoute() {
                                      setShouldZoomMap(true);
                                      setActiveMobileTab('map');
                                    }}
+                                   onCompleteTrip={() => handleOpenCompleteTripModal(trip)}
                                    onCancelTrip={() => handlePromptCancelTrip(trip)}
                                    onReactivateTrip={() => handleReactivateTrip(trip)}
                                  />
@@ -6117,8 +6467,9 @@ export default function DispatchRoute() {
                             <div className="flex items-center gap-2">
                               <span className="font-extrabold text-slate-900 text-sm">{driver.name}</span>
                               {driver.driverScore !== undefined && (
-                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-                                  ★ {driver.driverScore}
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+                                  <StarIcon className="w-3 h-3 text-amber-500 shrink-0" />
+                                  <span>{driver.driverScore}</span>
                                 </span>
                               )}
                             </div>
@@ -6221,9 +6572,9 @@ export default function DispatchRoute() {
           </div>
         )}
 
-        {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Phone / Messages / Voicemail) */}
+        {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Calls / SMS / Voicemail) */}
         {!isDesktop && (activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone') && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/60 lg:hidden pb-16">
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
             <CommsHub
               user={user}
               drivers={drivers}
@@ -6271,6 +6622,22 @@ export default function DispatchRoute() {
                 });
               }}
               onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+            />
+          </div>
+        )}
+
+        {/* 3. Mobile Email Console Page (Accessible from slide-out drawer) */}
+        {!isDesktop && activeMobileTab === 'email' && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
+            <EmailDock
+              isDocked={true}
+              onClose={() => setActiveMobileTab('queue')}
+              onPopOut={() => getWorkspaceBus().popOutModule('email')}
+              showWindowControls={false}
+              onPopulateBooking={() => {
+                setActiveMobileTab('booking');
+                showDispatchToast('Booking form populated from email!', 'success');
+              }}
             />
           </div>
         )}
@@ -6631,8 +6998,9 @@ export default function DispatchRoute() {
                   {/* Space-Saving Tactical Presets Dropdown */}
                   <div className="p-2.5 bg-slate-50 border-b border-slate-200 space-y-1.5 shrink-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide">
-                        ⚡ Tactical Broadcast Presets
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide inline-flex items-center gap-1">
+                        <BoltIcon className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span>Tactical Broadcast Presets</span>
                       </span>
                       {user?.role === 'admin' && !isAddingPreset && (
                         <button
@@ -6665,7 +7033,7 @@ export default function DispatchRoute() {
                         </option>
                       ))}
                       {user?.role === 'admin' && (
-                        <option value="__add_custom__">➕ Create New Preset (Admin)...</option>
+                        <option value="__add_custom__">+ Create New Preset (Admin)...</option>
                       )}
                     </select>
 
@@ -6715,7 +7083,7 @@ export default function DispatchRoute() {
                           onChange={(e) => setMsgRecipient(e.target.value)}
                           className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                         >
-                          <option value="All Drivers">📢 All Drivers</option>
+                          <option value="All Drivers">All Drivers</option>
                           {drivers.map((d) => (
                             <option key={d.id} value={d.name}>
                               {d.formattedLabel || formatDriverAssignmentLabel(d)}
@@ -6731,7 +7099,7 @@ export default function DispatchRoute() {
                           className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                         >
                           <option value="normal">Normal</option>
-                          <option value="urgent">🚨 Urgent</option>
+                          <option value="urgent">Urgent</option>
                         </select>
                       </div>
                     </div>
@@ -6787,12 +7155,18 @@ export default function DispatchRoute() {
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        📌 Pinned ({pinnedAlertsCount})
+                        <span className="inline-flex items-center gap-1">
+                          <FlagIcon className="w-3 h-3 shrink-0" />
+                          <span>Pinned ({pinnedAlertsCount})</span>
+                        </span>
                       </button>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[10px]">
-                      <span className="text-slate-500 font-medium">⏳ Retention:</span>
+                      <span className="text-slate-500 font-medium inline-flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3 shrink-0" />
+                        <span>Retention:</span>
+                      </span>
                       <select
                         value={alertDismissMinutes}
                         onChange={(e) => handleUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
@@ -6892,28 +7266,41 @@ export default function DispatchRoute() {
 
       {/* Driver Fare Adjustment & Permitted Rules Modal */}
       {driverModalTrip && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col">
+        <div
+          className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setDriverModalTrip(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400 font-bold text-sm">⚡ Driver Fare Console</span>
-                  <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
-                    Trip #{driverModalTrip.id.slice(-6).toUpperCase()}
-                  </span>
+            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-amber-400 font-bold text-sm inline-flex items-center gap-1.5">
+                      <BoltIcon className="w-4 h-4 shrink-0" />
+                      <span>Driver Fare Console</span>
+                    </span>
+                    <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                      Trip #{driverModalTrip.id.slice(-6).toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    Passenger: {driverModalTrip.passenger?.firstName} {driverModalTrip.passenger?.lastName}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Passenger: {driverModalTrip.passenger?.firstName} {driverModalTrip.passenger?.lastName}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setDriverModalTrip(null)}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  aria-label="Close fare console"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setDriverModalTrip(null)}
-                className="text-slate-400 hover:text-white text-lg font-bold p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
             </div>
 
             {/* Trip Snapshot */}
@@ -7065,11 +7452,11 @@ export default function DispatchRoute() {
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-end gap-2">
+            <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setDriverModalTrip(null)}
-                className="px-3.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -7078,7 +7465,7 @@ export default function DispatchRoute() {
                   type="button"
                   disabled={!selectedDriverRuleId || isApplyingDriverFare}
                   onClick={handleApplyDriverPricingRule}
-                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                  className="px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
                 >
                   {isApplyingDriverFare ? 'Applying...' : 'Apply Rule to Trip'}
                 </button>
@@ -7087,7 +7474,7 @@ export default function DispatchRoute() {
                   type="button"
                   disabled={!driverManualFare || isApplyingDriverFare}
                   onClick={handleApplyDriverFlatOverride}
-                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                  className="px-4 py-2 sm:py-1.5 rounded-xl sm:rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
                 >
                   {isApplyingDriverFare ? 'Applying...' : 'Apply Flat Fare'}
                 </button>
@@ -7176,9 +7563,10 @@ export default function DispatchRoute() {
             isResizable={true}
             isMinimizable={true}
             isMaximizable={true}
+            zIndex={120}
           >
             {/* Navigation Tabs Header */}
-            <div className="bg-slate-900/95 px-6 border-b border-slate-800 flex items-center gap-2 shrink-0 sticky top-0 z-10">
+            <div className="bg-slate-900/95 px-4 sm:px-6 border-b border-slate-800 flex items-center gap-2 shrink-0 sticky top-0 z-10 overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => setReviewModalTab('details')}
@@ -7486,7 +7874,8 @@ export default function DispatchRoute() {
                           {isPrivateAviation ? (
                             <>
                               <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                                <span>🛩️ Private Aviation / FBO:</span>
+                                <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                                <span>Private Aviation / FBO:</span>
                                 <span className="font-extrabold text-blue-950">{fboFacility || 'Private Aviation'}</span>
                               </div>
                               {tailNumber && (
@@ -7502,8 +7891,9 @@ export default function DispatchRoute() {
                             </>
                           ) : (
                             <>
-                              <div className="font-bold flex items-center gap-1 text-blue-900">
-                                ✈️ Commercial Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}
+                              <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                                <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                                <span>Commercial Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}</span>
                               </div>
                               {flightOrigin && (
                                 <div className="text-blue-800">
@@ -7587,7 +7977,8 @@ export default function DispatchRoute() {
                     <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 text-xs text-amber-950 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-bold flex items-center gap-1.5">
-                          🧳 Oversized Cargo Breakdown:
+                          <LuggageIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <span>Oversized Cargo Breakdown:</span>
                         </span>
                         <span className="text-[10px] bg-amber-200 font-bold px-1.5 py-0.5 rounded text-amber-900 uppercase">
                           Special Cargo
@@ -7605,7 +7996,10 @@ export default function DispatchRoute() {
                   )}
                   {tripMeta.customExtrasSummary && (
                     <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-950 space-y-0.5">
-                      <div className="font-bold text-emerald-900">✨ Selected Extras &amp; Add-Ons</div>
+                      <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                        <SparklesIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Selected Extras &amp; Add-Ons</span>
+                      </div>
                       <div className="font-semibold text-emerald-800">{String(tripMeta.customExtrasSummary)}</div>
                     </div>
                   )}
@@ -7636,7 +8030,7 @@ export default function DispatchRoute() {
                 <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                      <span>🚖</span>
+                      <CarIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                       <span>Assigned Driver Operator</span>
                     </div>
                     {reviewTrip.assignedDriverId ? (
@@ -7644,8 +8038,9 @@ export default function DispatchRoute() {
                         Assigned
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                        ⚠️ Unassigned
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 inline-flex items-center gap-1">
+                        <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                        <span>Unassigned</span>
                       </span>
                     )}
                   </div>
@@ -7666,7 +8061,7 @@ export default function DispatchRoute() {
                       }}
                       className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs"
                     >
-                      <option value="unassigned">⚠️ Unassigned (No driver assigned)</option>
+                      <option value="unassigned">Unassigned (No driver assigned)</option>
                       {drivers.map((drv) => (
                         <option
                           key={drv.id}
@@ -7679,6 +8074,72 @@ export default function DispatchRoute() {
                     </select>
                   </div>
                 </div>
+
+                {/* Manual Trip Status Override (Dispatch Recovery Controls) */}
+                {!reviewDeclineMode && !reviewClarifyMode && (
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                        <ShieldCheckIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        <span>Manual Status Override</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        Current: <strong className="text-slate-900 capitalize">{reviewTrip.status.replace(/_/g, ' ')}</strong>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          { status: 'pending', label: 'Pending' },
+                          { status: 'confirmed', label: 'Confirmed' },
+                          { status: 'assigned', label: 'Assigned' },
+                          { status: 'en_route', label: 'En Route' },
+                          { status: 'arrived', label: 'Arrived' },
+                          { status: 'in_progress', label: 'In Progress' },
+                        ] as { status: TripStatus; label: string }[]
+                      ).map((step) => {
+                        const isCurrent = reviewTrip.status.toLowerCase() === step.status;
+                        return (
+                          <button
+                            key={step.status}
+                            type="button"
+                            disabled={isCurrent || isOverridingStatus}
+                            onClick={() => handleManualStatusOverride(reviewTrip, step.status)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                              isCurrent
+                                ? 'bg-blue-600 text-white border-blue-600 cursor-default shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 cursor-pointer disabled:opacity-50'
+                            }`}
+                          >
+                            {step.label}
+                          </button>
+                        );
+                      })}
+                      {reviewTrip.status !== 'completed' && reviewTrip.status !== 'cancelled' && (
+                        <button
+                          type="button"
+                          disabled={isOverridingStatus}
+                          onClick={() => handleOpenCompleteTripModal(reviewTrip)}
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs disabled:opacity-50"
+                        >
+                          <CheckIcon className="w-3 h-3 shrink-0" />
+                          <span>Complete Trip</span>
+                        </button>
+                      )}
+                      {reviewTrip.status !== 'cancelled' && reviewTrip.status !== 'completed' && (
+                        <button
+                          type="button"
+                          disabled={isOverridingStatus}
+                          onClick={() => handlePromptCancelTrip(reviewTrip)}
+                          className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <BanIcon className="w-3 h-3 shrink-0" />
+                          <span>Cancel Trip</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Round-Trip Scope Option when Confirming */}
                 {hasLinkedLeg && !reviewDeclineMode && !reviewClarifyMode && (
@@ -7893,7 +8354,8 @@ export default function DispatchRoute() {
                   <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3 animate-in fade-in duration-100">
                     <div className="font-bold text-amber-900 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <span>❓</span> Request More Information / Clarification
+                        <AlertCircleIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>Request More Information / Clarification</span>
                       </span>
                       <span className="text-[10px] text-amber-700">Passenger will receive action-required email</span>
                     </div>
@@ -7954,7 +8416,7 @@ export default function DispatchRoute() {
               )}
 
               {/* Modal Actions Footer */}
-              <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-3 shrink-0 sticky bottom-0 z-10">
+              <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-2 shrink-0 sticky bottom-0 z-10">
                 <button
                   type="button"
                   onClick={() => setReviewTrip(null)}
@@ -7965,7 +8427,7 @@ export default function DispatchRoute() {
                 </button>
 
                 {reviewModalTab === 'audit' ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setReviewModalTab('details')}
@@ -7987,7 +8449,7 @@ export default function DispatchRoute() {
                           </>
                         ) : (
                           <>
-                            <span>✉</span>
+                            <MailIcon className="w-3.5 h-3.5 shrink-0" />
                             <span>Resend Confirmation Email</span>
                           </>
                         )}
@@ -7995,7 +8457,7 @@ export default function DispatchRoute() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {!reviewDeclineMode && !reviewClarifyMode ? (
                       <>
                         {isUnconfirmedTrip ? (
@@ -8020,7 +8482,8 @@ export default function DispatchRoute() {
                               }}
                               className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
                             >
-                              <span>❓</span> Request Info...
+                              <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>Request Info...</span>
                             </button>
                             <button
                               type="button"
@@ -8034,11 +8497,14 @@ export default function DispatchRoute() {
                                   <span>Confirming...</span>
                                 </>
                               ) : (
-                                <span>
-                                  {hasLinkedLeg && confirmScope === 'both'
-                                    ? '✓ Confirm Round-Trip Bookings'
-                                    : '✓ Confirm & Accept Booking'}
-                                </span>
+                                <>
+                                  <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    {hasLinkedLeg && confirmScope === 'both'
+                                      ? 'Confirm Round-Trip Bookings'
+                                      : 'Confirm & Accept Booking'}
+                                  </span>
+                                </>
                               )}
                             </button>
                           </>
@@ -8056,7 +8522,7 @@ export default function DispatchRoute() {
                               </>
                             ) : (
                               <>
-                                <span>✉</span>
+                                <MailIcon className="w-3.5 h-3.5 shrink-0" />
                                 <span>
                                   {isOverrideEmailEnabled && overrideRecipientEmail.trim()
                                     ? `Resend to ${overrideRecipientEmail.trim()}`
@@ -8163,7 +8629,10 @@ export default function DispatchRoute() {
           }}
           onOpenEditTrip={(tripId) => {
             const found = trips.find((t) => t.id === tripId);
-            if (found) handleOpenEditTrip(found);
+            if (found) {
+              handleOpenEditTrip(found);
+              setActiveMobileTab('booking');
+            }
           }}
           onFocusTripOnMap={(tripId) => {
             const found = trips.find((t) => t.id === tripId);
@@ -8230,9 +8699,20 @@ export default function DispatchRoute() {
           <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'booking' ? 'bg-blue-50 text-blue-600' : ''}`}>
             <DocumentTextIcon className="w-5 h-5" />
             {drafts.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+              <span
+                className={`absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[9px] font-black flex items-center justify-center ${
+                  hasUnsavedDraftWork ? 'bg-amber-500 ring-2 ring-white' : 'bg-blue-600'
+                }`}
+                title={hasUnsavedDraftWork ? 'Unsaved draft in progress' : `${drafts.length} open tab(s)`}
+              >
                 {drafts.length}
               </span>
+            )}
+            {hasUnsavedDraftWork && activeMobileTab !== 'booking' && (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white animate-pulse"
+                aria-label="Unsaved booking draft in progress"
+              />
             )}
           </div>
           <span className="text-[10px] tracking-tight leading-none">Booking</span>
@@ -8303,54 +8783,65 @@ export default function DispatchRoute() {
 
       {/* ─── Batch Assign Driver Modal ─── */}
       {isBatchAssignOpen && (
-        <div className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-black text-slate-900">
-                  Batch Assign Driver ({selectedTripIds.length} Trips)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Select a driver operator to assign to all {selectedTripIds.length} selected trip(s).
-                </p>
+        <div
+          className="fixed inset-0 z-[125] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => setIsBatchAssignOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+          >
+            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black tracking-tight flex items-center gap-2">
+                    <UsersIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span>Batch Assign Driver ({selectedTripIds.length} Trips)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Select a driver operator for all {selectedTripIds.length} selected trip(s).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBatchAssignOpen(false)}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  aria-label="Close batch assign modal"
+                >
+                  <XIcon className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsBatchAssignOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="p-4 sm:p-5 space-y-2">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
                 Driver Operator
               </label>
               <select
                 value={batchAssignDriverId}
                 onChange={(e) => setBatchAssignDriverId(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select a driver...</option>
-                <option value="unassigned">⚠️ Unassign Selected Trips</option>
+                <option value="unassigned">Unassign Selected Trips</option>
                 {drivers.map((drv) => (
                   <option
                     key={drv.id}
                     value={drv.id}
                     disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
                   >
-                    {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)} — {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
+                    {drv.formattedLabel || formatDriverAssignmentLabel(drv)} — {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="px-4 sm:px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsBatchAssignOpen(false)}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 Cancel
               </button>
@@ -8358,7 +8849,7 @@ export default function DispatchRoute() {
                 type="button"
                 disabled={!batchAssignDriverId}
                 onClick={handleConfirmBatchAssign}
-                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold shadow-xs cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 Assign to {selectedTripIds.length} Trip(s)
               </button>
@@ -8367,9 +8858,209 @@ export default function DispatchRoute() {
         </div>
       )}
 
+      {/* ─── Dispatch Console: Complete Trip Modal ─── */}
+      {completeTripTarget && (() => {
+        const parsedSubtotal = Math.max(0, Number.parseFloat(completeFareInput) || 0);
+        const parsedTip = Math.max(0, Number.parseFloat(completeTipInput) || 0);
+        const computedGrandTotal = Number((parsedSubtotal + parsedTip).toFixed(2));
+        return (
+          <div
+            className="fixed inset-0 z-[125] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+            onClick={() => {
+              if (!isCompletingTrip) setCompleteTripTarget(null);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+            >
+              <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <CheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <h3 className="text-sm font-black tracking-tight">Complete Trip</h3>
+                      <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                        #{completeTripTarget.id.slice(-6).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">
+                      {completeTripTarget.passenger?.firstName} {completeTripTarget.passenger?.lastName}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isCompletingTrip}
+                    onClick={() => setCompleteTripTarget(null)}
+                    className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    aria-label="Close complete trip modal"
+                  >
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                    <span className="text-slate-700 font-medium truncate">
+                      {completeTripTarget.pickupLocation?.address || 'Pickup'}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
+                    <span className="text-slate-700 font-medium truncate">
+                      {completeTripTarget.dropoffLocation?.address || 'Dropoff'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Final Fare (USD)
+                    </label>
+                    <div className="relative">
+                      <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={completeFareInput}
+                        onChange={(e) => setCompleteFareInput(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                      Tip / Gratuity (USD)
+                    </label>
+                    <div className="relative">
+                      <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={completeTipInput}
+                        onChange={(e) => setCompleteTipInput(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Payment Settlement Method
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { id: 'cash', label: 'Cash Collected', icon: CashIcon },
+                        { id: 'card_terminal', label: 'Card (In-Cab)', icon: CreditCardIcon },
+                        { id: 'card_on_file', label: 'Card on File', icon: CreditCardIcon },
+                        { id: 'corporate_account', label: 'Corporate Bill', icon: BuildingIcon },
+                      ] as const
+                    ).map((opt) => {
+                      const IconComp = opt.icon;
+                      const active = completePaymentMethod === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setCompletePaymentMethod(opt.id)}
+                          className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                            active
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <IconComp className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+                          <span className="truncate">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                    Completion Note (Audit Log — Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={completeNotes}
+                    onChange={(e) => setCompleteNotes(e.target.value)}
+                    placeholder="e.g. Driver lost cellular signal at airport dropoff"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={completeSendReceipt}
+                    disabled={!completeTripTarget.passenger?.email}
+                    onChange={(e) => setCompleteSendReceipt(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                  />
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-800">Send Official Receipt Email to Passenger</div>
+                    <div className="text-[11px] text-slate-600 truncate">
+                      {completeTripTarget.passenger?.email
+                        ? completeTripTarget.passenger.email
+                        : 'No email address on file for this passenger'}
+                    </div>
+                  </div>
+                </label>
+
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900 text-white">
+                  <span className="text-xs font-semibold text-slate-300">Total Settled</span>
+                  <span className="text-base font-mono font-black text-emerald-400 tabular-nums">
+                    ${computedGrandTotal.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-4 sm:px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={isCompletingTrip}
+                  onClick={() => setCompleteTripTarget(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isCompletingTrip}
+                  onClick={handleDispatchCompleteTrip}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  {isCompletingTrip ? (
+                    <>
+                      <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-white" />
+                      <span>Completing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>Complete Trip</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ─── Non-Blocking Dispatch Toast Notification ─── */}
       {dispatchToast && (
-        <div className="fixed bottom-16 lg:bottom-4 right-4 z-[130] max-w-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="fixed bottom-16 lg:bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-[130] sm:max-w-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
           <div
             className={`px-3.5 py-2.5 rounded-xl shadow-2xl border text-xs font-bold flex items-center gap-2 ${
               dispatchToast.type === 'success'
@@ -8379,16 +9070,21 @@ export default function DispatchRoute() {
                 : 'bg-slate-900 text-white border-slate-700'
             }`}
           >
-            <span>
-              {dispatchToast.type === 'success' ? '✓' : dispatchToast.type === 'error' ? '⚠️' : 'ℹ️'}
-            </span>
-            <span className="flex-1">{dispatchToast.text}</span>
+            {dispatchToast.type === 'success' ? (
+              <CheckIcon className="w-4 h-4 text-emerald-300 shrink-0" />
+            ) : dispatchToast.type === 'error' ? (
+              <AlertTriangleIcon className="w-4 h-4 text-rose-300 shrink-0" />
+            ) : (
+              <InfoIcon className="w-4 h-4 text-blue-300 shrink-0" />
+            )}
+            <span className="flex-1 min-w-0 break-words">{dispatchToast.text}</span>
             <button
               type="button"
               onClick={() => setDispatchToast(null)}
-              className="text-white/70 hover:text-white cursor-pointer"
+              className="text-white/70 hover:text-white cursor-pointer shrink-0 p-0.5"
+              aria-label="Dismiss notification"
             >
-              ✕
+              <XIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
