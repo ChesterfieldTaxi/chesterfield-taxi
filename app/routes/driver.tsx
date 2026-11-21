@@ -56,6 +56,7 @@ import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { validatePhoneNumber } from '../core/utils/phone';
 import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
 import { DriverTripManifest } from '../components/domain/driver/DriverTripManifest';
+import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 
 export function meta() {
   return [
@@ -231,6 +232,26 @@ export default function DriverAppRoute() {
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [customSmsText, setCustomSmsText] = useState('');
   const [isSendingTwilioSms, setIsSendingTwilioSms] = useState(false);
+
+  const driverSheetDrag = useBottomSheetDragToClose({
+    onClose: () => {
+      if (showTerminalModal && !isProcessingPayment && !completedPayoutReceipt) {
+        setShowTerminalModal(false);
+        setModalTripId(null);
+      } else if (showExtrasModal) {
+        setShowExtrasModal(false);
+        setModalTripId(null);
+      } else if (showSmsModal) {
+        setShowSmsModal(false);
+        setModalTripId(null);
+      } else if (showNoShowModal) {
+        setShowNoShowModal(false);
+        setModalTripId(null);
+      } else if (showVehiclePickerModal) {
+        setShowVehiclePickerModal(false);
+      }
+    },
+  });
   const [twilioSmsFeedback, setTwilioSmsFeedback] = useState<string | null>(null);
 
   const [showNoShowModal, setShowNoShowModal] = useState(false);
@@ -2975,9 +2996,12 @@ export default function DriverAppRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={driverSheetDrag.sheetStyle}
             className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
+            <div {...driverSheetDrag.dragHandlers} className="py-1.5 -mt-1.5 touch-none sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto" aria-hidden="true" />
+            </div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Select Shift Vehicle</h4>
@@ -3049,9 +3073,12 @@ export default function DriverAppRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={driverSheetDrag.sheetStyle}
             className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
+            <div {...driverSheetDrag.dragHandlers} className="py-1.5 -mt-1.5 touch-none sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto" aria-hidden="true" />
+            </div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Report No-Show / Cancel Ride</h4>
@@ -3133,9 +3160,12 @@ export default function DriverAppRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={driverSheetDrag.sheetStyle}
             className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
+            <div {...driverSheetDrag.dragHandlers} className="py-1.5 -mt-1.5 touch-none sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto" aria-hidden="true" />
+            </div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
@@ -3229,9 +3259,12 @@ export default function DriverAppRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={driverSheetDrag.sheetStyle}
             className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 pt-2.5 sm:pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-5 w-full max-w-md shadow-2xl flex flex-col gap-4 max-h-[90dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden" aria-hidden="true" />
+            <div {...driverSheetDrag.dragHandlers} className="py-1.5 -mt-1.5 touch-none sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto" aria-hidden="true" />
+            </div>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h4 className="font-bold text-base text-white">Add Toll / Extra to Fare</h4>
@@ -3351,9 +3384,12 @@ export default function DriverAppRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={driverSheetDrag.sheetStyle}
             className="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl px-5 sm:px-6 pt-2.5 sm:pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6 w-full max-w-md shadow-2xl flex flex-col gap-5 text-white max-h-[92dvh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden shrink-0" aria-hidden="true" />
+            <div {...driverSheetDrag.dragHandlers} className="py-1.5 -mt-1.5 touch-none sm:hidden shrink-0">
+              <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto" aria-hidden="true" />
+            </div>
             {completedPayoutReceipt ? (
               /* RECONCILED RECEIPT & DRIVER SETTLEMENT SUMMARY (ZERO DOUBLE-COUNT!) */
               <div className="space-y-4 text-center">

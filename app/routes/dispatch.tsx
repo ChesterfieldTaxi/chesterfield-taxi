@@ -92,6 +92,7 @@ import {
 } from '../core/hooks/useDispatchFleet';
 import { formatLocalDateStr } from '../core/services/pricing/vehicle-matching';
 import { FloatingWindow } from '../components/ui/FloatingWindow';
+import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 
 export type { DriverRosterItem };
 
@@ -988,6 +989,26 @@ export default function DispatchRoute() {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredTripIdRef = useRef<string | null>(null);
+
+  // Shared drag-down-to-close gesture for mobile bottom sheets in Dispatch
+  const handleDismissActiveDispatchSheet = useCallback(() => {
+    if (driverPickerTrip) {
+      setDriverPickerTrip(null);
+    } else if (completeTripTarget && !isCompletingTrip) {
+      setCompleteTripTarget(null);
+    } else if (isBatchAssignOpen) {
+      setIsBatchAssignOpen(false);
+    } else if (mobileActionSheetTrip) {
+      setMobileActionSheetTrip(null);
+    } else if (driverModalTrip) {
+      setDriverModalTrip(null);
+    }
+  }, [driverPickerTrip, completeTripTarget, isCompletingTrip, isBatchAssignOpen, mobileActionSheetTrip, driverModalTrip]);
+
+  const dispatchSheetDrag = useBottomSheetDragToClose({
+    onClose: handleDismissActiveDispatchSheet,
+    disabled: isDesktop,
+  });
 
   const cancelTripCardLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -4249,8 +4270,8 @@ export default function DispatchRoute() {
           </div>
         </div>
 
-        {/* Center: Brand Badge */}
-        <div className="flex items-center gap-2">
+        {/* Center: Brand Badge (Desktop only — keeps mobile header uncluttered) */}
+        <div className="hidden lg:flex items-center gap-2">
           <div
             style={{
               backgroundColor: 'var(--brand-primary, #2563eb)',
@@ -7679,10 +7700,14 @@ export default function DispatchRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={dispatchSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+            <div
+              {...dispatchSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0 touch-none"
+            >
               <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -9267,9 +9292,13 @@ export default function DispatchRoute() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={dispatchSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0">
+            <div
+              {...dispatchSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0 touch-none"
+            >
               <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
@@ -9350,9 +9379,13 @@ export default function DispatchRoute() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
+              style={dispatchSheetDrag.sheetStyle}
               className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
             >
-              <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+              <div
+                {...dispatchSheetDrag.dragHandlers}
+                className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0 touch-none"
+              >
                 <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -9552,10 +9585,14 @@ export default function DispatchRoute() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
+              style={dispatchSheetDrag.sheetStyle}
               className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[90dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
             >
               {/* Sheet Header */}
-              <div className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0">
+              <div
+                {...dispatchSheetDrag.dragHandlers}
+                className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
+              >
                 <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -9861,10 +9898,14 @@ export default function DispatchRoute() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
+              style={dispatchSheetDrag.sheetStyle}
               className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
             >
               {/* Header */}
-              <div className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0">
+              <div
+                {...dispatchSheetDrag.dragHandlers}
+                className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
+              >
                 <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">

@@ -50,6 +50,7 @@ import {
   DEFAULT_CORPORATE_ACCOUNTS,
 } from '../../../core/services/config/admin-config.service';
 import type { CorporateAccountConfig } from '../../../core/types/config';
+import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 
 const formatMessageTimestamp = (timestampMs?: number, fallbackStr?: string) => {
   if (!timestampMs) return fallbackStr || '';
@@ -596,6 +597,21 @@ function CommsHubComponent({
   const [corporateAccountsList, setCorporateAccountsList] = useState<CorporateAccountConfig[]>(DEFAULT_CORPORATE_ACCOUNTS);
   const [corpSearchQuery, setCorpSearchQuery] = useState('');
   const [isCorpDropdownOpen, setIsCorpDropdownOpen] = useState(false);
+
+  const commsSheetDrag = useBottomSheetDragToClose({
+    onClose: () => {
+      if (isNewMessageModalOpen) {
+        setIsNewMessageModalOpen(false);
+      } else if (isContactEditOpen) {
+        setIsCorpDropdownOpen(false);
+        setIsContactEditOpen(false);
+      } else if (showAgentSetupModal) {
+        setShowAgentSetupModal(false);
+        setPendingCallTarget(null);
+        setSetupAgentPhoneError(null);
+      }
+    },
+  });
 
   // Load corporate accounts from AdminConfigService
   useEffect(() => {
@@ -4750,9 +4766,13 @@ function CommsHubComponent({
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={commsSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-sm w-full border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
-            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5">
+            <div
+              {...commsSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 touch-none"
+            >
               <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -4851,11 +4871,15 @@ function CommsHubComponent({
           }}
         >
           <div
+            style={commsSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-2xl w-full border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 flex flex-col max-h-[92dvh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white px-4 sm:px-6 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0">
+            <div
+              {...commsSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 sm:px-6 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0 touch-none"
+            >
               <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
@@ -5515,10 +5539,14 @@ function CommsHubComponent({
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            style={commsSheetDrag.sheetStyle}
             className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 max-w-lg w-full max-h-[92dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
           >
             {/* Header */}
-            <div className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0">
+            <div
+              {...commsSheetDrag.dragHandlers}
+              className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0 touch-none"
+            >
               <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">

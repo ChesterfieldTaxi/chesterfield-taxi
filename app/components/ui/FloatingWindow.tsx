@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { XIcon } from './Icons';
+import { useBottomSheetDragToClose } from '../../core/hooks/useBottomSheetDragToClose';
 
 export interface FloatingWindowProps {
   id?: string;
@@ -78,6 +79,11 @@ export function FloatingWindow({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const mobileSheetDrag = useBottomSheetDragToClose({
+    onClose,
+    disabled: !isMobileViewport || !isOpen,
+  });
 
   const windowRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -215,10 +221,14 @@ export function FloatingWindow({
         <div
           ref={windowRef}
           onClick={(e) => e.stopPropagation()}
+          style={mobileSheetDrag.sheetStyle}
           className={`w-full max-h-[92dvh] flex flex-col bg-white rounded-t-3xl shadow-2xl border-t border-slate-200/90 overflow-hidden select-text animate-in slide-in-from-bottom duration-200 ${className}`}
         >
-          {/* Mobile Sheet Header with Drag Indicator */}
-          <div className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none">
+          {/* Mobile Sheet Header with Drag-Down-to-Close Handle */}
+          <div
+            {...mobileSheetDrag.dragHandlers}
+            className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none touch-none"
+          >
             <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5" aria-hidden="true" />
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
