@@ -300,8 +300,27 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     `Server email-templates leaked into client bundle assets: ${emailTemplateChunks.join(', ')}`
   );
 
+  // 6. Dual Booking Engine monolith prevention line-budget assertions (< 1800 lines)
+  const bookingEngineMaxLines = 1800;
+  const bookingEngineFiles = [
+    'app/components/domain/BookingEngineV2.tsx',
+    'app/components/domain/dispatch/DispatchBookingEngine.tsx',
+  ];
+  const bookingEngineLineSummary: string[] = [];
+
+  for (const relFile of bookingEngineFiles) {
+    const absFile = path.join(rootDir, relFile);
+    assert.ok(fs.existsSync(absFile), `Expected booking engine file not found: ${relFile}`);
+    const lineCount = fs.readFileSync(absFile, 'utf8').split(/\r?\n/).length;
+    assert.ok(
+      lineCount < bookingEngineMaxLines,
+      `Monolith budget exceeded in ${relFile}: ${lineCount} lines >= ${bookingEngineMaxLines} lines`
+    );
+    bookingEngineLineSummary.push(`${path.basename(relFile)}=${lineCount}L`);
+  }
+
   console.log(
-    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, zero secret-shaped literals, ${apiChunks.length} zero-KB api.*.js chunks, zero email-templates client chunks, and admin entry chunk (${(adminChunkStat.size / 1024).toFixed(2)} KB < 150 KB).\n`
+    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, zero secret-shaped literals, ${apiChunks.length} zero-KB api.*.js chunks, zero email-templates client chunks, admin entry chunk (${(adminChunkStat.size / 1024).toFixed(2)} KB < 150 KB), and booking engine line budgets (${bookingEngineLineSummary.join(', ')} < ${bookingEngineMaxLines}L).\n`
   );
 }
 

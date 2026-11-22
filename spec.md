@@ -881,8 +881,29 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Automated Production Bundle Budget Assertions (`scripts/test-browser-smoke.ts`)**:
   - Enforces automated build-asset assertions inside `verifyCutoverConfigInvariants` verifying every `api.*.js` chunk in `build/client/assets/` is `< 1024` bytes (`0.00 kB`) and the `admin-*.js` route entry chunk is `< 153600` bytes (`< 150 KB`).
 
-
-
-
-
+## 45. Phase 45 (Wave 3 Phase 2): Dual Booking Engine Decomposition (`BookingEngineV2.tsx` & `DispatchBookingEngine.tsx`)
+- **Strictly Zero-Behavior-Change Structural Refactor**:
+  - Preserves 100% of existing 4-pillar pricing/surcharge math, multi-stop waypoints, return-trip parity & symmetric fare balancing, corporate PO anti-fraud verification, Stripe card pre-authorization & in-cab flows, multi-car convoy splitting & associate roster linkage, recurring schedule generation, edit-mode state & draft caching, deterministic React 19 SSR hydration (`useState` initializers never read `localStorage` during initial render), zero secret-shaped literals (`constitution.md` Section 3), and Vercel Hobby cron (`"0 10 * * *"`).
+- **Customer Booking Engine Decomposition (`BookingEngineV2.tsx` `< 1,600` lines)**:
+  - Preserves 100% of `BookingEngineV2` public exports (`BookingEngineV2`, `BookingEngineV2Props`, `BookingEngineV2InitialValues`, `CorporatePortalBookingContext`, `COMMON_FBO_FACILITIES`, `formatUsPhone`, `formatTime12h`, `SpecialRequestKey`, `CustomerVehicleChoice`, `WaypointItem`, `AdditionalPassengerItem`).
+  - Extracts focused section components under `app/components/domain/booking/sections/`:
+    - `CustomerRouteTimingSection.tsx`: ASAP/Scheduled timing switcher, pickup/dropoff autocomplete, multi-stop waypoints, route distance/duration preview, and outbound `FlightAssistanceCard`.
+    - `CustomerVehicleExtrasSection.tsx`: Passenger/carry-on/checked counters, oversized cargo categories, Missouri RSMo § 307.179 child safety seats, universal custom add-on extras, and single/multi-vehicle tier selector.
+    - `CustomerReturnTripSection.tsx`: Optional standalone return trip switch, return date/time, return route/stops/swap, return `FlightAssistanceCard`, return pax/bags/extras/car-seats, and return single/multi-vehicle parity selector.
+    - `CustomerPassengerNotesSection.tsx`: Primary passenger contact details, additional passengers list, booker/coordinator contact drawer, and collapsible special requests / gate code / chauffeur notes.
+    - `CustomerPaymentSection.tsx`: Cash/Card/Corporate payment method tabs, Stripe online vs. in-car card sub-panel, pre-verified/public corporate account & PO fields, sticky Trip Summary & Price Breakdown card, SMS/Terms agreements, desktop submit CTA, and mobile sticky submit bar.
+  - Extracts live quote debouncing, customer form validation, Stripe pre-auth hold orchestration, corporate verification, multi-car web splitting, linked return creation, and email dispatch into `app/core/hooks/booking/useCustomerBookingSubmission.ts` (re-exported from `app/core/hooks/booking/index.ts`).
+- **Operator Dispatch Booking Engine Decomposition (`DispatchBookingEngine.tsx` `< 1,700` lines)**:
+  - Preserves 100% of `DispatchBookingEngine` (`React.memo`) and public type/value exports (`DispatchFormValues`, `DispatchBookingEngineProps`, `ContactPersonDetails`, `CardDetails`, `CorporateAccountDetails`, `ReturnTripDetails`, `RepeatTripDetails`, `COMMON_FBO_FACILITIES`, `AdditionalPassenger`, `CarSeatsBreakdown`, `VehicleChoice`).
+  - Extracts focused operator booking modules under `app/components/domain/dispatch/booking/`:
+    - `DispatchConvoyBanners.tsx`: Completed/cancelled trip lock banners, submit error alert, linked multi-car convoy edit banner with sibling navigation, and multi-vehicle split notice.
+    - `DispatchRoutingTimingSection.tsx`: Timing pill switch with local draft-saved badge, outbound pickup/stops/dropoff routing, airport/private-aviation FBO fields, and live staff `FlightTelemetryCheckPanel` (`allowLiveCheck={true}`).
+    - `DispatchPassengerCrmSection.tsx`: Instant CRM + historical trip phone/name lookup dropdown, VIP/BLOCKED/Corporate governance badges, 1-click recent address chips, multi-passenger rows, and booker/coordinator contact section.
+    - `DispatchExtrasVehicleSection.tsx`: Pax/carry-on/checked counters, oversized cargo, 3-tier child safety seats, universal custom extras, special requests & gate code, and inline multi-vehicle selector with live per-tier quotes.
+    - `DispatchPaymentAssignmentSection.tsx`: Segmented Cash/Card/Account tabs, PCI-safe card reference sub-panel, corporate PO anti-fraud validation & supervisor override, named pricing rule/tariff & courtesy discounts, fee waiver chips, company & driver assignment, and notes for all / internal dispatch notes.
+    - `DispatchReturnRepeatSection.tsx`: Linked round-trip lock card or full return leg specifications (route, stops, return flight telemetry check, date/time, pax/bags/oversized/car-seats, return multi-vehicle selector, auto-create toggle) plus recurring ride schedule panel.
+    - `DispatchBookingFooterBar.tsx`: Expandable canonical `PriceBreakdownPanel` drawer, sticky bottom action bar (manual fare override, breakdown toggle, leg split summary, email confirm toggle, Copy Booking / Clear Form, Book / Update CTA), and Clear Form `ConfirmationModal`.
+  - Extracts live outbound/return 4-pillar quote effects, draft/edit hydration & snapshot helpers, and single-car / multi-car convoy / edit-split / linked-return / recurring-schedule / confirmation-email submission workflow into `app/components/domain/dispatch/booking/useDispatchBookingSubmission.ts`.
+- **Automated Monolith Prevention Guardrail (`scripts/test-browser-smoke.ts`)**:
+  - Extends `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert both `app/components/domain/BookingEngineV2.tsx` and `app/components/domain/dispatch/DispatchBookingEngine.tsx` remain `< 1800` lines.
 

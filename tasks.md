@@ -692,8 +692,19 @@
   - [x] 44.5.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert every `api.*.js` chunk is `< 1024` bytes (`0.00 kB`) and `admin-*.js` is `< 153600` bytes (`< 150 KB`).
   - [x] 44.5.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-dispatch-email-webhook.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, and leave changes uncommitted for Control-Tower review.
 
-
-
-
-
+## Phase 45 (Wave 3 Phase 2): Dual Booking Engine Decomposition (`BookingEngineV2.tsx` & `DispatchBookingEngine.tsx`)
+- [x] 45.0 Baseline Hygiene & Specification Sync:
+  - [x] 45.0.1 Commit reviewed Phase 44 + Dispatch UX baseline cleanly (`feat(phase-44): server/client bundle split, lazy route chunking, and unified dispatch comms/fleet UX`).
+  - [x] 45.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 45 scope, architecture, and line-count guardrails before starting Phase 45 code edits.
+- [x] 45.1 Customer `BookingEngineV2.tsx` Decomposition (`< 1,600` lines):
+  - [x] 45.1.1 Create `app/core/hooks/booking/useCustomerBookingSubmission.ts` (and export from `app/core/hooks/booking/index.ts`) encapsulating customer form state types/defaults, debounced outbound/return quote calculation, validation, Stripe pre-auth, corporate PO verification, multi-car web splitting, linked return creation, and email dispatch.
+  - [x] 45.1.2 Create `CustomerRouteTimingSection.tsx`, `CustomerVehicleExtrasSection.tsx`, `CustomerReturnTripSection.tsx`, `CustomerPassengerNotesSection.tsx`, and `CustomerPaymentSection.tsx` under `app/components/domain/booking/sections/`.
+  - [x] 45.1.3 Refactor `app/components/domain/BookingEngineV2.tsx` (`< 1,600` lines) to compose the extracted section components and submission hook while preserving 100% of public props, exports (`formatUsPhone`, `formatTime12h`, `COMMON_FBO_FACILITIES`, etc.), and SSR hydration determinism.
+- [x] 45.2 Operator `DispatchBookingEngine.tsx` Decomposition (`< 1,700` lines):
+  - [x] 45.2.1 Create `app/components/domain/dispatch/booking/useDispatchBookingSubmission.ts` encapsulating draft/edit hydration & snapshot helpers, debounced outbound/return 4-pillar quote calculation, and single-car / multi-car convoy / edit-split / linked-return / recurring-schedule / confirmation-email submission workflow.
+  - [x] 45.2.2 Create `DispatchConvoyBanners.tsx`, `DispatchRoutingTimingSection.tsx`, `DispatchPassengerCrmSection.tsx`, `DispatchExtrasVehicleSection.tsx`, `DispatchPaymentAssignmentSection.tsx`, `DispatchReturnRepeatSection.tsx`, and `DispatchBookingFooterBar.tsx` under `app/components/domain/dispatch/booking/`.
+  - [x] 45.2.3 Refactor `app/components/domain/dispatch/DispatchBookingEngine.tsx` (`< 1,700` lines) to compose the extracted operator modules and submission hook while keeping `DispatchBookingEngine` (`React.memo`) and `DispatchFormValues` exports 100% intact.
+- [x] 45.3 Monolith Prevention Guardrail & Master Verification Gate:
+  - [x] 45.3.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert both `app/components/domain/BookingEngineV2.tsx` and `app/components/domain/dispatch/DispatchBookingEngine.tsx` remain `< 1800` lines.
+  - [x] 45.3.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, and `npm run test:stress` with `0` errors, mark Phase 45 complete in `tasks.md`, and leave Phase 45 changes uncommitted for Control-Tower review.
 

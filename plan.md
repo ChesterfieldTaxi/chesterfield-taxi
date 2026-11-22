@@ -1060,8 +1060,47 @@ export interface PassengerAccount {
   - Asserts all 14 `api.*.js` chunks are `< 1024` bytes (`0.00 kB`).
   - Asserts the `admin-*.js` route entry chunk is `< 153600` bytes (`< 150 KB`).
 
+## 34. Phase 45 Architecture (Wave 3 Phase 2): Dual Booking Engine Decomposition (`BookingEngineV2.tsx` & `DispatchBookingEngine.tsx`)
 
+### 34.1 Zero-Behavior-Change & Hydration Guardrails (`constitution.md`)
+- **Strict Functional & SSR Determinism Parity**:
+  - Zero changes to pricing/surcharge formulas, route/waypoint debouncing, return-trip seeding & symmetric round-trip fare balancing, corporate PO verification & credit-limit checks, Stripe card pre-authorization / in-cab fallbacks, multi-car convoy splitting & `multiCarAssociates` linkage, recurring schedule creation, edit-mode locking, or `WorkspaceBus` (`POPULATE_BOOKING`) integration.
+  - Maintain deterministic React 19 SSR hydration: `useState` initializers must never read `localStorage` during initial render; client-only storage/timezone defaults run strictly inside `useEffect`.
+  - Preserve `"0 10 * * *"` in `vercel.json`, zero secret-shaped literals across `app/` and `scripts/` (`constitution.md` Section 3), and `0.00 kB` client chunks across all 14 `/api/*` routes.
 
+### 34.2 Customer Booking Engine Architecture (`BookingEngineV2.tsx` `< 1,600` lines)
+- **Hook & Form Model (`app/core/hooks/booking/useCustomerBookingSubmission.ts`)**:
+  - Defines `CustomerBookingFormState` + `createInitialCustomerBookingFormState` and encapsulates:
+    - Debounced (800ms) outbound & return `bookingService.calculateQuote(...)` orchestration (`quote`, `isQuoteLoading`, `quoteError`, `returnQuote`, `isReturnQuoteLoading`), supporting single-vehicle and multi-vehicle quotes plus `surchargesVersion` reactivity.
+    - Full customer validation (`validateForm`, scrolling/focusing the first invalid `[name=...]` or `[data-field=...]` element) and honeypot anti-bot protection (`isBotHoneypotTriggered`).
+    - Complete `handleBookRide` submission pipeline: Corporate Portal / `/api/corporate/verify` validation, Stripe `createPreAuthorization`, `editingTripId` in-place `UNCONFIRMED` update, multi-car web convoy creation (`buildPerVehiclePricingSpecs` + `distributeAcrossCars` + `multiCarAssociates`), linked return trip creation & cross-linking, and `sendBookingConfirmation` + `sendAdminDispatchAlert` email dispatch.
+- **Section Components (`app/components/domain/booking/sections/`)**:
+  - `CustomerRouteTimingSection.tsx`: Section 1 card (ASAP vs. Scheduled switcher, `ModernDatePicker` / `ModernTimePicker`, swap route button, `DispatchLocationInput` pickup/stops/dropoff, route estimate bar, and outbound `FlightAssistanceCard` with `allowLiveCheck={false}`).
+  - `CustomerVehicleExtrasSection.tsx`: Section 2 card (3-column passenger/carry-on/checked steppers, oversized cargo categories & notes, child safety seats with Missouri statutory notice, Admin optional custom extras, and single/multi-vehicle tier selector with restriction badges).
+  - `CustomerReturnTripSection.tsx`: Standalone round-trip card (`Add Return Trip` switch, return date/time, return route/stops/swap, return `FlightAssistanceCard`, return pax/bags/oversized/car-seats/custom-extras, return single/multi-vehicle selector, and return estimated fare bar).
+  - `CustomerPassengerNotesSection.tsx`: Section 3 card (primary passenger name/phone/email, additional passengers list, booker/coordinator drawer, and collapsible special requests / gate code / driver notes).
+  - `CustomerPaymentSection.tsx`: Section 4 Payment Method card (`card` / `cash` / `account` tabs, `StripePaymentInput` vs. Pay-in-Car toggle, Corporate Portal / public corporate account & PO inputs) plus `CustomerTripSummaryCard` (sticky right-column itinerary preview, `PriceBreakdownPanel`, SMS/Terms checkboxes, validation banner, desktop submit CTA) and `CustomerMobileSubmitBar` (sticky mobile bottom bar).
+- **Orchestrator (`app/components/domain/BookingEngineV2.tsx`)**:
+  - Retains all public props, types, and utility re-exports (`formatUsPhone`, `formatTime12h`, `COMMON_FBO_FACILITIES`, etc.) for 100% backward compatibility with `app/routes/book.tsx`, `app/routes/app.tsx`, `app/routes/corporate.tsx`, and `scripts/stress-test-web-booking.ts`.
 
+### 34.3 Operator Dispatch Booking Engine Architecture (`DispatchBookingEngine.tsx` `< 1,700` lines)
+- **Submission, Quote & Hydration Hook (`app/components/domain/dispatch/booking/useDispatchBookingSubmission.ts`)**:
+  - Encapsulates:
+    - Pure snapshot & hydration helpers (`buildDispatchFormValuesSnapshot`, `hydrateDispatchStateFromInitialTrip`, `applySavedDraftOverlayToDispatchState`, `buildDispatchDraftStoragePayload`) eliminating duplicated 120-field object literals while keeping `hasHydratedDraft` mount-race protection intact.
+    - Debounced outbound (550ms) and return (650ms) 4-pillar `bookingService.calculateQuote(...)` effects (honoring `skipFirstEditQuoteRef` in Edit Mode, multi-vehicle non-duplicated extras math, named pricing rules, corporate/courtesy discounts, and fee waivers).
+    - Complete `handleSubmit` workflow: corporate PO & credit-limit validation (`validateDispatchAccount`), Edit Mode unsplit -> multi-car convoy split (`Car 1` update + `Cars 2..N` sibling creation + `multiCarAssociates`), standard Edit Mode update (respecting `isCompleted` / `isCancelled` locks), new single-car or multi-car convoy creation + Car 1 direct driver assignment, linked single/multi-car return leg creation, recurring schedule occurrence creation (`generateRecurringDates`), and consolidated passenger confirmation email dispatch.
+- **Operator Section Components (`app/components/domain/dispatch/booking/`)**:
+  - `DispatchConvoyBanners.tsx`: Completed/cancelled trip lock notices, `submitError` alert banner, linked multi-car convoy edit banner (`CAR k/N` with sibling `Open` buttons), and multi-vehicle split info notice.
+  - `DispatchRoutingTimingSection.tsx`: Pickup Time pill switch (`Later` vs `ASAP` + `Draft saved` / `Edits cached` badge), Outbound Route card (`DispatchLocationInput` pickup/stops/dropoff + swap + `+ Flight Info` + `Add stop`), and Outbound Airport/Private Aviation FBO + `FlightTelemetryCheckPanel` (`allowLiveCheck={true}`).
+  - `DispatchPassengerCrmSection.tsx`: Primary passenger name/phone/email with instant `ContactService` + `lookupTrips` caller autocomplete, `VIP` / `BLOCKED` / Corporate badges, recent address quick-fill chips, additional passenger rows, and booker/contact person expansion.
+  - `DispatchExtrasVehicleSection.tsx`: Trip Details 3-column steppers, oversized cargo, 3-tier child safety seats, Admin custom extras, collapsible special requests & gate code, and inline multi-vehicle selector with live per-tier quotes & capacity guards.
+  - `DispatchPaymentAssignmentSection.tsx`: Segmented `cash` / `card` / `account` tabs, PCI-safe card reference sub-panel, corporate account selector + live PO anti-fraud feedback & supervisor override, named pricing rule/tariff & `%`/`$` discount controls, fee waiver chips, company & driver assignment, and `Notes for All` + `Internal Notes`.
+  - `DispatchReturnRepeatSection.tsx`: Linked round-trip lock card (`Open Outbound/Return Leg in New Tab`) or interactive Return Trip panel (return route/stops/swap, return flight telemetry check, date/time, pax/bags/oversized/car-seats, return vehicles, auto-create toggle) + Repeat / Recurring Ride schedule panel.
+  - `DispatchBookingFooterBar.tsx`: Expandable `PriceBreakdownPanel` drawer, sticky bottom action bar (manual fare override input, `Details` toggle, round-trip leg split, `Email Confirm` toggle, `Copy Booking` / `Clear`, `Book` / `Update` submit button), and Clear Form `ConfirmationModal`.
+- **Orchestrator (`app/components/domain/dispatch/DispatchBookingEngine.tsx`)**:
+  - Keeps `export const DispatchBookingEngine = React.memo(DispatchBookingEngineComponent)` and all `DispatchFormValues` / `DispatchBookingEngineProps` exports 100% intact.
+
+### 34.4 Monolith Prevention Guardrail (`scripts/test-browser-smoke.ts`)
+- Extends `verifyCutoverConfigInvariants(rootDir)` to read `app/components/domain/BookingEngineV2.tsx` and `app/components/domain/dispatch/DispatchBookingEngine.tsx` and assert each file has `< 1800` lines (`split(/\r?\n/).length < 1800`).
 
 
