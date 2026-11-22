@@ -4311,6 +4311,7 @@ function DispatchBookingEngineComponent({
 
                         <FlightTelemetryCheckPanel
                           compact
+                          allowLiveCheck={true}
                           airline={airline}
                           flightNumber={flightNumber}
                           flightOrigin={flightOrigin}
@@ -4320,10 +4321,11 @@ function DispatchBookingEngineComponent({
                           isDropoffAirport={airportDetection.isDropoffAirport}
                           airportIataCode={airportDetection.airport?.iataCode || 'STL'}
                           serviceDate={scheduledDate}
+                          bookingType={timingType === 'asap' ? 'asap' : 'scheduled'}
                           scheduledPickupIso={
-                            timingType === 'later' && scheduledDate && scheduledTime
+                            timingType === 'later' && scheduledDate
                               ? (() => {
-                                  const d = new Date(`${scheduledDate}T${scheduledTime}:00`);
+                                  const d = new Date(`${scheduledDate}T${scheduledTime || '12:00'}:00`);
                                   return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
                                 })()
                               : undefined
@@ -5904,6 +5906,7 @@ function DispatchBookingEngineComponent({
 
                                 <FlightTelemetryCheckPanel
                                   compact
+                                  allowLiveCheck={true}
                                   airline={returnAirline}
                                   flightNumber={returnFlightNumber}
                                   flightOrigin={returnFlightOrigin}
@@ -5913,10 +5916,11 @@ function DispatchBookingEngineComponent({
                                   isDropoffAirport={returnAirportDetection.isDropoffAirport}
                                   airportIataCode={returnAirportDetection.airport?.iataCode || 'STL'}
                                   serviceDate={returnDate || scheduledDate}
+                                  bookingType="scheduled"
                                   scheduledPickupIso={
-                                    returnDate && returnTime
+                                    returnDate
                                       ? (() => {
-                                          const d = new Date(`${returnDate}T${returnTime}:00`);
+                                          const d = new Date(`${returnDate}T${returnTime || '12:00'}:00`);
                                           return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
                                         })()
                                       : undefined

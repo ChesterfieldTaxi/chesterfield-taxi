@@ -8,7 +8,7 @@
  * All detection logic is pure (no side effects) per constitution.md constraints.
  */
 
-import type { VehicleTier } from '../types';
+import type { VehicleTier, TripStatus } from '../types';
 import type {
   FlightPickupAlignment,
   FlightTelemetrySnapshot,
@@ -644,6 +644,98 @@ export function evaluateFlightPickupAlignment(
   }
 
   return { aligned: true, conflict: 'none', driftMinutes: 0, bufferMinutes };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 38.B: Flight Status Quota & Operational Window Eligibility Gate
+// ---------------------------------------------------------------------------
+
+export const FLIGHT_LOOKUP_FUTURE_WINDOW_MS = 24 * 3_600_000; // 24 hours before pickup
+export const FLIGHT_LOOKUP_PAST_WINDOW_MS = 12 * 3_600_000; // 12 hours after pickup
+
+export type FlightCheckBlockReason =
+  | 'staff_only'
+  | 'unconfirmed'
+  | 'terminal_status'
+  | 'outside_24h_window'
+  | 'past_window';
+
+export interface FlightCheckEligibilityInput {
+  status?: TripStatus;
+  bookingType?: 'asap' | 'scheduled';
+  scheduledPickupTime?: string;
+  isStaffContext?: boolean;
+  nowMs?: number;
+}
+
+export interface FlightCheckEligibilityResult {
+  eligible: boolean;
+  reason?: FlightCheckBlockReason;
+  message?: string;
+  unlocksAtIso?: string;
+}
+
+/**
+ * Pure operational quota gate controlling when live aviation API lookups are permitted:
+ * 1. Staff-only (`isStaffContext === true`).
+ * 2. Never for `UNCONFIRMED` bookings or closed/terminal (`DECLINED` / `cancelled` / `completed`) trips.
+ * 3. For scheduled rides, strictly within `[-12h, +24h]` of `scheduledPickupTime`.
+ */
+export function evaluateFlightCheckEligibility(
+  input: FlightCheckEligibilityInput
+): FlightCheckEligibilityResult {
+  if (!input.isStaffContext) {
+    return {
+      eligible: false,
+      reason: 'staff_only',
+      message: 'Live flight status checks are restricted to Dispatch and Admin staff.',
+    };
+  }
+
+  if (input.status === 'UNCONFIRMED' || input.status === 'unconfirmed') {
+    return {
+      eligible: false,
+      reason: 'unconfirmed',
+      message: 'Confirm booking first to enable live flight tracking.',
+    };
+  }
+
+  if (
+    input.status === 'DECLINED' ||
+    input.status === 'declined' ||
+    input.status === 'cancelled' ||
+    input.status === 'completed'
+  ) {
+    return {
+      eligible: false,
+      reason: 'terminal_status',
+      message: 'Live flight tracking is disabled for closed/completed trips.',
+    };
+  }
+
+  if (input.bookingType !== 'asap' && input.scheduledPickupTime) {
+    const pickupMs = Date.parse(input.scheduledPickupTime);
+    if (Number.isFinite(pickupMs)) {
+      const nowMs = input.nowMs ?? Date.now();
+      if (pickupMs - nowMs > FLIGHT_LOOKUP_FUTURE_WINDOW_MS) {
+        return {
+          eligible: false,
+          reason: 'outside_24h_window',
+          unlocksAtIso: new Date(pickupMs - FLIGHT_LOOKUP_FUTURE_WINDOW_MS).toISOString(),
+          message: 'Live flight tracking unlocks within 24 hours of scheduled pickup.',
+        };
+      }
+      if (nowMs - pickupMs > FLIGHT_LOOKUP_PAST_WINDOW_MS) {
+        return {
+          eligible: false,
+          reason: 'past_window',
+          message: 'Pickup window has passed (>12h ago); live flight lookup locked.',
+        };
+      }
+    }
+  }
+
+  return { eligible: true };
 }
 
 // ---------------------------------------------------------------------------

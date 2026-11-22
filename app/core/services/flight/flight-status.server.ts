@@ -12,6 +12,8 @@
  */
 
 import {
+  FLIGHT_LOOKUP_FUTURE_WINDOW_MS,
+  FLIGHT_LOOKUP_PAST_WINDOW_MS,
   parseFlightIdent,
   resolveStlTerminalInfo,
 } from '../../config/airports';
@@ -28,6 +30,7 @@ import {
   fetchFirestoreDocumentRest,
   getRequestClientIp,
   verifyServerRequestAuth,
+  type VerifiedServerAuth,
 } from '../auth/server-auth.server';
 import { isFirebaseConfigured } from '../firebase';
 import {
@@ -657,6 +660,8 @@ export interface LookupFlightServerOptions {
 export interface LookupFlightServerResult {
   success: boolean;
   status: number;
+  code?: string;
+  unlocksAtIso?: string;
   snapshot?: FlightTelemetrySnapshot;
   fromCache?: boolean;
   cacheKey?: string;
@@ -796,7 +801,56 @@ export async function lookupFlightTelemetryServer(
     return {
       success: false,
       status: 400,
+      code: 'INVALID_SERVICE_DATE',
       error: 'Valid serviceDate in YYYY-MM-DD format is required.',
+    };
+  }
+
+  // Phase 38.B Operational Window Guard (enforced before cache or upstream provider calls):
+  // 1. If scheduledPickupIso is supplied, require [-12h, +24h] relative to nowMs.
+  if (typeof input.scheduledPickupIso === 'string' && input.scheduledPickupIso.trim()) {
+    const pickupMs = Date.parse(input.scheduledPickupIso.trim());
+    if (!Number.isFinite(pickupMs)) {
+      return {
+        success: false,
+        status: 400,
+        code: 'INVALID_PICKUP_TIME',
+        error: 'Valid scheduledPickupIso timestamp is required.',
+      };
+    }
+    if (pickupMs - nowMs > FLIGHT_LOOKUP_FUTURE_WINDOW_MS) {
+      return {
+        success: false,
+        status: 400,
+        code: 'OUTSIDE_24H_WINDOW',
+        unlocksAtIso: new Date(pickupMs - FLIGHT_LOOKUP_FUTURE_WINDOW_MS).toISOString(),
+        error: 'Live flight tracking unlocks within 24 hours of scheduled pickup.',
+      };
+    }
+    if (nowMs - pickupMs > FLIGHT_LOOKUP_PAST_WINDOW_MS) {
+      return {
+        success: false,
+        status: 400,
+        code: 'OUTSIDE_24H_WINDOW',
+        error: 'Pickup window has passed (>12h ago); live flight lookup locked.',
+      };
+    }
+  }
+
+  // 2. Always require serviceDate (YYYY-MM-DD) within [-1, +1] calendar days of nowMs
+  const [yNum, mNum, dNum] = serviceDate.split('-').map(Number);
+  const serviceDayIndex = Math.floor(Date.UTC(yNum, mNum - 1, dNum) / 86_400_000);
+  const nowDayIndex = Math.floor(nowMs / 86_400_000);
+  const calendarDayDelta = serviceDayIndex - nowDayIndex;
+  if (calendarDayDelta > 1 || calendarDayDelta < -1) {
+    return {
+      success: false,
+      status: 400,
+      code: 'OUTSIDE_24H_WINDOW',
+      error:
+        calendarDayDelta > 1
+          ? 'Live flight tracking unlocks within 24 hours of scheduled pickup.'
+          : 'Pickup window has passed; live flight lookup locked.',
     };
   }
 
@@ -916,20 +970,53 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-export async function handleFlightStatusGet(request: Request): Promise<Response> {
+export interface FlightStatusHttpHandlerOptions {
+  enforceAuth?: boolean;
+  authResolver?: (request: Request) => Promise<VerifiedServerAuth>;
+  nowMs?: number;
+}
+
+function shouldEnforceStaffAuth(explicitFlag?: boolean): boolean {
+  if (typeof explicitFlag === 'boolean') return explicitFlag;
+  return isFirebaseConfigured() || process.env.NODE_ENV === 'production';
+}
+
+export async function handleFlightStatusGet(
+  request: Request,
+  options?: FlightStatusHttpHandlerOptions
+): Promise<Response> {
+  const resolveAuth = options?.authResolver ?? verifyServerRequestAuth;
+  const auth = await resolveAuth(request);
+
+  if (shouldEnforceStaffAuth(options?.enforceAuth)) {
+    if (!auth.authenticated) {
+      return jsonResponse(
+        {
+          success: false,
+          code: 'UNAUTHORIZED',
+          error: 'Dispatcher or Admin authentication required for flight telemetry.',
+        },
+        401
+      );
+    }
+    if (!auth.isDispatcher) {
+      return jsonResponse(
+        {
+          success: false,
+          code: 'FORBIDDEN',
+          error: 'Dispatcher or Admin role required for flight telemetry.',
+        },
+        403
+      );
+    }
+  }
+
   const url = new URL(request.url);
   const isDiagnostics =
     url.searchParams.get('diagnostics') === '1' ||
     url.searchParams.get('diagnostics') === 'true';
 
   if (isDiagnostics) {
-    const auth = await verifyServerRequestAuth(request);
-    if (isFirebaseConfigured() && !auth.isDispatcher) {
-      return jsonResponse(
-        { success: false, error: 'Dispatcher or Admin authorization required for diagnostics.' },
-        403
-      );
-    }
     return jsonResponse({
       success: true,
       ...getFlightIntegrationDiagnostics(),
@@ -944,12 +1031,12 @@ export async function handleFlightStatusGet(request: Request): Promise<Response>
     );
   }
 
-  const auth = await verifyServerRequestAuth(request);
   const airline = url.searchParams.get('airline') || '';
   const flightNumber = url.searchParams.get('flightNumber') || url.searchParams.get('flight') || '';
   const serviceDate = url.searchParams.get('serviceDate') || url.searchParams.get('date') || '';
   const destinationIata = url.searchParams.get('destinationIata') || 'STL';
   const originIata = url.searchParams.get('originIata') || '';
+  const scheduledPickupIso = url.searchParams.get('scheduledPickupIso') || undefined;
   const forceRefresh =
     url.searchParams.get('forceRefresh') === '1' ||
     url.searchParams.get('forceRefresh') === 'true';
@@ -961,17 +1048,24 @@ export async function handleFlightStatusGet(request: Request): Promise<Response>
       serviceDate,
       destinationIata,
       originIata,
+      scheduledPickupIso,
     },
     {
       forceRefresh,
-      isStaffAuthorized: auth.isDispatcher,
+      isStaffAuthorized: auth.isDispatcher || !shouldEnforceStaffAuth(options?.enforceAuth),
       staffBearerToken: auth.isDispatcher ? auth.rawToken : undefined,
+      nowMs: options?.nowMs,
     }
   );
 
   if (!result.success || !result.snapshot) {
     return jsonResponse(
-      { success: false, error: result.error || 'Unable to check flight status.' },
+      {
+        success: false,
+        code: result.code,
+        unlocksAtIso: result.unlocksAtIso,
+        error: result.error || 'Unable to check flight status.',
+      },
       result.status
     );
   }
@@ -984,7 +1078,36 @@ export async function handleFlightStatusGet(request: Request): Promise<Response>
   });
 }
 
-export async function handleFlightStatusPost(request: Request): Promise<Response> {
+export async function handleFlightStatusPost(
+  request: Request,
+  options?: FlightStatusHttpHandlerOptions
+): Promise<Response> {
+  const resolveAuth = options?.authResolver ?? verifyServerRequestAuth;
+  const auth = await resolveAuth(request);
+
+  if (shouldEnforceStaffAuth(options?.enforceAuth)) {
+    if (!auth.authenticated) {
+      return jsonResponse(
+        {
+          success: false,
+          code: 'UNAUTHORIZED',
+          error: 'Dispatcher or Admin authentication required for flight telemetry.',
+        },
+        401
+      );
+    }
+    if (!auth.isDispatcher) {
+      return jsonResponse(
+        {
+          success: false,
+          code: 'FORBIDDEN',
+          error: 'Dispatcher or Admin role required for flight telemetry.',
+        },
+        403
+      );
+    }
+  }
+
   const clientIp = getRequestClientIp(request);
   if (!checkRateLimit(`flight-status:${clientIp}`, 30, 60_000)) {
     return jsonResponse(
@@ -1000,15 +1123,7 @@ export async function handleFlightStatusPost(request: Request): Promise<Response
     return jsonResponse({ success: false, error: 'Invalid JSON request body.' }, 400);
   }
 
-  const auth = await verifyServerRequestAuth(request);
   const forceRefresh = Boolean(body.forceRefresh);
-  if (body.action === 'refresh_trip_flight' && isFirebaseConfigured() && !auth.isDispatcher) {
-    return jsonResponse(
-      { success: false, error: 'Dispatcher or Admin authorization required to force-refresh trip flights.' },
-      403
-    );
-  }
-
   const result = await lookupFlightTelemetryServer(
     {
       airline: typeof body.airline === 'string' ? body.airline : '',
@@ -1021,14 +1136,20 @@ export async function handleFlightStatusPost(request: Request): Promise<Response
     },
     {
       forceRefresh,
-      isStaffAuthorized: auth.isDispatcher,
+      isStaffAuthorized: auth.isDispatcher || !shouldEnforceStaffAuth(options?.enforceAuth),
       staffBearerToken: auth.isDispatcher ? auth.rawToken : undefined,
+      nowMs: options?.nowMs,
     }
   );
 
   if (!result.success || !result.snapshot) {
     return jsonResponse(
-      { success: false, error: result.error || 'Unable to check flight status.' },
+      {
+        success: false,
+        code: result.code,
+        unlocksAtIso: result.unlocksAtIso,
+        error: result.error || 'Unable to check flight status.',
+      },
       result.status
     );
   }

@@ -24,6 +24,7 @@ import {
 import { evaluateTripSlaUrgency } from '../../../core/services/dispatch/sla-monitor.service';
 import { getPayLinkService } from '../../../core/services/payments/pay-link.service';
 import {
+  evaluateFlightCheckEligibility,
   evaluateFlightPickupAlignment,
   resolveStlTerminalInfo,
 } from '../../../core/config/airports';
@@ -34,6 +35,8 @@ import {
 } from '../../../core/services/flight/flight-status.service';
 import {
   BoltIcon,
+  ClockIcon,
+  LockIcon,
   XIcon,
   DocumentTextIcon,
   ShieldCheckIcon,
@@ -2276,6 +2279,22 @@ export function DispatchTripDetailsDrawer({
                         const isTerminalStatus = ['completed', 'cancelled', 'DECLINED', 'declined'].includes(
                           String(reviewTrip.status || '')
                         );
+                        const flightEligibility = evaluateFlightCheckEligibility({
+                          status: reviewTrip.status,
+                          bookingType: reviewTrip.bookingType,
+                          scheduledPickupTime: reviewTrip.scheduledPickupTime,
+                          isStaffContext: true,
+                        });
+                        const unlockWindowLabel =
+                          flightEligibility.unlocksAtIso &&
+                          Number.isFinite(Date.parse(flightEligibility.unlocksAtIso))
+                            ? new Date(flightEligibility.unlocksAtIso).toLocaleString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })
+                            : null;
                         const alignment =
                           creds.isAirportPickup && snap
                             ? evaluateFlightPickupAlignment(snap, reviewTrip.scheduledPickupTime, {
@@ -2283,6 +2302,7 @@ export function DispatchTripDetailsDrawer({
                               })
                             : null;
                         const etaPlan =
+                          flightEligibility.eligible &&
                           !isTerminalStatus &&
                           creds.isAirportPickup &&
                           snap &&
@@ -2295,7 +2315,8 @@ export function DispatchTripDetailsDrawer({
                             ? buildFlightPickupEtaAdjustment(reviewTrip, snap)
                             : null;
                         const showEtaSyncBtn = Boolean(
-                          etaPlan &&
+                          flightEligibility.eligible &&
+                            etaPlan &&
                             (!reviewTrip.scheduledPickupTime ||
                               Math.abs(
                                 Date.parse(etaPlan.newScheduledPickupIso) -
@@ -2347,24 +2368,59 @@ export function DispatchTripDetailsDrawer({
                                   </div>
 
                                   {creds.flightIdent && (
-                                    <button
-                                      type="button"
-                                      disabled={isRefreshingFlight}
-                                      onClick={() => handleRefreshTripFlight(reviewTrip)}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
-                                    >
-                                      {isRefreshingFlight ? (
-                                        <>
-                                          <SpinnerIcon className="w-3 h-3 animate-spin" />
-                                          <span>Refreshing...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <RefreshCwIcon className="w-3 h-3" />
-                                          <span>Refresh Flight</span>
-                                        </>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {!flightEligibility.eligible && (
+                                        <span
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                            flightEligibility.reason === 'unconfirmed'
+                                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                                          }`}
+                                        >
+                                          {flightEligibility.reason === 'outside_24h_window' ? (
+                                            <>
+                                              <ClockIcon className="w-3 h-3 shrink-0" />
+                                              <span>
+                                                Unlocks 24h before pickup
+                                                {unlockWindowLabel ? ` (${unlockWindowLabel})` : ''}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <LockIcon className="w-3 h-3 shrink-0" />
+                                              <span>
+                                                {flightEligibility.message ||
+                                                  'Live flight tracking locked'}
+                                              </span>
+                                            </>
+                                          )}
+                                        </span>
                                       )}
-                                    </button>
+
+                                      <button
+                                        type="button"
+                                        disabled={isRefreshingFlight || !flightEligibility.eligible}
+                                        onClick={() => handleRefreshTripFlight(reviewTrip)}
+                                        title={
+                                          !flightEligibility.eligible
+                                            ? flightEligibility.message || 'Live flight lookup locked'
+                                            : 'Force-refresh live flight status'
+                                        }
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {isRefreshingFlight ? (
+                                          <>
+                                            <SpinnerIcon className="w-3 h-3 animate-spin" />
+                                            <span>Refreshing...</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <RefreshCwIcon className="w-3 h-3" />
+                                            <span>Refresh Flight</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
 

@@ -571,6 +571,23 @@
   - [x] 38.5.2 Run `npm run typecheck` (0 errors) and `npm run build` (confirming `api.flight-status` client chunk is `0.00 kB`).
   - [x] 38.5.3 Run `npx tsx scripts/test-flight-status.ts` AND all prior verification suites (`test-corporate-portal`, `test-payment-webhooks-and-links`, `test-auto-dispatch-sla`, `test-pwa-notifications`, `npm run test:e2e`, `npm run test:stress`), then mark Phase 38 complete in `tasks.md`.
 
+## Phase 38.B: Flight Status Quota & Operational Window Gates (Staff-Only, Confirmed-Only & 24-Hour Pickup Lock)
+- [x] 38.B.0 SDD Documentation:
+  - [x] 38.B.0.1 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 38.B scope and architecture before modifying application code.
+- [x] 38.B.1 Pure Eligibility Evaluator (`evaluateFlightCheckEligibility`):
+  - [x] 38.B.1.1 Implement `evaluateFlightCheckEligibility` in `app/core/config/airports.ts` (`staff_only`, `unconfirmed`, `terminal_status`, `outside_24h_window` with `unlocksAtIso`, `past_window`) and re-export from `app/core/services/flight/flight-status.service.ts`.
+- [x] 38.B.2 Server-Side Staff Auth & 24-Hour Window Guard:
+  - [x] 38.B.2.1 Enforce Dispatcher/Admin authorization (`401`/`403`) across all `GET` and `POST /api/flight-status` endpoints in `flight-status.server.ts`, and use `authorizedFetch` for all `FlightStatusService.checkFlightStatus` calls.
+  - [x] 38.B.2.2 Enforce `[-12h, +24h]` `scheduledPickupIso` window and `[-1, +1]` calendar-day `serviceDate` validation (`400` `OUTSIDE_24H_WINDOW`) inside `lookupFlightTelemetryServer` prior to any upstream provider call.
+- [x] 38.B.3 Customer vs. Staff UI & Service Gate Updates:
+  - [x] 38.B.3.1 Default `allowLiveCheck = false` on `FlightAssistanceCard` / `FlightTelemetryCheckPanel` (and `BookingEngineV2.tsx`) so customer/corporate forms render only free local STL Terminal & Exit Door guidance.
+  - [x] 38.B.3.2 Pass `allowLiveCheck={true}`, `bookingType`, and computed `scheduledPickupIso` in `DispatchBookingEngine.tsx` (rendering disabled *"Unlocks 24h before pickup"* badge when > 24h out).
+  - [x] 38.B.3.3 Guard `refreshTripFlightTelemetry` & `syncTripPickupToFlightEta` with `evaluateFlightCheckEligibility`, and disable `Refresh Flight` / `Adjust Pickup Time` in `DispatchTripDetailsDrawer.tsx` with clear inline lock-reason pills when ineligible.
+- [x] 38.B.4 Verification Gate:
+  - [x] 38.B.4.1 Expand `scripts/test-flight-status.ts` to verify `401`/`403` staff-only `/api/flight-status` rejection, `evaluateFlightCheckEligibility` (`UNCONFIRMED`, `completed`/`cancelled`, `> 24h` future `unlocksAtIso`, `> 12h` past, `CONFIRMED` <= 24h, `asap`), and `400` `OUTSIDE_24H_WINDOW` server rejection with 0 upstream `fetchImpl` calls.
+  - [x] 38.B.4.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-flight-status.ts`, and `npm run test:e2e` with 0 errors, then mark Phase 38.B complete in `tasks.md`.
+
+
 
 
 

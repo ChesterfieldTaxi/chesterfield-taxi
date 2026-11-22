@@ -859,6 +859,24 @@ export interface PassengerAccount {
 - **Driver (`DriverTripManifest.tsx`) & Admin (`AdminIntegrationsSubpage.tsx`)**:
   - Live flight status badge, terminal/gate/baggage belt, and STL exit door guidance in `DriverTripManifest.tsx`; Flight Status Telemetry readiness & cache diagnostics card in `AdminIntegrationsSubpage.tsx`.
 
+### 27.5 Phase 38.B Architecture: Quota & Operational Window Gates (Staff-Only, Confirmed-Only & 24-Hour Pickup Lock)
+- **Pure Domain Gate (`evaluateFlightCheckEligibility` in `app/core/config/airports.ts`)**:
+  - Accepts `{ status, bookingType, scheduledPickupTime, isStaffContext, nowMs }` and deterministically returns `{ eligible, reason, message, unlocksAtIso }`:
+    - `!isStaffContext` -> `{ eligible: false, reason: 'staff_only' }`
+    - `status` in `['UNCONFIRMED', 'unconfirmed']` -> `{ eligible: false, reason: 'unconfirmed', message: 'Confirm booking first to enable live flight tracking.' }`
+    - `status` in `['DECLINED', 'declined', 'cancelled', 'completed']` -> `{ eligible: false, reason: 'terminal_status', message: 'Live flight tracking is disabled for closed/completed trips.' }`
+    - `bookingType !== 'asap'` with valid `scheduledPickupTime`:
+      - `pickupMs - nowMs > 24 * 3_600_000` -> `{ eligible: false, reason: 'outside_24h_window', unlocksAtIso, message: 'Live flight tracking unlocks within 24 hours of scheduled pickup.' }`
+      - `nowMs - pickupMs > 12 * 3_600_000` -> `{ eligible: false, reason: 'past_window', message: 'Pickup window has passed (>12h ago); live flight lookup locked.' }`
+    - Otherwise `{ eligible: true }`.
+- **Server-Side Staff Auth & Operational Window Enforcement (`flight-status.server.ts`)**:
+  - All `GET` and `POST /api/flight-status` requests require Dispatcher/Admin auth (`401` unauthenticated, `403` non-dispatcher) when `isFirebaseConfigured()` or `NODE_ENV === 'production'` (or `enforceAuth: true` in verification tests).
+  - `lookupFlightTelemetryServer` rejects `scheduledPickupIso` outside `[-12h, +24h]` of `nowMs` and `serviceDate` outside `[-1, +1]` calendar days of `nowMs` with `400` (`code: 'OUTSIDE_24H_WINDOW'`) before any upstream `fetchImpl` invocation.
+- **UI & Service Gate Wiring**:
+  - `FlightAssistanceCard` / `FlightTelemetryCheckPanel` default `allowLiveCheck = false` so customer/corporate forms render only local STL Terminal & Exit Door guidance; `DispatchBookingEngine` passes `allowLiveCheck={true}` + `bookingType` + `scheduledPickupIso` to show unlocked live checks within 24h/ASAP and *"Unlocks 24h before pickup"* otherwise.
+  - `FlightStatusService.checkFlightStatus` uses `authorizedFetch`; `refreshTripFlightTelemetry` & `syncTripPickupToFlightEta` enforce `evaluateFlightCheckEligibility`; `DispatchTripDetailsDrawer` disables `Refresh Flight` & `Adjust Pickup Time` with inline reason pills when ineligible.
+
+
 
 
 

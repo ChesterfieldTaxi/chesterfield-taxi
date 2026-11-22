@@ -3076,6 +3076,7 @@ export function BookingEngineV2({
                   lambertPickupInstructions={bookingConfig.lambertPickupInstructions}
                   flightNumberError={errors.flightNumber}
                   tailNumberError={errors.tailNumber}
+                  allowLiveCheck={false}
                   serviceDate={form.scheduledDate || todayLocalDate}
                   scheduledPickupIso={
                     form.timingType === 'later' && form.scheduledDate && form.scheduledTime
@@ -4049,6 +4050,7 @@ export function BookingEngineV2({
                           lambertPickupInstructions={bookingConfig.lambertPickupInstructions}
                           flightNumberError={errors.returnFlightNumber}
                           tailNumberError={errors.returnTailNumber}
+                          allowLiveCheck={false}
                           serviceDate={form.returnDate || form.scheduledDate || todayLocalDate}
                           scheduledPickupIso={
                             form.returnDate && form.returnTime

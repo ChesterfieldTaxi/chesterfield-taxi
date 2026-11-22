@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  evaluateFlightCheckEligibility,
   evaluateFlightPickupAlignment,
   parseFlightIdent,
   resolveStlTerminalInfo,
@@ -30,12 +31,15 @@ import {
   FallbackScheduleProvider,
   FlightAwareProvider,
   getFlightIntegrationDiagnostics,
+  handleFlightStatusGet,
+  handleFlightStatusPost,
   isValidServiceDate,
   lookupFlightTelemetryServer,
   resetFlightTelemetryCacheForTests,
 } from '../app/core/services/flight/flight-status.server';
 import {
   FlightStatusService,
+  evaluateFlightCheckEligibility as reExportedEligibility,
   resolveTripFlightBadge,
 } from '../app/core/services/flight/flight-status.service';
 import { MockBookingService } from '../app/core/services/booking/mock-booking.service';
@@ -470,6 +474,7 @@ async function runTests() {
     actorId: 'disp-01',
     actorRole: 'dispatcher',
     bookingService: mockBooking,
+    nowMs: Date.parse('2026-11-22T18:00:00.000Z'),
     notifyDriverFn: async (driverId, payload) => {
       notifiedDriverId = driverId;
       notifiedTitle = payload.title;
@@ -526,7 +531,243 @@ async function runTests() {
 
   console.log('   ✅ Passed firestore.rules /flightStatusCache security assertions.\n');
 
-  console.log('🎉 ALL PHASE 38 FLIGHT STATUS TELEMETRY ASSERTIONS PASSED!');
+  // ───────────────────────────────────────────────────────────────────────────
+  // 6. Phase 38.B: Staff-Only Auth, Confirmed-Only & 24-Hour Operational Window
+  // ───────────────────────────────────────────────────────────────────────────
+  console.log('6️⃣  Testing Phase 38.B Quota & Operational Window Gates...');
+
+  assert.equal(evaluateFlightCheckEligibility, reExportedEligibility);
+  const refNow = Date.parse('2026-11-22T12:00:00.000Z');
+
+  // 6a. Pure evaluateFlightCheckEligibility checks
+  assert.deepEqual(
+    evaluateFlightCheckEligibility({
+      isStaffContext: false,
+      status: 'CONFIRMED',
+      bookingType: 'asap',
+      nowMs: refNow,
+    }),
+    {
+      eligible: false,
+      reason: 'staff_only',
+      message: 'Live flight status checks are restricted to Dispatch and Admin staff.',
+    }
+  );
+
+  const unconfirmedElig = evaluateFlightCheckEligibility({
+    isStaffContext: true,
+    status: 'UNCONFIRMED',
+    bookingType: 'scheduled',
+    scheduledPickupTime: '2026-11-22T18:00:00.000Z',
+    nowMs: refNow,
+  });
+  assert.equal(unconfirmedElig.eligible, false);
+  assert.equal(unconfirmedElig.reason, 'unconfirmed');
+  assert.equal(unconfirmedElig.message, 'Confirm booking first to enable live flight tracking.');
+
+  for (const termStatus of ['completed', 'cancelled', 'DECLINED', 'declined'] as const) {
+    const termElig = evaluateFlightCheckEligibility({
+      isStaffContext: true,
+      status: termStatus,
+      bookingType: 'scheduled',
+      scheduledPickupTime: '2026-11-22T18:00:00.000Z',
+      nowMs: refNow,
+    });
+    assert.equal(termElig.eligible, false, `Expected ${termStatus} to be blocked`);
+    assert.equal(termElig.reason, 'terminal_status');
+  }
+
+  // > 24h in future (30h ahead: 2026-11-23T18:00:00Z) -> unlocks at 2026-11-22T18:00:00Z
+  const farFutureElig = evaluateFlightCheckEligibility({
+    isStaffContext: true,
+    status: 'CONFIRMED',
+    bookingType: 'scheduled',
+    scheduledPickupTime: '2026-11-23T18:00:00.000Z',
+    nowMs: refNow,
+  });
+  assert.equal(farFutureElig.eligible, false);
+  assert.equal(farFutureElig.reason, 'outside_24h_window');
+  assert.equal(farFutureElig.unlocksAtIso, '2026-11-22T18:00:00.000Z');
+
+  // > 12h in past (15h ago: 2026-11-21T21:00:00Z) -> past_window
+  const pastElig = evaluateFlightCheckEligibility({
+    isStaffContext: true,
+    status: 'CONFIRMED',
+    bookingType: 'scheduled',
+    scheduledPickupTime: '2026-11-21T21:00:00.000Z',
+    nowMs: refNow,
+  });
+  assert.equal(pastElig.eligible, false);
+  assert.equal(pastElig.reason, 'past_window');
+
+  // Within 24h CONFIRMED -> eligible
+  const withinWindowElig = evaluateFlightCheckEligibility({
+    isStaffContext: true,
+    status: 'CONFIRMED',
+    bookingType: 'scheduled',
+    scheduledPickupTime: '2026-11-23T10:00:00.000Z', // +22h
+    nowMs: refNow,
+  });
+  assert.equal(withinWindowElig.eligible, true);
+
+  // ASAP CONFIRMED -> eligible even if legacy scheduledPickupTime was far out
+  const asapElig = evaluateFlightCheckEligibility({
+    isStaffContext: true,
+    status: 'CONFIRMED',
+    bookingType: 'asap',
+    scheduledPickupTime: '2026-11-29T10:00:00.000Z',
+    nowMs: refNow,
+  });
+  assert.equal(asapElig.eligible, true);
+
+  // Verify FlightStatusService.refreshTripFlightTelemetry blocks UNCONFIRMED trips client-side
+  const unconfirmedRefresh = await flightSvc.refreshTripFlightTelemetry(
+    { ...assignedTrip, status: 'UNCONFIRMED' },
+    { nowMs: refNow }
+  );
+  assert.equal(unconfirmedRefresh.success, false);
+  assert.equal(unconfirmedRefresh.code, 'unconfirmed');
+
+  // 6b. Server-side 24h window guard in lookupFlightTelemetryServer (0 upstream fetch calls!)
+  let guardedFetchCount = 0;
+  const zeroAllowedFetch: typeof fetch = async () => {
+    guardedFetchCount += 1;
+    throw new Error('Upstream fetchImpl MUST NOT be called for out-of-window requests');
+  };
+
+  // Rejects scheduledPickupIso > 24h ahead (+36h)
+  const over24hServer = await lookupFlightTelemetryServer(
+    {
+      airline: 'WN',
+      flightNumber: '1425',
+      serviceDate: '2026-11-23',
+      scheduledPickupIso: '2026-11-24T00:00:00.000Z',
+    },
+    {
+      env: testEnv,
+      fetchImpl: zeroAllowedFetch,
+      nowMs: refNow,
+      skipFirestoreCache: true,
+    }
+  );
+  assert.equal(over24hServer.success, false);
+  assert.equal(over24hServer.status, 400);
+  assert.equal(over24hServer.code, 'OUTSIDE_24H_WINDOW');
+  assert.equal(over24hServer.unlocksAtIso, '2026-11-23T00:00:00.000Z');
+  assert.equal(guardedFetchCount, 0);
+
+  // Rejects distant future serviceDate (>= +2 calendar days) even when scheduledPickupIso is omitted
+  const distantFutureDateServer = await lookupFlightTelemetryServer(
+    {
+      airline: 'AA',
+      flightNumber: '2049',
+      serviceDate: '2026-11-25', // +3 days from 2026-11-22
+    },
+    {
+      env: testEnv,
+      fetchImpl: zeroAllowedFetch,
+      nowMs: refNow,
+      skipFirestoreCache: true,
+    }
+  );
+  assert.equal(distantFutureDateServer.success, false);
+  assert.equal(distantFutureDateServer.status, 400);
+  assert.equal(distantFutureDateServer.code, 'OUTSIDE_24H_WINDOW');
+  assert.equal(guardedFetchCount, 0);
+
+  // Rejects distant past serviceDate (<= -2 calendar days)
+  const distantPastDateServer = await lookupFlightTelemetryServer(
+    {
+      airline: 'DL',
+      flightNumber: '1192',
+      serviceDate: '2026-11-19', // -3 days from 2026-11-22
+    },
+    {
+      env: testEnv,
+      fetchImpl: zeroAllowedFetch,
+      nowMs: refNow,
+      skipFirestoreCache: true,
+    }
+  );
+  assert.equal(distantPastDateServer.success, false);
+  assert.equal(distantPastDateServer.status, 400);
+  assert.equal(distantPastDateServer.code, 'OUTSIDE_24H_WINDOW');
+  assert.equal(guardedFetchCount, 0);
+
+  // 6c. HTTP endpoint staff-only auth enforcement (`401` unauthenticated, `403` customer, `200` dispatcher)
+  const unauthResp = await handleFlightStatusPost(
+    new Request('https://chesterfieldtaxi.com/api/flight-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ airline: 'WN', flightNumber: '1425', serviceDate: '2026-11-22' }),
+    }),
+    {
+      enforceAuth: true,
+      nowMs: refNow,
+      authResolver: async () => ({
+        authenticated: false,
+        isAdminSecret: false,
+        roles: [],
+        isAdmin: false,
+        isDispatcher: false,
+        isDriver: false,
+        isCorporateManager: false,
+      }),
+    }
+  );
+  assert.equal(unauthResp.status, 401);
+
+  const customerResp = await handleFlightStatusGet(
+    new Request(
+      'https://chesterfieldtaxi.com/api/flight-status?airline=WN&flightNumber=1425&serviceDate=2026-11-22'
+    ),
+    {
+      enforceAuth: true,
+      nowMs: refNow,
+      authResolver: async () => ({
+        authenticated: true,
+        isAdminSecret: false,
+        uid: 'cust-101',
+        email: 'rider@example.com',
+        roles: ['customer'],
+        isAdmin: false,
+        isDispatcher: false,
+        isDriver: false,
+        isCorporateManager: false,
+      }),
+    }
+  );
+  assert.equal(customerResp.status, 403);
+
+  const dispatcherResp = await handleFlightStatusPost(
+    new Request('https://chesterfieldtaxi.com/api/flight-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ airline: 'WN', flightNumber: '1425', serviceDate: '2026-11-22' }),
+    }),
+    {
+      enforceAuth: true,
+      nowMs: refNow,
+      authResolver: async () => ({
+        authenticated: true,
+        isAdminSecret: false,
+        uid: 'disp-01',
+        email: 'dispatch@chesterfieldtaxi.com',
+        roles: ['dispatcher'],
+        isAdmin: false,
+        isDispatcher: true,
+        isDriver: false,
+        isCorporateManager: false,
+      }),
+    }
+  );
+  assert.equal(dispatcherResp.status, 200);
+  const dispatcherBody = (await dispatcherResp.json()) as { success?: boolean };
+  assert.equal(dispatcherBody.success, true);
+
+  console.log('   ✅ Passed Phase 38.B staff-only auth, confirmed-only & 24h operational window gates.\n');
+
+  console.log('🎉 ALL PHASE 38 + 38.B FLIGHT STATUS TELEMETRY ASSERTIONS PASSED!');
 }
 
 runTests().catch((err) => {

@@ -14,10 +14,21 @@
 import { doc, setDoc } from 'firebase/firestore';
 import {
   detectAirportInAddresses,
+  evaluateFlightCheckEligibility,
   evaluateFlightPickupAlignment,
   parseFlightIdent,
   resolveStlTerminalInfo,
+  type FlightCheckBlockReason,
+  type FlightCheckEligibilityInput,
+  type FlightCheckEligibilityResult,
 } from '../../config/airports';
+
+export {
+  evaluateFlightCheckEligibility,
+  type FlightCheckBlockReason,
+  type FlightCheckEligibilityInput,
+  type FlightCheckEligibilityResult,
+};
 import type {
   FlightDiagnosticsSummary,
   FlightTelemetrySnapshot,
@@ -42,6 +53,8 @@ export interface CheckFlightStatusParams {
 
 export interface CheckFlightStatusResult {
   success: boolean;
+  code?: string;
+  unlocksAtIso?: string;
   snapshot?: FlightTelemetrySnapshot;
   fromCache?: boolean;
   cacheKey?: string;
@@ -462,8 +475,7 @@ export class FlightStatusService {
         : resolveServiceDateYmd(params.scheduledPickupIso);
 
     try {
-      const fetchFn = params.forceRefresh ? authorizedFetch : fetch;
-      const resp = await fetchFn('/api/flight-status', {
+      const resp = await authorizedFetch('/api/flight-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -480,6 +492,8 @@ export class FlightStatusService {
 
       const data = (await resp.json().catch(() => ({}))) as {
         success?: boolean;
+        code?: string;
+        unlocksAtIso?: string;
         snapshot?: FlightTelemetrySnapshot;
         fromCache?: boolean;
         cacheKey?: string;
@@ -489,6 +503,8 @@ export class FlightStatusService {
       if (!resp.ok || !data.success || !data.snapshot) {
         return {
           success: false,
+          code: data.code,
+          unlocksAtIso: data.unlocksAtIso,
           error: data.error || 'Unable to retrieve flight status right now.',
         };
       }
@@ -530,11 +546,35 @@ export class FlightStatusService {
 
   /**
    * Refreshes and persists `flightTelemetry` onto an existing `Trip` (Dispatcher/Admin).
+   * Guarded by `evaluateFlightCheckEligibility` (confirmed-only + 24h pickup window).
    */
   async refreshTripFlightTelemetry(
     trip: Trip,
-    options?: { forceRefresh?: boolean; bookingService?: IBookingService }
-  ): Promise<{ success: boolean; updatedTrip?: Trip; snapshot?: FlightTelemetrySnapshot; error?: string }> {
+    options?: { forceRefresh?: boolean; bookingService?: IBookingService; nowMs?: number }
+  ): Promise<{
+    success: boolean;
+    code?: string;
+    unlocksAtIso?: string;
+    updatedTrip?: Trip;
+    snapshot?: FlightTelemetrySnapshot;
+    error?: string;
+  }> {
+    const eligibility = evaluateFlightCheckEligibility({
+      status: trip.status,
+      bookingType: trip.bookingType,
+      scheduledPickupTime: trip.scheduledPickupTime,
+      isStaffContext: true,
+      nowMs: options?.nowMs,
+    });
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        code: eligibility.reason,
+        unlocksAtIso: eligibility.unlocksAtIso,
+        error: eligibility.message || 'Trip is not currently eligible for live flight lookup.',
+      };
+    }
+
     const creds = extractTripFlightCredentials(trip);
     if (!creds.flightIdent) {
       return {
@@ -594,9 +634,25 @@ export class FlightStatusService {
       actorId?: string;
       actorRole?: 'system' | 'admin' | 'dispatcher';
       bookingService?: IBookingService;
+      nowMs?: number;
       notifyDriverFn?: (driverId: string, payload: { title: string; body: string; url: string }) => Promise<void>;
     }
   ): Promise<SyncTripPickupResult> {
+    const eligibility = evaluateFlightCheckEligibility({
+      status: trip.status,
+      bookingType: trip.bookingType,
+      scheduledPickupTime: trip.scheduledPickupTime,
+      isStaffContext: true,
+      nowMs: options?.nowMs,
+    });
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        driverNotified: false,
+        error: eligibility.message || 'Trip is not eligible for live flight ETA sync.',
+      };
+    }
+
     const snapshot = options?.snapshot || trip.flightTelemetry;
     if (!snapshot) {
       return {

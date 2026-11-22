@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import {
   AlertTriangleIcon,
   CheckIcon,
+  ClockIcon,
+  LockIcon,
   PlaneLandingIcon,
   RefreshCwIcon,
   SpinnerIcon,
 } from '../../ui/Icons';
 import {
   MAJOR_AIRLINES,
+  evaluateFlightCheckEligibility,
   evaluateFlightPickupAlignment,
   parseFlightIdent,
   resolveStlTerminalInfo,
@@ -39,7 +42,10 @@ export interface FlightTelemetryCheckPanelProps {
   isDropoffAirport?: boolean;
   airportIataCode?: string;
   serviceDate?: string;
+  bookingType?: 'asap' | 'scheduled';
   scheduledPickupIso?: string;
+  /** Defaults to false so customer/corporate forms never trigger paid aviation API lookups */
+  allowLiveCheck?: boolean;
   flightTelemetry?: FlightTelemetrySnapshot | null;
   onFlightTelemetryChange?: (snapshot: FlightTelemetrySnapshot | null) => void;
   onApplyRecommendedPickupIso?: (recommendedIso: string) => void;
@@ -56,7 +62,9 @@ export function FlightTelemetryCheckPanel({
   isDropoffAirport = false,
   airportIataCode = 'STL',
   serviceDate,
+  bookingType,
   scheduledPickupIso,
+  allowLiveCheck = false,
   flightTelemetry,
   onFlightTelemetryChange,
   onApplyRecommendedPickupIso,
@@ -70,8 +78,18 @@ export function FlightTelemetryCheckPanel({
     ? resolveStlTerminalInfo(airline, airportIataCode || 'STL')
     : null;
 
+  const effectiveBookingType: 'asap' | 'scheduled' =
+    bookingType || (scheduledPickupIso ? 'scheduled' : 'asap');
+
+  const eligibility = evaluateFlightCheckEligibility({
+    isStaffContext: allowLiveCheck,
+    bookingType: effectiveBookingType,
+    scheduledPickupTime: scheduledPickupIso,
+  });
+
   // Ensure displayed telemetry matches current airline + flight number
   const activeTelemetry =
+    allowLiveCheck &&
     flightTelemetry &&
     parsedIdent.isValid &&
     flightTelemetry.flightIdent === parsedIdent.flightIdent
@@ -79,14 +97,14 @@ export function FlightTelemetryCheckPanel({
       : null;
 
   const alignment =
-    isPickupAirport && activeTelemetry
+    allowLiveCheck && isPickupAirport && activeTelemetry
       ? evaluateFlightPickupAlignment(activeTelemetry, scheduledPickupIso, {
           hasCheckedLuggage,
         })
       : null;
 
   const handleCheckStatus = async () => {
-    if (!parsedIdent.isValid) return;
+    if (!allowLiveCheck || !eligibility.eligible || !parsedIdent.isValid) return;
     setIsChecking(true);
     setCheckError(null);
     try {
@@ -162,13 +180,23 @@ export function FlightTelemetryCheckPanel({
     );
   };
 
-  if (!terminalResolution && !parsedIdent.isValid) {
+  if (!terminalResolution?.terminal && (!allowLiveCheck || !parsedIdent.isValid)) {
     return null;
   }
 
+  const unlockTimeLabel =
+    eligibility.unlocksAtIso && Number.isFinite(Date.parse(eligibility.unlocksAtIso))
+      ? new Date(eligibility.unlocksAtIso).toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : null;
+
   return (
     <div className="space-y-2">
-      {/* Instant STL Terminal & Exit Door Guidance Row + Check Flight Status Pill */}
+      {/* Instant STL Terminal & Exit Door Guidance Row + Staff-Only Live Check Pill */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {terminalResolution && terminalResolution.terminal && (
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-[11px] font-bold text-slate-800 shadow-2xs">
@@ -183,32 +211,65 @@ export function FlightTelemetryCheckPanel({
           </div>
         )}
 
-        {parsedIdent.isValid && (
-          <button
-            type="button"
-            onClick={handleCheckStatus}
-            disabled={isChecking}
-            className={`inline-flex items-center gap-1.5 ${
-              compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'
-            } rounded-full font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white shadow-2xs active:scale-95 transition-all cursor-pointer`}
-          >
-            {isChecking ? (
-              <>
-                <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                <span>Checking {parsedIdent.flightIdent}...</span>
-              </>
-            ) : activeTelemetry ? (
-              <>
-                <RefreshCwIcon className="w-3 h-3" />
-                <span>Recheck {parsedIdent.flightIdent}</span>
-              </>
-            ) : (
-              <>
-                <CheckIcon className="w-3.5 h-3.5" />
-                <span>Check Flight Status</span>
-              </>
-            )}
-          </button>
+        {allowLiveCheck && parsedIdent.isValid && (
+          eligibility.eligible ? (
+            <button
+              type="button"
+              onClick={handleCheckStatus}
+              disabled={isChecking}
+              className={`inline-flex items-center gap-1.5 ${
+                compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'
+              } rounded-full font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white shadow-2xs active:scale-95 transition-all cursor-pointer`}
+            >
+              {isChecking ? (
+                <>
+                  <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                  <span>Checking {parsedIdent.flightIdent}...</span>
+                </>
+              ) : activeTelemetry ? (
+                <>
+                  <RefreshCwIcon className="w-3 h-3" />
+                  <span>Recheck {parsedIdent.flightIdent}</span>
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5" />
+                  <span>Check Flight Status</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title={
+                unlockTimeLabel
+                  ? `Live flight lookup unlocks ${unlockTimeLabel}`
+                  : eligibility.message || 'Live flight lookup locked'
+              }
+              className={`inline-flex items-center gap-1.5 ${
+                compact ? 'px-2.5 py-1 text-[10.5px]' : 'px-3 py-1.5 text-xs'
+              } rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed opacity-90`}
+            >
+              {eligibility.reason === 'outside_24h_window' ? (
+                <>
+                  <ClockIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <span>
+                    Unlocks 24h before pickup{unlockTimeLabel ? ` (${unlockTimeLabel})` : ''}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <LockIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <span>
+                    {eligibility.reason === 'past_window'
+                      ? 'Pickup window passed (>12h)'
+                      : eligibility.message || 'Flight check locked'}
+                  </span>
+                </>
+              )}
+            </button>
+          )
         )}
       </div>
 
@@ -339,7 +400,10 @@ export interface FlightAssistanceCardProps {
   flightNumberError?: string;
   tailNumberError?: string;
   serviceDate?: string;
+  bookingType?: 'asap' | 'scheduled';
   scheduledPickupIso?: string;
+  /** Defaults to false on customer/corporate forms so only local STL terminal routing is shown */
+  allowLiveCheck?: boolean;
   flightTelemetry?: FlightTelemetrySnapshot | null;
   onFlightTelemetryChange?: (snapshot: FlightTelemetrySnapshot | null) => void;
   onApplyRecommendedPickupIso?: (recommendedIso: string) => void;
@@ -367,7 +431,9 @@ export function FlightAssistanceCard({
   flightNumberError,
   tailNumberError,
   serviceDate,
+  bookingType,
   scheduledPickupIso,
+  allowLiveCheck = false,
   flightTelemetry,
   onFlightTelemetryChange,
   onApplyRecommendedPickupIso,
@@ -580,7 +646,9 @@ export function FlightAssistanceCard({
                 isDropoffAirport={detection.isDropoffAirport}
                 airportIataCode={detection.airport?.iataCode || 'STL'}
                 serviceDate={serviceDate}
+                bookingType={bookingType}
                 scheduledPickupIso={scheduledPickupIso}
+                allowLiveCheck={allowLiveCheck}
                 flightTelemetry={flightTelemetry}
                 onFlightTelemetryChange={onFlightTelemetryChange}
                 onApplyRecommendedPickupIso={onApplyRecommendedPickupIso}

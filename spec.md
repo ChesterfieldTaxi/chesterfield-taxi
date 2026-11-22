@@ -740,6 +740,19 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Dispatch Console (`DispatchTripQueuePane.tsx`, `DispatchTripDetailsDrawer.tsx`, `dispatch.tsx`)**: Compact color-coded **Flight Telemetry Pills** (`On Time · STL T2`, `Delayed +42m`, `Landed · T1`, `Cancelled`) on airport trips, **"Refresh Flight"** button (`forceRefresh: true`), and **1-Tap "Adjust Pickup Time to New ETA"** when `delayMinutes >= 15` (or alignment drift >= 15m), updating `scheduledPickupTime`, appending an immutable `TripAuditEvent` (`STATUS_CHANGED`), and triggering a driver notification if a driver is assigned.
   - **Driver Mobile App (`DriverTripManifest.tsx`)**: Live flight status badge, terminal/gate/baggage claim, and STL curbside exit door / SUS FBO guidance inside the Driver Trip Manifest card.
   - **Admin Integrations (`AdminIntegrationsSubpage.tsx`)**: **Flight Status Telemetry (`AeroDataBox` / `FlightAware`)** readiness card polling `GET /api/flight-status?diagnostics=1` and displaying active provider mode, key configuration status, and 15-minute cache protection badge.
+- **Phase 38.B Quota & Operational Window Gates (Staff-Only, Confirmed-Only & 24-Hour Pickup Lock)**:
+  - **Pure Eligibility Evaluator (`evaluateFlightCheckEligibility`)**: Central domain gate in `app/core/config/airports.ts` (re-exported in `flight-status.service.ts`) enforcing:
+    1. `staff_only`: Blocks non-staff contexts (`!isStaffContext`).
+    2. `unconfirmed`: Blocks `UNCONFIRMED` / `unconfirmed` bookings (*"Confirm booking first to enable live flight tracking."*).
+    3. `terminal_status`: Blocks `DECLINED`, `declined`, `cancelled`, and `completed` trips.
+    4. `outside_24h_window` & `past_window`: For non-ASAP scheduled rides, locks live aviation API lookups until within `24` hours prior to `scheduledPickupTime` (computing exact `unlocksAtIso`) and locks lookups more than `12` hours past `scheduledPickupTime`.
+  - **Server-Side Zero-Leak Enforcement (`/api/flight-status` & `flight-status.server.ts`)**:
+    - Requires authenticated **Dispatcher / Admin** authorization (`auth.isDispatcher`) across all `GET` and `POST /api/flight-status` calls (`401` unauthenticated, `403` non-staff), paired with `authorizedFetch` in `FlightStatusService`.
+    - Enforces `[-12h, +24h]` `scheduledPickupIso` bounds and `[-1, +1]` calendar-day `serviceDate` bounds inside `lookupFlightTelemetryServer` (`400` `OUTSIDE_24H_WINDOW`) prior to any upstream aviation API request.
+  - **Customer vs. Staff Surface Separation**:
+    - Customer booking surfaces (`/book`, `/app/passenger`, `/app/corporate` via `BookingEngineV2` & `FlightAssistanceCard` with `allowLiveCheck={false}`) render strictly the zero-cost local **STL Terminal 1 / Terminal 2 & Exit Door** guidance badge and never expose live aviation API buttons.
+    - Staff surfaces (`DispatchBookingEngine.tsx` with `allowLiveCheck={true}` and `DispatchTripDetailsDrawer.tsx`) enforce `evaluateFlightCheckEligibility`, disabling `Check Flight Status`, `Refresh Flight`, and `Adjust Pickup Time` with explicit lock-reason pills (*"Confirm booking first..."* or *"Unlocks 24h before pickup (...)"*) until eligible.
+
 
 
 
