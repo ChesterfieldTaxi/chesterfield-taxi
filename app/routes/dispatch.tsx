@@ -2464,7 +2464,22 @@ export default function DispatchRoute() {
         const matchDropoff = (trip.dropoffLocation?.address || '').toLowerCase().includes(term);
         const matchDriver = (trip.assignedDriverId || '').toLowerCase().includes(term);
         const matchGroup = (trip.multiCarGroupId || '').toLowerCase().includes(term);
-        if (!matchId && !matchPassenger && !matchPhone && !matchPickup && !matchDropoff && !matchDriver && !matchGroup) {
+        const matchFlight =
+          (trip.flightTelemetry?.flightIdent || '').toLowerCase().includes(term) ||
+          (trip.flightTelemetry?.airlineName || '').toLowerCase().includes(term) ||
+          String(meta.flightNumber || '').toLowerCase().includes(term) ||
+          String(meta.airline || '').toLowerCase().includes(term) ||
+          String(meta.tailNumber || '').toLowerCase().includes(term);
+        if (
+          !matchId &&
+          !matchPassenger &&
+          !matchPhone &&
+          !matchPickup &&
+          !matchDropoff &&
+          !matchDriver &&
+          !matchGroup &&
+          !matchFlight
+        ) {
           return false;
         }
       }

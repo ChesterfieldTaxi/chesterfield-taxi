@@ -9,6 +9,10 @@
  */
 
 import type { VehicleTier } from '../types';
+import type {
+  FlightPickupAlignment,
+  FlightTelemetrySnapshot,
+} from '../types/flight';
 
 // ---------------------------------------------------------------------------
 // Regional Airports
@@ -214,6 +218,8 @@ export const MAJOR_AIRLINES: readonly Airline[] = [
   { code: 'AS', name: 'Alaska Airlines' },
   { code: 'NK', name: 'Spirit Airlines' },
   { code: 'F9', name: 'Frontier Airlines' },
+  { code: 'AC', name: 'Air Canada' },
+  { code: 'LH', name: 'Lufthansa' },
   { code: 'G4', name: 'Allegiant Air' },
   { code: 'B6', name: 'JetBlue Airways' },
   { code: 'HA', name: 'Hawaiian Airlines' },
@@ -231,6 +237,414 @@ export const AIRLINE_SELECT_OPTIONS = MAJOR_AIRLINES.map((airline) => ({
   value: airline.code,
   label: airline.name,
 }));
+
+// ---------------------------------------------------------------------------
+// Flight Ident Parsing, STL/SUS Terminal Intelligence & Pickup Drift Math
+// ---------------------------------------------------------------------------
+
+const ICAO_TO_IATA_CARRIER_MAP: Record<string, string> = {
+  SWA: 'WN',
+  AAL: 'AA',
+  DAL: 'DL',
+  UAL: 'UA',
+  ASA: 'AS',
+  NKS: 'NK',
+  FFT: 'F9',
+  ACA: 'AC',
+  DLH: 'LH',
+  AAY: 'G4',
+  JBU: 'B6',
+  HAL: 'HA',
+  SCX: 'SY',
+  MXY: 'MX',
+  SKW: 'OO',
+  RPA: 'YX',
+  CFG: 'DE',
+  ICE: 'FI',
+};
+
+const EXTENDED_AIRLINE_NAMES: Record<string, string> = {
+  ...Object.fromEntries(MAJOR_AIRLINES.map((a) => [a.code, a.name])),
+  DE: 'Condor',
+  FI: 'Icelandair',
+  WG: 'Sunwing Airlines',
+  '9K': 'Cape Air',
+  LF: 'Contour Airlines',
+  BA: 'British Airways',
+};
+
+const STL_TERMINAL_2_CODES = new Set(['WN', 'LH', 'DE', 'FI', 'WG']);
+const STL_TERMINAL_1_CODES = new Set([
+  'AA',
+  'DL',
+  'UA',
+  'AS',
+  'NK',
+  'F9',
+  'AC',
+  'OO',
+  'YX',
+  'G4',
+  'B6',
+  'HA',
+  'SY',
+  'MX',
+  '9K',
+  'LF',
+]);
+
+export interface ParsedFlightIdent {
+  airlineCode: string;
+  airlineName?: string;
+  flightNumber: string;
+  flightIdent: string;
+  isValid: boolean;
+}
+
+export interface StlTerminalInfo {
+  airportCode: 'STL' | 'SUS' | 'CPS';
+  airlineCode?: string;
+  airlineName?: string;
+  terminal?: string;
+  shortTerminal: string;
+  pickupDoorGuidance: string;
+  isPrivateFbo: boolean;
+}
+
+/**
+ * Resolves a raw airline code or carrier name (e.g. "WN", "Southwest Airlines",
+ * "Southwest Airlines (WN)", "SWA") to a normalized 2-character IATA carrier code.
+ */
+export function resolveAirlineCode(airlineCodeOrName?: string): {
+  airlineCode: string;
+  airlineName?: string;
+} {
+  const raw = (airlineCodeOrName || '').trim();
+  if (!raw) return { airlineCode: '' };
+
+  // Check parenthetical IATA code e.g. "Southwest Airlines (WN)"
+  const parenMatch = raw.match(/\(([A-Z0-9]{2,3})\)\s*$/i);
+  if (parenMatch) {
+    const candidate = parenMatch[1].toUpperCase();
+    const mapped = ICAO_TO_IATA_CARRIER_MAP[candidate] || candidate;
+    if (/^[A-Z0-9]{2}$/.test(mapped)) {
+      return {
+        airlineCode: mapped,
+        airlineName: EXTENDED_AIRLINE_NAMES[mapped] || raw.replace(/\s*\([A-Z0-9]{2,3}\)\s*$/i, '').trim(),
+      };
+    }
+  }
+
+  const upper = raw.toUpperCase();
+  if (/^[A-Z0-9]{2}$/.test(upper) && /[A-Z]/.test(upper)) {
+    return {
+      airlineCode: upper,
+      airlineName: EXTENDED_AIRLINE_NAMES[upper],
+    };
+  }
+
+  if (/^[A-Z]{3}$/.test(upper) && ICAO_TO_IATA_CARRIER_MAP[upper]) {
+    const mapped = ICAO_TO_IATA_CARRIER_MAP[upper];
+    return {
+      airlineCode: mapped,
+      airlineName: EXTENDED_AIRLINE_NAMES[mapped],
+    };
+  }
+
+  const lower = raw.toLowerCase();
+  for (const [code, name] of Object.entries(EXTENDED_AIRLINE_NAMES)) {
+    const nameLower = name.toLowerCase();
+    const firstWord = nameLower.split(/\s+/)[0];
+    if (
+      lower === nameLower ||
+      nameLower.includes(lower) ||
+      lower.includes(nameLower) ||
+      (firstWord.length >= 5 && lower.includes(firstWord))
+    ) {
+      return { airlineCode: code, airlineName: name };
+    }
+  }
+
+  return { airlineCode: '' };
+}
+
+/**
+ * Normalizes flexible user/dispatcher inputs such as ("WN", "1425"),
+ * ("Southwest Airlines", "1425"), or ("", "WN 1425") into a canonical IATA flight ident.
+ */
+export function parseFlightIdent(
+  airlineInput?: string,
+  flightNumberInput?: string
+): ParsedFlightIdent {
+  const rawAirline = (airlineInput || '').trim();
+  const rawNumber = (flightNumberInput || '').trim();
+
+  // Case 1: Combined ident supplied in either field (e.g. "WN1425", "WN 1425", "SWA-1425", "9K412")
+  const combinedSource =
+    rawAirline && !rawNumber
+      ? rawAirline
+      : /^[A-Za-z0-9]{2,3}[\s#-]*\d{1,4}$/.test(rawNumber)
+      ? rawNumber
+      : '';
+
+  if (combinedSource) {
+    const match = combinedSource
+      .replace(/^#/, '')
+      .trim()
+      .match(/^([A-Za-z]{2,3}|\d[A-Za-z]|[A-Za-z]\d)[\s#-]*(\d{1,4})$/);
+    if (match) {
+      const prefixUpper = match[1].toUpperCase();
+      const mappedCode = ICAO_TO_IATA_CARRIER_MAP[prefixUpper] || prefixUpper;
+      const cleanDigits = match[2].replace(/^0+(?=\d)/, '');
+      if (/^[A-Z0-9]{2}$/.test(mappedCode) && /^\d{1,4}$/.test(cleanDigits)) {
+        return {
+          airlineCode: mappedCode,
+          airlineName: EXTENDED_AIRLINE_NAMES[mappedCode],
+          flightNumber: cleanDigits,
+          flightIdent: `${mappedCode}${cleanDigits}`,
+          isValid: true,
+        };
+      }
+    }
+  }
+
+  const resolved = resolveAirlineCode(rawAirline);
+  let extractedDigits = rawNumber.replace(/^#/, '').trim();
+  if (resolved.airlineCode && extractedDigits.toUpperCase().startsWith(resolved.airlineCode)) {
+    extractedDigits = extractedDigits.slice(resolved.airlineCode.length).trim();
+  }
+  extractedDigits = extractedDigits.replace(/^[\s#-]+/, '');
+
+  if (!/^\d{1,4}$/.test(extractedDigits)) {
+    return {
+      airlineCode: resolved.airlineCode,
+      airlineName: resolved.airlineName,
+      flightNumber: '',
+      flightIdent: '',
+      isValid: false,
+    };
+  }
+
+  const cleanNumber = extractedDigits.replace(/^0+(?=\d)/, '');
+  if (!resolved.airlineCode || !/^[A-Z0-9]{2}$/.test(resolved.airlineCode)) {
+    return {
+      airlineCode: '',
+      airlineName: undefined,
+      flightNumber: cleanNumber,
+      flightIdent: '',
+      isValid: false,
+    };
+  }
+
+  return {
+    airlineCode: resolved.airlineCode,
+    airlineName: resolved.airlineName,
+    flightNumber: cleanNumber,
+    flightIdent: `${resolved.airlineCode}${cleanNumber}`,
+    isValid: true,
+  };
+}
+
+/**
+ * Pure regional terminal & curbside exit door mapper for Lambert-St. Louis (STL),
+ * Spirit of St. Louis (SUS), and St. Louis Downtown (CPS) airports.
+ */
+export function resolveStlTerminalInfo(
+  airlineCodeOrName?: string,
+  airportCode?: string
+): StlTerminalInfo {
+  const raw = (airlineCodeOrName || '').trim();
+  const rawLower = raw.toLowerCase();
+  const explicitAirport = (airportCode || '').trim().toUpperCase();
+
+  if (
+    explicitAirport === 'SUS' ||
+    raw.toUpperCase() === 'SUS' ||
+    rawLower.includes('spirit of st') ||
+    rawLower.includes('signature') ||
+    rawLower.includes('million air') ||
+    rawLower.includes('tac air') ||
+    rawLower.includes('premier jet')
+  ) {
+    return {
+      airportCode: 'SUS',
+      terminal: 'Private FBO',
+      shortTerminal: 'SUS FBO',
+      pickupDoorGuidance: 'Spirit of St. Louis (SUS) · Private FBO Ramp / Lobby Coordination',
+      isPrivateFbo: true,
+    };
+  }
+
+  if (
+    explicitAirport === 'CPS' ||
+    raw.toUpperCase() === 'CPS' ||
+    rawLower.includes('downtown airport') ||
+    rawLower.includes('jet aviation') ||
+    rawLower.includes('ideal aviation')
+  ) {
+    return {
+      airportCode: 'CPS',
+      terminal: 'Private FBO',
+      shortTerminal: 'CPS FBO',
+      pickupDoorGuidance: 'St. Louis Downtown (CPS) · Private FBO Ramp / Lobby Coordination',
+      isPrivateFbo: true,
+    };
+  }
+
+  const { airlineCode, airlineName } = resolveAirlineCode(raw);
+
+  if (
+    STL_TERMINAL_2_CODES.has(airlineCode) ||
+    rawLower.includes('southwest') ||
+    rawLower.includes('lufthansa') ||
+    rawLower.includes('terminal 2') ||
+    rawLower === 't2'
+  ) {
+    return {
+      airportCode: 'STL',
+      airlineCode: airlineCode || undefined,
+      airlineName,
+      terminal: 'Terminal 2',
+      shortTerminal: 'STL T2',
+      pickupDoorGuidance: 'Terminal 2 · Baggage Claim Exit Door 12',
+      isPrivateFbo: false,
+    };
+  }
+
+  if (
+    STL_TERMINAL_1_CODES.has(airlineCode) ||
+    Boolean(airlineCode) ||
+    rawLower.includes('terminal 1') ||
+    rawLower === 't1'
+  ) {
+    return {
+      airportCode: 'STL',
+      airlineCode: airlineCode || undefined,
+      airlineName,
+      terminal: 'Terminal 1',
+      shortTerminal: 'STL T1',
+      pickupDoorGuidance: 'Terminal 1 · Lower Level Exit Door 6 / Door 12',
+      isPrivateFbo: false,
+    };
+  }
+
+  return {
+    airportCode: 'STL',
+    terminal: undefined,
+    shortTerminal: 'STL',
+    pickupDoorGuidance:
+      'Terminal 1: Lower Level Exit Door 6 / Door 12 • Terminal 2 (Southwest / Lufthansa): Baggage Claim Exit Door 12',
+    isPrivateFbo: false,
+  };
+}
+
+/**
+ * Pure helper evaluating whether a passenger's scheduled pickup time conflicts
+ * with their flight's estimated landing or requires shifting due to >= 15m flight delay.
+ */
+export function evaluateFlightPickupAlignment(
+  snapshot: FlightTelemetrySnapshot | null | undefined,
+  scheduledPickupIso: string | null | undefined,
+  options?: {
+    bufferMinutesAfterArrival?: number;
+    hasCheckedLuggage?: boolean;
+    delayThresholdMinutes?: number;
+  }
+): FlightPickupAlignment {
+  const bufferMinutes =
+    options?.bufferMinutesAfterArrival ?? (options?.hasCheckedLuggage ? 25 : 20);
+  const delayThreshold = options?.delayThresholdMinutes ?? 15;
+
+  if (!snapshot) {
+    return { aligned: true, conflict: 'none', driftMinutes: 0, bufferMinutes };
+  }
+
+  if (snapshot.status === 'cancelled') {
+    return {
+      aligned: false,
+      conflict: 'flight_cancelled',
+      driftMinutes: 0,
+      bufferMinutes,
+      message: `Flight ${snapshot.flightIdent} is marked CANCELLED. Verify alternate flight details with the passenger.`,
+    };
+  }
+
+  if (!scheduledPickupIso) {
+    return { aligned: true, conflict: 'none', driftMinutes: 0, bufferMinutes };
+  }
+
+  const pickupMs = Date.parse(scheduledPickupIso);
+  if (!Number.isFinite(pickupMs)) {
+    return { aligned: true, conflict: 'none', driftMinutes: 0, bufferMinutes };
+  }
+
+  const effectiveArrivalIso = snapshot.estimatedArrivalIso || snapshot.scheduledArrivalIso;
+  if (effectiveArrivalIso) {
+    const arrivalMs = Date.parse(effectiveArrivalIso);
+    if (Number.isFinite(arrivalMs)) {
+      const recommendedMs = arrivalMs + bufferMinutes * 60_000;
+      const recommendedPickupIso = new Date(recommendedMs).toISOString();
+      const driftMinutes = Math.max(0, Math.round((recommendedMs - pickupMs) / 60_000));
+
+      // 1. Requested pickup time precedes estimated flight touchdown/gate arrival
+      if (pickupMs < arrivalMs) {
+        return {
+          aligned: false,
+          conflict: 'pickup_before_arrival',
+          driftMinutes,
+          recommendedPickupIso,
+          effectiveArrivalIso,
+          bufferMinutes,
+          message: `Scheduled pickup is earlier than ${snapshot.flightIdent} arrival (+${bufferMinutes}m deplane/curb buffer recommended).`,
+        };
+      }
+
+      // 2. Flight is delayed >= threshold AND pickup time leaves insufficient buffer (< arrival + buffer)
+      const scheduledArrMs = snapshot.scheduledArrivalIso
+        ? Date.parse(snapshot.scheduledArrivalIso)
+        : NaN;
+      const computedDelayMin = Number.isFinite(scheduledArrMs)
+        ? Math.round((arrivalMs - scheduledArrMs) / 60_000)
+        : snapshot.delayMinutes;
+      const effectiveDelay = Math.max(snapshot.delayMinutes || 0, computedDelayMin || 0);
+
+      if (effectiveDelay >= delayThreshold && pickupMs < recommendedMs) {
+        return {
+          aligned: false,
+          conflict: 'significant_delay',
+          driftMinutes,
+          recommendedPickupIso,
+          effectiveArrivalIso,
+          bufferMinutes,
+          message: `Flight ${snapshot.flightIdent} is delayed +${effectiveDelay}m. Recommend shifting pickup to ${bufferMinutes}m after new ETA.`,
+        };
+      }
+
+      return {
+        aligned: true,
+        conflict: 'none',
+        driftMinutes: 0,
+        effectiveArrivalIso,
+        bufferMinutes,
+      };
+    }
+  }
+
+  // Fallback when provider reports delayMinutes >= threshold without arrival ISO timestamps
+  if ((snapshot.delayMinutes || 0) >= delayThreshold) {
+    const recommendedMs = pickupMs + snapshot.delayMinutes * 60_000;
+    return {
+      aligned: false,
+      conflict: 'significant_delay',
+      driftMinutes: snapshot.delayMinutes,
+      recommendedPickupIso: new Date(recommendedMs).toISOString(),
+      bufferMinutes,
+      message: `Flight ${snapshot.flightIdent} is delayed +${snapshot.delayMinutes}m.`,
+    };
+  }
+
+  return { aligned: true, conflict: 'none', driftMinutes: 0, bufferMinutes };
+}
 
 // ---------------------------------------------------------------------------
 // Vehicle Luggage Capacity

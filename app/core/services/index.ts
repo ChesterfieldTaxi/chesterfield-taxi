@@ -17,3 +17,5 @@ export * from './corporate-portal.service';
 export * from './operator.service';
 export * from './dispatch';
 export * from './payments';
+export * from './flight';
+

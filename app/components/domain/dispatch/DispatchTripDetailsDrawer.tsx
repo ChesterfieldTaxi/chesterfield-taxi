@@ -16,12 +16,22 @@ import { TripAuditModal, TripAuditTimeline } from '../admin/TripAuditModal';
 import { PriceBreakdownPanel } from '../booking/PriceBreakdownPanel';
 import {
   DispatchCascadePill,
+  DispatchFlightTelemetryPill,
   DispatchSlaBadge,
   canTripTriggerAutoOffer,
   isTripCascadeActive,
 } from './DispatchCascadeSlaBadges';
 import { evaluateTripSlaUrgency } from '../../../core/services/dispatch/sla-monitor.service';
 import { getPayLinkService } from '../../../core/services/payments/pay-link.service';
+import {
+  evaluateFlightPickupAlignment,
+  resolveStlTerminalInfo,
+} from '../../../core/config/airports';
+import {
+  buildFlightPickupEtaAdjustment,
+  extractTripFlightCredentials,
+  getFlightStatusService,
+} from '../../../core/services/flight/flight-status.service';
 import {
   BoltIcon,
   XIcon,
@@ -340,6 +350,74 @@ export function DispatchTripDetailsDrawer({
   const [isOverridingStatus, setIsOverridingStatus] = useState<boolean>(false);
   const [payLinkBusyAction, setPayLinkBusyAction] = useState<'copy' | 'sms' | 'email' | null>(null);
   const [generatedPayUrl, setGeneratedPayUrl] = useState<string>('');
+  const [isRefreshingFlight, setIsRefreshingFlight] = useState<boolean>(false);
+  const [isSyncingFlightEta, setIsSyncingFlightEta] = useState<boolean>(false);
+
+  const handleRefreshTripFlight = async (targetTrip: Trip) => {
+    setIsRefreshingFlight(true);
+    try {
+      const res = await getFlightStatusService().refreshTripFlightTelemetry(targetTrip, {
+        forceRefresh: true,
+      });
+      if (!res.success || !res.updatedTrip || !res.snapshot) {
+        onShowToast(res.error || 'Unable to refresh flight status.', 'error');
+        return;
+      }
+      onReviewTripChange(res.updatedTrip);
+      onTripsChange((prev) =>
+        prev.map((t) => (t.id === res.updatedTrip!.id ? res.updatedTrip! : t))
+      );
+      const statusMsg =
+        res.snapshot.status === 'delayed' || res.snapshot.delayMinutes >= 15
+          ? `Delayed +${Math.max(15, res.snapshot.delayMinutes)}m`
+          : res.snapshot.status === 'landed'
+          ? 'Landed'
+          : res.snapshot.status === 'cancelled'
+          ? 'Cancelled'
+          : res.snapshot.isSimulatedFallback
+          ? `Verified · ${res.snapshot.terminal || 'STL'}`
+          : `On Time · ${res.snapshot.terminal || 'STL'}`;
+      onShowToast(`Flight ${res.snapshot.flightIdent} refreshed (${statusMsg}).`, 'success');
+    } finally {
+      setIsRefreshingFlight(false);
+    }
+  };
+
+  const handleAdjustPickupToFlightEta = async (targetTrip: Trip) => {
+    setIsSyncingFlightEta(true);
+    try {
+      const actorRole: 'admin' | 'dispatcher' = user?.roles?.includes('admin')
+        ? 'admin'
+        : 'dispatcher';
+      const res = await getFlightStatusService().syncTripPickupToFlightEta(targetTrip, {
+        actorId: user?.uid || user?.email || 'dispatch',
+        actorRole,
+      });
+      if (!res.success || !res.updatedTrip || !res.newScheduledPickupIso) {
+        onShowToast(res.error || 'Failed to sync pickup time to flight ETA.', 'error');
+        return;
+      }
+      onReviewTripChange(res.updatedTrip);
+      onTripsChange((prev) =>
+        prev.map((t) => (t.id === res.updatedTrip!.id ? res.updatedTrip! : t))
+      );
+      const timeLabel = new Date(res.newScheduledPickupIso).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+      const driverSuffix = res.driverNotified
+        ? ' Assigned driver push notification sent.'
+        : '';
+      onShowToast(
+        `Pickup adjusted to ${timeLabel}${
+          res.driftMinutes ? ` (${res.driftMinutes > 0 ? '+' : ''}${res.driftMinutes}m)` : ''
+        }.${driverSuffix}`,
+        'success'
+      );
+    } finally {
+      setIsSyncingFlightEta(false);
+    }
+  };
 
   // Driver Fare Console internal state
   const [driverPermittedRules, setDriverPermittedRules] = useState<NamedPricingRule[]>([]);
@@ -2188,44 +2266,209 @@ export function DispatchTripDetailsDrawer({
                         </span>{' '}
                         <span className="text-[10px] text-slate-500 uppercase">({reviewTrip.payment?.method || 'Cash'})</span>
                       </div>
-                      {(flightNumber || airline || tailNumber || fboFacility) && (
-                        <div className="p-2.5 bg-blue-50/90 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-1">
-                          {isPrivateAviation ? (
-                            <>
-                              <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                                <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                                <span>Private Aviation / FBO:</span>
-                                <span className="font-extrabold text-blue-950">{fboFacility || 'Private Aviation'}</span>
-                              </div>
-                              {tailNumber && (
-                                <div className="text-blue-800">
-                                  Tail Number: <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-blue-200">{tailNumber}</span>
+                      {(flightNumber || airline || tailNumber || fboFacility || reviewTrip.flightTelemetry) && (() => {
+                        const creds = extractTripFlightCredentials(reviewTrip);
+                        const snap = reviewTrip.flightTelemetry;
+                        const termInfo = resolveStlTerminalInfo(
+                          snap?.airlineCode || airline || creds.airline,
+                          snap?.destinationIata || creds.airportCode || 'STL'
+                        );
+                        const isTerminalStatus = ['completed', 'cancelled', 'DECLINED', 'declined'].includes(
+                          String(reviewTrip.status || '')
+                        );
+                        const alignment =
+                          creds.isAirportPickup && snap
+                            ? evaluateFlightPickupAlignment(snap, reviewTrip.scheduledPickupTime, {
+                                hasCheckedLuggage,
+                              })
+                            : null;
+                        const etaPlan =
+                          !isTerminalStatus &&
+                          creds.isAirportPickup &&
+                          snap &&
+                          snap.status !== 'cancelled' &&
+                          ((snap.delayMinutes || 0) >= 15 ||
+                            (alignment &&
+                              !alignment.aligned &&
+                              (alignment.conflict === 'pickup_before_arrival' ||
+                                alignment.driftMinutes >= 15)))
+                            ? buildFlightPickupEtaAdjustment(reviewTrip, snap)
+                            : null;
+                        const showEtaSyncBtn = Boolean(
+                          etaPlan &&
+                            (!reviewTrip.scheduledPickupTime ||
+                              Math.abs(
+                                Date.parse(etaPlan.newScheduledPickupIso) -
+                                  Date.parse(reviewTrip.scheduledPickupTime)
+                              ) >= 60_000)
+                        );
+
+                        return (
+                          <div className="p-2.5 bg-blue-50/90 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-2">
+                            {isPrivateAviation ? (
+                              <>
+                                <div className="font-bold flex items-center justify-between gap-1.5 text-blue-900 flex-wrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                                    <span>Private Aviation / FBO:</span>
+                                    <span className="font-extrabold text-blue-950">
+                                      {fboFacility || 'Private Aviation'}
+                                    </span>
+                                  </div>
+                                  <DispatchFlightTelemetryPill trip={reviewTrip} />
                                 </div>
-                              )}
-                              {flightOrigin && (
-                                <div className="text-blue-800">
-                                  Origin / FBO Base: <span className="font-semibold">{flightOrigin}</span>
+                                {tailNumber && (
+                                  <div className="text-blue-800">
+                                    Tail Number:{' '}
+                                    <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                                      {tailNumber}
+                                    </span>
+                                  </div>
+                                )}
+                                {flightOrigin && (
+                                  <div className="text-blue-800">
+                                    Origin / FBO Base: <span className="font-semibold">{flightOrigin}</span>
+                                  </div>
+                                )}
+                                <div className="text-blue-900 font-semibold">
+                                  Ramp / Lobby Guidance: {termInfo.pickupDoorGuidance}
                                 </div>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                                <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                                <span>Commercial Flight: {airline || 'Airline'} #{flightNumber || 'N/A'}</span>
-                              </div>
-                              {flightOrigin && (
-                                <div className="text-blue-800">
-                                  Departing From: <span className="font-semibold">{flightOrigin}</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="font-bold flex items-center gap-1.5 text-blue-900 flex-wrap">
+                                    <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                                    <span>
+                                      Flight: {snap?.airlineName || airline || creds.airline || 'Airline'}{' '}
+                                      #{snap?.flightNumber || flightNumber || creds.flightNumber || 'N/A'}
+                                    </span>
+                                    <DispatchFlightTelemetryPill trip={reviewTrip} />
+                                  </div>
+
+                                  {creds.flightIdent && (
+                                    <button
+                                      type="button"
+                                      disabled={isRefreshingFlight}
+                                      onClick={() => handleRefreshTripFlight(reviewTrip)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
+                                    >
+                                      {isRefreshingFlight ? (
+                                        <>
+                                          <SpinnerIcon className="w-3 h-3 animate-spin" />
+                                          <span>Refreshing...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <RefreshCwIcon className="w-3 h-3" />
+                                          <span>Refresh Flight</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
-                              )}
-                              <div>
-                                Checked Luggage: <span className="font-semibold">{hasCheckedLuggage ? 'Yes (Baggage Claim)' : 'No'}</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
+
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-blue-900">
+                                  {(snap?.originIata || flightOrigin) && (
+                                    <span>
+                                      Departing From:{' '}
+                                      <strong>
+                                        {snap?.originIata || flightOrigin}
+                                        {snap?.originCity ? ` (${snap.originCity})` : ''}
+                                      </strong>
+                                    </span>
+                                  )}
+                                  {(snap?.terminal || termInfo.terminal) && (
+                                    <span>
+                                      Terminal: <strong>{snap?.terminal || termInfo.terminal}</strong>
+                                    </span>
+                                  )}
+                                  {snap?.gate && (
+                                    <span>
+                                      Gate: <strong>{snap.gate}</strong>
+                                    </span>
+                                  )}
+                                  {snap?.baggageClaim && (
+                                    <span>
+                                      Baggage: <strong>{snap.baggageClaim}</strong>
+                                    </span>
+                                  )}
+                                  <span>
+                                    Checked Luggage:{' '}
+                                    <strong>{hasCheckedLuggage ? 'Yes (Baggage Claim)' : 'No'}</strong>
+                                  </span>
+                                </div>
+
+                                {(snap?.estimatedArrivalIso || snap?.scheduledArrivalIso) && (
+                                  <div className="text-blue-900">
+                                    Estimated Landing:{' '}
+                                    <strong className="font-mono">
+                                      {new Date(
+                                        (snap.estimatedArrivalIso || snap.scheduledArrivalIso)!
+                                      ).toLocaleString([], {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                      })}
+                                    </strong>
+                                  </div>
+                                )}
+
+                                <div className="text-blue-950 font-semibold bg-white/80 px-2 py-1 rounded border border-blue-200/80">
+                                  Curbside Pickup: {snap?.pickupDoorGuidance || termInfo.pickupDoorGuidance}
+                                </div>
+
+                                {alignment?.conflict === 'flight_cancelled' && (
+                                  <div className="p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 font-semibold">
+                                    {alignment.message}
+                                  </div>
+                                )}
+
+                                {showEtaSyncBtn && etaPlan && (
+                                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="space-y-0.5">
+                                      <div className="font-extrabold flex items-center gap-1 text-amber-900">
+                                        <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                        <span>
+                                          Flight Delay / Arrival Drift (
+                                          {etaPlan.driftMinutes > 0
+                                            ? `+${etaPlan.driftMinutes}m`
+                                            : `${etaPlan.driftMinutes}m`}
+                                          )
+                                        </span>
+                                      </div>
+                                      <div className="text-[10.5px] text-amber-900">
+                                        Sync scheduled pickup to{' '}
+                                        <strong className="font-mono">
+                                          {new Date(etaPlan.newScheduledPickupIso).toLocaleTimeString([], {
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                          })}
+                                        </strong>
+                                        {reviewTrip.assignedDriverId
+                                          ? ' and alert assigned driver.'
+                                          : ' (preserves landing buffer).'}
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      disabled={isSyncingFlightEta}
+                                      onClick={() => handleAdjustPickupToFlightEta(reviewTrip)}
+                                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-extrabold text-[11px] shrink-0 shadow-2xs transition-colors cursor-pointer"
+                                    >
+                                      {isSyncingFlightEta
+                                        ? 'Syncing ETA...'
+                                        : 'Adjust Pickup Time to New ETA'}
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -2356,6 +2599,7 @@ export function DispatchTripDetailsDrawer({
                       <DispatchSlaBadge
                         sla={evaluateTripSlaUrgency(reviewTrip, settings.dispatchAutomation)}
                       />
+                      <DispatchFlightTelemetryPill trip={reviewTrip} compact />
                       <DispatchCascadePill
                         trip={reviewTrip}
                         onCancel={

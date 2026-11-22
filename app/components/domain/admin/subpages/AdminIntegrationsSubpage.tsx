@@ -15,6 +15,7 @@ import {
   ChatBubbleLeftRightIcon,
   CopyIcon,
   RefreshCwIcon,
+  PlaneIcon,
 } from '../../../ui/Icons';
 import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
@@ -22,6 +23,8 @@ import {
   getPayLinkService,
   type WebhookDiagnosticsSummary,
 } from '../../../../core/services/payments/pay-link.service';
+import { getFlightStatusService } from '../../../../core/services/flight/flight-status.service';
+import type { FlightDiagnosticsSummary } from '../../../../core/types/flight';
 
 
 export type IntegrationsSubTab = 'gateways' | 'telephony' | 'webhooks';
@@ -179,6 +182,10 @@ export function AdminIntegrationsSubpage({
   const [isLoadingWebhookDiag, setIsLoadingWebhookDiag] = useState<boolean>(false);
   const [copiedWebhookEndpoint, setCopiedWebhookEndpoint] = useState<boolean>(false);
 
+  // Flight Status Telemetry Diagnostics State
+  const [flightDiag, setFlightDiag] = useState<FlightDiagnosticsSummary | null>(null);
+  const [isLoadingFlightDiag, setIsLoadingFlightDiag] = useState<boolean>(false);
+
   const refreshWebhookDiagnostics = async () => {
     setIsLoadingWebhookDiag(true);
     try {
@@ -189,9 +196,20 @@ export function AdminIntegrationsSubpage({
     }
   };
 
+  const refreshFlightDiagnostics = async () => {
+    setIsLoadingFlightDiag(true);
+    try {
+      const diag = await getFlightStatusService().fetchDiagnostics();
+      setFlightDiag(diag);
+    } finally {
+      setIsLoadingFlightDiag(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSub === 'webhooks') {
       void refreshWebhookDiagnostics();
+      void refreshFlightDiagnostics();
     }
   }, [activeSub]);
 
@@ -1299,6 +1317,121 @@ export function AdminIntegrationsSubpage({
                   <p className="text-[11px] text-slate-500">
                     Paste this URL into your Twilio Console under Messaging configuration to receive passenger text replies into the Dispatch console.
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Flight Status Telemetry (AeroDataBox / FlightAware) */}
+            <Card className="rounded-2xl border-slate-200">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                      <PlaneIcon className="w-5 h-5 text-blue-600 shrink-0" />
+                      <span>Flight Status Telemetry (AeroDataBox / FlightAware)</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500">
+                      Provider-agnostic STL &amp; SUS arrival tracking, Terminal 1 / Terminal 2 curbside door routing, and 1-tap Dispatch ETA sync.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto shrink-0">
+                    <Badge
+                      variant={flightDiag?.liveApiConfigured ? 'success' : 'info'}
+                      className="font-bold"
+                    >
+                      {flightDiag?.activeProvider === 'aerodatabox'
+                        ? 'AeroDataBox Live'
+                        : flightDiag?.activeProvider === 'flightaware'
+                        ? 'FlightAware AeroAPI v4'
+                        : 'STL Terminal Fallback Ready'}
+                    </Badge>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-[11px]">
+                      <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{flightDiag?.cacheTtlMinutes ?? 15}-Min Cache Protection</span>
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshFlightDiagnostics}
+                      disabled={isLoadingFlightDiag}
+                      className="text-xs font-bold px-2.5 py-1.5 cursor-pointer"
+                    >
+                      {isLoadingFlightDiag ? (
+                        <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCwIcon className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-slate-900">AeroDataBox Adapter</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          flightDiag?.aeroDataBoxConfigured
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {flightDiag?.aeroDataBoxConfigured ? 'Configured' : 'Env Key Unset'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Server env <code className="font-mono">AERODATABOX_API_KEY</code> or{' '}
+                      <code className="font-mono">FLIGHT_API_KEY</code> (RapidAPI &amp; direct headers).
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-slate-900">FlightAware AeroAPI v4</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          flightDiag?.flightAwareConfigured
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {flightDiag?.flightAwareConfigured ? 'Configured' : 'Env Key Unset'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Server env <code className="font-mono">FLIGHTAWARE_API_KEY</code> (or{' '}
+                      <code className="font-mono">FLIGHT_API_PROVIDER=flightaware</code>).
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-emerald-950">Quota &amp; Rate Shield</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-300">
+                        {flightDiag?.cachedEntriesCount ?? 0} Cached
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-900/80">
+                      15-minute TTL on <code className="font-mono">/flightStatusCache</code> + per-IP rate limiting;{' '}
+                      <code className="font-mono">forceRefresh</code> restricted to staff.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="text-slate-700">
+                    <strong className="text-slate-900">Regional Airport Intelligence:</strong>{' '}
+                    {(flightDiag?.supportedAirports || ['STL', 'SUS', 'CPS']).join(' · ')} — Southwest &amp; Lufthansa mapped to{' '}
+                    <strong>STL Terminal 2 (Exit Door 12)</strong>; AA, DL, UA, AC &amp; commercial carriers mapped to{' '}
+                    <strong>STL Terminal 1 (Exit Door 6 / Door 12)</strong>; SUS &amp; CPS mapped to{' '}
+                    <strong>Private FBO Ramp</strong>.
+                  </div>
+                  <code className="text-[11px] font-mono bg-white px-2.5 py-1 rounded border border-blue-200 text-blue-900 shrink-0">
+                    GET /api/flight-status?diagnostics=1
+                  </code>
                 </div>
               </CardContent>
             </Card>

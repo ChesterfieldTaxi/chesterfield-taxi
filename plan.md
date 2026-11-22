@@ -818,6 +818,48 @@ export interface PassengerAccount {
   - Guarded for `corporate_manager` (locked to `user.corporateAccountId`) and `admin` (with header **Admin Account Preview Selector**).
   - 4-tab responsive Executive Clean B2B shell: **Overview & Live Rides**, **Book Company Ride** (embedded `BookingEngineV2` with `corporatePortalContext`, Authorized Rider picker, Cost Center selector, and 1-tap Saved Company Locations), **Team, Locations & PO Security**, and **Statements & Billing** (printable PDF modal, CSV export, and 1-tap `/pay/:payToken` checkout).
 
+## 27. Phase 38 Architecture: Live Flight Status Tracking for STL & SUS Airport Pickups
+
+### 27.1 Architectural & Server-Secret Guardrails (`constitution.md`)
+- **Pure Domain & Server-Isolated Aviation Layer**:
+  - Keep all aviation telemetry contracts in `app/core/types/flight.ts`, pure STL/SUS/CPS terminal resolution & pickup alignment math in `app/core/config/airports.ts`, client orchestration in `app/core/services/flight/flight-status.service.ts`, and upstream HTTP adapters + secret keys in `app/core/services/flight/flight-status.server.ts`.
+  - Never expose `FLIGHT_API_KEY`, `AERODATABOX_API_KEY`, `AERODATABOX_RAPIDAPI_HOST`, or `FLIGHTAWARE_API_KEY` to client code; `app/routes/api.flight-status.ts` delegates strictly to `flight-status.server.ts` so its client chunk remains `0.00 kB`.
+- **Quota, Rate-Limit & Cache Protection**:
+  - Enforce per-IP sliding-window rate limiting (`checkRateLimit`) on public `/api/flight-status` lookups, strict IATA carrier/flight-number parsing (`parseFlightIdent`), and strict `YYYY-MM-DD` `serviceDate` validation.
+  - Cache normalized `FlightTelemetrySnapshot` results for **15 minutes** (`900_000` ms) under deterministic key `${airlineCode}_${flightNumber}_${serviceDate}` in both server memory and `/flightStatusCache/{cacheKey}` (Firestore REST).
+  - Restrict `forceRefresh: true` cache bypasses and server-side trip `flightTelemetry` mutations strictly to authenticated Dispatchers/Admins (`verifyServerRequestAuth`).
+  - Lock down `/flightStatusCache/{cacheKey}` in `firestore.rules` with `allow get: if true; allow list: if false; allow write: if isDispatcher();` (and permit `'flightTelemetry'` / `'flightNotes'` on customer pre-dispatch trip edits).
+
+### 27.2 Pure STL/SUS Terminal Intelligence & Pickup Alignment (`app/core/config/airports.ts`)
+- **`parseFlightIdent(airlineInput, flightNumberInput)`**:
+  - Resolves carrier names (`"Southwest Airlines"` -> `"WN"`, `"Lufthansa"` -> `"LH"`, `"Air Canada"` -> `"AC"`, etc.) or 2-character IATA codes, strips non-digits/carrier prefixes from `flightNumberInput` (`"WN 1425"` -> `airlineCode: "WN"`, `flightNumber: "1425"`), and validates 1–4 digit flight numbers into `{ airlineCode, airlineName, flightNumber, flightIdent }`.
+- **`resolveStlTerminalInfo(airlineCodeOrName, airportCode = 'STL')`**:
+  - `SUS` / `CPS`: Returns private FBO ramp/lobby coordination metadata (`terminal: 'Private FBO'`, `pickupDoorGuidance`).
+  - `STL` Terminal 2 (`WN` Southwest, `LH` Lufthansa, and international charters): `{ terminal: 'Terminal 2', pickupDoorGuidance: 'Terminal 2 · Baggage Claim Exit Door 12' }`.
+  - `STL` Terminal 1 (`AA`, `DL`, `UA`, `AS`, `NK`, `F9`, `AC`, `OO`, `YX`, `G4`, `B6`, `SY`, `MX`, `HA`, etc.): `{ terminal: 'Terminal 1', pickupDoorGuidance: 'Terminal 1 · Lower Level Exit Door 6 / Door 12' }`.
+- **`evaluateFlightPickupAlignment(snapshot, scheduledPickupIso, options)`**:
+  - Compares `scheduledPickupIso` against `estimatedArrivalIso || scheduledArrivalIso` (plus configurable curb/baggage buffer, default `20`m with checked bags or `15`m carry-on):
+    - Flags `conflict: 'pickup_before_arrival'` when `scheduledPickupTime < effectiveArrivalTime`, computing `recommendedPickupIso = effectiveArrivalTime + bufferMinutes`.
+    - Flags `conflict: 'significant_delay'` when `snapshot.delayMinutes >= 15` (or arrival-to-pickup drift >= 15m), computing `recommendedPickupIso` preserving the rider's post-landing buffer (or shifting by `delayMinutes`).
+
+### 27.3 Pluggable Aviation Provider Engine (`app/core/services/flight/`)
+- **`flight-status.server.ts`**:
+  - `AeroDataBoxProvider`: Supports RapidAPI (`x-rapidapi-key`, `x-rapidapi-host`) and direct AeroDataBox (`x-api-market-key` / `Authorization`) against `/flights/number/{flightIdent}/{serviceDate}`, prioritizing STL/SUS arrival legs and normalizing `FlightOperationalStatus`, `delayMinutes`, `originIata`, `terminal`, `gate`, `baggageClaim`, and STL `pickupDoorGuidance`.
+  - `FlightAwareProvider`: Queries `https://aeroapi.flightaware.com/aeroapi/flights/{flightIdent}` (`x-apikey`), selects the leg matching `serviceDate` (and STL/SUS destination when present), and normalizes arrival telemetry + STL `pickupDoorGuidance`.
+  - `FallbackScheduleProvider`: Deterministic zero-key / upstream-failure fallback enriching the snapshot with resolved STL `Terminal 1` / `Terminal 2` / `SUS` guidance, carrier name, scheduled alignment metadata, and `isSimulatedFallback: true`.
+  - Exposes `lookupFlightTelemetryServer` (with injectable `fetchImpl` & `env` for deterministic unit testing), `getFlightIntegrationDiagnostics`, `handleFlightStatusGet`, and `handleFlightStatusPost`.
+- **`flight-status.service.ts`**:
+  - Client service wrapping `GET / POST /api/flight-status`, `refreshTripFlightTelemetry`, and `syncTripPickupToFlightEta` (updating `Trip.scheduledPickupTime` + `Trip.flightTelemetry`, appending immutable `TripAuditEvent` `STATUS_CHANGED` with `fieldChanges`, and firing `/api/push` + toast notification when `assignedDriverId` is present).
+
+### 27.4 Booking, Dispatch, Driver & Admin Surface Integration
+- **Booking (`FlightAssistanceCard.tsx`, `BookingEngineV2.tsx`, `DispatchBookingEngine.tsx`)**:
+  - Live STL Terminal & Exit Door guidance badge on airline selection; **"Check Flight Status"** pill button; inline telemetry status card; auto-fill of empty `flightOrigin`; pickup alignment warning with 1-tap **"Use Recommended Pickup Time"**; persistence of `flightTelemetry` on `CreateTripInput`.
+- **Dispatch (`DispatchFlightTelemetryBadge.tsx`, `DispatchTripQueuePane.tsx`, `DispatchTripDetailsDrawer.tsx`, `dispatch.tsx`)**:
+  - Compact color-coded telemetry pills across Table, Card, and Compact queue layouts; full Flight Telemetry & 1-Tap **"Refresh Flight"** + **"Adjust Pickup Time to New ETA"** controls inside `DispatchTripDetailsDrawer.tsx`.
+- **Driver (`DriverTripManifest.tsx`) & Admin (`AdminIntegrationsSubpage.tsx`)**:
+  - Live flight status badge, terminal/gate/baggage belt, and STL exit door guidance in `DriverTripManifest.tsx`; Flight Status Telemetry readiness & cache diagnostics card in `AdminIntegrationsSubpage.tsx`.
+
+
 
 
 

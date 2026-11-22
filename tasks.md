@@ -547,6 +547,31 @@
   - [x] 37.5.1 Create `scripts/test-corporate-portal.ts` testing workspace routing, strict tenant isolation, `firestore.rules` invariants, credit-limit utilization math, CSV trip export, self-service PO rotation audit trail, and cross-tenant (`403`) vs own-tenant (`200`) invoice Pay Link generation.
   - [x] 37.5.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-corporate-portal.ts`, `npx tsx scripts/test-payment-webhooks-and-links.ts`, and `npm run test:e2e`, then mark Phase 37 complete in `tasks.md`.
 
+## Phase 38: Live Flight Status Tracking for STL & SUS Airport Pickups (Final Roadmap Phase)
+- [x] 38.0 Baseline Hygiene & SDD Documentation:
+  - [x] 38.0.1 Commit Phase 37 Corporate Portal baseline cleanly (`feat(phase-37): add corporate client self-service portal, multi-tenant RBAC, and manager provisioning`).
+  - [x] 38.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 38 scope and architecture before modifying application code.
+- [x] 38.1 Flight Telemetry Types, STL Terminal Intelligence & Data Model:
+  - [x] 38.1.1 Create `app/core/types/flight.ts` (`FlightProviderId`, `FlightOperationalStatus`, `FlightTelemetrySnapshot`, `FlightLookupQuery`, `FlightPickupAlignment`, `IFlightStatusProvider`) and export from `app/core/types/index.ts`.
+  - [x] 38.1.2 Enhance `app/core/config/airports.ts` with `resolveStlTerminalInfo`, `parseFlightIdent`, and `evaluateFlightPickupAlignment`.
+  - [x] 38.1.3 Extend `Trip` in `app/core/types/trip.ts` with `flightTelemetry?: FlightTelemetrySnapshot` and update `firestore.rules` with `/flightStatusCache/{cacheKey}` (`allow get: if true; allow list: if false; allow write: if isDispatcher();`).
+- [x] 38.2 Provider-Agnostic Flight Adapter Engine & Cached API Route:
+  - [x] 38.2.1 Implement `app/core/services/flight/flight-status.server.ts` (`AeroDataBoxProvider`, `FlightAwareProvider`, `FallbackScheduleProvider`, 15-minute memory + `/flightStatusCache` TTL cache, IP rate limiting, staff-only `forceRefresh`, and diagnostics).
+  - [x] 38.2.2 Create client service `app/core/services/flight/flight-status.service.ts` (plus barrel `app/core/services/flight/index.ts` and `app/core/services/index.ts` export).
+  - [x] 38.2.3 Create `app/routes/api.flight-status.ts` (`GET` lookup/diagnostics + `POST` lookup/staff refresh) and register `api/flight-status` in `app/routes.ts`.
+- [x] 38.3 Smart Booking Wizard Flight Check:
+  - [x] 38.3.1 Upgrade `app/components/domain/booking/FlightAssistanceCard.tsx` with automatic STL Terminal & Exit Door guidance badge, **"Check Flight Status"** pill button, inline telemetry banner, blank `flightOrigin` auto-fill, pickup conflict/delay warning + 1-tap **"Use Recommended Pickup Time"**.
+  - [x] 38.3.2 Wire live flight check, pickup time adjustment, and `Trip.flightTelemetry` persistence in `BookingEngineV2.tsx` and `DispatchBookingEngine.tsx`.
+- [x] 38.4 Dispatch Queue, Trip Details, Driver Manifest & Admin Integrations:
+  - [x] 38.4.1 Render compact color-coded **Flight Telemetry Pills** in `DispatchTripQueuePane.tsx` and `DispatchTripDetailsDrawer.tsx`, plus **"Refresh Flight"** and **1-Tap "Adjust Pickup Time to New ETA"** (updating `scheduledPickupTime`, appending `TripAuditEvent`, and notifying assigned driver) in `DispatchTripDetailsDrawer.tsx`.
+  - [x] 38.4.2 Render live flight status badge, terminal/gate/baggage claim, and STL curbside exit door guidance inside `DriverTripManifest.tsx`.
+  - [x] 38.4.3 Add **Flight Status Telemetry (`AeroDataBox` / `FlightAware`)** readiness & 15-minute cache card to `AdminIntegrationsSubpage.tsx`.
+- [x] 38.5 Final Verification Gate (Full 6-Phase Suite):
+  - [x] 38.5.1 Create `scripts/test-flight-status.ts` testing `parseFlightIdent`, `resolveStlTerminalInfo`, `AeroDataBoxProvider` & `FlightAwareProvider` mocked normalization, `FallbackScheduleProvider`, 15-minute cache deduplication + staff `forceRefresh`, and `evaluateFlightPickupAlignment` + 1-tap pickup ETA sync with `TripAuditEvent`.
+  - [x] 38.5.2 Run `npm run typecheck` (0 errors) and `npm run build` (confirming `api.flight-status` client chunk is `0.00 kB`).
+  - [x] 38.5.3 Run `npx tsx scripts/test-flight-status.ts` AND all prior verification suites (`test-corporate-portal`, `test-payment-webhooks-and-links`, `test-auto-dispatch-sla`, `test-pwa-notifications`, `npm run test:e2e`, `npm run test:stress`), then mark Phase 38 complete in `tasks.md`.
+
+
 
 
 

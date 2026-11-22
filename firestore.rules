@@ -261,7 +261,7 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'pickupLocation', 'dropoffLocation',
             'intermediateStops', 'bookingType', 'scheduledPickupTime', 'vehicleTier',
-            'passenger', 'pricing', 'driverNotes', 'metadata', 'updatedAt'
+            'passenger', 'pricing', 'driverNotes', 'flightNotes', 'flightTelemetry', 'metadata', 'updatedAt'
           ])
         );
 
@@ -343,6 +343,16 @@ service cloud.firestore {
 
     match /paymentWebhookEvents/{eventId} {
       allow read, write: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2D. 15-Minute Aviation Telemetry Cache (/flightStatusCache/{cacheKey})
+    // ─────────────────────────────────────────────────────────────
+    match /flightStatusCache/{cacheKey} {
+      // Exact airlineCode_flightNumber_serviceDate key lookup only; collection listing forbidden
+      allow get: if true;
+      allow list: if false;
+      allow write: if isDispatcher();
     }
 
     // ─────────────────────────────────────────────────────────────

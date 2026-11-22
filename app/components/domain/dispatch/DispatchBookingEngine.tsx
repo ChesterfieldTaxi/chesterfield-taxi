@@ -46,7 +46,9 @@ import {
 import { DEFAULT_OVERSIZED_BAG_CATEGORIES } from '../../../core/types/config';
 import { ConfirmationModal } from '../../ui/ConfirmationModal';
 import { ModernDatePicker, ModernTimePicker } from '../../ui/ModernDateTimePicker';
-import { MAJOR_AIRLINES } from '../../../core/config/airports';
+import { MAJOR_AIRLINES, parseFlightIdent } from '../../../core/config/airports';
+import { FlightTelemetryCheckPanel } from '../booking/FlightAssistanceCard';
+import type { FlightTelemetrySnapshot } from '../../../core/types/flight';
 import { getOperatorService, formatDriverAssignmentLabel, type DriverRosterItem } from '../../../core/services/operator.service';
 import {
   generateMultiCarGroupId,
@@ -338,6 +340,8 @@ function DispatchBookingEngineComponent({
   const [tailNumber, setTailNumber] = useState('');
   const [fboFacility, setFboFacility] = useState('');
   const [hasCheckedLuggage, setHasCheckedLuggage] = useState(false);
+  const [outboundFlightTelemetry, setOutboundFlightTelemetry] = useState<FlightTelemetrySnapshot | null>(null);
+  const [returnFlightTelemetry, setReturnFlightTelemetry] = useState<FlightTelemetrySnapshot | null>(null);
 
   // Passenger & Contact Person
   const [passengerName, setPassengerName] = useState('');
@@ -1070,6 +1074,7 @@ function DispatchBookingEngineComponent({
       setTailNumber(meta.tailNumber || (initialTrip as any).flightDetails?.tailNumber || '');
       setFboFacility(meta.fboFacility || (initialTrip as any).flightDetails?.fboFacility || '');
       setHasCheckedLuggage(Boolean(meta.hasCheckedLuggage || (initialTrip as any).flightDetails?.hasCheckedLuggage));
+      setOutboundFlightTelemetry(initialTrip.flightTelemetry || null);
 
       // Hydrate return flight info if present
       const returnMeta = (meta.returnTripDetails || meta.returnFlightDetails || {}) as Record<string, any>;
@@ -2458,6 +2463,8 @@ function DispatchBookingEngineComponent({
     setReturnTailNumber('');
     setReturnFboFacility('');
     setReturnHasCheckedLuggage(false);
+    setOutboundFlightTelemetry(null);
+    setReturnFlightTelemetry(null);
     setSubmitError(null);
 
     try {
@@ -2872,6 +2879,25 @@ function DispatchBookingEngineComponent({
       airportIataCode: airportDetection.airport?.iataCode,
     };
 
+    const parsedDispOutboundFlight = parseFlightIdent(airline, flightNumber);
+    const validDispOutboundTelemetry =
+      provideFlightInfo &&
+      !airportDetection.isPrivateAviation &&
+      outboundFlightTelemetry &&
+      parsedDispOutboundFlight.isValid &&
+      outboundFlightTelemetry.flightIdent === parsedDispOutboundFlight.flightIdent
+        ? outboundFlightTelemetry
+        : undefined;
+    const parsedDispReturnFlight = parseFlightIdent(returnAirline, returnFlightNumber);
+    const validDispReturnTelemetry =
+      returnProvideFlightInfo &&
+      !returnAirportDetection.isPrivateAviation &&
+      returnFlightTelemetry &&
+      parsedDispReturnFlight.isValid &&
+      returnFlightTelemetry.flightIdent === parsedDispReturnFlight.flightIdent
+        ? returnFlightTelemetry
+        : undefined;
+
     try {
       const resolveDisplayNameForChoice = (choice: string, resolvedTier: string) => {
         if (choice === 'any') return 'Any';
@@ -2946,6 +2972,7 @@ function DispatchBookingEngineComponent({
             scheduledPickupTime,
             driverNotes: notesForAll,
             flightNotes: outboundFlightNotes || undefined,
+            ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
             assignedDriverId: driverId === 'unassigned' ? null : driverId,
             status:
               driverId !== 'unassigned' && initialTrip.status === 'pending'
@@ -3022,6 +3049,7 @@ function DispatchBookingEngineComponent({
               vehicleTier: spec.vehicleTier as VehicleTier,
               driverNotes: notesForAll,
               flightNotes: outboundFlightNotes || undefined,
+              ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
               pricing: spec.pricing,
               payment: {
                 method,
@@ -3153,6 +3181,7 @@ function DispatchBookingEngineComponent({
           scheduledPickupTime: isCompleted || isCancelled ? initialTrip.scheduledPickupTime : scheduledPickupTime,
           driverNotes: notesForAll,
           flightNotes: outboundFlightNotes || undefined,
+          ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
           assignedDriverId: driverId === 'unassigned' ? null : driverId,
           status:
             isCompleted || isCancelled
@@ -3264,6 +3293,7 @@ function DispatchBookingEngineComponent({
             vehicleTier: spec.vehicleTier as VehicleTier,
             driverNotes: notesForAll,
             flightNotes: outboundFlightNotes || undefined,
+            ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
             pricing: spec.pricing,
             payment: {
               method,
@@ -3465,6 +3495,7 @@ function DispatchBookingEngineComponent({
                 vehicleTier: rSpec.vehicleTier as VehicleTier,
                 driverNotes: notesForAll,
                 flightNotes: returnLegFlightNotes || undefined,
+                ...(validDispReturnTelemetry ? { flightTelemetry: validDispReturnTelemetry } : {}),
                 pricing: rSpec.pricing,
                 payment: {
                   method,
@@ -4210,55 +4241,109 @@ function DispatchBookingEngineComponent({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            Airline
-                          </span>
-                          <select
-                            value={airline}
-                            onChange={(e) => setAirline(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
-                          >
-                            <option value="">Select Airline</option>
-                            {MAJOR_AIRLINES.map((al) => (
-                              <option key={al.code} value={al.name}>
-                                {al.name} ({al.code})
-                              </option>
-                            ))}
-                          </select>
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                              Airline
+                            </span>
+                            <select
+                              value={airline}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setAirline(v);
+                                const next = parseFlightIdent(v, flightNumber);
+                                if (
+                                  outboundFlightTelemetry &&
+                                  outboundFlightTelemetry.flightIdent !== next.flightIdent
+                                ) {
+                                  setOutboundFlightTelemetry(null);
+                                }
+                              }}
+                              className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
+                            >
+                              <option value="">Select Airline</option>
+                              {MAJOR_AIRLINES.map((al) => (
+                                <option key={al.code} value={al.name}>
+                                  {al.name} ({al.code})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                              Flight #
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]{1,4}"
+                              maxLength={4}
+                              placeholder="e.g. 1234"
+                              value={flightNumber}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setFlightNumber(val);
+                                const next = parseFlightIdent(airline, val);
+                                if (
+                                  outboundFlightTelemetry &&
+                                  outboundFlightTelemetry.flightIdent !== next.flightIdent
+                                ) {
+                                  setOutboundFlightTelemetry(null);
+                                }
+                              }}
+                              className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs font-mono font-bold"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                              {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="e.g. ORD, ATL, DEN"
+                              value={flightOrigin}
+                              onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
+                              className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            Flight #
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]{1,4}"
-                            maxLength={4}
-                            placeholder="e.g. 1234"
-                            value={flightNumber}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                              setFlightNumber(val);
-                            }}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs font-mono font-bold"
-                          />
-                        </div>
-                        <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                            {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="e.g. ORD, ATL, DEN"
-                            value={flightOrigin}
-                            onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
-                          />
-                        </div>
-                      </div>
+
+                        <FlightTelemetryCheckPanel
+                          compact
+                          airline={airline}
+                          flightNumber={flightNumber}
+                          flightOrigin={flightOrigin}
+                          onFlightOriginChange={setFlightOrigin}
+                          hasCheckedLuggage={hasCheckedLuggage}
+                          isPickupAirport={airportDetection.isPickupAirport}
+                          isDropoffAirport={airportDetection.isDropoffAirport}
+                          airportIataCode={airportDetection.airport?.iataCode || 'STL'}
+                          serviceDate={scheduledDate}
+                          scheduledPickupIso={
+                            timingType === 'later' && scheduledDate && scheduledTime
+                              ? (() => {
+                                  const d = new Date(`${scheduledDate}T${scheduledTime}:00`);
+                                  return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
+                                })()
+                              : undefined
+                          }
+                          flightTelemetry={outboundFlightTelemetry}
+                          onFlightTelemetryChange={setOutboundFlightTelemetry}
+                          onApplyRecommendedPickupIso={(recIso) => {
+                            const d = new Date(recIso);
+                            if (!Number.isFinite(d.getTime())) return;
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const min = String(d.getMinutes()).padStart(2, '0');
+                            setTimingType('later');
+                            setScheduledDate(`${yyyy}-${mm}-${dd}`);
+                            setScheduledTime(`${hh}:${min}`);
+                          }}
+                        />
+                      </>
                     )}
 
                     <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 text-[11px] text-blue-950">
@@ -5749,55 +5834,108 @@ function DispatchBookingEngineComponent({
                                 </div>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div>
-                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    Airline
-                                  </span>
-                                  <select
-                                    value={returnAirline}
-                                    onChange={(e) => setReturnAirline(e.target.value)}
-                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-800"
-                                  >
-                                    <option value="">Select Airline</option>
-                                    {MAJOR_AIRLINES.map((al) => (
-                                      <option key={al.code} value={al.name}>
-                                        {al.name} ({al.code})
-                                      </option>
-                                    ))}
-                                  </select>
+                              <>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <div>
+                                    <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                      Airline
+                                    </span>
+                                    <select
+                                      value={returnAirline}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        setReturnAirline(v);
+                                        const next = parseFlightIdent(v, returnFlightNumber);
+                                        if (
+                                          returnFlightTelemetry &&
+                                          returnFlightTelemetry.flightIdent !== next.flightIdent
+                                        ) {
+                                          setReturnFlightTelemetry(null);
+                                        }
+                                      }}
+                                      className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs text-slate-800"
+                                    >
+                                      <option value="">Select Airline</option>
+                                      {MAJOR_AIRLINES.map((al) => (
+                                        <option key={al.code} value={al.name}>
+                                          {al.name} ({al.code})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                      Flight #
+                                    </span>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]{1,4}"
+                                      maxLength={4}
+                                      placeholder="e.g. 1234"
+                                      value={returnFlightNumber}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                        setReturnFlightNumber(val);
+                                        const next = parseFlightIdent(returnAirline, val);
+                                        if (
+                                          returnFlightTelemetry &&
+                                          returnFlightTelemetry.flightIdent !== next.flightIdent
+                                        ) {
+                                          setReturnFlightTelemetry(null);
+                                        }
+                                      }}
+                                      className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs font-mono font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                                      {returnAirportDetection.isPickupAirport ? 'Origin' : 'Destination'}
+                                    </span>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. ORD, ATL, DEN"
+                                      value={returnFlightOrigin}
+                                      onChange={(e) => setReturnFlightOrigin(e.target.value.toUpperCase())}
+                                      className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs uppercase"
+                                    />
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    Flight #
-                                  </span>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    pattern="[0-9]{1,4}"
-                                    maxLength={4}
-                                    placeholder="e.g. 1234"
-                                    value={returnFlightNumber}
-                                    onChange={(e) => {
-                                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                                      setReturnFlightNumber(val);
-                                    }}
-                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs font-mono font-bold"
-                                  />
-                                </div>
-                                <div>
-                                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                                    {returnAirportDetection.isPickupAirport ? 'Origin' : 'Destination'}
-                                  </span>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. ORD, ATL, DEN"
-                                    value={returnFlightOrigin}
-                                    onChange={(e) => setReturnFlightOrigin(e.target.value.toUpperCase())}
-                                    className="w-full px-2 py-1 bg-white border border-indigo-200 rounded text-xs uppercase"
-                                  />
-                                </div>
-                              </div>
+
+                                <FlightTelemetryCheckPanel
+                                  compact
+                                  airline={returnAirline}
+                                  flightNumber={returnFlightNumber}
+                                  flightOrigin={returnFlightOrigin}
+                                  onFlightOriginChange={setReturnFlightOrigin}
+                                  hasCheckedLuggage={returnHasCheckedLuggage}
+                                  isPickupAirport={returnAirportDetection.isPickupAirport}
+                                  isDropoffAirport={returnAirportDetection.isDropoffAirport}
+                                  airportIataCode={returnAirportDetection.airport?.iataCode || 'STL'}
+                                  serviceDate={returnDate || scheduledDate}
+                                  scheduledPickupIso={
+                                    returnDate && returnTime
+                                      ? (() => {
+                                          const d = new Date(`${returnDate}T${returnTime}:00`);
+                                          return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
+                                        })()
+                                      : undefined
+                                  }
+                                  flightTelemetry={returnFlightTelemetry}
+                                  onFlightTelemetryChange={setReturnFlightTelemetry}
+                                  onApplyRecommendedPickupIso={(recIso) => {
+                                    const d = new Date(recIso);
+                                    if (!Number.isFinite(d.getTime())) return;
+                                    const yyyy = d.getFullYear();
+                                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                    const dd = String(d.getDate()).padStart(2, '0');
+                                    const hh = String(d.getHours()).padStart(2, '0');
+                                    const min = String(d.getMinutes()).padStart(2, '0');
+                                    setReturnDate(`${yyyy}-${mm}-${dd}`);
+                                    setReturnTime(`${hh}:${min}`);
+                                  }}
+                                />
+                              </>
                             )}
 
                             <div className="flex items-center justify-between pt-1 border-t border-indigo-200/60 text-[11px] text-indigo-950">

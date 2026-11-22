@@ -18,6 +18,8 @@ import React, { useState } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { resolveStlTerminalInfo } from '../../../core/config/airports';
+import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
 
 export interface DriverTripManifestProps {
   trip: Trip;
@@ -124,8 +126,15 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
     : '';
   const hasCheckedLuggage = Boolean(meta.hasCheckedLuggage);
   const legacyFlightNotes = typeof trip.flightNotes === 'string' ? trip.flightNotes.trim() : '';
+  const flightBadge = resolveTripFlightBadge(trip);
   const hasAviationInfo = Boolean(
-    isPrivateAviation || airline || flightNumber || flightOrigin || legacyFlightNotes
+    isPrivateAviation ||
+      airline ||
+      flightNumber ||
+      flightOrigin ||
+      legacyFlightNotes ||
+      trip.flightTelemetry ||
+      flightBadge.hasFlight
   );
 
   // Booker vs Passenger contact
@@ -344,45 +353,128 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
       )}
 
       {/* Aviation / Flight Information */}
-      {hasAviationInfo && (
-        <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-1 text-xs">
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 block">
-            {isPrivateAviation ? 'Private Aviation (FBO / Tail #)' : 'Commercial Flight Details'}
-          </span>
-          {isPrivateAviation ? (
-            <div className="text-sky-100 space-y-0.5">
-              {tailNumber && (
-                <div>
-                  <strong className="text-sky-300">Tail #:</strong> {tailNumber}
-                </div>
-              )}
-              {fboFacility && (
-                <div>
-                  <strong className="text-sky-300">FBO Facility:</strong> {fboFacility}
-                </div>
-              )}
-              {hasCheckedLuggage && (
-                <div className="text-[11px] text-sky-200 font-semibold">Checked / Ramp Luggage Expected</div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sky-100 space-y-0.5">
-              {(airline || flightNumber) && (
-                <div>
-                  <strong className="text-sky-300">Flight:</strong> {airline} {flightNumber ? `#${flightNumber}` : ''}
-                  {flightOrigin ? ` (from ${flightOrigin})` : ''}
-                </div>
-              )}
-              {hasCheckedLuggage && (
-                <div className="text-[11px] text-sky-200 font-semibold">Passenger Has Checked Luggage</div>
-              )}
-              {legacyFlightNotes && (
-                <div className="text-[11px] text-sky-200">{legacyFlightNotes}</div>
+      {hasAviationInfo && (() => {
+        const snap = trip.flightTelemetry;
+        const termInfo = resolveStlTerminalInfo(
+          snap?.airlineCode || airline || fboFacility,
+          snap?.destinationIata || (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : undefined)
+        );
+        const pillToneMap: Record<typeof flightBadge.tone, string> = {
+          emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40',
+          amber: 'bg-amber-500/25 text-amber-200 border-amber-400/50',
+          rose: 'bg-rose-500/25 text-rose-200 border-rose-400/50',
+          blue: 'bg-sky-500/25 text-sky-200 border-sky-400/45',
+          slate: 'bg-slate-800 text-slate-200 border-slate-600',
+        };
+        const doorGuidance =
+          snap?.pickupDoorGuidance || flightBadge.pickupDoorGuidance || termInfo.pickupDoorGuidance;
+
+        return (
+          <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-1.5 text-xs">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">
+                {isPrivateAviation ? 'Private Aviation (FBO / Tail #)' : 'Live Flight & Terminal Manifest'}
+              </span>
+              {flightBadge.hasFlight && flightBadge.shortLabel && (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold border ${
+                    pillToneMap[flightBadge.tone]
+                  }`}
+                >
+                  {flightBadge.shortLabel}
+                </span>
               )}
             </div>
-          )}
-        </div>
-      )}
+
+            {isPrivateAviation ? (
+              <div className="text-sky-100 space-y-1">
+                {tailNumber && (
+                  <div>
+                    <strong className="text-sky-300">Tail #:</strong>{' '}
+                    <span className="font-mono font-bold">{tailNumber}</span>
+                  </div>
+                )}
+                {fboFacility && (
+                  <div>
+                    <strong className="text-sky-300">FBO Facility:</strong> {fboFacility}
+                  </div>
+                )}
+                {doorGuidance && (
+                  <div className="text-[11px] font-bold text-emerald-300 bg-slate-950/60 border border-sky-800/50 rounded-lg px-2.5 py-1.5">
+                    Ramp / Lobby Guidance: {doorGuidance}
+                  </div>
+                )}
+                {hasCheckedLuggage && (
+                  <div className="text-[11px] text-sky-200 font-semibold">Checked / Ramp Luggage Expected</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sky-100 space-y-1">
+                {(snap?.flightIdent || airline || flightNumber) && (
+                  <div>
+                    <strong className="text-sky-300">Flight:</strong>{' '}
+                    {snap?.airlineName || airline}{' '}
+                    {snap?.flightIdent
+                      ? `(${snap.flightIdent})`
+                      : flightNumber
+                      ? `#${flightNumber}`
+                      : ''}
+                    {snap?.originIata || flightOrigin
+                      ? ` · from ${snap?.originIata || flightOrigin}${
+                          snap?.originCity ? ` (${snap.originCity})` : ''
+                        }`
+                      : ''}
+                  </div>
+                )}
+
+                {(snap?.estimatedArrivalIso || snap?.scheduledArrivalIso) && (
+                  <div>
+                    <strong className="text-sky-300">Est. Arrival:</strong>{' '}
+                    <span className="font-mono font-bold text-white">
+                      {new Date(
+                        (snap.estimatedArrivalIso || snap.scheduledArrivalIso)!
+                      ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                )}
+
+                {((snap?.terminal || termInfo.terminal) || snap?.gate || snap?.baggageClaim) && (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {(snap?.terminal || termInfo.terminal) && (
+                      <span className="px-2 py-0.5 rounded bg-sky-900/60 border border-sky-700/60 text-sky-100 font-bold text-[11px]">
+                        {snap?.terminal || termInfo.terminal}
+                      </span>
+                    )}
+                    {snap?.gate && (
+                      <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
+                        Gate {snap.gate}
+                      </span>
+                    )}
+                    {snap?.baggageClaim && (
+                      <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
+                        Baggage Belt {snap.baggageClaim}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {doorGuidance && (
+                  <div className="text-[11px] font-bold text-emerald-300 bg-slate-950/70 border border-emerald-700/40 rounded-lg px-2.5 py-1.5">
+                    Curbside Door: {doorGuidance}
+                  </div>
+                )}
+
+                {hasCheckedLuggage && (
+                  <div className="text-[11px] text-sky-200 font-semibold">Passenger Has Checked Luggage</div>
+                )}
+                {legacyFlightNotes && (
+                  <div className="text-[11px] text-sky-200/90">{legacyFlightNotes}</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Access Codes, Booker Contact, Special Requests & Notes */}
       {(unitOrApt || gateCode || bookerName || specialRequests || topDriverNotes) && (

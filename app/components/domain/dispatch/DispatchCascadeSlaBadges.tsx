@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { TripSlaEvaluation } from '../../../core/services/dispatch/sla-monitor.service';
+import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
 import { AlertTriangleIcon, BoltIcon, ClockIcon, PlaneIcon, XIcon } from '../../ui/Icons';
 
 export function isTripCascadeActive(trip?: Partial<Trip> | null): boolean {
@@ -135,4 +136,49 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
   }
 
   return null;
+});
+
+export interface DispatchFlightTelemetryPillProps {
+  trip: Trip;
+  compact?: boolean;
+}
+
+export const DispatchFlightTelemetryPill = React.memo(function DispatchFlightTelemetryPill({
+  trip,
+  compact = false,
+}: DispatchFlightTelemetryPillProps) {
+  const badge = resolveTripFlightBadge(trip);
+  if (!badge.hasFlight || !badge.label) {
+    return null;
+  }
+
+  const toneClasses: Record<typeof badge.tone, string> = {
+    emerald: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+    amber: 'bg-amber-100 text-amber-950 border-amber-300',
+    rose: 'bg-rose-100 text-rose-900 border-rose-300',
+    blue: 'bg-sky-50 text-sky-900 border-sky-300',
+    slate: 'bg-slate-100 text-slate-800 border-slate-300',
+  };
+
+  const tooltipParts = [
+    badge.flightIdent ? `Flight ${badge.flightIdent}` : null,
+    badge.terminal || null,
+    badge.gate ? `Gate ${badge.gate}` : null,
+    badge.baggageClaim ? `Baggage ${badge.baggageClaim}` : null,
+    badge.pickupDoorGuidance || null,
+  ].filter(Boolean);
+
+  return (
+    <span
+      title={tooltipParts.join(' · ')}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10.5px] font-extrabold tracking-tight shrink-0 ${
+        toneClasses[badge.tone]
+      }`}
+    >
+      <PlaneIcon className="w-3 h-3 shrink-0" />
+      <span className={compact ? 'truncate max-w-[140px]' : ''}>
+        {compact ? badge.shortLabel : badge.label}
+      </span>
+    </span>
+  );
 });

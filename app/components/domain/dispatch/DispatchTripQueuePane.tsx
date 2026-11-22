@@ -5,6 +5,7 @@ import { CustomDateTimePicker, type DateTimeRange } from './CustomDateTimePicker
 import { TripActionDropdown } from './TripActionDropdown';
 import {
   DispatchCascadePill,
+  DispatchFlightTelemetryPill,
   DispatchSlaBadge,
   canTripTriggerAutoOffer,
   isTripCascadeActive,
@@ -1301,6 +1302,7 @@ export function DispatchTripQueuePane({
                         {trip.passenger.firstName} {trip.passenger.lastName}
                       </span>
                       <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                      <DispatchFlightTelemetryPill trip={trip} compact />
                       <DispatchCascadePill
                         trip={trip}
                         onCancel={() => onCancelAutoOffer(trip)}
@@ -1593,6 +1595,7 @@ export function DispatchTripQueuePane({
                     {trip.passenger.firstName} {trip.passenger.lastName}
                   </span>
                   <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                  <DispatchFlightTelemetryPill trip={trip} compact />
                   <DispatchCascadePill
                     trip={trip}
                     compact
@@ -1779,6 +1782,7 @@ export function DispatchTripQueuePane({
                         <div className="flex flex-col items-start gap-1">
                           <span>{pickupTimeStr}</span>
                           <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
+                          <DispatchFlightTelemetryPill trip={trip} compact />
                         </div>
                       </td>
                       <td className="py-2 px-3 font-medium">

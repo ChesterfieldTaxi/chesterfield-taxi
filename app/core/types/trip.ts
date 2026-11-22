@@ -6,6 +6,8 @@
  * and driver broadcasting targeting arrays (offeredToIds).
  */
 
+import type { FlightTelemetrySnapshot } from './flight';
+
 /**
  * State machine literal types for Trip lifecycle.
  */
@@ -414,6 +416,9 @@ export interface Trip {
   // Phase 35: Sequential Auto-Dispatch Offer Cascade & Scheduled SLA Monitor
   offerCascade?: TripOfferCascade;
   slaStatus?: TripSlaStatus;
+
+  // Phase 38: Live Flight Status Telemetry Snapshot (STL / SUS / CPS Airport Pickups)
+  flightTelemetry?: FlightTelemetrySnapshot;
 
   /** State Machine Audit Trail */
   statusHistory: TripStatusHistoryEntry[];

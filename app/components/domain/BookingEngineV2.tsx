@@ -125,6 +125,8 @@ import { StripePaymentInput } from './payments/StripePaymentInput';
 import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 import { FlightAssistanceCard } from './booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../ui/ModernDateTimePicker';
+import type { FlightTelemetrySnapshot } from '../../core/types/flight';
+import { parseFlightIdent } from '../../core/config/airports';
 
 export interface CorporatePortalBookingContext {
   corporateAccountId: string;
@@ -314,6 +316,8 @@ export function BookingEngineV2({
   // Defer local-timezone default date/time computation to client mount so SSR (UTC)
   // and browser hydration always match without React Hydration Error #418.
   const [todayLocalDate, setTodayLocalDate] = useState<string>('');
+  const [outboundFlightTelemetry, setOutboundFlightTelemetry] = useState<FlightTelemetrySnapshot | null>(null);
+  const [returnFlightTelemetry, setReturnFlightTelemetry] = useState<FlightTelemetrySnapshot | null>(null);
 
   // Form State
   const [form, setForm] = useState<FormState>({
@@ -2009,10 +2013,22 @@ export function BookingEngineV2({
       const vehicleDisplayName =
         selectedVehicleTierObj?.name || formatVehicleTier(mapChoiceToTier(form.vehicleChoice));
 
+      // Resolve validated checked flightTelemetry for outbound leg
+      const parsedOutboundFlight = parseFlightIdent(form.airline, form.flightNumber);
+      const validOutboundTelemetry =
+        form.provideFlightInfo &&
+        !airportDetection.isPrivateAviation &&
+        outboundFlightTelemetry &&
+        parsedOutboundFlight.isValid &&
+        outboundFlightTelemetry.flightIdent === parsedOutboundFlight.flightIdent
+          ? outboundFlightTelemetry
+          : undefined;
+
       // Customer web submissions strictly default to 'UNCONFIRMED'
       const inputPayload: CreateTripInput = {
         ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
         ...(verifiedCorporateAccountId ? { corporateAccountId: verifiedCorporateAccountId } : {}),
+        ...(validOutboundTelemetry ? { flightTelemetry: validOutboundTelemetry } : {}),
         pickupLocation,
         dropoffLocation,
         intermediateStops: intermediateStopsLocations.length > 0 ? intermediateStopsLocations : undefined,
@@ -2104,6 +2120,7 @@ export function BookingEngineV2({
           passenger: inputPayload.passenger,
           pricing: inputPayload.pricing,
           driverNotes: inputPayload.driverNotes,
+          ...(inputPayload.flightTelemetry ? { flightTelemetry: inputPayload.flightTelemetry } : {}),
           metadata: inputPayload.metadata,
         });
         setConfirmedTrip(updatedTrip);
@@ -2226,9 +2243,20 @@ export function BookingEngineV2({
           const returnVehicleDisplayName =
             returnVehicleTierObj?.name || formatVehicleTier(mapChoiceToTier(form.returnVehicleChoice));
 
+          const parsedReturnFlight = parseFlightIdent(form.returnAirline, form.returnFlightNumber);
+          const validReturnTelemetry =
+            form.returnProvideFlightInfo &&
+            !returnAirportDetection.isPrivateAviation &&
+            returnFlightTelemetry &&
+            parsedReturnFlight.isValid &&
+            returnFlightTelemetry.flightIdent === parsedReturnFlight.flightIdent
+              ? returnFlightTelemetry
+              : undefined;
+
           const returnPayload: CreateTripInput = {
             ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
             ...(verifiedCorporateAccountId ? { corporateAccountId: verifiedCorporateAccountId } : {}),
+            ...(validReturnTelemetry ? { flightTelemetry: validReturnTelemetry } : {}),
             pickupLocation: {
               address: form.returnPickupAddress,
               coordinates: form.returnPickupCoordinates || dropoffLocation.coordinates,
@@ -2587,6 +2615,8 @@ export function BookingEngineV2({
             }));
             setQuote(null);
             setReturnQuote(null);
+            setOutboundFlightTelemetry(null);
+            setReturnFlightTelemetry(null);
           }}
         />
       </div>
@@ -3046,6 +3076,32 @@ export function BookingEngineV2({
                   lambertPickupInstructions={bookingConfig.lambertPickupInstructions}
                   flightNumberError={errors.flightNumber}
                   tailNumberError={errors.tailNumber}
+                  serviceDate={form.scheduledDate || todayLocalDate}
+                  scheduledPickupIso={
+                    form.timingType === 'later' && form.scheduledDate && form.scheduledTime
+                      ? (() => {
+                          const d = new Date(`${form.scheduledDate}T${form.scheduledTime}:00`);
+                          return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
+                        })()
+                      : undefined
+                  }
+                  flightTelemetry={outboundFlightTelemetry}
+                  onFlightTelemetryChange={setOutboundFlightTelemetry}
+                  onApplyRecommendedPickupIso={(recIso) => {
+                    const d = new Date(recIso);
+                    if (!Number.isFinite(d.getTime())) return;
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const min = String(d.getMinutes()).padStart(2, '0');
+                    setForm((prev) => ({
+                      ...prev,
+                      timingType: 'later',
+                      scheduledDate: `${yyyy}-${mm}-${dd}`,
+                      scheduledTime: `${hh}:${min}`,
+                    }));
+                  }}
                 />
               )}
             </div>
@@ -3993,6 +4049,31 @@ export function BookingEngineV2({
                           lambertPickupInstructions={bookingConfig.lambertPickupInstructions}
                           flightNumberError={errors.returnFlightNumber}
                           tailNumberError={errors.returnTailNumber}
+                          serviceDate={form.returnDate || form.scheduledDate || todayLocalDate}
+                          scheduledPickupIso={
+                            form.returnDate && form.returnTime
+                              ? (() => {
+                                  const d = new Date(`${form.returnDate}T${form.returnTime}:00`);
+                                  return Number.isFinite(d.getTime()) ? d.toISOString() : undefined;
+                                })()
+                              : undefined
+                          }
+                          flightTelemetry={returnFlightTelemetry}
+                          onFlightTelemetryChange={setReturnFlightTelemetry}
+                          onApplyRecommendedPickupIso={(recIso) => {
+                            const d = new Date(recIso);
+                            if (!Number.isFinite(d.getTime())) return;
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const min = String(d.getMinutes()).padStart(2, '0');
+                            setForm((prev) => ({
+                              ...prev,
+                              returnDate: `${yyyy}-${mm}-${dd}`,
+                              returnTime: `${hh}:${min}`,
+                            }));
+                          }}
                         />
                       )}
                     </div>

@@ -54,4 +54,5 @@ export default [
   route("api/cron/sla-dispatch", "routes/api.cron.sla-dispatch.ts"),
   route("api/telephony", "routes/api.telephony.ts"),
   route("api/telephony/verify", "routes/api.telephony.verify.ts"),
+  route("api/flight-status", "routes/api.flight-status.ts"),
 ] satisfies RouteConfig;
