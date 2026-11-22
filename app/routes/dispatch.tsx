@@ -1562,6 +1562,14 @@ export default function DispatchRoute() {
       } else if (msg.type === 'OPEN_EMAIL_MESSAGE') {
         setActiveDockTab('email');
         setActiveMobileTab('email');
+      } else if (msg.type === 'FOCUS_MODULE') {
+        if (msg.payload?.moduleKey === 'email') {
+          setActiveDockTab('email');
+          setActiveMobileTab('email');
+        } else if (msg.payload?.moduleKey === 'comms') {
+          setActiveDockTab('comms');
+          setActiveMobileTab('comms');
+        }
       } else if (msg.type === 'EMAIL_STATE_CHANGED') {
         if (typeof msg.payload?.unreadCount === 'number') {
           setUnreadEmailCount(msg.payload.unreadCount);

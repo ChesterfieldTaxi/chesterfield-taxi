@@ -814,5 +814,36 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Dispatch Workspace Integration (`dispatch.tsx`, `dispatch.popout.tsx`, `workspace-bus.service.ts`)**:
   - Broadcasts `EMAIL_STATE_CHANGED` across Dispatch windows, wires `trips` and `onOpenEditTrip` into `<EmailDock />` in both `/app/dispatch` and `/app/dispatch/popout?module=email` (with `getBookingService()` fallback inside `EmailDock`), and surfaces live unread email counts on the Dispatch `Email` dock/mobile tab badges.
 
+## 42. Phase 42 (Wave 2 Phase 4): `CommsHub` Multi-Channel Thread UI/UX, Canned SMS Templates & Live Caller CRM Context
+- **Pure Canned SMS Templates & Unified Caller/Thread CRM Context (`comms-templates.service.ts`)**:
+  - Strictly pure/client-safe domain service (`app/core/services/comms/comms-templates.service.ts`, re-exported from `app/core/services/comms/index.ts`) with zero `*.server.ts` or `node:*` imports (`constitution.md`).
+  - **Config-Driven Canned SMS Templates (`CANNED_DISPATCH_SMS_TEMPLATES`) & `interpolateCommsSmsTemplate(template, context)`**:
+    1. `driver_en_route`: Driver en route with formatted `Car #` (`{carUnit}`), ETA/pickup time (`{pickupTime}`), `{pickupShort}`, and `{trackingUrl}`.
+    2. `driver_arrived`: Driver arrived curbside (`{driverName}`, `{carUnit}`) at `{pickupShort}` + `{trackingUrl}`.
+    3. `airport_curbside`: STL / SUS airport arrival & curbside meeting instructions dynamically resolved via `resolveStlTerminalInfo` (`STL Terminal 1 Exit Door 6`, `STL Terminal 2 Exit Door 12`, or `SUS FBO` private ramp/lobby) + `{trackingUrl}`.
+    4. `reservation_confirmed`: Reservation `{tripId}` confirmed for `{pickupTime}` (`{pickupShort}` to `{dropoffShort}`) + `{trackingUrl}`.
+    5. `payment_link`: 1-tap secure Stripe payment link (`{payUrl}`) for `{tripId}`.
+    6. `flight_checkin`: Friendly arrival check-in asking `{firstName}` to text once luggage is collected so `{driverName}` (`{carUnit}`) can pull to the curb.
+    - Supports `{firstName}`, `{passengerName}`, `{tripId}`, `{pickupTime}`, `{pickupShort}`, `{dropoffShort}`, `{driverName}`, `{carUnit}`, `{trackingUrl}`, and `{payUrl}` with deterministic fallbacks guaranteeing zero raw `{...}` placeholders ever remain.
+  - **Pure Unified Caller / Thread CRM Context Resolver (`resolveCommsCrmContext`)**:
+    - Computes a normalized `CommsCrmContextSummary` from `{ phone?, email?, threadId?, contact?, thread?, trips, drivers }`:
+      - Contact flags: `contactName`, `firstName`, `primaryPhone`, `primaryEmail`, `isVip`, `vipReason`, `isBlacklisted`, `blacklistReason`, `corporateAccountName`, `corporateAccountNumber`, `preferredVehicleTier`, `accessibilityBadges: string[]`, `tripCount`, `customerScore`, `internalNotes`.
+      - Matched `activeTrips` (status label, assigned driver name + formatted `Car #` unit, airport flight badge via `resolveTripFlightBadge`, `trackingUrl` via `buildTripTrackingUrl`, cached `payToken`/`payUrl`) plus `lastCompletedTrip` + `rebookPayload` (`buildPopulateRebookPayloadFromTrip`) for 1-tap rebooking.
+- **Multi-Channel Thread List, Timeline & Composer Power Tools (`CommsHub.tsx` & `app/components/domain/dispatch/comms/*`)**:
+  - **Live Cross-Channel Email Sync & Multi-Channel Thread List**:
+    - Syncs `DispatchEmailService` directly into `CommsHub` so live inbound/outbound `dispatch@chesterfieldtaxi.com` emails appear inside `CommsHub` threads without needing `EmailDock` opened first, while keeping `EmailDock` as its dedicated email dock.
+    - Upgrades conversation list rows (`SmsThreadPane` `mode === 'list'`) and selection in `CommsHub.tsx` so phone-only, email-only, and unified phone+email threads are selectable via canonical `threadId` / `primaryPhone || primaryEmail`, displaying multi-channel activity badges (`SMS`, `Call`, `VM`, `Email`, `Note`) and unread counts.
+    - Supports full `All` tab channel filtering (`CommsFilterToolbar`) across `all`, `calls`, `voicemail`, `messages`, `emails`, and `notes`.
+  - **Enhanced Multi-Channel Thread Timeline (`SmsThreadPane` `mode === 'thread'`)**:
+    - Upgrades Email timeline cards with delivery status pills (`Received`, `Sent`, `Delivered`, `Bounced` / `Failed` warning), linked trip reference badge, `Book` button when `suggestedBooking` is present, and 1-tap **"Open in Email Dock"** (`OPEN_EMAIL_MESSAGE` + `FOCUS_MODULE: 'email'`).
+    - Adds **1-Tap Retry** on failed/undelivered outbound SMS bubbles (`deliveryStatus === 'failed' || 'undelivered'`).
+    - Adds a `Call` | `Email` | `Book` quick-action trio in the thread header (`Email` deep-links `EmailDock` via `OPEN_EMAIL_MESSAGE` + `FOCUS_MODULE: 'email'`) and a compact composer mode toggle (`SMS Reply` vs `Internal Note`) at the bottom of the thread so dispatchers can log internal notes from any thread tab without switching tabs.
+  - **Dynamic Canned SMS Bar + 1-Tap Tracking & Pay Link Insertion**:
+    - Replaces hardcoded SMS chips in `SmsThreadPane.tsx` and `NewSmsMessageModal` with config-driven `CANNED_DISPATCH_SMS_TEMPLATES` dynamically interpolated from `CommsCrmContextSummary`, paired with **1-Tap Insert Tracking Link** (`/track/...`) and **1-Tap Insert Pay Link** (`/pay/...` via `getPayLinkService()`) buttons when the contact has a matched trip.
+- **Live Caller / Thread CRM Context Banner & Keyboard Shortcuts (`CommsCrmContextBanner.tsx`, `SoftphoneDialerPane.tsx`)**:
+  - `CommsCrmContextBanner.tsx` rendered inside `SmsThreadPane.tsx` (selected thread) and `SoftphoneDialerPane.tsx` (active/ringing calls AND live on the dialpad when entered digits match a known contact or trip), surfacing VIP badge, Blacklist alert banner (`isBlacklisted`), Corporate Account pill, Accessibility/Vehicle preference tags, Active/Upcoming Trip pill (`Car #`, flight delay badge, 1-tap **Open Trip**), and 1-tap **Rebook Last Ride** (`POPULATE_BOOKING`).
+  - Keyboard ergonomics across `CommsHub` & `SmsThreadPane`: `/` focuses the visible `CommsHub` search input when focus is outside editable fields, `Cmd/Ctrl + Enter` submits the active SMS reply or Internal Note, and `Escape` closes active `CommsHub` modals/action sheets or exits the active thread back to the list.
+
+
 
 

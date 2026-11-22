@@ -644,5 +644,23 @@
   - [x] 41.4.1 Create and run `scripts/test-email-dock-service.ts` verifying all 9 folder views & badges, `DispatchEmailService` <-> `CommsThreadService` (`unreadByChannel.email`) sync, auto-saved draft lifecycle & zero-duplicate `sendComposerEmail`, all 6 canned templates + `POPULATE_BOOKING` mapping, and cross-channel sender timeline resolution (`amanda.vance@bayer.com` + `+13145550199`).
   - [x] 41.4.2 Run `npx tsx scripts/test-dispatch-email-webhook.ts`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (confirming `0.00 kB` `/api/*` client chunks), then mark Phase 41 complete in `tasks.md`.
 
+## Phase 42 (Wave 2 Phase 4): `CommsHub` Multi-Channel Thread UI/UX, Canned SMS Templates & Live Caller CRM Context
+- [x] 42.0 Baseline Hygiene & Specification Sync:
+  - [x] 42.0.1 Commit reviewed Phase 41 baseline cleanly (`feat(phase-41): overhaul dedicated EmailDock client with live folders, drafts, canned templates, and cross-channel sender rail`).
+  - [x] 42.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 42 scope and architecture.
+- [x] 42.1 Pure Canned SMS Templates & CRM Context Domain Service (`comms-templates.service.ts`):
+  - [x] 42.1.1 Create `app/core/services/comms/comms-templates.service.ts` with `CANNED_DISPATCH_SMS_TEMPLATES` (`driver_en_route`, `driver_arrived`, `airport_curbside`, `reservation_confirmed`, `payment_link`, `flight_checkin`), pure `interpolateCommsSmsTemplate` (with `resolveStlTerminalInfo` STL T1/T2 + SUS FBO guidance and zero leftover `{...}` placeholders), `resolveCommsCrmContext`, and pure multi-channel thread grouping/filtering helpers; export from `app/core/services/comms/index.ts`.
+- [x] 42.2 Multi-Channel Thread List, Timeline & Composer Power Tools (`CommsHub.tsx` & `app/components/domain/dispatch/comms/*`):
+  - [x] 42.2.1 Sync `DispatchEmailService` into `CommsHub.tsx` (`ensureCommsMirrorSynced` + `syncWithServer`), upgrade thread selection & `SmsThreadPane` (`mode === 'list'`) for phone, email, and unified phone+email threads with `SMS`/`Call`/`VM`/`Email`/`Note` badges & unread counts, and support `all`/`calls`/`voicemail`/`messages`/`emails`/`notes` filtering in `CommsFilterToolbar` / `VoicemailCallLogPane`.
+  - [x] 42.2.2 Upgrade `SmsThreadPane` (`mode === 'thread'`) with Email delivery status pills (`Received`, `Sent`, `Delivered`, `Bounced`/`Failed`), linked trip badge, `Book`, and 1-tap **"Open in Email Dock"** (`OPEN_EMAIL_MESSAGE` + `FOCUS_MODULE: 'email'`), **1-Tap Retry** on failed/undelivered outbound SMS bubbles, `Call` | `Email` | `Book` header actions, and `SMS Reply` vs `Internal Note` composer mode toggle.
+  - [x] 42.2.3 Replace hardcoded SMS chips in `SmsThreadPane.tsx` and `NewSmsMessageModal` with dynamic `CANNED_DISPATCH_SMS_TEMPLATES` interpolated from `CommsCrmContextSummary`, plus **1-Tap Insert Tracking Link** (`/track/...`) and **1-Tap Insert Pay Link** (`/pay/...` via `getPayLinkService()`) buttons.
+- [x] 42.3 Live Caller / Thread CRM Context Banner & Keyboard Shortcuts:
+  - [x] 42.3.1 Create `app/components/domain/dispatch/comms/CommsCrmContextBanner.tsx` and wire into `SmsThreadPane.tsx` and `SoftphoneDialerPane.tsx` (active/ringing calls AND live dialpad lookup) surfacing VIP badge, Blacklist alert banner, Corporate Account pill, Accessibility/Vehicle tags, Active/Upcoming Trip pill (`Car #`, flight delay badge, 1-tap **Open Trip**), and 1-tap **Rebook Last Ride** (`POPULATE_BOOKING`).
+  - [x] 42.3.2 Add keyboard ergonomics in `CommsHub.tsx` + `SmsThreadPane.tsx` (`/` search focus, `Cmd/Ctrl + Enter` submit SMS or Internal Note, `Escape` close modal/sheet or exit thread back to list).
+- [x] 42.4 Verification & Build Gates:
+  - [x] 42.4.1 Create and run `scripts/test-comms-multichannel-ui.ts` verifying all 6 canned SMS templates + STL T1/T2/SUS FBO interpolation + zero raw `{...}` tokens, `resolveCommsCrmContext`, multi-channel thread list/timeline interleaving + filtering + `OPEN_EMAIL_MESSAGE` / `OPEN_COMMS_THREAD` routing, and `constitution.md` guardrails.
+  - [x] 42.4.2 Run `npx tsx scripts/test-email-dock-service.ts`, `npx tsx scripts/test-dispatch-email-webhook.ts`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (`0.00 kB` `/api/*` client chunks), then mark Phase 42 complete in `tasks.md`.
+
+
 
 

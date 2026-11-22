@@ -166,6 +166,23 @@ export function EmailDock({
         if (matched.isUnread) {
           void emailService.markEmailsRead([matched.id]);
         }
+      } else if (normSender || p.threadId) {
+        const contact = normSender ? getContactService().getContactByEmail(normSender) : null;
+        const nowMs = Date.now();
+        setModalComposeDraft({
+          id: `draft_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
+          mode: 'new',
+          toEmail: normSender || contact?.email || '',
+          toName: contact?.name || '',
+          subject: '',
+          bodyText: '',
+          threadId: p.threadId,
+          contactId: contact?.id,
+          contactPhone: contact?.phone,
+          corporateAccountNumber: contact?.corporateAccountNumber,
+          createdAtMs: nowMs,
+          updatedAtMs: nowMs,
+        });
       }
     });
     return () => unsub();

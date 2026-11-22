@@ -13,6 +13,7 @@ export interface CommsFilterToolbarProps {
   onChangeContactFilter: (val: ContactFilter) => void;
   searchQuery: string;
   onChangeSearchQuery: (val: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   showChannelFilter?: boolean;
   channelFilter?: string;
   onChangeChannelFilter?: (val: string) => void;
@@ -31,6 +32,7 @@ export function CommsFilterToolbar({
   onChangeContactFilter,
   searchQuery,
   onChangeSearchQuery,
+  searchInputRef,
   showChannelFilter = false,
   channelFilter = 'all',
   onChangeChannelFilter,
@@ -90,12 +92,18 @@ export function CommsFilterToolbar({
       <div className="relative w-full sm:w-48">
         <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
+          ref={searchInputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => onChangeSearchQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-8 pr-3 py-1.5 sm:py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-blue-500"
+          className="w-full pl-8 pr-6 py-1.5 sm:py-1 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-blue-500"
         />
+        {!searchQuery && (
+          <kbd className="hidden sm:inline-block absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-slate-400 bg-slate-100 border border-slate-200 px-1 rounded pointer-events-none">
+            /
+          </kbd>
+        )}
       </div>
     </div>
   );

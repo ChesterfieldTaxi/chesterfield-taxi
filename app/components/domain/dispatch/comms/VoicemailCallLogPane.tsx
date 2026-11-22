@@ -1,5 +1,10 @@
 import type React from 'react';
 import {
+  COMMS_ALL_CHANNEL_FILTER_OPTIONS,
+  resolveCommsEmailDeliveryBadge,
+  resolveInteractionSelectorTarget,
+} from '../../../../core/services/comms/comms-templates.service';
+import {
   CarIcon,
   ChatBubbleLeftRightIcon,
   CheckIcon,
@@ -46,6 +51,7 @@ export interface VoicemailCallLogPaneProps {
   onChangeContactFilter: (val: ContactFilter) => void;
   searchQuery: string;
   onChangeSearchQuery: (val: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   channelFilter: ChannelFilter;
   onChangeChannelFilter: (val: ChannelFilter) => void;
   callTypeFilter: CallTypeFilter;
@@ -62,6 +68,7 @@ export interface VoicemailCallLogPaneProps {
   onOpenInKeypad: (phone: string) => void;
   onSelectContact: (phone: string) => void;
   onConvertVoicemailToBooking: (suggested: InteractionEvent['suggestedBooking']) => void;
+  onOpenEmailInDock?: (evt: InteractionEvent) => void;
   onToggleReadStatus: (id: string) => void;
   onForwardItem: (item: InteractionEvent) => void;
   onArchiveItem: (id: string) => void;
@@ -90,6 +97,7 @@ export function VoicemailCallLogPane({
   onChangeContactFilter,
   searchQuery,
   onChangeSearchQuery,
+  searchInputRef,
   channelFilter,
   onChangeChannelFilter,
   callTypeFilter,
@@ -106,6 +114,7 @@ export function VoicemailCallLogPane({
   onOpenInKeypad,
   onSelectContact,
   onConvertVoicemailToBooking,
+  onOpenEmailInDock,
   onToggleReadStatus,
   onForwardItem,
   onArchiveItem,
@@ -137,17 +146,11 @@ export function VoicemailCallLogPane({
             onChangeContactFilter={onChangeContactFilter}
             searchQuery={searchQuery}
             onChangeSearchQuery={onChangeSearchQuery}
+            searchInputRef={searchInputRef}
             showChannelFilter={true}
             channelFilter={channelFilter}
             onChangeChannelFilter={(val) => onChangeChannelFilter(val as ChannelFilter)}
-            channelOptions={[
-              { value: 'all', label: 'All channels' },
-              { value: 'calls', label: 'Calls Only' },
-              { value: 'voicemail', label: 'Voicemail Only' },
-              { value: 'messages', label: 'Messaging Only' },
-              { value: 'emails', label: 'Emails Only' },
-              { value: 'notes', label: 'Internal Notes' },
-            ]}
+            channelOptions={[...COMMS_ALL_CHANNEL_FILTER_OPTIONS]}
             placeholder="Filter communications..."
           />
         )}
@@ -195,7 +198,8 @@ export function VoicemailCallLogPane({
                       onToggleSelectRow(event.id);
                       return;
                     }
-                    onSelectContact(event.contactPhone || event.contactEmail || event.threadId || '');
+                    const target = resolveInteractionSelectorTarget(event);
+                    if (target) onSelectContact(target);
                   }}
                   className={`group relative p-3 transition-all cursor-pointer flex items-start justify-between gap-2.5 border-l-4 select-none ${
                     isRowSelected
@@ -456,6 +460,43 @@ export function VoicemailCallLogPane({
                     <span className="text-[10px] text-slate-400 font-medium">
                       {event.timestamp}
                     </span>
+                    {event.type.startsWith('email_') && (() => {
+                      const badge = resolveCommsEmailDeliveryBadge(
+                        event.deliveryStatus,
+                        event.type === 'email_outbound' ? 'outbound' : 'inbound'
+                      );
+                      return (
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-md border ${
+                              badge.tone === 'emerald'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : badge.tone === 'blue'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : badge.tone === 'amber'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : badge.tone === 'rose'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {badge.label}
+                          </span>
+                          {onOpenEmailInDock && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEmailInDock(event);
+                              }}
+                              className="px-1.5 py-0.2 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[9.5px] font-bold border border-indigo-200 cursor-pointer"
+                            >
+                              Email Dock
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {event.type === 'call_missed' && (
                       <button
                         type="button"
@@ -488,18 +529,23 @@ export function VoicemailCallLogPane({
                         <MailIcon className="w-3.5 h-3.5" />
                       )}
                     </button>
+                    {event.contactPhone && (
+                      <button
+                        type="button"
+                        onClick={() => onStartCall(event.contactPhone, event.contactName)}
+                        title={`Call ${event.contactName}`}
+                        className="p-1 rounded-lg hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
+                      >
+                        <PhoneIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => onStartCall(event.contactPhone, event.contactName)}
-                      title={`Call ${event.contactName}`}
-                      className="p-1 rounded-lg hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
-                    >
-                      <PhoneIcon className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSelectContact(event.contactPhone)}
-                      title="Open SMS message thread"
+                      onClick={() => {
+                        const target = resolveInteractionSelectorTarget(event);
+                        if (target) onSelectContact(target);
+                      }}
+                      title="Open unified conversation thread"
                       className="p-1 rounded-lg hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
                     >
                       <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
@@ -552,6 +598,7 @@ export function VoicemailCallLogPane({
             onChangeContactFilter={onChangeContactFilter}
             searchQuery={searchQuery}
             onChangeSearchQuery={onChangeSearchQuery}
+            searchInputRef={searchInputRef}
             showChannelFilter={true}
             channelFilter={callTypeFilter}
             onChangeChannelFilter={(val) => onChangeCallTypeFilter(val as CallTypeFilter)}
@@ -753,6 +800,7 @@ export function VoicemailCallLogPane({
             onChangeContactFilter={onChangeContactFilter}
             searchQuery={searchQuery}
             onChangeSearchQuery={onChangeSearchQuery}
+            searchInputRef={searchInputRef}
             showChannelFilter={false}
             placeholder="Filter missed calls..."
           />
@@ -896,6 +944,7 @@ export function VoicemailCallLogPane({
           onChangeContactFilter={onChangeContactFilter}
           searchQuery={searchQuery}
           onChangeSearchQuery={onChangeSearchQuery}
+          searchInputRef={searchInputRef}
           showChannelFilter={false}
           placeholder="Filter voicemails..."
         />

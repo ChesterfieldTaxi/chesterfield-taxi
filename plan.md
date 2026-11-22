@@ -968,5 +968,33 @@ export interface PassengerAccount {
 - **`EmailCrossChannelRail.tsx`**: Toggleable / side-by-side **Unified Customer Activity & Trips** panel displaying the sender's chronologically interleaved `CommsThread` timeline (`Calls + SMS + Voicemails + Notes + Emails`), matched `Trip` cards (`Open Trip`, `Populate Rebook`, `Insert Tracking Link`, `Insert Pay Link`), and 1-tap `Open in Comms Hub` / `Call Customer` actions.
 - **`EmailDock.tsx`, `dispatch.tsx` & `dispatch.popout.tsx`**: Thin orchestrator preserving `EmailDockProps` (`+ trips?`, `onOpenEditTrip?` with `getBookingService()` fallback), live unread badge wiring in `dispatch.tsx`, and full pop-out support in `dispatch.popout.tsx`.
 
+## 31. Phase 42 Architecture (Wave 2 Phase 4): `CommsHub` Multi-Channel Thread UI/UX, Canned SMS Templates & Live Caller CRM Context
+
+### 31.1 Architectural & Bundle Guardrails (`constitution.md`)
+- **Pure/Client Domain Service Abstraction**:
+  - Encapsulate all canned SMS template definitions, variable interpolation, STL/SUS curbside door resolution, unified CRM context resolution, active/completed trip matching, and multi-channel thread list grouping/filtering inside `app/core/services/comms/comms-templates.service.ts` (exported via `app/core/services/comms/index.ts`).
+  - Never import `*.server.ts` or `node:*` modules into `app/core/services/comms/comms-templates.service.ts` or any `app/components/domain/dispatch/comms/*` component so all `/api/*` resource routes (`api.email.webhook`, `api.send-email`, `api.telephony`, `api.flight-status`, `api.pay`) retain `0.00 kB` client chunks.
+  - Keep `EmailDock` as its dedicated email dock while surfacing unified cross-channel Email timeline cards + 1-tap `OPEN_EMAIL_MESSAGE` deep-links inside `CommsHub`, and preserve `"0 10 * * *"` in `vercel.json`.
+
+### 31.2 Canned SMS Templates, CRM Context & Thread Grouping Service (`comms-templates.service.ts`)
+- **`CANNED_DISPATCH_SMS_TEMPLATES` & `interpolateCommsSmsTemplate(template, context)`**:
+  - Defines 6 config-driven operational templates: `driver_en_route`, `driver_arrived`, `airport_curbside`, `reservation_confirmed`, `payment_link`, and `flight_checkin`.
+  - Resolves `{firstName}`, `{passengerName}`, `{tripId}`, `{pickupTime}`, `{pickupShort}`, `{dropoffShort}`, `{driverName}`, `{carUnit}` (normalized `"Car #..."`), `{trackingUrl}`, `{payUrl}`, and `{airportCurbsideGuidance}` (via `resolveStlTerminalInfo` for STL Terminal 1 Exit Door 6, STL Terminal 2 Exit Door 12, and SUS FBO) with safe fallbacks and final `{...}` scrubbing so zero raw placeholders ever remain.
+- **`resolveCommsCrmContext({ phone?, email?, threadId?, contact?, thread?, trips, drivers })`**:
+  - Resolves unified contact/thread identity across `ContactService`, `CommsThread`, `trips`, and `drivers`, returning `CommsCrmContextSummary` (`contactName`, `firstName`, `primaryPhone`, `primaryEmail`, `isVip`, `vipReason`, `isBlacklisted`, `blacklistReason`, `corporateAccountName`, `corporateAccountNumber`, `preferredVehicleTier`, `accessibilityBadges`, `tripCount`, `customerScore`, `internalNotes`, `activeTrips` with status label + driver `Car #` + `resolveTripFlightBadge` + `buildTripTrackingUrl` + cached `payToken`/`payUrl`, `lastCompletedTrip`, `rebookPayload` via `buildPopulateRebookPayloadFromTrip`, and pre-built `templateContext`).
+- **Multi-Channel Thread Grouping & Filtering (`buildUnifiedCommsThreadSummaries` & `filterCommsInteractionEvents`)**:
+  - Groups `InteractionEvent` + `CommsThread` records into canonical conversation rows supporting phone-only, email-only, and unified phone+email contacts with per-channel badges (`sms`, `call`, `voicemail`, `email`, `note`) and unread counts, plus pure `all`/`calls`/`voicemail`/`messages`/`emails`/`notes` filtering.
+
+### 31.3 Multi-Channel `CommsHub`, Timeline Power Tools & `CommsCrmContextBanner`
+- **`CommsHub.tsx` & `EmailDock.tsx`**:
+  - Subscribes to `getDispatchEmailService()` (and triggers `syncWithServer` + `ensureCommsMirrorSynced()`) inside `CommsHub.tsx` so `dispatch@chesterfieldtaxi.com` inbound/outbound emails hydrate `CommsHub` threads even when `EmailDock` has not been opened yet.
+  - Supports canonical `threadId` / `primaryPhone || primaryEmail` thread selection, outbound SMS retry (`handleRetrySms`), `OPEN_EMAIL_MESSAGE` + `FOCUS_MODULE: 'email'` deep-linking (opening matched email or pre-filled compose draft in `EmailDock`), and capture-safe keyboard shortcuts (`/`, `Cmd/Ctrl + Enter`, `Escape`).
+- **`SmsThreadPane.tsx`**:
+  - `mode === 'list'`: Renders unified multi-channel conversation rows (phone, email, or both) with channel activity pills (`SMS`, `Call`, `VM`, `Email`, `Note`) and unread counts.
+  - `mode === 'thread'`: Renders `Call` | `Email` | `Book` header actions, `CommsCrmContextBanner`, upgraded Email cards (delivery status pills, linked `tripId` badge, `Book`, `"Open in Email Dock"`), **1-Tap Retry** on failed/undelivered outbound SMS bubbles, compact `SMS Reply` vs `Internal Note` composer mode toggle, config-driven dynamic Canned SMS chips, and **1-Tap Insert Tracking Link** + **1-Tap Insert Pay Link** (`getPayLinkService()`) buttons (plus upgraded dynamic chips in `NewSmsMessageModal`).
+- **`CommsCrmContextBanner.tsx` & `SoftphoneDialerPane.tsx`**:
+  - Reusable light/dark CRM banner displaying Blacklist alert (`isBlacklisted`), VIP badge, Corporate Account pill, Accessibility/Vehicle preference tags, Active/Upcoming Trip pill (`Car #`, flight delay badge, 1-tap **Open Trip**), and 1-tap **Rebook Last Ride** (`POPULATE_BOOKING`), rendered in `SmsThreadPane` and `SoftphoneDialerPane` (both during active/ringing calls and live on the dialpad when entered digits match a known contact or trip).
+
+
 
 

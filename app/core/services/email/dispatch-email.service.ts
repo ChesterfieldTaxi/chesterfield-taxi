@@ -1615,6 +1615,36 @@ export class DispatchEmailService {
   }
 
   /**
+   * Ensures every active `DispatchEmailRecord` currently held in `DispatchEmailService`
+   * is mirrored idempotently into `CommsThreadService` (`em_${emailId}`) so `CommsHub`
+   * always reflects `dispatch@chesterfieldtaxi.com` emails even before `EmailDock` opens.
+   */
+  public async ensureCommsMirrorSynced(): Promise<void> {
+    if (this.emails.size === 0) return;
+    const commsService = getCommsThreadService();
+    const sortedChrono = Array.from(this.emails.values()).sort(
+      (a, b) => (a.timestampMs || 0) - (b.timestampMs || 0)
+    );
+    for (const record of sortedChrono) {
+      if (!record || !record.id) continue;
+      const commsEventId = record.commsEventId || buildDispatchEmailCommsEventId(record.id);
+      const existingCommsEvt = commsService.getAllEvents({ includeArchived: true }).find(
+        (e) => e.id === commsEventId
+      );
+      if (
+        !existingCommsEvt ||
+        existingCommsEvt.deliveryStatus !== record.deliveryStatus ||
+        existingCommsEvt.errorMessage !== record.deliveryError
+      ) {
+        await this.syncEmailRecordToComms(record, {
+          skipFirestore: true,
+          skipBroadcast: true,
+        });
+      }
+    }
+  }
+
+  /**
    * Hydrates & flushes `/dispatchEmails` via `/api/email/webhook?action=sync_emails`.
    * Preserves newer local triage states (`isUnread`, `isStarred`, `folder`) while always
    * adopting upstream Resend delivery status updates (`delivered`, `bounced`, `complained`, `delayed`).

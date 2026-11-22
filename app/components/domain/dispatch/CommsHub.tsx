@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getWorkspaceBus, type UpcomingBookingPreview } from '../../../core/services/workspace-bus.service';
+import {
+  getWorkspaceBus,
+  type UpcomingBookingPreview,
+  type WorkspaceEventMap,
+} from '../../../core/services/workspace-bus.service';
 import { authorizedFetch } from '../../../core/services/auth/auth-headers';
 import { normalizePhone } from '../../../core/services/passenger.service';
 import { validatePhoneNumber, sanitizeToE164, formatDisplayPhone } from '../../../core/utils/phone';
@@ -21,6 +25,19 @@ import {
   getCommsThreadService,
   interactionEventToCommsEvent,
 } from '../../../core/services/comms/comms-thread.service';
+import {
+  buildUnifiedCommsThreadSummaries,
+  filterCommsInteractionEvents,
+  matchesCommsContactAndSearchFilter,
+  resolveCommsCrmContext,
+  resolveInteractionSelectorTarget,
+} from '../../../core/services/comms/comms-templates.service';
+import {
+  buildTripTrackingUrl,
+  getDispatchEmailService,
+} from '../../../core/services/email/dispatch-email.service';
+import { getPayLinkService } from '../../../core/services/payments/pay-link.service';
+import type { CommsThread } from '../../../core/types/comms';
 import {
   getAdminConfigService,
   DEFAULT_CORPORATE_ACCOUNTS,
@@ -203,9 +220,15 @@ function CommsHubComponent({
 
   // Primary Interactions state (persisted to localStorage)
   const [interactions, setInteractions] = useState<InteractionEvent[]>(getInitialInteractions);
+  const [commsThreads, setCommsThreads] = useState<CommsThread[]>(() =>
+    getCommsThreadService().getThreads()
+  );
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [forwardToast, setForwardToast] = useState<string | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [retryingSmsId, setRetryingSmsId] = useState<string | null>(null);
+  const [isGeneratingPayLink, setIsGeneratingPayLink] = useState<boolean>(false);
 
   // Active call tracking & user notices
   const activeCallInteractionIdRef = useRef<string | null>(null);
@@ -707,14 +730,18 @@ function CommsHubComponent({
     setIncomingCallInfo(null);
   };
 
-  // Subscribe to CommsThreadService so unified Calls + SMS + Voicemails + Emails + Notes stay in sync
+  // Subscribe to CommsThreadService & DispatchEmailService so unified Calls + SMS + Voicemails + Emails + Notes stay in sync
   useEffect(() => {
     const commsService = getCommsThreadService();
+    const emailService = getDispatchEmailService();
+
     if (interactions.length > 0 && commsService.getAllEvents().length === 0) {
       const seeded = interactions.map((item) => interactionEventToCommsEvent(item));
       commsService.hydrateFromServerSync({ events: seeded });
     }
-    const unsub = commsService.subscribe(({ threads, events }) => {
+
+    const unsubComms = commsService.subscribe(({ threads, events }) => {
+      setCommsThreads(threads);
       if (events.length === 0) return;
       const threadMap = new Map(threads.map((t) => [t.id, t]));
       const adapted = events.map((evt) =>
@@ -724,7 +751,6 @@ function CommsHubComponent({
       setInteractions((prev) => {
         const mergedById = new Map<string, InteractionEvent>();
         for (const item of prev) {
-          // Avoid duplicating raw SID if deterministic prefixed ID exists
           const prefixedSms = `sms_${item.id}`;
           const prefixedCall = `call_${item.id}`;
           const prefixedVm = `vm_${item.id}`;
@@ -749,7 +775,17 @@ function CommsHubComponent({
         );
       });
     });
-    return () => unsub();
+
+    // Sync DispatchEmailService (`dispatch@chesterfieldtaxi.com`) into CommsThreadService even if EmailDock has not opened yet
+    const unsubEmails = emailService.subscribe(() => {
+      void emailService.ensureCommsMirrorSynced();
+    });
+    void emailService.syncWithServer({ seedSamplesIfOfflineEmpty: true });
+
+    return () => {
+      unsubComms();
+      unsubEmails();
+    };
   }, []);
 
   // Subscribe to global workspace bus for cross-dock answering, rejection, and OPEN_COMMS_THREAD
@@ -830,6 +866,7 @@ function CommsHubComponent({
         authorizedFetch('/api/telephony?action=list_voicemails'),
         authorizedFetch('/api/telephony?action=list_messages'),
         authorizedFetch('/api/telephony?action=list_recordings'),
+        getDispatchEmailService().syncWithServer(),
       ]);
 
       if (syncResp.ok) {
@@ -1157,29 +1194,15 @@ function CommsHubComponent({
     return unsub;
   }, [workspaceBus]);
 
-  // Filter interaction items helper
-  const filterItem = (item: InteractionEvent) => {
-    if (filterUnreadOnly && !item.isUnread) return false;
-
-    if (
-      contactFilter === 'passengers' &&
-      item.contactType !== 'passenger' &&
-      item.contactType !== 'corporate'
-    ) {
-      return false;
-    }
-    if (contactFilter === 'drivers' && item.contactType !== 'driver') return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = (item.contactName || '').toLowerCase().includes(q);
-      const matchPhone = (item.contactPhone || '').includes(q);
-      const matchSnippet = (item.snippet || '').toLowerCase().includes(q);
-      const matchTranscript = (item.transcription || '').toLowerCase().includes(q);
-      if (!matchName && !matchPhone && !matchSnippet && !matchTranscript) return false;
-    }
-    return true;
-  };
+  // Pure domain filtering & multi-channel conversation list grouping
+  const filterOptionsBase = useMemo(
+    () => ({
+      unreadOnly: filterUnreadOnly,
+      contactFilter,
+      searchQuery,
+    }),
+    [filterUnreadOnly, contactFilter, searchQuery]
+  );
 
   const allHistoryCalls = useMemo(
     () => interactions.filter((item) => item.type.startsWith('call_')),
@@ -1203,65 +1226,72 @@ function CommsHubComponent({
     [interactions]
   );
 
-  const filteredAllInteractions = useMemo(() => {
-    return interactions.filter((item) => {
-      if (item.snippet?.includes('Thank you for contacting our dispatch desk')) return false;
-      if (channelFilter === 'calls' && !item.type.startsWith('call_')) return false;
-      if (channelFilter === 'voicemail' && item.type !== 'voicemail') return false;
-      if (channelFilter === 'messages' && !item.type.startsWith('sms_')) return false;
-      if (channelFilter === 'emails' && !item.type.startsWith('email_')) return false;
-      if (channelFilter === 'notes' && item.type !== 'internal_note') return false;
-      return filterItem(item);
-    });
-  }, [interactions, channelFilter, filterUnreadOnly, contactFilter, searchQuery]);
+  const filteredAllInteractions = useMemo(
+    () =>
+      filterCommsInteractionEvents(interactions, {
+        channelFilter,
+        ...filterOptionsBase,
+      }),
+    [interactions, channelFilter, filterOptionsBase]
+  );
 
   const filteredHistoryCalls = useMemo(() => {
     return allHistoryCalls.filter((item) => {
       if (callTypeFilter === 'inbound' && item.type !== 'call_inbound') return false;
       if (callTypeFilter === 'outbound' && item.type !== 'call_outbound') return false;
       if (callTypeFilter === 'missed' && item.type !== 'call_missed') return false;
-      return filterItem(item);
+      return matchesCommsContactAndSearchFilter(item, filterOptionsBase);
     });
-  }, [allHistoryCalls, callTypeFilter, filterUnreadOnly, contactFilter, searchQuery]);
+  }, [allHistoryCalls, callTypeFilter, filterOptionsBase]);
 
   const filteredMissedCalls = useMemo(
-    () => allMissedCalls.filter(filterItem),
-    [allMissedCalls, filterUnreadOnly, contactFilter, searchQuery]
+    () =>
+      allMissedCalls.filter((item) =>
+        matchesCommsContactAndSearchFilter(item, filterOptionsBase)
+      ),
+    [allMissedCalls, filterOptionsBase]
   );
   const filteredVoicemails = useMemo(
-    () => allVoicemails.filter(filterItem),
-    [allVoicemails, filterUnreadOnly, contactFilter, searchQuery]
+    () =>
+      allVoicemails.filter((item) =>
+        matchesCommsContactAndSearchFilter(item, filterOptionsBase)
+      ),
+    [allVoicemails, filterOptionsBase]
   );
   const filteredMessages = useMemo(
-    () => allMessages.filter(filterItem),
-    [allMessages, filterUnreadOnly, contactFilter, searchQuery]
+    () =>
+      allMessages.filter((item) =>
+        matchesCommsContactAndSearchFilter(item, filterOptionsBase)
+      ),
+    [allMessages, filterOptionsBase]
+  );
+
+  // Unified multi-channel conversation rows (phone, email, and merged phone+email threads)
+  const conversationRows = useMemo(
+    () => buildUnifiedCommsThreadSummaries(interactions, commsThreads, filterOptionsBase),
+    [interactions, commsThreads, filterOptionsBase]
   );
 
   const threadUnreadCountMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const msg of allMessages) {
-      if (msg.isUnread) {
-        const norm = normalizePhone(msg.contactPhone) || msg.contactPhone;
-        map.set(norm, (map.get(norm) || 0) + 1);
+    for (const row of conversationRows) {
+      if (row.unreadCountTotal > 0) {
+        map.set(row.threadId, row.unreadCountTotal);
+        if (row.primaryPhone) {
+          map.set(normalizePhone(row.primaryPhone) || row.primaryPhone, row.unreadCountTotal);
+        }
+        if (row.primaryEmail) {
+          map.set(row.primaryEmail, row.unreadCountTotal);
+        }
       }
     }
     return map;
-  }, [allMessages]);
+  }, [conversationRows]);
 
-  const messageConversations = useMemo(() => {
-    const threadMap = new Map<string, InteractionEvent>();
-    for (const msg of filteredMessages) {
-      const norm = normalizePhone(msg.contactPhone) || msg.contactPhone;
-      if (!norm) continue;
-      const existing = threadMap.get(norm);
-      if (!existing || (msg.timestampMs || 0) > (existing.timestampMs || 0)) {
-        threadMap.set(norm, msg);
-      }
-    }
-    return Array.from(threadMap.values()).sort(
-      (a, b) => (b.timestampMs || 0) - (a.timestampMs || 0)
-    );
-  }, [filteredMessages]);
+  const messageConversations = useMemo(
+    () => conversationRows.map((row) => row.latestEvent),
+    [conversationRows]
+  );
 
   // Active items for current view
   const currentTabItems = useMemo(() => {
@@ -1518,38 +1548,81 @@ function CommsHubComponent({
     [allSelectedContactInteractions]
   );
 
-  // Active contact summary
+  // Active contact summary (safe across phone-only, email-only, and canonical thr_... selectors)
   const activeContactSummary = useMemo(() => {
     const lastEvt = allSelectedContactInteractions[allSelectedContactInteractions.length - 1];
+    const isEmailSel = Boolean(selectedContactPhone && selectedContactPhone.includes('@'));
+    const isThreadSel = Boolean(selectedContactPhone && selectedContactPhone.startsWith('thr_'));
+
     const contactRec = selectedContactPhone
-      ? getContactService().getContactByPhone(selectedContactPhone)
+      ? (!isEmailSel && !isThreadSel
+          ? getContactService().getContactByPhone(selectedContactPhone)
+          : null) ||
+        (isEmailSel ? getContactService().getContactByEmail(selectedContactPhone) : null) ||
+        (activeUnifiedThread?.contactId
+          ? getContactService().getContactById(activeUnifiedThread.contactId)
+          : null)
       : null;
+
+    const fallbackDisplay = selectedContactPhone
+      ? isEmailSel
+        ? selectedContactPhone
+        : isThreadSel
+        ? activeUnifiedThread?.contactName ||
+          activeUnifiedThread?.primaryEmail ||
+          (activeUnifiedThread?.primaryPhone
+            ? formatDisplayPhone(activeUnifiedThread.primaryPhone)
+            : 'Contact')
+        : formatDisplayPhone(selectedContactPhone)
+      : 'Contact';
+
     const resolvedName =
-      activeContactRecord?.name ||
+      (activeContactRecord && !String(activeContactRecord.id || '').startsWith('temp_')
+        ? activeContactRecord.name
+        : '') ||
       contactRec?.name ||
+      (activeUnifiedThread?.contactName && !activeUnifiedThread.contactName.startsWith('+')
+        ? activeUnifiedThread.contactName
+        : '') ||
       lastEvt?.contactName ||
-      (selectedContactPhone ? formatDisplayPhone(selectedContactPhone) : 'Contact');
+      fallbackDisplay;
+
+    const resolvedPhone =
+      contactRec?.phone ||
+      activeUnifiedThread?.primaryPhone ||
+      lastEvt?.contactPhone ||
+      (!isEmailSel && !isThreadSel && selectedContactPhone ? selectedContactPhone : '');
+
+    const resolvedEmail =
+      contactRec?.email ||
+      activeUnifiedThread?.primaryEmail ||
+      lastEvt?.contactEmail ||
+      (isEmailSel && selectedContactPhone ? selectedContactPhone : undefined);
 
     if (lastEvt) {
       return {
         ...lastEvt,
         contactName: resolvedName,
+        contactPhone: resolvedPhone,
+        contactEmail: resolvedEmail || lastEvt.contactEmail,
       };
     }
     if (selectedContactPhone) {
       return {
         id: `contact_${selectedContactPhone}`,
-        type: 'call_inbound' as const,
+        threadId: activeUnifiedThread?.id || (isThreadSel ? selectedContactPhone : undefined),
+        type: isEmailSel ? ('email_inbound' as const) : ('call_inbound' as const),
         contactName: resolvedName,
-        contactPhone: selectedContactPhone,
-        contactType: 'passenger' as const,
+        contactPhone: resolvedPhone,
+        contactEmail: resolvedEmail,
+        contactType: activeUnifiedThread?.contactType || ('passenger' as const),
         timestamp: 'Recent',
         timestampMs: Date.now(),
         snippet: 'Direct contact thread',
       } as InteractionEvent;
     }
     return null;
-  }, [allSelectedContactInteractions, selectedContactPhone, activeContactRecord]);
+  }, [allSelectedContactInteractions, selectedContactPhone, activeContactRecord, activeUnifiedThread]);
 
   // Sync activeContactRecord from ContactService whenever contact changes
   useEffect(() => {
@@ -1557,21 +1630,41 @@ function CommsHubComponent({
       setActiveContactRecord(null);
       return;
     }
+    const isEmailSel = selectedContactPhone.includes('@');
+    const isThreadSel = selectedContactPhone.startsWith('thr_');
     const contactService = getContactService();
     const found =
-      contactService.getContactByPhone(selectedContactPhone) ||
-      contactService.getContactByEmail(selectedContactPhone) ||
+      (!isEmailSel && !isThreadSel
+        ? contactService.getContactByPhone(selectedContactPhone)
+        : null) ||
+      (isEmailSel ? contactService.getContactByEmail(selectedContactPhone) : null) ||
       (activeUnifiedThread?.contactId
         ? contactService.getContactById(activeUnifiedThread.contactId)
+        : null) ||
+      (activeUnifiedThread?.primaryPhone
+        ? contactService.getContactByPhone(activeUnifiedThread.primaryPhone)
+        : null) ||
+      (activeUnifiedThread?.primaryEmail
+        ? contactService.getContactByEmail(activeUnifiedThread.primaryEmail)
         : null);
+
     if (found) {
       setActiveContactRecord(found);
     } else {
       setActiveContactRecord({
         id: `temp_${Date.now()}`,
-        name: activeContactSummary?.contactName || formatDisplayPhone(selectedContactPhone),
-        phone: selectedContactPhone,
-        email: '',
+        name:
+          activeContactSummary?.contactName ||
+          (isEmailSel
+            ? selectedContactPhone
+            : isThreadSel
+            ? activeUnifiedThread?.contactName || 'Contact'
+            : formatDisplayPhone(selectedContactPhone)),
+        phone:
+          activeUnifiedThread?.primaryPhone ||
+          (!isEmailSel && !isThreadSel ? selectedContactPhone : ''),
+        email:
+          activeUnifiedThread?.primaryEmail || (isEmailSel ? selectedContactPhone : ''),
         isVip: false,
         preferredVehicleTier: 'standard',
         notes: '',
@@ -1582,7 +1675,61 @@ function CommsHubComponent({
         updatedAt: Date.now(),
       });
     }
-  }, [selectedContactPhone, activeContactSummary?.contactName]);
+  }, [selectedContactPhone, activeContactSummary?.contactName, activeUnifiedThread]);
+
+  // Live Unified CRM Context for selected thread, Softphone caller/dialpad, and New Message recipient
+  const threadCrmContext = useMemo(() => {
+    if (!selectedContactPhone) return null;
+    const isEmailSel = selectedContactPhone.includes('@');
+    const isThreadSel = selectedContactPhone.startsWith('thr_');
+    return resolveCommsCrmContext({
+      phone:
+        activeUnifiedThread?.primaryPhone ||
+        activeContactSummary?.contactPhone ||
+        (!isEmailSel && !isThreadSel ? selectedContactPhone : undefined),
+      email:
+        activeUnifiedThread?.primaryEmail ||
+        activeContactSummary?.contactEmail ||
+        activeContactRecord?.email ||
+        (isEmailSel ? selectedContactPhone : undefined),
+      threadId: activeUnifiedThread?.id || (isThreadSel ? selectedContactPhone : undefined),
+      contactNameHint: activeContactSummary?.contactName,
+      contact: activeContactRecord,
+      thread: activeUnifiedThread,
+      trips,
+      drivers,
+    });
+  }, [
+    selectedContactPhone,
+    activeUnifiedThread,
+    activeContactSummary,
+    activeContactRecord,
+    trips,
+    drivers,
+  ]);
+
+  const callerCrmContext = useMemo(() => {
+    const targetPhone =
+      incomingCallInfo?.from ||
+      (callStatus !== 'idle' ? activeCallPhone || dialpadNumber : dialpadNumber);
+    if (!targetPhone || !targetPhone.trim()) return null;
+    return resolveCommsCrmContext({
+      phone: targetPhone,
+      contactNameHint: activeCallContact,
+      trips,
+      drivers,
+    });
+  }, [incomingCallInfo?.from, callStatus, activeCallPhone, dialpadNumber, activeCallContact, trips, drivers]);
+
+  const newMsgRecipientCrmContext = useMemo(() => {
+    if (!newMsgRecipientPhone.trim()) return null;
+    return resolveCommsCrmContext({
+      phone: newMsgRecipientPhone,
+      contactNameHint: newMsgRecipientName,
+      trips,
+      drivers,
+    });
+  }, [newMsgRecipientPhone, newMsgRecipientName, trips, drivers]);
 
   // Listen to CONTACT_UPDATED events across tabs
   useEffect(() => {
@@ -2296,16 +2443,29 @@ function CommsHubComponent({
 
   const handleBookContactRide = () => {
     if (!activeContactSummary) return;
-    const phone =
+    const rawCandidate =
       activeContactSummary.mobilePhone ||
       activeContactSummary.contactPhone ||
-      selectedContactPhone;
+      threadCrmContext?.primaryPhone ||
+      (!selectedContactPhone?.includes('@') && !selectedContactPhone?.startsWith('thr_')
+        ? selectedContactPhone
+        : '');
+    const emailCandidate =
+      threadCrmContext?.primaryEmail ||
+      activeContactRecord?.email ||
+      activeContactSummary.contactEmail ||
+      (selectedContactPhone?.includes('@') ? selectedContactPhone : '');
     const contact =
-      activeContactRecord || (phone ? getContactService().getContactByPhone(phone) : null);
+      (activeContactRecord && !String(activeContactRecord.id || '').startsWith('temp_')
+        ? activeContactRecord
+        : null) ||
+      (rawCandidate ? getContactService().getContactByPhone(rawCandidate) : null) ||
+      (emailCandidate ? getContactService().getContactByEmail(emailCandidate) : null);
+
     const payload = {
-      passengerName: contact?.name || activeContactSummary.contactName || '',
-      passengerPhone: contact?.phone || phone || '',
-      passengerEmail: contact?.email || '',
+      passengerName: contact?.name || threadCrmContext?.contactName || activeContactSummary.contactName || '',
+      passengerPhone: contact?.phone || rawCandidate || '',
+      passengerEmail: contact?.email || emailCandidate || '',
       pickupAddress: contact?.homeAddress || contact?.workAddress || '',
       dropoffAddress: contact?.workAddress && contact?.homeAddress ? contact.workAddress : '',
       vehicleTier: contact?.preferredVehicleTier || '',
@@ -2322,24 +2482,56 @@ function CommsHubComponent({
     }
   };
 
-  const handleViewUpcomingTrip = (targetTrip: UpcomingBookingPreview) => {
-    if (!targetTrip) return;
+  const handleOpenTripById = (tripId: string) => {
+    if (!tripId) return;
     workspaceBus.publish('OPEN_EDIT_TRIP', {
-      tripId: targetTrip.id,
-      phone: activeContactSummary?.contactPhone || selectedContactPhone || undefined,
+      tripId,
+      phone:
+        threadCrmContext?.primaryPhone ||
+        activeContactSummary?.contactPhone ||
+        activeCallPhone ||
+        dialpadNumber ||
+        undefined,
     });
     workspaceBus.publish('FOCUS_TRIP_ON_MAP', {
-      tripId: targetTrip.id,
+      tripId,
     });
     if (onOpenEditTrip) {
-      onOpenEditTrip(targetTrip.id);
+      onOpenEditTrip(tripId);
     }
+  };
+
+  const handleRebookFromCrm = (payload: WorkspaceEventMap['POPULATE_BOOKING']) => {
+    workspaceBus.publish('POPULATE_BOOKING', payload);
+    if (onPopulateBooking) {
+      onPopulateBooking(payload);
+    }
+    setBookingToast('Rebook loaded');
+    setSmsStatusMessage('Loaded last ride into Dispatch Booking');
+    setTimeout(() => {
+      setBookingToast(null);
+      setSmsStatusMessage(null);
+    }, 2500);
+  };
+
+  const handleViewUpcomingTrip = (targetTrip: UpcomingBookingPreview) => {
+    if (!targetTrip) return;
+    handleOpenTripById(targetTrip.id);
   };
 
   const handleSendSms = async () => {
     if (!smsReplyText.trim() || !selectedContactPhone) return;
 
-    const phoneValidation = validatePhoneNumber(selectedContactPhone);
+    const rawRecipient =
+      activeContactSummary?.mobilePhone ||
+      threadCrmContext?.primaryPhone ||
+      activeContactRecord?.phone ||
+      activeUnifiedThread?.primaryPhone ||
+      (!selectedContactPhone.includes('@') && !selectedContactPhone.startsWith('thr_')
+        ? selectedContactPhone
+        : '');
+
+    const phoneValidation = validatePhoneNumber(rawRecipient);
     if (!phoneValidation.isValid) {
       setSmsStatusMessage(phoneValidation.error || 'Invalid recipient phone number.');
       setTimeout(() => setSmsStatusMessage(null), 3500);
@@ -2351,19 +2543,25 @@ function CommsHubComponent({
 
     const messageText = smsReplyText.trim();
     const targetContactName =
+      threadCrmContext?.contactName ||
       activeContactRecord?.name ||
       activeContactSummary?.contactName ||
       formatDisplayPhone(phoneValidation.e164);
 
+    const optimisticId = `sms_out_${Date.now()}`;
     const newInteraction: InteractionEvent = {
-      id: `sms_out_${Date.now()}`,
+      id: optimisticId,
+      threadId: activeUnifiedThread?.id,
+      channel: 'sms',
       type: 'sms_outbound',
       contactName: targetContactName,
       contactPhone: phoneValidation.e164,
+      contactEmail: threadCrmContext?.primaryEmail || activeContactRecord?.email || undefined,
       contactType: ((activeContactRecord as any)?.type as any) || 'passenger',
       timestamp: 'Just now',
       timestampMs: Date.now(),
       snippet: messageText,
+      bodyText: messageText,
       isUnread: false,
     };
 
@@ -2394,27 +2592,42 @@ function CommsHubComponent({
       const resData = (await resp.json()) as any;
       if (resData.success) {
         setSmsStatusMessage(resData.simulated ? 'Sent (Simulated)' : 'Sent to carrier');
-        if (resData.messageSid || resData.status) {
-          setInteractions((prev) =>
-            prev.map((i) =>
-              i.id === newInteraction.id
-                ? {
-                    ...i,
-                    id: resData.messageSid || i.id,
-                    deliveryStatus: resData.status || 'sent',
-                    errorCode: resData.code || resData.errorCode,
-                    errorMessage: resData.error || resData.errorMessage,
-                  }
-                : i
-            )
-          );
-        }
+        const resolvedSid = resData.messageSid || optimisticId;
+        const resolvedStatus = resData.status || 'sent';
+        setInteractions((prev) =>
+          prev.map((i) =>
+            i.id === optimisticId
+              ? {
+                  ...i,
+                  id: resolvedSid,
+                  deliveryStatus: resolvedStatus,
+                  errorCode: resData.code || resData.errorCode,
+                  errorMessage: resData.error || resData.errorMessage,
+                }
+              : i
+          )
+        );
+        void getCommsThreadService().recordCommsEvent({
+          id: resolvedSid,
+          externalSid: resData.messageSid || undefined,
+          threadId: activeUnifiedThread?.id,
+          channel: 'sms',
+          direction: 'outbound',
+          eventType: 'sms_outbound',
+          contactName: targetContactName,
+          contactPhone: phoneValidation.e164,
+          contactEmail: threadCrmContext?.primaryEmail || activeContactRecord?.email || undefined,
+          snippet: messageText.slice(0, 160),
+          bodyText: messageText,
+          deliveryStatus: resolvedStatus,
+          isUnread: false,
+        });
       } else {
         const errorDesc = resData.error || resData.warning || 'Failed to dispatch';
         setSmsStatusMessage(`Failed: ${errorDesc}`);
         setInteractions((prev) =>
           prev.map((i) =>
-            i.id === newInteraction.id
+            i.id === optimisticId
               ? { ...i, deliveryStatus: 'failed', errorMessage: errorDesc }
               : i
           )
@@ -2423,21 +2636,167 @@ function CommsHubComponent({
       setTimeout(fetchTelephonyData, 1000);
     } catch (err: any) {
       setSmsStatusMessage(err?.message || 'Error sending');
+      setInteractions((prev) =>
+        prev.map((i) =>
+          i.id === optimisticId
+            ? { ...i, deliveryStatus: 'failed', errorMessage: err?.message || 'Network error' }
+            : i
+        )
+      );
     } finally {
       setIsSendingSms(false);
       setTimeout(() => setSmsStatusMessage(null), 4000);
     }
   };
 
+  const handleRetrySms = async (failedEvt: InteractionEvent) => {
+    const messageBody = (failedEvt.bodyText || failedEvt.snippet || '').trim();
+    if (!messageBody) return;
+
+    const rawRecipient =
+      failedEvt.contactPhone ||
+      threadCrmContext?.primaryPhone ||
+      activeContactRecord?.phone ||
+      '';
+    const phoneVal = validatePhoneNumber(rawRecipient);
+    if (!phoneVal.isValid) {
+      // Pre-load into composer if recipient phone needs attention
+      setSmsReplyText(messageBody);
+      setSmsStatusMessage('Loaded message into composer — verify recipient phone.');
+      setTimeout(() => setSmsStatusMessage(null), 3500);
+      return;
+    }
+
+    setRetryingSmsId(failedEvt.id);
+    setSmsStatusMessage(null);
+    try {
+      const creds = getClientTelephonyCredentials();
+      const resp = await authorizedFetch('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_sms',
+          to: phoneVal.e164,
+          body: messageBody,
+          credentials: {
+            accountSid: creds.accountSid,
+            authToken: creds.authToken,
+            phoneNumber: sanitizeToE164(creds.phoneNumber || '+13142281454'),
+          },
+        }),
+      });
+      const resData = (await resp.json().catch(() => ({}))) as any;
+      if (resp.ok && resData.success) {
+        const nextStatus = resData.status || 'sent';
+        setInteractions((prev) =>
+          prev.map((item) =>
+            item.id === failedEvt.id
+              ? {
+                  ...item,
+                  deliveryStatus: nextStatus,
+                  errorCode: undefined,
+                  errorMessage: undefined,
+                  timestamp: 'Just now',
+                  timestampMs: Date.now(),
+                }
+              : item
+          )
+        );
+        void getCommsThreadService().recordCommsEvent({
+          id: failedEvt.id,
+          threadId: failedEvt.threadId || activeUnifiedThread?.id,
+          channel: 'sms',
+          direction: 'outbound',
+          eventType: 'sms_outbound',
+          contactName: failedEvt.contactName,
+          contactPhone: phoneVal.e164,
+          snippet: messageBody.slice(0, 160),
+          bodyText: messageBody,
+          deliveryStatus: nextStatus,
+          errorMessage: '',
+          isUnread: false,
+        });
+        setSmsStatusMessage(resData.simulated ? 'Retried (Simulated)' : 'Retried — sent to carrier');
+      } else {
+        setSmsReplyText(messageBody);
+        setSmsStatusMessage(
+          `Retry failed (${resData.error || 'Carrier error'}) — pre-loaded in composer.`
+        );
+      }
+    } catch {
+      setSmsReplyText(messageBody);
+      setSmsStatusMessage('Network offline — message pre-loaded in composer.');
+    } finally {
+      setRetryingSmsId(null);
+      setTimeout(() => setSmsStatusMessage(null), 4000);
+    }
+  };
+
+  const appendUrlToDraft = (url: string, target: 'thread' | 'modal') => {
+    if (!url) return;
+    if (target === 'modal') {
+      setNewMsgBody((prev) => {
+        const trimmed = prev.trimEnd();
+        return trimmed ? `${trimmed} ${url}` : url;
+      });
+    } else {
+      setSmsReplyText((prev) => {
+        const trimmed = prev.trimEnd();
+        return trimmed ? `${trimmed} ${url}` : url;
+      });
+    }
+  };
+
+  const handleInsertTrackingLink = (target: 'thread' | 'modal') => {
+    const ctx = target === 'modal' ? newMsgRecipientCrmContext : threadCrmContext;
+    const trip = ctx?.primaryMatchedTrip;
+    if (!trip) return;
+    const url = buildTripTrackingUrl(trip);
+    appendUrlToDraft(url, target);
+  };
+
+  const handleInsertPayLink = async (target: 'thread' | 'modal') => {
+    const ctx = target === 'modal' ? newMsgRecipientCrmContext : threadCrmContext;
+    const trip = ctx?.primaryMatchedTrip;
+    if (!trip) return;
+
+    const payService = getPayLinkService();
+    const cachedToken = payService.getTripCachedPayToken(trip);
+    if (cachedToken) {
+      appendUrlToDraft(payService.buildPayUrl(cachedToken), target);
+      return;
+    }
+
+    setIsGeneratingPayLink(true);
+    try {
+      const created = await payService.createOrGetTripPayLink(trip, {
+        sendSms: false,
+        sendEmail: false,
+      });
+      if (created.success && (created.payUrl || created.payToken)) {
+        const payUrl = created.payUrl || payService.buildPayUrl(created.payToken as string);
+        appendUrlToDraft(payUrl, target);
+      } else {
+        setSmsStatusMessage(created.error || 'Unable to generate Pay Link right now.');
+        setTimeout(() => setSmsStatusMessage(null), 3500);
+      }
+    } finally {
+      setIsGeneratingPayLink(false);
+    }
+  };
+
   const handleConvertVoicemailToBooking = (suggested: InteractionEvent['suggestedBooking']) => {
     if (!suggested) return;
     const phone = suggested.passengerPhone;
-    const contact = phone ? getContactService().getContactByPhone(phone) : null;
+    const email = suggested.passengerEmail;
+    const contact =
+      (phone ? getContactService().getContactByPhone(phone) : null) ||
+      (email ? getContactService().getContactByEmail(email) : null);
 
     const payload = {
       passengerName: contact?.name || suggested.passengerName || '',
       passengerPhone: contact?.phone || phone || '',
-      passengerEmail: contact?.email || '',
+      passengerEmail: contact?.email || email || activeContactRecord?.email || '',
       pickupAddress: suggested.pickup || contact?.homeAddress || '',
       dropoffAddress: suggested.dropoff || contact?.workAddress || '',
       vehicleTier: contact?.preferredVehicleTier || '',
@@ -2446,9 +2805,9 @@ function CommsHubComponent({
         contact?.corporateAccountNumber || (contact as any)?.accountNumber || '',
       billingPo: contact?.defaultPoNumber || (contact as any)?.billingPo || '',
       accessibilityNeeds: contact?.accessibilityNeeds || {},
-      notes: `Converted from Voicemail (Received ${suggested.pickupTime || 'earlier'})${
-        contact?.notes ? ` | Contact notes: ${contact.notes}` : ''
-      }`,
+      notes: `${
+        suggested.notes || `Converted from Comms (Requested ${suggested.pickupTime || 'earlier'})`
+      }${contact?.notes ? ` | Contact notes: ${contact.notes}` : ''}`,
     };
 
     workspaceBus.publish('POPULATE_BOOKING', payload);
@@ -2474,6 +2833,187 @@ function CommsHubComponent({
     setCallsSubTab('keypad');
   };
 
+  const handleAddThreadInternalNote = async () => {
+    const clean = noteDraftText.trim();
+    if (!clean || !selectedContactPhone) return;
+    const phoneCandidate =
+      threadCrmContext?.primaryPhone ||
+      activeContactRecord?.phone ||
+      activeContactSummary?.contactPhone ||
+      (!selectedContactPhone.includes('@') && !selectedContactPhone.startsWith('thr_')
+        ? selectedContactPhone
+        : undefined);
+    const emailCandidate =
+      threadCrmContext?.primaryEmail ||
+      activeContactRecord?.email ||
+      activeContactSummary?.contactEmail ||
+      (selectedContactPhone.includes('@') ? selectedContactPhone : undefined);
+
+    setNoteDraftText('');
+    await getCommsThreadService().addInternalNote({
+      threadId: activeUnifiedThread?.id,
+      phone: phoneCandidate,
+      email: emailCandidate,
+      contactName:
+        threadCrmContext?.contactName ||
+        activeContactRecord?.name ||
+        activeContactSummary?.contactName,
+      bodyText: clean,
+      actorName: _user?.displayName || _user?.email || 'Dispatcher',
+    });
+  };
+
+  const handleOpenEmailInDock = (evt: InteractionEvent) => {
+    workspaceBus.publish('OPEN_EMAIL_MESSAGE', {
+      emailMessageId: evt.emailMessageId || evt.id.replace(/^em_/, ''),
+      threadId: evt.threadId || activeUnifiedThread?.id,
+      senderEmail:
+        evt.contactEmail || threadCrmContext?.primaryEmail || activeContactRecord?.email,
+    });
+    workspaceBus.publish('FOCUS_MODULE', { moduleKey: 'email' });
+  };
+
+  const handleOpenContactEmailInDock = () => {
+    const latestEmailEvt = [...allSelectedContactInteractions]
+      .reverse()
+      .find((e) => e.type.startsWith('email_'));
+    workspaceBus.publish('OPEN_EMAIL_MESSAGE', {
+      emailMessageId: latestEmailEvt
+        ? latestEmailEvt.emailMessageId || latestEmailEvt.id.replace(/^em_/, '')
+        : undefined,
+      threadId: activeUnifiedThread?.id || threadCrmContext?.threadId,
+      senderEmail:
+        threadCrmContext?.primaryEmail ||
+        activeContactRecord?.email ||
+        activeContactSummary?.contactEmail,
+    });
+    workspaceBus.publish('FOCUS_MODULE', { moduleKey: 'email' });
+  };
+
+  // Keyboard ergonomics: `/` search focus, `Cmd/Ctrl + Enter` submit SMS or Note, `Escape` close modal/sheet or exit thread
+  const keyboardHandlersRef = useRef({
+    onSendSms: handleSendSms,
+    onAddNote: handleAddThreadInternalNote,
+    onSendNewMsg: handleSendNewMessage,
+  });
+  keyboardHandlersRef.current = {
+    onSendSms: handleSendSms,
+    onAddNote: handleAddThreadInternalNote,
+    onSendNewMsg: handleSendNewMessage,
+  };
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleCommsHotkeys = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditable = Boolean(
+        target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable)
+      );
+
+      // 1. `Cmd/Ctrl + Enter`: submit active SMS reply, Internal Note, or New Message modal
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (isNewMessageModalOpen && newMsgBody.trim()) {
+          e.preventDefault();
+          e.stopPropagation();
+          void keyboardHandlersRef.current.onSendNewMsg();
+          return;
+        }
+        if (selectedContactPhone) {
+          if (noteDraftText.trim()) {
+            e.preventDefault();
+            e.stopPropagation();
+            void keyboardHandlersRef.current.onAddNote();
+            return;
+          }
+          if (smsReplyText.trim()) {
+            e.preventDefault();
+            e.stopPropagation();
+            void keyboardHandlersRef.current.onSendSms();
+            return;
+          }
+        }
+      }
+
+      // 2. `Escape`: close active CommsHub modals/sheets first, or exit active thread back to list
+      if (e.key === 'Escape') {
+        if (commsActionSheetEvent) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setCommsActionSheetEvent(null);
+          return;
+        }
+        if (isNewMessageModalOpen) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setIsNewMessageModalOpen(false);
+          return;
+        }
+        if (isContactEditOpen) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setIsCorpDropdownOpen(false);
+          setIsContactEditOpen(false);
+          return;
+        }
+        if (showAgentSetupModal) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setShowAgentSetupModal(false);
+          setPendingCallTarget(null);
+          setSetupAgentPhoneError(null);
+          return;
+        }
+        if (isEditingOperatorPhone) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setIsEditingOperatorPhone(false);
+          return;
+        }
+        if (selectedContactPhone) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setSelectedContactPhone(null);
+          return;
+        }
+        if (selectedItemIds.size > 0) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setSelectedItemIds(new Set());
+          return;
+        }
+      }
+
+      // 3. `/`: focus visible CommsHub search input when focus is not inside an editable field
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !isEditable) {
+        if (searchInputRef.current && searchInputRef.current.offsetParent !== null) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          searchInputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleCommsHotkeys, true);
+    return () => window.removeEventListener('keydown', handleCommsHotkeys, true);
+  }, [
+    isVisible,
+    commsActionSheetEvent,
+    isNewMessageModalOpen,
+    isContactEditOpen,
+    showAgentSetupModal,
+    isEditingOperatorPhone,
+    selectedContactPhone,
+    selectedItemIds.size,
+    newMsgBody,
+    noteDraftText,
+    smsReplyText,
+  ]);
+
   const sharedLogProps = {
     selectedItemIds,
     isAllSelected,
@@ -2490,6 +3030,7 @@ function CommsHubComponent({
     onChangeContactFilter: setContactFilter,
     searchQuery,
     onChangeSearchQuery: setSearchQuery,
+    searchInputRef,
     channelFilter,
     onChangeChannelFilter: setChannelFilter,
     callTypeFilter,
@@ -2506,6 +3047,7 @@ function CommsHubComponent({
     onOpenInKeypad: handleOpenInKeypad,
     onSelectContact: setSelectedContactPhone,
     onConvertVoicemailToBooking: handleConvertVoicemailToBooking,
+    onOpenEmailInDock: handleOpenEmailInDock,
     onToggleReadStatus: handleToggleReadStatus,
     onForwardItem: handleForwardItem,
     onArchiveItem: handleArchiveItem,
@@ -2515,46 +3057,16 @@ function CommsHubComponent({
     onRowTouchEnd: cancelCommsLongPress,
   };
 
-  const handleAddThreadInternalNote = async () => {
-    const clean = noteDraftText.trim();
-    if (!clean || !selectedContactPhone) return;
-    const phoneCandidate =
-      activeContactRecord?.phone ||
-      activeContactSummary?.contactPhone ||
-      (!selectedContactPhone.includes('@') && !selectedContactPhone.startsWith('thr_')
-        ? selectedContactPhone
-        : undefined);
-    const emailCandidate =
-      activeContactRecord?.email ||
-      activeContactSummary?.contactEmail ||
-      (selectedContactPhone.includes('@') ? selectedContactPhone : undefined);
-
-    setNoteDraftText('');
-    await getCommsThreadService().addInternalNote({
-      threadId: activeUnifiedThread?.id,
-      phone: phoneCandidate,
-      email: emailCandidate,
-      contactName: activeContactRecord?.name || activeContactSummary?.contactName,
-      bodyText: clean,
-      actorName: _user?.displayName || _user?.email || 'Dispatcher',
-    });
-  };
-
-  const handleOpenEmailInDock = (evt: InteractionEvent) => {
-    workspaceBus.publish('OPEN_EMAIL_MESSAGE', {
-      emailMessageId: evt.emailMessageId || evt.id.replace(/^em_/, ''),
-      threadId: evt.threadId,
-      senderEmail: evt.contactEmail || activeContactRecord?.email,
-    });
-    workspaceBus.publish('FOCUS_MODULE', { moduleKey: 'email' });
-  };
-
   const sharedSmsThreadProps = {
     activeContactSummary,
     activeContactRecord,
+    threadCrmContext,
     onBackFromThread: () => setSelectedContactPhone(null),
     onOpenContactEdit: handleOpenContactEdit,
     onBookContactRide: handleBookContactRide,
+    onOpenContactEmailInDock: handleOpenContactEmailInDock,
+    onOpenTripById: handleOpenTripById,
+    onRebookLastRide: handleRebookFromCrm,
     threadTab,
     onChangeThreadTab: setThreadTab,
     totalContactInteractionCount: allSelectedContactInteractions.length,
@@ -2576,6 +3088,11 @@ function CommsHubComponent({
     onStartCall: handleStartCall,
     onConvertVoicemailToBooking: handleConvertVoicemailToBooking,
     onOpenEmailInDock: handleOpenEmailInDock,
+    onRetrySms: handleRetrySms,
+    retryingSmsId,
+    onInsertTrackingLink: () => handleInsertTrackingLink('thread'),
+    onInsertPayLink: () => handleInsertPayLink('thread'),
+    isGeneratingPayLink,
     noteDraftText,
     onChangeNoteDraftText: setNoteDraftText,
     onAddInternalNote: handleAddThreadInternalNote,
@@ -2584,6 +3101,7 @@ function CommsHubComponent({
     isSendingSms,
     onSendSms: handleSendSms,
     smsStatusMessage,
+    conversationRows,
     messageConversations,
     threadUnreadCountMap,
     selectedItemIds,
@@ -2602,6 +3120,7 @@ function CommsHubComponent({
     onChangeContactFilter: setContactFilter,
     searchQuery,
     onChangeSearchQuery: setSearchQuery,
+    searchInputRef,
     onSelectContact: setSelectedContactPhone,
     onOpenFreshNewMessageModal: handleOpenFreshNewMessageModal,
   };
@@ -2628,9 +3147,14 @@ function CommsHubComponent({
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200">
                 Incoming Softphone Call
+                {callerCrmContext?.isVip ? ' · VIP' : ''}
+                {callerCrmContext?.isBlacklisted ? ' · DO NOT DISPATCH' : ''}
               </p>
               <p className="text-sm font-bold font-mono">
-                {formatDisplayPhone(incomingCallInfo.from)}
+                {callerCrmContext?.hasKnownContext &&
+                callerCrmContext.contactName !== 'Unknown Caller'
+                  ? `${callerCrmContext.contactName} (${formatDisplayPhone(incomingCallInfo.from)})`
+                  : formatDisplayPhone(incomingCallInfo.from)}
               </p>
             </div>
           </div>
@@ -2926,6 +3450,9 @@ function CommsHubComponent({
                 onClearDialpad={() => setDialpadNumber('')}
                 onStartCall={handleStartCall}
                 drivers={drivers}
+                callerCrmContext={callerCrmContext}
+                onRebookCallerRide={handleRebookFromCrm}
+                onSelectThread={(target) => setSelectedContactPhone(target)}
               />
             )}
 
@@ -3018,6 +3545,10 @@ function CommsHubComponent({
         isSendingNewMsg={isSendingNewMsg}
         isMsgContactDropdownOpen={isMsgContactDropdownOpen}
         filteredContactsForMsg={filteredContactsForMsg}
+        recipientCrmContext={newMsgRecipientCrmContext}
+        onInsertTrackingLink={() => handleInsertTrackingLink('modal')}
+        onInsertPayLink={() => handleInsertPayLink('modal')}
+        isGeneratingPayLink={isGeneratingPayLink}
         onRecipientInputChange={(val) => {
           setMsgContactSearch(val);
           setNewMsgRecipientPhone(val);
@@ -3063,7 +3594,8 @@ function CommsHubComponent({
         }}
         onOpenThread={(target) => {
           setCommsActionSheetEvent(null);
-          setSelectedContactPhone(target.contactPhone);
+          const sel = resolveInteractionSelectorTarget(target);
+          if (sel) setSelectedContactPhone(sel);
         }}
         onBookTrip={(target) => {
           setCommsActionSheetEvent(null);
@@ -3073,6 +3605,7 @@ function CommsHubComponent({
             onPopulateBooking({
               passengerName: target.contactName,
               passengerPhone: target.contactPhone,
+              passengerEmail: target.contactEmail,
             });
           }
         }}

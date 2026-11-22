@@ -1,6 +1,11 @@
 import type React from 'react';
+import type { CommsCrmContextSummary } from '../../../../core/services/comms/comms-templates.service';
 import { formatDisplayPhone } from '../../../../core/utils/phone';
-import type { UpcomingBookingPreview } from '../../../../core/services/workspace-bus.service';
+import type {
+  UpcomingBookingPreview,
+  WorkspaceEventMap,
+} from '../../../../core/services/workspace-bus.service';
+import { CommsCrmContextBanner } from './CommsCrmContextBanner';
 import {
   PhoneIcon,
   PauseIcon,
@@ -86,6 +91,9 @@ export interface SoftphoneDialerPaneProps {
   onClearDialpad: () => void;
   onStartCall: (numberToCall?: string, contactName?: string) => void;
   drivers: any[];
+  callerCrmContext?: CommsCrmContextSummary | null;
+  onRebookCallerRide?: (payload: WorkspaceEventMap['POPULATE_BOOKING']) => void;
+  onSelectThread?: (selectorTarget: string) => void;
 }
 
 export function SoftphoneDialerPane({
@@ -130,6 +138,9 @@ export function SoftphoneDialerPane({
   onClearDialpad,
   onStartCall,
   drivers,
+  callerCrmContext,
+  onRebookCallerRide,
+  onSelectThread,
 }: SoftphoneDialerPaneProps) {
   if (callStatus !== 'idle') {
     return (
@@ -217,6 +228,16 @@ export function SoftphoneDialerPane({
             </div>
           )}
         </div>
+
+        {/* Live Caller CRM Context Banner (VIP, Blacklist, Corporate, Active Trip & Rebook) */}
+        <CommsCrmContextBanner
+          crmContext={callerCrmContext}
+          variant="dark"
+          hideWhenUnknown={true}
+          onOpenTrip={onEditCallerTrip}
+          onRebookLastRide={onRebookCallerRide}
+          onSelectThread={onSelectThread}
+        />
 
         {/* Booking & Dispatch Actions Section */}
         <div className="bg-slate-800/80 rounded-2xl p-2.5 border border-slate-700/80 space-y-2 shrink-0">
@@ -543,6 +564,17 @@ export function SoftphoneDialerPane({
             </button>
           )}
         </div>
+
+        {/* Live Dialpad Caller CRM Lookup Banner (Matches Known Contacts or Trips Instantly) */}
+        <CommsCrmContextBanner
+          crmContext={callerCrmContext}
+          variant="light"
+          hideWhenUnknown={true}
+          showIdentityHeader={true}
+          onOpenTrip={onEditCallerTrip}
+          onRebookLastRide={onRebookCallerRide}
+          onSelectThread={onSelectThread}
+        />
 
         {/* 12 Key DTMF Matrix */}
         <div className="grid grid-cols-3 gap-2.5">
