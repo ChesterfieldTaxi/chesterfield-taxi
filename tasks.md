@@ -708,3 +708,22 @@
   - [x] 45.3.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert both `app/components/domain/BookingEngineV2.tsx` and `app/components/domain/dispatch/DispatchBookingEngine.tsx` remain `< 1800` lines.
   - [x] 45.3.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, and `npm run test:stress` with `0` errors, mark Phase 45 complete in `tasks.md`, and leave Phase 45 changes uncommitted for Control-Tower review.
 
+## Phase 46 (Wave 3 Phase 3): Dispatch Workspace Decomposition & Responsive Trips Queue (Table Overflow Auto-Cards + Dynamic Resizable Card Columns)
+- [x] 46.0 Baseline Hygiene & Specification Sync:
+  - [x] 46.0.1 Commit reviewed Phase 45 baseline cleanly on `main` (`feat(phase-45): decompose BookingEngineV2 and DispatchBookingEngine into modular sections and hooks`).
+  - [x] 46.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 46 scope, responsive layout thresholds, and monolith line-count guardrails before making Phase 46 code edits.
+- [x] 46.1 Responsive Trips Queue Decomposition, Auto-Cards Fallback & Dynamic Columns (`DispatchTripQueuePane.tsx` `< 900` lines):
+  - [x] 46.1.1 Create `app/components/domain/dispatch/queue/trip-queue-layout.util.ts` (`TABLE_OVERFLOW_MIN_WIDTH_PX = 860`, `resolveEffectiveQueueDisplayLayout`, `computeResponsiveTripCardColumns`, and shared queue helper types/formatters).
+  - [x] 46.1.2 Extract `TripQueueToolbar.tsx` (with `Cards (Auto)` indicator when auto-switched), `TripQueueTableView.tsx`, `TripQueueCardsGrid.tsx` (container-driven `1..4` dynamic columns + `@container/tripqueue` CSS fallback), and `TripQueueCompactList.tsx` under `app/components/domain/dispatch/queue/`, and refactor `DispatchTripQueuePane.tsx` (`< 900` lines) with SSR-safe `ResizeObserver` `queueWidthPx` tracking.
+  - [x] 46.1.3 Create `scripts/test-trip-queue-responsive.ts` verifying `resolveEffectiveQueueDisplayLayout` and `computeResponsiveTripCardColumns` across dock open/close transitions (`480px`, `620px`, `859px`, `860px`, `950px`, `1280px`), mobile override, and non-destructive `'table'` user preference preservation.
+- [x] 46.2 Decompose `app/routes/dispatch.tsx` (`< 1,750` lines):
+  - [x] 46.2.1 Create `app/core/hooks/dispatch/useDispatchPanelResize.ts` and `app/core/hooks/dispatch/useDispatchSlaCascadeLoop.ts` (plus `useDispatchFleetAlerts.ts`, `useDispatchTripTriageActions.ts`, `useDispatchWorkspaceSync.ts`, and `dispatch-workspace.util.ts`).
+  - [x] 46.2.2 Create `DispatchDesktopTopHeader.tsx`, `DispatchNavigationShell.tsx`, `DispatchRightOperationsDock.tsx`, and `DispatchLeftBookingSidebar.tsx` under `app/components/domain/dispatch/workspace/`, and refactor `app/routes/dispatch.tsx` (`< 1,750` lines) preserving 100% of triage flows, lazy chunks, and SSR hydration determinism.
+- [x] 46.3 Decompose `DispatchTripDetailsDrawer.tsx` (`< 1,200` lines) & `CommsHub.tsx` (`< 1,600` lines):
+  - [x] 46.3.1 Extract `TripDrawerOverviewSection.tsx`, `TripDrawerPricingPaymentSection.tsx`, `DispatchCompleteTripModal.tsx`, `DispatchDriverFareModal.tsx`, and `useTripDrawerReviewActions.ts` under `app/components/domain/dispatch/drawer/`, refactoring `DispatchTripDetailsDrawer.tsx` (`< 1,200` lines) while preserving all exports (`DispatchTripDetailsDrawer`, `getContextualEmailMeta`, `sendDispatchContextualTripEmail`).
+  - [x] 46.3.2 Extract `useTwilioSoftphoneDevice.ts`, `CommsRowActionSheet.tsx`, `useCommsInteractionSync.ts`, and `useCommsMessagingAndContacts.ts` under `app/components/domain/dispatch/comms/`, refactoring `CommsHub.tsx` (`< 1,600` lines) while preserving `React.memo` and the standardized bottom-docked SMS composer + floating `+` button.
+- [x] 46.4 Monolith Prevention Guardrails & Master Verification Gate:
+  - [x] 46.4.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert `app/routes/dispatch.tsx < 2000`L, `DispatchTripQueuePane.tsx < 1200`L, `DispatchTripDetailsDrawer.tsx < 1500`L, and `CommsHub.tsx < 1800`L.
+  - [x] 46.4.2 Pass `npm run typecheck`, `npm run build`, `npx tsx scripts/test-trip-queue-responsive.ts`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-comms-multichannel-ui.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, mark Phase 46 complete in `tasks.md`, and leave Phase 46 changes uncommitted for Control-Tower review.
+
+

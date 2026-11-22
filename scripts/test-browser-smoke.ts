@@ -300,27 +300,30 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     `Server email-templates leaked into client bundle assets: ${emailTemplateChunks.join(', ')}`
   );
 
-  // 6. Dual Booking Engine monolith prevention line-budget assertions (< 1800 lines)
-  const bookingEngineMaxLines = 1800;
-  const bookingEngineFiles = [
-    'app/components/domain/BookingEngineV2.tsx',
-    'app/components/domain/dispatch/DispatchBookingEngine.tsx',
+  // 6. Dual Booking Engine & Dispatch Workspace monolith prevention line-budget assertions
+  const monolithBudgets: Array<{ relFile: string; maxLines: number }> = [
+    { relFile: 'app/components/domain/BookingEngineV2.tsx', maxLines: 1800 },
+    { relFile: 'app/components/domain/dispatch/DispatchBookingEngine.tsx', maxLines: 1800 },
+    { relFile: 'app/routes/dispatch.tsx', maxLines: 2000 },
+    { relFile: 'app/components/domain/dispatch/DispatchTripQueuePane.tsx', maxLines: 1200 },
+    { relFile: 'app/components/domain/dispatch/DispatchTripDetailsDrawer.tsx', maxLines: 1500 },
+    { relFile: 'app/components/domain/dispatch/CommsHub.tsx', maxLines: 1800 },
   ];
-  const bookingEngineLineSummary: string[] = [];
+  const monolithLineSummary: string[] = [];
 
-  for (const relFile of bookingEngineFiles) {
+  for (const { relFile, maxLines } of monolithBudgets) {
     const absFile = path.join(rootDir, relFile);
-    assert.ok(fs.existsSync(absFile), `Expected booking engine file not found: ${relFile}`);
+    assert.ok(fs.existsSync(absFile), `Expected module file not found: ${relFile}`);
     const lineCount = fs.readFileSync(absFile, 'utf8').split(/\r?\n/).length;
     assert.ok(
-      lineCount < bookingEngineMaxLines,
-      `Monolith budget exceeded in ${relFile}: ${lineCount} lines >= ${bookingEngineMaxLines} lines`
+      lineCount < maxLines,
+      `Monolith budget exceeded in ${relFile}: ${lineCount} lines >= ${maxLines} lines`
     );
-    bookingEngineLineSummary.push(`${path.basename(relFile)}=${lineCount}L`);
+    monolithLineSummary.push(`${path.basename(relFile)}=${lineCount}L/<${maxLines}L`);
   }
 
   console.log(
-    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, zero secret-shaped literals, ${apiChunks.length} zero-KB api.*.js chunks, zero email-templates client chunks, admin entry chunk (${(adminChunkStat.size / 1024).toFixed(2)} KB < 150 KB), and booking engine line budgets (${bookingEngineLineSummary.join(', ')} < ${bookingEngineMaxLines}L).\n`
+    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, zero secret-shaped literals, ${apiChunks.length} zero-KB api.*.js chunks, zero email-templates client chunks, admin entry chunk (${(adminChunkStat.size / 1024).toFixed(2)} KB < 150 KB), and monolith line budgets (${monolithLineSummary.join(', ')}).\n`
   );
 }
 

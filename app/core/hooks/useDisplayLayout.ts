@@ -10,36 +10,35 @@ export interface UseDisplayLayoutOptions {
 
 /**
  * Hook for managing layout presentation (cards vs table vs compact list).
- * - Persists operator preference in localStorage
- * - Automatically defaults to 'cards' on viewports narrower than mobileBreakpoint (< 768px)
- *   unless explicitly overridden by the operator.
+ * - Initializes deterministically to `defaultLayout` for React 19 SSR hydration parity.
+ * - Restores persisted operator preference from `localStorage` (or mobile viewport fallback) post-mount.
  */
 export function useDisplayLayout(
   storageKey: string = 'ct_display_layout',
   defaultLayout: DisplayLayout = 'table',
   mobileBreakpoint: number = 768
 ): [DisplayLayout, (mode: DisplayLayout) => void] {
-  const [layout, setLayoutState] = useState<DisplayLayout>(() => {
-    if (typeof window === 'undefined') {
-      return defaultLayout;
-    }
+  const [layout, setLayoutState] = useState<DisplayLayout>(defaultLayout);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
     try {
       const stored = localStorage.getItem(storageKey) as DisplayLayout | null;
       if (stored && (stored === 'cards' || stored === 'table' || stored === 'compact')) {
-        return stored;
+        setLayoutState(stored);
+        return;
       }
     } catch {
       // Ignore storage errors
     }
 
-    // Default to 'cards' on mobile viewports (< 768px), otherwise provided default
     if (window.innerWidth < mobileBreakpoint) {
-      return 'cards';
+      setLayoutState('cards');
+    } else {
+      setLayoutState(defaultLayout);
     }
-
-    return defaultLayout;
-  });
+  }, [storageKey, defaultLayout, mobileBreakpoint]);
 
   const setLayout = useCallback(
     (newLayout: DisplayLayout) => {

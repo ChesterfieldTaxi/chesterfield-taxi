@@ -907,3 +907,33 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Automated Monolith Prevention Guardrail (`scripts/test-browser-smoke.ts`)**:
   - Extends `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert both `app/components/domain/BookingEngineV2.tsx` and `app/components/domain/dispatch/DispatchBookingEngine.tsx` remain `< 1800` lines.
 
+## 46. Phase 46 (Wave 3 Phase 3): Dispatch Workspace Decomposition & Responsive Trips Queue (Table Overflow Auto-Cards + Dynamic Resizable Card Columns)
+- **Strict Functional & SSR Determinism Guardrails**:
+  - Preserves 100% of existing dispatch triage flows, SLA alerts, offer cascades, flight telemetry, pay links, standardized SMS/Email floating `+` compose & bottom-docked composers, mobile `Trips · Booking · Comms · Email · Fleet` navigation, deterministic React 19 SSR hydration (`useState` initializers never read `localStorage` or `window` dimensions during initial render), zero secret-shaped literals (`constitution.md` Section 3), and Vercel Hobby cron (`"0 10 * * *"`).
+- **Responsive Trips Queue: Table Overflow Auto-Cards + Dynamic Container Columns (`DispatchTripQueuePane.tsx` `< 900` lines)**:
+  - Decomposes `app/components/domain/dispatch/DispatchTripQueuePane.tsx` into modular sub-components under `app/components/domain/dispatch/queue/`:
+    - `trip-queue-layout.util.ts`: Pure layout & responsive column calculators (`resolveEffectiveQueueDisplayLayout`, `computeResponsiveTripCardColumns`, `TABLE_OVERFLOW_MIN_WIDTH_PX = 860`) plus shared queue formatting/helper types.
+    - `TripQueueToolbar.tsx`: Queue status tabs (`Active`, `Scheduled`, `Completed`, `Cancelled`), search input, date-range filter, urgency/filter pills, multi-select batch bar, and Layout switcher (`Cards` / `Table` / `Compact`) showing a subtle `Cards (Auto)` indicator when auto-switched.
+    - `TripQueueTableView.tsx`: Dense tabular queue renderer.
+    - `TripQueueCardsGrid.tsx`: Responsive container-driven card grid renderer.
+    - `TripQueueCompactList.tsx`: High-density compact row renderer.
+  - **Non-Destructive Table Horizontal Overflow → Auto-Cards Switch**:
+    - Tracks live Trips Queue container width via `ResizeObserver` (`queueWidthPx`, initialized deterministically to `0` on SSR/initial render).
+    - When `isDesktop && displayLayout === 'table'` and `queueWidthPx > 0 && queueWidthPx < 860` (e.g., when opening the Phone/Email/Drivers right dock or widening sidebars), resolves `effectiveDisplayLayout = 'cards'` and `isAutoCardsFallback = true` **without overwriting** the user's saved `'table'` preference in state/`localStorage`, and automatically restores `'table'` as soon as `queueWidthPx >= 860`.
+  - **Container-Driven Dynamic Card Columns on Resize**:
+    - Replaces viewport-bound `grid-cols-1 md:grid-cols-2 xl:grid-cols-3` classes in `TripQueueCardsGrid.tsx` with true Trips-section container-width columns (`computeResponsiveTripCardColumns(queueWidthPx)`: `1` col `< 580px`, `2` cols `580–899px`, `3` cols `900–1219px`, `4` cols `>= 1220px`, backed by `@container/tripqueue` CSS fallback prior to client measurement) so dragging either the Left Booking Sidebar resizer or Right Operations Dock resizer smoothly updates card column count in real time without cramped cards or horizontal scrollbars.
+- **Dispatch Route Orchestrator Decomposition (`app/routes/dispatch.tsx` `< 1,750` lines)**:
+  - Extracts focused workspace hooks under `app/core/hooks/dispatch/`:
+    - `useDispatchPanelResize.ts`: Left booking sidebar, bottom trip queue, and right operations dock pointer drag-resizing, clamping, and post-mount `localStorage` persistence.
+    - `useDispatchSlaCascadeLoop.ts`: Periodic SLA urgency scanner, tactical alerts synthesizer, and auto-offer cascade timer loop.
+  - Extracts focused workspace UI modules under `app/components/domain/dispatch/workspace/`:
+    - `DispatchDesktopTopHeader.tsx`: Incoming softphone call alert banner, desktop `Main | Phone | Email | Drivers` workspace switcher, `DispatchHeaderCallHud`, Tactical Alerts bell dropdown, audio/wake-lock/push settings menu, and lazy `AppSuiteLauncher`.
+    - `DispatchNavigationShell.tsx`: Slide-out operations/profile drawer and 5-tab `Trips · Booking · Comms · Email · Fleet` mobile bottom dock.
+    - `DispatchRightOperationsDock.tsx`: Resizable right desktop dock hosting lazy `CommsHub` (kept mounted once loaded for WebRTC softphone continuity), `EmailDock`, and `DispatchDriverRosterPane`.
+- **Drawer & CommsHub Decomposition (`DispatchTripDetailsDrawer.tsx` `< 1,200` lines & `CommsHub.tsx` `< 1,600` lines)**:
+  - Splits `app/components/domain/dispatch/DispatchTripDetailsDrawer.tsx` into `app/components/domain/dispatch/drawer/` (`TripDrawerOverviewSection.tsx`, `TripDrawerPricingPaymentSection.tsx`, `DispatchCompleteTripModal.tsx`), preserving all exports (`DispatchTripDetailsDrawer`, `getContextualEmailMeta`, `sendDispatchContextualTripEmail`).
+  - Splits `app/components/domain/dispatch/CommsHub.tsx` by extracting `useTwilioSoftphoneDevice.ts` (inbound ringtone + lazy `@twilio/voice-sdk` WebRTC device + PSTN bridge fallback) and `CommsRowActionSheet.tsx` under `app/components/domain/dispatch/comms/`, preserving `CommsHub` (`React.memo`) and the standardized bottom-docked SMS composer + floating `+` button.
+- **Automated Monolith Prevention Guardrails (`scripts/test-browser-smoke.ts`)**:
+  - Extends `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert line-count ceilings: `app/routes/dispatch.tsx < 2000` lines, `DispatchTripQueuePane.tsx < 1200` lines, `DispatchTripDetailsDrawer.tsx < 1500` lines, and `CommsHub.tsx < 1800` lines.
+
+
