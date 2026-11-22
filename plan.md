@@ -943,4 +943,30 @@ export interface PassengerAccount {
   - `allow read, write: if isDispatcher();` on `/dispatchEmails/{emailId}` and `/emailWebhookEvents/{eventId}`.
   - Dispatch Email & Resend Inbound Webhook diagnostics card in `AdminIntegrationsSubpage.tsx` (`webhooks` sub-tab).
 
+## 30. Phase 41 Architecture (Wave 2 Phase 3): Dedicated `EmailDock` Client Overhaul (Live Folders, Threaded Composer & Cross-Channel Sender Timeline)
+
+### 30.1 Architectural & Bundle Guardrails (`constitution.md`)
+- **Pure/Client Domain Service Abstraction**:
+  - Encapsulate all `/dispatchEmails` Firestore `onSnapshot` subscriptions, `/api/email/webhook?action=sync_emails` hydration, `localStorage` persistence (`ct_dispatch_emails_v1` & `ct_dispatch_email_drafts_v1`), smart folder filtering, conversation grouping, auto-saved drafts, canned template interpolation, `POPULATE_BOOKING` mapping, and cross-channel sender timeline resolution inside `app/core/services/email/dispatch-email.service.ts`.
+  - Never import `*.server.ts` or `node:*` modules into `dispatch-email.service.ts` or any `app/components/domain/dispatch/**` UI component so all `/api/*` resource routes (`api.email.webhook`, `api.send-email`, `api.telephony`, `api.flight-status`) continue compiling to `0.00 kB` client chunks.
+  - Keep `EmailDock` strictly scoped to the single operational mailbox `DISPATCH_MAILBOX_ADDRESS = 'dispatch@chesterfieldtaxi.com'` and preserve `"0 10 * * *"` in `vercel.json`.
+
+### 30.2 Client Dispatch Email Service, Drafts & Canned Templates (`dispatch-email.service.ts`)
+- **Real-Time & Cross-Window Sync**:
+  - Subscribes lazily to Firestore `/dispatchEmails` (`orderBy('timestampMs', 'desc')`, `limit(250)`) when `isFirebaseConfigured()`, hydrates/flushes via `authorizedFetch('/api/email/webhook?action=sync_emails')` while preserving newer local triage timestamps, persists to `ct_dispatch_emails_v1` & `ct_dispatch_email_drafts_v1`, and broadcasts `EMAIL_STATE_CHANGED: { unreadCount, updatedAt }` over `WorkspaceBus`.
+  - Synchronizes read/unread and archive/trash transitions (`markEmailsRead`, `markEmailsUnread`, `toggleEmailStar`, `moveEmailsToFolder`) bidirectionally with `CommsThreadService` (`em_${emailId}`) so `unreadByChannel.email` never drifts.
+- **Drafts, Outbound Authoritative Hydration & Templates**:
+  - Manages `DispatchEmailDraft` lifecycle (`saveDraft`, `listDrafts`, `discardDraft` / `deleteDraft`).
+  - `sendComposerEmail` calls `POST /api/send-email` (`type: 'direct'`) via `authorizedFetch` with RFC threading context (`threadId`, `inReplyTo`, `references`, `tripId`, `contactPhone`, `contactName`), records a single outbound `DispatchEmailRecord` keyed by the server's authoritative `emailId` (`out_...`) + `rfcMessageId` (preventing duplicate local vs. server records), syncs `CommsThreadService`, and discards any source draft.
+  - Provides config-driven `CANNED_DISPATCH_EMAIL_TEMPLATES` (6 templates including STL Terminal 1 Exit Door 6 / Terminal 2 Exit Door 12 / SUS FBO guidance and `{payUrl}`) and pure `interpolateDispatchEmailTemplate(template, context)`.
+
+### 30.3 Modular `EmailDock` Component Architecture (`app/components/domain/dispatch/email/*` + `EmailDock.tsx`)
+- **`EmailFolderToolbar.tsx`**: Single-mailbox `dispatch@chesterfieldtaxi.com` header (hidden when `isDocked` inside the Dispatch right drawer to prevent double headers), config-driven folder pills (`Inbox`, `Bookings`, `Inquiries`, `Sent`, `Receipts`, `Drafts`, `Starred`, `Archive`, `Trash`) with live badges, `/` search focus shortcut, `Unread Only` filter, manual `Sync` trigger, and multi-select Batch Action Bar.
+- **`EmailMessageListPane.tsx`**: High-density thread/message rows and draft rows with conversation count badges (`> 1`), delivery status pills (`Delivered`, `Sent`, `Bounced`, `Simulated`), attachment chips, category/VIP/Corporate pills, star toggle, selection checkboxes, and `useBottomSheetDragToClose` mobile long-press action sheet.
+- **`EmailReaderPane.tsx`**: Chronological threaded conversation viewer collapsing older messages to 1-line headers with click-to-expand and keeping the latest message expanded, `sanitizeDispatchEmailHtml` rendering, bounce/error alert banner, attachment chips, structured **Extracted Booking Card** (`POPULATE_BOOKING`), and `Reply` / `Reply All` / `Forward` triggers.
+- **`EmailComposerPane.tsx`**: Supports inline threaded Reply/Reply-All/Forward and New Email composition (`From: Chesterfield Taxi Dispatch <dispatch@chesterfieldtaxi.com>`), `ContactService` recipient autocomplete, collapsible `Cc`, Canned Template picker, 1-tap `/track/...` and `/pay/...` (`getPayLinkService()`) link insertion, debounced auto-save draft indicator, and `Cmd/Ctrl + Enter` send.
+- **`EmailCrossChannelRail.tsx`**: Toggleable / side-by-side **Unified Customer Activity & Trips** panel displaying the sender's chronologically interleaved `CommsThread` timeline (`Calls + SMS + Voicemails + Notes + Emails`), matched `Trip` cards (`Open Trip`, `Populate Rebook`, `Insert Tracking Link`, `Insert Pay Link`), and 1-tap `Open in Comms Hub` / `Call Customer` actions.
+- **`EmailDock.tsx`, `dispatch.tsx` & `dispatch.popout.tsx`**: Thin orchestrator preserving `EmailDockProps` (`+ trips?`, `onOpenEditTrip?` with `getBookingService()` fallback), live unread badge wiring in `dispatch.tsx`, and full pop-out support in `dispatch.popout.tsx`.
+
+
 

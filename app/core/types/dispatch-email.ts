@@ -36,6 +36,28 @@ export type DispatchEmailFolder =
   | 'archive'
   | 'trash';
 
+export type DispatchEmailFolderView = DispatchEmailFolder | 'starred';
+
+export interface DispatchEmailDraft {
+  id: string;
+  mode?: 'new' | 'reply' | 'reply_all' | 'forward';
+  toEmail: string;
+  toName?: string;
+  ccEmails?: string[];
+  subject: string;
+  bodyText: string;
+  threadId?: string;
+  replyToEmailId?: string;
+  inReplyTo?: string;
+  references?: string[];
+  tripId?: string;
+  contactId?: string;
+  contactPhone?: string;
+  corporateAccountNumber?: string;
+  createdAtMs?: number;
+  updatedAtMs: number;
+}
+
 export type DispatchEmailDeliveryStatus =
   | 'received'
   | 'queued'

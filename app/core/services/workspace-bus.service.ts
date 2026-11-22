@@ -93,6 +93,11 @@ export interface WorkspaceEventMap {
     notes?: string;
     date?: string;
     time?: string;
+    pickupTime?: string;
+    airline?: string;
+    airlineCode?: string;
+    flightNumber?: string;
+    flightIdent?: string;
   };
   OPEN_EDIT_TRIP: {
     tripId?: string;
@@ -154,6 +159,10 @@ export interface WorkspaceEventMap {
     emailMessageId?: string;
     threadId?: string;
     senderEmail?: string;
+  };
+  EMAIL_STATE_CHANGED: {
+    unreadCount: number;
+    updatedAt: number;
   };
 }
 

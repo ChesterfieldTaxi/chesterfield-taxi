@@ -1164,6 +1164,12 @@ function DispatchBookingEngineComponent({
           setTimingType('later');
           setScheduledTime(payload.time);
         }
+        if (payload.airline || payload.airlineCode) {
+          setAirline(String(payload.airline || payload.airlineCode));
+        }
+        if (payload.flightNumber) {
+          setFlightNumber(String(payload.flightNumber));
+        }
 
         if (payload.vehicleTier || payload.vehicle) {
           const v = String(payload.vehicleTier || payload.vehicle).toLowerCase();

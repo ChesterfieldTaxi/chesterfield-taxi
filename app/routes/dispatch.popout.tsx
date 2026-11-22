@@ -155,7 +155,11 @@ export default function DispatchPopoutRoute() {
           <EmailDock
             isPopout={true}
             showWindowControls={false}
+            trips={trips}
             onClose={() => window.close()}
+            onOpenEditTrip={(tripId) => {
+              workspaceBus.publish('OPEN_EDIT_TRIP', { tripId });
+            }}
             onPopulateBooking={(data) => {
               workspaceBus.publish('POPULATE_BOOKING', data);
             }}

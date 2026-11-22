@@ -43,6 +43,7 @@ import {
 } from '../components/ui/Icons';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
 import { formatVehicleTier, formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { getDispatchEmailService } from '../core/services/email/dispatch-email.service';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { useWakeLock } from '../core/hooks/useWakeLock';
@@ -181,6 +182,10 @@ export default function DispatchRoute() {
       }
     } catch {}
     return 0;
+  });
+  const [unreadEmailCount, setUnreadEmailCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return getDispatchEmailService().getUnreadCount();
   });
 
   // Dispatcher Review Modal State for UNCONFIRMED web bookings & Trip Details
@@ -1557,10 +1562,23 @@ export default function DispatchRoute() {
       } else if (msg.type === 'OPEN_EMAIL_MESSAGE') {
         setActiveDockTab('email');
         setActiveMobileTab('email');
+      } else if (msg.type === 'EMAIL_STATE_CHANGED') {
+        if (typeof msg.payload?.unreadCount === 'number') {
+          setUnreadEmailCount(msg.payload.unreadCount);
+        }
       }
     });
 
-    return unsub;
+    const emailSvc = getDispatchEmailService();
+    const unsubEmails = emailSvc.subscribe((snap) => {
+      setUnreadEmailCount(snap.counts.totalUnread);
+    });
+    void emailSvc.syncWithServer({ seedSamplesIfOfflineEmpty: true });
+
+    return () => {
+      unsub();
+      unsubEmails();
+    };
   }, []);
 
   // Softphone call timer
@@ -2844,10 +2862,15 @@ export default function DispatchRoute() {
                   ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Email Inbox: Requests, Bookings, Receipts (Alt+E)"
+              title="Email Inbox: dispatch@chesterfieldtaxi.com (Alt+E)"
             >
               <MailIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Email</span>
+              {unreadEmailCount > 0 && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-tight">
+                  {unreadEmailCount}
+                </span>
+              )}
             </button>
 
             {/* Drivers Tab */}
@@ -3577,10 +3600,12 @@ export default function DispatchRoute() {
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       (isDesktop ? activeDockTab === 'email' : activeMobileTab === 'email')
                         ? 'bg-white/20 text-white'
+                        : unreadEmailCount > 0
+                        ? 'bg-blue-600 text-white'
                         : 'bg-slate-800 text-slate-300 border border-slate-700'
                     }`}
                   >
-                    Inquiries
+                    {unreadEmailCount > 0 ? `${unreadEmailCount} unread` : 'Inquiries'}
                   </span>
                 </button>
                 <button
@@ -4404,6 +4429,8 @@ export default function DispatchRoute() {
           <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
             <EmailDock
               isDocked={true}
+              trips={trips}
+              onOpenEditTrip={stableCommsOpenEditTrip}
               onClose={() => setActiveMobileTab('queue')}
               onPopOut={() => getWorkspaceBus().popOutModule('email')}
               showWindowControls={false}
@@ -4465,6 +4492,11 @@ export default function DispatchRoute() {
                       <MailIcon className="w-3.5 h-3.5" />
                     </div>
                     <span className="font-extrabold text-slate-900 tracking-tight truncate">Email Inbox</span>
+                    {unreadEmailCount > 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                        {unreadEmailCount}
+                      </span>
+                    )}
                   </>
                 )}
                 {activeDockTab === 'drivers' && (
@@ -4542,6 +4574,8 @@ export default function DispatchRoute() {
                 <div className="flex-1 flex flex-col h-full overflow-hidden">
                   <EmailDock
                     isDocked={true}
+                    trips={trips}
+                    onOpenEditTrip={stableCommsOpenEditTrip}
                     onClose={() => setActiveDockTab('none')}
                     onPopOut={() => getWorkspaceBus().popOutModule('email')}
                     showWindowControls={false}

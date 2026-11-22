@@ -625,4 +625,24 @@
   - [x] 40.5.1 Create and run `scripts/test-dispatch-email-webhook.ts` covering Svix signature verification, `email.received` + Receiving API fetch + XSS sanitization + booking extraction + multi-channel thread linkage + idempotency, RFC reply correlation + `email.delivered`/`email.bounced` reconciliation, outbound `/api/send-email` + `contact_inquiry` + `dispatcher_alert` thread rules, staff auth gates, and `firestore.rules`.
   - [x] 40.5.2 Run `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (`0.00 kB` client chunks for `api.email.webhook`, `api.send-email`, `api.telephony`, and `api.flight-status`).
 
+## Phase 41 (Wave 2 Phase 3): Dedicated `EmailDock` Client Overhaul (Live Folders, Threaded Composer & Cross-Channel Sender Timeline)
+- [x] 41.0 Baseline Hygiene & Specification Sync:
+  - [x] 41.0.1 Commit reviewed Phase 40 baseline cleanly (`feat(phase-40): add single-mailbox dispatch email backend, Svix Resend webhook, and outbound thread sync`).
+  - [x] 41.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 41 scope and architecture.
+- [x] 41.1 Client Dispatch Email Service, Drafts & Canned Templates:
+  - [x] 41.1.1 Add `EMAIL_STATE_CHANGED` to `WorkspaceEventMap` in `app/core/services/workspace-bus.service.ts`.
+  - [x] 41.1.2 Create `app/core/services/email/dispatch-email.service.ts` (Firestore `/dispatchEmails` `onSnapshot` + `/api/email/webhook?action=sync_emails` sync, `ct_dispatch_emails_v1` & `ct_dispatch_email_drafts_v1` storage, 9 smart folder views, `CommsThreadService` read/archive sync, `DispatchEmailDraft` lifecycle, zero-duplicate `sendComposerEmail`, `CANNED_DISPATCH_EMAIL_TEMPLATES` + `interpolateDispatchEmailTemplate`, `POPULATE_BOOKING` mapper, and cross-channel sender timeline resolver) and export from `app/core/services/email/index.ts`.
+- [x] 41.2 Modular Dedicated `EmailDock` UI (`app/components/domain/dispatch/email/*` + `EmailDock.tsx`):
+  - [x] 41.2.1 Create `EmailFolderToolbar.tsx` (`dispatch@chesterfieldtaxi.com` header, 9 folder pills + badges, `/` search shortcut, `Unread Only`, `Sync`, and multi-select Batch Action Bar).
+  - [x] 41.2.2 Create `EmailMessageListPane.tsx` (high-density message/draft rows, thread count badge, delivery status pills, attachment & category/VIP/Corporate chips, star toggle, multi-select checkboxes, and `useBottomSheetDragToClose` mobile action sheet).
+  - [x] 41.2.3 Create `EmailReaderPane.tsx` (chronological threaded conversation viewer with collapsible older messages, `sanitizeDispatchEmailHtml` rendering, bounce/failure banner, attachment chips, Extracted Booking Card + `POPULATE_BOOKING`, and Reply/Reply-All/Forward actions).
+  - [x] 41.2.4 Create `EmailComposerPane.tsx` (inline Reply/Reply-All/Forward + New Email composer, `ContactService` autocomplete, collapsible `Cc`, Canned Template dropdown, 1-tap Tracking & Pay link insertion via `getPayLinkService()`, auto-saved draft indicator, and `Cmd/Ctrl + Enter` send).
+  - [x] 41.2.5 Create `EmailCrossChannelRail.tsx` (Unified Customer Activity & Trips panel showing chronologically interleaved `Calls + SMS + Voicemails + Notes + Emails`, matched `Trip` cards with 1-tap Open/Rebook/Tracking/Pay actions, `Open in Comms Hub`, and `Call Customer`) and orchestrate in `EmailDock.tsx`.
+- [x] 41.3 Workspace Integration (`dispatch.tsx` & `dispatch.popout.tsx`):
+  - [x] 41.3.1 Pass `trips` and `onOpenEditTrip` into `<EmailDock />` in `app/routes/dispatch.tsx` and `app/routes/dispatch.popout.tsx` (plus `DispatchBookingEngine.tsx` airline/flight hydration on `POPULATE_BOOKING`), and surface live unread email count on Dispatch `Email` dock/mobile badges.
+- [x] 41.4 Verification & Build Gates:
+  - [x] 41.4.1 Create and run `scripts/test-email-dock-service.ts` verifying all 9 folder views & badges, `DispatchEmailService` <-> `CommsThreadService` (`unreadByChannel.email`) sync, auto-saved draft lifecycle & zero-duplicate `sendComposerEmail`, all 6 canned templates + `POPULATE_BOOKING` mapping, and cross-channel sender timeline resolution (`amanda.vance@bayer.com` + `+13145550199`).
+  - [x] 41.4.2 Run `npx tsx scripts/test-dispatch-email-webhook.ts`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (confirming `0.00 kB` `/api/*` client chunks), then mark Phase 41 complete in `tasks.md`.
+
+
 
