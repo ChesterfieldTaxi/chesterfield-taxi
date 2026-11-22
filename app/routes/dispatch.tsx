@@ -1550,6 +1550,13 @@ export default function DispatchRoute() {
         setActiveCallStatus('idle');
         setActiveCallMeta(null);
         setCallDuration(0);
+      } else if (msg.type === 'OPEN_COMMS_THREAD') {
+        setActiveDockTab('comms');
+        setCommsInitialTab('messages');
+        setActiveMobileTab('comms');
+      } else if (msg.type === 'OPEN_EMAIL_MESSAGE') {
+        setActiveDockTab('email');
+        setActiveMobileTab('email');
       }
     });
 

@@ -14,7 +14,8 @@ import type {
 } from '../types/telephony';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
-import { getFirebaseAuthHeaders } from './auth/auth-headers';
+import { authorizedFetch, getFirebaseAuthHeaders } from './auth/auth-headers';
+import { getCommsThreadService } from './comms/comms-thread.service';
 import { doc, updateDoc } from 'firebase/firestore';
 
 const MASKED_SESSIONS_STORAGE_KEY = 'ct_telephony_masked_sessions';
@@ -200,6 +201,25 @@ class TelephonyService implements ITelephonyService {
 
     this.persistStorage();
 
+    // Sync outbound lifecycle SMS into unified CommsThreadService
+    if (formattedRecipient) {
+      getCommsThreadService()
+        .recordCommsEvent({
+          id: notification.id,
+          externalSid: notification.id,
+          channel: 'sms',
+          direction: 'outbound',
+          eventType: 'sms_outbound',
+          contactPhone: formattedRecipient,
+          snippet: message,
+          bodyText: message,
+          tripId,
+          deliveryStatus: 'sent',
+          isUnread: false,
+        })
+        .catch(() => {});
+    }
+
     // Trigger real outbound SMS via authenticated server Twilio endpoint (never send raw secrets from localStorage)
     if (typeof window !== 'undefined' && formattedRecipient) {
       getFirebaseAuthHeaders()
@@ -214,6 +234,7 @@ class TelephonyService implements ITelephonyService {
               action: 'send_sms',
               to: formattedRecipient,
               body: message,
+              tripId,
             }),
           })
         )
@@ -222,6 +243,10 @@ class TelephonyService implements ITelephonyService {
             const err = await res.json().catch(() => ({}));
             console.warn('[TelephonyService] Live Twilio SMS dispatch warning:', err);
           } else {
+            const payload = await res.json().catch(() => ({}));
+            if (payload?.commsEventId && payload?.threadId) {
+              getCommsThreadService().hydrateFromServerSync({});
+            }
             console.info('[TelephonyService] Live Twilio SMS delivered to:', formattedRecipient);
           }
         })
@@ -231,6 +256,23 @@ class TelephonyService implements ITelephonyService {
     }
 
     return notification;
+  }
+
+  async syncServerComms(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const resp = await authorizedFetch('/api/telephony?action=sync_comms');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data?.success) {
+        getCommsThreadService().hydrateFromServerSync({
+          threads: data.threads,
+          events: data.events,
+        });
+      }
+    } catch {
+      // Tolerated offline fallback
+    }
   }
 
   async getSmsHistory(tripId?: string): Promise<SmsNotification[]> {

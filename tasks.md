@@ -587,11 +587,22 @@
   - [x] 38.B.4.1 Expand `scripts/test-flight-status.ts` to verify `401`/`403` staff-only `/api/flight-status` rejection, `evaluateFlightCheckEligibility` (`UNCONFIRMED`, `completed`/`cancelled`, `> 24h` future `unlocksAtIso`, `> 12h` past, `CONFIRMED` <= 24h, `asap`), and `400` `OUTSIDE_24H_WINDOW` server rejection with 0 upstream `fetchImpl` calls.
   - [x] 38.B.4.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-flight-status.ts`, and `npm run test:e2e` with 0 errors, then mark Phase 38.B complete in `tasks.md`.
 
-
-
-
-
-
-
-
+## Phase 39 (Wave 2 Phase 1): Unified Multi-Channel Thread Engine, Serverless Telephony Persistence & Security Hardening
+- [x] 39.1 Specification & Plan Sync:
+  - [x] 39.1.1 Confirm clean git status at `c3c11b4` and update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 39 scope and architecture.
+- [x] 39.2 Multi-Channel Domain Types, Unified Contact Resolution & WorkspaceBus Events:
+  - [x] 39.2.1 Create `app/core/types/comms.ts` (`CommsChannel`, `CommsDirection`, `CommsEventType`, `CommsThread`, `CommsEvent`, deterministic ID builders) and export from `app/core/types/index.ts`.
+  - [x] 39.2.2 Extend `app/core/services/customer/contact.service.ts` (and regional profiles) with `normalizeEmail`, `getContactByEmail`, `resolveUnifiedContact`, `resolveCanonicalThreadId`, and pure thread-merge support.
+  - [x] 39.2.3 Extend `WorkspaceEventMap` in `app/core/services/workspace-bus.service.ts` with `COMMS_EVENT_RECORDED`, `OPEN_COMMS_THREAD`, and `OPEN_EMAIL_MESSAGE`.
+- [x] 39.3 Client & Server Multi-Channel Thread Services:
+  - [x] 39.3.1 Create `app/core/services/comms/comms-thread.service.ts` with Firestore `onSnapshot` (`sanitizePayload`), `localStorage` + `WorkspaceBus` sync, rollup/thread-merge operations (`recordCommsEvent`, `addInternalNote`, `markThreadRead`, `markThreadsUnread`, `archiveThreads`, `linkTripToThread`, `mergeThreadsForContact`), and `InteractionEvent` adapters.
+  - [x] 39.3.2 Create `app/core/services/comms/comms-thread.server.ts` with idempotent Firestore REST persistence (`/commsThreads`, `/commsEvents`, `/telephonyWebhookEvents`) and bounded `commsServerStore` buffer flushed on `sync_comms`.
+- [x] 39.4 Serverless Telephony Extraction, Firestore Persistence & Security Hardening:
+  - [x] 39.4.1 Create `app/core/services/comms/telephony-gateway.server.ts` (`verifyTwilioWebhookSignature`, full `GET`/`POST` staff auth gates, HMAC-signed `audio_proxy` URLs, `comms-thread.server.ts` ingestion, and `sync_comms`) and refactor `app/routes/api.telephony.ts` into a `0.00 kB` client-chunk wrapper.
+  - [x] 39.4.2 Update `comms-types.ts`, `CommsHub.tsx`, `SmsThreadPane.tsx`, `VoicemailCallLogPane.tsx`, `EmailDock.tsx`, `dispatch.tsx`, and `telephony.service.ts` to integrate `CommsThreadService`, `authorizedFetch`, signed audio playback, internal notes, email timeline cards, and `OPEN_COMMS_THREAD` / `OPEN_EMAIL_MESSAGE` cross-dock navigation.
+- [x] 39.5 Firestore Security Rules:
+  - [x] 39.5.1 Update `firestore.rules` with explicit staff-scoped blocks (`allow read, write: if isDispatcher();`) for `/commsThreads/{threadId}`, `/commsEvents/{eventId}`, and `/telephonyWebhookEvents/{eventId}`.
+- [x] 39.6 Verification & Build Gates:
+  - [x] 39.6.1 Create and run `scripts/test-comms-threads-telephony.ts` verifying unified contact/thread resolution & merging, `verifyTwilioWebhookSignature`, idempotent webhook ingestion, `GET`/`POST /api/telephony` auth + signed `audio_proxy` gates, and `firestore.rules`.
+  - [x] 39.6.2 Run `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (confirming `0.00 kB` client chunks for `api.telephony` and `api.flight-status`), then mark Phase 39 complete in `tasks.md`.
 

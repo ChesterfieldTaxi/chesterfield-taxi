@@ -412,7 +412,7 @@ export function AdminIntegrationsSubpage({
     setTwilioStatus('checking');
     setTwilioStatusMsg('Connecting to Twilio Accounts API...');
     try {
-      const resp = await fetch('/api/telephony/verify', {
+      const resp = await authorizedFetch('/api/telephony/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

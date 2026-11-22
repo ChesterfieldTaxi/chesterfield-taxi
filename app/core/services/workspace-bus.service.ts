@@ -139,6 +139,22 @@ export interface WorkspaceEventMap {
   CONTACT_UPDATED: {
     contact: any;
   };
+  COMMS_EVENT_RECORDED: {
+    threadId: string;
+    eventId: string;
+    channel: string;
+  };
+  OPEN_COMMS_THREAD: {
+    threadId?: string;
+    phone?: string;
+    email?: string;
+    tab?: 'all' | 'sms' | 'calls' | 'emails' | 'notes';
+  };
+  OPEN_EMAIL_MESSAGE: {
+    emailMessageId?: string;
+    threadId?: string;
+    senderEmail?: string;
+  };
 }
 
 export type WorkspaceEventType = keyof WorkspaceEventMap;

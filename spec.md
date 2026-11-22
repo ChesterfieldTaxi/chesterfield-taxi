@@ -753,11 +753,20 @@ The booking portal will guide the user through a sequential, config-driven flow:
     - Customer booking surfaces (`/book`, `/app/passenger`, `/app/corporate` via `BookingEngineV2` & `FlightAssistanceCard` with `allowLiveCheck={false}`) render strictly the zero-cost local **STL Terminal 1 / Terminal 2 & Exit Door** guidance badge and never expose live aviation API buttons.
     - Staff surfaces (`DispatchBookingEngine.tsx` with `allowLiveCheck={true}` and `DispatchTripDetailsDrawer.tsx`) enforce `evaluateFlightCheckEligibility`, disabling `Check Flight Status`, `Refresh Flight`, and `Adjust Pickup Time` with explicit lock-reason pills (*"Confirm booking first..."* or *"Unlocks 24h before pickup (...)"*) until eligible.
 
-
-
-
-
-
-
-
+## 39. Phase 39 (Wave 2 Phase 1): Unified Multi-Channel Thread Engine, Serverless Telephony Persistence & Security Hardening
+- **Unified Multi-Channel Threading (`CommsThread` & `CommsEvent`)**:
+  - Consolidates all customer and operator communications (`Calls + SMS + Voicemails + Emails + Internal Notes`) into canonical `CommsThread` (`/commsThreads/{threadId}`) and deterministic, idempotent `CommsEvent` (`/commsEvents/{eventId}`) records (`sms_${MessageSid}`, `call_${CallSid}`, `vm_${RecordingSid}`, `em_${emailId}`, `note_${id}`).
+  - Unified identity resolution (`normalizeEmail`, `getContactByEmail`, `resolveUnifiedContact`, `resolveCanonicalThreadId`) links phone numbers (E.164) and email addresses (lowercase, e.g., `+13145550199` and `amanda.vance@bayer.com` to `dispatch@chesterfieldtaxi.com`) to the same `ContactRecord` and canonical `threadId`, with automatic thread merging (`mergeThreadsForContact`) when previously separate phone-only and email-only threads become linked via contact save or trip creation.
+  - Per-channel and aggregate unread tracking (`unreadCountTotal`, `unreadByChannel: { sms, call, voicemail, email }`), linked trip IDs (`linkedTripIds`), corporate account metadata, and cross-dock navigation (`OPEN_COMMS_THREAD`, `OPEN_EMAIL_MESSAGE`, `COMMS_EVENT_RECORDED`) across `CommsHub` and `EmailDock`.
+- **Serverless Telephony Persistence & Sync (`comms-thread.server.ts`, `comms-thread.service.ts`)**:
+  - Server-isolated (`*.server.ts`) ingestion engine writing idempotently to `/commsThreads/{threadId}`, `/commsEvents/{eventId}`, and `/telephonyWebhookEvents/{eventId}` via Firestore REST (`getServiceAccountDatastoreToken()` or verified staff `rawToken`), paired with a bounded in-memory buffer (`commsServerStore`) that retains inbound webhooks and flushes them to Firestore whenever an authenticated dispatcher invokes `sync_comms`.
+  - Real-time client synchronization (`onSnapshot` on `/commsThreads` and `/commsEvents` with `sanitizePayload`, `localStorage` offline cache, and `WorkspaceBus` broadcast fallback) plus bidirectional `InteractionEvent` adapters so `CommsHub` softphone, SMS, voicemail, email timeline cards, internal dispatcher notes, and batch actions work seamlessly.
+- **Twilio Webhook Authenticity & Full Staff Auth Hardening (`telephony-gateway.server.ts`, `/api/telephony`, `firestore.rules`)**:
+  - Strict server-only isolation in `telephony-gateway.server.ts` so `app/routes/api.telephony.ts` emits a `0.00 kB` client bundle.
+  - Cryptographic `X-Twilio-Signature` verification (`verifyTwilioWebhookSignature` using `node:crypto` HMAC-SHA1 + `crypto.timingSafeEqual` over proxy-aware URL + sorted POST form parameters) enforced on Twilio webhook callbacks (`incoming_call`, `incoming_sms`, `handle_unanswered`, `voicemail_recorded`, `voicemail_transcription`, `call_status_callback`, `call_recording_status`) when `TWILIO_AUTH_TOKEN` is configured in production (`TWILIO_VALIDATE_WEBHOOK_SIGNATURE !== 'false'`).
+  - Full `GET` & `POST /api/telephony` staff authentication gates via `verifyServerRequestAuth(request)`:
+    - `auth.isDispatcher` required for `get_voice_token`, `list_messages`, `list_recordings`, `list_voicemails`, `sync_comms`, `verify_credentials`, and `save_credentials`.
+    - `auth.isDispatcher || auth.isDriver` required for `make_call`, `send_sms`, `end_call`, and `get_call_status`.
+    - `GET /api/telephony?action=audio_proxy` requires either a verified staff `Authorization` Bearer header OR a short-lived server-signed HMAC query token (`sig` + `exp`, automatically appended to `audioUrl` values returned to authenticated staff) so HTML `<audio>` playback in `CommsHub` works seamlessly while unauthenticated/unsigned requests receive `401`/`403`.
+  - Explicit staff-only Firestore Security Rules (`allow read, write: if isDispatcher();`) on `/commsThreads/{threadId}`, `/commsEvents/{eventId}`, and `/telephonyWebhookEvents/{eventId}`.
 

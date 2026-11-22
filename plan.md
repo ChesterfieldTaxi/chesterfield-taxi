@@ -876,11 +876,39 @@ export interface PassengerAccount {
   - `FlightAssistanceCard` / `FlightTelemetryCheckPanel` default `allowLiveCheck = false` so customer/corporate forms render only local STL Terminal & Exit Door guidance; `DispatchBookingEngine` passes `allowLiveCheck={true}` + `bookingType` + `scheduledPickupIso` to show unlocked live checks within 24h/ASAP and *"Unlocks 24h before pickup"* otherwise.
   - `FlightStatusService.checkFlightStatus` uses `authorizedFetch`; `refreshTripFlightTelemetry` & `syncTripPickupToFlightEta` enforce `evaluateFlightCheckEligibility`; `DispatchTripDetailsDrawer` disables `Refresh Flight` & `Adjust Pickup Time` with inline reason pills when ineligible.
 
+## 28. Phase 39 Architecture (Wave 2 Phase 1): Unified Multi-Channel Thread Engine, Serverless Telephony Persistence & Security Hardening
 
+### 28.1 Architectural & Bundle Isolation Guardrails (`constitution.md`)
+- **Domain/Service Separation**:
+  - Keep all contact normalization, identity resolution, canonical `threadId` derivation, thread merging, and unread rollup math inside pure/service modules (`app/core/types/comms.ts`, `app/core/services/customer/contact.service.ts`, `app/core/services/comms/comms-thread.service.ts`, `app/core/services/comms/comms-thread.server.ts`). UI components (`CommsHub.tsx`, `SmsThreadPane.tsx`, `VoicemailCallLogPane.tsx`, `EmailDock.tsx`) strictly consume service contracts and `WorkspaceBus` events.
+- **Zero-Byte Client Telephony Route (`0.00 kB`)**:
+  - Isolate all `twilio` SDK (`AccessToken`, `VoiceResponse`), `node:crypto`, `node:fs`, `node:path`, and secret credential handling inside `app/core/services/comms/telephony-gateway.server.ts`.
+  - Refactor `app/routes/api.telephony.ts` into a pure `loader`/`action` wrapper delegating to `telephony-gateway.server.ts` so `api.telephony` compiles to a `0.00 kB` client bundle.
+  - Preserve Vercel Hobby cron configuration (`"0 10 * * *"`) in `vercel.json` untouched.
 
+### 28.2 Multi-Channel Schemas, Unified Contact Resolution & Thread Merging
+- **Firestore Schemas (`app/core/types/comms.ts` & `firestore.rules`)**:
+  - `/commsThreads/{threadId}` (`allow read, write: if isDispatcher();`): `id`, `contactId?`, `contactName`, `contactType`, `primaryPhone?` (E.164), `phones` (E.164[]), `primaryEmail?` (lowercase), `emails` (lowercase[]), `corporateAccountId?`, `corporateAccountName?`, `linkedTripIds`, `channels`, `lastEventAt`, `lastEventAtMs`, `lastChannel`, `lastDirection`, `lastSubject?`, `lastSnippet`, `unreadCountTotal`, `unreadByChannel: { sms, call, voicemail, email }`, `isStarred?`, `isArchived?`, `createdAt`, `updatedAt`.
+  - `/commsEvents/{eventId}` (`allow read, write: if isDispatcher();`): deterministic idempotent `id` (`sms_${MessageSid}`, `call_${CallSid}`, `vm_${RecordingSid}`, `em_${emailId}`, `note_${id}`), `threadId`, `channel`, `direction`, `eventType`, `contactId?`, `contactName`, `contactPhone?`, `contactEmail?`, `fromAddress`, `toAddress`, `subject?`, `snippet`, `bodyText?`, `emailMessageId?`, `tripId?`, `deliveryStatus?`, `errorCode?`, `errorMessage?`, `externalSid?`, `recordingSid?`, `durationSeconds?`, `audioUrl?`, `audioDuration?`, `transcription?`, `suggestedBooking?`, `isUnread`, `actorId?`, `actorName?`, `timestampIso`, `timestampMs`.
+  - `/telephonyWebhookEvents/{eventId}` (`allow read, write: if isDispatcher();`): webhook delivery audit & idempotency log.
+- **Unified Contact & Canonical Thread Resolution (`app/core/services/customer/contact.service.ts`)**:
+  - `normalizeEmail(email)`: Strips optional display-name angle brackets, trims, and lowercases valid email addresses.
+  - `getContactByEmail(email)` & `resolveUnifiedContact({ phone?, email?, name? })`: Resolves customer records across E.164 phones and lowercase emails so calls/texts from `+13145550199` and emails to `dispatch@chesterfieldtaxi.com` from `amanda.vance@bayer.com` resolve to the same `ContactRecord` and canonical `threadId` (`resolveCanonicalThreadId`).
+  - Thread Merge Engine (`mergeCommsThreads` / `CommsThreadService.mergeThreadsForContact`): Automatically merges fragmented phone-only (`thr_phone_...`) and email-only (`thr_email_...`) threads into the canonical `thr_contact_...` thread upon contact save or trip creation, re-pointing all `CommsEvent.threadId` references and recomputing exact `unreadByChannel` rollups.
 
+### 28.3 Client & Server Thread Services (`app/core/services/comms/`)
+- **`comms-thread.service.ts`**:
+  - Lazy staff-scoped Firestore `onSnapshot` listeners on `/commsThreads` and `/commsEvents` (sanitizing writes via `sanitizePayload`), backed by `localStorage` persistence and `WorkspaceBus` (`COMMS_EVENT_RECORDED`, `OPEN_COMMS_THREAD`, `OPEN_EMAIL_MESSAGE`) synchronization.
+  - Exposes `recordCommsEvent`, `addInternalNote`, `markThreadRead`, `markThreadsUnread`, `archiveThreads`, `linkTripToThread`, `mergeThreadsForContact`, `commsEventToInteractionEvent`, and `interactionEventToCommsEvent`.
+- **`comms-thread.server.ts`**:
+  - Idempotent server ingestion writing to Firestore REST via `getServiceAccountDatastoreToken()` or verified dispatcher `rawToken`, plus bounded in-memory `commsServerStore` retaining inbound webhook events and flushing dirty threads/events to Firestore on authenticated `sync_comms` requests.
 
-
-
-
+### 28.4 Twilio Signature Verification & `/api/telephony` Auth Hardening (`telephony-gateway.server.ts`)
+- **`verifyTwilioWebhookSignature`**:
+  - Reconstructs external callback URL respecting `x-forwarded-proto` and `x-forwarded-host` behind Vercel, sorts POST form keys lexicographically, computes `HMAC-SHA1(authToken, url + sortedKeyValues)` in Base64, and compares via `crypto.timingSafeEqual`.
+  - Enforced on `incoming_call`, `incoming_sms`, `handle_unanswered`, `voicemail_recorded`, `voicemail_transcription`, `call_status_callback`, and `call_recording_status` when `TWILIO_AUTH_TOKEN` is configured in production (`TWILIO_VALIDATE_WEBHOOK_SIGNATURE !== 'false'`), returning `403` on missing or invalid signatures.
+- **Endpoint Auth Matrix**:
+  - `auth.isDispatcher`: `get_voice_token`, `list_messages`, `list_recordings`, `list_voicemails`, `sync_comms`, `verify_credentials`, `save_credentials` (`401` unauthenticated, `403` non-dispatcher).
+  - `auth.isDispatcher || auth.isDriver`: `make_call`, `send_sms`, `end_call`, `get_call_status` (`401` unauthenticated, `403` unauthorized role).
+  - `audio_proxy`: Accepts either verified staff `Authorization` Bearer header OR short-lived HMAC-SHA256 query signature (`sig` + `exp` appended by `buildSignedAudioProxyUrl` on staff responses), rejecting unsigned/expired/tampered unauthenticated requests with `401`/`403`.
 

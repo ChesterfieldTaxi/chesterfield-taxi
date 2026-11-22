@@ -9,5 +9,7 @@ export * from './payment';
 export * from './invoicing';
 export * from './telephony';
 export * from './flight';
+export * from './comms';
+
 
 

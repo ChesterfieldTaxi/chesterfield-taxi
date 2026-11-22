@@ -1,9 +1,10 @@
 import type React from 'react';
+import type { CommsChannel, CommsEventType } from '../../../../core/types/comms';
 import type { Trip } from '../../../../core/types/trip';
 import type { BottomSheetDragHandlers } from '../../../../core/hooks/useBottomSheetDragToClose';
 
 export type CommsTab = 'all' | 'phone' | 'messages' | 'voicemail';
-export type ChannelFilter = 'all' | 'calls' | 'voicemail' | 'messages';
+export type ChannelFilter = 'all' | 'calls' | 'voicemail' | 'messages' | 'emails' | 'notes';
 export type ContactFilter = 'all' | 'passengers' | 'drivers';
 export type CallTypeFilter = 'all' | 'inbound' | 'outbound' | 'missed';
 export type CallsSubTab = 'keypad' | 'history' | 'missed';
@@ -15,7 +16,7 @@ export type SoftphoneStatus =
   | 'connecting'
   | 'on_call'
   | 'error';
-export type ThreadTab = 'all' | 'sms' | 'calls';
+export type ThreadTab = 'all' | 'sms' | 'calls' | 'emails' | 'notes';
 export type PlaybackSpeed = 1 | 1.5 | 2;
 
 export interface CallNotice {
@@ -25,16 +26,24 @@ export interface CallNotice {
 
 export interface InteractionEvent {
   id: string;
-  type: 'call_inbound' | 'call_outbound' | 'call_missed' | 'voicemail' | 'sms_inbound' | 'sms_outbound';
+  threadId?: string;
+  channel?: CommsChannel;
+  type: CommsEventType;
   contactName: string;
   contactPhone: string;
+  contactEmail?: string;
   contactType: 'passenger' | 'driver' | 'corporate' | 'unknown';
   homePhone?: string;
   mobilePhone?: string;
   timestamp: string;
   timestampMs: number;
   durationSeconds?: number;
+  subject?: string;
   snippet: string;
+  bodyText?: string;
+  emailMessageId?: string;
+  tripId?: string;
+  actorName?: string;
   isUnread?: boolean;
   deliveryStatus?: string;
   errorCode?: number | string;
@@ -51,6 +60,8 @@ export interface InteractionEvent {
     pickupTime: string;
     passengerName: string;
     passengerPhone: string;
+    passengerEmail?: string;
+    notes?: string;
   };
 }
 

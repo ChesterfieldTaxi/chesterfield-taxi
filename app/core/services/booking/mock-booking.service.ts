@@ -25,6 +25,7 @@ import type {
 import { calculateTripPricing } from '../pricing';
 import { generateTrackingToken } from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
+import { getCommsThreadService } from '../comms/comms-thread.service';
 import { getAdminConfigService } from '../config/admin-config.service';
 import {
   getZoneService,
@@ -505,6 +506,16 @@ export class MockBookingService implements IBookingService {
     this.trips.set(id, newTrip);
     this.persistToStorage();
     this.notifyListeners(newTrip);
+
+    getCommsThreadService()
+      .linkTripToThread({
+        tripId: newTrip.id,
+        phone: newTrip.passenger?.phone,
+        email: newTrip.passenger?.email,
+        passengerName: `${newTrip.passenger?.firstName || ''} ${newTrip.passenger?.lastName || ''}`.trim(),
+        corporateAccountId: newTrip.corporateAccountId,
+      })
+      .catch(() => {});
 
     return newTrip;
   }

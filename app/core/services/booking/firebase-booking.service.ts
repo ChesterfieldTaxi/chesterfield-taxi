@@ -51,6 +51,7 @@ import {
   buildSanitizedTrackingProjection,
 } from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
+import { getCommsThreadService } from '../comms/comms-thread.service';
 import { getAdminConfigService } from '../config/admin-config.service';
 import {
   getZoneService,
@@ -538,6 +539,16 @@ export class FirebaseBookingService implements IBookingService {
 
     // Mirror strictly zero-PII public tracking projection & last-4 phone lookup index
     this.syncPublicTrackingProjection(sanitizedTrip, true).catch(() => {});
+
+    getCommsThreadService()
+      .linkTripToThread({
+        tripId: sanitizedTrip.id,
+        phone: sanitizedTrip.passenger?.phone,
+        email: sanitizedTrip.passenger?.email,
+        passengerName: `${sanitizedTrip.passenger?.firstName || ''} ${sanitizedTrip.passenger?.lastName || ''}`.trim(),
+        corporateAccountId: sanitizedTrip.corporateAccountId,
+      })
+      .catch(() => {});
 
     return sanitizedTrip;
   }

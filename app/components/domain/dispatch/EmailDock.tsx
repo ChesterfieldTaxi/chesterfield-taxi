@@ -1,6 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import { getFirebaseAuthHeaders } from '../../../core/services/auth/auth-headers';
+import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
+import { normalizeEmail } from '../../../core/services/customer/contact.service';
 import { escapeHtml } from '../../../core/services/email/email-templates';
 import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 import {
@@ -235,6 +237,70 @@ export function EmailDock({
   const composeSheetDrag = useBottomSheetDragToClose({ onClose: dismissComposeModal });
   const emailActionSheetDrag = useBottomSheetDragToClose({ onClose: dismissActionSheet });
 
+  // Sync EmailDock inbox/sent items into unified CommsThreadService & listen for OPEN_EMAIL_MESSAGE
+  useEffect(() => {
+    const commsService = getCommsThreadService();
+    emails.forEach((em, idx) => {
+      const isOutbound = em.folder === 'sent';
+      const contactEmail = isOutbound ? em.toEmail : em.fromEmail;
+      void commsService.recordCommsEvent(
+        {
+          id: `em_${em.id}`,
+          emailMessageId: em.id,
+          channel: 'email',
+          direction: isOutbound ? 'outbound' : 'inbound',
+          eventType: isOutbound ? 'email_outbound' : 'email_inbound',
+          contactName: isOutbound ? undefined : em.fromName,
+          contactEmail,
+          contactPhone: em.suggestedBooking?.passengerPhone,
+          fromAddress: em.fromEmail,
+          toAddress: em.toEmail,
+          subject: em.subject,
+          snippet: `${em.subject} — ${em.body.slice(0, 120)}`,
+          bodyText: em.body,
+          suggestedBooking: em.suggestedBooking
+            ? {
+                passengerName: em.suggestedBooking.passengerName,
+                passengerPhone: em.suggestedBooking.passengerPhone,
+                passengerEmail: em.suggestedBooking.passengerEmail || em.fromEmail,
+                pickup: em.suggestedBooking.pickupLocation,
+                dropoff: em.suggestedBooking.dropoffLocation,
+                pickupLocation: em.suggestedBooking.pickupLocation,
+                dropoffLocation: em.suggestedBooking.dropoffLocation,
+                notes: em.suggestedBooking.notes,
+              }
+            : undefined,
+          isUnread: em.isUnread,
+          timestampMs: Date.now() - idx * 3_600_000,
+        },
+        { skipFirestore: true, skipBroadcast: true }
+      );
+    });
+
+    const unsub = getWorkspaceBus().subscribe((msg) => {
+      if (msg.type === 'OPEN_EMAIL_MESSAGE') {
+        const p = msg.payload;
+        const targetId = p.emailMessageId?.replace(/^em_/, '');
+        const normSender = normalizeEmail(p.senderEmail);
+        setEmails((current) => {
+          const found = current.find(
+            (e) =>
+              (targetId && e.id === targetId) ||
+              (normSender &&
+                (normalizeEmail(e.fromEmail) === normSender ||
+                  normalizeEmail(e.toEmail) === normSender))
+          );
+          if (found) {
+            setFolderFilter('all');
+            setSelectedEmailId(found.id);
+          }
+          return current;
+        });
+      }
+    });
+    return () => unsub();
+  }, []);
+
   const selectedEmail = emails.find((e) => e.id === selectedEmailId) || null;
 
   const showToast = (msg: string) => {
@@ -248,6 +314,7 @@ export function EmailDock({
       setEmails((prev) =>
         prev.map((e) => (e.id === email.id ? { ...e, isUnread: false } : e))
       );
+      void getCommsThreadService().markEventsRead([`em_${email.id}`]);
     }
   };
 
@@ -256,11 +323,13 @@ export function EmailDock({
     setEmails((prev) =>
       prev.map((item) => (item.id === id ? { ...item, isUnread: !item.isUnread } : item))
     );
+    void getCommsThreadService().toggleEventReadStatus(`em_${id}`);
   };
 
   const handleDeleteEmail = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEmails((prev) => prev.filter((item) => item.id !== id));
+    void getCommsThreadService().archiveEvents([`em_${id}`]);
     if (selectedEmailId === id) {
       setSelectedEmailId(null);
     }
@@ -345,6 +414,22 @@ export function EmailDock({
         body: replyText,
       };
       setEmails((prev) => [newSentEmail, ...prev]);
+      void getCommsThreadService().recordCommsEvent({
+        id: `em_${newSentEmail.id}`,
+        emailMessageId: newSentEmail.id,
+        channel: 'email',
+        direction: 'outbound',
+        eventType: 'email_outbound',
+        contactName: selectedEmail.fromName,
+        contactEmail: selectedEmail.fromEmail,
+        contactPhone: selectedEmail.suggestedBooking?.passengerPhone,
+        fromAddress: newSentEmail.fromEmail,
+        toAddress: newSentEmail.toEmail,
+        subject,
+        snippet: `${subject} — ${replyText.slice(0, 120)}`,
+        bodyText: replyText,
+        isUnread: false,
+      });
       setReplyText('');
       showToast(
         result.simulated
@@ -401,6 +486,20 @@ export function EmailDock({
         body: composeBody,
       };
       setEmails((prev) => [newSentEmail, ...prev]);
+      void getCommsThreadService().recordCommsEvent({
+        id: `em_${newSentEmail.id}`,
+        emailMessageId: newSentEmail.id,
+        channel: 'email',
+        direction: 'outbound',
+        eventType: 'email_outbound',
+        contactEmail: newSentEmail.toEmail,
+        fromAddress: newSentEmail.fromEmail,
+        toAddress: newSentEmail.toEmail,
+        subject: newSentEmail.subject,
+        snippet: `${newSentEmail.subject} — ${composeBody.slice(0, 120)}`,
+        bodyText: composeBody,
+        isUnread: false,
+      });
       setIsComposing(false);
       setComposeTo('');
       setComposeSubject('');
@@ -677,6 +776,26 @@ export function EmailDock({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetEmail =
+                        selectedEmail.folder === 'sent'
+                          ? selectedEmail.toEmail
+                          : selectedEmail.fromEmail;
+                      getWorkspaceBus().publish('OPEN_COMMS_THREAD', {
+                        email: targetEmail,
+                        phone: selectedEmail.suggestedBooking?.passengerPhone,
+                        tab: 'all',
+                      });
+                      getWorkspaceBus().publish('FOCUS_MODULE', { moduleKey: 'comms' });
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl sm:rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer inline-flex items-center gap-1 transition-colors whitespace-nowrap"
+                    title="Open customer's unified Call + SMS + Email thread"
+                  >
+                    <PhoneIcon className="w-3 h-3 shrink-0" />
+                    <span>Unified Thread</span>
+                  </button>
                   {selectedEmail.suggestedBooking && (
                     <button
                       type="button"

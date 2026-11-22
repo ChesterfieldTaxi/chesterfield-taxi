@@ -9,6 +9,8 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
+import { verifyServerRequestAuth } from '../core/services/auth/server-auth.server';
+import { isFirebaseConfigured } from '../core/services/firebase';
 
 export interface TelephonyVerifyRequestBody {
   accountSid?: string;
@@ -78,6 +80,32 @@ export async function action({ request }: ActionFunctionArgs) {
         },
         400
       );
+    }
+
+    // Enforce Dispatcher/Admin authentication when Firebase or production auth is active
+    const auth = await verifyServerRequestAuth(request);
+    const enforceAuth = process.env.NODE_ENV === 'production' || isFirebaseConfigured();
+    if (enforceAuth) {
+      if (!auth.authenticated) {
+        return jsonResponse(
+          {
+            success: false,
+            error: 'Authentication required to verify telephony credentials.',
+            configured: false,
+          },
+          401
+        );
+      }
+      if (!auth.isDispatcher) {
+        return jsonResponse(
+          {
+            success: false,
+            error: 'Dispatcher or Admin role required to verify telephony credentials.',
+            configured: false,
+          },
+          403
+        );
+      }
     }
 
     // Resolve credentials from flat body, nested credentials, or environment fallback

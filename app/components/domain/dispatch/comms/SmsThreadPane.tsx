@@ -47,6 +47,8 @@ export interface SmsThreadPaneProps {
   totalContactInteractionCount: number;
   threadSmsCount: number;
   threadCallCount: number;
+  threadEmailCount?: number;
+  threadNoteCount?: number;
   has10DlcBlockedMessages: boolean;
   upcomingBookingsForContact: UpcomingBookingPreview[];
   onViewUpcomingTrip: (trip: UpcomingBookingPreview) => void;
@@ -60,6 +62,10 @@ export interface SmsThreadPaneProps {
   onCyclePlaybackSpeed: () => void;
   onStartCall: (numberToCall?: string, contactName?: string) => void;
   onConvertVoicemailToBooking: (suggested: InteractionEvent['suggestedBooking']) => void;
+  onOpenEmailInDock?: (evt: InteractionEvent) => void;
+  noteDraftText?: string;
+  onChangeNoteDraftText?: (val: string) => void;
+  onAddInternalNote?: () => void;
   smsReplyText: string;
   onChangeSmsReplyText: (val: string) => void;
   isSendingSms: boolean;
@@ -100,6 +106,8 @@ export function SmsThreadPane({
   totalContactInteractionCount,
   threadSmsCount,
   threadCallCount,
+  threadEmailCount = 0,
+  threadNoteCount = 0,
   has10DlcBlockedMessages,
   upcomingBookingsForContact,
   onViewUpcomingTrip,
@@ -113,6 +121,10 @@ export function SmsThreadPane({
   onCyclePlaybackSpeed,
   onStartCall,
   onConvertVoicemailToBooking,
+  onOpenEmailInDock,
+  noteDraftText = '',
+  onChangeNoteDraftText,
+  onAddInternalNote,
   smsReplyText,
   onChangeSmsReplyText,
   isSendingSms,
@@ -172,8 +184,15 @@ export function SmsThreadPane({
                   Verified Contact
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                <span>Calling: {activeContactSummary.contactPhone}</span>
+              <div className="flex items-center gap-2 text-[10px] text-slate-500 flex-wrap">
+                {activeContactSummary.contactPhone && (
+                  <span>Calling: {activeContactSummary.contactPhone}</span>
+                )}
+                {(activeContactRecord?.email || activeContactSummary.contactEmail) && (
+                  <span className="text-indigo-600 font-semibold">
+                    • {activeContactRecord?.email || activeContactSummary.contactEmail}
+                  </span>
+                )}
                 {activeContactSummary.mobilePhone && (
                   <span className="text-blue-600 font-semibold">
                     • SMS Cell: {activeContactSummary.mobilePhone}
@@ -248,6 +267,29 @@ export function SmsThreadPane({
             >
               <PhoneIcon className="w-3 h-3" />
               <span>Calls ({threadCallCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeThreadTab('emails')}
+              className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                threadTab === 'emails'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <MailIcon className="w-3 h-3" />
+              <span>Email ({threadEmailCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeThreadTab('notes')}
+              className={`px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                threadTab === 'notes'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>Notes ({threadNoteCount})</span>
             </button>
           </div>
 
@@ -523,6 +565,77 @@ export function SmsThreadPane({
                     )}
                   </div>
                 )}
+
+                {/* Email Inbound / Outbound Card */}
+                {evt.type.startsWith('email_') && (
+                  <div
+                    className={`w-full max-w-[88%] rounded-2xl p-3 shadow-xs space-y-1.5 border ${
+                      evt.type === 'email_outbound'
+                        ? 'self-end bg-indigo-50/90 border-indigo-200 rounded-tr-sm'
+                        : 'self-start bg-white border-indigo-200/80 rounded-tl-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold text-indigo-900">
+                        <MailIcon className="w-3 h-3 text-indigo-600 shrink-0" />
+                        <span>
+                          {evt.type === 'email_outbound' ? 'Sent Email' : 'Inbound Email'}
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                      </span>
+                    </div>
+                    {evt.subject && (
+                      <p className="text-xs font-bold text-slate-900 leading-snug">{evt.subject}</p>
+                    )}
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap line-clamp-4 leading-relaxed">
+                      {evt.bodyText || evt.snippet}
+                    </p>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[10px] font-mono text-slate-500 truncate">
+                        {evt.contactEmail || activeContactRecord?.email || 'dispatch@chesterfieldtaxi.com'}
+                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {evt.suggestedBooking && (
+                          <button
+                            type="button"
+                            onClick={() => onConvertVoicemailToBooking(evt.suggestedBooking)}
+                            className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold cursor-pointer"
+                          >
+                            Book
+                          </button>
+                        )}
+                        {onOpenEmailInDock && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenEmailInDock(evt)}
+                            className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold cursor-pointer"
+                          >
+                            Open Email
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Internal Dispatcher Note Card */}
+                {evt.type === 'internal_note' && (
+                  <div className="self-center w-full max-w-[90%] bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-[10px]">
+                      <span className="font-extrabold uppercase tracking-wide text-amber-800">
+                        Internal Note · {evt.actorName || 'Dispatcher'}
+                      </span>
+                      <span className="font-mono text-amber-700/80">
+                        {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                      {evt.bodyText || evt.snippet}
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -534,10 +647,16 @@ export function SmsThreadPane({
                   ? 'No SMS text messages for this contact yet.'
                   : threadTab === 'calls'
                   ? 'No calls or voicemails recorded for this contact yet.'
+                  : threadTab === 'emails'
+                  ? 'No emails recorded for this contact yet.'
+                  : threadTab === 'notes'
+                  ? 'No internal dispatcher notes for this thread yet.'
                   : 'No interactions recorded for this contact yet.'}
               </p>
               <p className="text-[11px] text-slate-400 mt-1">
-                Use the composer below to send an SMS text message.
+                {threadTab === 'notes'
+                  ? 'Add an internal note below to document thread context.'
+                  : 'Use the composer below to send an SMS text message.'}
               </p>
             </div>
           )}
@@ -545,58 +664,83 @@ export function SmsThreadPane({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Response Templates & SMS Composer */}
+        {/* Quick Response Templates & SMS / Internal Note Composer */}
         <div className="p-3 bg-white border-t border-slate-200 shrink-0 space-y-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
-            <button
-              type="button"
-              onClick={() => onChangeSmsReplyText('Your cab is 5 minutes away.')}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
-            >
-              <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
-              <span>&ldquo;Cab is 5 mins away&rdquo;</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onChangeSmsReplyText('Your driver has arrived outside.')}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
-            >
-              <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
-              <span>&ldquo;Driver has arrived&rdquo;</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onChangeSmsReplyText('We have confirmed your airport reservation.')}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
-            >
-              <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
-              <span>&ldquo;Reservation confirmed&rdquo;</span>
-            </button>
-          </div>
+          {threadTab === 'notes' && onChangeNoteDraftText && onAddInternalNote ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={noteDraftText}
+                onChange={(e) => onChangeNoteDraftText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onAddInternalNote();
+                }}
+                placeholder="Add internal dispatcher note to unified thread..."
+                className="flex-1 px-3 py-2 text-xs rounded-xl border border-amber-300 focus:outline-amber-500 bg-amber-50/40 focus:bg-white"
+              />
+              <button
+                type="button"
+                onClick={onAddInternalNote}
+                disabled={!noteDraftText.trim()}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Save Note
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onChangeSmsReplyText('Your cab is 5 minutes away.')}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                >
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Cab is 5 mins away&rdquo;</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeSmsReplyText('Your driver has arrived outside.')}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                >
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Driver has arrived&rdquo;</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeSmsReplyText('We have confirmed your airport reservation.')}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 whitespace-nowrap cursor-pointer"
+                >
+                  <ZapIcon className="w-2.5 h-2.5 text-amber-500" />
+                  <span>&ldquo;Reservation confirmed&rdquo;</span>
+                </button>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={smsReplyText}
-              onChange={(e) => onChangeSmsReplyText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onSendSms();
-              }}
-              placeholder={`Send SMS to ${
-                activeContactSummary.mobilePhone || activeContactSummary.contactPhone
-              }...`}
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-blue-500 bg-slate-50 focus:bg-white"
-            />
-            <button
-              type="button"
-              onClick={onSendSms}
-              disabled={isSendingSms || !smsReplyText.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              {isSendingSms ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : null}
-              <span>Send</span>
-            </button>
-          </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={smsReplyText}
+                  onChange={(e) => onChangeSmsReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') onSendSms();
+                  }}
+                  placeholder={`Send SMS to ${
+                    activeContactSummary.mobilePhone || activeContactSummary.contactPhone
+                  }...`}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-blue-500 bg-slate-50 focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={onSendSms}
+                  disabled={isSendingSms || !smsReplyText.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSendingSms ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : null}
+                  <span>Send</span>
+                </button>
+              </div>
+            </>
+          )}
 
           {smsStatusMessage && (
             <p className="text-[10px] text-emerald-600 font-bold">{smsStatusMessage}</p>

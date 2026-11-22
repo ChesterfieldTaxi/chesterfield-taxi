@@ -18,4 +18,6 @@ export * from './operator.service';
 export * from './dispatch';
 export * from './payments';
 export * from './flight';
+export * from './comms';
+
 

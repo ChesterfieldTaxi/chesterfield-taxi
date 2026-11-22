@@ -145,6 +145,8 @@ export function VoicemailCallLogPane({
               { value: 'calls', label: 'Calls Only' },
               { value: 'voicemail', label: 'Voicemail Only' },
               { value: 'messages', label: 'Messaging Only' },
+              { value: 'emails', label: 'Emails Only' },
+              { value: 'notes', label: 'Internal Notes' },
             ]}
             placeholder="Filter communications..."
           />
@@ -193,7 +195,7 @@ export function VoicemailCallLogPane({
                       onToggleSelectRow(event.id);
                       return;
                     }
-                    onSelectContact(event.contactPhone);
+                    onSelectContact(event.contactPhone || event.contactEmail || event.threadId || '');
                   }}
                   className={`group relative p-3 transition-all cursor-pointer flex items-start justify-between gap-2.5 border-l-4 select-none ${
                     isRowSelected
@@ -237,7 +239,7 @@ export function VoicemailCallLogPane({
                           <MicIcon className="w-4 h-4" />
                         </div>
                       )}
-                      {event.type === 'call_inbound' && (
+                      {(event.type === 'call_inbound' || event.type === 'call_outbound') && (
                         <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shadow-2xs">
                           <PhoneIcon className="w-4 h-4" />
                         </div>
@@ -249,7 +251,17 @@ export function VoicemailCallLogPane({
                       )}
                       {event.type.startsWith('sms_') && (
                         <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shadow-2xs">
+                          <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                        </div>
+                      )}
+                      {event.type.startsWith('email_') && (
+                        <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shadow-2xs">
                           <MailIcon className="w-4 h-4" />
+                        </div>
+                      )}
+                      {event.type === 'internal_note' && (
+                        <div className="w-8 h-8 rounded-xl bg-amber-100/80 text-amber-800 flex items-center justify-center font-black text-[10px] shadow-2xs">
+                          NOTE
                         </div>
                       )}
                     </div>
@@ -267,7 +279,7 @@ export function VoicemailCallLogPane({
                           {event.contactName}
                         </span>
                         <span className="text-[11px] font-mono text-slate-500">
-                          {event.contactPhone}
+                          {event.contactPhone || event.contactEmail}
                         </span>
                         {event.homePhone && (
                           <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">

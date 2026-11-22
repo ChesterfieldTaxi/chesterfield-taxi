@@ -356,6 +356,21 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // 2E. Unified Multi-Channel Comms & Telephony Webhook Persistence
+    // ─────────────────────────────────────────────────────────────
+    match /commsThreads/{threadId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /commsEvents/{eventId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /telephonyWebhookEvents/{eventId} {
+      allow read, write: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // 3. Driver Shift Tracking & Vehicle Assignments (/vehicleAssignments)
     // ─────────────────────────────────────────────────────────────
     match /vehicleAssignments/{assignmentId} {
