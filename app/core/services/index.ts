@@ -13,6 +13,7 @@ export * from './payment.service';
 export * from './invoicing.service';
 export * from './telephony.service';
 export * from './corporate-account.service';
+export * from './corporate-portal.service';
 export * from './operator.service';
 export * from './dispatch';
 export * from './payments';

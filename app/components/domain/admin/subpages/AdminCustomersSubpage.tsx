@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router';
 import type { AppSettings, CorporateAccountConfig } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
+import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
+import {
+  getCorporatePortalService,
+  type ProvisionCorporateManagerResult,
+} from '../../../../core/services/corporate-portal.service';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
@@ -23,6 +29,8 @@ import {
   CarIcon,
   PhoneIcon,
   MailIcon,
+  ExternalLinkIcon,
+  UserCheckIcon,
   XIcon,
 } from '../../../ui/Icons';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
@@ -91,6 +99,19 @@ export function AdminCustomersSubpage({
   const [editingCorp, setEditingCorp] = useState<CorporateAccountConfig | null>(null);
   const [isNewCorp, setIsNewCorp] = useState(false);
   const [isSavingCorp, setIsSavingCorp] = useState(false);
+
+  // Corporate Portal Manager Provisioning State
+  const [provisioningCorp, setProvisioningCorp] = useState<CorporateAccountConfig | null>(null);
+  const [mgrName, setMgrName] = useState('');
+  const [mgrEmail, setMgrEmail] = useState('');
+  const [mgrPhone, setMgrPhone] = useState('');
+  const [mgrIncludeCustomerRole, setMgrIncludeCustomerRole] = useState(false);
+  const [isProvisioningMgr, setIsProvisioningMgr] = useState(false);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
+  const [provisionResult, setProvisionResult] = useState<ProvisionCorporateManagerResult | null>(
+    null
+  );
+  const [copiedInstructions, setCopiedInstructions] = useState(false);
 
   useEffect(() => {
     setActiveSub(initialSubTab);
@@ -362,10 +383,54 @@ export function AdminCustomersSubpage({
         ? corporateClients.map((a) => (a.id === updatedRecord.id ? updatedRecord : a))
         : [updatedRecord, ...corporateClients];
       await onSave({ corporateAccounts: nextAccounts });
+      await getCorporateAccountService().syncAccountToFirestore(updatedRecord);
       setEditingCorp(null);
       setIsNewCorp(false);
     } finally {
       setIsSavingCorp(false);
+    }
+  };
+
+  const handleOpenProvisionModal = (corp: CorporateAccountConfig) => {
+    setProvisioningCorp(corp);
+    setMgrName(corp.billingContactName || '');
+    setMgrEmail(corp.billingContactEmail || '');
+    setMgrPhone(corp.billingContactPhone || '');
+    setMgrIncludeCustomerRole(false);
+    setProvisionError(null);
+    setProvisionResult(null);
+    setCopiedInstructions(false);
+  };
+
+  const handleProvisionPortalManager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provisioningCorp) return;
+    setIsProvisioningMgr(true);
+    setProvisionError(null);
+    try {
+      const result = await getCorporatePortalService().provisionCorporatePortalManager({
+        corporateAccount: provisioningCorp,
+        managerName: mgrName,
+        managerEmail: mgrEmail,
+        managerPhone: mgrPhone,
+        includeCustomerRole: mgrIncludeCustomerRole,
+      });
+
+      if (onSave) {
+        const nextAccounts = corporateClients.map((a) =>
+          a.id === result.updatedAccount.id ? result.updatedAccount : a
+        );
+        await onSave({ corporateAccounts: nextAccounts });
+      }
+      setProvisioningCorp(result.updatedAccount);
+      if (editingCorp?.id === result.updatedAccount.id) {
+        setEditingCorp(result.updatedAccount);
+      }
+      setProvisionResult(result);
+    } catch (err: any) {
+      setProvisionError(err?.message || 'Unable to provision Corporate Portal Manager.');
+    } finally {
+      setIsProvisioningMgr(false);
     }
   };
 
@@ -900,6 +965,33 @@ export function AdminCustomersSubpage({
                       <div className="pt-1">
                         <p className="font-bold text-slate-700 text-[11px]">Contact &amp; Authorized Email:</p>
                         <p className="text-slate-600 text-[11px] truncate">{corp.billingContactEmail}</p>
+                        {(corp.portalManagers || []).length > 0 && (
+                          <p className="text-[10px] font-bold text-indigo-700 mt-1">
+                            {corp.portalManagers!.length} Portal Manager(s) Active on /app/corporate
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Corporate Self-Service Portal Actions */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenProvisionModal(corp)}
+                          className="text-[10px] font-bold text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex-1 py-1.5 h-auto cursor-pointer"
+                        >
+                          <UserCheckIcon className="w-3.5 h-3.5 mr-1 shrink-0" />
+                          <span>Provision Portal Manager</span>
+                        </Button>
+                        <Link
+                          to={`/app/corporate?accountId=${encodeURIComponent(corp.id)}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-300 bg-white hover:bg-indigo-50 text-[10px] font-bold text-slate-700 hover:text-indigo-700 transition-colors shrink-0"
+                          title="Preview Corporate Self-Service Portal"
+                        >
+                          <span>Portal</span>
+                          <ExternalLinkIcon className="w-3 h-3" />
+                        </Link>
                       </div>
                     </CardContent>
                   </div>
@@ -1610,9 +1702,246 @@ export function AdminCustomersSubpage({
                 </label>
               </div>
             </section>
+
+            {/* Corporate Portal Managers Section (for saved corporate accounts) */}
+            {!isNewCorp && (
+              <section className="bg-indigo-50/50 rounded-2xl border border-indigo-200/80 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-indigo-100">
+                  <div className="flex items-center gap-2">
+                    <UserCheckIcon className="w-4 h-4 text-indigo-600" />
+                    <div>
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-950">
+                        Corporate Self-Service Portal Managers (/app/corporate)
+                      </h3>
+                      <p className="text-[11px] text-slate-600">
+                        Provision B2B travel coordinators strictly scoped to {editingCorp.accountNumber}.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleOpenProvisionModal(editingCorp)}
+                    className="text-[11px] font-bold bg-white border-indigo-300 text-indigo-800 hover:bg-indigo-100 shrink-0 cursor-pointer"
+                  >
+                    + Provision Corporate Portal Manager
+                  </Button>
+                </div>
+
+                {(editingCorp.portalManagers || []).length > 0 ? (
+                  <div className="space-y-1.5">
+                    {editingCorp.portalManagers!.map((pm, idx) => (
+                      <div
+                        key={`${pm.email}-${idx}`}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-indigo-100 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 truncate">{pm.name}</div>
+                          <div className="text-[11px] text-slate-500 font-mono truncate">{pm.email}</div>
+                        </div>
+                        <Badge variant="success" size="sm" className="text-[10px]">
+                          {pm.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    No Corporate Portal Managers provisioned yet for {editingCorp.companyName}.
+                  </p>
+                )}
+              </section>
+            )}
           </form>
         )}
       </AdminSlideOverDrawer>
+
+      {/* ─── Provision Corporate Portal Manager Modal ─── */}
+      {provisioningCorp && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 text-xs">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+                  <UserCheckIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-950">
+                    Provision Corporate Portal Manager
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {provisioningCorp.companyName} ({provisioningCorp.accountNumber})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setProvisioningCorp(null);
+                  setProvisionResult(null);
+                }}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {provisionError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
+                {provisionError}
+              </div>
+            )}
+
+            {provisionResult ? (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-1">
+                  <div className="font-extrabold flex items-center gap-1.5">
+                    <CheckIcon className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      Corporate Portal Manager Provisioned ({provisionResult.email})
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800">
+                    Bound strictly to <strong>{provisionResult.corporateAccountNumber}</strong> (
+                    <code>{provisionResult.corporateAccountId}</code>) with role{' '}
+                    <code>{provisionResult.roles.join(', ')}</code>.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700">
+                      Copyable Client Login Instructions (/app/corporate)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(provisionResult.instructionsText);
+                        setCopiedInstructions(true);
+                        setTimeout(() => setCopiedInstructions(false), 2500);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    >
+                      {copiedInstructions ? (
+                        <>
+                          <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon className="w-3.5 h-3.5" />
+                          <span>Copy Instructions</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] whitespace-pre-wrap break-all leading-relaxed border border-slate-800">
+                    {provisionResult.instructionsText}
+                  </pre>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setProvisioningCorp(null);
+                      setProvisionResult(null);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleProvisionPortalManager} className="space-y-3.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Manager Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={mgrName}
+                    onChange={(e) => setMgrName(e.target.value)}
+                    placeholder="e.g. Laura Vance"
+                    className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">
+                      Corporate Login Email <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={mgrEmail}
+                      onChange={(e) => setMgrEmail(e.target.value)}
+                      placeholder="traveldesk@company.com"
+                      className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">
+                      Direct Phone (Optional)
+                    </label>
+                    <input
+                      type="tel"
+                      value={mgrPhone}
+                      onChange={(e) => setMgrPhone(e.target.value)}
+                      placeholder="(314) 555-0190"
+                      className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={mgrIncludeCustomerRole}
+                    onChange={(e) => setMgrIncludeCustomerRole(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-300 text-indigo-600"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-800 block">
+                      Also grant personal Client Portal (customer) workspace
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Leave unchecked so this manager lands directly inside /app/corporate upon login.
+                    </span>
+                  </div>
+                </label>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setProvisioningCorp(null)}
+                    className="cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={isProvisioningMgr}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer"
+                  >
+                    Provision Portal Access
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ─── Regenerate PO Modal ─── */}
       {selectedPoAccount && (

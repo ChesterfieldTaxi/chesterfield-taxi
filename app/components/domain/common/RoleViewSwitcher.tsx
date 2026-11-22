@@ -6,7 +6,7 @@ import {
   type UserRole,
 } from '../../../core/services/auth/admin-auth.service';
 
-export type WorkspaceViewKey = 'admin' | 'dispatch' | 'driver' | 'app' | 'passenger';
+export type WorkspaceViewKey = 'admin' | 'dispatch' | 'driver' | 'corporate' | 'app' | 'passenger';
 
 export interface RoleViewSwitcherProps {
   currentView: WorkspaceViewKey;
@@ -25,7 +25,7 @@ interface WorkspaceDefinition {
   icon: string;
   badge: string;
   badgeColor: string;
-  requiredRole: 'admin' | 'dispatcher' | 'driver' | 'customer';
+  requiredRole: 'admin' | 'dispatcher' | 'driver' | 'corporate_manager' | 'customer';
 }
 
 const WORKSPACES: WorkspaceDefinition[] = [
@@ -61,6 +61,17 @@ const WORKSPACES: WorkspaceDefinition[] = [
     badge: 'Driver',
     badgeColor: 'bg-amber-100 text-amber-700 border-amber-200',
     requiredRole: 'driver',
+  },
+  {
+    id: 'corporate',
+    label: 'Corporate Portal',
+    shortLabel: 'Corporate',
+    description: 'Company rides, travel desk, PO security & statements',
+    path: '/app/corporate',
+    icon: '',
+    badge: 'Corporate',
+    badgeColor: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    requiredRole: 'corporate_manager',
   },
   {
     id: 'app',

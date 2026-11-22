@@ -43,6 +43,15 @@ service cloud.firestore {
       return isDispatcher() || hasUserRole('driver');
     }
 
+    function isCorporateManagerFor(accountId) {
+      return isAuthenticated() &&
+        hasUserRole('corporate_manager') &&
+        'corporateAccountId' in getUserData() &&
+        getUserData().corporateAccountId != null &&
+        accountId != null &&
+        getUserData().corporateAccountId == accountId;
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -66,22 +75,25 @@ service cloud.firestore {
       // Passengers and drivers can view only their own profile; Dispatchers/Admins view all
       allow read: if isOwner(userId) || isDispatcher();
 
-      // Self-registration strictly provisions a non-privileged 'customer' role
+      // Self-registration strictly provisions a non-privileged 'customer' role (never self-binds corporateAccountId)
       allow create: if isDispatcher() || (
         isOwner(userId) &&
         request.resource.data.role == 'customer' &&
         (!('roles' in request.resource.data) || request.resource.data.roles == null || request.resource.data.roles == ['customer']) &&
+        (!('corporateAccountId' in request.resource.data) || request.resource.data.corporateAccountId == null) &&
+        (!('corporateAccountNumber' in request.resource.data) || request.resource.data.corporateAccountNumber == null) &&
         (!('isBlacklisted' in request.resource.data) || request.resource.data.isBlacklisted != true) &&
         (!('isArchived' in request.resource.data) || request.resource.data.isArchived != true) &&
         (!('status' in request.resource.data) || request.resource.data.status == null || request.resource.data.status == 'active')
       );
 
-      // Users can update profile/savedPlaces/preferences, NEVER role/roles/governance fields
+      // Users can update profile/savedPlaces/preferences, NEVER role/roles/corporateAccountId/governance fields
       // (Narrow legacy self-heal permitted only when roles was previously missing/null and mirrors existing role)
       allow update: if isDispatcher() || (
         isOwner(userId) && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'role', 'roles', 'status', 'isBlacklisted', 'blacklistReason', 'isArchived', 'adminNotes'
+            'role', 'roles', 'corporateAccountId', 'corporateAccountNumber',
+            'status', 'isBlacklisted', 'blacklistReason', 'isArchived', 'adminNotes'
           ]) ||
           (
             (!('roles' in resource.data) || resource.data.roles == null) &&
@@ -100,40 +112,54 @@ service cloud.firestore {
     // 2. Trips & Bookings (/trips/{tripId})
     // ─────────────────────────────────────────────────────────────
     match /trips/{tripId} {
-      // Public / Guest / Customer booking creation (never pre-assigned to a driver)
-      allow create: if isDispatcher() || (
-        request.resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
-        request.resource.data.pickupLocation != null &&
-        request.resource.data.dropoffLocation != null &&
-        request.resource.data.pricing != null &&
-        request.resource.data.pricing.totalFare is number &&
-        request.resource.data.pricing.totalFare >= 0 &&
-        (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
-        (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0) &&
+      // Public / Guest / Customer / Corporate Manager booking creation (never pre-assigned to a driver)
+      allow create: if isDispatcher() ||
         (
-          !('customerId' in request.resource.data) ||
-          request.resource.data.customerId == null ||
-          (isAuthenticated() && request.resource.data.customerId == request.auth.uid)
-        ) &&
-        (
-          !('userId' in request.resource.data) ||
-          request.resource.data.userId == null ||
-          (isAuthenticated() && request.resource.data.userId == request.auth.uid)
-        )
-      );
+          'corporateAccountId' in request.resource.data &&
+          isCorporateManagerFor(request.resource.data.corporateAccountId) &&
+          request.resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
+          request.resource.data.pickupLocation != null &&
+          request.resource.data.dropoffLocation != null &&
+          request.resource.data.pricing != null &&
+          request.resource.data.pricing.totalFare is number &&
+          request.resource.data.pricing.totalFare >= 0 &&
+          (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
+          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0)
+        ) || (
+          request.resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
+          request.resource.data.pickupLocation != null &&
+          request.resource.data.dropoffLocation != null &&
+          request.resource.data.pricing != null &&
+          request.resource.data.pricing.totalFare is number &&
+          request.resource.data.pricing.totalFare >= 0 &&
+          (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
+          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0) &&
+          (
+            !('customerId' in request.resource.data) ||
+            request.resource.data.customerId == null ||
+            (isAuthenticated() && request.resource.data.customerId == request.auth.uid)
+          ) &&
+          (
+            !('userId' in request.resource.data) ||
+            request.resource.data.userId == null ||
+            (isAuthenticated() && request.resource.data.userId == request.auth.uid)
+          )
+        );
 
-      // Single trip read: strictly authenticated owner, assigned/offered/convoy driver, or staff
+      // Single trip read: strictly authenticated owner, corporate manager for company trip, assigned/offered/convoy driver, or staff
       // Unauthenticated guests use zero-PII /tripTracking/{trackingToken} via /api/track
       allow get: if isDispatcher() ||
         isTripCustomer(resource.data) ||
+        ('corporateAccountId' in resource.data && isCorporateManagerFor(resource.data.corporateAccountId)) ||
         (isDriver() && (
           ('assignedDriverId' in resource.data && resource.data.assignedDriverId == request.auth.uid) ||
           ('offeredToIds' in resource.data && resource.data.offeredToIds is list && request.auth.uid in resource.data.offeredToIds) ||
           ('multiCarDriverIds' in resource.data && resource.data.multiCarDriverIds is list && request.auth.uid in resource.data.multiCarDriverIds)
         ));
 
-      // List query: statically provable scoped queries for passengers, drivers, and staff
+      // List query: statically provable scoped queries for passengers, corporate managers, drivers, and staff
       allow list: if isDispatcher() ||
+        isCorporateManagerFor(resource.data.corporateAccountId) ||
         (isAuthenticated() && (
           resource.data.customerId == request.auth.uid ||
           resource.data.userId == request.auth.uid ||
@@ -297,8 +323,12 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
 
-      // Only authenticated staff (Dispatchers/Admins) or Drivers can create/update sanitized PayLinkProjections
-      allow create, update: if (isDispatcher() || isDriver()) &&
+      // Only authenticated staff (Dispatchers/Admins), Drivers, or Corporate Managers (for invoice pay links) can create/update sanitized PayLinkProjections
+      allow create, update: if (
+        isDispatcher() ||
+        isDriver() ||
+        (hasUserRole('corporate_manager') && request.resource.data.targetType == 'invoice')
+      ) &&
         request.resource.data.payToken == payToken &&
         request.resource.data.keys().hasOnly([
           'payToken', 'targetType', 'targetId', 'referenceNumber', 'customerLabel',
@@ -395,17 +425,46 @@ service cloud.firestore {
     }
 
     // Sensitive B2B Corporate Accounts, Invoices, AR, Ledger & Driver Settlements
-    match /corporateAccounts/{document=**} {
-      allow read, write: if isDispatcher();
+    match /corporateAccounts/{accountId} {
+      allow get: if isDispatcher() || isCorporateManagerFor(accountId);
+      allow list: if isDispatcher();
+      allow create, delete: if isDispatcher();
+      // Corporate Managers may ONLY update safe self-service portal fields — NEVER creditLimit, discountPercent, billingCycle, accountNumber, or isActive!
+      allow update: if isDispatcher() || (
+        isCorporateManagerFor(accountId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'currentPoNumber',
+          'poGeneratedAt',
+          'poNumberHistory',
+          'authorizedBookers',
+          'authorizedRiders',
+          'savedCompanyLocations',
+          'costCenters',
+          'updatedAt'
+        ])
+      );
     }
     // Zero-PII hashed corporate verification lookup (never listable; contains only hashes & billing flags)
     match /corporateLookup/{lookupKey} {
       allow get: if true;
       allow list: if false;
-      allow write: if isDispatcher();
+      allow create, delete: if isDispatcher();
+      allow update: if isDispatcher() || (
+        'corporateAccountId' in resource.data &&
+        isCorporateManagerFor(resource.data.corporateAccountId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'currentPoHash',
+          'revokedPoHashes',
+          'updatedAt'
+        ])
+      );
     }
-    match /invoices/{document=**} {
-      allow read, write: if isDispatcher();
+    match /invoices/{invoiceId} {
+      allow get: if isDispatcher() ||
+        ('corporateAccountId' in resource.data && isCorporateManagerFor(resource.data.corporateAccountId));
+      allow list: if isDispatcher() ||
+        isCorporateManagerFor(resource.data.corporateAccountId);
+      allow create, update, delete: if isDispatcher();
     }
     match /unbilledTransactions/{txId} {
       allow read, update, delete: if isDispatcher();

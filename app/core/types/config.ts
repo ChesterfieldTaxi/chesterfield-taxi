@@ -414,6 +414,30 @@ export interface PoHistoryRecord {
   reason?: string;
 }
 
+export interface CorporateAuthorizedRider {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  isVip?: boolean;
+}
+
+export interface CorporateSavedLocation {
+  id: string;
+  label: string;
+  address: string;
+  notes?: string;
+}
+
+export interface CorporatePortalManagerRecord {
+  uid?: string;
+  email: string;
+  name: string;
+  provisionedAt: string;
+  status: 'active' | 'invited';
+}
+
 export interface CorporateAccountConfig {
   id: string;
   companyName: string;
@@ -438,6 +462,12 @@ export interface CorporateAccountConfig {
   billingAddress?: string;
   taxId?: string;
   updatedAt?: string;
+
+  // Phase 37: B2B Corporate Self-Service Portal Fields
+  authorizedRiders?: CorporateAuthorizedRider[];
+  costCenters?: string[];
+  savedCompanyLocations?: CorporateSavedLocation[];
+  portalManagers?: CorporatePortalManagerRecord[];
 }
 
 

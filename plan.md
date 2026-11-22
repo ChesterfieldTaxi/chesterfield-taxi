@@ -789,6 +789,36 @@ export interface PassengerAccount {
   - `app/routes/pay.$payToken.tsx`: Mobile-first Executive Clean standalone checkout route (`/pay/:payToken`) with itemized summary, tip presets (`15%`, `20%`, `25%`, `Custom`, `No Tip`), Stripe Payment Element (`js.stripe.com/v3/`), graceful fallback notice, instant Paid Receipt view, and Print Receipt button.
   - Staff triggers wired into `DispatchTripDetailsDrawer.tsx`, `DriverPaymentTerminalModal.tsx` (`driver.tsx`), `AdminInvoicingSubpage.tsx` (including PDF invoice remittance footer), and `AdminIntegrationsSubpage.tsx` (`webhooks` sub-tab).
 
+## 26. Phase 37 Architecture: Corporate Client Self-Service Portal (`/app/corporate`)
+
+### 26.1 Architectural & Multi-Tenant Security Guardrails (`constitution.md`)
+- **Service-Layer Domain Encapsulation**:
+  - Isolate all B2B tenant queries, credit utilization math, RFC 4180 CSV expense generation, team/location mutations, PO rotation orchestration, and Admin manager provisioning inside `app/core/services/corporate-portal.service.ts` (reusing `corporate-account.service.ts`, `invoicing.service.ts`, and `pay-link.service.ts`). UI components (`app/routes/corporate.tsx`, `AdminCustomersSubpage.tsx`) remain strictly declarative.
+- **Zero-Trust Multi-Tenant Lockdown (`firestore.rules` & Server Auth)**:
+  - `/users/{userId}`: Forbid `corporateAccountId` and `corporateAccountNumber` during self-registration (`allow create`) and self-profile edits (`allow update` `affectedKeys().hasAny([...])`) so only `isDispatcher()` can assign or change a user's corporate tenant binding.
+  - `isCorporateManagerFor(accountId)`: Requires `isAuthenticated() && hasUserRole('corporate_manager') && 'corporateAccountId' in getUserData() && getUserData().corporateAccountId != null && accountId != null && getUserData().corporateAccountId == accountId`.
+  - `/corporateAccounts/{accountId}`: `allow get: if isDispatcher() || isCorporateManagerFor(accountId); allow list: if isDispatcher();` and `allow update` for `isCorporateManagerFor(accountId)` restricted via `affectedKeys().hasOnly(['currentPoNumber', 'poGeneratedAt', 'poNumberHistory', 'authorizedBookers', 'authorizedRiders', 'savedCompanyLocations', 'costCenters', 'updatedAt'])`.
+  - `/corporateLookup/{lookupKey}`: Allow `isCorporateManagerFor(resource.data.corporateAccountId)` to update only `['currentPoHash', 'revokedPoHashes', 'updatedAt']` during self-service PO rotation.
+  - `/trips/{tripId}` & `/invoices/{invoiceId}`: Stamp top-level `corporateAccountId` on corporate trips (`Trip.corporateAccountId`) and enforce `isCorporateManagerFor(resource.data.corporateAccountId)` on `get`/`list` (and `request.resource.data.corporateAccountId` on `trips` `create`).
+  - `server-auth.server.ts` & `pay-link.server.ts`: Hydrate `isCorporateManager`, `corporateAccountId`, and `corporateAccountNumber` in `verifyServerRequestAuth`; permit `corporate_manager` in `POST /api/pay` (`create_link`) strictly when `targetType === 'invoice'` and `loadedInvoice.corporateAccountId === auth.corporateAccountId` (rejecting cross-tenant invoices with `403`).
+
+### 26.2 RBAC, Config Schema & Unified Workspace Routing
+- Extend `UserRole` (`'corporate_manager'`) and `AdminUser` (`corporateAccountId`, `corporateAccountNumber`) in `app/core/services/auth/admin-auth.service.ts`.
+- Extend `CorporateAccountConfig` in `app/core/types/config.ts` with `authorizedRiders`, `costCenters`, `savedCompanyLocations`, and `portalManagers`.
+- Register workspace `'corporate'` (`path: '/app/corporate'`, `requiredRole: 'corporate_manager'`) in `workspace-routing.util.ts`, `app.hub.tsx` (Indigo/Slate theme + `BuildingIcon`), `RoleViewSwitcher.tsx`, `UserDropdown.tsx`, `legacy.redirect.tsx` (`/corporate` -> `/app/corporate`), and `app/routes.ts`.
+
+### 26.3 Corporate Portal Service & UI Architecture (`corporate-portal.service.ts`, `corporate.tsx`, `BookingEngineV2.tsx`, `AdminCustomersSubpage.tsx`)
+- **`CorporatePortalService`**:
+  - `getCorporateDashboardSummary(corporateAccountId)`: Computes `activeRides`, `completedCycleRides`, `unbilledSpend`, `openInvoiceBalance`, `availableCredit`, and `creditUtilizationPercent = ((openInvoiceBalance + unbilledSpend) / creditLimit) * 100`.
+  - `getCorporateTrips(corporateAccountId)` & `exportCorporateTripsCsv(trips, account)`: Scoped Firestore `where('corporateAccountId', '==', id)` + local merge and formula-safe CSV export (`Date, Trip ID, Traveler, Department/Cost Center, PO #, Pickup, Dropoff, Fare, Status`).
+  - `getCorporateInvoices(corporateAccountId)` & `getCorporatePrintableInvoice(corporateAccountId, invoiceId)`: Scoped invoice list & printable statement builder integrated with Phase 36 1-tap Pay Links.
+  - `updateCorporateTeamAndSettings(corporateAccountId, patch)` & `rotateCorporatePoSelfService(corporateAccountId, reason, actorEmail)`: Strict field-allowlisted self-service mutations and PO rotation audit trail.
+  - `provisionCorporatePortalManager(input)`: Secondary Firebase Auth app user creation / existing `/users/{uid}` role binding (`roles: ['corporate_manager']`, `corporateAccountId`, `corporateAccountNumber`) + `account.portalManagers` persistence.
+- **`app/routes/corporate.tsx` (`/app/corporate`)**:
+  - Guarded for `corporate_manager` (locked to `user.corporateAccountId`) and `admin` (with header **Admin Account Preview Selector**).
+  - 4-tab responsive Executive Clean B2B shell: **Overview & Live Rides**, **Book Company Ride** (embedded `BookingEngineV2` with `corporatePortalContext`, Authorized Rider picker, Cost Center selector, and 1-tap Saved Company Locations), **Team, Locations & PO Security**, and **Statements & Billing** (printable PDF modal, CSV export, and 1-tap `/pay/:payToken` checkout).
+
+
 
 
 

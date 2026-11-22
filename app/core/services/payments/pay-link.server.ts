@@ -35,6 +35,7 @@ import {
   fetchFirestoreDocumentRest,
   getRequestClientIp,
   verifyServerRequestAuth,
+  type VerifiedServerAuth,
 } from '../auth/server-auth.server';
 import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
@@ -363,6 +364,8 @@ export interface CreatePayLinkServerInput {
   callerUid?: string;
   isDispatcher?: boolean;
   isDriver?: boolean;
+  isCorporateManager?: boolean;
+  corporateAccountId?: string;
   /** Used only in local dev / offline tests when Firestore is not configured */
   tripSnapshot?: Trip;
   /** Used only in local dev / offline tests when Firestore is not configured */
@@ -392,11 +395,42 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
     return { success: false, status: 400, error: 'Valid targetId is required to create a pay link.' };
   }
 
-  if (targetType === 'invoice' && input.isDriver && !input.isDispatcher) {
+  if (
+    targetType === 'invoice' &&
+    input.isDriver &&
+    !input.isDispatcher &&
+    !input.isCorporateManager
+  ) {
     return {
       success: false,
       status: 403,
-      error: 'Forbidden: Only Dispatchers or Administrators may generate corporate invoice pay links.',
+      error: 'Forbidden: Only Dispatchers, Administrators, or Corporate Managers may generate corporate invoice pay links.',
+    };
+  }
+
+  if (
+    targetType === 'trip' &&
+    input.isCorporateManager &&
+    !input.isDispatcher &&
+    !input.isDriver
+  ) {
+    return {
+      success: false,
+      status: 403,
+      error: 'Forbidden: Corporate Managers may only generate payment links for their assigned company invoices.',
+    };
+  }
+
+  if (
+    targetType === 'invoice' &&
+    input.isCorporateManager &&
+    !input.isDispatcher &&
+    !(input.corporateAccountId || '').trim()
+  ) {
+    return {
+      success: false,
+      status: 403,
+      error: 'Forbidden: Corporate Manager account is not bound to an active corporateAccountId.',
     };
   }
 
@@ -473,6 +507,20 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
     }
     if (!loadedInvoice) {
       return { success: false, status: 404, error: `Invoice ${targetId} was not found.` };
+    }
+
+    // Strict Multi-Tenant Guard: Corporate Managers can ONLY generate/open Pay Links for their own company's invoices!
+    if (input.isCorporateManager && !input.isDispatcher) {
+      const callerCorpId = (input.corporateAccountId || '').trim();
+      const invoiceCorpId = (loadedInvoice.corporateAccountId || '').trim();
+      if (!callerCorpId || !invoiceCorpId || callerCorpId !== invoiceCorpId) {
+        return {
+          success: false,
+          status: 403,
+          error:
+            'Forbidden: Cross-tenant access denied. You may only generate payment links for invoices belonging to your corporate account.',
+        };
+      }
     }
 
     if (!resolvedEmail) resolvedEmail = loadedInvoice.customerEmail || '';
@@ -995,7 +1043,14 @@ export async function handlePayApiGet(request: Request): Promise<Response> {
   );
 }
 
-export async function handlePayApiPost(request: Request): Promise<Response> {
+export async function handlePayApiPost(
+  request: Request,
+  options?: {
+    authOverride?: VerifiedServerAuth;
+    invoicingService?: IInvoicingService;
+    bookingService?: IBookingService;
+  }
+): Promise<Response> {
   if (request.method !== 'POST') {
     return Response.json(
       { success: false, error: 'Method Not Allowed. Use POST.' },
@@ -1023,19 +1078,21 @@ export async function handlePayApiPost(request: Request): Promise<Response> {
 
   const clientIp = getRequestClientIp(request);
 
-  // ─── Action 1: `create_link` (Authenticated Dispatcher / Admin / Driver) ───
+  // ─── Action 1: `create_link` (Authenticated Dispatcher / Admin / Driver / Corporate Manager) ───
   if (action === 'create_link') {
-    const auth = await verifyServerRequestAuth(request);
+    const auth = options?.authOverride ?? (await verifyServerRequestAuth(request));
     const enforceAuth =
+      Boolean(options?.authOverride) ||
       process.env.NODE_ENV === 'production' ||
       isFirebaseConfigured() ||
       Boolean(process.env.ADMIN_API_SECRET?.trim());
 
-    if (enforceAuth && !auth.isDispatcher && !auth.isDriver) {
+    if (enforceAuth && !auth.isDispatcher && !auth.isDriver && !auth.isCorporateManager) {
       return Response.json(
         {
           success: false,
-          error: 'Unauthorized: Dispatcher, Administrator, or Driver sign-in required.',
+          error:
+            'Unauthorized: Dispatcher, Administrator, Driver, or Corporate Manager sign-in required.',
         },
         { status: auth.authenticated ? 403 : 401 }
       );
@@ -1054,8 +1111,18 @@ export async function handlePayApiPost(request: Request): Promise<Response> {
       callerUid: auth.uid,
       isDispatcher: auth.isDispatcher || !enforceAuth,
       isDriver: auth.isDriver,
-      tripSnapshot: !isFirebaseConfigured() ? body.tripSnapshot : undefined,
-      invoiceSnapshot: !isFirebaseConfigured() ? body.invoiceSnapshot : undefined,
+      isCorporateManager: auth.isCorporateManager,
+      corporateAccountId: auth.corporateAccountId,
+      tripSnapshot:
+        !isFirebaseConfigured() && (auth.isDispatcher || !enforceAuth || auth.isDriver)
+          ? body.tripSnapshot
+          : undefined,
+      invoiceSnapshot:
+        !isFirebaseConfigured() && (auth.isDispatcher || !enforceAuth)
+          ? body.invoiceSnapshot
+          : undefined,
+      invoicingService: options?.invoicingService,
+      bookingService: options?.bookingService,
     });
 
     if (!createRes.success) {

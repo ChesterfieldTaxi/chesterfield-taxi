@@ -330,6 +330,8 @@ export interface Trip {
   id: string;
   customerId?: string;
   userId?: string;
+  /** Top-level corporate account identifier for multi-tenant Firestore security rules & scoped B2B queries */
+  corporateAccountId?: string;
   /** High-entropy token for zero-PII guest tracking links (/track/:trackingToken) */
   trackingToken?: string;
 

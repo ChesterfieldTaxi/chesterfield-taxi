@@ -696,6 +696,30 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - **Admin Corporate Invoicing (`AdminInvoicingSubpage.tsx`)**: **Generate / Send Pay Link** action on open corporate invoices plus 1-tap Pay Link remittance URL on printable PDF statements.
   - **Admin Integrations (`AdminIntegrationsSubpage.tsx` — `webhooks` sub-tab)**: Live Stripe Webhook configuration status, copyable `/api/payments/webhook` endpoint URL, subscribed event catalog, and recent processed webhook event log.
 
+## 37. Phase 37: Corporate Client Self-Service Portal (`/app/corporate`)
+- **Multi-Tenant B2B Isolation & Security Rules (`firestore.rules` & Server Auth)**:
+  - Prevent privilege escalation and tenant spoofing on `/users/{userId}`: block `corporateAccountId` and `corporateAccountNumber` on self-registration (`allow create`) and add both to forbidden self-update keys (`allow update`) so only Dispatchers/Admins (`isDispatcher()`) can bind or modify a user's corporate account assignment.
+  - Enforce `isCorporateManagerFor(accountId)` across Firestore collections:
+    - `/corporateAccounts/{accountId}`: Permit `get` for `isDispatcher() || isCorporateManagerFor(accountId)` (`list` restricted to `isDispatcher()`), and restrict `corporate_manager` `update` strictly to safe self-service fields (`currentPoNumber`, `poGeneratedAt`, `poNumberHistory`, `authorizedBookers`, `authorizedRiders`, `savedCompanyLocations`, `costCenters`, `updatedAt`) — never `creditLimit`, `discountPercent`, `billingCycle`, `accountNumber`, or `isActive`.
+    - `/corporateLookup/{lookupKey}`: Permit `corporate_manager` `update` strictly on PO hash rotation fields (`currentPoHash`, `revokedPoHashes`, `updatedAt`) for their own `corporateAccountId`.
+    - `/trips/{tripId}`: Permit `get` and `list` for `isCorporateManagerFor(resource.data.corporateAccountId)` and `create` when `isCorporateManagerFor(request.resource.data.corporateAccountId)` with pre-dispatch status and unassigned-driver guards.
+    - `/invoices/{invoiceId}`: Permit `get` and `list` for `isCorporateManagerFor(resource.data.corporateAccountId)` while keeping invoice mutations restricted to `isDispatcher()`.
+  - Extend `verifyServerRequestAuth` (`server-auth.server.ts`) and `POST /api/pay` `create_link` (`pay-link.server.ts`) so an authenticated `corporate_manager` can generate/open a 1-tap Pay Link strictly for an invoice whose `corporateAccountId` matches their own `auth.corporateAccountId` (returning `403` for any cross-tenant invoice).
+- **RBAC, Auth & Multi-Workspace Routing**:
+  - Extend `UserRole` with `'corporate_manager'` and `AdminUser` with `corporateAccountId?: string` and `corporateAccountNumber?: string`.
+  - Extend `CorporateAccountConfig` with B2B self-service portal fields (`authorizedRiders`, `costCenters`, `savedCompanyLocations`, `portalManagers`).
+  - Register `'corporate'` (`Corporate Portal` at `/app/corporate`, legacy `/corporate` redirect) across `workspace-routing.util.ts`, `app.hub.tsx` (Executive Slate/Indigo card with `BuildingIcon`), `RoleViewSwitcher.tsx`, `UserDropdown.tsx`, and `app/routes.ts`.
+  - Single-role `corporate_manager` users route directly to `/app/corporate`; `admin` superusers access all 5 workspaces including `/app/corporate` with an **Admin Account Preview Selector**.
+- **Corporate Portal Domain Service (`corporate-portal.service.ts`)**:
+  - Strictly parameterized by `corporateAccountId` per `constitution.md`: dashboard summary & credit-limit utilization math (`(openInvoices + unbilledSpend) / creditLimit`), scoped company trips & RFC 4180 CSV expense export, scoped corporate invoices & printable statement data, team/locations/cost-center updates, self-service anti-fraud PO rotation (`poNumberHistory`), and Admin portal manager provisioning.
+- **Executive Clean B2B Workspace (`/app/corporate`) & Admin Provisioning**:
+  - **1. Overview & Live Rides**: Credit limit utilization meter, unbilled cycle spend, open AR banner, active PO badge, and live company rides table/cards with 1-tap Live Tracking (`/track/:trackingToken` or `/booking/status/:tripId`).
+  - **2. Book Company Ride**: Embedded `BookingEngineV2` pre-bound to verified Corporate Account direct billing with quick-fill **Authorized Employee / Guest Picker**, **Department / Cost Center** selector, and 1-tap **Company Saved Locations** chips (HQ, Lambert STL, Spirit SUS).
+  - **3. Team, Locations & PO Security**: Manage authorized riders & bookers, cost center tags, saved company locations, and **1-Click Anti-Fraud PO Rotation** with `poNumberHistory` audit trail.
+  - **4. Statements & Billing**: Scoped corporate statements with `Unpaid` / `Overdue` / `Paid` status pills, **View / Print PDF Statement** modal, **Export Rides CSV**, and **1-Tap "Pay Invoice Now"** launching `/pay/:payToken`.
+  - **Admin Corporate Provisioning (`AdminCustomersSubpage.tsx`)**: **Provision Corporate Portal Manager** modal/drawer workflow assigning `roles: ['corporate_manager']`, `corporateAccountId`, and `corporateAccountNumber` onto `/users/{uid}`, recording `account.portalManagers`, and generating copyable `/app/corporate` login instructions.
+
+
 
 
 

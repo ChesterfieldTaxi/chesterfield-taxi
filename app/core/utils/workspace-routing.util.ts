@@ -1,6 +1,6 @@
 import type { AdminUser, UserRole } from '../services/auth/admin-auth.service';
 
-export type UnifiedWorkspaceId = 'admin' | 'dispatch' | 'driver' | 'passenger';
+export type UnifiedWorkspaceId = 'admin' | 'dispatch' | 'driver' | 'corporate' | 'passenger';
 
 export interface UnifiedWorkspaceMeta {
   id: UnifiedWorkspaceId;
@@ -39,6 +39,15 @@ export const UNIFIED_WORKSPACES: UnifiedWorkspaceMeta[] = [
     path: '/app/driver',
     badge: 'Driver',
     requiredRole: 'driver',
+  },
+  {
+    id: 'corporate',
+    label: 'Corporate Portal',
+    shortLabel: 'Corporate',
+    description: 'Company rides, employee travel booking, PO security, and statements.',
+    path: '/app/corporate',
+    badge: 'Corporate',
+    requiredRole: 'corporate_manager',
   },
   {
     id: 'passenger',
@@ -93,7 +102,13 @@ export function getSavedDefaultWorkspace(uid?: string): UnifiedWorkspaceId | nul
   if (!uid || typeof window === 'undefined') return null;
   try {
     const val = window.localStorage.getItem(`${DEFAULT_WORKSPACE_STORAGE_PREFIX}${uid}`);
-    if (val === 'admin' || val === 'dispatch' || val === 'driver' || val === 'passenger') {
+    if (
+      val === 'admin' ||
+      val === 'dispatch' ||
+      val === 'driver' ||
+      val === 'corporate' ||
+      val === 'passenger'
+    ) {
       return val;
     }
   } catch {}
@@ -124,6 +139,7 @@ export function normalizeAppRedirect(rawRedirect?: string | null): string | null
   if (pathname === '/dispatch') return `/app/dispatch${suffix}`;
   if (pathname === '/dispatch/popout') return `/app/dispatch/popout${suffix}`;
   if (pathname === '/driver') return `/app/driver${suffix}`;
+  if (pathname === '/corporate') return `/app/corporate${suffix}`;
   return `${pathname}${suffix}`;
 }
 
@@ -141,6 +157,9 @@ export function canAccessWorkspacePath(
   }
   if (targetPath.startsWith('/app/driver')) {
     return accessible.some((w) => w.id === 'driver');
+  }
+  if (targetPath.startsWith('/app/corporate')) {
+    return accessible.some((w) => w.id === 'corporate');
   }
   if (targetPath.startsWith('/app/passenger')) {
     return accessible.some((w) => w.id === 'passenger');

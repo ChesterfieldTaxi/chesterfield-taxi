@@ -15,6 +15,7 @@ import {
   CarIcon,
   ShieldCheckIcon,
   RadioIcon,
+  BuildingIcon,
   UserIcon,
   SpinnerIcon,
   ChevronRightIcon,
@@ -54,6 +55,13 @@ function getWorkspaceStyle(id: UnifiedWorkspaceId) {
         iconBg: 'bg-amber-50 border-amber-200',
         badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
         hoverBorder: 'hover:border-amber-400 hover:shadow-amber-500/10',
+      };
+    case 'corporate':
+      return {
+        icon: <BuildingIcon className="w-6 h-6 text-indigo-600" />,
+        iconBg: 'bg-indigo-50 border-indigo-200',
+        badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        hoverBorder: 'hover:border-indigo-400 hover:shadow-indigo-500/10',
       };
     case 'passenger':
     default:

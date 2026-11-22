@@ -24,6 +24,9 @@ export interface VerifiedServerAuth {
   isAdmin: boolean;
   isDispatcher: boolean;
   isDriver: boolean;
+  isCorporateManager: boolean;
+  corporateAccountId?: string;
+  corporateAccountNumber?: string;
   rawToken?: string;
 }
 
@@ -34,6 +37,7 @@ const UNAUTHENTICATED: VerifiedServerAuth = {
   isAdmin: false,
   isDispatcher: false,
   isDriver: false,
+  isCorporateManager: false,
 };
 
 interface CachedAuthEntry {
@@ -155,6 +159,7 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
         isAdmin: true,
         isDispatcher: true,
         isDriver: true,
+        isCorporateManager: false,
       };
     }
     if (authHeader) {
@@ -167,6 +172,7 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
           isAdmin: true,
           isDispatcher: true,
           isDriver: true,
+          isCorporateManager: false,
         };
       }
     }
@@ -225,7 +231,13 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
     const roleSet = new Set<UserRole>();
     if (Array.isArray(userDoc?.roles)) {
       for (const r of userDoc.roles) {
-        if (r === 'admin' || r === 'dispatcher' || r === 'driver' || r === 'customer') {
+        if (
+          r === 'admin' ||
+          r === 'dispatcher' ||
+          r === 'driver' ||
+          r === 'corporate_manager' ||
+          r === 'customer'
+        ) {
           roleSet.add(r);
         }
       }
@@ -234,6 +246,7 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
       userDoc?.role === 'admin' ||
       userDoc?.role === 'dispatcher' ||
       userDoc?.role === 'driver' ||
+      userDoc?.role === 'corporate_manager' ||
       userDoc?.role === 'customer'
     ) {
       roleSet.add(userDoc.role);
@@ -249,6 +262,15 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
     const isAdmin = roles.includes('admin');
     const isDispatcher = isAdmin || roles.includes('dispatcher');
     const isDriver = roles.includes('driver');
+    const isCorporateManager = roles.includes('corporate_manager');
+    const corporateAccountId =
+      typeof userDoc?.corporateAccountId === 'string' && userDoc.corporateAccountId.trim()
+        ? userDoc.corporateAccountId.trim()
+        : undefined;
+    const corporateAccountNumber =
+      typeof userDoc?.corporateAccountNumber === 'string' && userDoc.corporateAccountNumber.trim()
+        ? userDoc.corporateAccountNumber.trim()
+        : undefined;
 
     const verified: VerifiedServerAuth = {
       authenticated: true,
@@ -259,6 +281,9 @@ export async function verifyServerRequestAuth(request: Request): Promise<Verifie
       isAdmin,
       isDispatcher,
       isDriver,
+      isCorporateManager,
+      corporateAccountId,
+      corporateAccountNumber,
       rawToken: idToken,
     };
 

@@ -11,7 +11,7 @@
 import type { CorporateAccountConfig, PoHistoryRecord } from '../types/config';
 import { getAdminConfigService } from './config/admin-config.service';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { sanitizePayload } from './firestore-sanitizer';
 
 export interface CsvImportOptions {
@@ -93,12 +93,31 @@ export class CorporateAccountService {
     const settings = await configService.getSettings();
     const accounts = [...(settings.corporateAccounts || [])];
 
-    const targetIndex = accounts.findIndex((a) => a.id === accountId || a.accountNumber === accountId);
-    if (targetIndex === -1) {
+    let targetIndex = accounts.findIndex((a) => a.id === accountId || a.accountNumber === accountId);
+    let currentAccount: CorporateAccountConfig | undefined =
+      targetIndex >= 0 ? accounts[targetIndex] : undefined;
+
+    // If running under strict corporate_manager isolation, hydrate latest doc directly from `/corporateAccounts/{accountId}`
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        const remoteSnap = await getDoc(doc(db, 'corporateAccounts', accountId));
+        if (remoteSnap.exists()) {
+          currentAccount = {
+            ...(currentAccount || {}),
+            ...(remoteSnap.data() as CorporateAccountConfig),
+            id: remoteSnap.id,
+          };
+        }
+      } catch {
+        // Fallback to cached settings account
+      }
+    }
+
+    if (!currentAccount) {
       throw new Error(`Corporate account with ID "${accountId}" not found.`);
     }
 
-    const currentAccount = accounts[targetIndex];
     const oldPo = currentAccount.currentPoNumber || null;
     const nowIso = new Date().toISOString();
 
@@ -125,22 +144,85 @@ export class CorporateAccountService {
       updatedAt: nowIso,
     };
 
-    accounts[targetIndex] = updatedAccount;
+    if (targetIndex >= 0) {
+      accounts[targetIndex] = updatedAccount;
+    } else {
+      accounts.push(updatedAccount);
+    }
 
-    // Persist to central AppSettings
-    await configService.updateSettings({
-      corporateAccounts: accounts,
-      updatedBy: operatorEmail || 'admin@chesterfieldtaxi.com',
-    });
+    // Persist to central AppSettings when caller has staff write permissions (or in offline mode)
+    try {
+      await configService.updateSettings({
+        corporateAccounts: accounts,
+        updatedBy: operatorEmail || 'admin@chesterfieldtaxi.com',
+      });
+    } catch (cfgErr) {
+      console.warn('[CorporateAccountService] Skipping staff appSettings write during self-service PO rotation:', cfgErr);
+    }
 
-    // Also persist individual doc to Firestore collection if configured
-    await this.syncIndividualAccountToFirestore(updatedAccount);
+    // Persist strictly safe PO rotation fields to Firestore (compatible with both corporate_manager & dispatcher rules)
+    await this.syncPoRotationToFirestore(updatedAccount);
 
     return {
       account: updatedAccount,
       oldPo,
       newPo,
     };
+  }
+
+  /**
+   * Syncs strictly the allowed self-service PO rotation fields onto `/corporateAccounts/{id}`
+   * and `/corporateLookup/{acctHash}` so both `corporate_manager` and `admin` callers succeed under `firestore.rules`.
+   */
+  private async syncPoRotationToFirestore(account: CorporateAccountConfig): Promise<void> {
+    if (!isFirebaseConfigured()) return;
+    try {
+      const db = getFirestoreDb();
+      const docRef = doc(db, 'corporateAccounts', account.id);
+      const poPatch = sanitizePayload({
+        currentPoNumber: account.currentPoNumber,
+        poGeneratedAt: account.poGeneratedAt,
+        poNumberHistory: account.poNumberHistory || [],
+        updatedAt: account.updatedAt || new Date().toISOString(),
+      });
+      try {
+        await updateDoc(docRef, poPatch);
+      } catch {
+        // If document didn't exist yet (e.g. initial Admin action), fall back to full sync
+        await this.syncIndividualAccountToFirestore(account);
+        return;
+      }
+
+      const acctHash = await hashCorporateLookupValue(account.accountNumber);
+      if (acctHash) {
+        const currentPoHash = account.currentPoNumber
+          ? await hashCorporateLookupValue(account.currentPoNumber)
+          : null;
+        const revokedPoHashes = (
+          await Promise.all(
+            (account.poNumberHistory || [])
+              .filter((h) => h.poNumber)
+              .map((h) => hashCorporateLookupValue(h.poNumber))
+          )
+        ).filter(Boolean);
+
+        const lookupRef = doc(db, 'corporateLookup', acctHash);
+        try {
+          await updateDoc(
+            lookupRef,
+            sanitizePayload({
+              currentPoHash,
+              revokedPoHashes,
+              updatedAt: account.updatedAt || new Date().toISOString(),
+            })
+          );
+        } catch {
+          // Non-fatal if lookup doc hasn't been seeded yet and caller is corporate_manager
+        }
+      }
+    } catch (err) {
+      console.warn(`[CorporateAccountService] PO rotation Firestore sync warning for ${account.id}:`, err);
+    }
   }
 
   /**

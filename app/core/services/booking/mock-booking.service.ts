@@ -480,8 +480,17 @@ export class MockBookingService implements IBookingService {
         : 'Booking submitted via system (Auto-confirmed)',
     };
 
+    const meta = (payload.metadata || {}) as Record<string, any>;
+    const resolvedCorporateAccountId =
+      payload.corporateAccountId ||
+      payload.payment?.corporateAccountId ||
+      (typeof meta.corporateAccountId === 'string' && meta.corporateAccountId.trim()
+        ? meta.corporateAccountId.trim()
+        : undefined);
+
     const newTrip: Trip = {
       ...payload,
+      ...(resolvedCorporateAccountId ? { corporateAccountId: resolvedCorporateAccountId } : {}),
       id,
       trackingToken: payload.trackingToken || generateTrackingToken(),
       status: initialStatus,

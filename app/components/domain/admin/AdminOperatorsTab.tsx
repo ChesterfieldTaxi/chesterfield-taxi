@@ -24,6 +24,7 @@ import {
   CarIcon,
   RadioIcon,
   ShieldIcon,
+  BuildingIcon,
   SearchIcon,
   EditIcon,
   BanIcon,
@@ -81,6 +82,13 @@ const ROLE_META: Record<
     cardActiveClass: 'border-purple-500 bg-purple-50/70 ring-1 ring-purple-500/30',
     iconClass: 'text-purple-600',
   },
+  corporate_manager: {
+    label: 'Corporate Manager',
+    description: 'B2B travel desk, PO security & statements',
+    pillClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    cardActiveClass: 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500/30',
+    iconClass: 'text-indigo-600',
+  },
   customer: {
     label: 'Client',
     description: 'Client booking portal',
@@ -94,6 +102,7 @@ function RoleIcon({ role, className = 'w-3.5 h-3.5' }: { role: UserRole; classNa
   if (role === 'driver') return <CarIcon className={className} />;
   if (role === 'dispatcher') return <RadioIcon className={className} />;
   if (role === 'admin') return <ShieldIcon className={className} />;
+  if (role === 'corporate_manager') return <BuildingIcon className={className} />;
   return <UserIcon className={className} />;
 }
 

@@ -486,9 +486,16 @@ export class FirebaseBookingService implements IBookingService {
     };
 
     const trackingToken = payload.trackingToken || generateTrackingToken();
+    const resolvedCorporateAccountId =
+      payload.corporateAccountId ||
+      payload.payment?.corporateAccountId ||
+      (typeof meta.corporateAccountId === 'string' && meta.corporateAccountId.trim()
+        ? meta.corporateAccountId.trim()
+        : undefined);
 
     const newTrip: Trip = {
       ...payload,
+      ...(resolvedCorporateAccountId ? { corporateAccountId: resolvedCorporateAccountId } : {}),
       id,
       trackingToken,
       status: initialStatus,

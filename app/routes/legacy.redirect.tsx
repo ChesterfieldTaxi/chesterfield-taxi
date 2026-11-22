@@ -11,6 +11,9 @@ function computeTargetUrl(pathname: string, search: string): string {
   if (pathname === '/driver') {
     return `/app/driver${search}`;
   }
+  if (pathname === '/corporate') {
+    return `/app/corporate${search}`;
+  }
   if (pathname === '/dispatch') {
     return `/app/dispatch${search}`;
   }

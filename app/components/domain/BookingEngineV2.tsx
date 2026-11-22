@@ -126,6 +126,19 @@ import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 import { FlightAssistanceCard } from './booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../ui/ModernDateTimePicker';
 
+export interface CorporatePortalBookingContext {
+  corporateAccountId: string;
+  companyName: string;
+  accountNumber: string;
+  billingCycle?: string;
+  discountPercent?: number;
+  currentPoNumber?: string;
+  poRequired?: boolean;
+  costCenter?: string;
+  bookerName?: string;
+  bookerEmail?: string;
+}
+
 export interface BookingEngineV2InitialValues {
   pickupAddress?: string;
   pickupCoordinates?: GeoPoint;
@@ -140,6 +153,17 @@ export interface BookingEngineV2InitialValues {
   passengerName?: string;
   passengerPhone?: string;
   passengerEmail?: string;
+  paymentMethod?: 'card' | 'cash' | 'account';
+  corporateOrgName?: string;
+  corporateAccountNumber?: string;
+  billingPo?: string;
+  authorizedBy?: string;
+  costCenter?: string;
+  isBookerDifferent?: boolean;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  contactRole?: string;
 }
 
 export interface BookingEngineV2Props {
@@ -152,6 +176,7 @@ export interface BookingEngineV2Props {
   onCancelEdit?: () => void;
   hideDispatchBanner?: boolean;
   embeddedInApp?: boolean;
+  corporatePortalContext?: CorporatePortalBookingContext;
 }
 
 interface FormState {
@@ -267,6 +292,7 @@ interface FormState {
   corporateAccountNumber: string;
   billingPo: string;
   authorizedBy: string;
+  costCenter: string;
   invoicingTerms: string;
   botTrapField?: string;
 }
@@ -281,6 +307,7 @@ export function BookingEngineV2({
   onCancelEdit,
   hideDispatchBanner = false,
   embeddedInApp = false,
+  corporatePortalContext,
 }: BookingEngineV2Props) {
   const location = useLocation();
 
@@ -373,7 +400,9 @@ export function BookingEngineV2({
     driverNotes: '',
     smsConsent: true,
 
-    paymentMethod: 'card',
+    paymentMethod: corporatePortalContext
+      ? 'account'
+      : initialValues?.paymentMethod || 'card',
     cardPaymentType: 'terminal',
     cardholderName: '',
     cardNumber: '',
@@ -384,11 +413,22 @@ export function BookingEngineV2({
     paymentToken: '',
     saveCardOnFile: false,
 
-    corporateOrgName: '',
-    corporateAccountNumber: '',
-    billingPo: '',
-    authorizedBy: '',
-    invoicingTerms: 'Net 30 Direct Bill',
+    corporateOrgName:
+      corporatePortalContext?.companyName || initialValues?.corporateOrgName || '',
+    corporateAccountNumber:
+      corporatePortalContext?.accountNumber || initialValues?.corporateAccountNumber || '',
+    billingPo:
+      corporatePortalContext?.currentPoNumber || initialValues?.billingPo || '',
+    authorizedBy:
+      corporatePortalContext?.bookerName ||
+      corporatePortalContext?.bookerEmail ||
+      initialValues?.authorizedBy ||
+      '',
+    costCenter:
+      corporatePortalContext?.costCenter || initialValues?.costCenter || '',
+    invoicingTerms: corporatePortalContext?.billingCycle
+      ? `${corporatePortalContext.billingCycle.toUpperCase()} Direct Bill`
+      : 'Net 30 Direct Bill',
     botTrapField: '',
   });
 
@@ -525,11 +565,61 @@ export function BookingEngineV2({
       ...(initialValues.timingType ? { timingType: initialValues.timingType } : {}),
       ...(initialValues.scheduledDate ? { scheduledDate: initialValues.scheduledDate } : {}),
       ...(initialValues.scheduledTime ? { scheduledTime: initialValues.scheduledTime } : {}),
-      ...(initialValues.passengerName ? { passengerName: initialValues.passengerName } : {}),
-      ...(initialValues.passengerPhone ? { passengerPhone: initialValues.passengerPhone } : {}),
-      ...(initialValues.passengerEmail ? { passengerEmail: initialValues.passengerEmail } : {}),
+      ...(initialValues.passengerName !== undefined ? { passengerName: initialValues.passengerName } : {}),
+      ...(initialValues.passengerPhone !== undefined ? { passengerPhone: initialValues.passengerPhone } : {}),
+      ...(initialValues.passengerEmail !== undefined ? { passengerEmail: initialValues.passengerEmail } : {}),
+      ...(initialValues.paymentMethod ? { paymentMethod: initialValues.paymentMethod } : {}),
+      ...(initialValues.corporateOrgName !== undefined
+        ? { corporateOrgName: initialValues.corporateOrgName }
+        : {}),
+      ...(initialValues.corporateAccountNumber !== undefined
+        ? { corporateAccountNumber: initialValues.corporateAccountNumber }
+        : {}),
+      ...(initialValues.billingPo !== undefined ? { billingPo: initialValues.billingPo } : {}),
+      ...(initialValues.authorizedBy !== undefined
+        ? { authorizedBy: initialValues.authorizedBy }
+        : {}),
+      ...(initialValues.costCenter !== undefined ? { costCenter: initialValues.costCenter } : {}),
+      ...(initialValues.isBookerDifferent !== undefined
+        ? { isBookerDifferent: initialValues.isBookerDifferent }
+        : {}),
+      ...(initialValues.contactName !== undefined
+        ? { contactName: initialValues.contactName }
+        : {}),
+      ...(initialValues.contactPhone !== undefined
+        ? { contactPhone: initialValues.contactPhone }
+        : {}),
+      ...(initialValues.contactEmail !== undefined
+        ? { contactEmail: initialValues.contactEmail }
+        : {}),
+      ...(initialValues.contactRole !== undefined
+        ? { contactRole: initialValues.contactRole }
+        : {}),
     }));
   }, [initialValues, editingTripId]);
+
+  // Keep pre-bound Corporate Portal billing fields synced when account/PO/cost-center changes in `/app/corporate`
+  useEffect(() => {
+    if (!corporatePortalContext) return;
+    setForm((prev) => ({
+      ...prev,
+      paymentMethod: 'account',
+      corporateOrgName: corporatePortalContext.companyName,
+      corporateAccountNumber: corporatePortalContext.accountNumber,
+      billingPo: corporatePortalContext.currentPoNumber || prev.billingPo,
+      authorizedBy:
+        corporatePortalContext.bookerName ||
+        corporatePortalContext.bookerEmail ||
+        prev.authorizedBy,
+      costCenter:
+        corporatePortalContext.costCenter !== undefined
+          ? corporatePortalContext.costCenter
+          : prev.costCenter,
+      invoicingTerms: corporatePortalContext.billingCycle
+        ? `${corporatePortalContext.billingCycle.toUpperCase()} Direct Bill`
+        : prev.invoicingTerms,
+    }));
+  }, [corporatePortalContext]);
 
   // Populate client-local default date & time (+45 min rounded up to next 5-min step) after hydration
   useEffect(() => {
@@ -1848,18 +1938,42 @@ export function BookingEngineV2({
       if (form.paymentMethod === 'card') paymentMethodType = 'card';
       if (form.paymentMethod === 'account') paymentMethodType = 'corporate';
 
-      // Verify Corporate Account # & PO anti-fraud via rate-limited server endpoint (never falls back to mock 'corp-1'!)
+      // Verify Corporate Account # & PO anti-fraud via rate-limited server endpoint (or authenticated Corporate Portal context)
       let verifiedCorporateAccountId: string | undefined;
       if (form.paymentMethod === 'account') {
-        const totalProjected = form.returnTrip
-          ? effectivePricing.totalFare + returnEffectivePricing.totalFare
-          : effectivePricing.totalFare;
-        const verification = await verifyCustomerAccount({
-          accountNumber: form.corporateAccountNumber,
-          poNumber: form.billingPo,
-          estimatedFare: totalProjected,
-        });
-        verifiedCorporateAccountId = verification.corporateAccountId;
+        if (
+          corporatePortalContext?.corporateAccountId &&
+          form.corporateAccountNumber.trim().toUpperCase() ===
+            corporatePortalContext.accountNumber.trim().toUpperCase()
+        ) {
+          if (corporatePortalContext.poRequired) {
+            const candidatePo = form.billingPo.trim().toUpperCase();
+            if (!candidatePo) {
+              throw new Error(
+                `A valid Purchase Order (PO) number is required for ${corporatePortalContext.companyName}.`
+              );
+            }
+            if (
+              corporatePortalContext.currentPoNumber &&
+              candidatePo !== corporatePortalContext.currentPoNumber.trim().toUpperCase()
+            ) {
+              throw new Error(
+                `PO "${form.billingPo}" does not match the active PO (${corporatePortalContext.currentPoNumber}) for ${corporatePortalContext.companyName}.`
+              );
+            }
+          }
+          verifiedCorporateAccountId = corporatePortalContext.corporateAccountId;
+        } else {
+          const totalProjected = form.returnTrip
+            ? effectivePricing.totalFare + returnEffectivePricing.totalFare
+            : effectivePricing.totalFare;
+          const verification = await verifyCustomerAccount({
+            accountNumber: form.corporateAccountNumber,
+            poNumber: form.billingPo,
+            estimatedFare: totalProjected,
+          });
+          verifiedCorporateAccountId = verification.corporateAccountId;
+        }
       }
 
       // Phase 31: PCI-Compliant Stripe Pre-authorization Hold (or In-Cab Payment Fallback)
@@ -1898,6 +2012,7 @@ export function BookingEngineV2({
       // Customer web submissions strictly default to 'UNCONFIRMED'
       const inputPayload: CreateTripInput = {
         ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
+        ...(verifiedCorporateAccountId ? { corporateAccountId: verifiedCorporateAccountId } : {}),
         pickupLocation,
         dropoffLocation,
         intermediateStops: intermediateStopsLocations.length > 0 ? intermediateStopsLocations : undefined,
@@ -1934,8 +2049,11 @@ export function BookingEngineV2({
           bookerRole: form.isBookerDifferent ? sanitizeTextInput(form.contactRole, 60) : undefined,
           corporateOrgName: form.paymentMethod === 'account' ? sanitizeTextInput(form.corporateOrgName, 100) : undefined,
           corporateAccountNumber: form.paymentMethod === 'account' ? sanitizeTextInput(form.corporateAccountNumber, 50) : undefined,
+          corporateAccountId: verifiedCorporateAccountId,
           billingPo: form.paymentMethod === 'account' ? sanitizeTextInput(form.billingPo, 50) : undefined,
           authorizedBy: form.paymentMethod === 'account' ? sanitizeTextInput(form.authorizedBy, 100) : undefined,
+          costCenter: form.paymentMethod === 'account' && form.costCenter ? sanitizeTextInput(form.costCenter, 60) : undefined,
+          bookedViaCorporatePortal: Boolean(corporatePortalContext),
           invoicingTerms: form.paymentMethod === 'account' ? sanitizeTextInput(form.invoicingTerms, 50) : undefined,
           additionalPassengers: form.additionalPassengers,
           provideFlightInfo: form.provideFlightInfo,
@@ -2110,6 +2228,7 @@ export function BookingEngineV2({
 
           const returnPayload: CreateTripInput = {
             ...(signedInUid ? { customerId: signedInUid, userId: signedInUid } : {}),
+            ...(verifiedCorporateAccountId ? { corporateAccountId: verifiedCorporateAccountId } : {}),
             pickupLocation: {
               address: form.returnPickupAddress,
               coordinates: form.returnPickupCoordinates || dropoffLocation.coordinates,
@@ -2149,7 +2268,25 @@ export function BookingEngineV2({
               isReturnRide: true,
               vehicleTypeId: form.returnVehicleChoice,
               vehicleDisplayName: returnVehicleDisplayName,
-              createdByRole: 'customer_web',
+              createdByRole: corporatePortalContext ? 'corporate_manager' : 'customer_web',
+              corporateAccountId: verifiedCorporateAccountId,
+              corporateOrgName:
+                form.paymentMethod === 'account'
+                  ? sanitizeTextInput(form.corporateOrgName, 100)
+                  : undefined,
+              corporateAccountNumber:
+                form.paymentMethod === 'account'
+                  ? sanitizeTextInput(form.corporateAccountNumber, 50)
+                  : undefined,
+              billingPo:
+                form.paymentMethod === 'account'
+                  ? sanitizeTextInput(form.billingPo, 50)
+                  : undefined,
+              costCenter:
+                form.paymentMethod === 'account' && form.costCenter
+                  ? sanitizeTextInput(form.costCenter, 60)
+                  : undefined,
+              bookedViaCorporatePortal: Boolean(corporatePortalContext),
               airline: form.returnProvideFlightInfo ? form.returnAirline : undefined,
               airlineName: form.returnProvideFlightInfo ? form.returnAirline : undefined,
               flightNumber: form.returnProvideFlightInfo ? form.returnFlightNumber : undefined,
@@ -5120,24 +5257,49 @@ export function BookingEngineV2({
 
               {/* Corporate Account Sub-panel */}
               {form.paymentMethod === 'account' && (
-                <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-xl space-y-3 animate-in fade-in duration-150">
-                  <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide block">
-                    Corporate Account
-                  </span>
-
-                  <div className="text-[11px] bg-white p-3 rounded-xl border border-amber-200 text-amber-900 flex items-start gap-2 shadow-2xs">
-                    <PhoneIcon className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-                    <div className="leading-relaxed">
-                      <span className="font-semibold">Need account assistance?</span> Call 24/7 Dispatch at{' '}
-                      <a
-                        href={`tel:${(COMPANY_CONFIG.phone?.primaryRaw || '+13147380100').replace(/[^\d+]/g, '')}`}
-                        className="font-bold underline text-amber-950 hover:text-blue-700"
-                      >
-                        {COMPANY_CONFIG.phone?.dispatch || COMPANY_CONFIG.phone?.primary || '(314) 738-0100'}
-                      </a>{' '}
-                      to verify or set up direct corporate billing.
-                    </div>
+                <div
+                  className={`p-3.5 rounded-xl space-y-3 animate-in fade-in duration-150 ${
+                    corporatePortalContext
+                      ? 'bg-indigo-50/80 border border-indigo-200'
+                      : 'bg-amber-50/80 border border-amber-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${
+                        corporatePortalContext ? 'text-indigo-950' : 'text-amber-900'
+                      }`}
+                    >
+                      <BuildingIcon className="w-3.5 h-3.5" />
+                      <span>
+                        {corporatePortalContext
+                          ? 'Pre-Verified Corporate Direct Billing'
+                          : 'Corporate Account'}
+                      </span>
+                    </span>
+                    {corporatePortalContext && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <ShieldCheckIcon className="w-3 h-3" />
+                        Verified • {corporatePortalContext.accountNumber}
+                      </span>
+                    )}
                   </div>
+
+                  {!corporatePortalContext && (
+                    <div className="text-[11px] bg-white p-3 rounded-xl border border-amber-200 text-amber-900 flex items-start gap-2 shadow-2xs">
+                      <PhoneIcon className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <span className="font-semibold">Need account assistance?</span> Call 24/7 Dispatch at{' '}
+                        <a
+                          href={`tel:${(COMPANY_CONFIG.phone?.primaryRaw || '+13147380100').replace(/[^\d+]/g, '')}`}
+                          className="font-bold underline text-amber-950 hover:text-blue-700"
+                        >
+                          {COMPANY_CONFIG.phone?.dispatch || COMPANY_CONFIG.phone?.primary || '(314) 738-0100'}
+                        </a>{' '}
+                        to verify or set up direct corporate billing.
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
@@ -5146,7 +5308,9 @@ export function BookingEngineV2({
                         name="corporateOrgName"
                         placeholder="Organization / Company Name *"
                         value={form.corporateOrgName}
+                        readOnly={Boolean(corporatePortalContext)}
                         onChange={(e) => {
+                          if (corporatePortalContext) return;
                           setForm((prev) => ({ ...prev, corporateOrgName: e.target.value }));
                           if (errors.corporateOrgName) {
                             setErrors((prev) => {
@@ -5157,8 +5321,12 @@ export function BookingEngineV2({
                           }
                         }}
                         required={form.paymentMethod === 'account'}
-                        className={`w-full px-3 py-2.5 bg-white border ${
-                          errors.corporateOrgName ? 'border-red-400' : 'border-amber-300'
+                        className={`w-full px-3 py-2.5 border ${
+                          corporatePortalContext
+                            ? 'bg-slate-100 border-indigo-200 text-slate-700 font-semibold cursor-not-allowed'
+                            : errors.corporateOrgName
+                            ? 'bg-white border-red-400'
+                            : 'bg-white border-amber-300'
                         } rounded-xl text-base sm:text-sm`}
                       />
                       {errors.corporateOrgName && (
@@ -5171,7 +5339,9 @@ export function BookingEngineV2({
                         name="corporateAccountNumber"
                         placeholder="Corporate Account # (or 'Pending Dispatch') *"
                         value={form.corporateAccountNumber}
+                        readOnly={Boolean(corporatePortalContext)}
                         onChange={(e) => {
+                          if (corporatePortalContext) return;
                           setForm((prev) => ({ ...prev, corporateAccountNumber: e.target.value }));
                           if (errors.corporateAccountNumber) {
                             setErrors((prev) => {
@@ -5181,8 +5351,12 @@ export function BookingEngineV2({
                             });
                           }
                         }}
-                        className={`w-full px-3 py-2.5 bg-white border ${
-                          errors.corporateAccountNumber ? 'border-red-400' : 'border-amber-300'
+                        className={`w-full px-3 py-2.5 border ${
+                          corporatePortalContext
+                            ? 'bg-slate-100 border-indigo-200 text-indigo-900 font-mono font-bold cursor-not-allowed'
+                            : errors.corporateAccountNumber
+                            ? 'bg-white border-red-400'
+                            : 'bg-white border-amber-300'
                         } rounded-xl text-base sm:text-sm`}
                       />
                       {errors.corporateAccountNumber && (
@@ -5193,19 +5367,38 @@ export function BookingEngineV2({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <input
                       type="text"
-                      placeholder="Billing PO / Project Code (Optional)"
+                      placeholder={
+                        corporatePortalContext?.poRequired
+                          ? 'Active PO Number (Required) *'
+                          : 'Billing PO / Project Code (Optional)'
+                      }
                       value={form.billingPo}
                       onChange={(e) => setForm((prev) => ({ ...prev, billingPo: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-white border border-amber-300 rounded-xl text-base sm:text-sm"
+                      className={`w-full px-3 py-2.5 bg-white border ${
+                        corporatePortalContext ? 'border-indigo-200 font-mono font-semibold' : 'border-amber-300'
+                      } rounded-xl text-base sm:text-sm`}
                     />
                     <input
                       type="text"
                       placeholder="Authorized By (Manager Name)"
                       value={form.authorizedBy}
                       onChange={(e) => setForm((prev) => ({ ...prev, authorizedBy: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-white border border-amber-300 rounded-xl text-base sm:text-sm"
+                      className={`w-full px-3 py-2.5 bg-white border ${
+                        corporatePortalContext ? 'border-indigo-200' : 'border-amber-300'
+                      } rounded-xl text-base sm:text-sm`}
                     />
                   </div>
+                  {corporatePortalContext && (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Department / Cost Center Tag (e.g. EXEC-100)"
+                        value={form.costCenter}
+                        onChange={(e) => setForm((prev) => ({ ...prev, costCenter: e.target.value }))}
+                        className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-semibold text-slate-800"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

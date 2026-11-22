@@ -527,6 +527,27 @@
   - [x] 36.5.1 Create `scripts/test-payment-webhooks-and-links.ts` testing HMAC signature validation/tamper/replay/multi-`v1` rotation, webhook idempotency, trip & corporate invoice reconciliation (`payment_intent.succeeded` & `charge.refunded`), zero-PII pay link sanitization, expiry, and anti-tamper fare calculation.
   - [x] 36.5.2 Run `npm run typecheck`, `npm run build` (confirming `api.payments.webhook` client chunk is `0.00 kB`), `npx tsx scripts/test-payment-webhooks-and-links.ts`, `npm run test:e2e`, and `npm run test:stress`, then mark Phase 36 complete in `tasks.md`.
 
+## Phase 37: Corporate Client Self-Service Portal (`/app/corporate`)
+- [x] 37.0 Baseline Hygiene & SDD Documentation:
+  - [x] 37.0.1 Commit Phase 36 Stripe Webhooks & Pay Links baseline cleanly (`feat(phase-36): add verified Stripe webhooks, 1-tap zero-PII pay links, and Hobby cron schedule`).
+  - [x] 37.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Phase 37 scope and architecture before modifying application code.
+- [x] 37.1 Multi-Tenant Security Rules & Server Auth Isolation:
+  - [x] 37.1.1 Update `firestore.rules`: block `corporateAccountId` & `corporateAccountNumber` on `/users/{userId}` self-create and self-update; add `isCorporateManagerFor(accountId)`; scope `/corporateAccounts/{accountId}` (`get` + safe self-service `update` allowlist only), `/corporateLookup/{lookupKey}` (PO hash rotation only), `/trips/{tripId}` (`get`/`list`/`create`), `/invoices/{invoiceId}` (`get`/`list`), and `/payLinks/{payToken}` (invoice pay links).
+  - [x] 37.1.2 Update `app/core/services/auth/server-auth.server.ts` (`verifyServerRequestAuth`) and `app/core/services/payments/pay-link.server.ts` (`POST /api/pay` `create_link`) so `corporate_manager` can generate/open 1-tap Pay Links strictly for invoices matching their `auth.corporateAccountId` (`403` on cross-tenant invoices).
+- [x] 37.2 RBAC, Config Types & Multi-Workspace Routing:
+  - [x] 37.2.1 Extend `UserRole` (`'corporate_manager'`) and `AdminUser` (`corporateAccountId`, `corporateAccountNumber`) in `app/core/services/auth/admin-auth.service.ts`; extend `CorporateAccountConfig` in `app/core/types/config.ts` and `Trip.corporateAccountId` in `app/core/types/trip.ts`.
+  - [x] 37.2.2 Register `'corporate'` workspace (`/app/corporate` + legacy `/corporate` redirect) across `workspace-routing.util.ts`, `app.hub.tsx`, `RoleViewSwitcher.tsx`, `UserDropdown.tsx`, `legacy.redirect.tsx`, and `app/routes.ts`.
+- [x] 37.3 Corporate Portal Domain Service (`app/core/services/corporate-portal.service.ts`):
+  - [x] 37.3.1 Implement `getCorporateDashboardSummary`, `getCorporateTrips`, `exportCorporateTripsCsv`, `getCorporateInvoices`, `getCorporatePrintableInvoice`, `updateCorporateTeamAndSettings`, `rotateCorporatePoSelfService`, and `provisionCorporatePortalManager` (updating `corporate-account.service.ts` for non-dispatcher self-service PO rotation compatibility).
+- [x] 37.4 Corporate Workspace UI & Admin Client Provisioning:
+  - [x] 37.4.1 Enhance `BookingEngineV2.tsx` (plus `firebase-booking.service.ts` / `mock-booking.service.ts`) with `corporatePortalContext` pre-binding, locked/pre-verified corporate account fields, cost center metadata, and top-level `Trip.corporateAccountId` stamping.
+  - [x] 37.4.2 Build `app/routes/corporate.tsx` (`/app/corporate`) with `corporate_manager` + `admin` guard, **Admin Account Preview Selector**, and 4-tab Executive Clean B2B interface (Overview & Live Rides, Book Company Ride, Team/Locations/PO Security, Statements & Billing with Printable PDF & 1-Tap Pay Invoice Now).
+  - [x] 37.4.3 Add **Provision Corporate Portal Manager** action modal/drawer section in `AdminCustomersSubpage.tsx` assigning `roles: ['corporate_manager']`, `corporateAccountId`, and `corporateAccountNumber` onto `/users/{uid}`, recording `account.portalManagers`, and rendering copyable `/app/corporate` login instructions.
+- [x] 37.5 Verification Gate:
+  - [x] 37.5.1 Create `scripts/test-corporate-portal.ts` testing workspace routing, strict tenant isolation, `firestore.rules` invariants, credit-limit utilization math, CSV trip export, self-service PO rotation audit trail, and cross-tenant (`403`) vs own-tenant (`200`) invoice Pay Link generation.
+  - [x] 37.5.2 Run `npm run typecheck`, `npm run build`, `npx tsx scripts/test-corporate-portal.ts`, `npx tsx scripts/test-payment-webhooks-and-links.ts`, and `npm run test:e2e`, then mark Phase 37 complete in `tasks.md`.
+
+
 
 
 

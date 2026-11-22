@@ -7,6 +7,7 @@ import {
   ShieldCheckIcon,
   RadioIcon,
   CarIcon,
+  BuildingIcon,
   UserIcon,
 } from '../../ui/Icons';
 import { getAdminAuthService, type AdminUser } from '../../../core/services/auth/admin-auth.service';
@@ -38,7 +39,7 @@ export interface UserDropdownProps {
   /**
    * Optional override for current active view
    */
-  currentView?: 'admin' | 'dispatch' | 'driver' | 'app' | 'customer';
+  currentView?: 'admin' | 'dispatch' | 'driver' | 'corporate' | 'app' | 'customer';
   /**
    * Trigger button style variant:
    * 'minimized': compact profile picture + down arrow (default, saves header space)
@@ -104,6 +105,8 @@ export function UserDropdown({
         ? 'dispatch'
         : window.location.pathname.startsWith('/app/driver') || window.location.pathname.startsWith('/driver')
         ? 'driver'
+        : window.location.pathname.startsWith('/app/corporate') || window.location.pathname.startsWith('/corporate')
+        ? 'corporate'
         : window.location.pathname.startsWith('/app/passenger')
         ? 'app'
         : 'public'
@@ -277,6 +280,32 @@ export function UserDropdown({
                     </div>
                     {currentPath === 'driver' ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        Active
+                      </span>
+                    ) : (
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                    )}
+                  </button>
+                )}
+
+                {accessibleWorkspaces.some((w) => w.id === 'corporate') && (
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateView('/app/corporate')}
+                    className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+                      currentPath === 'corporate'
+                        ? 'bg-indigo-50 text-indigo-900 font-semibold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-100/80 flex items-center justify-center shrink-0">
+                        <BuildingIcon className="w-3.5 h-3.5 text-indigo-700" />
+                      </div>
+                      <span>Corporate Portal</span>
+                    </div>
+                    {currentPath === 'corporate' ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
                         Active
                       </span>
                     ) : (

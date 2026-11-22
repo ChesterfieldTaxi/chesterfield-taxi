@@ -19,7 +19,7 @@ import {
 import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseApp, isFirebaseConfigured } from '../firebase';
 
-export type UserRole = 'customer' | 'driver' | 'dispatcher' | 'admin';
+export type UserRole = 'customer' | 'driver' | 'dispatcher' | 'admin' | 'corporate_manager';
 
 export interface AdminUser {
   uid: string;
@@ -31,12 +31,15 @@ export interface AdminUser {
   phone?: string;
   status?: 'active' | 'inactive' | 'suspended';
   assignedVehicleUnit?: string;
+  corporateAccountId?: string;
+  corporateAccountNumber?: string;
   isArchived?: boolean;
   isBlacklisted?: boolean;
   blacklistReason?: string;
 }
 
 const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
+export const LOCAL_CORPORATE_MANAGERS_KEY = 'ct_provisioned_corporate_managers';
 
 export class AdminAuthService {
   private isConfigured: boolean;
@@ -53,6 +56,8 @@ export class AdminAuthService {
     isBlacklisted?: boolean;
     blacklistReason?: string;
     assignedVehicleUnit?: string;
+    corporateAccountId?: string;
+    corporateAccountNumber?: string;
   }> {
     if (!this.isConfigured) return { roles: ['customer'] };
 
@@ -87,6 +92,14 @@ export class AdminAuthService {
           isBlacklisted: data?.isBlacklisted,
           blacklistReason: data?.blacklistReason,
           assignedVehicleUnit: data?.assignedVehicleUnit || data?.assignedUnit,
+          corporateAccountId:
+            typeof data?.corporateAccountId === 'string' && data.corporateAccountId.trim()
+              ? data.corporateAccountId.trim()
+              : undefined,
+          corporateAccountNumber:
+            typeof data?.corporateAccountNumber === 'string' && data.corporateAccountNumber.trim()
+              ? data.corporateAccountNumber.trim()
+              : undefined,
         };
       }
 
@@ -103,6 +116,8 @@ export class AdminAuthService {
           isBlacklisted: this.cachedUser.isBlacklisted,
           blacklistReason: this.cachedUser.blacklistReason,
           assignedVehicleUnit: this.cachedUser.assignedVehicleUnit,
+          corporateAccountId: this.cachedUser.corporateAccountId,
+          corporateAccountNumber: this.cachedUser.corporateAccountNumber,
         };
       }
       return { roles: ['customer'] };
@@ -199,6 +214,8 @@ export class AdminAuthService {
               isBlacklisted: profile.isBlacklisted,
               blacklistReason: profile.blacklistReason,
               assignedVehicleUnit: profile.assignedVehicleUnit,
+              corporateAccountId: profile.corporateAccountId,
+              corporateAccountNumber: profile.corporateAccountNumber,
             };
             this.cachedUser = hydrated;
             callback(hydrated);
@@ -259,6 +276,8 @@ export class AdminAuthService {
           isBlacklisted: profile.isBlacklisted,
           blacklistReason: profile.blacklistReason,
           assignedVehicleUnit: profile.assignedVehicleUnit,
+          corporateAccountId: profile.corporateAccountId,
+          corporateAccountNumber: profile.corporateAccountNumber,
         };
         this.cachedUser = signedInUser;
         return signedInUser;
@@ -273,11 +292,45 @@ export class AdminAuthService {
       throw new Error('Access Denied: Account is blacklisted.');
     }
 
+    // Check locally provisioned corporate managers (offline mode)
+    if (typeof window !== 'undefined') {
+      try {
+        const rawMgrs = window.localStorage.getItem(LOCAL_CORPORATE_MANAGERS_KEY);
+        if (rawMgrs) {
+          const mgrs = JSON.parse(rawMgrs) as Array<{
+            uid: string;
+            email: string;
+            displayName?: string;
+            roles: UserRole[];
+            corporateAccountId: string;
+            corporateAccountNumber: string;
+          }>;
+          const matchedMgr = mgrs.find((m) => m.email.toLowerCase() === trimmedEmail);
+          if (matchedMgr) {
+            const demoMgr: AdminUser = {
+              uid: matchedMgr.uid,
+              email: matchedMgr.email,
+              displayName: matchedMgr.displayName || 'Corporate Manager',
+              isDemo: true,
+              role: matchedMgr.roles[0] || 'corporate_manager',
+              roles: matchedMgr.roles,
+              corporateAccountId: matchedMgr.corporateAccountId,
+              corporateAccountNumber: matchedMgr.corporateAccountNumber,
+            };
+            window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoMgr));
+            this.cachedUser = demoMgr;
+            return demoMgr;
+          }
+        }
+      } catch {}
+    }
+
     if (
       trimmedEmail === 'admin@chesterfieldtaxi.com' ||
       trimmedEmail.includes('admin') ||
       trimmedEmail.includes('dispatch') ||
       trimmedEmail.includes('driver') ||
+      trimmedEmail.includes('corporate') ||
       trimmedEmail.includes('customer')
     ) {
       const role: UserRole = trimmedEmail.includes('admin')
@@ -286,6 +339,8 @@ export class AdminAuthService {
         ? 'driver'
         : (trimmedEmail.includes('dispatch') || trimmedEmail.includes('dispatcher'))
         ? 'dispatcher'
+        : trimmedEmail.includes('corporate')
+        ? 'corporate_manager'
         : 'customer';
       const demoUser: AdminUser = {
         uid: 'demo_user_uid_001',
@@ -295,6 +350,9 @@ export class AdminAuthService {
         isDemo: true,
         role,
         roles: [role],
+        ...(role === 'corporate_manager'
+          ? { corporateAccountId: 'corp-001', corporateAccountNumber: 'CORP-BAY-902' }
+          : {}),
       };
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
@@ -391,8 +449,8 @@ export class AdminAuthService {
         const cred = await signInWithPopup(auth, provider);
 
         await this.ensureOAuthCustomerProfile(cred.user);
-        // Fetch user role
-        const roles = await this.fetchUserRoles(cred.user);
+        const profile = await this.fetchUserProfileData(cred.user);
+        const roles = profile.roles;
         
         return {
           uid: cred.user.uid,
@@ -400,6 +458,8 @@ export class AdminAuthService {
           displayName: cred.user.displayName,
           role: roles[0] || role,
           roles,
+          corporateAccountId: profile.corporateAccountId,
+          corporateAccountNumber: profile.corporateAccountNumber,
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth Google sign-in error:', err);
@@ -417,8 +477,8 @@ export class AdminAuthService {
         const cred = await signInWithPopup(auth, provider);
 
         await this.ensureOAuthCustomerProfile(cred.user);
-        // Fetch user role
-        const roles = await this.fetchUserRoles(cred.user);
+        const profile = await this.fetchUserProfileData(cred.user);
+        const roles = profile.roles;
         
         return {
           uid: cred.user.uid,
@@ -426,6 +486,8 @@ export class AdminAuthService {
           displayName: cred.user.displayName,
           role: roles[0] || role,
           roles,
+          corporateAccountId: profile.corporateAccountId,
+          corporateAccountNumber: profile.corporateAccountNumber,
         };
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth Facebook sign-in error:', err);
