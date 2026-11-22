@@ -300,7 +300,7 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     `Server email-templates leaked into client bundle assets: ${emailTemplateChunks.join(', ')}`
   );
 
-  // 6. Dual Booking Engine & Dispatch Workspace monolith prevention line-budget assertions
+  // 6. Dual Booking Engine, Dispatch Workspace, Heavy Admin Subpages & Wave 2 Services monolith prevention line-budget assertions
   const monolithBudgets: Array<{ relFile: string; maxLines: number }> = [
     { relFile: 'app/components/domain/BookingEngineV2.tsx', maxLines: 1800 },
     { relFile: 'app/components/domain/dispatch/DispatchBookingEngine.tsx', maxLines: 1800 },
@@ -308,6 +308,11 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     { relFile: 'app/components/domain/dispatch/DispatchTripQueuePane.tsx', maxLines: 1200 },
     { relFile: 'app/components/domain/dispatch/DispatchTripDetailsDrawer.tsx', maxLines: 1500 },
     { relFile: 'app/components/domain/dispatch/CommsHub.tsx', maxLines: 1800 },
+    { relFile: 'app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx', maxLines: 1400 },
+    { relFile: 'app/components/domain/admin/AdminZonesTab.tsx', maxLines: 1300 },
+    { relFile: 'app/core/services/comms/telephony-gateway.server.ts', maxLines: 1400 },
+    { relFile: 'app/core/services/email/dispatch-email.service.ts', maxLines: 1400 },
+    { relFile: 'app/core/services/email/dispatch-email.server.ts', maxLines: 1400 },
   ];
   const monolithLineSummary: string[] = [];
 

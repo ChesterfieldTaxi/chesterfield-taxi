@@ -726,4 +726,20 @@
   - [x] 46.4.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert `app/routes/dispatch.tsx < 2000`L, `DispatchTripQueuePane.tsx < 1200`L, `DispatchTripDetailsDrawer.tsx < 1500`L, and `CommsHub.tsx < 1800`L.
   - [x] 46.4.2 Pass `npm run typecheck`, `npm run build`, `npx tsx scripts/test-trip-queue-responsive.ts`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-comms-multichannel-ui.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, mark Phase 46 complete in `tasks.md`, and leave Phase 46 changes uncommitted for Control-Tower review.
 
+## Phase 47 (Wave 3 Phase 4): Heavy Admin Subpages & Wave 2 Domain Service Split
+- [x] 47.0 Baseline Hygiene & Specification Sync:
+  - [x] 47.0.1 Commit reviewed Phase 46 baseline cleanly on `main` (`feat(phase-46): decompose dispatch workspace/drawers/comms and add responsive trip queue auto-cards`).
+  - [x] 47.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 47 scope, module boundaries, and monolith line-count guardrails before making Phase 47 code edits.
+- [x] 47.1 Decompose Heavy Admin Subpages (`AdminInvoicingSubpage.tsx` `< 1,200`L & `AdminZonesTab.tsx` `< 1,100`L):
+  - [x] 47.1.1 Extract `InvoiceLedgerTable.tsx`, `InvoiceBuilderModal.tsx`, `CorporateAccountsPanel.tsx`, `DriverPayoutsPanel.tsx`, `useAdminInvoicingActions.ts`, and `index.ts` under `app/components/domain/admin/invoicing/`, and refactor `app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx` (`308` lines `< 1,200` lines) preserving all existing props and exports.
+  - [x] 47.1.2 Extract `ZoneDirectoryListPane.tsx`, `ZoneInspectorEditorPane.tsx`, `ZonePolygonMapCanvas.tsx`, `useAdminZonesController.ts`, `types.ts`, and `index.ts` under `app/components/domain/admin/zones/`, and refactor `app/components/domain/admin/AdminZonesTab.tsx` (`242` lines `< 1,100` lines) preserving all existing props and exports.
+- [x] 47.2 Modularize Wave 2 Domain Services (`< 1,300` lines each):
+  - [x] 47.2.1 Split `app/core/services/comms/telephony-gateway.server.ts` (`1,006` lines `< 1,300` lines) by extracting `telephony-credentials.server.ts`, `telephony-twiml-webhooks.server.ts`, and `telephony-outbound-rest.server.ts` under `app/core/services/comms/` and re-exporting every existing public function, constant, and type.
+  - [x] 47.2.2 Split `app/core/services/email/dispatch-email.service.ts` (`1,244` lines `< 1,300` lines) by extracting static seed emails, folder/badge configs, canned dispatch templates, pure filter/interpolation/payload helpers, and sender timeline resolution into client-safe `app/core/services/email/dispatch-email-catalog.ts` and `app/core/services/email/dispatch-email-timeline.ts` and re-exporting every existing public symbol.
+  - [x] 47.2.3 Split `app/core/services/email/dispatch-email.server.ts` (`1,135` lines `< 1,300` lines) by extracting shared server store/persistence helpers and Svix HMAC verification + Resend inbound/delivery webhook handlers into `app/core/services/email/dispatch-email-store.server.ts` and `app/core/services/email/dispatch-email-webhook.server.ts` and re-exporting every existing public symbol.
+- [x] 47.3 Monolith Prevention Guardrails & Master Verification Gate:
+  - [x] 47.3.1 Extend `monolithBudgets` in `scripts/test-browser-smoke.ts` to assert `AdminInvoicingSubpage.tsx < 1400`L, `AdminZonesTab.tsx < 1300`L, `telephony-gateway.server.ts < 1400`L, `dispatch-email.service.ts < 1400`L, and `dispatch-email.server.ts < 1400`L.
+  - [x] 47.3.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-dispatch-email-webhook.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, mark Phase 47 complete in `tasks.md`, and leave Phase 47 changes uncommitted for Control-Tower review.
+
+
 

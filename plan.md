@@ -1155,5 +1155,50 @@ export interface PassengerAccount {
   - `app/components/domain/dispatch/DispatchTripDetailsDrawer.tsx < 1500` lines
   - `app/components/domain/dispatch/CommsHub.tsx < 1800` lines
 
+## 36. Phase 47 Architecture (Wave 3 Phase 4): Heavy Admin Subpages & Wave 2 Domain Service Split
+
+### 36.1 Strict Zero-Behavior-Change, Bundle & Security Guardrails (`constitution.md`)
+- **Zero-Behavior-Change Invariants**:
+  - Preserve 100% of invoicing & AR reconciliation math, corporate PO governance/CSV import/batch invoicing, driver payout & commission split calculations, geofence polygon/circle/group/collection/blacklist logic, Twilio `X-Twilio-Signature` HMAC-SHA1 verification, signed `audio_proxy` token streaming, WebRTC softphone JWT issuance, Resend Svix HMAC-SHA256 webhook verification & RFC email threading, and React 19 SSR hydration determinism.
+  - Keep all 14 `/api/*` client route chunks `< 1024` bytes (`0.00 kB`), `admin-*.js` `< 150 KB`, zero `email-templates-*.js` client chunks, zero secret-shaped literals across `app/` and `scripts/` (`constitution.md` Section 3), and `"0 10 * * *"` in `vercel.json`.
+
+### 36.2 Admin Subpages Decomposition (`AdminInvoicingSubpage.tsx` `< 1,200`L & `AdminZonesTab.tsx` `< 1,100`L)
+- **Admin Invoicing Modules (`app/components/domain/admin/invoicing/`)**:
+  - `useAdminInvoicingActions.ts`: Encapsulates AR & invoice state derivations, QuickBooks/CSV/GL export actions, 1-tap Stripe invoice pay-link copy/email, corporate batch invoicing, PO regeneration/CSV import callbacks, billing/driver commission policy persistence, and Stripe/Square/Twilio live credential testers.
+  - `InvoiceLedgerTable.tsx`: Renders the 4 KPI summary cards (`Total Unbilled AR`, `Outstanding >30d`, `Settled Revenue This Month`, `Total Invoiced`) and dual-mode `Accounts Receivable Transactions Ledger` (`ar_ledger` mobile cards + desktop table) / `Invoiced & Reconciled Statements` (`invoices` mobile cards + desktop table).
+  - `InvoiceBuilderModal.tsx`: Renders the mobile-sheet-enabled `New Corporate Account` modal, `New Invoice` builder modal, and printable PDF Invoice Preview modal (`#printable-invoice-modal` with 1-tap pay link remittance footer).
+  - `CorporateAccountsPanel.tsx`: Renders the `Corporate Accounts` sub-view (search/status/PO filters, paginated corporate cards with Active PO Authorization & Fraud Prevention controls, financial terms, and `RegeneratePoModal` / `PoHistoryModal` / `CorporateCsvImportModal` bindings).
+  - `DriverPayoutsPanel.tsx`: Renders the `Accounting Sync & General Ledger` (including `driver_payout` disbursements), `Payment Gateways & Terminals` (Stripe, Square, and `Default Driver Commission Split` / billing policies), and `Twilio Telephony & Voice/SMS Tester` sub-views.
+  - `AdminInvoicingSubpage.tsx` (`< 1,200` lines): Clean orchestrator preserving `export type InvoicingSubTab` and `export function AdminInvoicingSubpage`.
+- **Admin Zones Modules (`app/components/domain/admin/zones/`)**:
+  - `types.ts` & `useAdminZonesController.ts`: Shared sub-tab/map/archive types, coordinate projection helpers, SSR-deterministic state, `ZoneService` subscriptions, memoized filters, and CRUD/consolidation/archive handlers.
+  - `ZoneDirectoryListPane.tsx`: Sub-tab top action bar (`ZoneSubTabActionBar`), filter controls, and left-column directory lists for `Operational Geofences` (`zones`), `Zone Groups` (`groups`), `Location Collections` (`collections`), and `Blacklists` (`blacklists`).
+  - `ZoneInspectorEditorPane.tsx`: Editor drawers/forms for creating and editing individual Zones (polygon/circle geometry, airport/FBO/surcharge flags), Zone Groups, Location Collections (POI search & radius buffers), and Restricted Blacklists.
+  - `ZonePolygonMapCanvas.tsx`: Interactive Google Maps (`InteractiveZoneGoogleMap`) & schematic SVG workspace, vertex drawing/undo/4-point-box/clear controls, and bottom live selection HUD.
+  - `AdminZonesTab.tsx` (`< 1,100` lines): Clean orchestrator preserving `export interface AdminZonesTabProps`, `export type AdminZonesSubTab`, and `export function AdminZonesTab`.
+
+### 36.3 Wave 2 Domain Services Split (`< 1,300`L each)
+- **Telephony Gateway Split (`app/core/services/comms/`)**:
+  - `telephony-credentials.server.ts`: Types & action sets (`TelephonyActionName`, `TelephonyApiRequest`, `StoredVoicemail`, `StoredSms`, `TWILIO_WEBHOOK_ACTIONS`, `DISPATCHER_ONLY_TELEPHONY_ACTIONS`, `OPERATOR_TELEPHONY_ACTIONS`, `TelephonyHttpHandlerOptions`, `TwilioWebhookSignatureResult`), bounded in-memory store & `resetTelephonyGatewayStoreForTests()`, `computeTwilioWebhookSignature` & `verifyTwilioWebhookSignature` (HMAC-SHA1 + `timingSafeEqual`), `signAudioProxyToken` / `buildSignedAudioProxyUrl` / `verifyAudioProxyToken` / `handleTelephonyAudioProxyGet`, `resolveCredentials`, `buildVoiceTokenResponse`, and `buildSyncCommsPayload`.
+  - `telephony-twiml-webhooks.server.ts`: Inbound & callback TwiML/webhook handlers for GET and POST (`handleTelephonyWebhookGet`, `handleTelephonyWebhookPostAction`).
+  - `telephony-outbound-rest.server.ts`: Outbound PSTN `make_call`, `send_sms`, and `save_credentials` / `verify_credentials` Twilio REST handlers (`handleSaveOrVerifyTelephonyCredentialsPost`, `handleOutboundMakeCallPost`, `handleOutboundSendSmsPost`).
+  - `telephony-gateway.server.ts` (`< 1,300` lines): Orchestrates `handleTelephonyGet` and `handleTelephonyPost` and **re-exports 100% of existing public symbols and types** so `api.telephony.ts`, `api.telephony.verify.ts`, and `scripts/test-comms-threads-telephony.ts` require zero changes.
+- **Client/Pure Dispatch Email Service Split (`app/core/services/email/`)**:
+  - `dispatch-email-catalog.ts` & `dispatch-email-timeline.ts` (strictly client-safe: zero `*.server` or `node:*` imports): Storage keys, folder & badge configs (`DISPATCH_EMAIL_FOLDER_CONFIGS`, `DISPATCH_EMAIL_DELIVERY_BADGE_CONFIG`, `DISPATCH_EMAIL_CATEGORY_BADGE_CONFIG`), canned dispatch email templates & interpolation (`CANNED_DISPATCH_EMAIL_TEMPLATES`, `interpolateDispatchEmailTemplate`, `getCannedDispatchTemplateById`), pure filter/search/folder-count/conversation-thread helpers, `formatDispatchEmailTimestamp`, `buildTripTrackingUrl`, `parseRequestedPickupDateTime`, `buildPopulateBookingPayloadFromEmail`, `buildPopulateRebookPayloadFromTrip`, `buildReplyOrForwardDraftSeed`, `buildDefaultSampleDispatchEmails`, `isActiveOrUpcomingTripStatus`, and `resolveSenderCrossChannelTimeline`.
+  - `dispatch-email.service.ts` (`< 1,300` lines): Retains `DispatchEmailService` and `getDispatchEmailService()` and **re-exports 100% of existing public symbols and types** from `./dispatch-email-catalog` and `./dispatch-email-timeline`.
+- **Server Dispatch Email & Webhook Engine Split (`app/core/services/email/`)**:
+  - `dispatch-email-store.server.ts`: Shared `DispatchEmailServerStore` (`getDispatchEmailServerStore`, `resetDispatchEmailServerStoreForTests`), env/auth policy readers, RFC parent lookup, and Firestore REST persistence helpers.
+  - `dispatch-email-webhook.server.ts`: Svix HMAC-SHA256 signature calculation & verification (`DEFAULT_SVIX_TOLERANCE_SECONDS`, `ResendWebhookSignatureResult`, `computeResendWebhookSignature`, `verifyResendWebhookSignature`), Resend inbound `email.received` & delivery status (`email.sent`, `email.delivered`, `email.bounced`, `email.complained`, `email.delivery_delayed`, `email.failed`) handlers, `flushAndSyncDispatchEmailsServer`, `getDispatchEmailDiagnostics`, and `handleEmailWebhookGet` / `handleEmailWebhookPost`.
+  - `dispatch-email.server.ts` (`< 1,300` lines): Retains outbound RFC Message-ID & customer/composer email dispatch (`handleSendEmailPost`, `handleSendEmailGet`) and **re-exports 100% of existing public symbols and types** from `./dispatch-email-store.server` and `./dispatch-email-webhook.server` so `api.email.webhook.ts`, `api.send-email.ts`, `scripts/test-dispatch-email-webhook.ts`, and `scripts/test-email-dock-service.ts` require zero changes.
+
+### 36.4 Monolith Prevention Guardrails (`scripts/test-browser-smoke.ts`)
+- Extends `monolithBudgets` in `verifyCutoverConfigInvariants` (`scripts/test-browser-smoke.ts`) to assert:
+  - `app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx < 1400` lines
+  - `app/components/domain/admin/AdminZonesTab.tsx < 1300` lines
+  - `app/core/services/comms/telephony-gateway.server.ts < 1400` lines
+  - `app/core/services/email/dispatch-email.service.ts < 1400` lines
+  - `app/core/services/email/dispatch-email.server.ts < 1400` lines
+
+
 
 

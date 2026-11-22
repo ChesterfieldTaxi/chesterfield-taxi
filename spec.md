@@ -936,4 +936,23 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Automated Monolith Prevention Guardrails (`scripts/test-browser-smoke.ts`)**:
   - Extends `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert line-count ceilings: `app/routes/dispatch.tsx < 2000` lines, `DispatchTripQueuePane.tsx < 1200` lines, `DispatchTripDetailsDrawer.tsx < 1500` lines, and `CommsHub.tsx < 1800` lines.
 
+## 47. Phase 47 (Wave 3 Phase 4): Heavy Admin Subpages & Wave 2 Domain Service Split
+- **Strictly Zero-Behavior-Change Structural Refactor**:
+  - Preserves 100% of existing invoicing & Accounts Receivable math, corporate PO anti-fraud & batch billing workflows, driver commission/payout calculations, geofence polygon/circle/group/collection/blacklist spatial logic, Twilio `X-Twilio-Signature` HMAC-SHA1 verification, `audio_proxy` HMAC query token auth, WebRTC voice token issuance & PSTN fallback, Resend Svix HMAC-SHA256 webhook verification & RFC `Message-ID`/`In-Reply-To`/`References` email threading, deterministic React 19 SSR hydration, zero secret-shaped literals (`constitution.md` Section 3), and Vercel Hobby cron (`"0 10 * * *"`).
+- **Heavy Admin Subpages Decomposition (`AdminInvoicingSubpage.tsx` `< 1,200`L & `AdminZonesTab.tsx` `< 1,100`L)**:
+  - Splits `app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx` into focused modules under `app/components/domain/admin/invoicing/` (`InvoiceLedgerTable.tsx`, `InvoiceBuilderModal.tsx`, `CorporateAccountsPanel.tsx`, `DriverPayoutsPanel.tsx`, `useAdminInvoicingActions.ts`, `index.ts`) while preserving `AdminInvoicingSubpage`, `AdminInvoicingSubpageProps`, and `InvoicingSubTab` exports.
+  - Splits `app/components/domain/admin/AdminZonesTab.tsx` into focused modules under `app/components/domain/admin/zones/` (`ZoneDirectoryListPane.tsx`, `ZoneInspectorEditorPane.tsx`, `ZonePolygonMapCanvas.tsx`, `useAdminZonesController.ts`, `types.ts`, `index.ts`) while preserving `AdminZonesTab`, `AdminZonesTabProps`, and `AdminZonesSubTab` exports.
+- **Wave 2 Domain Services Modularization (`< 1,300` lines each)**:
+  - Splits `app/core/services/comms/telephony-gateway.server.ts` into `telephony-credentials.server.ts` (env/credential resolution, `X-Twilio-Signature` HMAC-SHA1 verification, signed `audio_proxy` token helpers & streaming proxy, WebRTC voice JWT token builder, in-memory test store), `telephony-twiml-webhooks.server.ts` (inbound/outbound TwiML & call/recording/voicemail/SMS webhook handlers), and `telephony-outbound-rest.server.ts` (outbound PSTN `make_call`, `send_sms`, and Twilio REST credential verification), keeping `telephony-gateway.server.ts` (`< 1,300`L) as the orchestrator re-exporting 100% of existing public functions, constants, and types (`0.00 kB` client API chunks).
+  - Splits `app/core/services/email/dispatch-email.service.ts` by extracting static seed emails, folder/badge configs, canned dispatch email templates, variable interpolation, and pure filter/conversation/booking-payload helpers into `app/core/services/email/dispatch-email-catalog.ts` and multi-channel sender timeline resolution into `app/core/services/email/dispatch-email-timeline.ts` (both strictly client-safe: zero `*.server` or `node:*` imports) and re-exporting every existing public symbol from `dispatch-email.service.ts` (`< 1,300`L).
+  - Splits `app/core/services/email/dispatch-email.server.ts` by extracting shared server store/persistence helpers into `app/core/services/email/dispatch-email-store.server.ts` and Svix HMAC-SHA256 signature verification, Resend inbound `email.received` & delivery status webhook handlers, diagnostics, and server sync helpers into `app/core/services/email/dispatch-email-webhook.server.ts`, re-exporting every existing public symbol from `dispatch-email.server.ts` (`< 1,300`L) so `/api/email/webhook` and `/api/send-email` remain `0.00 kB` client chunks with zero caller modifications.
+- **Automated Monolith Prevention Guardrails (`scripts/test-browser-smoke.ts`)**:
+  - Extends `monolithBudgets` in `scripts/test-browser-smoke.ts` to assert:
+    - `app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx < 1400` lines
+    - `app/components/domain/admin/AdminZonesTab.tsx < 1300` lines
+    - `app/core/services/comms/telephony-gateway.server.ts < 1400` lines
+    - `app/core/services/email/dispatch-email.service.ts < 1400` lines
+    - `app/core/services/email/dispatch-email.server.ts < 1400` lines
+
+
 
