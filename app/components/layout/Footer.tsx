@@ -23,17 +23,11 @@ const QUICK_LINKS = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const [company, setCompany] = React.useState<CompanyConfig>(() => {
-    try {
-      return getAdminConfigService().getCachedSettings().company;
-    } catch {
-      return {
-        name: COMPANY_CONFIG.name,
-        phone: COMPANY_CONFIG.phone.dispatch,
-        email: COMPANY_CONFIG.email.dispatch,
-        address: COMPANY_CONFIG.address.formatted,
-      };
-    }
+  const [company, setCompany] = React.useState<CompanyConfig>({
+    name: COMPANY_CONFIG.name,
+    phone: COMPANY_CONFIG.phone.dispatch,
+    email: COMPANY_CONFIG.email.dispatch,
+    address: COMPANY_CONFIG.address.formatted,
   });
 
   React.useEffect(() => {
@@ -44,6 +38,7 @@ export function Footer() {
           setCompany(settings.company);
         }
       };
+      applySettings(configService.getCachedSettings());
       const unsub =
         typeof configService.subscribeToSettings === 'function'
           ? configService.subscribeToSettings(applySettings)

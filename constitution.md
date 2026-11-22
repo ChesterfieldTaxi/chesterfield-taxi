@@ -11,3 +11,6 @@
 - **Config-Driven UI:** UI generation and multi-step form rendering must heavily rely on configuration objects (e.g., forms, steps, validation schemas, and pricing configurations) rather than hardcoded JSX. This ensures maximum maintainability and flexibility for future updates.
 - **Strict Abstraction:** Domain logic must not leak into UI components. UI components strictly consume services and configurations.
 - **No Executable Code Yet:** This document, alongside the accompanying SDD documents, explicitly outlines the project constraints. Implementation code will follow strictly after specification approval.
+
+## 3. Security & Test Fixture Hygiene
+- **Zero Secret-Shaped Literals in Code or Tests:** Never commit real credentials or synthetic placeholder strings shaped like live provider tokens (e.g., `AC` + 32 hex chars, `SK` + 32 hex chars, `sk_live_`/`sk_test_`, `rk_live_`/`rk_test_`, raw `whsec_` base64, raw `re_` keys, `SG.`, `AKIA`, or PEM private keys) in `app/` or `scripts/`. Always use explicit non-hex fixture labels such as `AC_TEST_FIXTURE`, `SK_TEST_FIXTURE`, `whsec_test_fixture`, or `re_test_fixture` so automated secret scanners and GitHub Push Protection are never tripped by mock data.

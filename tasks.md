@@ -661,6 +661,20 @@
   - [x] 42.4.1 Create and run `scripts/test-comms-multichannel-ui.ts` verifying all 6 canned SMS templates + STL T1/T2/SUS FBO interpolation + zero raw `{...}` tokens, `resolveCommsCrmContext`, multi-channel thread list/timeline interleaving + filtering + `OPEN_EMAIL_MESSAGE` / `OPEN_COMMS_THREAD` routing, and `constitution.md` guardrails.
   - [x] 42.4.2 Run `npx tsx scripts/test-email-dock-service.ts`, `npx tsx scripts/test-dispatch-email-webhook.ts`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (`0.00 kB` `/api/*` client chunks), then mark Phase 42 complete in `tasks.md`.
 
+## Phase 43 (Wave 2 Phase 5): Production Cutover Readiness, Firestore Rules/Indexes Alignment & Headless Browser Smoke Suite
+- [x] 43.0 Baseline Hygiene & Specification Sync:
+  - [x] 43.0.1 Commit reviewed Phase 42 baseline cleanly (`feat(phase-42): upgrade CommsHub multi-channel threads, dynamic canned SMS templates, and live caller CRM context`).
+  - [x] 43.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 43 scope and architecture.
+- [x] 43.1 Firestore Rules Audit & Composite Indexes (`firestore.rules` + `firestore.indexes.json`):
+  - [x] 43.1.1 Audit and harden CEL-safe map key checks (`'key' in map`) and strict role/tenant boundaries across `/users`, `/trips`, `/tripTracking`, `/tripTrackingLookup`, `/payLinks`, `/paymentWebhookEvents`, `/flightStatusCache`, `/commsThreads`, `/commsEvents`, `/telephonyWebhookEvents`, `/dispatchEmails`, `/emailWebhookEvents`, `/corporateAccounts`, `/corporateLookup`, and `/invoices` in `firestore.rules`.
+  - [x] 43.1.2 Update `firestore.indexes.json` (preserving the 2 existing `trips` indexes) to add composite indexes for `trips` (`corporateAccountId` + `createdAt` DESC, `corporateAccountId` + `scheduledPickupTime` DESC), `invoices` (`corporateAccountId` + `issuedDate` DESC), `commsEvents` (`threadId` + `timestampMs` ASC/DESC), and `dispatchEmails` (`folder` + `timestampMs` DESC, `threadId` + `timestampMs` ASC).
+- [x] 43.2 Production Build Server Runner & `puppeteer-core` Headless Browser Smoke Suite:
+  - [x] 43.2.1 Create `scripts/serve-prod-build.ts` exporting `startProdBuildServer({ port?: number })` + direct CLI execution (locating `build/server/index.js` or `build/server/nodejs_*/index.js` via `pathToFileURL`, serving `build/client` + `public` assets with accurate `Content-Type` headers, and forwarding SSR/API requests to `@react-router/node`'s `createRequestListener`), and update `package.json` `"start"` and `"test:smoke"` scripts.
+  - [x] 43.2.2 Create `scripts/test-browser-smoke.ts` using `puppeteer-core` verifying zero React hydration mismatches (`#418` / `#423` / `Hydration failed`) & zero `pageerror` exceptions across all 12 public/customer routes, PWA/manifest/SW integrity, `/api/*` JSON & `401`/`403` unauthenticated security checks, and all 7 `/app*` workspaces with clean `finally` teardown.
+- [x] 43.3 Full Wave 1 + Wave 2 Master Verification Gate:
+  - [x] 43.3.1 Fix returning-visitor SSR/client `localStorage` hydration mismatches (`#418`) uncovered by real Chromium rendering across `root.tsx`, `layout.tsx`, `Navbar.tsx`, `Footer.tsx`, `services.tsx`, `contact.tsx`, `BookingEngineV2.tsx`, `VehicleTierSelector.tsx`, `StripePaymentInput.tsx`, `pay.$payToken.tsx`, `dispatch.tsx`, and `admin.tsx`, then pass `npm run typecheck`, `npm run build` (confirming all 13 `/api/*` client chunks remain `0.00 kB`), `npm run test:smoke`, `npm run test:e2e`, `npm run test:stress`, and all 9 Wave 1 + Wave 2 test suites.
+
+
 
 
 

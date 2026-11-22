@@ -22,15 +22,9 @@ export default function PublicLayout() {
 
   const isPreview = previewParam && isStaffUser;
 
-  const [constructionMode, setConstructionMode] = useState<boolean>(() => {
-    try {
-      const cached = getAdminConfigService().getCachedSettings();
-      if (cached?.constructionMode !== undefined) {
-        return cached.constructionMode;
-      }
-    } catch {}
-    return COMPANY_CONFIG.constructionMode ?? false;
-  });
+  const [constructionMode, setConstructionMode] = useState<boolean>(
+    COMPANY_CONFIG.constructionMode ?? false
+  );
 
   const [branding, setBranding] = useState<BrandingConfig>({
     primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb',

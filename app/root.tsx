@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
   useLocation,
   useNavigate,
+  useRouteLoaderData,
 } from "react-router";
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
@@ -52,8 +53,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const manifestHref = isDriverRoute ? '/manifest-driver.json' : '/manifest.json';
   const appIconHref = isDriverRoute ? '/icon-driver-192.svg' : '/icon-192.svg';
 
+  const rootData = useRouteLoaderData<typeof loader>("root");
   const clientMapsKey =
-    (typeof process !== 'undefined' && (process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY)) ||
+    rootData?.ENV?.VITE_GOOGLE_MAPS_API_KEY ||
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_API_KEY) ||
     DEFAULT_GOOGLE_MAPS_KEY;
 
   const primaryHex = COMPANY_CONFIG.primaryColor || "#2563eb";

@@ -78,18 +78,6 @@ export function VehicleTierSelector({
 
   const [tiers, setTiers] = useState<VehicleTierOption[]>(() => {
     if (options && options.length > 0) return options;
-    const cached = getAdminConfigService().getCachedSettings().vehicles;
-    if (cached && cached.length > 0) {
-      return cached.map((v) => ({
-        value: v.id as VehicleTier,
-        label: v.name,
-        description: v.description || `${v.name} tier`,
-        badge: v.badge,
-        maxPassengers: v.maxPassengers,
-        maxLuggage: v.maxLuggage,
-        iconType: (v.iconType as any) || (v.id as any) || 'standard',
-      }));
-    }
     return DEFAULT_FALLBACK_TIERS;
   });
 
@@ -99,10 +87,10 @@ export function VehicleTierSelector({
       return;
     }
 
-    const unsub = getAdminConfigService().subscribeToSettings((settings) => {
-      if (settings.vehicles && settings.vehicles.length > 0) {
+    const applyVehicles = (vehicles?: any[]) => {
+      if (vehicles && vehicles.length > 0) {
         setTiers(
-          settings.vehicles
+          vehicles
             .filter((v) => !v.isArchived)
             .map((v) => ({
               value: v.id as VehicleTier,
@@ -115,6 +103,11 @@ export function VehicleTierSelector({
             }))
         );
       }
+    };
+
+    applyVehicles(getAdminConfigService().getCachedSettings().vehicles);
+    const unsub = getAdminConfigService().subscribeToSettings((settings) => {
+      applyVehicles(settings.vehicles);
     });
 
     return unsub;

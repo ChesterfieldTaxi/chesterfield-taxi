@@ -995,6 +995,40 @@ export interface PassengerAccount {
 - **`CommsCrmContextBanner.tsx` & `SoftphoneDialerPane.tsx`**:
   - Reusable light/dark CRM banner displaying Blacklist alert (`isBlacklisted`), VIP badge, Corporate Account pill, Accessibility/Vehicle preference tags, Active/Upcoming Trip pill (`Car #`, flight delay badge, 1-tap **Open Trip**), and 1-tap **Rebook Last Ride** (`POPULATE_BOOKING`), rendered in `SmsThreadPane` and `SoftphoneDialerPane` (both during active/ringing calls and live on the dialpad when entered digits match a known contact or trip).
 
+## 32. Phase 43 Architecture (Wave 2 Phase 5): Production Cutover Readiness, Firestore Rules/Indexes Alignment & Headless Browser Smoke Suite
+
+### 32.1 Architectural & Production Cutover Guardrails (`constitution.md`)
+- **Strict Boundary Preservation**:
+  - Keep all 13 `/api/*` resource routes (`api.public-config`, `api.track`, `api.corporate-verify`, `api.send-email`, `api.email.webhook`, `api.seed-stress-data`, `api.payments`, `api.payments.webhook`, `api.pay`, `api.push`, `api.cron.sla-dispatch`, `api.telephony`, `api.telephony.verify`, `api.flight-status` — specifically the 13 zero-byte server-only routes) isolated from client bundles (`0.00 kB` client chunks).
+  - Preserve `"0 10 * * *"` in `vercel.json` untouched for Vercel Hobby compatibility.
+  - Keep production server harness and headless browser verification self-contained inside `scripts/serve-prod-build.ts` and `scripts/test-browser-smoke.ts` using existing `devDependencies` (`puppeteer-core`, `tsx`, `@react-router/node`).
+
+### 32.2 CEL-Safe Firestore Security Rules & Composite Index Matrix (`firestore.rules` + `firestore.indexes.json`)
+- **`firestore.rules` CEL-Safety & RBAC Verification**:
+  - Guard optional map property reads with `'field' in map` checks across document-level `get`, `create`, and `update` rules on `/users`, `/trips`, `/tripTracking`, `/tripTrackingLookup`, `/payLinks`, `/vehicleAssignments`, `/applications`, `/inquiries`, `/corporateAccounts`, `/corporateLookup`, `/invoices`, `/unbilledTransactions`, `/financialLedger`, and `/driverPayouts`, while keeping `allow list` predicates on `/trips` and `/invoices` statically provable for Firestore's query planner.
+  - Maintain strict `allow list: if false;` on zero-PII token/hash lookup collections (`/tripTracking`, `/tripTrackingLookup`, `/payLinks`, `/flightStatusCache`, `/corporateLookup`) and strict `allow read, write: if isDispatcher();` on operational comms, email, and webhook idempotency collections (`/paymentWebhookEvents`, `/commsThreads`, `/commsEvents`, `/telephonyWebhookEvents`, `/dispatchEmails`, `/emailWebhookEvents`).
+- **`firestore.indexes.json` Composite Index Definitions**:
+  - Preserve the 2 baseline `trips` indexes (`status` ASC + `pickupDateTime` ASC; `isAsap` ASC + `status` ASC) and register 7 Wave 1 + Wave 2 composite indexes across `trips` (`corporateAccountId` ASC + `createdAt` DESC; `corporateAccountId` ASC + `scheduledPickupTime` DESC), `invoices` (`corporateAccountId` ASC + `issuedDate` DESC), `commsEvents` (`threadId` ASC + `timestampMs` ASC; `threadId` ASC + `timestampMs` DESC), and `dispatchEmails` (`folder` ASC + `timestampMs` DESC; `threadId` ASC + `timestampMs` ASC).
+
+### 32.3 Vercel-Preset Production Build Server (`scripts/serve-prod-build.ts`)
+- **Dynamic `ServerBuild` Discovery**:
+  - Inspects `build/server/index.js` first and falls back to `build/server/nodejs_*/index.js` produced by `@vercel/react-router/vite` (`vercelPreset()`), importing the module via `pathToFileURL(serverEntryPath).href` for cross-platform Windows/POSIX ESM compatibility.
+  - Hydrates `.env.local` and `.env` into `process.env` (without overriding already-defined environment variables) when started locally.
+- **Static Asset Pipeline & SSR Delegation**:
+  - Serves `GET`/`HEAD` static files from `build/client` and `public` (preventing path traversal and bypassing `/api/*` and React Router `.data` single-fetch endpoints) with accurate `Content-Type` headers, immutable caching on `/assets/*`, `no-cache` + `Service-Worker-Allowed: /` on `/sw.js`, and baseline security headers.
+  - Delegates all SSR document requests, `.data` loader fetches, and `/api/*` actions/loaders to `createRequestListener({ build })` from `@react-router/node`, and exposes `close()` using `server.closeAllConnections()` for deterministic teardown.
+
+### 32.4 Headless Chromium Smoke & Hydration Suite (`scripts/test-browser-smoke.ts`)
+- **Browser Discovery & Instrumentation**:
+  - Resolves `process.env.CHROME_PATH`, Windows Chrome/Edge installation paths, and macOS/Linux Chromium binaries, launching `puppeteer-core` in headless mode against `startProdBuildServer({ port: 0, host: '127.0.0.1' })`.
+  - Records `pageerror`, `console` (`error` and React hydration warnings `#418`, `#423`, `Hydration failed`), same-origin `>= 500` responses, and `/assets/*` chunk failures across:
+    1. Public & customer SSR routes (`/`, `/book`, `/services`, `/about`, `/contact`, `/apply`, `/terms`, `/privacy`, `/track`, `/pay/pay_smoke_invalid_token_check`, `/app/login`, `/app/register`).
+    2. PWA & static endpoints (`/manifest.json`, `/manifest-driver.json`, `/sw.js`).
+    3. Serverless API endpoints (`/api/public-config`, `/api/send-email`, and unauthenticated `401`/`403` JSON enforcement on `/api/telephony?action=list_messages`, `/api/flight-status?diagnostics=1`, and `/api/email/webhook?diagnostics=1`).
+    4. Authenticated/role-gated application workspaces (`/app`, `/app/dispatch`, `/app/dispatch/popout?module=email`, `/app/dispatch/popout?module=comms`, `/app/driver`, `/app/corporate`, `/app/admin`).
+  - Guarantees clean browser and HTTP server shutdown inside `finally`.
+
+
 
 
 

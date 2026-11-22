@@ -249,9 +249,9 @@ export default function AdminLayout() {
   const location = useLocation();
   const [, setSearchParams] = useSearchParams();
 
-  // Authentication state
-  const [user, setUser] = useState<AdminUser | null>(() => getAdminAuthService().getCurrentUser());
-  const [isAuthChecking, setIsAuthChecking] = useState(() => !getAdminAuthService().getCurrentUser());
+  // Authentication state (initialize `isAuthChecking = true` so SSR & initial client hydration match)
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Dynamic configuration state
   const [settings, setSettings] = useState<AppSettings>(() =>

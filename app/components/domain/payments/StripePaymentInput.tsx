@@ -46,12 +46,16 @@ export function StripePaymentInput({
   const [isLiveStripeActive, setIsLiveStripeActive] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [localFallbackPk, setLocalFallbackPk] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setLocalFallbackPk(localStorage.getItem('ct_stripe_pk') || '');
+    }
+  }, []);
+
   // 1. Resolve Stripe Publishable Key (Public key only, never secret keys)
-  const activePk =
-    publishableKey ||
-    (typeof window !== 'undefined'
-      ? localStorage.getItem('ct_stripe_pk') || ''
-      : '');
+  const activePk = publishableKey || localFallbackPk;
 
   const hasValidPublishableKey = Boolean(activePk && activePk.startsWith('pk_'));
 

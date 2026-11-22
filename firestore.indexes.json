@@ -15,6 +15,62 @@
         { "fieldPath": "isAsap", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "corporateAccountId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "corporateAccountId", "order": "ASCENDING" },
+        { "fieldPath": "scheduledPickupTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "corporateAccountId", "order": "ASCENDING" },
+        { "fieldPath": "issuedDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commsEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "threadId", "order": "ASCENDING" },
+        { "fieldPath": "timestampMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commsEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "threadId", "order": "ASCENDING" },
+        { "fieldPath": "timestampMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dispatchEmails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "folder", "order": "ASCENDING" },
+        { "fieldPath": "timestampMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dispatchEmails",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "threadId", "order": "ASCENDING" },
+        { "fieldPath": "timestampMs", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

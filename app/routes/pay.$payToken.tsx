@@ -75,13 +75,9 @@ export default function PublicPayLinkCheckoutPage() {
 
   const [payLink, setPayLink] = useState<PayLinkProjection | null>(loaderData.payLink);
   const [stripeConfigured, setStripeConfigured] = useState<boolean>(loaderData.stripeConfigured);
-  const [publishableKey, setPublishableKey] = useState<string>(() => {
-    if (loaderData.stripePublishableKey) return loaderData.stripePublishableKey;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('ct_stripe_pk') || '';
-    }
-    return '';
-  });
+  const [publishableKey, setPublishableKey] = useState<string>(
+    loaderData.stripePublishableKey || ''
+  );
 
   // Tip State (only active when `payLink.allowTip === true` and `status === 'open'`)
   const [tipMode, setTipMode] = useState<TipMode>(loaderData.payLink?.allowTip ? 15 : 'none');
@@ -100,12 +96,14 @@ export default function PublicPayLinkCheckoutPage() {
   const stripeInstanceRef = useRef<any>(null);
   const elementsInstanceRef = useRef<any>(null);
 
-  // Sync state if route token changes
+  // Sync state if route token changes or hydrate local Stripe publishable key fallback post-mount
   useEffect(() => {
     setPayLink(loaderData.payLink);
     setStripeConfigured(loaderData.stripeConfigured);
     if (loaderData.stripePublishableKey) {
       setPublishableKey(loaderData.stripePublishableKey);
+    } else if (typeof window !== 'undefined') {
+      setPublishableKey(localStorage.getItem('ct_stripe_pk') || '');
     }
     setTipMode(loaderData.payLink?.allowTip ? 15 : 'none');
     setCustomTipStr('');

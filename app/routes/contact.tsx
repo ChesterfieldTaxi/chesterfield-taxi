@@ -33,17 +33,11 @@ export function meta() {
 
 
 export default function ContactRoute() {
-  const [company, setCompany] = useState<CompanyConfig>(() => {
-    try {
-      return getAdminConfigService().getCachedSettings().company;
-    } catch {
-      return {
-        name: COMPANY_CONFIG.name,
-        phone: COMPANY_CONFIG.phone.dispatch,
-        email: COMPANY_CONFIG.email.dispatch,
-        address: COMPANY_CONFIG.address.formatted,
-      };
-    }
+  const [company, setCompany] = useState<CompanyConfig>({
+    name: COMPANY_CONFIG.name,
+    phone: COMPANY_CONFIG.phone.dispatch,
+    email: COMPANY_CONFIG.email.dispatch,
+    address: COMPANY_CONFIG.address.formatted,
   });
 
   useEffect(() => {
@@ -54,6 +48,8 @@ export default function ContactRoute() {
           setCompany(settings.company);
         }
       };
+
+      applySettings(configService.getCachedSettings());
 
       const unsub =
         typeof configService.subscribeToSettings === 'function'

@@ -78,6 +78,7 @@ service cloud.firestore {
       // Self-registration strictly provisions a non-privileged 'customer' role (never self-binds corporateAccountId)
       allow create: if isDispatcher() || (
         isOwner(userId) &&
+        'role' in request.resource.data &&
         request.resource.data.role == 'customer' &&
         (!('roles' in request.resource.data) || request.resource.data.roles == null || request.resource.data.roles == ['customer']) &&
         (!('corporateAccountId' in request.resource.data) || request.resource.data.corporateAccountId == null) &&
@@ -100,6 +101,7 @@ service cloud.firestore {
             'role' in resource.data &&
             resource.data.role != null &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles']) &&
+            'roles' in request.resource.data &&
             request.resource.data.roles == [resource.data.role]
           )
         )
@@ -117,23 +119,33 @@ service cloud.firestore {
         (
           'corporateAccountId' in request.resource.data &&
           isCorporateManagerFor(request.resource.data.corporateAccountId) &&
+          'status' in request.resource.data &&
           request.resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
+          'pickupLocation' in request.resource.data &&
           request.resource.data.pickupLocation != null &&
+          'dropoffLocation' in request.resource.data &&
           request.resource.data.dropoffLocation != null &&
-          request.resource.data.pricing != null &&
+          'pricing' in request.resource.data &&
+          request.resource.data.pricing is map &&
+          'totalFare' in request.resource.data.pricing &&
           request.resource.data.pricing.totalFare is number &&
           request.resource.data.pricing.totalFare >= 0 &&
           (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
-          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0)
+          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || (request.resource.data.offeredToIds is list && request.resource.data.offeredToIds.size() == 0))
         ) || (
+          'status' in request.resource.data &&
           request.resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
+          'pickupLocation' in request.resource.data &&
           request.resource.data.pickupLocation != null &&
+          'dropoffLocation' in request.resource.data &&
           request.resource.data.dropoffLocation != null &&
-          request.resource.data.pricing != null &&
+          'pricing' in request.resource.data &&
+          request.resource.data.pricing is map &&
+          'totalFare' in request.resource.data.pricing &&
           request.resource.data.pricing.totalFare is number &&
           request.resource.data.pricing.totalFare >= 0 &&
           (!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
-          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || request.resource.data.offeredToIds.size() == 0) &&
+          (!('offeredToIds' in request.resource.data) || request.resource.data.offeredToIds == null || (request.resource.data.offeredToIds is list && request.resource.data.offeredToIds.size() == 0)) &&
           (
             !('customerId' in request.resource.data) ||
             request.resource.data.customerId == null ||
@@ -179,6 +191,7 @@ service cloud.firestore {
         (isDriver() &&
           'assignedDriverId' in resource.data &&
           resource.data.assignedDriverId == request.auth.uid &&
+          'assignedDriverId' in request.resource.data &&
           request.resource.data.assignedDriverId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'driverTelemetry', 'currentLocation',
@@ -200,6 +213,7 @@ service cloud.firestore {
         ) ||
         // Offered driver atomic accept OR decline (prevents hijacking an already-assigned trip)
         (isDriver() &&
+          'status' in resource.data &&
           resource.data.status == 'offered' &&
           (!('assignedDriverId' in resource.data) || resource.data.assignedDriverId == null) &&
           'offeredToIds' in resource.data &&
@@ -211,15 +225,20 @@ service cloud.firestore {
             'statusHistory', 'auditLog', 'metadata', 'updatedAt'
           ]) && (
             // Accept offer
-            (request.resource.data.status == 'assigned' &&
+            ('status' in request.resource.data &&
+             request.resource.data.status == 'assigned' &&
+             'assignedDriverId' in request.resource.data &&
              request.resource.data.assignedDriverId == request.auth.uid &&
+             'offeredToIds' in request.resource.data &&
+             request.resource.data.offeredToIds is list &&
              request.resource.data.offeredToIds.size() == 0) ||
             // Decline offer
-            (request.resource.data.assignedDriverId == null &&
-             !(request.auth.uid in request.resource.data.offeredToIds) &&
+            ((!('assignedDriverId' in request.resource.data) || request.resource.data.assignedDriverId == null) &&
+             (!('offeredToIds' in request.resource.data) || (request.resource.data.offeredToIds is list && !(request.auth.uid in request.resource.data.offeredToIds))) &&
              'rejectedByIds' in request.resource.data &&
              request.resource.data.rejectedByIds is list &&
              request.auth.uid in request.resource.data.rejectedByIds &&
+             'status' in request.resource.data &&
              request.resource.data.status in ['offered', 'pending', 'CONFIRMED', 'confirmed'])
           )
         ) ||
@@ -230,6 +249,7 @@ service cloud.firestore {
           resource.data.passenger is map &&
           'email' in resource.data.passenger &&
           resource.data.passenger.email == request.auth.token.email &&
+          'customerId' in request.resource.data &&
           request.resource.data.customerId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'customerId', 'userId', 'updatedAt', 'auditLog'
@@ -237,7 +257,9 @@ service cloud.firestore {
         ) ||
         // Customer: cancel own pre-dispatch booking
         (isTripCustomer(resource.data) &&
+          'status' in resource.data &&
           resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED', 'assigned', 'accepted'] &&
+          'status' in request.resource.data &&
           request.resource.data.status == 'cancelled' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'cancellationReason', 'cancelledAt', 'cancelledBy', 'updatedAt'
@@ -245,6 +267,7 @@ service cloud.firestore {
         ) ||
         // Customer: update notes on non-terminal trip
         (isTripCustomer(resource.data) &&
+          'status' in resource.data &&
           !(resource.data.status in ['completed', 'cancelled', 'DECLINED']) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'driverNotes', 'passengerNotes', 'specialInstructions', 'updatedAt', 'auditLog'
@@ -252,12 +275,16 @@ service cloud.firestore {
         ) ||
         // Customer: edit pre-dispatch booking details (never self-confirms or edits en_route/in_progress/completed)
         (isTripCustomer(resource.data) &&
+          'status' in resource.data &&
           resource.data.status in ['UNCONFIRMED', 'pending', 'CONFIRMED'] &&
+          'status' in request.resource.data &&
           request.resource.data.status in ['UNCONFIRMED', 'pending'] &&
-          request.resource.data.pricing != null &&
+          'pricing' in request.resource.data &&
+          request.resource.data.pricing is map &&
+          'totalFare' in request.resource.data.pricing &&
           request.resource.data.pricing.totalFare is number &&
           request.resource.data.pricing.totalFare >= 0 &&
-          (!('customerId' in resource.data) || request.resource.data.customerId == resource.data.customerId) &&
+          (!('customerId' in resource.data) || ('customerId' in request.resource.data && request.resource.data.customerId == resource.data.customerId)) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'statusHistory', 'auditLog', 'pickupLocation', 'dropoffLocation',
             'intermediateStops', 'bookingType', 'scheduledPickupTime', 'vehicleTier',
@@ -277,7 +304,8 @@ service cloud.firestore {
       allow list: if false;
 
       // Strictly allowlisted zero-PII fields only (never passenger phone, email, gateCode, PO#)
-      allow create: if request.resource.data.trackingToken == trackingToken &&
+      allow create: if 'trackingToken' in request.resource.data &&
+        request.resource.data.trackingToken == trackingToken &&
         request.resource.data.keys().hasOnly([
           'trackingToken', 'tripId', 'status', 'bookingType', 'scheduledPickupTime',
           'pickupDisplay', 'dropoffDisplay', 'pickupCoordinates', 'dropoffCoordinates',
@@ -294,6 +322,8 @@ service cloud.firestore {
          exists(/databases/$(database)/documents/trips/$(resource.data.tripId)) &&
          isTripCustomer(get(/databases/$(database)/documents/trips/$(resource.data.tripId)).data))
       ) &&
+        'trackingToken' in request.resource.data &&
+        request.resource.data.trackingToken == trackingToken &&
         request.resource.data.keys().hasOnly([
           'trackingToken', 'tripId', 'status', 'bookingType', 'scheduledPickupTime',
           'pickupDisplay', 'dropoffDisplay', 'pickupCoordinates', 'dropoffCoordinates',
@@ -309,7 +339,8 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
 
-      allow create: if request.resource.data.keys().hasOnly(['trackingToken', 'updatedAt']) &&
+      allow create: if 'trackingToken' in request.resource.data &&
+        request.resource.data.keys().hasOnly(['trackingToken', 'updatedAt']) &&
         request.resource.data.trackingToken is string;
 
       allow update, delete: if isDispatcher();
@@ -327,8 +358,11 @@ service cloud.firestore {
       allow create, update: if (
         isDispatcher() ||
         isDriver() ||
-        (hasUserRole('corporate_manager') && request.resource.data.targetType == 'invoice')
+        (hasUserRole('corporate_manager') &&
+         'targetType' in request.resource.data &&
+         request.resource.data.targetType == 'invoice')
       ) &&
+        'payToken' in request.resource.data &&
         request.resource.data.payToken == payToken &&
         request.resource.data.keys().hasOnly([
           'payToken', 'targetType', 'targetId', 'referenceNumber', 'customerLabel',
@@ -382,9 +416,16 @@ service cloud.firestore {
     // 3. Driver Shift Tracking & Vehicle Assignments (/vehicleAssignments)
     // ─────────────────────────────────────────────────────────────
     match /vehicleAssignments/{assignmentId} {
-      allow read: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
-      allow create: if isDispatcher() || (isDriver() && request.resource.data.driverId == request.auth.uid);
-      allow update: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
+      allow get: if isDispatcher() || (isDriver() && 'driverId' in resource.data && resource.data.driverId == request.auth.uid);
+      allow list: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
+      allow create: if isDispatcher() || (isDriver() && 'driverId' in request.resource.data && request.resource.data.driverId == request.auth.uid);
+      allow update: if isDispatcher() || (
+        isDriver() &&
+        'driverId' in resource.data &&
+        resource.data.driverId == request.auth.uid &&
+        'driverId' in request.resource.data &&
+        request.resource.data.driverId == request.auth.uid
+      );
       allow delete: if isDispatcher();
     }
 
@@ -392,14 +433,19 @@ service cloud.firestore {
     // 4. Job Applications & Public Inquiries (/applications, /inquiries)
     // ─────────────────────────────────────────────────────────────
     match /applications/{applicationId} {
-      allow create: if request.resource.data.firstName is string &&
+      allow create: if 'firstName' in request.resource.data &&
+                       request.resource.data.firstName is string &&
+                       'lastName' in request.resource.data &&
                        request.resource.data.lastName is string &&
+                       'phone' in request.resource.data &&
                        request.resource.data.phone is string;
       allow read, update, delete: if isDispatcher();
     }
 
     match /inquiries/{inquiryId} {
-      allow create: if request.resource.data.name is string &&
+      allow create: if 'name' in request.resource.data &&
+                       request.resource.data.name is string &&
+                       'message' in request.resource.data &&
                        request.resource.data.message is string;
       allow read, update, delete: if isDispatcher();
     }
@@ -501,15 +547,16 @@ service cloud.firestore {
     }
     match /unbilledTransactions/{txId} {
       allow read, update, delete: if isDispatcher();
-      allow create: if isDispatcher() || (isDriver() && request.resource.data.driverId == request.auth.uid);
+      allow create: if isDispatcher() || (isDriver() && 'driverId' in request.resource.data && request.resource.data.driverId == request.auth.uid);
     }
     match /financialLedger/{entryId} {
       allow read, update, delete: if isDispatcher();
-      allow create: if isDispatcher() || (isDriver() && request.resource.data.driverId == request.auth.uid);
+      allow create: if isDispatcher() || (isDriver() && 'driverId' in request.resource.data && request.resource.data.driverId == request.auth.uid);
     }
     match /driverPayouts/{payoutId} {
-      allow read: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
-      allow create: if isDispatcher() || (isDriver() && request.resource.data.driverId == request.auth.uid);
+      allow get: if isDispatcher() || (isDriver() && 'driverId' in resource.data && resource.data.driverId == request.auth.uid);
+      allow list: if isDispatcher() || (isDriver() && resource.data.driverId == request.auth.uid);
+      allow create: if isDispatcher() || (isDriver() && 'driverId' in request.resource.data && request.resource.data.driverId == request.auth.uid);
       allow update, delete: if isDispatcher();
     }
 

@@ -45,29 +45,23 @@ export function Navbar() {
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const location = useLocation();
 
-  const [settingsState, setSettingsState] = useState<AppSettings>(() => {
-    try {
-      return getAdminConfigService().getCachedSettings();
-    } catch {
-      return {
-        company: {
-          name: COMPANY_CONFIG.name,
-          phone: COMPANY_CONFIG.phone.dispatch,
-          email: COMPANY_CONFIG.email.dispatch,
-          address: COMPANY_CONFIG.address.formatted,
-        },
-        branding: {
-          primaryColor: COMPANY_CONFIG.primaryColor,
-          secondaryColor: COMPANY_CONFIG.secondaryColor,
-        },
-        pricing: { baseFare: 5, perMileRate: 2.5, airportFee: 5, surgeMultiplier: 1 },
-        vehicles: [],
-        enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
-      };
-    }
+  const [settingsState, setSettingsState] = useState<AppSettings>({
+    company: {
+      name: COMPANY_CONFIG.name,
+      phone: COMPANY_CONFIG.phone.dispatch,
+      email: COMPANY_CONFIG.email.dispatch,
+      address: COMPANY_CONFIG.address.formatted,
+    },
+    branding: {
+      primaryColor: COMPANY_CONFIG.primaryColor,
+      secondaryColor: COMPANY_CONFIG.secondaryColor,
+    },
+    pricing: { baseFare: 5, perMileRate: 2.5, airportFee: 5, surgeMultiplier: 1 },
+    vehicles: [],
+    enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
   });
 
-  // Keep company & navigation settings updated when admin config changes
+  // Keep company & navigation settings updated when admin config changes (hydrated post-mount to match SSR)
   useEffect(() => {
     try {
       const configService = getAdminConfigService();
@@ -79,6 +73,7 @@ export function Navbar() {
         }
       };
 
+      applySettings(configService.getCachedSettings());
       const unsub = configService.subscribeToSettings(applySettings);
       if (typeof configService.getSettings === 'function') {
         configService.getSettings().then(applySettings).catch(() => {});

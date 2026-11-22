@@ -130,26 +130,13 @@ const SERVICE_ZONES = [
 ];
 
 export default function ServicesRoute() {
-  const [vehicles, setVehicles] = React.useState<VehicleTierConfig[]>(() => {
-    try {
-      const active = getAdminConfigService().getCachedSettings().vehicles.filter((v: VehicleTierConfig) => !v.isArchived);
-      return active.length > 0 ? active : [];
-    } catch {
-      return [];
-    }
-  });
+  const [vehicles, setVehicles] = React.useState<VehicleTierConfig[]>([]);
 
-  const [company, setCompany] = React.useState<CompanyConfig>(() => {
-    try {
-      return getAdminConfigService().getCachedSettings().company;
-    } catch {
-      return {
-        name: COMPANY_CONFIG.name,
-        phone: COMPANY_CONFIG.phone.dispatch,
-        email: COMPANY_CONFIG.email.dispatch,
-        address: COMPANY_CONFIG.address.formatted,
-      };
-    }
+  const [company, setCompany] = React.useState<CompanyConfig>({
+    name: COMPANY_CONFIG.name,
+    phone: COMPANY_CONFIG.phone.dispatch,
+    email: COMPANY_CONFIG.email.dispatch,
+    address: COMPANY_CONFIG.address.formatted,
   });
 
   React.useEffect(() => {
@@ -163,6 +150,8 @@ export default function ServicesRoute() {
           setCompany(settings.company);
         }
       };
+
+      applySettings(configService.getCachedSettings());
 
       const unsub =
         typeof configService.subscribeToSettings === 'function'

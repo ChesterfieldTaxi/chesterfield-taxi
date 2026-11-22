@@ -640,46 +640,44 @@ export function BookingEngineV2({
   }, []);
 
   // Customer Booking Form Config and Active Vehicle Classes from Admin Settings
-  // Prefer SSR-loaded `initialSettings` when available so first paint & hydration match identically.
+  // Deterministic SSR + Hydration initialization: use only `initialSettings` or static defaults on
+  // first render, then hydrate cached/live `localStorage` & Firestore settings inside `useEffect`.
   const [bookingConfig, setBookingConfig] = useState<CustomerBookingConfig>(() => {
     if (initialSettings?.customerBookingConfig) {
       return { ...DEFAULT_CUSTOMER_BOOKING_CONFIG, ...initialSettings.customerBookingConfig };
     }
-    return (
-      getAdminConfigService().getCachedSettings().customerBookingConfig ||
-      DEFAULT_CUSTOMER_BOOKING_CONFIG
-    );
+    return DEFAULT_CUSTOMER_BOOKING_CONFIG;
   });
 
   const [companyConfig, setCompanyConfig] = useState(() => {
     if (initialSettings?.company) {
       return initialSettings.company;
     }
-    return getAdminConfigService().getCachedSettings().company;
+    return {
+      name: COMPANY_CONFIG.name,
+      phone: COMPANY_CONFIG.phone.dispatch,
+      email: COMPANY_CONFIG.email.dispatch,
+      address: COMPANY_CONFIG.address.formatted,
+    };
   });
 
   const [vehicleTiers, setVehicleTiers] = useState<VehicleTierConfig[]>(() => {
     if (initialSettings?.vehicles && initialSettings.vehicles.length > 0) {
       return initialSettings.vehicles.filter((v) => !v.isArchived);
     }
-    const cached = getAdminConfigService().getCachedSettings();
-    if (cached.vehicles && cached.vehicles.length > 0) {
-      return cached.vehicles.filter((v) => !v.isArchived);
-    }
     return [];
   });
 
-  const [universalExtras, setUniversalExtras] = useState<UniversalExtrasConfig>(() => {
-    try {
-      return getUniversalExtrasService().getCached();
-    } catch {
-      return DEFAULT_UNIVERSAL_EXTRAS;
-    }
-  });
+  const [universalExtras, setUniversalExtras] = useState<UniversalExtrasConfig>(
+    DEFAULT_UNIVERSAL_EXTRAS
+  );
 
   const [surchargesVersion, setSurchargesVersion] = useState(0);
 
   useEffect(() => {
+    try {
+      setUniversalExtras(getUniversalExtrasService().getCached());
+    } catch {}
     const unsubExtras = getUniversalExtrasService().subscribeToExtras((liveExtras) => {
       setUniversalExtras(liveExtras);
     });
@@ -694,7 +692,7 @@ export function BookingEngineV2({
 
   useEffect(() => {
     const configService = getAdminConfigService();
-    const unsubscribe = configService.subscribeToSettings((s) => {
+    const applySettings = (s: Partial<AppSettings>) => {
       if (s.customerBookingConfig) {
         setBookingConfig({ ...DEFAULT_CUSTOMER_BOOKING_CONFIG, ...s.customerBookingConfig });
       }
@@ -704,11 +702,15 @@ export function BookingEngineV2({
       if (s.vehicles && s.vehicles.length > 0) {
         setVehicleTiers(s.vehicles.filter((v) => !v.isArchived));
       }
-    });
+    };
+    if (!initialSettings) {
+      applySettings(configService.getCachedSettings());
+    }
+    const unsubscribe = configService.subscribeToSettings(applySettings);
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [initialSettings]);
 
   const activeVehicleTiers: VehicleTierConfig[] = useMemo(
     () => buildCustomerActiveVehicleTiers(vehicleTiers),

@@ -129,9 +129,9 @@ export default function DispatchRoute() {
   const urlTripId = searchParams.get('tripId');
   const handledUrlTripIdRef = useRef<string | null>(null);
 
-  // Auth & Settings state
-  const [user, setUser] = useState<AdminUser | null>(() => getAdminAuthService().getCurrentUser());
-  const [isAuthChecking, setIsAuthChecking] = useState(() => !getAdminAuthService().getCurrentUser());
+  // Auth & Settings state (initialize `isAuthChecking = true` so SSR & initial client hydration match)
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [settings, setSettings] = useState<AppSettings>(() => getAdminConfigService().getCachedSettings());
 
   // Trips real-time state

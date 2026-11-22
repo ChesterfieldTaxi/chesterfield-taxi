@@ -844,6 +844,27 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - `CommsCrmContextBanner.tsx` rendered inside `SmsThreadPane.tsx` (selected thread) and `SoftphoneDialerPane.tsx` (active/ringing calls AND live on the dialpad when entered digits match a known contact or trip), surfacing VIP badge, Blacklist alert banner (`isBlacklisted`), Corporate Account pill, Accessibility/Vehicle preference tags, Active/Upcoming Trip pill (`Car #`, flight delay badge, 1-tap **Open Trip**), and 1-tap **Rebook Last Ride** (`POPULATE_BOOKING`).
   - Keyboard ergonomics across `CommsHub` & `SmsThreadPane`: `/` focuses the visible `CommsHub` search input when focus is outside editable fields, `Cmd/Ctrl + Enter` submits the active SMS reply or Internal Note, and `Escape` closes active `CommsHub` modals/action sheets or exits the active thread back to the list.
 
+## 43. Phase 43 (Wave 2 Phase 5): Production Cutover Readiness, Firestore Rules/Indexes Alignment & Headless Browser Smoke Suite
+- **Firestore Security Rules Audit & Composite Indexes Alignment (`firestore.rules` + `firestore.indexes.json`)**:
+  - Comprehensive CEL-safety (`'key' in map` guards on optional map properties) and strict RBAC/multi-tenant boundary audit across all 15 operational and webhook collections: `/users`, `/trips`, `/tripTracking`, `/tripTrackingLookup`, `/payLinks`, `/paymentWebhookEvents`, `/flightStatusCache`, `/commsThreads`, `/commsEvents`, `/telephonyWebhookEvents`, `/dispatchEmails`, `/emailWebhookEvents`, `/corporateAccounts`, `/corporateLookup`, and `/invoices`.
+  - Complete composite index manifest in `firestore.indexes.json` preserving existing `trips` dispatch queue indexes (`status` ASC + `pickupDateTime` ASC; `isAsap` ASC + `status` ASC) and adding all Wave 1 + Wave 2 multi-field query indexes:
+    - `trips`: `corporateAccountId` ASC + `createdAt` DESC, and `corporateAccountId` ASC + `scheduledPickupTime` DESC.
+    - `invoices`: `corporateAccountId` ASC + `issuedDate` DESC.
+    - `commsEvents`: `threadId` ASC + `timestampMs` ASC, and `threadId` ASC + `timestampMs` DESC.
+    - `dispatchEmails`: `folder` ASC + `timestampMs` DESC, and `threadId` ASC + `timestampMs` ASC.
+- **Vercel-Preset Production Build Server Runner (`scripts/serve-prod-build.ts` & `npm start`)**:
+  - Programmatic (`startProdBuildServer({ port?: number })`) and direct CLI Node HTTP server designed for `@vercel/react-router/vite` (`vercelPreset()`) builds where the compiled `ServerBuild` is emitted to `build/server/nodejs_*/index.js` (or `build/server/index.js`).
+  - Resolves and dynamically imports the server entry via Windows-safe `pathToFileURL`, serves static assets from `build/client` and `public` (`/assets/*`, `/sw.js`, `/manifest.json`, `/manifest-driver.json`, icons, `robots.txt`, `sitemap.xml`) with accurate `Content-Type`, cache, and security headers, and forwards all SSR/single-fetch/API requests to `@react-router/node`'s `createRequestListener({ build })`.
+- **Automated `puppeteer-core` Headless Chromium Smoke & Hydration Suite (`scripts/test-browser-smoke.ts` & `npm run test:smoke`)**:
+  - Auto-detects local Chromium (`CHROME_PATH`, Google Chrome, Microsoft Edge, and macOS/Linux fallbacks), boots `startProdBuildServer({ port: 0 })` on `127.0.0.1`, and attaches `pageerror`, `console` (`error` / React hydration mismatch `#418` & `#423`), and same-origin `>= 500` / asset chunk listeners:
+    - **Public & Customer Routes**: Verifies zero React hydration mismatches and zero uncaught page exceptions across `/`, `/book`, `/services`, `/about`, `/contact`, `/apply`, `/terms`, `/privacy`, `/track`, `/pay/pay_smoke_invalid_token_check` (graceful invalid/expired link state), `/app/login`, and `/app/register`.
+    - **PWA & Static Asset Integrity**: Verifies `200` responses and valid payloads for `GET /manifest.json`, `GET /manifest-driver.json` (`start_url: "/app/driver"`), and `GET /sw.js`.
+    - **Serverless API Endpoint Smoke & Auth Gates**: Verifies `GET /api/public-config` (`200` JSON) and `GET /api/send-email` (`200` JSON), plus unauthenticated security checks on `GET /api/telephony?action=list_messages`, `GET /api/flight-status?diagnostics=1`, and `GET /api/email/webhook?diagnostics=1` (returning clean JSON `401`/`403` when Firebase auth is configured, never `500` or HTML error pages).
+    - **Application Workspaces**: Verifies zero uncaught `pageerror` exceptions and zero chunk-loading failures across `/app`, `/app/dispatch`, `/app/dispatch/popout?module=email`, `/app/dispatch/popout?module=comms`, `/app/driver`, `/app/corporate`, and `/app/admin`.
+- **Full Wave 1 + Wave 2 Master Regression Gate**:
+  - End-to-end production cutover verification across `npm run typecheck`, `npm run build` (confirming all 13 `/api/*` client chunks remain `0.00 kB`), `npm run test:smoke`, `npm run test:e2e`, `npm run test:stress`, and all 9 Wave 1 + Wave 2 domain test suites while keeping Vercel Hobby cron (`"0 10 * * *"`) in `vercel.json` untouched.
+
+
 
 
 
