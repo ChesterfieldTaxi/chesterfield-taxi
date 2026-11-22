@@ -46,6 +46,7 @@ export default [
   route("api/track", "routes/api.track.ts"),
   route("api/corporate/verify", "routes/api.corporate-verify.ts"),
   route("api/send-email", "routes/api.send-email.ts"),
+  route("api/email/webhook", "routes/api.email.webhook.ts"),
   route("api/seed-stress-data", "routes/api.seed-stress-data.tsx"),
   route("api/payments", "routes/api.payments.ts"),
   route("api/payments/webhook", "routes/api.payments.webhook.ts"),

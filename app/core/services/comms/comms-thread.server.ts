@@ -227,10 +227,13 @@ export async function ingestCommsEventServer(
     emails: resolution.emails,
   });
 
-  const canonicalThreadId =
-    resolution.threadId !== 'thr_unknown'
-      ? resolution.threadId
-      : input.threadId || existingEvent?.threadId || candidateMatches[0]?.id || 'thr_unknown';
+  const canonicalThreadId = resolution.threadId.startsWith('thr_contact_')
+    ? resolution.threadId
+    : (input.threadId && input.threadId !== 'thr_unknown' ? input.threadId : '') ||
+      (resolution.threadId !== 'thr_unknown' ? resolution.threadId : '') ||
+      existingEvent?.threadId ||
+      candidateMatches[0]?.id ||
+      'thr_unknown';
 
   let activeThread: CommsThread | undefined;
   if (

@@ -1,40 +1,59 @@
 /**
  * Resend Transactional Email Dispatch Service
- * 
+ *
  * Provides production-grade transactional email integration via the Resend API
- * with secure server-side delegation, responsive HTML templates, and graceful
+ * with secure server-side delegation, RFC-5322 single-mailbox threading headers
+ * (`dispatch@chesterfieldtaxi.com`), responsive HTML templates, and graceful
  * development fallbacks when API keys are absent.
+ *
+ * Strictly free of `node:*` and `*.server.ts` imports so client bundles remain clean.
  */
 
 import { Resend } from 'resend';
-import type {
-  IEmailDispatchService,
-  BookingConfirmationEmailPayload,
-  AdminDispatchAlertEmailPayload,
-  StatusUpdateEmailPayload,
-  BookingDeclinedEmailPayload,
-  BookingClarificationRequestEmailPayload,
-  TripReceiptEmailPayload,
-  CorporateInvoiceEmailPayload,
-  EmailDispatchResult,
-  EmailDispatchApiRequest,
-} from './types';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { DISPATCH_MAILBOX_ADDRESS } from '../../types/dispatch-email';
+import { getFirebaseAuthHeaders } from '../auth/auth-headers';
 import {
-  renderPassengerConfirmationEmail,
-  renderDispatcherAlertEmail,
-  renderStatusUpdateEmail,
   renderBookingDeclinedEmail,
   renderClarificationRequestEmail,
-  renderTripReceiptEmail,
   renderCorporateInvoiceEmail,
+  renderDispatcherAlertEmail,
+  renderPassengerConfirmationEmail,
+  renderStatusUpdateEmail,
+  renderTripReceiptEmail,
 } from './email-templates';
-import { COMPANY_CONFIG } from '../../../config/companyConfig';
-import { getFirebaseAuthHeaders } from '../auth/auth-headers';
+import type {
+  AdminDispatchAlertEmailPayload,
+  BookingClarificationRequestEmailPayload,
+  BookingConfirmationEmailPayload,
+  BookingDeclinedEmailPayload,
+  CorporateInvoiceEmailPayload,
+  EmailDispatchApiRequest,
+  EmailDispatchResult,
+  IEmailDispatchService,
+  StatusUpdateEmailPayload,
+  TripReceiptEmailPayload,
+} from './types';
 
 export interface EmailServiceConfig {
   apiKey?: string;
   fromAddress?: string;
   adminAlertRecipient?: string;
+  replyToAddress?: string;
+  fetchImpl?: typeof fetch;
+}
+
+export interface EmailSendTransportOptions {
+  replyTo?: string;
+  headers?: Record<string, string>;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string[];
+  tripId?: string;
+  invoiceId?: string;
+  corporateAccountNumber?: string;
+  contactPhone?: string;
+  contactName?: string;
 }
 
 function getEnv(key: string): string | undefined {
@@ -50,30 +69,21 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
-const DEFAULT_SENDER_EMAIL =
-  getEnv('RESEND_FROM_EMAIL') ||
-  getEnv('EMAIL_FROM') ||
-  COMPANY_CONFIG.email.dispatch;
-const DEFAULT_FROM_ADDRESS = `${COMPANY_CONFIG.name} <${DEFAULT_SENDER_EMAIL}>`;
 const DEFAULT_ADMIN_EMAIL =
+  getEnv('DISPATCH_MAILBOX_ADDRESS') ||
   getEnv('DISPATCH_ALERT_EMAIL') ||
   getEnv('ADMIN_ALERT_EMAIL') ||
-  COMPANY_CONFIG.email.dispatch;
+  DISPATCH_MAILBOX_ADDRESS;
 
-/**
- * Production Resend Email Dispatch Service.
- * - In server environments: Dispatches directly using Resend API / SDK.
- * - In browser environments: Delegates securely to `/api/send-email` resource route.
- * - In local dev (no API key): Gracefully logs simulated dispatch without throwing.
- */
 function getResolvedFromAddress(configuredFrom?: string): string {
   if (configuredFrom) return configuredFrom;
   const envFrom = getEnv('RESEND_FROM_EMAIL') || getEnv('EMAIL_FROM');
   if (envFrom) {
     return envFrom.includes('<') ? envFrom : `${COMPANY_CONFIG.name} <${envFrom}>`;
   }
-  // If no custom domain is verified in Resend yet, Resend's API will reject non-verified domains like chesterfieldtaxi.com with a 403.
-  // Using onboarding@resend.dev allows immediate delivery to test/registered recipient accounts.
+  // If no custom domain is verified in Resend yet, Resend's API rejects non-verified domains with 403.
+  // Using onboarding@resend.dev allows immediate delivery to test/registered recipient accounts while
+  // setting replyTo to dispatch@chesterfieldtaxi.com.
   return `${COMPANY_CONFIG.name} <onboarding@resend.dev>`;
 }
 
@@ -82,17 +92,25 @@ export class ResendEmailService implements IEmailDispatchService {
   private apiKey?: string;
   private fromAddress: string;
   private adminAlertRecipient: string;
+  private replyToAddress: string;
+  private fetchImpl?: typeof fetch;
 
   constructor(config?: EmailServiceConfig) {
-    this.apiKey = config?.apiKey || getEnv('RESEND_API_KEY');
+    this.apiKey = config?.apiKey ?? getEnv('RESEND_API_KEY');
     this.fromAddress = getResolvedFromAddress(config?.fromAddress);
     this.adminAlertRecipient =
       config?.adminAlertRecipient ||
       getEnv('DISPATCH_ALERT_EMAIL') ||
       getEnv('ADMIN_ALERT_EMAIL') ||
-      COMPANY_CONFIG.email.dispatch;
+      DISPATCH_MAILBOX_ADDRESS;
+    this.replyToAddress =
+      config?.replyToAddress ||
+      getEnv('DISPATCH_MAILBOX_ADDRESS') ||
+      COMPANY_CONFIG.email.dispatch ||
+      DISPATCH_MAILBOX_ADDRESS;
+    this.fetchImpl = config?.fetchImpl;
 
-    if (this.apiKey) {
+    if (this.apiKey && !this.fetchImpl) {
       try {
         this.resendClient = new Resend(this.apiKey);
       } catch (err) {
@@ -102,14 +120,15 @@ export class ResendEmailService implements IEmailDispatchService {
   }
 
   /**
-   * Dispatches email via browser fetch to server route or direct Resend API.
+   * Dispatches email via browser fetch to `/api/send-email` or direct Resend API.
    */
   private async dispatch(
     request: EmailDispatchApiRequest,
     recipient: string,
     subject: string,
     html: string,
-    text: string
+    text: string,
+    transportOptions?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const isBrowser = typeof window !== 'undefined';
 
@@ -120,15 +139,27 @@ export class ResendEmailService implements IEmailDispatchService {
           (request.type as string) === 'direct' ||
           !request.payload ||
           Object.keys(request.payload).length === 0;
-        const requestPayload = isDirect
-          ? {
-              ...request,
-              recipient,
-              subject,
-              html,
-              text,
-            }
-          : request;
+        const requestPayload = {
+          ...(isDirect
+            ? {
+                ...request,
+                recipient,
+                subject,
+                html,
+                text,
+              }
+            : request),
+          ...(transportOptions?.threadId ? { threadId: transportOptions.threadId } : {}),
+          ...(transportOptions?.inReplyTo ? { inReplyTo: transportOptions.inReplyTo } : {}),
+          ...(transportOptions?.references ? { references: transportOptions.references } : {}),
+          ...(transportOptions?.tripId ? { tripId: transportOptions.tripId } : {}),
+          ...(transportOptions?.invoiceId ? { invoiceId: transportOptions.invoiceId } : {}),
+          ...(transportOptions?.corporateAccountNumber
+            ? { corporateAccountNumber: transportOptions.corporateAccountNumber }
+            : {}),
+          ...(transportOptions?.contactPhone ? { contactPhone: transportOptions.contactPhone } : {}),
+          ...(transportOptions?.contactName ? { contactName: transportOptions.contactName } : {}),
+        };
         const authHeaders = await getFirebaseAuthHeaders();
         const response = await fetch('/api/send-email', {
           method: 'POST',
@@ -142,7 +173,10 @@ export class ResendEmailService implements IEmailDispatchService {
         if (response.ok) {
           const result = (await response.json()) as EmailDispatchResult;
           if (!result.success && result.error) {
-            console.error('[ResendEmailService] /api/send-email reported dispatch failure:', result.error);
+            console.error(
+              '[ResendEmailService] /api/send-email reported dispatch failure:',
+              result.error
+            );
           }
           return result;
         }
@@ -176,9 +210,21 @@ export class ResendEmailService implements IEmailDispatchService {
       }
     }
 
+    const effectiveReplyTo = transportOptions?.replyTo || this.replyToAddress;
+    const cleanHeaders: Record<string, string> = {};
+    if (transportOptions?.headers) {
+      for (const [k, v] of Object.entries(transportOptions.headers)) {
+        if (k && typeof v === 'string' && v.trim()) {
+          cleanHeaders[k] = v.trim();
+        }
+      }
+    }
+
     // 2. Server environment without API key -> simulated dispatch
-    if (!this.resendClient) {
-      console.info(`[ResendEmailService] [SIMULATED] "${subject}" to <${recipient}> (RESEND_API_KEY not configured)`);
+    if (!this.apiKey) {
+      console.info(
+        `[ResendEmailService] [SIMULATED] "${subject}" to <${recipient}> (replyTo=${effectiveReplyTo}, RESEND_API_KEY not configured)`
+      );
       return {
         success: true,
         simulated: true,
@@ -189,24 +235,96 @@ export class ResendEmailService implements IEmailDispatchService {
       };
     }
 
-    // 3. Server environment with live Resend client
+    // 3A. Injectable custom fetch transport (deterministic server tests & edge runtimes)
+    if (this.fetchImpl) {
+      try {
+        const resp = await this.fetchImpl('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: this.fromAddress,
+            reply_to: effectiveReplyTo,
+            to: [recipient],
+            subject,
+            html,
+            text,
+            ...(Object.keys(cleanHeaders).length > 0 ? { headers: cleanHeaders } : {}),
+          }),
+        });
+        const json = (await resp.json().catch(() => ({}))) as {
+          id?: string;
+          message?: string;
+          name?: string;
+        };
+        if (!resp.ok) {
+          return {
+            success: false,
+            recipient,
+            subject,
+            error: json.message || `Resend HTTP ${resp.status}`,
+            dispatchedAt: new Date().toISOString(),
+          };
+        }
+        return {
+          success: true,
+          messageId: json.id,
+          recipient,
+          subject,
+          dispatchedAt: new Date().toISOString(),
+        };
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          recipient,
+          subject,
+          error: errorMessage,
+          dispatchedAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    // 3B. Server environment with live Resend SDK client
+    if (!this.resendClient) {
+      return {
+        success: false,
+        recipient,
+        subject,
+        error: 'Resend client failed to initialize.',
+        dispatchedAt: new Date().toISOString(),
+      };
+    }
+
     try {
       const response = await this.resendClient.emails.send({
         from: this.fromAddress,
-        replyTo: this.adminAlertRecipient,
+        replyTo: effectiveReplyTo,
         to: recipient,
         subject,
         html,
         text,
+        ...(Object.keys(cleanHeaders).length > 0 ? { headers: cleanHeaders } : {}),
       });
 
       if (response.error) {
         console.error('[ResendEmailService] Email gateway error:', response.error);
-        let errorMsg = 'Unable to deliver email right now. Please verify sender domain configuration or try again.';
-        if (response.error.name === 'validation_error' && response.error.message?.includes('not verified')) {
-          errorMsg = 'Email sender domain is not verified yet. Please contact your system administrator.';
-        } else if (response.error.name === 'validation_error' && response.error.message?.includes('testing emails')) {
-          errorMsg = 'Email delivery is currently restricted to verified test recipients until domain verification is completed.';
+        let errorMsg =
+          'Unable to deliver email right now. Please verify sender domain configuration or try again.';
+        if (
+          response.error.name === 'validation_error' &&
+          response.error.message?.includes('not verified')
+        ) {
+          errorMsg =
+            'Email sender domain is not verified yet. Please contact your system administrator.';
+        } else if (
+          response.error.name === 'validation_error' &&
+          response.error.message?.includes('testing emails')
+        ) {
+          errorMsg =
+            'Email delivery is currently restricted to verified test recipients until domain verification is completed.';
         }
         return {
           success: false,
@@ -217,7 +335,9 @@ export class ResendEmailService implements IEmailDispatchService {
         };
       }
 
-      console.info(`[ResendEmailService] Dispatched "${subject}" to <${recipient}> (ID: ${response.data?.id})`);
+      console.info(
+        `[ResendEmailService] Dispatched "${subject}" to <${recipient}> (ID: ${response.data?.id})`
+      );
       return {
         success: true,
         messageId: response.data?.id,
@@ -239,20 +359,42 @@ export class ResendEmailService implements IEmailDispatchService {
   }
 
   /**
-   * Dispatches pre-rendered transactional email directly.
+   * Dispatches pre-rendered transactional or direct reply email.
    */
   public async sendDirect(params: {
     recipient: string;
     subject: string;
     html: string;
     text?: string;
+    replyTo?: string;
+    headers?: Record<string, string>;
+    threadId?: string;
+    inReplyTo?: string;
+    references?: string[];
+    tripId?: string;
+    invoiceId?: string;
+    corporateAccountNumber?: string;
+    contactPhone?: string;
+    contactName?: string;
   }): Promise<EmailDispatchResult> {
     return this.dispatch(
-      { type: 'direct' as any, payload: {} as any },
+      { type: 'direct', payload: {} },
       params.recipient,
       params.subject,
       params.html,
-      params.text || ''
+      params.text || '',
+      {
+        replyTo: params.replyTo,
+        headers: params.headers,
+        threadId: params.threadId,
+        inReplyTo: params.inReplyTo,
+        references: params.references,
+        tripId: params.tripId,
+        invoiceId: params.invoiceId,
+        corporateAccountNumber: params.corporateAccountNumber,
+        contactPhone: params.contactPhone,
+        contactName: params.contactName,
+      }
     );
   }
 
@@ -260,7 +402,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends passenger booking confirmation receipt.
    */
   public async sendBookingConfirmation(
-    payload: BookingConfirmationEmailPayload
+    payload: BookingConfirmationEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderPassengerConfirmationEmail(payload);
     const recipient = payload.recipientEmailOverride?.trim() || payload.passenger.email;
@@ -269,7 +412,8 @@ export class ResendEmailService implements IEmailDispatchService {
       recipient,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -277,7 +421,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends immediate dispatch alert to operations team.
    */
   public async sendAdminDispatchAlert(
-    payload: AdminDispatchAlertEmailPayload
+    payload: AdminDispatchAlertEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderDispatcherAlertEmail(payload);
     return this.dispatch(
@@ -285,7 +430,8 @@ export class ResendEmailService implements IEmailDispatchService {
       this.adminAlertRecipient,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -293,7 +439,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends ride status update notification to passenger.
    */
   public async sendStatusUpdateNotification(
-    payload: StatusUpdateEmailPayload
+    payload: StatusUpdateEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderStatusUpdateEmail(payload);
     return this.dispatch(
@@ -301,7 +448,8 @@ export class ResendEmailService implements IEmailDispatchService {
       payload.passenger.email,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -309,7 +457,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends booking declined notification to passenger.
    */
   public async sendBookingDeclined(
-    payload: BookingDeclinedEmailPayload
+    payload: BookingDeclinedEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderBookingDeclinedEmail(payload);
     return this.dispatch(
@@ -317,7 +466,8 @@ export class ResendEmailService implements IEmailDispatchService {
       payload.passenger.email,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -325,7 +475,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends request for information or clarification email to passenger.
    */
   public async sendClarificationRequest(
-    payload: BookingClarificationRequestEmailPayload
+    payload: BookingClarificationRequestEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderClarificationRequestEmail(payload);
     return this.dispatch(
@@ -333,7 +484,8 @@ export class ResendEmailService implements IEmailDispatchService {
       payload.passenger.email,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -341,7 +493,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends official itemized post-trip tax receipt email to passenger.
    */
   public async sendTripReceipt(
-    payload: TripReceiptEmailPayload
+    payload: TripReceiptEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderTripReceiptEmail(payload);
     return this.dispatch(
@@ -349,7 +502,8 @@ export class ResendEmailService implements IEmailDispatchService {
       payload.passenger.email,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 
@@ -357,7 +511,8 @@ export class ResendEmailService implements IEmailDispatchService {
    * Sends B2B corporate billing invoice statement email.
    */
   public async sendCorporateInvoice(
-    payload: CorporateInvoiceEmailPayload
+    payload: CorporateInvoiceEmailPayload,
+    options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
     const rendered = renderCorporateInvoiceEmail(payload);
     return this.dispatch(
@@ -365,7 +520,8 @@ export class ResendEmailService implements IEmailDispatchService {
       payload.customerEmail,
       rendered.subject,
       rendered.html,
-      rendered.text
+      rendered.text,
+      options
     );
   }
 }
@@ -407,7 +563,9 @@ export class StubEmailDispatchService implements IEmailDispatchService {
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
-    console.info(`[StubEmailDispatch] Booking declined email sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
+    console.info(
+      `[StubEmailDispatch] Booking declined email sent to ${payload.passenger.email} (Trip #${payload.tripId})`
+    );
     return result;
   }
 
@@ -424,7 +582,9 @@ export class StubEmailDispatchService implements IEmailDispatchService {
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
-    console.info(`[StubEmailDispatch] Clarification request sent to ${payload.passenger.email} (Trip #${payload.tripId})`);
+    console.info(
+      `[StubEmailDispatch] Clarification request sent to ${payload.passenger.email} (Trip #${payload.tripId})`
+    );
     return result;
   }
 
@@ -458,7 +618,9 @@ export class StubEmailDispatchService implements IEmailDispatchService {
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
-    console.info(`[StubEmailDispatch] Status update (${payload.newStatus}) logged for Trip #${payload.tripId}`);
+    console.info(
+      `[StubEmailDispatch] Status update (${payload.newStatus}) logged for Trip #${payload.tripId}`
+    );
     return result;
   }
 
@@ -492,7 +654,9 @@ export class StubEmailDispatchService implements IEmailDispatchService {
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
-    console.info(`[StubEmailDispatch] Invoice ${payload.invoiceNumber} logged for ${payload.customerEmail}`);
+    console.info(
+      `[StubEmailDispatch] Invoice ${payload.invoiceNumber} logged for ${payload.customerEmail}`
+    );
     return result;
   }
 }

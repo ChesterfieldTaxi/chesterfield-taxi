@@ -287,9 +287,27 @@ export interface CorporateInvoiceEmailPayload {
   };
 }
 
+export interface EmailThreadingContext {
+  emailId?: string;
+  threadId?: string;
+  rfcMessageId?: string;
+  inReplyTo?: string;
+  references?: string[];
+  tripId?: string;
+  invoiceId?: string;
+  corporateAccountNumber?: string;
+  contactId?: string;
+  contactPhone?: string;
+  contactName?: string;
+}
+
 export interface EmailDispatchResult {
   success: boolean;
   messageId?: string;
+  emailId?: string;
+  threadId?: string;
+  commsEventId?: string;
+  rfcMessageId?: string;
   recipient: string;
   subject: string;
   error?: string;
@@ -298,6 +316,7 @@ export interface EmailDispatchResult {
 }
 
 export type EmailDispatchApiRequest = (
+  | { type: 'direct'; payload?: Record<string, any> }
   | { type: 'booking_confirmation'; payload: BookingConfirmationEmailPayload }
   | { type: 'dispatcher_alert'; payload: AdminDispatchAlertEmailPayload }
   | { type: 'status_update'; payload: StatusUpdateEmailPayload }
@@ -311,6 +330,16 @@ export type EmailDispatchApiRequest = (
   html?: string;
   text?: string;
   recipient?: string;
+  replyTo?: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string[];
+  tripId?: string;
+  invoiceId?: string;
+  corporateAccountNumber?: string;
+  contactId?: string;
+  contactPhone?: string;
+  contactName?: string;
 };
 
 /**

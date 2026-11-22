@@ -356,7 +356,7 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 2E. Unified Multi-Channel Comms & Telephony Webhook Persistence
+    // 2E. Unified Multi-Channel Comms, Telephony & Dispatch Email Persistence
     // ─────────────────────────────────────────────────────────────
     match /commsThreads/{threadId} {
       allow read, write: if isDispatcher();
@@ -367,6 +367,14 @@ service cloud.firestore {
     }
 
     match /telephonyWebhookEvents/{eventId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatchEmails/{emailId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /emailWebhookEvents/{eventId} {
       allow read, write: if isDispatcher();
     }
 

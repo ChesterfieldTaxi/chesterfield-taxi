@@ -912,3 +912,35 @@ export interface PassengerAccount {
   - `auth.isDispatcher || auth.isDriver`: `make_call`, `send_sms`, `end_call`, `get_call_status` (`401` unauthenticated, `403` unauthorized role).
   - `audio_proxy`: Accepts either verified staff `Authorization` Bearer header OR short-lived HMAC-SHA256 query signature (`sig` + `exp` appended by `buildSignedAudioProxyUrl` on staff responses), rejecting unsigned/expired/tampered unauthenticated requests with `401`/`403`.
 
+## 29. Phase 40 Architecture (Wave 2 Phase 2): Single-Mailbox Dispatch Email Backend (`dispatch@chesterfieldtaxi.com`), Resend Inbound Webhook & Outbound Thread Sync
+
+### 29.1 Architectural & Bundle Isolation Guardrails (`constitution.md`)
+- **Pure Domain vs. Server Isolation (`0.00 kB` Client Chunks)**:
+  - Keep all subject normalization, XSS HTML sanitization, plain-text fallback conversion, and deterministic Email-to-Booking extraction pure and free of Node/DOM globals inside `app/core/services/email/email-booking-parser.ts` and `app/core/types/dispatch-email.ts`.
+  - Isolate all `node:crypto` Svix HMAC-SHA256 verification, Resend Receiving API fetches, Firestore REST persistence, and server-side outbound/inquiry recording inside `app/core/services/email/dispatch-email.server.ts` (never exported from client barrels).
+  - Keep `app/routes/api.email.webhook.ts` and `app/routes/api.send-email.ts` as thin `loader`/`action` resource wrappers delegating to `dispatch-email.server.ts` so `api.email.webhook`, `api.send-email`, `api.telephony`, and `api.flight-status` all compile to `0.00 kB` client chunks.
+  - Scope mailbox handling strictly to `DISPATCH_MAILBOX_ADDRESS = 'dispatch@chesterfieldtaxi.com'` and preserve Vercel Hobby cron (`"0 10 * * *"`) in `vercel.json`.
+
+### 29.2 Schema, HTML Sanitizer & Email-to-Booking Parser (`dispatch-email.ts`, `email-booking-parser.ts`)
+- **`app/core/types/dispatch-email.ts`**:
+  - Defines `DISPATCH_MAILBOX_ADDRESS`, `DispatchEmailFolder`, `DispatchEmailDeliveryStatus`, `DispatchEmailCategory`, `DispatchEmailAttachmentMeta`, `DispatchEmailRecord` (`/dispatchEmails/{emailId}`), `EmailWebhookEventRecord` (`/emailWebhookEvents/{webhookEventId}`), and `DispatchEmailDiagnosticsSummary`.
+- **`app/core/services/email/email-booking-parser.ts`**:
+  - `normalizeEmailSubject(subject)`: Iteratively strips `Re:`, `Fwd:`, `FW:`, and `[Website Inquiry - ...]` prefixes and collapses whitespace.
+  - `sanitizeDispatchEmailHtml(rawHtml)` & `htmlToPlainText(html)`: Removes `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<meta>`, `<link>`, `<base>`, `<svg>`, and `<style>` blocks/expressions, strips all `on*` event attributes and `javascript:`/`vbscript:`/`data:text/html` URIs, allowlists clean email tags (`p`, `br`, `div`, `span`, `strong`, `em`, `ul`, `ol`, `li`, `table`, `blockquote`, `hr`, `a` with `target="_blank" rel="noopener noreferrer"`), and provides plain-text extraction when `text` is absent.
+  - `extractSuggestedBookingFromEmail({ subject, textBody, fromName, fromEmail })`: Extracts passenger name, E.164 phone (`sanitizeToE164`), pickup/dropoff addresses + regional airport intelligence (`detectAirportInAddresses`), pickup date/time, IATA flight ident (`parseFlightIdent`), corporate account/PO code (`Account:`, `PO:`, `#CORP-...`, `#BY-...`), and classifies inbound `folder` & `category`.
+
+### 29.3 Svix Webhook Engine, Receiving Fetch & Outbound Sync (`dispatch-email.server.ts`)
+- **`verifyResendWebhookSignature`**:
+  - Validates `svix-id`, `svix-timestamp` (`toleranceSeconds = 300`), and space-delimited `svix-signature` (`v1,<base64>`) headers against Base64-decoded `RESEND_WEBHOOK_SECRET` (stripping `whsec_`) using `HMAC-SHA256(secretBytes, "${svixId}.${svixTimestamp}.${rawBody}")` and `crypto.timingSafeEqual`.
+- **Inbound & Status Webhook Processing (`POST /api/email/webhook`)**:
+  - Deduplicates retries via `/emailWebhookEvents/{svixId}`.
+  - `email.received`: Validates `dispatch@chesterfieldtaxi.com` recipient in `to`/`cc` (returning `{ received: true, ignored: true }` for unrelated recipients), fetches `/emails/receiving/{email_id}` with `Authorization: Bearer ${RESEND_API_KEY}` when `html`/`text` are not inline, correlates `threadId` via RFC `In-Reply-To`/`References` against stored `rfcMessageId` first then `resolveUnifiedContact` second, persists `/dispatchEmails/{emailId}`, and calls `ingestCommsEventServer` (`email_inbound`, `em_${emailId}`).
+  - `email.sent` / `email.delivered` / `email.bounced` / `email.complained` / `email.delivery_delayed`: Updates `deliveryStatus` and `deliveryError` on `/dispatchEmails/{emailId}` and linked `/commsEvents/em_${emailId}`.
+  - Staff-only (`auth.isDispatcher`) `GET /api/email/webhook?diagnostics=1` and `GET/POST /api/email/webhook?action=sync_emails`.
+- **Outbound & Website Inquiry Sync (`POST /api/send-email`)**:
+  - Generates `<em_${emailId}@chesterfieldtaxi.com>` `Message-ID`, sets `replyTo: 'dispatch@chesterfieldtaxi.com'`, forwards `In-Reply-To`/`References` headers to Resend, records customer/corporate outbound emails into `/dispatchEmails` + `CommsThread` (`email_outbound`), records public `contact_inquiry` as unread inbound `inquiries`/`website_inquiry` into `/dispatchEmails` + `CommsThread` (`email_inbound`), and excludes internal `dispatcher_alert` from customer threads.
+- **Security Rules & Admin Diagnostics (`firestore.rules`, `AdminIntegrationsSubpage.tsx`)**:
+  - `allow read, write: if isDispatcher();` on `/dispatchEmails/{emailId}` and `/emailWebhookEvents/{eventId}`.
+  - Dispatch Email & Resend Inbound Webhook diagnostics card in `AdminIntegrationsSubpage.tsx` (`webhooks` sub-tab).
+
+

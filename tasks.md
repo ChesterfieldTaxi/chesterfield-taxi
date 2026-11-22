@@ -606,3 +606,23 @@
   - [x] 39.6.1 Create and run `scripts/test-comms-threads-telephony.ts` verifying unified contact/thread resolution & merging, `verifyTwilioWebhookSignature`, idempotent webhook ingestion, `GET`/`POST /api/telephony` auth + signed `audio_proxy` gates, and `firestore.rules`.
   - [x] 39.6.2 Run `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (confirming `0.00 kB` client chunks for `api.telephony` and `api.flight-status`), then mark Phase 39 complete in `tasks.md`.
 
+## Phase 40 (Wave 2 Phase 2): Single-Mailbox Dispatch Email Backend (`dispatch@chesterfieldtaxi.com`), Resend Inbound Webhook & Outbound Thread Sync
+- [x] 40.0 Baseline Hygiene & Specification Sync:
+  - [x] 40.0.1 Commit reviewed Phase 39 baseline cleanly (`feat(phase-39): add unified multi-channel thread engine, serverless telephony persistence, and webhook auth hardening`).
+  - [x] 40.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 40 scope and architecture.
+- [x] 40.1 Dispatch Email Schema, HTML Sanitizer & Deterministic Email-to-Booking Parser:
+  - [x] 40.1.1 Create `app/core/types/dispatch-email.ts` (`DISPATCH_MAILBOX_ADDRESS = 'dispatch@chesterfieldtaxi.com'`, `DispatchEmailFolder`, `DispatchEmailDeliveryStatus`, `DispatchEmailCategory`, `DispatchEmailAttachmentMeta`, `DispatchEmailRecord`, `EmailWebhookEventRecord`, `DispatchEmailDiagnosticsSummary`) and re-export from `app/core/types/index.ts`.
+  - [x] 40.1.2 Create pure `app/core/services/email/email-booking-parser.ts` (`normalizeEmailSubject`, `sanitizeDispatchEmailHtml`, `htmlToPlainText`, `extractSuggestedBookingFromEmail`) and re-export from `app/core/services/email/index.ts`.
+- [x] 40.2 Server-Isolated Dispatch Email Store & Resend Svix Webhook:
+  - [x] 40.2.1 Create `app/core/services/email/dispatch-email.server.ts` (`verifyResendWebhookSignature`, `dispatchEmailServerStore` + Firestore REST persistence, `email.received` single-mailbox ingestion + Resend Receiving API fetch + RFC/contact thread correlation + `ingestCommsEventServer`, delivery status reconciliation, `diagnostics=1`, and `sync_emails`).
+  - [x] 40.2.2 Create thin `app/routes/api.email.webhook.ts` (`0.00 kB` client chunk) and register `api/email/webhook` in `app/routes.ts`.
+- [x] 40.3 Outbound `/api/send-email` RFC Threading & Multi-Channel Sync:
+  - [x] 40.3.1 Update `app/core/services/email/types.ts`, `app/core/services/email/resend-email.service.ts`, and `app/routes/api.send-email.ts` (delegating server persistence to `dispatch-email.server.ts` so `api.send-email` remains `0.00 kB` client chunk) to attach RFC `Message-ID`/`In-Reply-To`/`References` headers, record outbound customer/corporate emails + `email_outbound` `CommsEvent`s, record public `contact_inquiry` as inbound `inquiries`/`website_inquiry` + `email_inbound` `CommsEvent`, and keep `dispatcher_alert` off customer threads.
+- [x] 40.4 Firestore Security Rules & Admin Integrations Diagnostics Card:
+  - [x] 40.4.1 Add staff-only rules (`allow read, write: if isDispatcher();`) for `/dispatchEmails/{emailId}` and `/emailWebhookEvents/{eventId}` in `firestore.rules`.
+  - [x] 40.4.2 Add **Dispatch Email (`dispatch@chesterfieldtaxi.com`) & Resend Inbound Webhook** readiness card to `app/components/domain/admin/subpages/AdminIntegrationsSubpage.tsx`.
+- [x] 40.5 Verification & Build Gates:
+  - [x] 40.5.1 Create and run `scripts/test-dispatch-email-webhook.ts` covering Svix signature verification, `email.received` + Receiving API fetch + XSS sanitization + booking extraction + multi-channel thread linkage + idempotency, RFC reply correlation + `email.delivered`/`email.bounced` reconciliation, outbound `/api/send-email` + `contact_inquiry` + `dispatcher_alert` thread rules, staff auth gates, and `firestore.rules`.
+  - [x] 40.5.2 Run `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-flight-status.ts`, `npm run test:e2e`, `npm run typecheck`, and `npm run build` (`0.00 kB` client chunks for `api.email.webhook`, `api.send-email`, `api.telephony`, and `api.flight-status`).
+
+
