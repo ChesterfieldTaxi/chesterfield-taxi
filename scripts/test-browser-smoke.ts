@@ -259,8 +259,49 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     `Secret-shaped token literals detected (use *_TEST_FIXTURE placeholders instead):\n${secretViolations.join('\n')}`
   );
 
+  // 5. Production client bundle budget assertions (build/client/assets/)
+  const clientAssetsDir = path.join(rootDir, 'build', 'client', 'assets');
+  assert.ok(
+    fs.existsSync(clientAssetsDir),
+    `build/client/assets directory not found at ${clientAssetsDir} — run "npm run build" before "npm run test:smoke"`
+  );
+
+  const assetEntries = fs.readdirSync(clientAssetsDir);
+  const apiChunks = assetEntries.filter((file) => /^api\..*\.js$/.test(file));
+  assert.ok(
+    apiChunks.length >= 14,
+    `Expected at least 14 api.*.js route chunks in build/client/assets/, found ${apiChunks.length}: ${apiChunks.join(', ')}`
+  );
+
+  for (const apiChunk of apiChunks) {
+    const stat = fs.statSync(path.join(clientAssetsDir, apiChunk));
+    assert.ok(
+      stat.size < 1024,
+      `Server API route chunk "${apiChunk}" leaked client bundle code (${stat.size} bytes >= 1024 bytes; expected 0.00 kB)`
+    );
+  }
+
+  const adminEntryChunks = assetEntries.filter((file) => /^admin-(?!auth\.)[^.]+\.js$/.test(file));
+  assert.equal(
+    adminEntryChunks.length,
+    1,
+    `Expected exactly 1 admin-*.js route entry chunk in build/client/assets/, found ${adminEntryChunks.length}: ${adminEntryChunks.join(', ')}`
+  );
+  const adminChunkStat = fs.statSync(path.join(clientAssetsDir, adminEntryChunks[0]));
+  assert.ok(
+    adminChunkStat.size < 153600,
+    `Admin route entry chunk "${adminEntryChunks[0]}" exceeded 150 KB budget (${adminChunkStat.size} bytes >= 153600 bytes)`
+  );
+
+  const emailTemplateChunks = assetEntries.filter((file) => /^email-templates-.*\.js$/.test(file));
+  assert.deepEqual(
+    emailTemplateChunks,
+    [],
+    `Server email-templates leaked into client bundle assets: ${emailTemplateChunks.join(', ')}`
+  );
+
   console.log(
-    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, and zero secret-shaped literals.\n`
+    `   ✅ Verified 15 Firestore rule blocks, ${expectedIndexes.length} composite indexes, Vercel Hobby cron, zero secret-shaped literals, ${apiChunks.length} zero-KB api.*.js chunks, zero email-templates client chunks, and admin entry chunk (${(adminChunkStat.size / 1024).toFixed(2)} KB < 150 KB).\n`
   );
 }
 

@@ -31,7 +31,7 @@ import {
   getMapStatusLabel,
   type LiveFleetDriver,
 } from '../../../core/hooks/useDispatchFleet';
-import { PhoneIcon, CarIcon, MapPinIcon, XIcon, CheckIcon } from '../../ui/Icons';
+import { PhoneIcon, CarIcon, MapPinIcon, UsersIcon, XIcon, CheckIcon } from '../../ui/Icons';
 import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 
 export interface LiveFleetMapProps {
@@ -48,10 +48,11 @@ export interface LiveFleetMapProps {
   onCallDriver?: (phone: string, name?: string) => void;
   onChangeDriverDutyStatus?: (driverId: string, dutyStatus: DriverDutyStatus) => void | Promise<void>;
   onSelectTrip?: (trip: Trip) => void;
+  onSwitchToRoster?: () => void;
   className?: string;
 }
 
-type MapFilterKey = 'all' | 'available' | 'en_route' | 'busy' | 'break';
+type MapFilterKey = 'all' | 'available' | 'en_route' | 'busy' | 'break' | 'offline';
 
 // Memoized cache for encoded SVG car marker data URLs
 const svgIconCache = new Map<string, string>();
@@ -167,6 +168,7 @@ function LiveFleetMapComponent({
   onCallDriver,
   onChangeDriverDutyStatus,
   onSelectTrip,
+  onSwitchToRoster,
   className = '',
 }: LiveFleetMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -179,7 +181,6 @@ function LiveFleetMapComponent({
   const [mapReady, setMapReady] = useState(false);
   const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>('loading');
   const [statusFilter, setStatusFilter] = useState<MapFilterKey>('all');
-  const [showOffline, setShowOffline] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
   const [showAwaitingGps, setShowAwaitingGps] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -207,8 +208,9 @@ function LiveFleetMapComponent({
     setSelectedDriverId(focusedDriverId);
     const target = fleet.find((d) => d.id === focusedDriverId);
     if (target) {
-      if (target.mapStatus === 'offline') setShowOffline(true);
-      if (statusFilter !== 'all' && statusFilter !== target.mapStatus) {
+      if (target.mapStatus === 'offline') {
+        setStatusFilter('offline');
+      } else if (statusFilter !== 'all' && statusFilter !== target.mapStatus) {
         setStatusFilter('all');
       }
       if (target.telemetry?.coordinates && mapInstanceRef.current) {
@@ -323,11 +325,11 @@ function LiveFleetMapComponent({
       c[drv.mapStatus] += 1;
       if (drv.mapStatus !== 'offline') c.all += 1;
 
-      // Apply filter rules
+      // Apply mutually exclusive single-select filter rules
       const matchesStatus =
-        drv.mapStatus === 'offline'
-          ? showOffline && statusFilter === 'all'
-          : statusFilter === 'all' || drv.mapStatus === statusFilter;
+        statusFilter === 'all'
+          ? drv.mapStatus !== 'offline'
+          : drv.mapStatus === statusFilter;
 
       if (!matchesStatus) continue;
 
@@ -339,7 +341,7 @@ function LiveFleetMapComponent({
     }
 
     return { visibleWithGps: withGps, awaitingGpsDrivers: noGps, counts: c };
-  }, [fleet, statusFilter, showOffline]);
+  }, [fleet, statusFilter]);
 
   // Pooled zero-flicker marker synchronization (runs once mapReady === true)
   useEffect(() => {
@@ -679,7 +681,13 @@ function LiveFleetMapComponent({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {fleet
-                .filter((d) => !d.isBlacklisted && (showOffline || d.mapStatus !== 'offline'))
+                .filter(
+                  (d) =>
+                    !d.isBlacklisted &&
+                    (statusFilter === 'all'
+                      ? d.mapStatus !== 'offline'
+                      : d.mapStatus === statusFilter)
+                )
                 .map((drv) => {
                   const palette = FLEET_STATUS_COLORS[drv.mapStatus];
                   const label = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
@@ -725,12 +733,83 @@ function LiveFleetMapComponent({
 
       {/* ─── TOP FLOATING FLEET FILTER & LEGEND HUD ─── */}
       <div className="absolute top-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between gap-1.5 pointer-events-none">
-        {/* Status Color Filter Pills (Single-row horizontal rail on mobile, wrapping bar on sm+) */}
-        <div className="pointer-events-auto flex flex-nowrap sm:flex-wrap items-center gap-1 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl sm:rounded-xl px-1.5 py-1 max-w-full overflow-x-auto scrollbar-none">
+        {/* Mobile (< sm): Full-width 6-column 2-line Status + Count Tiles (Zero horizontal overflow, locked level with Roster) */}
+        <div className="pointer-events-auto sm:hidden w-full grid grid-cols-6 gap-1 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl p-1">
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
+            className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+            title="Show all active on-shift drivers"
+          >
+            <span className="text-[10px] font-bold tracking-tight whitespace-nowrap leading-none">
+              All
+            </span>
+            <span className="text-xs font-black font-mono leading-tight">{counts.all}</span>
+          </button>
+
+          {(
+            [
+              { key: 'available', label: 'Available', shortLabel: 'Avail', hex: '#10b981', count: counts.available },
+              { key: 'en_route', label: 'En Route', shortLabel: 'En Route', hex: '#2563eb', count: counts.en_route },
+              { key: 'busy', label: 'Arrived / Busy', shortLabel: 'Busy', hex: '#ef4444', count: counts.busy },
+              { key: 'break', label: 'Break', shortLabel: 'Break', hex: '#eab308', count: counts.break },
+            ] as const
+          ).map((item) => {
+            const active = statusFilter === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setStatusFilter(active ? 'all' : item.key)}
+                className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                  active
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+                title={`Filter ${item.label} drivers`}
+              >
+                <span className="inline-flex items-center gap-1 leading-none">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0 ring-1 ring-black/10"
+                    style={{ backgroundColor: item.hex }}
+                  />
+                  <span className="text-[10px] font-bold tracking-tight whitespace-nowrap">
+                    {item.shortLabel}
+                  </span>
+                </span>
+                <span className="text-xs font-black font-mono leading-tight">{item.count}</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === 'offline' ? 'all' : 'offline')}
+            className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+              statusFilter === 'offline'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+            title="Filter Offline drivers on map"
+          >
+            <span className="inline-flex items-center gap-1 leading-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+              <span className="text-[10px] font-bold tracking-tight whitespace-nowrap">Off</span>
+            </span>
+            <span className="text-xs font-black font-mono leading-tight">{counts.offline}</span>
+          </button>
+        </div>
+
+        {/* Desktop / Tablet (sm+): Compact Single-Row Status Color Filter Pills */}
+        <div className="pointer-events-auto hidden sm:flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-xl px-1.5 py-1 max-w-full">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0 ${
               statusFilter === 'all'
                 ? 'bg-slate-900 text-white shadow-2xs'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -755,7 +834,7 @@ function LiveFleetMapComponent({
                 key={item.key}
                 type="button"
                 onClick={() => setStatusFilter(active ? 'all' : item.key)}
-                className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border shrink-0 ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 border shrink-0 ${
                   active
                     ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                     : 'bg-white text-slate-700 border-transparent hover:bg-slate-100'
@@ -766,8 +845,7 @@ function LiveFleetMapComponent({
                   className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/10"
                   style={{ backgroundColor: item.hex }}
                 />
-                <span className="sm:hidden">{item.shortLabel}</span>
-                <span className="hidden sm:inline">{item.label}</span>
+                <span>{item.label}</span>
                 <span className="font-mono text-[10px] opacity-80">{item.count}</span>
               </button>
             );
@@ -777,20 +855,16 @@ function LiveFleetMapComponent({
 
           <button
             type="button"
-            onClick={() => {
-              setShowOffline((v) => !v);
-              if (!showOffline) setStatusFilter('all');
-            }}
-            className={`px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-xl sm:rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 border shrink-0 ${
-              showOffline
-                ? 'bg-slate-700 text-white border-slate-700'
+            onClick={() => setStatusFilter(statusFilter === 'offline' ? 'all' : 'offline')}
+            className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 border shrink-0 ${
+              statusFilter === 'offline'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                 : 'text-slate-500 border-transparent hover:bg-slate-100'
             }`}
-            title="Toggle Offline drivers on map"
+            title="Filter Offline drivers on map"
           >
             <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-            <span className="sm:hidden">Off</span>
-            <span className="hidden md:inline">Offline</span>
+            <span>Offline</span>
             <span className="font-mono text-[10px] opacity-80">{counts.offline}</span>
           </button>
         </div>
@@ -876,43 +950,61 @@ function LiveFleetMapComponent({
         </div>
       </div>
 
-      {/* ─── MOBILE FLOATING RIGHT-EDGE MAP CONTROLS (Google Maps style) ─── */}
+      {/* ─── MOBILE FLOATING RIGHT-EDGE MAP CONTROLS + ROSTER SWITCHER ─── */}
       <div
-        className={`sm:hidden absolute right-3 z-20 flex flex-col items-end gap-2 pointer-events-auto transition-all ${
-          selectedDriver ? 'bottom-[245px]' : 'bottom-4'
+        className={`lg:hidden absolute right-3.5 z-20 flex flex-col items-end gap-2 pointer-events-auto transition-all ${
+          selectedDriver ? 'bottom-[245px] sm:bottom-3.5' : 'bottom-3.5'
         }`}
       >
-        {awaitingGpsDrivers.length > 0 && (
+        <div className="sm:hidden flex flex-col items-end gap-2">
+          {awaitingGpsDrivers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAwaitingGps(true)}
+              className="px-3 py-2 rounded-full bg-amber-50/95 active:scale-95 border border-amber-300 text-amber-900 text-[11px] font-bold shadow-lg backdrop-blur-md cursor-pointer flex items-center gap-1.5"
+              title="On-shift drivers without live GPS"
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>No GPS ({awaitingGpsDrivers.length})</span>
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setShowAwaitingGps(true)}
-            className="px-3 py-2 rounded-full bg-amber-50/95 active:scale-95 border border-amber-300 text-amber-900 text-[11px] font-bold shadow-lg backdrop-blur-md cursor-pointer flex items-center gap-1.5"
-            title="On-shift drivers without live GPS"
+            onClick={handleFitFleet}
+            className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-blue-600 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
+            title="Fit all live GPS vehicles"
+            aria-label="Fit Fleet"
           >
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span>No GPS ({awaitingGpsDrivers.length})</span>
+            <CarIcon className="w-5 h-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRecenterChesterfield}
+            className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-slate-700 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
+            title="Recenter on Chesterfield, MO"
+            aria-label="Recenter Map"
+          >
+            <MapPinIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {onSwitchToRoster && (
+          <button
+            type="button"
+            onClick={onSwitchToRoster}
+            className="px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold shadow-xl ring-1 ring-white/15 flex items-center gap-2 cursor-pointer transition-all"
+            title="Switch to Drivers Roster"
+            aria-label="Switch to Drivers Roster"
+          >
+            <UsersIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Roster</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black leading-none">
+              {fleet.filter((d) => d.mapStatus === 'available').length}
+            </span>
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={handleFitFleet}
-          className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-blue-600 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
-          title="Fit all live GPS vehicles"
-          aria-label="Fit Fleet"
-        >
-          <CarIcon className="w-5 h-5" />
-        </button>
-
-        <button
-          type="button"
-          onClick={handleRecenterChesterfield}
-          className="w-11 h-11 rounded-full bg-white/95 active:scale-95 border border-slate-200 text-slate-700 shadow-lg backdrop-blur-md cursor-pointer flex items-center justify-center"
-          title="Recenter on Chesterfield, MO"
-          aria-label="Recenter Map"
-        >
-          <MapPinIcon className="w-5 h-5" />
-        </button>
       </div>
 
       {/* ─── MOBILE AWAITING GPS BOTTOM SHEET (Drag-down to close) ─── */}

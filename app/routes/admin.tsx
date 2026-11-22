@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams, useLocation, Outlet, Link } from 'react-router';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
@@ -6,23 +6,78 @@ import { getAdminConfigService } from '../core/services/config/admin-config.serv
 import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import {
-  AdminDashboardTab,
-  AdminGeneralTab,
-  AdminRatesTab,
-  AdminVehiclesTab,
-  AdminZonesTab,
-  AdminOperatorsTab,
-  AdminAdvancedTab,
-  AdminTripsSubpage,
-  AdminInvoicingSubpage,
-  AdminCustomersSubpage,
-  AdminWebsiteTab,
-  AdminArchiveTab,
-} from '../components/domain/admin';
-import { AdminIntegrationsSubpage } from '../components/domain/admin/subpages/AdminIntegrationsSubpage';
-import { AdminRulesTab } from '../components/domain/admin/AdminRulesTab';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
+
+const AdminDashboardTab = React.lazy(() =>
+  import('../components/domain/admin/AdminDashboardTab').then((m) => ({
+    default: m.AdminDashboardTab,
+  }))
+);
+const AdminGeneralTab = React.lazy(() =>
+  import('../components/domain/admin/AdminGeneralTab').then((m) => ({
+    default: m.AdminGeneralTab,
+  }))
+);
+const AdminRatesTab = React.lazy(() =>
+  import('../components/domain/admin/AdminRatesTab').then((m) => ({
+    default: m.AdminRatesTab,
+  }))
+);
+const AdminVehiclesTab = React.lazy(() =>
+  import('../components/domain/admin/AdminVehiclesTab').then((m) => ({
+    default: m.AdminVehiclesTab,
+  }))
+);
+const AdminZonesTab = React.lazy(() =>
+  import('../components/domain/admin/AdminZonesTab').then((m) => ({
+    default: m.AdminZonesTab,
+  }))
+);
+const AdminOperatorsTab = React.lazy(() =>
+  import('../components/domain/admin/AdminOperatorsTab').then((m) => ({
+    default: m.AdminOperatorsTab,
+  }))
+);
+const AdminAdvancedTab = React.lazy(() =>
+  import('../components/domain/admin/AdminAdvancedTab').then((m) => ({
+    default: m.AdminAdvancedTab,
+  }))
+);
+const AdminTripsSubpage = React.lazy(() =>
+  import('../components/domain/admin/subpages/AdminTripsSubpage').then((m) => ({
+    default: m.AdminTripsSubpage,
+  }))
+);
+const AdminInvoicingSubpage = React.lazy(() =>
+  import('../components/domain/admin/subpages/AdminInvoicingSubpage').then((m) => ({
+    default: m.AdminInvoicingSubpage,
+  }))
+);
+const AdminCustomersSubpage = React.lazy(() =>
+  import('../components/domain/admin/subpages/AdminCustomersSubpage').then((m) => ({
+    default: m.AdminCustomersSubpage,
+  }))
+);
+const AdminWebsiteTab = React.lazy(() =>
+  import('../components/domain/admin/website/AdminWebsiteTab').then((m) => ({
+    default: m.AdminWebsiteTab,
+  }))
+);
+const AdminArchiveTab = React.lazy(() =>
+  import('../components/domain/admin/AdminArchiveTab').then((m) => ({
+    default: m.AdminArchiveTab,
+  }))
+);
+const AdminIntegrationsSubpage = React.lazy(() =>
+  import('../components/domain/admin/subpages/AdminIntegrationsSubpage').then((m) => ({
+    default: m.AdminIntegrationsSubpage,
+  }))
+);
+const AdminRulesTab = React.lazy(() =>
+  import('../components/domain/admin/AdminRulesTab').then((m) => ({
+    default: m.AdminRulesTab,
+  }))
+);
 import {
   CarIcon,
   SpinnerIcon,
@@ -751,6 +806,14 @@ export default function AdminLayout() {
         <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-24 lg:pb-6 space-y-4 sm:space-y-6">
           {/* Dynamic Tab Body */}
           <div className="pt-1">
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
+                  <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="text-xs font-semibold tracking-wide">Loading module...</span>
+                </div>
+              }
+            >
             {normalizedTab === 'dashboard' && (
               <AdminDashboardTab
                 settings={settings}
@@ -847,6 +910,7 @@ export default function AdminLayout() {
             {normalizedTab === 'archive' && (
               <AdminArchiveTab initialSubTab={effectiveSub as any} />
             )}
+            </Suspense>
           </div>
 
           {/* Outlet for any nested routes */}

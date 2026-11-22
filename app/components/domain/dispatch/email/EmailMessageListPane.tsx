@@ -152,7 +152,7 @@ export function EmailMessageListPane({
   // ─── DRAFTS FOLDER VIEW ───
   if (activeFolder === 'drafts') {
     return (
-      <div className={`divide-y divide-slate-100 overflow-y-auto bg-white ${className}`}>
+      <div className={`divide-y divide-slate-100 overflow-y-auto pb-16 bg-white ${className}`}>
         {drafts.length === 0 ? (
           <div className="p-8 text-center space-y-1.5">
             <EditIcon className="w-8 h-8 text-slate-300 mx-auto" />
@@ -216,7 +216,7 @@ export function EmailMessageListPane({
 
   return (
     <>
-      <div className={`divide-y divide-slate-100 overflow-y-auto bg-white ${className}`}>
+      <div className={`divide-y divide-slate-100 overflow-y-auto pb-16 bg-white ${className}`}>
         {emails.length === 0 ? (
           <div className="p-8 text-center space-y-1.5">
             <MailIcon className="w-8 h-8 text-slate-300 mx-auto" />

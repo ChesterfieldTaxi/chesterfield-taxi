@@ -173,7 +173,7 @@ export function VoicemailCallLogPane({
         )}
 
         {/* Event rows list */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 pb-16">
           {items.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs">
               No communications found matching the selected filters.

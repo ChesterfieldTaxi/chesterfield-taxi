@@ -6,22 +6,16 @@
  * (`dispatch@chesterfieldtaxi.com`), responsive HTML templates, and graceful
  * development fallbacks when API keys are absent.
  *
- * Strictly free of `node:*` and `*.server.ts` imports so client bundles remain clean.
+ * Strictly free of `node:*`, `*.server.ts`, and static `resend` / `./email-templates`
+ * browser imports: browser calls delegate via lightweight `fetch('/api/send-email')`
+ * requests while `resend` and `./email-templates` load dynamically strictly inside
+ * server-side (`typeof window === 'undefined'`) execution paths.
  */
 
-import { Resend } from 'resend';
+import type { Resend } from 'resend';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DISPATCH_MAILBOX_ADDRESS } from '../../types/dispatch-email';
 import { getFirebaseAuthHeaders } from '../auth/auth-headers';
-import {
-  renderBookingDeclinedEmail,
-  renderClarificationRequestEmail,
-  renderCorporateInvoiceEmail,
-  renderDispatcherAlertEmail,
-  renderPassengerConfirmationEmail,
-  renderStatusUpdateEmail,
-  renderTripReceiptEmail,
-} from './email-templates';
 import type {
   AdminDispatchAlertEmailPayload,
   BookingClarificationRequestEmailPayload,
@@ -63,10 +57,14 @@ function getEnv(key: string): string | undefined {
   if (envSource && envSource[key]) {
     return envSource[key];
   }
-  if (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env as any)[key]) {
-    return (import.meta.env as any)[key];
-  }
   return undefined;
+}
+
+async function loadServerEmailTemplates() {
+  if (typeof window === 'undefined' && process.env.VITE_CLIENT_BUILD !== '1') {
+    return import('./email-templates');
+  }
+  return null;
 }
 
 const DEFAULT_ADMIN_EMAIL =
@@ -109,14 +107,21 @@ export class ResendEmailService implements IEmailDispatchService {
       COMPANY_CONFIG.email.dispatch ||
       DISPATCH_MAILBOX_ADDRESS;
     this.fetchImpl = config?.fetchImpl;
+  }
 
-    if (this.apiKey && !this.fetchImpl) {
+  private async getServerResendClient(): Promise<Resend | null> {
+    if (this.resendClient) return this.resendClient;
+    if (!this.apiKey || this.fetchImpl) return null;
+    if (typeof window === 'undefined' && process.env.VITE_CLIENT_BUILD !== '1') {
       try {
-        this.resendClient = new Resend(this.apiKey);
+        const { Resend: ResendCtor } = await import('resend');
+        this.resendClient = new ResendCtor(this.apiKey);
+        return this.resendClient;
       } catch (err) {
         console.warn('[ResendEmailService] Failed to initialize Resend client:', err);
       }
     }
+    return null;
   }
 
   /**
@@ -288,7 +293,8 @@ export class ResendEmailService implements IEmailDispatchService {
     }
 
     // 3B. Server environment with live Resend SDK client
-    if (!this.resendClient) {
+    const resendClient = await this.getServerResendClient();
+    if (!resendClient) {
       return {
         success: false,
         recipient,
@@ -299,7 +305,7 @@ export class ResendEmailService implements IEmailDispatchService {
     }
 
     try {
-      const response = await this.resendClient.emails.send({
+      const response = await resendClient.emails.send({
         from: this.fromAddress,
         replyTo: effectiveReplyTo,
         to: recipient,
@@ -405,8 +411,19 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: BookingConfirmationEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderPassengerConfirmationEmail(payload);
     const recipient = payload.recipientEmailOverride?.trim() || payload.passenger.email;
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'booking_confirmation', payload },
+        recipient,
+        `Booking Confirmation – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderPassengerConfirmationEmail(payload);
     return this.dispatch(
       { type: 'booking_confirmation', payload },
       recipient,
@@ -424,7 +441,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: AdminDispatchAlertEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderDispatcherAlertEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'dispatcher_alert', payload },
+        this.adminAlertRecipient,
+        `Dispatch Alert – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderDispatcherAlertEmail(payload);
     return this.dispatch(
       { type: 'dispatcher_alert', payload },
       this.adminAlertRecipient,
@@ -442,7 +470,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: StatusUpdateEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderStatusUpdateEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'status_update', payload },
+        payload.passenger.email,
+        `Ride Status Update – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderStatusUpdateEmail(payload);
     return this.dispatch(
       { type: 'status_update', payload },
       payload.passenger.email,
@@ -460,7 +499,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: BookingDeclinedEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderBookingDeclinedEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'booking_declined', payload },
+        payload.passenger.email,
+        `Booking Update – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderBookingDeclinedEmail(payload);
     return this.dispatch(
       { type: 'booking_declined', payload },
       payload.passenger.email,
@@ -478,7 +528,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: BookingClarificationRequestEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderClarificationRequestEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'clarification_request', payload },
+        payload.passenger.email,
+        `Information Requested – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderClarificationRequestEmail(payload);
     return this.dispatch(
       { type: 'clarification_request', payload },
       payload.passenger.email,
@@ -496,7 +557,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: TripReceiptEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderTripReceiptEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'trip_receipt', payload },
+        payload.passenger.email,
+        `Trip Receipt – #${payload.tripId}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderTripReceiptEmail(payload);
     return this.dispatch(
       { type: 'trip_receipt', payload },
       payload.passenger.email,
@@ -514,7 +586,18 @@ export class ResendEmailService implements IEmailDispatchService {
     payload: CorporateInvoiceEmailPayload,
     options?: EmailSendTransportOptions
   ): Promise<EmailDispatchResult> {
-    const rendered = renderCorporateInvoiceEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    if (!templates) {
+      return this.dispatch(
+        { type: 'corporate_invoice', payload },
+        payload.customerEmail,
+        `Invoice ${payload.invoiceNumber} – ${COMPANY_CONFIG.name}`,
+        '',
+        '',
+        options
+      );
+    }
+    const rendered = templates.renderCorporateInvoiceEmail(payload);
     return this.dispatch(
       { type: 'corporate_invoice', payload },
       payload.customerEmail,
@@ -535,14 +618,17 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendBookingConfirmation(
     payload: BookingConfirmationEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderPassengerConfirmationEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderPassengerConfirmationEmail(payload).subject
+      : `Booking Confirmation – #${payload.tripId}`;
     const recipient = payload.recipientEmailOverride?.trim() || payload.passenger.email;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_confirm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -553,13 +639,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendBookingDeclined(
     payload: BookingDeclinedEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderBookingDeclinedEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderBookingDeclinedEmail(payload).subject
+      : `Booking Update – #${payload.tripId}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_declined_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: payload.passenger.email,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -572,13 +661,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendClarificationRequest(
     payload: BookingClarificationRequestEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderClarificationRequestEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderClarificationRequestEmail(payload).subject
+      : `Information Requested – #${payload.tripId}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_clarify_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: payload.passenger.email,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -591,13 +683,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendAdminDispatchAlert(
     payload: AdminDispatchAlertEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderDispatcherAlertEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderDispatcherAlertEmail(payload).subject
+      : `Dispatch Alert – #${payload.tripId}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_alert_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: DEFAULT_ADMIN_EMAIL,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -608,13 +703,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendStatusUpdateNotification(
     payload: StatusUpdateEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderStatusUpdateEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderStatusUpdateEmail(payload).subject
+      : `Ride Status Update – #${payload.tripId}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_status_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: payload.passenger.email,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -627,13 +725,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendTripReceipt(
     payload: TripReceiptEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderTripReceiptEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderTripReceiptEmail(payload).subject
+      : `Trip Receipt – #${payload.tripId}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: payload.passenger.email,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);
@@ -644,13 +745,16 @@ export class StubEmailDispatchService implements IEmailDispatchService {
   public async sendCorporateInvoice(
     payload: CorporateInvoiceEmailPayload
   ): Promise<EmailDispatchResult> {
-    const rendered = renderCorporateInvoiceEmail(payload);
+    const templates = await loadServerEmailTemplates();
+    const subject = templates
+      ? templates.renderCorporateInvoiceEmail(payload).subject
+      : `Invoice ${payload.invoiceNumber} – ${COMPANY_CONFIG.name}`;
     const result: EmailDispatchResult = {
       success: true,
       simulated: true,
       messageId: `stub_invoice_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       recipient: payload.customerEmail,
-      subject: rendered.subject,
+      subject,
       dispatchedAt: new Date().toISOString(),
     };
     this.dispatchedEmails.push(result);

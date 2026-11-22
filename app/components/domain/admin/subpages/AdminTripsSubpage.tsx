@@ -3,7 +3,7 @@ import type { Trip, TripStatus } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
 import { getEmailDispatchService } from '../../../../core/services/email';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
-import { formatVehicleTier } from '../../../../core/services/email/email-templates';
+import { formatVehicleTier } from '../../../../core/utils/vehicle-tier-format.util';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';

@@ -12,7 +12,7 @@ import {
 } from './DispatchCascadeSlaBadges';
 import type { SlaScanSummary } from '../../../core/services/dispatch/sla-monitor.service';
 import { Badge } from '../../ui/Badge';
-import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { formatDriverAssignmentLabel } from '../../../core/services/operator.service';
 import {
   FLEET_STATUS_COLORS,

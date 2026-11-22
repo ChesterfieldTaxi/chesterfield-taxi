@@ -45,7 +45,7 @@ import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { useWakeLock } from '../core/hooks/useWakeLock';
 import { usePushNotifications } from '../core/hooks/usePushNotifications';
 import { validatePhoneNumber } from '../core/utils/phone';
-import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import {
   formatCabUnitLabel,

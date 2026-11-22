@@ -1028,6 +1028,39 @@ export interface PassengerAccount {
     4. Authenticated/role-gated application workspaces (`/app`, `/app/dispatch`, `/app/dispatch/popout?module=email`, `/app/dispatch/popout?module=comms`, `/app/driver`, `/app/corporate`, `/app/admin`).
   - Guarantees clean browser and HTTP server shutdown inside `finally`.
 
+## 33. Phase 44 Architecture (Wave 3 Phase 1): Server/Client Bundle Separation & Route-Level Lazy Chunking
+
+### 33.1 Zero-Behavior-Change & Bundle Isolation Guardrails (`constitution.md`)
+- **Non-Functional Refactor Invariants**:
+  - Zero changes to pricing pipeline formulas, Firestore schemas/rules/indexes, `/api/*` request/response JSON contracts, UI layout/styling, `WorkspaceBus` event payloads, or SSR/client initial render trees.
+  - Preserve `"0 10 * * *"` in `vercel.json` and enforce zero secret-shaped literals across `app/` and `scripts/` (`constitution.md` Section 3).
+
+### 33.2 Server-Only Public Config Loader (`app/core/services/config/public-settings.server.ts`)
+- **`loadPublicSettingsForServer()` Extraction**:
+  - Moves `loadPublicSettingsForServer()` out of `app/routes/api.public-config.ts` into `app/core/services/config/public-settings.server.ts` (`*.server.ts` boundary).
+  - Both `app/routes/api.public-config.ts` and `app/routes/book.tsx` import `loadPublicSettingsForServer` from `../core/services/config/public-settings.server` so React Router's Vite compiler strips the server dependency graph from client bundles and all **14** `/api/*` routes emit `0.00 kB` client chunks.
+
+### 33.3 Vehicle Tier Formatter Decoupling & Server-Gated Email Templates (`vehicle-tier-format.util.ts`, `resend-email.service.ts`)
+- **Pure Formatter Utility (`app/core/utils/vehicle-tier-format.util.ts`)**:
+  - Houses `formatVehicleTier` and `formatVehicleTierDisplay` with zero email/template dependencies; re-exported from `app/core/services/email/email-templates.ts` for backward compatibility while all 12 client/UI routes and components import directly from `vehicle-tier-format.util.ts`.
+- **Dynamic Server-Only `resend` & `./email-templates` Loading (`resend-email.service.ts`, `email/index.ts`)**:
+  - Removes static top-level `import { Resend } from 'resend'` and `./email-templates` imports from `resend-email.service.ts` and removes `export * from './email-templates'` from `app/core/services/email/index.ts`.
+  - Loads `resend` and `./email-templates` via dynamic `await import(...)` strictly inside server-side (`typeof window === 'undefined'`) execution branches so browser calls remain lightweight `fetch('/api/send-email')` requests and the `~74 kB` `email-templates` chunk is eliminated from browser bundles.
+
+### 33.4 Route-Level & Workspace Lazy Chunking (`admin.tsx`, `dispatch.popout.tsx`, `dispatch.tsx`)
+- **Admin Console Per-Tab Splitting (`app/routes/admin.tsx`)**:
+  - Replaces static barrel imports from `../components/domain/admin`, `AdminIntegrationsSubpage`, and `AdminRulesTab` with 14 direct module `React.lazy()` definitions wrapped in a `<Suspense>` spinner inside `<main>`, shrinking the `admin-*.js` route entry chunk below `120 KB`.
+- **Dispatch Contextual Email Extraction & Lazy Workspace Modules**:
+  - Moves `getContextualEmailMeta` and `sendDispatchContextualTripEmail` into `app/core/services/dispatch/dispatch-trip-email.util.ts` (re-exported from `DispatchTripDetailsDrawer.tsx`) so `app/routes/dispatch.tsx` no longer statically pulls in `DispatchTripDetailsDrawer.tsx`.
+  - Wraps `CommsHub`, `EmailDock`, `DispatchBookingEngine`, and `LiveFleetMap` with `React.lazy()` + `<Suspense>` in `app/routes/dispatch.popout.tsx`.
+  - Wraps `CommsHub`, `EmailDock`, `AppSuiteLauncher`, and `DispatchTripDetailsDrawer` with `React.lazy()` + `<Suspense>` in `app/routes/dispatch.tsx`, keeping desktop `CommsHub` mounted once loaded for WebRTC softphone continuity and conditionally mounting `DispatchTripDetailsDrawer` when any modal target (`reviewTrip`, `auditTrailTrip`, `driverModalTrip`, `completeTripTarget`) is active.
+
+### 33.5 Automated Bundle Budget Gate (`scripts/test-browser-smoke.ts`)
+- Extends `verifyCutoverConfigInvariants(rootDir)` to scan `build/client/assets/`:
+  - Asserts all 14 `api.*.js` chunks are `< 1024` bytes (`0.00 kB`).
+  - Asserts the `admin-*.js` route entry chunk is `< 153600` bytes (`< 150 KB`).
+
+
 
 
 

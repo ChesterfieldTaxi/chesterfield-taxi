@@ -469,7 +469,7 @@ export function EmailCrossChannelRail({
           )}
 
           {/* Channel Filter Pills */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+          <div className="flex items-center flex-wrap gap-1 pb-0.5">
             {(
               [
                 { id: 'all', label: 'All' },

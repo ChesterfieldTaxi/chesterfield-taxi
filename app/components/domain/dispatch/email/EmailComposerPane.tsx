@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBottomSheetDragToClose } from '../../../../core/hooks/useBottomSheetDragToClose';
 import {
   getContactService,
   normalizeEmail,
@@ -24,6 +23,7 @@ import type { Trip } from '../../../../core/types/trip';
 import {
   BuildingIcon,
   CheckIcon,
+  ChevronDownIcon,
   CreditCardIcon,
   LinkIcon,
   MailIcon,
@@ -34,7 +34,7 @@ import {
 } from '../../../ui/Icons';
 
 export interface EmailComposerPaneProps {
-  variant: 'inline' | 'modal';
+  variant: 'inline' | 'dock' | 'modal';
   initialDraft: DispatchEmailDraft;
   anchorEmail?: DispatchEmailRecord | null;
   matchedTrips?: Trip[];
@@ -82,11 +82,10 @@ export function EmailComposerPane({
   );
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isGeneratingPayLink, setIsGeneratingPayLink] = useState<boolean>(false);
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
 
   const hasMountedRef = useRef<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const modalSheetDrag = useBottomSheetDragToClose({ onClose });
 
   // Sync selectedTripId if matchedTrips updates and none was selected yet
   useEffect(() => {
@@ -98,6 +97,7 @@ export function EmailComposerPane({
   // Apply external link/snippet insertions triggered from `EmailCrossChannelRail`
   useEffect(() => {
     if (!pendingInsertion) return;
+    setIsMinimized(false);
     setBodyText((prev) => {
       const trimmed = prev.trimEnd();
       return trimmed ? `${trimmed}\n\n${pendingInsertion.text}` : pendingInsertion.text;
@@ -448,321 +448,341 @@ export function EmailComposerPane({
       ? 'Forward Email'
       : 'New Dispatch Email';
 
+  const isInline = variant === 'inline';
+  const minimizedSummary =
+    subject.trim() ||
+    (toEmail.trim() ? `To: ${toEmail.trim()}` : modeLabel);
+
   const composerInner = (
     <div
       onKeyDown={handleKeyDown}
       className={
-        variant === 'inline'
+        isInline
           ? 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
           : 'flex flex-col flex-1 min-h-0 overflow-hidden bg-white'
       }
     >
       {/* Header Bar */}
       <div
-        {...(variant === 'modal' ? modalSheetDrag.dragHandlers : {})}
-        className={`px-3.5 py-2.5 flex items-center justify-between gap-2 shrink-0 ${
-          variant === 'modal'
-            ? 'bg-slate-900 text-white touch-none'
+        onClick={!isInline ? () => setIsMinimized((prev) => !prev) : undefined}
+        className={`px-3 py-2 flex items-center justify-between gap-2 shrink-0 ${
+          !isInline
+            ? 'bg-slate-900 text-white cursor-pointer hover:bg-slate-800/95 transition-colors'
             : 'bg-slate-50 border-b border-slate-200 text-slate-800'
         }`}
       >
-        <div className="min-w-0">
-          {variant === 'modal' && (
-            <div
-              className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2 sm:hidden"
-              aria-hidden="true"
-            />
-          )}
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
             <MailIcon
-              className={`w-4 h-4 shrink-0 ${
-                variant === 'modal' ? 'text-blue-400' : 'text-blue-600'
+              className={`w-3.5 h-3.5 shrink-0 ${
+                !isInline ? 'text-blue-400' : 'text-blue-600'
               }`}
             />
-            <span className="text-xs font-extrabold">{modeLabel}</span>
-            <span
-              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                variant === 'modal'
-                  ? 'bg-slate-800 text-slate-300'
-                  : 'bg-white border border-slate-200 text-slate-500'
-              }`}
-            >
-              From: Chesterfield Taxi Dispatch &lt;{DISPATCH_MAILBOX_ADDRESS}&gt;
+            <span className="text-xs font-extrabold truncate">
+              {!isInline && isMinimized ? minimizedSummary : modeLabel}
             </span>
+            {(!isMinimized || isInline) && (
+              <span
+                className={`hidden @md/emaildock:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded truncate ${
+                  !isInline
+                    ? 'bg-slate-800 text-slate-300'
+                    : 'bg-white border border-slate-200 text-slate-500'
+                }`}
+              >
+                {DISPATCH_MAILBOX_ADDRESS}
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div
+          className="flex items-center gap-1 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
           {lastSavedAtMs && (
             <span
-              className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold ${
-                variant === 'modal' ? 'text-emerald-300' : 'text-emerald-700'
+              className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold mr-1 ${
+                !isInline ? 'text-emerald-300' : 'text-emerald-700'
               }`}
             >
               <CheckIcon className="w-3 h-3" />
               <span>Saved {formatDispatchEmailTimestamp(lastSavedAtMs)}</span>
             </span>
           )}
+          {!isInline && (
+            <button
+              type="button"
+              onClick={() => setIsMinimized((prev) => !prev)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 cursor-pointer"
+              title={isMinimized ? 'Expand compose pane' : 'Minimize to bottom bar'}
+              aria-label={isMinimized ? 'Expand compose pane' : 'Minimize compose pane'}
+            >
+              <ChevronDownIcon
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                  isMinimized ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
             className={`p-1 rounded-lg cursor-pointer ${
-              variant === 'modal'
-                ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+              !isInline
+                ? 'text-slate-400 hover:text-white hover:bg-slate-700/80'
                 : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/70'
             }`}
-            title="Minimize & keep draft saved"
+            title="Close & keep draft saved"
             aria-label="Close composer"
           >
-            <XIcon className="w-4 h-4" />
+            <XIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Form Fields */}
-      <div className="p-3 space-y-2.5 overflow-y-auto">
-        {/* To + Collapsible Cc */}
-        <div className="relative">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">To:</span>
-            <div className="relative flex-1 min-w-0">
-              <input
-                type="email"
-                value={toEmail}
-                onFocus={() => setIsAutocompleteOpen(true)}
-                onBlur={() => setTimeout(() => setIsAutocompleteOpen(false), 160)}
-                onChange={(e) => {
-                  setToEmail(e.target.value);
-                  setIsAutocompleteOpen(true);
-                }}
-                placeholder="passenger@company.com (type name or email...)"
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
-              />
-              {isAutocompleteOpen && contactSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
-                  {contactSuggestions.map((c) => {
-                    const displayEmail = c.email || c.secondaryEmail || '';
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectContact(c);
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-blue-50/70 flex items-center justify-between gap-2 cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-900 truncate">
-                              {c.name}
-                            </span>
-                            {c.isVip && (
-                              <span className="text-[9px] font-black px-1 py-0.2 rounded bg-amber-100 text-amber-800">
-                                VIP
+      {/* Form Fields & Footer (Collapsible when bottom-docked) */}
+      {(isInline || !isMinimized) && (
+        <>
+          <div className="flex-1 min-h-0 p-2.5 space-y-2 overflow-y-auto">
+            {/* To + Collapsible Cc */}
+            <div className="relative">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">To:</span>
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="email"
+                    value={toEmail}
+                    onFocus={() => setIsAutocompleteOpen(true)}
+                    onBlur={() => setTimeout(() => setIsAutocompleteOpen(false), 160)}
+                    onChange={(e) => {
+                      setToEmail(e.target.value);
+                      setIsAutocompleteOpen(true);
+                    }}
+                    placeholder="passenger@company.com (type name or email...)"
+                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  />
+                  {isAutocompleteOpen && contactSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 max-h-44 overflow-y-auto">
+                      {contactSuggestions.map((c) => {
+                        const displayEmail = c.email || c.secondaryEmail || '';
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectContact(c);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50/70 flex items-center justify-between gap-2 cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {c.name}
+                                </span>
+                                {c.isVip && (
+                                  <span className="text-[9px] font-black px-1 py-0.2 rounded bg-amber-100 text-amber-800">
+                                    VIP
+                                  </span>
+                                )}
+                                {c.corporateAccountName && (
+                                  <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 inline-flex items-center gap-0.5 truncate max-w-[110px]">
+                                    <BuildingIcon className="w-2.5 h-2.5 shrink-0" />
+                                    <span className="truncate">{c.corporateAccountName}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] font-mono text-slate-500 truncate">
+                                {displayEmail}
+                              </p>
+                            </div>
+                            {c.phone && (
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                {c.phone}
                               </span>
                             )}
-                            {c.corporateAccountName && (
-                              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 inline-flex items-center gap-0.5 truncate max-w-[110px]">
-                                <BuildingIcon className="w-2.5 h-2.5 shrink-0" />
-                                <span className="truncate">{c.corporateAccountName}</span>
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-mono text-slate-500 truncate">
-                            {displayEmail}
-                          </p>
-                        </div>
-                        {c.phone && (
-                          <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                            {c.phone}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {!showCc && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCc(true)}
+                    className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 cursor-pointer shrink-0"
+                  >
+                    + Cc
+                  </button>
+                )}
+              </div>
             </div>
 
-            {!showCc && (
+            {showCc && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Cc:</span>
+                <input
+                  type="text"
+                  value={ccInput}
+                  onChange={(e) => setCcInput(e.target.value)}
+                  placeholder="assistant@company.com, travel@company.com"
+                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCcInput('');
+                    setShowCc(false);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Remove Cc"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Subject */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Subject:</span>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Reservation Confirmation / Airport Pickup Instructions"
+                className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Smart Canned Templates + 1-Tap Tracking / Pay Link Toolbar */}
+            <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-1.5 rounded-xl border border-slate-200/80">
+              <div className="flex items-center gap-1 min-w-[155px] flex-1 sm:flex-none">
+                <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    const val = e.target.value as CannedDispatchTemplateId;
+                    setSelectedTemplateId(val);
+                    if (val) void handleApplyTemplate(val);
+                  }}
+                  className="w-full text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-blue-500"
+                  aria-label="Insert canned dispatch email template"
+                >
+                  <option value="">+ Canned Dispatch Template...</option>
+                  {CANNED_DISPATCH_EMAIL_TEMPLATES.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {matchedTrips.length > 0 && (
+                <select
+                  value={selectedTripId}
+                  onChange={(e) => setSelectedTripId(e.target.value)}
+                  className="text-[11px] font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer max-w-[150px]"
+                  title="Linked customer trip for Tracking & Pay links"
+                >
+                  {matchedTrips.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id} ({t.status})
+                    </option>
+                  ))}
+                </select>
+              )}
+
               <button
                 type="button"
-                onClick={() => setShowCc(true)}
-                className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 cursor-pointer shrink-0"
+                onClick={handleInsertTrackingLink}
+                className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                title="1-Tap Insert Live Chauffeur Tracking Link (/track/...)"
               >
-                + Cc
+                <LinkIcon className="w-3 h-3 shrink-0" />
+                <span>Tracking Link</span>
               </button>
-            )}
-          </div>
-        </div>
 
-        {showCc && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Cc:</span>
-            <input
-              type="text"
-              value={ccInput}
-              onChange={(e) => setCcInput(e.target.value)}
-              placeholder="assistant@company.com, travel@company.com"
-              className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              <button
+                type="button"
+                onClick={() => void handleInsertPayLink()}
+                disabled={isGeneratingPayLink}
+                className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold text-emerald-800 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                title="1-Tap Insert Tokenized Stripe Payment Link (/pay/...)"
+              >
+                {isGeneratingPayLink ? (
+                  <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />
+                ) : (
+                  <CreditCardIcon className="w-3 h-3 shrink-0" />
+                )}
+                <span>Pay Link</span>
+              </button>
+            </div>
+
+            {/* Message Body */}
+            <textarea
+              ref={textareaRef}
+              value={bodyText}
+              onChange={(e) => setBodyText(e.target.value)}
+              rows={isInline ? 6 : 4}
+              placeholder="Write message or choose a Canned Dispatch Template above... (Ctrl/Cmd + Enter to send)"
+              className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 leading-relaxed resize-y"
             />
-            <button
-              type="button"
-              onClick={() => {
-                setCcInput('');
-                setShowCc(false);
-              }}
-              className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-              title="Remove Cc"
-            >
-              <XIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Subject */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Subject:</span>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="Reservation Confirmation / Airport Pickup Instructions"
-            className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        {/* Smart Canned Templates + 1-Tap Tracking / Pay Link Toolbar */}
-        <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-2 rounded-xl border border-slate-200/80">
-          <div className="flex items-center gap-1 min-w-[170px] flex-1 sm:flex-none">
-            <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <select
-              value={selectedTemplateId}
-              onChange={(e) => {
-                const val = e.target.value as CannedDispatchTemplateId;
-                setSelectedTemplateId(val);
-                if (val) void handleApplyTemplate(val);
-              }}
-              className="w-full text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-blue-500"
-              aria-label="Insert canned dispatch email template"
-            >
-              <option value="">+ Canned Dispatch Template...</option>
-              {CANNED_DISPATCH_EMAIL_TEMPLATES.map((tpl) => (
-                <option key={tpl.id} value={tpl.id}>
-                  {tpl.label}
-                </option>
-              ))}
-            </select>
           </div>
 
-          {matchedTrips.length > 0 && (
-            <select
-              value={selectedTripId}
-              onChange={(e) => setSelectedTripId(e.target.value)}
-              className="text-[11px] font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer max-w-[160px]"
-              title="Linked customer trip for Tracking & Pay links"
-            >
-              {matchedTrips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.id} ({t.status})
-                </option>
-              ))}
-            </select>
-          )}
+          {/* Footer Action Bar */}
+          <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={handleDiscard}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-[11px] font-bold text-slate-600 hover:text-rose-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                title="Discard draft permanently"
+              >
+                <TrashIcon className="w-3.5 h-3.5" />
+                <span>Discard</span>
+              </button>
+              <span className="hidden @lg/emaildock:inline text-[10px] text-slate-400">
+                Ctrl/Cmd + Enter to send
+              </span>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleInsertTrackingLink}
-            className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
-            title="1-Tap Insert Live Chauffeur Tracking Link (/track/...)"
-          >
-            <LinkIcon className="w-3 h-3 shrink-0" />
-            <span>Insert Tracking Link</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleInsertPayLink()}
-            disabled={isGeneratingPayLink}
-            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold text-emerald-800 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
-            title="1-Tap Insert Tokenized Stripe Payment Link (/pay/...)"
-          >
-            {isGeneratingPayLink ? (
-              <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />
-            ) : (
-              <CreditCardIcon className="w-3 h-3 shrink-0" />
-            )}
-            <span>Insert Pay Link</span>
-          </button>
-        </div>
-
-        {/* Message Body */}
-        <textarea
-          ref={textareaRef}
-          value={bodyText}
-          onChange={(e) => setBodyText(e.target.value)}
-          rows={variant === 'modal' ? 8 : 6}
-          placeholder="Write message or choose a Canned Dispatch Template above... (Ctrl/Cmd + Enter to send)"
-          className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 leading-relaxed resize-y"
-        />
-      </div>
-
-      {/* Footer Action Bar */}
-      <div className="px-3.5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={handleDiscard}
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-[11px] font-bold text-slate-600 hover:text-rose-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
-            title="Discard draft permanently"
-          >
-            <TrashIcon className="w-3.5 h-3.5" />
-            <span>Discard</span>
-          </button>
-          <span className="hidden sm:inline text-[10px] text-slate-400">
-            Ctrl/Cmd + Enter to send
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer"
-          >
-            Save &amp; Close
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={isSending || !toEmail.trim() || !subject.trim() || !bodyText.trim()}
-            className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-45 text-white text-xs font-extrabold shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-          >
-            {isSending && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
-            <span>{isSending ? 'Sending...' : 'Send Email'}</span>
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-slate-700 cursor-pointer"
+              >
+                Save &amp; Close
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={isSending || !toEmail.trim() || !subject.trim() || !bodyText.trim()}
+                className="px-3.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-45 text-white text-xs font-extrabold shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                {isSending && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSending ? 'Sending...' : 'Send Email'}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 
-  if (variant === 'inline') {
+  if (isInline) {
     return composerInner;
   }
 
   return (
     <div
-      className="fixed inset-0 z-[140] bg-slate-900/55 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}
+      className={`shrink-0 z-30 w-full @4xl/emaildock:max-w-2xl @4xl/emaildock:ml-auto @4xl/emaildock:mr-3 bg-white border-t-2 border-slate-900 @4xl/emaildock:border-x @4xl/emaildock:rounded-t-2xl shadow-[0_-8px_24px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden ${
+        isMinimized ? '' : 'max-h-[58%] @2xl/emaildock:max-h-[54%]'
+      }`}
     >
-      <div
-        style={modalSheetDrag.sheetStyle}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:pb-0"
-      >
-        {composerInner}
-      </div>
+      {composerInner}
     </div>
   );
 }

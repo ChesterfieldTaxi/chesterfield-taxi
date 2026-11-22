@@ -4,7 +4,7 @@ import type { VehicleTierConfig } from '../../../core/types/config';
 import type { PublicTripTrackingProjection } from '../../../core/utils/tracking-token.util';
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps/google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
-import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { buildFleetCarMarkerDataUrl } from '../dispatch/LiveFleetMap';
 import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon, ClockIcon, PhoneIcon, ChatBubbleLeftRightIcon } from '../../ui/Icons';
 

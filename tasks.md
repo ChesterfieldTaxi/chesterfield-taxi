@@ -674,6 +674,25 @@
 - [x] 43.3 Full Wave 1 + Wave 2 Master Verification Gate:
   - [x] 43.3.1 Fix returning-visitor SSR/client `localStorage` hydration mismatches (`#418`) uncovered by real Chromium rendering across `root.tsx`, `layout.tsx`, `Navbar.tsx`, `Footer.tsx`, `services.tsx`, `contact.tsx`, `BookingEngineV2.tsx`, `VehicleTierSelector.tsx`, `StripePaymentInput.tsx`, `pay.$payToken.tsx`, `dispatch.tsx`, and `admin.tsx`, then pass `npm run typecheck`, `npm run build` (confirming all 13 `/api/*` client chunks remain `0.00 kB`), `npm run test:smoke`, `npm run test:e2e`, `npm run test:stress`, and all 9 Wave 1 + Wave 2 test suites.
 
+## Phase 44 (Wave 3 Phase 1): Server/Client Bundle Separation & Route-Level Lazy Chunking
+- [x] 44.0 Specification & Plan Sync:
+  - [x] 44.0.1 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 44 scope, architectural guardrails, and bundle budget targets.
+- [x] 44.1 Zero-KB `/api/public-config` Client Chunk (`public-settings.server.ts`):
+  - [x] 44.1.1 Move `loadPublicSettingsForServer()` from `app/routes/api.public-config.ts` into `app/core/services/config/public-settings.server.ts` and update `app/routes/api.public-config.ts` and `app/routes/book.tsx` imports so all 14 `/api/*` routes compile to `0.00 kB` client chunks.
+- [x] 44.2 Eliminate `email-templates` Browser Bundle Leak (`vehicle-tier-format.util.ts`):
+  - [x] 44.2.1 Extract `formatVehicleTier` and `formatVehicleTierDisplay` into `app/core/utils/vehicle-tier-format.util.ts` (re-exporting from `app/core/services/email/email-templates.ts`) and update all 12 client/UI callers to import from `vehicle-tier-format.util.ts`.
+  - [x] 44.2.2 Remove static top-level client imports of `resend` and `./email-templates` in `app/core/services/email/resend-email.service.ts` and `app/core/services/email/index.ts`, loading `resend` and `./email-templates` dynamically strictly inside server-side (`typeof window === 'undefined'`) paths.
+- [x] 44.3 Per-Tab Code Splitting in `app/routes/admin.tsx`:
+  - [x] 44.3.1 Convert all 14 Admin tab/subpage imports (`AdminDashboardTab`, `AdminGeneralTab`, `AdminRatesTab`, `AdminVehiclesTab`, `AdminZonesTab`, `AdminOperatorsTab`, `AdminAdvancedTab`, `AdminTripsSubpage`, `AdminInvoicingSubpage`, `AdminCustomersSubpage`, `AdminWebsiteTab`, `AdminArchiveTab`, `AdminIntegrationsSubpage`, `AdminRulesTab`) in `app/routes/admin.tsx` to `React.lazy()` wrapped in `<Suspense>` so `admin-*.js` drops `< 120 KB`.
+- [x] 44.4 Lazy-Load Detached Pop-Outs & Secondary Dispatch Docks:
+  - [x] 44.4.1 Extract `getContextualEmailMeta` and `sendDispatchContextualTripEmail` into `app/core/services/dispatch/dispatch-trip-email.util.ts` (re-exporting from `DispatchTripDetailsDrawer.tsx`) and update `app/routes/dispatch.tsx`.
+  - [x] 44.4.2 Convert `CommsHub`, `EmailDock`, `DispatchBookingEngine`, and `LiveFleetMap` to `React.lazy()` + `<Suspense>` in `app/routes/dispatch.popout.tsx`.
+  - [x] 44.4.3 Convert `CommsHub`, `EmailDock`, `AppSuiteLauncher`, and `DispatchTripDetailsDrawer` to `React.lazy()` + `<Suspense>` in `app/routes/dispatch.tsx`.
+- [x] 44.5 Automated Bundle Budget Assertions & Master Verification Gate:
+  - [x] 44.5.1 Extend `verifyCutoverConfigInvariants` in `scripts/test-browser-smoke.ts` to assert every `api.*.js` chunk is `< 1024` bytes (`0.00 kB`) and `admin-*.js` is `< 153600` bytes (`< 150 KB`).
+  - [x] 44.5.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-dispatch-email-webhook.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, and leave changes uncommitted for Control-Tower review.
+
+
 
 
 

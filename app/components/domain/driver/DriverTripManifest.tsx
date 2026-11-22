@@ -17,7 +17,7 @@
 import React, { useState } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
-import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { resolveStlTerminalInfo } from '../../../core/config/airports';
 import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
 

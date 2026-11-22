@@ -2,7 +2,7 @@ import React from 'react';
 import { useLoaderData } from 'react-router';
 import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import { loadPublicSettingsForServer } from './api.public-config';
+import { loadPublicSettingsForServer } from '../core/services/config/public-settings.server';
 import type { AppSettings } from '../core/types/config';
 
 export async function loader() {

@@ -3126,7 +3126,7 @@ function CommsHubComponent({
   };
 
   return (
-    <div className={`flex flex-col h-full bg-slate-50 text-slate-900 ${isPopout ? 'h-screen' : ''}`}>
+    <div className={`@container/commshub relative flex flex-col h-full overflow-hidden bg-slate-50 text-slate-900 ${isPopout ? 'h-screen' : ''}`}>
       {/* Hidden audio element for Twilio recordings & voicemail playback */}
       <audio
         ref={audioPlayerRef}
@@ -3575,13 +3575,14 @@ function CommsHubComponent({
         sheetDrag={commsSheetDrag}
       />
 
-      {/* ─── Mobile Floating Compose SMS Button (All / SMS stream views) ─── */}
+      {/* ─── Standardized Floating Compose SMS Button (All / SMS stream views) ─── */}
       <MobileComposeSmsFab
-        isVisible={!selectedContactPhone && (activeTab === 'all' || activeTab === 'messages')}
-        onOpenCompose={() => {
-          setNewMsgError(null);
-          setIsNewMessageModalOpen(true);
-        }}
+        isVisible={
+          !isNewMessageModalOpen &&
+          !selectedContactPhone &&
+          (activeTab === 'all' || activeTab === 'messages')
+        }
+        onOpenCompose={handleOpenFreshNewMessageModal}
       />
 
       {/* ─── Mobile-Native Comms Row Quick Action Bottom Sheet (Touch & Hold) ─── */}

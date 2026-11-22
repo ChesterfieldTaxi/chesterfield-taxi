@@ -17,6 +17,7 @@ import { formatDisplayPhone } from '../../../../core/utils/phone';
 import {
   AlertTriangleIcon,
   ChatBubbleLeftRightIcon,
+  ChevronDownIcon,
   CreditCardIcon,
   ExternalLinkIcon,
   FileTextIcon,
@@ -28,6 +29,7 @@ import {
   PlayIcon,
   PlusIcon,
   RefreshCwIcon,
+  SparklesIcon,
   SpinnerIcon,
   XIcon,
   ZapIcon,
@@ -1075,14 +1077,6 @@ export function SmsThreadPane({
             ({effectiveRows.length})
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onOpenFreshNewMessageModal}
-          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
-        >
-          <PlusIcon className="w-3.5 h-3.5" />
-          <span>New Message</span>
-        </button>
       </div>
 
       <CommsBatchActionBar
@@ -1110,7 +1104,7 @@ export function SmsThreadPane({
         />
       )}
 
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-slate-100 pb-16">
         {effectiveRows.length === 0 ? (
           <div className="text-center py-12 text-slate-400 space-y-3 px-4">
             <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
@@ -1334,8 +1328,16 @@ export function NewSmsMessageModal({
   onOpenThread,
   onSend,
   onClose,
-  sheetDrag,
 }: NewSmsMessageModalProps) {
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsMinimized(false);
+    }
+  }, [isOpen]);
+
   const dynamicChips = React.useMemo(
     () => buildInterpolatedCommsSmsChips(recipientCrmContext?.templateContext),
     [recipientCrmContext?.templateContext]
@@ -1344,215 +1346,247 @@ export function NewSmsMessageModal({
   if (!isOpen) return null;
 
   const hasMatchedTrip = Boolean(recipientCrmContext?.primaryMatchedTrip);
+  const recipientPreview =
+    newMsgRecipientName ||
+    (newMsgRecipientPhone ? formatDisplayPhone(newMsgRecipientPhone) : '');
+  const minimizedSummary = recipientPreview
+    ? `To: ${recipientPreview}`
+    : 'New Text Message';
 
   return (
     <div
-      className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+      className={`shrink-0 z-30 w-full @4xl/commshub:max-w-2xl @4xl/commshub:ml-auto @4xl/commshub:mr-3 bg-white border-t-2 border-slate-900 @4xl/commshub:border-x @4xl/commshub:rounded-t-2xl shadow-[0_-8px_24px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden ${
+        isMinimized ? '' : 'max-h-[58%] @2xl/commshub:max-h-[54%]'
+      }`}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={sheetDrag.sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 max-w-lg w-full max-h-[92dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-      >
-        {/* Header */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
+        {/* Header Bar (Matches EmailComposerPane bottom-dock header) */}
         <div
-          {...sheetDrag.dragHandlers}
-          className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0 touch-none"
+          onClick={() => setIsMinimized((prev) => !prev)}
+          className="px-3 py-2 bg-slate-900 text-white cursor-pointer hover:bg-slate-800/95 transition-colors flex items-center justify-between gap-2 shrink-0"
         >
-          <div
-            className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-            aria-hidden="true"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                <MailIcon className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-bold text-white truncate">New Text Message</h3>
-                <p className="text-[11px] text-slate-400 truncate">
-                  Send an SMS dispatch or chat with a passenger
-                </p>
-              </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="text-xs font-extrabold truncate">
+                {isMinimized ? minimizedSummary : 'New Text Message'}
+              </span>
+              {!isMinimized && (
+                <span className="hidden @md/commshub:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 truncate">
+                  SMS Dispatch
+                </span>
+              )}
             </div>
+          </div>
+
+          <div
+            className="flex items-center gap-1 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsMinimized((prev) => !prev)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 cursor-pointer"
+              title={isMinimized ? 'Expand compose pane' : 'Minimize to bottom bar'}
+              aria-label={isMinimized ? 'Expand compose pane' : 'Minimize compose pane'}
+            >
+              <ChevronDownIcon
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                  isMinimized ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              aria-label="Close new message modal"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 cursor-pointer"
+              title="Close composer"
+              aria-label="Close new message composer"
             >
-              <XIcon className="w-4 h-4" />
+              <XIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Form */}
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
-          {newMsgError && (
-            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-              {newMsgError}
-            </div>
-          )}
-
-          {/* Recipient Search & Input */}
-          <div className="relative">
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Recipient (Phone Number or Contact)
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={msgContactSearch || newMsgRecipientPhone}
-                onChange={(e) => onRecipientInputChange(e.target.value)}
-                onFocus={onRecipientInputFocus}
-                placeholder="Search contact by name, phone, or enter 10-digit number..."
-                className="w-full px-3 py-2 pr-8 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-blue-500 font-medium"
-              />
-              {newMsgRecipientName && (
-                <span className="absolute right-2.5 top-2 text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md pointer-events-none">
-                  {newMsgRecipientName}
-                </span>
+        {/* Form Fields & Footer (Collapsible when minimized) */}
+        {!isMinimized && (
+          <>
+            <div className="flex-1 min-h-0 p-2.5 space-y-2 overflow-y-auto">
+              {newMsgError && (
+                <div className="p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+                  {newMsgError}
+                </div>
               )}
-            </div>
 
-            {/* Dropdown search results */}
-            {isMsgContactDropdownOpen && filteredContactsForMsg.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
-                {filteredContactsForMsg.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => onSelectContactOption(c)}
-                    className="p-2.5 hover:bg-blue-50 transition-colors cursor-pointer flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-slate-800 block">{c.name}</span>
-                      <span className="text-[11px] text-slate-500 font-medium">
-                        {formatDisplayPhone(c.mobilePhone || c.phone)}
-                        {c.corporateAccountName ? ` • ${c.corporateAccountName}` : ''}
-                      </span>
-                    </div>
-                    {(c.corporateAccountNumber || (c as any).accountNumber) && (
-                      <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
-                        {c.corporateAccountNumber || (c as any).accountNumber}
+              {/* To: Recipient Phone or Contact */}
+              <div className="relative">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">
+                    To:
+                  </span>
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={msgContactSearch || newMsgRecipientPhone}
+                      onChange={(e) => onRecipientInputChange(e.target.value)}
+                      onFocus={onRecipientInputFocus}
+                      placeholder="Name or 10-digit mobile number..."
+                      className="w-full text-xs px-2.5 py-1.5 pr-24 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                    {newMsgRecipientName && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md pointer-events-none max-w-[96px] truncate">
+                        {newMsgRecipientName}
                       </span>
                     )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Message text */}
-          <div>
-            <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-              <label className="text-xs font-bold text-slate-700">Message Text</label>
-              <div className="flex items-center gap-1.5">
+                    {/* Dropdown search results */}
+                    {isMsgContactDropdownOpen && filteredContactsForMsg.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 max-h-44 overflow-y-auto">
+                        {filteredContactsForMsg.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              onSelectContactOption(c);
+                            }}
+                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50/70 flex items-center justify-between gap-2 text-xs cursor-pointer"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-900 block truncate">
+                                {c.name}
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 block truncate">
+                                {formatDisplayPhone(c.mobilePhone || c.phone)}
+                                {c.corporateAccountName ? ` • ${c.corporateAccountName}` : ''}
+                              </span>
+                            </div>
+                            {(c.corporateAccountNumber || (c as any).accountNumber) && (
+                              <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded shrink-0">
+                                {c.corporateAccountNumber || (c as any).accountNumber}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Smart Canned SMS Templates + 1-Tap Tracking / Pay Link Toolbar (Matches EmailComposerPane) */}
+              <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-1.5 rounded-xl border border-slate-200/80">
+                <div className="flex items-center gap-1 min-w-[155px] flex-1 sm:flex-none">
+                  <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => {
+                      const chosenId = e.target.value;
+                      setSelectedTemplateId(chosenId);
+                      const matched = dynamicChips.find((c) => c.id === chosenId);
+                      if (matched) {
+                        onSelectPresetChip(matched.text);
+                        setSelectedTemplateId('');
+                      }
+                    }}
+                    className="w-full text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-blue-500"
+                    aria-label="Insert canned dispatch SMS template"
+                  >
+                    <option value="">+ Canned SMS Template...</option>
+                    {dynamicChips.map((chip) => (
+                      <option key={chip.id} value={chip.id}>
+                        {chip.shortLabel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {hasMatchedTrip && onInsertTrackingLink && (
                   <button
                     type="button"
                     onClick={onInsertTrackingLink}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-bold cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                    title="1-Tap Insert Live Chauffeur Tracking Link (/track/...)"
                   >
-                    <LinkIcon className="w-2.5 h-2.5" />
-                    <span>+ Tracking Link</span>
+                    <LinkIcon className="w-3 h-3 shrink-0" />
+                    <span>Tracking Link</span>
                   </button>
                 )}
+
                 {hasMatchedTrip && onInsertPayLink && (
                   <button
                     type="button"
                     disabled={isGeneratingPayLink}
                     onClick={onInsertPayLink}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold cursor-pointer disabled:opacity-50"
+                    className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold text-emerald-800 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                    title="1-Tap Insert Tokenized Stripe Payment Link (/pay/...)"
                   >
                     {isGeneratingPayLink ? (
-                      <SpinnerIcon className="w-2.5 h-2.5 animate-spin" />
+                      <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />
                     ) : (
-                      <CreditCardIcon className="w-2.5 h-2.5" />
+                      <CreditCardIcon className="w-3 h-3 shrink-0" />
                     )}
-                    <span>+ Pay Link</span>
+                    <span>Pay Link</span>
                   </button>
                 )}
-                <span className="text-[10px] text-slate-400 font-medium">
+
+                <span className="ml-auto text-[10px] text-slate-400 font-mono shrink-0">
                   {newMsgBody.length} chars
                 </span>
               </div>
-            </div>
-            <textarea
-              rows={4}
-              value={newMsgBody}
-              onChange={(e) => onBodyChange(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  e.preventDefault();
-                  onSend();
-                }
-              }}
-              placeholder="Type your message to passenger or driver (Ctrl+Enter to send)..."
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 bg-white focus:outline-blue-500 resize-none font-normal"
-            />
-          </div>
 
-          {/* Config-Driven Dynamic Canned SMS Templates */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Canned Dispatch Templates
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {dynamicChips.map((chip) => (
+              {/* Message Body */}
+              <textarea
+                rows={3}
+                value={newMsgBody}
+                onChange={(e) => onBodyChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    onSend();
+                  }
+                }}
+                placeholder="Write text message or choose a Canned SMS Template above... (Ctrl/Cmd + Enter to send)"
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 leading-relaxed resize-y"
+              />
+            </div>
+
+            {/* Footer Action Bar */}
+            <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <button
-                  key={chip.id}
                   type="button"
-                  onClick={() => onSelectPresetChip(chip.text)}
-                  title={chip.text}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-800 border border-slate-200/80 text-slate-700 text-[10px] font-semibold transition-colors cursor-pointer"
+                  onClick={onOpenThread}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-blue-700 cursor-pointer transition-colors"
                 >
-                  <ZapIcon className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                  <span>{chip.shortLabel}</span>
+                  Open Thread
                 </button>
-              ))}
+                <span className="hidden @lg/commshub:inline text-[10px] text-slate-400">
+                  Ctrl/Cmd + Enter to send
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-slate-700 cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={isSendingNewMsg || !newMsgBody.trim()}
+                  onClick={onSend}
+                  className="px-3.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-45 text-white text-xs font-extrabold shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  {isSendingNewMsg && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSendingNewMsg ? 'Sending...' : 'Send SMS'}</span>
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={onOpenThread}
-            className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-          >
-            Open Thread
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={isSendingNewMsg}
-              onClick={onSend}
-              className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {isSendingNewMsg ? (
-                <>
-                  <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                  <span>Sending...</span>
-                </>
-              ) : (
-                <>
-                  <MailIcon className="w-3.5 h-3.5" />
-                  <span>Send SMS</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1569,7 +1603,7 @@ export function MobileComposeSmsFab({ isVisible, onOpenCompose }: MobileComposeS
     <button
       type="button"
       onClick={onOpenCompose}
-      className="lg:hidden fixed bottom-16 right-4 z-30 w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-600/30 flex items-center justify-center transition-all cursor-pointer"
+      className="absolute bottom-4 right-4 z-20 w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-600/30 flex items-center justify-center transition-all cursor-pointer"
       title="Compose New Text Message"
       aria-label="Compose New Text Message"
     >

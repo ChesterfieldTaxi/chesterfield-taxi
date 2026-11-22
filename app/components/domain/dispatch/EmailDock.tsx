@@ -18,7 +18,7 @@ import {
   type DispatchEmailRecord,
 } from '../../../core/types/dispatch-email';
 import type { Trip } from '../../../core/types/trip';
-import { AlertCircleIcon, CheckIcon, MailIcon, XIcon } from '../../ui/Icons';
+import { AlertCircleIcon, CheckIcon, MailIcon, PlusIcon, XIcon } from '../../ui/Icons';
 import {
   EmailComposerPane,
   EmailCrossChannelRail,
@@ -678,11 +678,24 @@ export function EmailDock({
         )}
       </div>
 
-      {/* ─── NEW EMAIL / STANDALONE DRAFT COMPOSE MODAL ─── */}
+      {/* ─── STANDARDIZED FLOATING COMPOSE EMAIL BUTTON (Matches SMS Compose FAB) ─── */}
+      {!modalComposeDraft && !inlineReplyDraft && (
+        <button
+          type="button"
+          onClick={handleOpenNewCompose}
+          className="absolute bottom-4 right-4 z-20 w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xl shadow-blue-600/30 flex items-center justify-center transition-all cursor-pointer"
+          title={`Compose new email from ${DISPATCH_MAILBOX_ADDRESS}`}
+          aria-label="Compose New Email"
+        >
+          <PlusIcon className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* ─── BOTTOM-DOCKED COMPOSE PANE (Anchored inside EmailDock — never covers Dispatch) ─── */}
       {modalComposeDraft && (
         <EmailComposerPane
           key={modalComposeDraft.id}
-          variant="modal"
+          variant="dock"
           initialDraft={modalComposeDraft}
           matchedTrips={senderContext.matchedTrips}
           pendingInsertion={pendingInsertion}

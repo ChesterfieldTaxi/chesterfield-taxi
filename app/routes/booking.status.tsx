@@ -14,7 +14,7 @@ import { getEffectiveRoles } from '../core/utils/workspace-routing.util';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
-import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 
 export function meta() {
   return [

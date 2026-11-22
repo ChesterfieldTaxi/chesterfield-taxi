@@ -28,7 +28,7 @@ import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 import { getAdminAuthService } from '../../core/services/auth/admin-auth.service';
 import type { VehicleTierConfig } from '../../core/types/config';
-import { formatVehicleTierDisplay } from '../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../core/utils/vehicle-tier-format.util';
 import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 
 export interface EmailDeliveryFeedback {

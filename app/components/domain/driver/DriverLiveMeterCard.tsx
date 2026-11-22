@@ -3,7 +3,7 @@ import type { DriverProfile, DriverMeterExtra } from '../../../core/types/driver
 import type { Trip, TripStatus } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
-import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { DriverTripManifest } from './DriverTripManifest';
 import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
 import {

@@ -46,7 +46,7 @@ import { BookingEngineV2, type BookingEngineV2InitialValues } from '../component
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
-import { formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 
 export function meta() {
   return [

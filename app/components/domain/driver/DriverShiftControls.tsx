@@ -6,7 +6,7 @@ import type { PhysicalFleetAsset } from '../../../core/types/fleet';
 import type { UseDriverTelemetryResult } from '../../../core/hooks/useDriverTelemetry';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
 import type { PushPermissionState } from '../../../core/services/notifications/push-notification.service';
-import { formatVehicleTierDisplay } from '../../../core/services/email/email-templates';
+import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import {
   formatCabUnitLabel,
   type PreferredNavApp,

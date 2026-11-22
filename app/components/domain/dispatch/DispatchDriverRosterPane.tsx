@@ -124,47 +124,18 @@ export function DispatchDriverRosterPane({
 
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/70 lg:hidden">
-        {/* Compact Search & Status Filter Toolbar */}
-        <div className="px-3 pt-2.5 pb-2 bg-white border-b border-slate-200/90 space-y-2 shrink-0 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 min-w-0">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search driver, car #, zone..."
-                value={driverSearch}
-                onChange={(e) => onDriverSearchChange(e.target.value)}
-                className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              />
-              {driverSearch && (
-                <button
-                  type="button"
-                  onClick={() => onDriverSearchChange('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                  aria-label="Clear driver search"
-                >
-                  <XIcon className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{drivers.filter((d) => d.mapStatus === 'available').length} Avail</span>
-            </span>
-          </div>
-
-          {/* Status Segmented Pills */}
-          <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl overflow-x-auto no-scrollbar">
+        {/* Top Status Counter Strip (Locked at exact top-2.5/px-2.5 level as LiveFleetMap) + Search Below */}
+        <div className="px-2.5 pt-2.5 pb-2 bg-white border-b border-slate-200/90 space-y-2 shrink-0 shadow-2xs">
+          {/* 6-Column 2-Line Status + Count Tiles */}
+          <div className="grid grid-cols-6 gap-1 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-1">
             {(
               [
-                { key: 'all', label: 'All' },
-                { key: 'available', label: 'Avail' },
-                { key: 'en_route', label: 'En Route' },
-                { key: 'busy', label: 'Busy' },
-                { key: 'break', label: 'Break' },
-                { key: 'offline', label: 'Off' },
+                { key: 'all', label: 'All', hex: null },
+                { key: 'available', label: 'Avail', hex: '#10b981' },
+                { key: 'en_route', label: 'En Route', hex: '#2563eb' },
+                { key: 'busy', label: 'Busy', hex: '#ef4444' },
+                { key: 'break', label: 'Break', hex: '#eab308' },
+                { key: 'offline', label: 'Off', hex: '#94a3b8' },
               ] as const
             ).map((tab) => {
               const count =
@@ -177,28 +148,56 @@ export function DispatchDriverRosterPane({
                   key={tab.key}
                   type="button"
                   onClick={() => onDriverFilterChange(tab.key)}
-                  className={`flex-1 min-w-[58px] shrink-0 py-1.5 px-1.5 text-center rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-black ${
-                      isActive ? 'bg-blue-600 text-white' : 'bg-slate-200/80 text-slate-600'
-                    }`}
-                  >
-                    {count}
+                  <span className="inline-flex items-center gap-1 leading-none">
+                    {tab.hex && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0 ring-1 ring-black/10"
+                        style={{ backgroundColor: tab.hex }}
+                      />
+                    )}
+                    <span className="text-[10px] font-bold tracking-tight whitespace-nowrap">
+                      {tab.label}
+                    </span>
                   </span>
+                  <span className="text-xs font-black font-mono leading-tight">{count}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Search Input Directly Below Status Pills */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+              <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search driver, car #, zone..."
+              value={driverSearch}
+              onChange={(e) => onDriverSearchChange(e.target.value)}
+              className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            />
+            {driverSearch && (
+              <button
+                type="button"
+                onClick={() => onDriverSearchChange('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                aria-label="Clear driver search"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Drivers Card Stream (1-tap → Queue Sheet; Touch & Hold or ⋮ → Quick Actions & Duty Status) */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
+        <div className="flex-1 overflow-y-auto p-3 pb-16 space-y-2.5 text-xs">
           {visibleMobileDrivers.length === 0 ? (
             <div className="py-12 text-center text-slate-400 font-semibold text-xs">
               No drivers match this filter.
@@ -371,8 +370,49 @@ export function DispatchDriverRosterPane({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
-      {/* Search + Compact Status Pills */}
-      <div className="px-3 py-2.5 bg-white border-b border-slate-200/80 space-y-2 shrink-0">
+      {/* 6-Column 2-Line Status Counter Strip + Search Below */}
+      <div className="px-2.5 pt-2.5 pb-2 bg-white border-b border-slate-200/80 space-y-2 shrink-0">
+        <div className="grid grid-cols-6 gap-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-1">
+          {(
+            [
+              { key: 'all', label: 'All', hex: null },
+              { key: 'available', label: 'Avail', hex: '#10b981' },
+              { key: 'en_route', label: 'En Route', hex: '#2563eb' },
+              { key: 'busy', label: 'Busy', hex: '#ef4444' },
+              { key: 'break', label: 'Break', hex: '#eab308' },
+              { key: 'offline', label: 'Off', hex: '#94a3b8' },
+            ] as const
+          ).map((tab) => {
+            const count = statusCounts[tab.key];
+            const active = driverFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => onDriverFilterChange(tab.key)}
+                className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                  active
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/60'
+                }`}
+              >
+                <span className="inline-flex items-center gap-1 leading-none">
+                  {tab.hex && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0 ring-1 ring-black/10"
+                      style={{ backgroundColor: tab.hex }}
+                    />
+                  )}
+                  <span className="text-[10px] font-bold tracking-tight whitespace-nowrap">
+                    {tab.label}
+                  </span>
+                </span>
+                <span className="text-xs font-black font-mono leading-tight">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="relative">
           <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
           <input
@@ -391,43 +431,6 @@ export function DispatchDriverRosterPane({
               ✕
             </button>
           )}
-        </div>
-
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          {(
-            [
-              { key: 'all', label: 'All' },
-              { key: 'available', label: 'Avail' },
-              { key: 'en_route', label: 'En Route' },
-              { key: 'busy', label: 'Busy' },
-              { key: 'break', label: 'Break' },
-              { key: 'offline', label: 'Off' },
-            ] as const
-          ).map((tab) => {
-            const count = statusCounts[tab.key];
-            const active = driverFilter === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => onDriverFilterChange(tab.key)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                  active
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[9.5px] font-mono ${
-                    active ? 'text-slate-300' : 'text-slate-400'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
         </div>
       </div>
 

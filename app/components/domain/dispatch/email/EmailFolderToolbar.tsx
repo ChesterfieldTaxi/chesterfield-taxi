@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DISPATCH_EMAIL_FOLDER_CONFIGS,
   type DispatchEmailFolderCounts,
@@ -7,6 +7,7 @@ import {
 import { DISPATCH_MAILBOX_ADDRESS } from '../../../../core/types/dispatch-email';
 import {
   CheckIcon,
+  ChevronDownIcon,
   ExternalLinkIcon,
   MailIcon,
   PlusIcon,
@@ -97,6 +98,153 @@ export function EmailFolderToolbar({
 }: EmailFolderToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const measureRowRef = useRef<HTMLDivElement | null>(null);
+  const moreMenuContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const [visibleFolderCount, setVisibleFolderCount] = useState<number>(
+    DISPATCH_EMAIL_FOLDER_CONFIGS.length
+  );
+  const [isMoreOpen, setIsMoreOpen] = useState<boolean>(false);
+
+  const activeFolderConfig = useMemo(
+    () =>
+      DISPATCH_EMAIL_FOLDER_CONFIGS.find((f) => f.id === activeFolder) ||
+      DISPATCH_EMAIL_FOLDER_CONFIGS[0],
+    [activeFolder]
+  );
+
+  const visibleFolders = useMemo(
+    () => DISPATCH_EMAIL_FOLDER_CONFIGS.slice(0, visibleFolderCount),
+    [visibleFolderCount]
+  );
+
+  const overflowFolders = useMemo(
+    () => DISPATCH_EMAIL_FOLDER_CONFIGS.slice(visibleFolderCount),
+    [visibleFolderCount]
+  );
+
+  const activeOverflowFolder = useMemo(
+    () => overflowFolders.find((f) => f.id === activeFolder) || null,
+    [overflowFolders, activeFolder]
+  );
+
+  const overflowBadgeTotal = useMemo(
+    () =>
+      overflowFolders.reduce(
+        (sum, folder) => sum + getFolderBadgeValue(folder.id, counts),
+        0
+      ),
+    [overflowFolders, counts]
+  );
+
+  const recalculateVisibleFolders = useCallback(() => {
+    const barEl = tabBarRef.current;
+    const measureEl = measureRowRef.current;
+    if (!barEl || !measureEl) return;
+
+    const availableWidth = barEl.clientWidth;
+    if (availableWidth <= 0) return;
+
+    const pillEls = Array.from(
+      measureEl.querySelectorAll<HTMLElement>('[data-measure-folder-pill]')
+    );
+    if (pillEls.length !== DISPATCH_EMAIL_FOLDER_CONFIGS.length) return;
+
+    const GAP_PX = 4;
+    const pillWidths = pillEls.map((el) => Math.ceil(el.getBoundingClientRect().width));
+    const totalAllWidth =
+      pillWidths.reduce((sum, w) => sum + w, 0) +
+      Math.max(0, pillWidths.length - 1) * GAP_PX;
+
+    if (totalAllWidth <= availableWidth) {
+      setVisibleFolderCount(DISPATCH_EMAIL_FOLDER_CONFIGS.length);
+      return;
+    }
+
+    const baseMoreEl = measureEl.querySelector<HTMLElement>('[data-measure-more-base]');
+    const activeMoreEl = measureEl.querySelector<HTMLElement>('[data-measure-more-active]');
+    const baseMoreWidth = baseMoreEl
+      ? Math.ceil(baseMoreEl.getBoundingClientRect().width)
+      : 78;
+    const activeMoreWidth = activeMoreEl
+      ? Math.ceil(activeMoreEl.getBoundingClientRect().width)
+      : 124;
+
+    const activeIdx = DISPATCH_EMAIL_FOLDER_CONFIGS.findIndex(
+      (f) => f.id === activeFolder
+    );
+
+    let bestCount = 1;
+    for (let count = DISPATCH_EMAIL_FOLDER_CONFIGS.length - 1; count >= 1; count -= 1) {
+      const isActiveInOverflow = activeIdx >= count;
+      const requiredMoreWidth = isActiveInOverflow ? activeMoreWidth : baseMoreWidth;
+      let tabsWidth = 0;
+      for (let i = 0; i < count; i += 1) {
+        tabsWidth += pillWidths[i];
+      }
+      // `count` gaps covers `(count - 1)` gaps between tabs + `1` gap before the More button
+      const requiredTotal = tabsWidth + count * GAP_PX + requiredMoreWidth + 2;
+      if (requiredTotal <= availableWidth) {
+        bestCount = count;
+        break;
+      }
+    }
+
+    setVisibleFolderCount(bestCount);
+  }, [activeFolder]);
+
+  useEffect(() => {
+    recalculateVisibleFolders();
+    const barEl = tabBarRef.current;
+    if (!barEl) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        recalculateVisibleFolders();
+      });
+      observer.observe(barEl);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', recalculateVisibleFolders);
+    return () => window.removeEventListener('resize', recalculateVisibleFolders);
+  }, [recalculateVisibleFolders, counts]);
+
+  // Auto-close More menu if container widens enough to show all folders
+  useEffect(() => {
+    if (overflowFolders.length === 0 && isMoreOpen) {
+      setIsMoreOpen(false);
+    }
+  }, [overflowFolders.length, isMoreOpen]);
+
+  // Close More dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!isMoreOpen) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      if (
+        moreMenuContainerRef.current &&
+        !moreMenuContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsMoreOpen(false);
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setIsMoreOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape, true);
+    };
+  }, [isMoreOpen]);
 
   useEffect(() => {
     if (masterCheckboxRef.current) {
@@ -131,7 +279,7 @@ export function EmailFolderToolbar({
   const isArchiveOrTrashView = activeFolder === 'archive' || activeFolder === 'trash';
 
   return (
-    <div className="shrink-0 bg-white border-b border-slate-200">
+    <div className="relative z-40 shrink-0 bg-white border-b border-slate-200">
       {/* ─── SINGLE-MAILBOX HEADER (Hidden when docked inside Dispatch right drawer to avoid double header) ─── */}
       {!isDocked && (
         <div className="bg-slate-900 text-white px-3 py-2.5 flex items-center justify-between gap-2 border-b border-slate-800">
@@ -157,16 +305,6 @@ export function EmailFolderToolbar({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={onOpenNewCompose}
-              className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer inline-flex items-center gap-1"
-              title={`Compose new email from ${DISPATCH_MAILBOX_ADDRESS}`}
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              <span>Compose</span>
-            </button>
-
             {!isPopout && onPopOut && (
               <button
                 type="button"
@@ -256,18 +394,6 @@ export function EmailFolderToolbar({
           >
             <RefreshCwIcon className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
           </button>
-
-          {isDocked && (
-            <button
-              type="button"
-              onClick={onOpenNewCompose}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1"
-              title={`Compose new email from ${DISPATCH_MAILBOX_ADDRESS}`}
-            >
-              <PlusIcon className="w-3 h-3" />
-              <span>Compose</span>
-            </button>
-          )}
         </div>
 
         {/* Docked subtle single-mailbox address subtitle */}
@@ -286,13 +412,59 @@ export function EmailFolderToolbar({
           </div>
         )}
 
-        {/* ─── SCROLLABLE / COMPACT OPERATIONAL FOLDER PILLS ─── */}
+        {/* ─── RESPONSIVE OPERATIONAL FOLDER TABS + OVERFLOW "MORE" DROPDOWN (NO SCROLLBAR) ─── */}
         <div
-          className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar"
+          ref={tabBarRef}
+          className="relative flex items-center gap-1 min-w-0 pb-0.5"
           role="tablist"
           aria-label="Dispatch Email Folders"
         >
-          {DISPATCH_EMAIL_FOLDER_CONFIGS.map((folder) => {
+          {/* Off-flow measurement shadow row for exact responsive overflow packing */}
+          <div
+            ref={measureRowRef}
+            aria-hidden="true"
+            className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-1 whitespace-nowrap h-0 overflow-hidden"
+          >
+            {DISPATCH_EMAIL_FOLDER_CONFIGS.map((folder) => {
+              const badgeVal = getFolderBadgeValue(folder.id, counts);
+              return (
+                <span
+                  key={`measure-${folder.id}`}
+                  data-measure-folder-pill
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 border"
+                >
+                  <span>{folder.shortLabel}</span>
+                  {badgeVal > 0 && (
+                    <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black leading-tight">
+                      {badgeVal}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+            <span
+              data-measure-more-base
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 border"
+            >
+              <span>More</span>
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black leading-tight">
+                99
+              </span>
+              <ChevronDownIcon className="w-3 h-3" />
+            </span>
+            <span
+              data-measure-more-active
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shrink-0 border"
+            >
+              <span>More · {activeFolderConfig.shortLabel}</span>
+              <span className="text-[9.5px] px-1.5 py-0.2 rounded-full font-black leading-tight">
+                99
+              </span>
+              <ChevronDownIcon className="w-3 h-3" />
+            </span>
+          </div>
+
+          {visibleFolders.map((folder) => {
             const isActive = activeFolder === folder.id;
             const badgeVal = getFolderBadgeValue(folder.id, counts);
             const isDraftBadge = folder.badgeMode === 'drafts';
@@ -304,7 +476,10 @@ export function EmailFolderToolbar({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => onSelectFolder(folder.id)}
+                onClick={() => {
+                  onSelectFolder(folder.id);
+                  setIsMoreOpen(false);
+                }}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 shrink-0 border ${
                   isActive
                     ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
@@ -330,6 +505,105 @@ export function EmailFolderToolbar({
               </button>
             );
           })}
+
+          {overflowFolders.length > 0 && (
+            <div ref={moreMenuContainerRef} className="relative ml-auto shrink-0">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isMoreOpen}
+                onClick={() => setIsMoreOpen((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 shrink-0 border ${
+                  activeOverflowFolder
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                    : isMoreOpen
+                    ? 'bg-slate-100 text-slate-900 border-slate-300'
+                    : 'bg-slate-50/90 text-slate-600 border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                title="More email folders"
+              >
+                <span>
+                  {activeOverflowFolder
+                    ? `More · ${activeOverflowFolder.shortLabel}`
+                    : 'More'}
+                </span>
+                {overflowBadgeTotal > 0 && (
+                  <span
+                    className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-black leading-tight ${
+                      activeOverflowFolder
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-blue-600 text-white'
+                    }`}
+                  >
+                    {overflowBadgeTotal}
+                  </span>
+                )}
+                <ChevronDownIcon
+                  className={`w-3 h-3 transition-transform duration-150 ${
+                    isMoreOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {isMoreOpen && (
+                <div
+                  role="menu"
+                  aria-label="Additional email folders"
+                  className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-white border border-slate-200 shadow-xl py-1 z-50"
+                >
+                  {overflowFolders.map((folder) => {
+                    const isActive = activeFolder === folder.id;
+                    const badgeVal = getFolderBadgeValue(folder.id, counts);
+                    const isDraftBadge = folder.badgeMode === 'drafts';
+                    const isStarBadge = folder.badgeMode === 'starred';
+
+                    return (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={isActive}
+                        onClick={() => {
+                          onSelectFolder(folder.id);
+                          setIsMoreOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-slate-900 text-white font-extrabold'
+                            : 'text-slate-700 font-semibold hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5 truncate">
+                          {isActive ? (
+                            <CheckIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          ) : (
+                            <span className="w-3.5 shrink-0" />
+                          )}
+                          <span className="truncate">{folder.label}</span>
+                        </span>
+
+                        {badgeVal > 0 && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-black leading-none shrink-0 ${
+                              isActive
+                                ? 'bg-blue-500 text-white'
+                                : isDraftBadge
+                                ? 'bg-amber-100 text-amber-800'
+                                : isStarBadge
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-blue-600 text-white'
+                            }`}
+                          >
+                            {badgeVal}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

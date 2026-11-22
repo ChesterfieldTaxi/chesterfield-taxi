@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
 import { getWorkspaceBus, type WorkspaceModuleKey } from '../core/services/workspace-bus.service';
-import { CommsHub } from '../components/domain/dispatch/CommsHub';
-import { EmailDock } from '../components/domain/dispatch/EmailDock';
-import { DispatchBookingEngine } from '../components/domain/dispatch/DispatchBookingEngine';
-import { LiveFleetMap } from '../components/domain/dispatch/LiveFleetMap';
 import {
   useDispatchFleet,
   FLEET_STATUS_COLORS,
@@ -14,6 +10,21 @@ import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { SpinnerIcon } from '../components/ui/Icons';
+
+const CommsHub = React.lazy(() =>
+  import('../components/domain/dispatch/CommsHub').then((m) => ({ default: m.CommsHub }))
+);
+const EmailDock = React.lazy(() =>
+  import('../components/domain/dispatch/EmailDock').then((m) => ({ default: m.EmailDock }))
+);
+const DispatchBookingEngine = React.lazy(() =>
+  import('../components/domain/dispatch/DispatchBookingEngine').then((m) => ({
+    default: m.DispatchBookingEngine,
+  }))
+);
+const LiveFleetMap = React.lazy(() =>
+  import('../components/domain/dispatch/LiveFleetMap').then((m) => ({ default: m.LiveFleetMap }))
+);
 
 export function meta() {
   return [{ title: 'Dispatch Window Pop-Out – Chesterfield Taxi' }];
@@ -140,121 +151,130 @@ export default function DispatchPopoutRoute() {
 
       {/* Detached Content Body */}
       <div className="flex-1 min-h-0 bg-white text-slate-900 overflow-hidden">
-        {moduleKey === 'comms' && (
-          <CommsHub
-            isPopout={true}
-            drivers={fleet}
-            trips={trips}
-            onPopulateBooking={(data) => {
-              workspaceBus.publish('POPULATE_BOOKING', data);
-            }}
-          />
-        )}
-
-        {moduleKey === 'email' && (
-          <EmailDock
-            isPopout={true}
-            showWindowControls={false}
-            trips={trips}
-            onClose={() => window.close()}
-            onOpenEditTrip={(tripId) => {
-              workspaceBus.publish('OPEN_EDIT_TRIP', { tripId });
-            }}
-            onPopulateBooking={(data) => {
-              workspaceBus.publish('POPULATE_BOOKING', data);
-            }}
-          />
-        )}
-
-        {moduleKey === 'booking' && (
-          <div className="h-full overflow-hidden max-w-2xl mx-auto border-x border-slate-200">
-            <DispatchBookingEngine
-              draftId="popout-booking"
-              isActive={true}
-              trips={trips}
+        <Suspense
+          fallback={
+            <div className="flex flex-col h-full w-full items-center justify-center bg-slate-50 text-slate-500 gap-2.5">
+              <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
+              <span className="text-xs font-semibold">Loading {getModuleTitle(moduleKey)}...</span>
+            </div>
+          }
+        >
+          {moduleKey === 'comms' && (
+            <CommsHub
+              isPopout={true}
               drivers={fleet}
+              trips={trips}
+              onPopulateBooking={(data) => {
+                workspaceBus.publish('POPULATE_BOOKING', data);
+              }}
             />
-          </div>
-        )}
+          )}
 
-        {moduleKey === 'drivers' && (
-          <div className="h-full overflow-y-auto p-4 space-y-4">
-            <h2 className="text-base font-extrabold text-slate-900">Live Drivers Roster (Detached)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {fleet.map((drv) => {
-                const palette = FLEET_STATUS_COLORS[drv.mapStatus];
-                const label = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
-                return (
-                  <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-extrabold text-sm text-slate-900 truncate">
-                        {drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${palette.badgeClass}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
-                        {label}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>{drv.vehicle}</span>
-                      {drv.queuedTripsCount > 0 && (
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
-                          {drv.queuedTripsCount} Queued
+          {moduleKey === 'email' && (
+            <EmailDock
+              isPopout={true}
+              showWindowControls={false}
+              trips={trips}
+              onClose={() => window.close()}
+              onOpenEditTrip={(tripId) => {
+                workspaceBus.publish('OPEN_EDIT_TRIP', { tripId });
+              }}
+              onPopulateBooking={(data) => {
+                workspaceBus.publish('POPULATE_BOOKING', data);
+              }}
+            />
+          )}
+
+          {moduleKey === 'booking' && (
+            <div className="h-full overflow-hidden max-w-2xl mx-auto border-x border-slate-200">
+              <DispatchBookingEngine
+                draftId="popout-booking"
+                isActive={true}
+                trips={trips}
+                drivers={fleet}
+              />
+            </div>
+          )}
+
+          {moduleKey === 'drivers' && (
+            <div className="h-full overflow-y-auto p-4 space-y-4">
+              <h2 className="text-base font-extrabold text-slate-900">Live Drivers Roster (Detached)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {fleet.map((drv) => {
+                  const palette = FLEET_STATUS_COLORS[drv.mapStatus];
+                  const label = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
+                  return (
+                    <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-extrabold text-sm text-slate-900 truncate">
+                          {drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}
                         </span>
-                      )}
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${palette.badgeClass}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${palette.dotClass}`} />
+                          {label}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>{drv.vehicle}</span>
+                        {drv.queuedTripsCount > 0 && (
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                            {drv.queuedTripsCount} Queued
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
                     </div>
-                    <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {moduleKey === 'trips' && (
-          <div className="h-full overflow-y-auto p-4 space-y-4">
-            <h2 className="text-base font-extrabold text-slate-900">Active Trips Queue (Detached)</h2>
-            <div className="space-y-2">
-              {trips.map((tr) => (
-                <div key={tr.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-                  <div>
-                    <span className="font-mono font-bold text-xs text-slate-900 block">{tr.id}</span>
-                    <span className="text-xs text-slate-600">{tr.pickupLocation?.address} → {tr.dropoffLocation?.address}</span>
+          {moduleKey === 'trips' && (
+            <div className="h-full overflow-y-auto p-4 space-y-4">
+              <h2 className="text-base font-extrabold text-slate-900">Active Trips Queue (Detached)</h2>
+              <div className="space-y-2">
+                {trips.map((tr) => (
+                  <div key={tr.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <div>
+                      <span className="font-mono font-bold text-xs text-slate-900 block">{tr.id}</span>
+                      <span className="text-xs text-slate-600">{tr.pickupLocation?.address} → {tr.dropoffLocation?.address}</span>
+                    </div>
+                    <span className="font-bold text-xs text-emerald-700">${tr.pricing?.totalFare?.toFixed(2)}</span>
                   </div>
-                  <span className="font-bold text-xs text-emerald-700">${tr.pricing?.totalFare?.toFixed(2)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {moduleKey === 'map' && (
-          <LiveFleetMap
-            fleet={fleet}
-            trips={trips}
-            selectedTrip={selectedMapTrip}
-            shouldZoom={Boolean(selectedMapTrip)}
-            onSelectTrip={(trip) => setSelectedMapTrip(trip)}
-            onChangeDriverDutyStatus={(driverId, duty) => setDriverDutyStatus(driverId, duty)}
-            onCallDriver={(phone, name) => {
-              workspaceBus.publish('CALL_OUTBOUND_STARTED', {
-                targetNumber: phone,
-                contactName: name,
-              });
-            }}
-            onAssignDriverToTrip={async (tripId, driverId) => {
-              const bookingService = getBookingService();
-              if (bookingService.updateTrip) {
-                await bookingService.updateTrip(tripId, {
-                  assignedDriverId: driverId,
-                  status: 'assigned',
+          {moduleKey === 'map' && (
+            <LiveFleetMap
+              fleet={fleet}
+              trips={trips}
+              selectedTrip={selectedMapTrip}
+              shouldZoom={Boolean(selectedMapTrip)}
+              onSelectTrip={(trip) => setSelectedMapTrip(trip)}
+              onChangeDriverDutyStatus={(driverId, duty) => setDriverDutyStatus(driverId, duty)}
+              onCallDriver={(phone, name) => {
+                workspaceBus.publish('CALL_OUTBOUND_STARTED', {
+                  targetNumber: phone,
+                  contactName: name,
                 });
-              }
-            }}
-          />
-        )}
+              }}
+              onAssignDriverToTrip={async (tripId, driverId) => {
+                const bookingService = getBookingService();
+                if (bookingService.updateTrip) {
+                  await bookingService.updateTrip(tripId, {
+                    assignedDriverId: driverId,
+                    status: 'assigned',
+                  });
+                }
+              }}
+            />
+          )}
+        </Suspense>
       </div>
     </div>
   );

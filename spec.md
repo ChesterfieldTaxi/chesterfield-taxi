@@ -864,6 +864,24 @@ The booking portal will guide the user through a sequential, config-driven flow:
 - **Full Wave 1 + Wave 2 Master Regression Gate**:
   - End-to-end production cutover verification across `npm run typecheck`, `npm run build` (confirming all 13 `/api/*` client chunks remain `0.00 kB`), `npm run test:smoke`, `npm run test:e2e`, `npm run test:stress`, and all 9 Wave 1 + Wave 2 domain test suites while keeping Vercel Hobby cron (`"0 10 * * *"`) in `vercel.json` untouched.
 
+## 44. Phase 44 (Wave 3 Phase 1): Server/Client Bundle Separation & Route-Level Lazy Chunking
+- **Zero-Behavior-Change Performance & Bundle Isolation Refactor**:
+  - Strictly preserves all pricing calculations, Firestore schemas/security rules, API request/response contracts, SSR/client hydration determinism, `WorkspaceBus` cross-window synchronization, and Vercel Hobby cron (`"0 10 * * *"`).
+- **100% Zero-KB `/api/*` Client Chunk Isolation (`public-settings.server.ts`)**:
+  - Extracts `loadPublicSettingsForServer()` from `app/routes/api.public-config.ts` into server-only `app/core/services/config/public-settings.server.ts`, consumed by both `app/routes/api.public-config.ts` and `app/routes/book.tsx` `loader()` so all **14** `/api/*` resource routes compile to `0.00 kB` client chunks.
+- **Elimination of `email-templates` & `resend` Browser Bundle Leak (`vehicle-tier-format.util.ts`)**:
+  - Extracts pure `formatVehicleTier` and `formatVehicleTierDisplay` formatters into `app/core/utils/vehicle-tier-format.util.ts` (re-exporting from `app/core/services/email/email-templates.ts` for server/test compatibility) and updates all 12 client/UI surfaces (`BookingConfirmation.tsx`, `AdminTripsSubpage.tsx`, `DispatchTripDetailsDrawer.tsx`, `DispatchTripQueuePane.tsx`, `DriverLiveMeterCard.tsx`, `DriverShiftControls.tsx`, `DriverTripManifest.tsx`, `CustomerTelemetryMap.tsx`, `app/routes/app.tsx`, `app/routes/booking.status.tsx`, `app/routes/dispatch.tsx`, `app/routes/driver.tsx`).
+  - Removes static top-level client imports of `resend` and `./email-templates` from `app/core/services/email/resend-email.service.ts` and `app/core/services/email/index.ts`, loading `resend` and `./email-templates` dynamically strictly inside server-side (`typeof window === 'undefined'`) execution paths while keeping browser dispatches lightweight `fetch('/api/send-email')` calls.
+- **Per-Tab Code Splitting on `/app/admin` (`app/routes/admin.tsx`)**:
+  - Converts all 14 Admin tab and subpage modules (`AdminDashboardTab`, `AdminGeneralTab`, `AdminRatesTab`, `AdminVehiclesTab`, `AdminZonesTab`, `AdminOperatorsTab`, `AdminAdvancedTab`, `AdminTripsSubpage`, `AdminInvoicingSubpage`, `AdminCustomersSubpage`, `AdminWebsiteTab`, `AdminArchiveTab`, `AdminIntegrationsSubpage`, `AdminRulesTab`) to direct module-level `React.lazy()` dynamic imports wrapped in `<Suspense>` inside the tab content area, reducing the `admin-*.js` route entry chunk from `~873 kB` to `< 120 kB`.
+- **Detached Pop-Out & Secondary Dispatch Dock Lazy Chunking (`dispatch.popout.tsx`, `dispatch.tsx`, `dispatch-trip-email.util.ts`)**:
+  - Extracts `getContextualEmailMeta` and `sendDispatchContextualTripEmail` from `DispatchTripDetailsDrawer.tsx` into `app/core/services/dispatch/dispatch-trip-email.util.ts` (re-exporting from `DispatchTripDetailsDrawer.tsx` for compatibility).
+  - Converts `CommsHub`, `EmailDock`, `DispatchBookingEngine`, and `LiveFleetMap` in `app/routes/dispatch.popout.tsx` to `React.lazy()` + `<Suspense>` so detached pop-out windows (`?module=email`, `?module=comms`, `?module=booking`, `?module=map`) download only their active module.
+  - Converts `CommsHub`, `EmailDock`, `AppSuiteLauncher`, and `DispatchTripDetailsDrawer` in `app/routes/dispatch.tsx` to `React.lazy()` + `<Suspense>` while preserving WebRTC softphone persistence, `WorkspaceBus` listeners, and SSR hydration parity.
+- **Automated Production Bundle Budget Assertions (`scripts/test-browser-smoke.ts`)**:
+  - Enforces automated build-asset assertions inside `verifyCutoverConfigInvariants` verifying every `api.*.js` chunk in `build/client/assets/` is `< 1024` bytes (`0.00 kB`) and the `admin-*.js` route entry chunk is `< 153600` bytes (`< 150 KB`).
+
+
 
 
 

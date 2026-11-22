@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
@@ -7,8 +7,8 @@ import type { AppSettings } from '../core/types/config';
 import type { Trip, TripStatus, TripAuditEvent } from '../core/types/trip';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { COMPANY_CONFIG } from '../config/companyConfig';
-import { type DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
-import { type DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
+import type { DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
+import type { DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import {
   SpinnerIcon,
@@ -42,7 +42,7 @@ import {
   SettingsIcon,
 } from '../components/ui/Icons';
 import { getEmailDispatchService } from '../core/services/email/resend-email.service';
-import { formatVehicleTier, formatVehicleTierDisplay } from '../core/services/email/email-templates';
+import { formatVehicleTier, formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 import { getDispatchEmailService } from '../core/services/email/dispatch-email.service';
 import { getTelephonyService, sanitizePhoneNumber, formatDisplayPhone } from '../core/services/telephony.service';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
@@ -52,9 +52,6 @@ import {
   pushNotificationService,
   formatDispatchNewRideAlert,
 } from '../core/services/notifications/push-notification.service';
-import { CommsHub } from '../components/domain/dispatch/CommsHub';
-import { EmailDock } from '../components/domain/dispatch/EmailDock';
-import { AppSuiteLauncher } from '../components/domain/dispatch/AppSuiteLauncher';
 import { DispatchHeaderCallHud } from '../components/domain/dispatch/DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../components/domain/dispatch/FleetAlertCard';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
@@ -81,10 +78,7 @@ import {
   DispatchDriverRosterPane,
   DispatchDriverSheets,
 } from '../components/domain/dispatch/DispatchDriverRosterPane';
-import {
-  DispatchTripDetailsDrawer,
-  sendDispatchContextualTripEmail,
-} from '../components/domain/dispatch/DispatchTripDetailsDrawer';
+import { sendDispatchContextualTripEmail } from '../core/services/dispatch/dispatch-trip-email.util';
 import { getZoneService, DEFAULT_ZONES } from '../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../core/types/zone';
 import {
@@ -94,6 +88,23 @@ import {
   scanUpcomingUnassignedSlaTrips,
   startOfferCascade,
 } from '../core/services/dispatch';
+
+const CommsHub = React.lazy(() =>
+  import('../components/domain/dispatch/CommsHub').then((m) => ({ default: m.CommsHub }))
+);
+const EmailDock = React.lazy(() =>
+  import('../components/domain/dispatch/EmailDock').then((m) => ({ default: m.EmailDock }))
+);
+const AppSuiteLauncher = React.lazy(() =>
+  import('../components/domain/dispatch/AppSuiteLauncher').then((m) => ({
+    default: m.AppSuiteLauncher,
+  }))
+);
+const DispatchTripDetailsDrawer = React.lazy(() =>
+  import('../components/domain/dispatch/DispatchTripDetailsDrawer').then((m) => ({
+    default: m.DispatchTripDetailsDrawer,
+  }))
+);
 
 export type { DriverRosterItem };
 
@@ -660,6 +671,15 @@ export default function DispatchRoute() {
     try {
       localStorage.setItem(MOBILE_TAB_STORAGE_KEY, activeMobileTab);
     } catch {}
+  }, [activeMobileTab]);
+
+  // Remember preferred Fleet sub-view ('drivers' roster vs 'map') on mobile
+  const [mobileFleetView, setMobileFleetView] = useState<'drivers' | 'map'>('drivers');
+
+  useEffect(() => {
+    if (activeMobileTab === 'drivers' || activeMobileTab === 'map') {
+      setMobileFleetView(activeMobileTab);
+    }
   }, [activeMobileTab]);
 
   useEffect(() => {
@@ -2657,6 +2677,7 @@ export default function DispatchRoute() {
   }, []);
 
   const stableClearFocusedDriver = useCallback(() => setFocusedMapDriverId(null), []);
+  const stableSwitchToRoster = useCallback(() => setActiveMobileTab('drivers'), []);
   const stableAssignDriverToTrip = useCallback((tripId: string, driverId: string) => {
     panelCallbacksRef.current.handleQuickAssignDriver(tripId, driverId);
   }, []);
@@ -2938,16 +2959,29 @@ export default function DispatchRoute() {
             missedCallsCount={missedCallsCount}
             hideIdleButtonOnDesktop={true}
             isPhoneDockActive={
-              activeDockTab === 'phone' || activeDockTab === 'comms'
+              isDesktop
+                ? activeDockTab === 'phone' || activeDockTab === 'comms'
+                : activeMobileTab === 'phone' ||
+                  (activeMobileTab === 'comms' && commsActiveTab === 'phone')
             }
             onTogglePhoneDock={() => {
-              if (activeDockTab === 'phone' || activeDockTab === 'comms') {
-                setActiveDockTab('none');
+              if (isDesktop) {
+                if (activeDockTab === 'phone' || activeDockTab === 'comms') {
+                  setActiveDockTab('none');
+                } else {
+                  setCommsActiveTab('all');
+                  setCommsInitialTab('all');
+                  setActiveDockTab('phone');
+                }
+              } else if (
+                activeMobileTab === 'phone' ||
+                (activeMobileTab === 'comms' && commsActiveTab === 'phone')
+              ) {
+                setActiveMobileTab('queue');
               } else {
-                setCommsActiveTab('all');
-                setCommsInitialTab('all');
-                setActiveDockTab('phone');
-                setActiveMobileTab('comms');
+                setCommsActiveTab('phone');
+                setCommsInitialTab('phone');
+                setActiveMobileTab('phone');
               }
             }}
             onOpenBooking={() => setActiveMobileTab('booking')}
@@ -3006,75 +3040,6 @@ export default function DispatchRoute() {
               });
             }}
           />
-
-          {/* Mobile-only Messages Shortcut (hidden on desktop to prevent double nav bar) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                activeDockTab !== 'none' &&
-                (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-                commsActiveTab === 'messages'
-              ) {
-                setActiveDockTab('none');
-              } else {
-                setCommsActiveTab('messages');
-                setCommsInitialTab('messages');
-                setActiveDockTab('phone');
-                setActiveMobileTab('messages');
-                setUnreadMessagesCount(0);
-              }
-            }}
-            className={`lg:hidden w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              activeDockTab !== 'none' &&
-              (activeDockTab === 'phone' || activeDockTab === 'comms') &&
-              commsActiveTab === 'messages'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
-            }`}
-            title="Communications & Messages Hub"
-            aria-label="Messages"
-          >
-            <ChatBubbleLeftRightIcon className="w-4 h-4" />
-            {unreadMessagesCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                {unreadMessagesCount}
-              </span>
-            )}
-          </button>
-
-          {/* Mobile-only Drivers Shortcut (hidden on desktop to prevent double nav bar) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (activeDockTab === 'drivers') {
-                setActiveDockTab('none');
-              } else {
-                setActiveDockTab('drivers');
-                setActiveMobileTab('drivers');
-              }
-            }}
-            className={`lg:hidden w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              activeDockTab === 'drivers'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
-            }`}
-            title="Open Drivers Roster"
-            aria-label="Drivers Roster"
-          >
-            <CarIcon className="w-4 h-4" />
-            {drivers.filter((d) => d.mapStatus === 'available').length > 0 && (
-              <span
-                className={`absolute -top-1 -right-1 text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-xs ${
-                  activeDockTab === 'drivers'
-                    ? 'bg-blue-800 text-white border border-white'
-                    : 'bg-emerald-600 text-white'
-                }`}
-              >
-                {drivers.filter((d) => d.mapStatus === 'available').length}
-              </span>
-            )}
-          </button>
 
           {/* Tactical Alerts Bell Notification Center */}
           <div className="relative" ref={alertsDropdownRef}>
@@ -3397,7 +3362,16 @@ export default function DispatchRoute() {
           </div>
 
           {/* App Suite Launcher (9-Dot Grid) */}
-          <AppSuiteLauncher />
+          <Suspense
+            fallback={
+              <div
+                className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs shrink-0"
+                aria-hidden="true"
+              />
+            }
+          >
+            <AppSuiteLauncher />
+          </Suspense>
         </div>
       </header>
 
@@ -4244,6 +4218,7 @@ export default function DispatchRoute() {
             onCallDriver={stableCallDriverFromMap}
             onChangeDriverDutyStatus={stableChangeDriverDutyStatus}
             onSelectTrip={stableSelectMapTrip}
+            onSwitchToRoster={stableSwitchToRoster}
           />
 
           <DispatchTripQueuePane
@@ -4356,97 +4331,138 @@ export default function DispatchRoute() {
         </div>
 
         {/* ─── FULL-SCREEN MOBILE OPERATIONS TABS (lg:hidden) ─── */}
-        {/* 1. Mobile Drivers Roster Page (Beautified Native Cards + Touch & Hold Actions) */}
+        {/* 1. Mobile Fleet — Drivers Roster Sub-View (Paired with Bottom-Right Live Map Floating Button) */}
         {activeMobileTab === 'drivers' && (
-          <DispatchDriverRosterPane
-            variant="mobile"
-            drivers={drivers}
-            isDesktop={isDesktop}
-            driverFilter={driverFilter}
-            onDriverFilterChange={setDriverFilter}
-            driverSearch={driverSearch}
-            onDriverSearchChange={setDriverSearch}
-            onOpenDriverQueue={(driver) => setQueueDriver(driver)}
-            onOpenMobileActionSheetDriver={setMobileActionSheetDriver}
-            onFocusMapDriver={setFocusedMapDriverId}
-            onCallDriver={(phone, name) => {
-              setActiveMobileTab('phone');
-              handleStartCall(phone, name);
-            }}
-            onChangeDriverDutyStatus={setDriverDutyStatus}
-            onShowToast={showDispatchToast}
-          />
+          <div className="relative flex-1 min-h-0 flex flex-col h-full overflow-hidden lg:hidden">
+            <DispatchDriverRosterPane
+              variant="mobile"
+              drivers={drivers}
+              isDesktop={isDesktop}
+              driverFilter={driverFilter}
+              onDriverFilterChange={setDriverFilter}
+              driverSearch={driverSearch}
+              onDriverSearchChange={setDriverSearch}
+              onOpenDriverQueue={(driver) => setQueueDriver(driver)}
+              onOpenMobileActionSheetDriver={setMobileActionSheetDriver}
+              onFocusMapDriver={(driverId) => {
+                setFocusedMapDriverId(driverId);
+                setActiveMobileTab('map');
+              }}
+              onCallDriver={(phone, name) => {
+                setActiveMobileTab('phone');
+                handleStartCall(phone, name);
+              }}
+              onChangeDriverDutyStatus={setDriverDutyStatus}
+              onShowToast={showDispatchToast}
+            />
+
+            <button
+              type="button"
+              onClick={() => setActiveMobileTab('map')}
+              className="absolute bottom-3.5 right-3.5 z-30 px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold shadow-xl ring-1 ring-white/15 flex items-center gap-2 cursor-pointer transition-all"
+              title="Switch to Live Fleet Map"
+              aria-label="Switch to Live Fleet Map"
+            >
+              <MapIcon className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>Live Map</span>
+            </button>
+          </div>
         )}
 
         {/* 2. Mobile Comms Hub Page (Omnichannel View: All / Calls / SMS / Voicemail) */}
         {!isDesktop && (activeMobileTab === 'comms' || activeMobileTab === 'messages' || activeMobileTab === 'phone') && (
           <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
-            <CommsHub
-              user={user}
-              drivers={drivers}
-              trips={trips}
-              onTabChange={(tab) => setCommsActiveTab(tab)}
-              initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
-              onOpenEditTrip={(tripId) => {
-                const found = trips.find((t) => t.id === tripId);
-                if (found) {
-                  setSelectedQueueTripId(found.id);
-                  setSelectedMapTrip(found);
-                  setShouldZoomMap(true);
-                  handleOpenEditTrip(found);
+            <Suspense
+              fallback={
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
+                  <span className="text-xs font-semibold">Loading communications...</span>
+                </div>
+              }
+            >
+              <CommsHub
+                user={user}
+                drivers={drivers}
+                trips={trips}
+                onTabChange={(tab) => {
+                  setCommsActiveTab(tab);
+                  if (!isDesktop) {
+                    setActiveMobileTab(
+                      tab === 'phone' ? 'phone' : tab === 'messages' ? 'messages' : 'comms'
+                    );
+                  }
+                }}
+                initialTab={activeMobileTab === 'phone' ? 'phone' : activeMobileTab === 'messages' ? 'messages' : 'all'}
+                onOpenEditTrip={(tripId) => {
+                  const found = trips.find((t) => t.id === tripId);
+                  if (found) {
+                    setSelectedQueueTripId(found.id);
+                    setSelectedMapTrip(found);
+                    setShouldZoomMap(true);
+                    handleOpenEditTrip(found);
+                    setActiveMobileTab('booking');
+                  }
+                }}
+                onPopulateBooking={(payload) => {
                   setActiveMobileTab('booking');
-                }
-              }}
-              onPopulateBooking={(payload) => {
-                setActiveMobileTab('booking');
-                setDrafts((prev) => {
-                  const target = prev.find((d) => d.id === activeDraftId) || prev[0];
-                  if (!target) return prev;
-                  const currentForm = target.formValues || ({} as any);
-                  const updatedForm: DispatchFormValues = {
-                    ...currentForm,
-                    passengerName: payload.passengerName || currentForm.passengerName || '',
-                    phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
-                    email: payload.passengerEmail || payload.email || currentForm.email || '',
-                    pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
-                    dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
-                    vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
-                    selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
-                    corporateDetails: {
-                      ...currentForm.corporateDetails,
-                      corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
-                      billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
-                      authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
-                      invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
-                    },
-                    paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
-                    internalNotes: payload.notes
-                      ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
-                      : currentForm.internalNotes,
-                  };
-                  return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
-                });
-              }}
-              onPopOut={() => getWorkspaceBus().popOutModule('comms')}
-            />
+                  setDrafts((prev) => {
+                    const target = prev.find((d) => d.id === activeDraftId) || prev[0];
+                    if (!target) return prev;
+                    const currentForm = target.formValues || ({} as any);
+                    const updatedForm: DispatchFormValues = {
+                      ...currentForm,
+                      passengerName: payload.passengerName || currentForm.passengerName || '',
+                      phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
+                      email: payload.passengerEmail || payload.email || currentForm.email || '',
+                      pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+                      dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+                      vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
+                      selectedVehicles: payload.vehicleTier ? [payload.vehicleTier as any] : (currentForm.selectedVehicles || ['any']),
+                      corporateDetails: {
+                        ...currentForm.corporateDetails,
+                        corporateAccount: payload.corporateAccount || payload.corporateAccountName || payload.accountNumber || currentForm.corporateDetails?.corporateAccount || '',
+                        billingPo: payload.billingPo || payload.poNumber || currentForm.corporateDetails?.billingPo || '',
+                        authorizedBy: currentForm.corporateDetails?.authorizedBy || '',
+                        invoicingTerms: currentForm.corporateDetails?.invoicingTerms || 'Net 30 Direct Bill',
+                      },
+                      paymentMethod: (payload.corporateAccount || payload.corporateAccountName || payload.accountNumber) ? 'account' : (currentForm.paymentMethod || 'cash'),
+                      internalNotes: payload.notes
+                        ? `${currentForm.internalNotes ? currentForm.internalNotes + '\n' : ''}${payload.notes}`
+                        : currentForm.internalNotes,
+                    };
+                    return prev.map((item) => (item.id === target.id ? { ...item, formValues: updatedForm } : item));
+                  });
+                }}
+                onPopOut={() => getWorkspaceBus().popOutModule('comms')}
+              />
+            </Suspense>
           </div>
         )}
 
         {/* 3. Mobile Email Console Page (Accessible from slide-out drawer) */}
         {!isDesktop && activeMobileTab === 'email' && (
           <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
-            <EmailDock
-              isDocked={true}
-              trips={trips}
-              onOpenEditTrip={stableCommsOpenEditTrip}
-              onClose={() => setActiveMobileTab('queue')}
-              onPopOut={() => getWorkspaceBus().popOutModule('email')}
-              showWindowControls={false}
-              onPopulateBooking={() => {
-                setActiveMobileTab('booking');
-                showDispatchToast('Booking form populated from email!', 'success');
-              }}
-            />
+            <Suspense
+              fallback={
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <SpinnerIcon className="w-5 h-5 animate-spin text-indigo-600" />
+                  <span className="text-xs font-semibold">Loading email console...</span>
+                </div>
+              }
+            >
+              <EmailDock
+                isDocked={true}
+                trips={trips}
+                onOpenEditTrip={stableCommsOpenEditTrip}
+                onClose={() => setActiveMobileTab('queue')}
+                onPopOut={() => getWorkspaceBus().popOutModule('email')}
+                showWindowControls={false}
+                onPopulateBooking={() => {
+                  setActiveMobileTab('booking');
+                  showDispatchToast('Booking form populated from email!', 'success');
+                }}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -4562,37 +4578,55 @@ export default function DispatchRoute() {
               <div className={`flex-1 flex-col h-full overflow-hidden ${
                 activeDockTab === 'phone' || activeDockTab === 'comms' ? 'flex' : 'hidden'
               }`}>
-                <CommsHub
-                  user={user}
-                  drivers={drivers}
-                  trips={trips}
-                  initialTab={commsInitialTab}
-                  onTabChange={stableCommsTabChange}
-                  isPopout={false}
-                  isVisible={activeDockTab === 'phone' || activeDockTab === 'comms'}
-                  onPopOut={stableCommsPopOut}
-                  onClose={stableCommsClose}
-                  onOpenEditTrip={stableCommsOpenEditTrip}
-                  onPopulateBooking={stableCommsPopulateBooking}
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                      <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
+                      <span className="text-xs font-semibold">Loading communications...</span>
+                    </div>
+                  }
+                >
+                  <CommsHub
+                    user={user}
+                    drivers={drivers}
+                    trips={trips}
+                    initialTab={commsInitialTab}
+                    onTabChange={stableCommsTabChange}
+                    isPopout={false}
+                    isVisible={activeDockTab === 'phone' || activeDockTab === 'comms'}
+                    onPopOut={stableCommsPopOut}
+                    onClose={stableCommsClose}
+                    onOpenEditTrip={stableCommsOpenEditTrip}
+                    onPopulateBooking={stableCommsPopulateBooking}
+                  />
+                </Suspense>
               </div>
 
               {/* 2. EMAIL DOCK CONSOLE (isDocked hides redundant dark header bar) */}
               {activeDockTab === 'email' && (
                 <div className="flex-1 flex flex-col h-full overflow-hidden">
-                  <EmailDock
-                    isDocked={true}
-                    trips={trips}
-                    onOpenEditTrip={stableCommsOpenEditTrip}
-                    onClose={() => setActiveDockTab('none')}
-                    onPopOut={() => getWorkspaceBus().popOutModule('email')}
-                    showWindowControls={false}
-                    onPopulateBooking={() => {
-                      // EmailDock publishes POPULATE_BOOKING directly to DispatchBookingEngine via WorkspaceBus
-                      setActiveMobileTab('booking');
-                      showDispatchToast('Booking form populated from email!', 'success');
-                    }}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                        <SpinnerIcon className="w-5 h-5 animate-spin text-indigo-600" />
+                        <span className="text-xs font-semibold">Loading email console...</span>
+                      </div>
+                    }
+                  >
+                    <EmailDock
+                      isDocked={true}
+                      trips={trips}
+                      onOpenEditTrip={stableCommsOpenEditTrip}
+                      onClose={() => setActiveDockTab('none')}
+                      onPopOut={() => getWorkspaceBus().popOutModule('email')}
+                      showWindowControls={false}
+                      onPopulateBooking={() => {
+                        // EmailDock publishes POPULATE_BOOKING directly to DispatchBookingEngine via WorkspaceBus
+                        setActiveMobileTab('booking');
+                        showDispatchToast('Booking form populated from email!', 'success');
+                      }}
+                    />
+                  </Suspense>
                 </div>
               )}
 
@@ -4892,46 +4926,59 @@ export default function DispatchRoute() {
       </div>
 
       {/* Trip Details, Unconfirmed Review, Fare Override, Audit Trail & Complete Trip Modals */}
-      <DispatchTripDetailsDrawer
-        isDesktop={isDesktop}
-        user={user}
-        settings={settings}
-        trips={trips}
-        onTripsChange={setTrips}
-        drivers={drivers}
-        reviewTrip={reviewTrip}
-        reviewOpenSeq={reviewOpenSeq}
-        reviewModalTab={reviewModalTab}
-        onReviewModalTabChange={setReviewModalTab}
-        onReviewTripChange={setReviewTrip}
-        onOpenReviewModal={handleOpenReviewModal}
-        auditTrailTrip={auditTrailTrip}
-        onCloseAuditTrailTrip={() => setAuditTrailTrip(null)}
-        driverModalTrip={driverModalTrip}
-        driverModalOpenSeq={driverModalOpenSeq}
-        onCloseDriverModal={() => setDriverModalTrip(null)}
-        completeTripTarget={completeTripTarget}
-        completeModalOpenSeq={completeModalOpenSeq}
-        onOpenCompleteTripModal={handleOpenCompleteTripModal}
-        onCloseCompleteTripModal={() => setCompleteTripTarget(null)}
-        onQuickAssignDriver={handleQuickAssignDriver}
-        onStartAutoOffer={handleStartAutoOffer}
-        onCancelAutoOffer={handleCancelAutoOffer}
-        onPromptCancelTrip={handlePromptCancelTrip}
-        onReactivateTrip={handleReactivateTrip}
-        onCloneBookingFromReview={(trip) => {
-          handleCloneBooking(trip);
-          setActiveMobileTab('booking');
-        }}
-        onEditTripFromReview={(trip) => {
-          setSelectedQueueTripId(trip.id);
-          setSelectedMapTrip(trip);
-          setShouldZoomMap(true);
-          handleOpenEditTrip(trip);
-          setActiveMobileTab('booking');
-        }}
-        onShowToast={showDispatchToast}
-      />
+      {Boolean(reviewTrip || auditTrailTrip || driverModalTrip || completeTripTarget) && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[120] bg-slate-950/35 backdrop-blur-xs flex items-center justify-center">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-slate-700">
+                <SpinnerIcon className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Loading trip details...</span>
+              </div>
+            </div>
+          }
+        >
+          <DispatchTripDetailsDrawer
+            isDesktop={isDesktop}
+            user={user}
+            settings={settings}
+            trips={trips}
+            onTripsChange={setTrips}
+            drivers={drivers}
+            reviewTrip={reviewTrip}
+            reviewOpenSeq={reviewOpenSeq}
+            reviewModalTab={reviewModalTab}
+            onReviewModalTabChange={setReviewModalTab}
+            onReviewTripChange={setReviewTrip}
+            onOpenReviewModal={handleOpenReviewModal}
+            auditTrailTrip={auditTrailTrip}
+            onCloseAuditTrailTrip={() => setAuditTrailTrip(null)}
+            driverModalTrip={driverModalTrip}
+            driverModalOpenSeq={driverModalOpenSeq}
+            onCloseDriverModal={() => setDriverModalTrip(null)}
+            completeTripTarget={completeTripTarget}
+            completeModalOpenSeq={completeModalOpenSeq}
+            onOpenCompleteTripModal={handleOpenCompleteTripModal}
+            onCloseCompleteTripModal={() => setCompleteTripTarget(null)}
+            onQuickAssignDriver={handleQuickAssignDriver}
+            onStartAutoOffer={handleStartAutoOffer}
+            onCancelAutoOffer={handleCancelAutoOffer}
+            onPromptCancelTrip={handlePromptCancelTrip}
+            onReactivateTrip={handleReactivateTrip}
+            onCloneBookingFromReview={(trip) => {
+              handleCloneBooking(trip);
+              setActiveMobileTab('booking');
+            }}
+            onEditTripFromReview={(trip) => {
+              setSelectedQueueTripId(trip.id);
+              setSelectedMapTrip(trip);
+              setShouldZoomMap(true);
+              handleOpenEditTrip(trip);
+              setActiveMobileTab('booking');
+            }}
+            onShowToast={showDispatchToast}
+          />
+        </Suspense>
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmationModal
@@ -5074,39 +5121,55 @@ export default function DispatchRoute() {
           <span className="text-[10px] tracking-tight leading-none">Comms</span>
         </button>
 
-        {/* Tab 4: Drivers */}
+        {/* Tab 4: Email (dispatch@chesterfieldtaxi.com) */}
         <button
           type="button"
-          onClick={() => setActiveMobileTab('drivers')}
+          onClick={() => setActiveMobileTab('email')}
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
-            activeMobileTab === 'drivers'
+            activeMobileTab === 'email'
               ? 'text-blue-600 font-extrabold'
               : 'text-slate-500 hover:text-slate-800 font-medium'
           }`}
         >
-          <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'drivers' ? 'bg-blue-50 text-blue-600' : ''}`}>
-            <UsersIcon className="w-5 h-5" />
+          <div className={`p-1 rounded-xl transition-colors relative ${activeMobileTab === 'email' ? 'bg-blue-50 text-blue-600' : ''}`}>
+            <MailIcon className="w-5 h-5" />
+            {unreadEmailCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
+                {unreadEmailCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] tracking-tight leading-none">Email</span>
+        </button>
+
+        {/* Tab 5: Fleet (Unified Drivers Roster + Live Map Switcher) */}
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab(mobileFleetView)}
+          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
+            activeMobileTab === 'drivers' || activeMobileTab === 'map'
+              ? 'text-blue-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <div
+            className={`p-1 rounded-xl transition-colors relative ${
+              activeMobileTab === 'drivers' || activeMobileTab === 'map'
+                ? 'bg-blue-50 text-blue-600'
+                : ''
+            }`}
+          >
+            {activeMobileTab === 'map' ||
+            (activeMobileTab !== 'drivers' && mobileFleetView === 'map') ? (
+              <MapIcon className="w-5 h-5" />
+            ) : (
+              <UsersIcon className="w-5 h-5" />
+            )}
             <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
               {drivers.filter((d) => d.mapStatus === 'available').length}
             </span>
           </div>
-          <span className="text-[10px] tracking-tight leading-none">Drivers</span>
-        </button>
-
-        {/* Tab 5: Map */}
-        <button
-          type="button"
-          onClick={() => setActiveMobileTab('map')}
-          className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
-            activeMobileTab === 'map'
-              ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
-          }`}
-        >
-          <div className={`p-1 rounded-xl transition-colors ${activeMobileTab === 'map' ? 'bg-blue-50 text-blue-600' : ''}`}>
-            <MapIcon className="w-5 h-5" />
-          </div>
-          <span className="text-[10px] tracking-tight leading-none">Map</span>
+          <span className="text-[10px] tracking-tight leading-none">Fleet</span>
         </button>
       </nav>
 

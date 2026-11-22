@@ -11,6 +11,7 @@ export default defineConfig(({ isSsrBuild }) => ({
   define: isSsrBuild
     ? {}
     : {
+        'process.env.VITE_CLIENT_BUILD': JSON.stringify('1'),
         'process.env': {},
       },
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
