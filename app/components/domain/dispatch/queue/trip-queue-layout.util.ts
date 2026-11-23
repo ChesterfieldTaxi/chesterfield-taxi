@@ -9,7 +9,8 @@ export type QueueFilterType =
   | 'payment_type'
   | 'tariff'
   | 'has_car_seat'
-  | 'has_stops';
+  | 'has_stops'
+  | 'has_staged_driver';
 
 /**
  * Baseline minimum Trips Queue outer width (in CSS pixels) required to render

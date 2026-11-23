@@ -22,9 +22,13 @@ import {
   buildPerVehiclePricingSpecs,
   buildAssociateEntryFromTrip,
 } from '../../../../core/services/booking/multi-car.util';
+import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import { getEmailDispatchService } from '../../../../core/services/email';
-import type { DriverRosterItem } from '../../../../core/services/operator.service';
+import {
+  formatDriverAssignmentLabel,
+  type DriverRosterItem,
+} from '../../../../core/services/operator.service';
 import { formatLocalDateStr } from '../../../../core/services/pricing/vehicle-matching';
 import {
   DEFAULT_CORPORATE_ACCOUNTS,
@@ -140,6 +144,7 @@ export interface DispatchFormValues {
   discount: string;
   company: string;
   driverId: string;
+  driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
   notesForAll: string;
   internalNotes: string;
   returnDetails: ReturnTripDetails;
@@ -239,6 +244,7 @@ export interface DispatchHydrationSetters {
   setBypassSurge: (v: boolean) => void;
   setCompany: (v: string) => void;
   setDriverId: (v: string) => void;
+  setDriverAssignmentMode?: (v: 'send_to_driver' | 'stage_hold') => void;
   setNotesForAll: (v: string) => void;
   setInternalNotes: (v: string) => void;
   setReturnTrip: (v: boolean) => void;
@@ -424,6 +430,12 @@ export function applySavedDraftOverlayToDispatchState(
   if (parsed.bypassSurge !== undefined) s.setBypassSurge(parsed.bypassSurge);
   if (parsed.company) s.setCompany(parsed.company);
   if (parsed.driverId) s.setDriverId(parsed.driverId);
+  if (
+    parsed.driverAssignmentMode === 'stage_hold' ||
+    parsed.driverAssignmentMode === 'send_to_driver'
+  ) {
+    s.setDriverAssignmentMode?.(parsed.driverAssignmentMode);
+  }
   if (parsed.notesForAll !== undefined) s.setNotesForAll(parsed.notesForAll);
   if (parsed.internalNotes !== undefined) s.setInternalNotes(parsed.internalNotes);
   if (parsed.sendEmailConfirmation !== undefined) {
@@ -755,6 +767,10 @@ export function hydrateInitialTripIntoDispatchState(
 
   if (initialTrip.assignedDriverId) {
     s.setDriverId(initialTrip.assignedDriverId);
+    s.setDriverAssignmentMode?.('send_to_driver');
+  } else if (initialTrip.plannedDriverId) {
+    s.setDriverId(initialTrip.plannedDriverId);
+    s.setDriverAssignmentMode?.('stage_hold');
   }
 
   if (meta.pricingRuleId) s.setSelectedRuleId(meta.pricingRuleId);
@@ -934,6 +950,7 @@ export interface UseDispatchBookingSubmissionParams {
   bypassSurge: boolean;
   company: string;
   driverId: string;
+  driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
   driverOptions: DriverRosterItem[];
   notesForAll: string;
   internalNotes: string;
@@ -1066,6 +1083,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     bypassSurge,
     company,
     driverId,
+    driverAssignmentMode = 'send_to_driver',
     driverOptions,
     notesForAll,
     internalNotes,
@@ -1784,6 +1802,26 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
 
       const selectedDriverInfo =
         driverId !== 'unassigned' ? driverOptions.find((d) => d.id === driverId) : undefined;
+      const isStagingSelectedDriver =
+        driverId !== 'unassigned' && driverAssignmentMode === 'stage_hold';
+      const nowStagingIso = new Date().toISOString();
+      const stagingActorUser = (() => {
+        try {
+          return getAdminAuthService().getCurrentUser();
+        } catch {
+          return null;
+        }
+      })();
+      const stagingActorName =
+        stagingActorUser?.displayName ||
+        stagingActorUser?.email ||
+        stagingActorUser?.uid ||
+        'Dispatcher';
+      const resolvedPlannedDriverLabel = selectedDriverInfo
+        ? formatDriverAssignmentLabel(selectedDriverInfo)
+        : driverId !== 'unassigned'
+        ? driverId
+        : null;
 
       if (isEditMode && initialTrip) {
         const shouldSplitIntoMultiCar =
@@ -1850,10 +1888,31 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             driverNotes: notesForAll,
             flightNotes: outboundFlightNotes || undefined,
             ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
-            assignedDriverId: driverId === 'unassigned' ? null : driverId,
+            assignedDriverId:
+              driverId === 'unassigned' || isStagingSelectedDriver ? null : driverId,
+            ...(isStagingSelectedDriver
+              ? {
+                  offeredToIds: [],
+                  plannedDriverId: driverId,
+                  plannedDriverLabel: resolvedPlannedDriverLabel,
+                  plannedAt: nowStagingIso,
+                  plannedBy: stagingActorName,
+                }
+              : {
+                  plannedDriverId: null,
+                  plannedDriverLabel: null,
+                  plannedAt: null,
+                  plannedBy: null,
+                }),
             status:
-              driverId !== 'unassigned' && initialTrip.status === 'pending'
+              driverId !== 'unassigned' &&
+              !isStagingSelectedDriver &&
+              ['pending', 'confirmed', 'CONFIRMED', 'UNCONFIRMED', 'unconfirmed'].includes(
+                initialTrip.status
+              )
                 ? 'assigned'
+                : isStagingSelectedDriver && initialTrip.status === 'assigned'
+                ? 'CONFIRMED'
                 : initialTrip.status,
             pricing: car1Spec.pricing,
             payment: {
@@ -1880,7 +1939,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               multiCarTotalPassengers: passengers,
               multiCarTotalBags: bags,
               multiCarOrderTotalFare: finalFare,
-              ...(selectedDriverInfo
+              ...(selectedDriverInfo && !isStagingSelectedDriver
                 ? {
                     assignedDriverName: selectedDriverInfo.name,
                     assignedDriverPhone: selectedDriverInfo.phone,
@@ -1976,7 +2035,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           const associates = convoyTrips.map((t, idx) =>
             buildAssociateEntryFromTrip(
               t,
-              idx === 0 && selectedDriverInfo
+              idx === 0 && selectedDriverInfo && !isStagingSelectedDriver
                 ? {
                     driverId: selectedDriverInfo.id,
                     driverName: selectedDriverInfo.name,
@@ -2069,12 +2128,52 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           driverNotes: notesForAll,
           flightNotes: outboundFlightNotes || undefined,
           ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
-          assignedDriverId: driverId === 'unassigned' ? null : driverId,
+          assignedDriverId:
+            isCompleted || isCancelled
+              ? initialTrip.assignedDriverId
+              : driverId === 'unassigned' || isStagingSelectedDriver
+              ? null
+              : driverId,
+          ...(isCompleted || isCancelled
+            ? {}
+            : isStagingSelectedDriver
+            ? {
+                offeredToIds: [],
+                plannedDriverId: driverId,
+                plannedDriverLabel: resolvedPlannedDriverLabel,
+                plannedAt: nowStagingIso,
+                plannedBy: stagingActorName,
+                auditLog: [
+                  ...(initialTrip.auditLog || []),
+                  {
+                    action: 'DRIVER_STAGED',
+                    timestamp: nowStagingIso,
+                    actorId: stagingActorUser?.uid,
+                    actorRole:
+                      stagingActorUser?.role === 'admin' ? ('admin' as const) : ('dispatcher' as const),
+                    referenceNumber: `STG-${Math.floor(1000 + Math.random() * 9000)}`,
+                    referenceType: 'lifecycle' as const,
+                    context: `Staged ${resolvedPlannedDriverLabel} as planned driver — held in Dispatch`,
+                  },
+                ],
+              }
+            : {
+                plannedDriverId: null,
+                plannedDriverLabel: null,
+                plannedAt: null,
+                plannedBy: null,
+              }),
           status:
             isCompleted || isCancelled
               ? initialTrip.status
-              : driverId !== 'unassigned' && initialTrip.status === 'pending'
+              : driverId !== 'unassigned' &&
+                !isStagingSelectedDriver &&
+                ['pending', 'confirmed', 'CONFIRMED', 'UNCONFIRMED', 'unconfirmed'].includes(
+                  initialTrip.status
+                )
               ? 'assigned'
+              : isStagingSelectedDriver && initialTrip.status === 'assigned'
+              ? 'CONFIRMED'
               : initialTrip.status,
           pricing: persistedOutboundPricing,
           payment: {
@@ -2086,7 +2185,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           metadata: {
             ...initialTrip.metadata,
             ...metadataPayload,
-            ...(selectedDriverInfo
+            ...(selectedDriverInfo && !isStagingSelectedDriver
               ? {
                   assignedDriverName: selectedDriverInfo.name,
                   assignedDriverPhone: selectedDriverInfo.phone,
@@ -2231,16 +2330,51 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
 
           let createdCar = await service.createBooking(carPayload);
 
-          if (isCar1 && driverId !== 'unassigned' && service.updateTripStatus) {
-            try {
-              createdCar = await service.updateTripStatus(createdCar.id, 'assigned', {
-                assignedDriverId: driverId,
-                actorRole: 'admin',
-                reason: `Directly assigned to ${
-                  selectedDriverInfo?.name || driverId
-                } by dispatcher`,
-              });
-            } catch {}
+          if (isCar1 && driverId !== 'unassigned') {
+            if (isStagingSelectedDriver) {
+              const stagedPatch: Partial<Trip> = {
+                plannedDriverId: driverId,
+                plannedDriverLabel: resolvedPlannedDriverLabel,
+                plannedAt: nowStagingIso,
+                plannedBy: stagingActorName,
+                assignedDriverId: null,
+                offeredToIds: [],
+                auditLog: [
+                  ...(createdCar.auditLog || []),
+                  {
+                    action: 'DRIVER_STAGED',
+                    timestamp: nowStagingIso,
+                    actorId: stagingActorUser?.uid,
+                    actorRole:
+                      stagingActorUser?.role === 'admin'
+                        ? ('admin' as const)
+                        : ('dispatcher' as const),
+                    referenceNumber: `STG-${Math.floor(1000 + Math.random() * 9000)}`,
+                    referenceType: 'lifecycle' as const,
+                    context: `Staged ${resolvedPlannedDriverLabel} as planned driver — held in Dispatch`,
+                  },
+                ],
+              };
+              if (service.updateTrip) {
+                try {
+                  createdCar = await service.updateTrip(createdCar.id, stagedPatch);
+                } catch {
+                  createdCar = { ...createdCar, ...stagedPatch };
+                }
+              } else {
+                createdCar = { ...createdCar, ...stagedPatch };
+              }
+            } else if (service.updateTripStatus) {
+              try {
+                createdCar = await service.updateTripStatus(createdCar.id, 'assigned', {
+                  assignedDriverId: driverId,
+                  actorRole: 'admin',
+                  reason: `Directly assigned to ${
+                    selectedDriverInfo?.name || driverId
+                  } by dispatcher`,
+                });
+              } catch {}
+            }
           }
 
           createdOutboundTrips.push(createdCar);
@@ -2251,7 +2385,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           const associates = createdOutboundTrips.map((t, idx) =>
             buildAssociateEntryFromTrip(
               t,
-              idx === 0 && selectedDriverInfo
+              idx === 0 && selectedDriverInfo && !isStagingSelectedDriver
                 ? {
                     driverId: selectedDriverInfo.id,
                     driverName: selectedDriverInfo.name,

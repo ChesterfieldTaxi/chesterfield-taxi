@@ -11,6 +11,7 @@ import {
   MapPinIcon,
   DocumentTextIcon,
   BoltIcon,
+  CarIcon,
   PlusIcon,
   ShieldCheckIcon,
   CheckIcon,
@@ -18,6 +19,10 @@ import {
   BanIcon,
   XIcon,
 } from '../../ui/Icons';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../core/services/dispatch/staged-driver-planner.service';
 
 export interface TripActionDropdownProps {
   trip: Trip;
@@ -34,6 +39,9 @@ export interface TripActionDropdownProps {
   onFocusMap: () => void;
   onStartAutoOffer?: () => void;
   onCancelAutoOffer?: () => void;
+  onSendStagedToDriver?: () => void;
+  onStageDriver?: () => void;
+  onClearStagedDriver?: () => void;
   onCompleteTrip?: () => void;
   onCancelTrip?: () => void;
   onReactivateTrip?: () => void;
@@ -54,6 +62,9 @@ export function TripActionDropdown({
   onFocusMap,
   onStartAutoOffer,
   onCancelAutoOffer,
+  onSendStagedToDriver,
+  onStageDriver,
+  onClearStagedDriver,
   onCompleteTrip,
   onCancelTrip,
   onReactivateTrip,
@@ -249,6 +260,54 @@ export function TripActionDropdown({
               <DocumentTextIcon className={`w-3.5 h-3.5 shrink-0 ${isUnconfirmed ? 'text-amber-600' : 'text-blue-500'}`} />
               <span>{isUnconfirmed ? 'Review Booking' : 'Trip Details & Audit'}</span>
             </button>
+
+            {hasStagedDriver(trip) && onSendStagedToDriver && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSendStagedToDriver();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-extrabold text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100/90 transition-colors cursor-pointer"
+                title="Send staged placeholder live to driver"
+              >
+                <CarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="truncate">
+                  Send to Driver ({trip.plannedDriverLabel || 'Staged'})
+                </span>
+              </button>
+            )}
+
+            {isTripEligibleForStaging(trip) && onStageDriver && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onStageDriver();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50/80 transition-colors cursor-pointer"
+                title="Stage a driver shift placeholder (held in Dispatch)"
+              >
+                <CarIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span>
+                  {hasStagedDriver(trip) ? 'Change Staged Driver' : 'Stage Driver (Hold)'}
+                </span>
+              </button>
+            )}
+
+            {hasStagedDriver(trip) && onClearStagedDriver && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onClearStagedDriver();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+              >
+                <XIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Clear Staged Driver</span>
+              </button>
+            )}
 
             {isTripCascadeActive(trip) && onCancelAutoOffer ? (
               <button

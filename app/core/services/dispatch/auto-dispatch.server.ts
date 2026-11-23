@@ -38,6 +38,11 @@ import {
   type OfferCascadeStepResult,
 } from './auto-dispatch.service';
 import {
+  getDueStagedTripsForAutoRelease,
+  hasStagedDriver,
+  releaseDueStagedTrips,
+} from './staged-driver-planner.service';
+import {
   getServiceAccountDatastoreToken,
   listCollectionFirestoreRest,
   patchFirestoreTripRest,
@@ -141,18 +146,14 @@ export async function executeServerAutoDispatchForTrip(
     settings?.dispatchAutomation || DEFAULT_DISPATCH_AUTOMATION_CONFIG
   );
 
-  // Fast exit before reading collections when Auto-Pilot is off, paused, or outside operating hours
+  // Fast exit before reading collections when paused, or when both Auto-Pilot and Staged Auto-Release are disabled
   if (
-    dispatchConfig.dispatchMode === 'manual_1tap' ||
     dispatchConfig.isPaused ||
-    !isWithinAutoDispatchOperatingHours(dispatchConfig, new Date(nowMs))
+    (dispatchConfig.dispatchMode === 'manual_1tap' && !dispatchConfig.autoReleaseStagedDrivers)
   ) {
-    const fastReason =
-      dispatchConfig.dispatchMode === 'manual_1tap'
-        ? 'Auto-Pilot is disabled (mode is 1-Tap Manual).'
-        : dispatchConfig.isPaused
-        ? 'Auto-Pilot is currently paused.'
-        : 'Current time is outside configured Auto-Dispatch operating hours.';
+    const fastReason = dispatchConfig.isPaused
+      ? 'Auto-Pilot and Staged Auto-Release are currently paused.'
+      : 'Auto-Pilot and Staged Auto-Release are disabled.';
     return {
       success: true,
       tripId,
@@ -205,7 +206,106 @@ export async function executeServerAutoDispatchForTrip(
     };
   }
 
-  // 3. Enforce authoritative server-side eligibility (lead window, CONFIRMED status, idempotency)
+  // 3a. Staged Driver Auto-Release Window Handling (Phase 51)
+  if (hasStagedDriver(targetTrip)) {
+    const dueStaged = getDueStagedTripsForAutoRelease([targetTrip], dispatchConfig, nowMs);
+    if (dueStaged.length === 0) {
+      return {
+        success: true,
+        tripId,
+        dispatched: false,
+        outcome: 'skipped_ineligible',
+        mode: dispatchConfig.dispatchMode,
+        status: targetTrip.status,
+        reason: dispatchConfig.autoReleaseStagedDrivers
+          ? `Staged trip is outside the ${dispatchConfig.stagedAutoReleaseLeadMinutes}m Auto-Release Lead Window.`
+          : 'Auto-Release Staged Drivers is disabled in settings.',
+      };
+    }
+
+    let stagedDrivers: AutoDispatchDriverInput[] = options?.driversOverride || [];
+    let stagedTrips: Trip[] = [];
+
+    if (!options?.bookingServiceOverride && restToken && isFirebaseConfigured()) {
+      const [restTrips, restDrivers] = await Promise.all([
+        listCollectionFirestoreRest<Trip>('trips', restToken, 250),
+        stagedDrivers.length === 0
+          ? listCollectionFirestoreRest<AutoDispatchDriverInput>('drivers', restToken, 150)
+          : Promise.resolve(stagedDrivers),
+      ]);
+      if (restTrips) stagedTrips = restTrips;
+      if (restDrivers) stagedDrivers = restDrivers;
+    } else if (baseBookingService.getAllTrips) {
+      try {
+        stagedTrips = await baseBookingService.getAllTrips();
+      } catch {
+        stagedTrips = [targetTrip];
+      }
+    }
+
+    if (!stagedTrips.some((t) => t.id === targetTrip!.id)) {
+      stagedTrips = [targetTrip, ...stagedTrips];
+    }
+
+    let persistedStagedTrip: Trip = targetTrip;
+    const stagedPersistence: IBookingService = {
+      ...baseBookingService,
+      updateTrip: async (id: string, updates: Partial<Trip>): Promise<Trip> => {
+        const merged: Trip = {
+          ...persistedStagedTrip,
+          ...updates,
+          updatedAt: updates.updatedAt || nowIso,
+        };
+        persistedStagedTrip = merged;
+        if (!options?.bookingServiceOverride && restToken && isFirebaseConfigured()) {
+          const ok = await patchFirestoreTripRest(id, updates, restToken);
+          if (ok) return merged;
+        }
+        if (baseBookingService.updateTrip) {
+          return await baseBookingService.updateTrip(id, updates);
+        }
+        return merged;
+      },
+    };
+
+    const releaseRes = await releaseDueStagedTrips({
+      trips: stagedTrips,
+      drivers: stagedDrivers,
+      settings: {
+        ...(settings || {}),
+        dispatchAutomation: dispatchConfig,
+      },
+      actorName: 'Server Staged Auto-Release',
+      bookingService: stagedPersistence,
+      sendPush: false,
+      nowMs,
+    });
+
+    const releasedMatch = releaseRes.releasedTrips.find((t) => t.id === tripId);
+    if (releasedMatch) {
+      return {
+        success: true,
+        tripId,
+        dispatched: true,
+        outcome: 'assigned',
+        mode: dispatchConfig.dispatchMode,
+        status: releasedMatch.status,
+      };
+    }
+
+    const matchAlert = releaseRes.alerts.find((a) => a.tripId === tripId);
+    return {
+      success: true,
+      tripId,
+      dispatched: false,
+      outcome: 'skipped_ineligible',
+      mode: dispatchConfig.dispatchMode,
+      status: targetTrip.status,
+      reason: matchAlert?.message || 'Staged driver is currently unavailable for auto-release.',
+    };
+  }
+
+  // 3b. Enforce authoritative server-side eligibility (lead window, CONFIRMED status, idempotency)
   if (!isTripEligibleForAutoPilot(targetTrip, dispatchConfig, nowMs)) {
     return {
       success: true,

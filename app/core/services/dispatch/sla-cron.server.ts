@@ -45,6 +45,7 @@ import {
   isTripEligibleForAutoPilot,
   type AutoDispatchDriverInput,
 } from './auto-dispatch.service';
+import { releaseDueStagedTrips } from './staged-driver-planner.service';
 import {
   buildTripSlaStatusPatch,
   scanUpcomingUnassignedSlaTrips,
@@ -531,10 +532,37 @@ export async function executeSlaDispatchCronCycle(options?: {
     }
   }
 
+  // 4.5. Staged Driver Auto-Release Pass inside `stagedAutoReleaseLeadMinutes` (Phase 51)
+  const stagedReleasedTripIds: string[] = [];
+  const stagedReleaseAlerts: string[] = [];
+
+  if (dispatchConfig.autoReleaseStagedDrivers && !dispatchConfig.isPaused) {
+    const stagedRes = await releaseDueStagedTrips({
+      trips: Array.from(tripMap.values()),
+      drivers,
+      settings: {
+        ...(settings || {}),
+        dispatchAutomation: dispatchConfig,
+      },
+      actorName: 'Cron Staged Auto-Release',
+      bookingService: persistenceAdapter,
+      sendPush: false,
+      nowMs,
+    });
+    for (const rt of stagedRes.releasedTrips) {
+      tripMap.set(rt.id, rt);
+      stagedReleasedTripIds.push(rt.id);
+    }
+    for (const al of stagedRes.alerts) {
+      stagedReleaseAlerts.push(al.message);
+    }
+  }
+
   // 5. Server Auto-Dispatch Pass across all trips eligible for Auto-Pilot (inside Pre-Pickup Lead Window)
   if (drivers.length > 0 && dispatchConfig.dispatchMode !== 'manual_1tap' && !dispatchConfig.isPaused) {
     for (const candidateTrip of Array.from(tripMap.values())) {
       const latestTrip = tripMap.get(candidateTrip.id) || candidateTrip;
+      if (latestTrip.plannedDriverId) continue;
       if (isTripEligibleForAutoPilot(latestTrip, dispatchConfig, nowMs)) {
         const autoRes = await executeAutoDispatch({
           trip: latestTrip,
@@ -569,6 +597,8 @@ export async function executeSlaDispatchCronCycle(options?: {
     newlyAlertedTripIds,
     skippedAlreadyNotifiedCount,
     autoOfferedTripIds,
+    stagedReleasedTripIds,
+    stagedReleaseAlerts,
     cascadeAdvancedCount,
     cascadeExhaustedCount,
     config: dispatchConfig,

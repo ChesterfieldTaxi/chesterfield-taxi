@@ -870,7 +870,7 @@ export function canOperatorConfigureLeadWindows(
     ].map((r) => String(r).trim().toLowerCase())
   );
 
-  if (roleSet.has('admin')) return true;
+  if (roleSet.has('admin') || roleSet.has('super_admin')) return true;
   if (!roleSet.has('dispatcher')) return false;
 
   const allowlist = Array.isArray(config?.authorizedLeadWindowDispatcherIds)

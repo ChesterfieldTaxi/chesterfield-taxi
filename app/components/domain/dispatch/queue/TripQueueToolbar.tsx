@@ -7,6 +7,7 @@ import type { Trip, TripStatus } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
+import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import { CustomDateTimePicker, type DateTimeRange } from '../CustomDateTimePicker';
 import { canTripTriggerAutoOffer } from '../DispatchCascadeSlaBadges';
@@ -104,6 +105,7 @@ export function getDispatchStatusBadge(status: TripStatus) {
 
 const FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; label: string }> = [
   { key: 'driver', label: 'Driver' },
+  { key: 'has_staged_driver', label: 'Staged Only' },
   { key: 'vehicle', label: 'Vehicle' },
   { key: 'company', label: 'Company' },
   { key: 'payment_type', label: 'Payment Type' },
@@ -184,6 +186,9 @@ export interface TripQueueToolbarProps {
   readyAutoDispatchCount?: number;
   isRunningAutoDispatchSweep?: boolean;
   onRunAutoDispatchSweep?: () => void | Promise<void>;
+
+  // Phase 51: Staged Driver Shift Planner Controller
+  stagedPlanner?: DispatchStagedPlannerController;
 }
 
 export function TripQueueToolbar({
@@ -246,6 +251,7 @@ export function TripQueueToolbar({
   readyAutoDispatchCount = 0,
   isRunningAutoDispatchSweep = false,
   onRunAutoDispatchSweep,
+  stagedPlanner,
 }: TripQueueToolbarProps) {
   const autoConfig = normalizeDispatchAutomationConfig(settings.dispatchAutomation);
   const isManualOrPaused =
@@ -475,6 +481,24 @@ export function TripQueueToolbar({
                   </div>
                 )}
 
+                {activeFilterKeys.includes('has_staged_driver') && (
+                  <div className="inline-flex items-center gap-1 bg-indigo-50 border border-dashed border-indigo-400 rounded-full px-2 py-0.5 text-xs font-extrabold text-indigo-900 shadow-2xs shrink-0 h-6">
+                    <span className="text-[11px]">📌 Staged Only</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onActiveFilterKeysChange(
+                          activeFilterKeys.filter((k) => k !== 'has_staged_driver')
+                        )
+                      }
+                      className="text-indigo-500 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                      title="Remove Staged Only filter"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 {activeFilterKeys.includes('vehicle') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
@@ -579,8 +603,24 @@ export function TripQueueToolbar({
             </div>
           </div>
 
-          {/* Right Side: Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
+          {/* Right Side: Auto-Stage Open, Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {stagedPlanner && stagedPlanner.openScheduledUnstagedCount > 0 && (
+              <button
+                type="button"
+                disabled={stagedPlanner.isAutoStaging}
+                onClick={() => stagedPlanner.openAutoStagePreview()}
+                className="h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold tracking-tight hidden sm:flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
+                title="Preview non-overlapping staged driver placeholders for open scheduled rides (held in Dispatch)"
+              >
+                <span>
+                  {stagedPlanner.isAutoStaging
+                    ? '📌 Staging...'
+                    : `📌 Auto-Stage Open (${stagedPlanner.openScheduledUnstagedCount})`}
+                </span>
+              </button>
+            )}
+
             {readyAutoDispatchCount > 0 && onRunAutoDispatchSweep && (
               <button
                 type="button"
@@ -863,6 +903,21 @@ export function TripQueueToolbar({
             </div>
           )}
 
+          {activeFilterKeys.includes('has_staged_driver') && (
+            <div className="inline-flex items-center gap-1 bg-indigo-50 border border-dashed border-indigo-400 rounded-full px-2 py-0.5 text-xs font-extrabold text-indigo-900 shadow-2xs shrink-0 h-6">
+              <span className="text-[11px]">📌 Staged Only</span>
+              <button
+                type="button"
+                onClick={() =>
+                  onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_staged_driver'))
+                }
+                className="text-indigo-500 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {activeFilterKeys.includes('vehicle') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Veh:</span>
@@ -1089,13 +1144,48 @@ export function TripQueueToolbar({
             </button>
             <button
               type="button"
-              onClick={onBatchAssignDriver}
+              onClick={() => {
+                stagedPlanner?.setBatchAssignMode('send_to_driver');
+                onBatchAssignDriver();
+              }}
               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
               title="Assign driver to selected trips"
             >
               <UsersIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Assign</span>
             </button>
+            {stagedPlanner && stagedPlanner.selectedStageableCount > 0 && (
+              <button
+                type="button"
+                onClick={() => stagedPlanner.openBatchStageDriverModal()}
+                className="px-2.5 py-1 bg-indigo-950/90 hover:bg-indigo-900 border border-dashed border-indigo-400 rounded-lg text-indigo-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                title="Stage driver placeholder on selected trips (held in Dispatch)"
+              >
+                <span>📌 Stage Driver</span>
+              </button>
+            )}
+            {stagedPlanner && stagedPlanner.selectedStagedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => void stagedPlanner.sendSelectedStagedTrips()}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-extrabold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                title="Send selected staged trips live to their planned drivers"
+              >
+                <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                <span>Send to Driver ({stagedPlanner.selectedStagedCount})</span>
+              </button>
+            )}
+            {stagedPlanner && stagedPlanner.selectedAutoDispatchableCount > 0 && (
+              <button
+                type="button"
+                onClick={() => void stagedPlanner.requestBatchAutoDispatchWithStagedCheck()}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-indigo-500/40 rounded-lg text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                title="Run Auto-Dispatch across selected open trips"
+              >
+                <BoltIcon className="w-3.5 h-3.5 shrink-0" />
+                <span>Auto-Dispatch</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onBatchExportCsv}

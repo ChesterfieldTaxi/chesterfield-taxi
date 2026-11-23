@@ -7,6 +7,7 @@ import {
   sendDispatchContextualTripEmail,
 } from '../../../core/services/dispatch/dispatch-trip-email.util';
 import type { LiveFleetDriver } from '../../../core/hooks/useDispatchFleet';
+import type { DispatchStagedPlannerController } from '../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import { FloatingWindow } from '../../ui/FloatingWindow';
 import { TripAuditModal, TripAuditTimeline } from '../admin/TripAuditModal';
 import {
@@ -72,6 +73,7 @@ export interface DispatchTripDetailsDrawerProps {
   onCloneBookingFromReview: (trip: Trip) => void;
   onEditTripFromReview: (trip: Trip) => void;
   onShowToast: (text: string, type: 'success' | 'error' | 'info') => void;
+  stagedPlanner?: DispatchStagedPlannerController;
 }
 
 export function DispatchTripDetailsDrawer({
@@ -104,6 +106,7 @@ export function DispatchTripDetailsDrawer({
   onCloneBookingFromReview,
   onEditTripFromReview,
   onShowToast,
+  stagedPlanner,
 }: DispatchTripDetailsDrawerProps) {
   const {
     reviewDeclineMode,
@@ -311,6 +314,7 @@ export function DispatchTripDetailsDrawer({
                     onCancelAutoOffer={onCancelAutoOffer}
                     onRefreshTripFlight={handleRefreshTripFlight}
                     onAdjustPickupToFlightEta={handleAdjustPickupToFlightEta}
+                    stagedPlanner={stagedPlanner}
                   />
 
                   <TripDrawerPricingPaymentSection

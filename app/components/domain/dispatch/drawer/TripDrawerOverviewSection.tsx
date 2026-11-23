@@ -2,6 +2,11 @@ import React from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
+import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../../core/services/dispatch/staged-driver-planner.service';
 import {
   formatVehicleTier,
   formatVehicleTierDisplay,
@@ -57,6 +62,7 @@ export interface TripDrawerOverviewSectionProps {
   onCancelAutoOffer?: (trip: Trip) => void | Promise<void>;
   onRefreshTripFlight: (trip: Trip) => void | Promise<void>;
   onAdjustPickupToFlightEta: (trip: Trip) => void | Promise<void>;
+  stagedPlanner?: DispatchStagedPlannerController;
 }
 
 export function TripDrawerOverviewSection({
@@ -74,6 +80,7 @@ export function TripDrawerOverviewSection({
   onCancelAutoOffer,
   onRefreshTripFlight,
   onAdjustPickupToFlightEta,
+  stagedPlanner,
 }: TripDrawerOverviewSectionProps) {
   const tripMeta = (reviewTrip.metadata || {}) as Record<string, any>;
   const carSeatsBreakdown = (tripMeta.carSeatsBreakdown || {}) as {
@@ -761,12 +768,12 @@ export function TripDrawerOverviewSection({
         )}
       </div>
 
-      {/* Driver Operator Assignment */}
+      {/* Driver Operator Assignment & Staged Shift Planner */}
       <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
             <CarIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <span>Assigned Driver Operator</span>
+            <span>Driver Assignment &amp; Shift Staging</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <DispatchSlaBadge
@@ -781,6 +788,10 @@ export function TripDrawerOverviewSection({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
                 Assigned
               </span>
+            ) : hasStagedDriver(reviewTrip) ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-dashed border-indigo-400">
+                📌 Staged: {reviewTrip.plannedDriverLabel || reviewTrip.plannedDriverId}
+              </span>
             ) : (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 inline-flex items-center gap-1">
                 <AlertTriangleIcon className="w-3 h-3 shrink-0" />
@@ -789,24 +800,116 @@ export function TripDrawerOverviewSection({
             )}
           </div>
         </div>
+
+        {/* Staged Driver Status Callout + Send to Driver / Clear Stage */}
+        {hasStagedDriver(reviewTrip) && (
+          <div className="p-3 rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/75 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="space-y-0.5 min-w-0">
+              <div className="text-xs font-extrabold text-indigo-950 truncate">
+                📌 Staged: {reviewTrip.plannedDriverLabel || reviewTrip.plannedDriverId} — Not yet
+                sent to driver
+              </div>
+              <div className="text-[11px] text-indigo-700">
+                Held privately in Dispatch (zero driver visibility or push alerts until sent).
+                {reviewTrip.plannedBy ? ` Staged by ${reviewTrip.plannedBy}.` : ''}
+              </div>
+            </div>
+            {stagedPlanner && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={stagedPlanner.busyTripIds.has(reviewTrip.id)}
+                  onClick={() => void stagedPlanner.sendStagedTrip(reviewTrip)}
+                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-xs cursor-pointer transition-colors"
+                >
+                  Send to Driver
+                </button>
+                <button
+                  type="button"
+                  disabled={stagedPlanner.busyTripIds.has(reviewTrip.id)}
+                  onClick={() => void stagedPlanner.clearTripStage(reviewTrip)}
+                  className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-indigo-200 text-slate-700 hover:text-rose-700 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Clear Stage
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {!reviewTrip.assignedDriverId && stagedPlanner && isTripEligibleForStaging(reviewTrip) && (
+            <div className="inline-flex rounded-lg bg-slate-200/80 p-0.5 border border-slate-300 shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
+                className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold transition-colors cursor-pointer ${
+                  stagedPlanner.queueAssignMode !== 'stage_hold'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                Send to Driver
+              </button>
+              <button
+                type="button"
+                onClick={() => stagedPlanner.setQueueAssignMode('stage_hold')}
+                className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold transition-colors cursor-pointer ${
+                  stagedPlanner.queueAssignMode === 'stage_hold'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                📌 Stage Driver
+              </button>
+            </div>
+          )}
+
           <select
-            value={reviewTrip.assignedDriverId || 'unassigned'}
+            value={
+              reviewTrip.assignedDriverId ||
+              (stagedPlanner?.queueAssignMode === 'stage_hold' && reviewTrip.plannedDriverId
+                ? reviewTrip.plannedDriverId
+                : 'unassigned')
+            }
             onChange={(e) => {
               const newDriverId = e.target.value;
+              if (
+                !reviewTrip.assignedDriverId &&
+                stagedPlanner?.queueAssignMode === 'stage_hold'
+              ) {
+                void stagedPlanner.stageTripDriver(reviewTrip, newDriverId);
+                return;
+              }
               onQuickAssignDriver(reviewTrip.id, newDriverId);
               onReviewTripChange((prev) =>
                 prev
                   ? {
                       ...prev,
                       assignedDriverId: newDriverId === 'unassigned' ? null : newDriverId,
+                      ...(newDriverId !== 'unassigned'
+                        ? {
+                            plannedDriverId: null,
+                            plannedDriverLabel: null,
+                            plannedAt: null,
+                            plannedBy: null,
+                          }
+                        : {}),
                     }
                   : null
               );
             }}
-            className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs"
+            className={`flex-1 px-3 py-2 bg-white border rounded-lg text-xs font-semibold text-slate-800 cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs ${
+              !reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                ? 'border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-950'
+                : 'border-slate-300'
+            }`}
           >
-            <option value="unassigned">Unassigned (No driver assigned)</option>
+            <option value="unassigned">
+              {!reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                ? '📌 Select driver to stage (Hold in Dispatch)...'
+                : 'Unassigned (No driver assigned)'}
+            </option>
             {drivers.map((drv) => (
               <option
                 key={drv.id}

@@ -434,6 +434,17 @@ export function AdminAutoDispatchControlPanel({
                     {config.stagedAutoReleaseLeadMinutes}m
                   </span>
                 </div>
+                <input
+                  type="range"
+                  min={15}
+                  max={240}
+                  step={5}
+                  value={config.stagedAutoReleaseLeadMinutes}
+                  onChange={(e) =>
+                    update({ stagedAutoReleaseLeadMinutes: parseInt(e.target.value, 10) || 45 })
+                  }
+                  className="w-full accent-indigo-600 cursor-pointer"
+                />
                 <Input
                   type="number"
                   min="15"

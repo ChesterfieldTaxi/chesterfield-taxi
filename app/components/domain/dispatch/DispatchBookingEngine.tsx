@@ -246,6 +246,10 @@ function DispatchBookingEngineComponent({
   const [bypassSurge, setBypassSurge] = useState(false);
   const [company, setCompany] = useState(DEFAULT_COMPANIES[0]);
   const [driverId, setDriverId] = useState('unassigned');
+  const [driverAssignmentMode, setDriverAssignmentMode] = useState<
+    'send_to_driver' | 'stage_hold'
+  >('send_to_driver');
+  const [hasManualDriverModeOverride, setHasManualDriverModeOverride] = useState(false);
   const [notesForAll, setNotesForAll] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
@@ -541,6 +545,37 @@ function DispatchBookingEngineComponent({
     ]
   );
 
+  // Auto-default Driver Delivery Mode: Stage (Hold) when booking a future scheduled trip outside the Pre-Pickup Lead Window,
+  // or Send to Driver for ASAP and inside-window rides (unless manually overridden or hydrated in edit mode)
+  useEffect(() => {
+    if (isEditMode || hasManualDriverModeOverride) return;
+    if (timingType !== 'later' || !scheduledDate || !scheduledTime) {
+      setDriverAssignmentMode('send_to_driver');
+      return;
+    }
+    const scheduledMs = Date.parse(`${scheduledDate}T${scheduledTime}:00`);
+    if (!Number.isFinite(scheduledMs)) {
+      setDriverAssignmentMode('send_to_driver');
+      return;
+    }
+    const cachedAuto = getAdminConfigService().getCachedSettings()?.dispatchAutomation;
+    const baseLead = Number(cachedAuto?.scheduledDispatchLeadMinutes || 45);
+    const airportExtra = airportDetection.isAirportTrip
+      ? Number(cachedAuto?.airportExtraLeadMinutes || 15)
+      : 0;
+    const minutesUntilPickup = (scheduledMs - Date.now()) / 60_000;
+    setDriverAssignmentMode(
+      minutesUntilPickup > baseLead + airportExtra ? 'stage_hold' : 'send_to_driver'
+    );
+  }, [
+    isEditMode,
+    hasManualDriverModeOverride,
+    timingType,
+    scheduledDate,
+    scheduledTime,
+    airportDetection.isAirportTrip,
+  ]);
+
   const {
     estimatedFare,
     setEstimatedFare,
@@ -635,6 +670,7 @@ function DispatchBookingEngineComponent({
     bypassSurge,
     company,
     driverId,
+    driverAssignmentMode,
     driverOptions,
     notesForAll,
     internalNotes,
@@ -777,6 +813,10 @@ function DispatchBookingEngineComponent({
       setBypassSurge,
       setCompany,
       setDriverId,
+      setDriverAssignmentMode: (m: 'send_to_driver' | 'stage_hold') => {
+        setDriverAssignmentMode(m);
+        setHasManualDriverModeOverride(true);
+      },
       setNotesForAll,
       setInternalNotes,
       setInternalNotesUpdater: setInternalNotes,
@@ -889,6 +929,7 @@ function DispatchBookingEngineComponent({
       bypassSurge,
       company,
       driverId,
+      driverAssignmentMode,
       notesForAll,
       internalNotes,
       returnTrip,
@@ -1333,6 +1374,11 @@ function DispatchBookingEngineComponent({
           setCompany={setCompany}
           driverId={driverId}
           setDriverId={setDriverId}
+          driverAssignmentMode={driverAssignmentMode}
+          onChangeDriverAssignmentMode={(mode) => {
+            setDriverAssignmentMode(mode);
+            setHasManualDriverModeOverride(true);
+          }}
           driverOptions={driverOptions}
           notesForAll={notesForAll}
           setNotesForAll={setNotesForAll}

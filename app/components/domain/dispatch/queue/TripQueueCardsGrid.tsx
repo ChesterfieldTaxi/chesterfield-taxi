@@ -5,6 +5,11 @@ import {
   FLEET_STATUS_COLORS,
   type LiveFleetDriver,
 } from '../../../../core/hooks/useDispatchFleet';
+import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../../core/services/dispatch/staged-driver-planner.service';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import {
@@ -66,6 +71,7 @@ export interface TripQueueCardsGridProps {
   slaSummary: SlaScanSummary;
   onStartAutoOffer: (trip: Trip) => void | Promise<void>;
   onCancelAutoOffer: (trip: Trip) => void | Promise<void>;
+  stagedPlanner?: DispatchStagedPlannerController;
 }
 
 export function TripQueueCardsGrid({
@@ -98,6 +104,7 @@ export function TripQueueCardsGrid({
   slaSummary,
   onStartAutoOffer,
   onCancelAutoOffer,
+  stagedPlanner,
 }: TripQueueCardsGridProps) {
   const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
   const [expandedStopTripIds, setExpandedStopTripIds] = useState<Set<string>>(() => new Set());
@@ -423,7 +430,44 @@ export function TripQueueCardsGrid({
 
               {!isDesktop ? (
                 /* Mobile-Native Card Footer */
-                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
+                  {hasStagedDriver(trip) && (
+                    <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/80 text-[11px]">
+                      <span className="font-extrabold text-indigo-900 truncate">
+                        📌 Staged: {trip.plannedDriverLabel || trip.plannedDriverId}
+                      </span>
+                      {stagedPlanner && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stagedPlanner.sendStagedTrip(trip);
+                            }}
+                            className="px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer"
+                            title="Send to Driver"
+                          >
+                            Send
+                          </button>
+                          <button
+                            type="button"
+                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stagedPlanner.clearTripStage(trip);
+                            }}
+                            className="px-1 text-indigo-500 hover:text-rose-600 font-black text-xs cursor-pointer"
+                            title="Clear staged driver"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
                       ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
@@ -469,6 +513,7 @@ export function TripQueueCardsGrid({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        stagedPlanner?.setDriverPickerMode('send_to_driver');
                         onOpenDriverPickerForTrip(trip);
                       }}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all active:scale-95 cursor-pointer max-w-[140px] ${
@@ -476,7 +521,7 @@ export function TripQueueCardsGrid({
                           ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
                           : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
                       }`}
-                      title="Tap to assign or change driver"
+                      title="Tap to assign or stage driver"
                     >
                       {assignedDriverStatusPalette ? (
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${assignedDriverStatusPalette.dotClass}`} />
@@ -501,10 +546,50 @@ export function TripQueueCardsGrid({
                       </button>
                     )}
                   </div>
+                  </div>
                 </div>
               ) : (
                 /* Desktop Card Footer */
                 <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
+                  {hasStagedDriver(trip) && (
+                    <div className="flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/80 text-[11px]">
+                      <span
+                        className="font-extrabold text-indigo-900 truncate"
+                        title={`Staged driver placeholder: ${trip.plannedDriverLabel || trip.plannedDriverId}`}
+                      >
+                        📌 Staged: {trip.plannedDriverLabel || trip.plannedDriverId}
+                      </span>
+                      {stagedPlanner && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stagedPlanner.sendStagedTrip(trip);
+                            }}
+                            className="px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer disabled:opacity-50"
+                            title="Send to Driver"
+                          >
+                            Send
+                          </button>
+                          <button
+                            type="button"
+                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stagedPlanner.clearTripStage(trip);
+                            }}
+                            className="px-1 text-indigo-500 hover:text-rose-600 font-black text-xs leading-none cursor-pointer"
+                            title="Clear staged driver"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
@@ -548,6 +633,24 @@ export function TripQueueCardsGrid({
                         onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
                         onStartAutoOffer={() => onStartAutoOffer(trip)}
                         onCancelAutoOffer={() => onCancelAutoOffer(trip)}
+                        onSendStagedToDriver={
+                          stagedPlanner && hasStagedDriver(trip)
+                            ? () => void stagedPlanner.sendStagedTrip(trip)
+                            : undefined
+                        }
+                        onStageDriver={
+                          stagedPlanner && isTripEligibleForStaging(trip)
+                            ? () => {
+                                stagedPlanner.setDriverPickerMode('stage_hold');
+                                onOpenDriverPickerForTrip(trip);
+                              }
+                            : undefined
+                        }
+                        onClearStagedDriver={
+                          stagedPlanner && hasStagedDriver(trip)
+                            ? () => void stagedPlanner.clearTripStage(trip)
+                            : undefined
+                        }
                         onCompleteTrip={() => onOpenCompleteTripModal(trip)}
                         onCancelTrip={() => onPromptCancelTrip(trip)}
                         onReactivateTrip={() => onReactivateTrip(trip)}
@@ -557,20 +660,43 @@ export function TripQueueCardsGrid({
 
                   <div className="flex items-center gap-1.5 min-w-0">
                     <select
-                      value={trip.assignedDriverId || 'unassigned'}
+                      value={
+                        trip.assignedDriverId ||
+                        (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
+                          ? trip.plannedDriverId
+                          : 'unassigned')
+                      }
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         e.stopPropagation();
-                        onQuickAssignDriver(trip.id, e.target.value);
+                        const val = e.target.value;
+                        if (
+                          !trip.assignedDriverId &&
+                          stagedPlanner?.queueAssignMode === 'stage_hold'
+                        ) {
+                          void stagedPlanner.stageTripDriver(trip, val);
+                        } else {
+                          void onQuickAssignDriver(trip.id, val);
+                        }
                       }}
                       className={`flex-1 text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
                         trip.assignedDriverId
                           ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                          : stagedPlanner?.queueAssignMode === 'stage_hold'
+                          ? 'bg-indigo-50 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100'
                           : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
                       }`}
-                      title="Quick-assign driver"
+                      title={
+                        !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                          ? 'Select driver to stage (Hold in Dispatch)'
+                          : 'Select driver to send immediately'
+                      }
                     >
-                      <option value="unassigned">Unassigned Driver</option>
+                      <option value="unassigned">
+                        {!trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                          ? '📌 Stage Driver...'
+                          : 'Unassigned Driver'}
+                      </option>
                       {drivers.map((drv) => (
                         <option
                           key={drv.id}
@@ -581,6 +707,32 @@ export function TripQueueCardsGrid({
                         </option>
                       ))}
                     </select>
+
+                    {!trip.assignedDriverId && stagedPlanner && isTripEligibleForStaging(trip) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          stagedPlanner.setQueueAssignMode(
+                            stagedPlanner.queueAssignMode === 'stage_hold'
+                              ? 'send_to_driver'
+                              : 'stage_hold'
+                          );
+                        }}
+                        className={`px-2 py-1.5 rounded-lg border text-[10.5px] font-extrabold cursor-pointer shrink-0 transition-colors ${
+                          stagedPlanner.queueAssignMode === 'stage_hold'
+                            ? 'bg-indigo-600 text-white border-indigo-700'
+                            : 'bg-white hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border-slate-300'
+                        }`}
+                        title={
+                          stagedPlanner.queueAssignMode === 'stage_hold'
+                            ? 'Mode: Stage Driver (Hold in Dispatch) — click to switch to Send to Driver'
+                            : 'Mode: Send to Driver — click to switch dropdown to Stage Driver (Hold)'
+                        }
+                      >
+                        {stagedPlanner.queueAssignMode === 'stage_hold' ? '📌 Hold' : 'Stage'}
+                      </button>
+                    )}
 
                     {isTripCascadeActive(trip) ? (
                       <button

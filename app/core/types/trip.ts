@@ -243,6 +243,8 @@ export interface TripAuditEvent {
     | 'AUTO_CONFIRMED'
     | 'FLAGGED_FOR_HUMAN_REVIEW'
     | 'DISPATCH_OFFERED'
+    | 'DRIVER_STAGED'
+    | 'DRIVER_UNSTAGED'
     | 'DRIVER_ASSIGNED'
     | 'DRIVER_ACCEPTED'
     | 'DRIVER_DECLINED'
@@ -365,9 +367,9 @@ export interface Trip {
 
   /** Pre-staged / planned driver metadata (Phase 50/51) */
   plannedDriverId?: string | null;
-  plannedDriverLabel?: string;
-  plannedAt?: string;
-  plannedBy?: string;
+  plannedDriverLabel?: string | null;
+  plannedAt?: string | null;
+  plannedBy?: string | null;
 
   /** Audit Log */
   auditLog?: TripAuditEvent[];

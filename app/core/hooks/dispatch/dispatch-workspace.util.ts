@@ -355,7 +355,10 @@ export function filterDispatchQueueTrips({
     }
 
     if (activeFilterKeys.includes('driver') && selectedDriverFilter !== 'all') {
-      if (trip.assignedDriverId !== selectedDriverFilter) return false;
+      const matchesAssigned = trip.assignedDriverId === selectedDriverFilter;
+      const matchesStaged =
+        !trip.assignedDriverId && trip.plannedDriverId === selectedDriverFilter;
+      if (!matchesAssigned && !matchesStaged) return false;
     }
 
     if (activeFilterKeys.includes('vehicle') && selectedVehicleFilter !== 'all') {
@@ -399,6 +402,13 @@ export function filterDispatchQueueTrips({
       return false;
     }
 
+    if (
+      activeFilterKeys.includes('has_staged_driver') &&
+      (Boolean(trip.assignedDriverId) || !trip.plannedDriverId)
+    ) {
+      return false;
+    }
+
     if (activeFilterKeys.includes('company') && selectedCompanyFilter !== 'all') {
       const companyStr = `${meta.corporateOrgName || ''} ${
         meta.corporateDetails?.corporateAccount || ''
@@ -429,7 +439,10 @@ export function filterDispatchQueueTrips({
       const matchStops = (trip.intermediateStops || []).some((s) =>
         (s.address || '').toLowerCase().includes(term)
       );
-      const matchDriver = (trip.assignedDriverId || '').toLowerCase().includes(term);
+      const matchDriver =
+        (trip.assignedDriverId || '').toLowerCase().includes(term) ||
+        (trip.plannedDriverId || '').toLowerCase().includes(term) ||
+        (trip.plannedDriverLabel || '').toLowerCase().includes(term);
       const matchGroup = (trip.multiCarGroupId || '').toLowerCase().includes(term);
       const matchFlight =
         (trip.flightTelemetry?.flightIdent || '').toLowerCase().includes(term) ||

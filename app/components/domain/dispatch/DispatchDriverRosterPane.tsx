@@ -6,6 +6,11 @@ import {
   getMapStatusLabel,
   type LiveFleetDriver,
 } from '../../../core/hooks/useDispatchFleet';
+import type { DispatchStagedPlannerController } from '../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../core/services/dispatch/staged-driver-planner.service';
 import {
   MagnifyingGlassIcon,
   XIcon,
@@ -575,6 +580,7 @@ export interface DispatchDriverSheetsProps {
   onCallDriverOnMobile: (phone: string, name: string) => void;
   onAssignDriverToActiveDraftOnMobile: (driver: DriverRosterItem) => void;
   onShowToast: (text: string, type: 'success' | 'error' | 'info') => void;
+  stagedPlanner?: DispatchStagedPlannerController;
   sheetStyle?: React.CSSProperties;
   dragHandlers?: Record<string, any>;
 }
@@ -597,6 +603,7 @@ export function DispatchDriverSheets({
   onCallDriverOnMobile,
   onAssignDriverToActiveDraftOnMobile,
   onShowToast,
+  stagedPlanner,
   sheetStyle,
   dragHandlers,
 }: DispatchDriverSheetsProps) {
@@ -668,8 +675,34 @@ export function DispatchDriverSheets({
                 </div>
               </div>
 
-              {/* Search & Filter */}
+              {/* Search, Placement Mode & Filter */}
               <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
+                {stagedPlanner && isTripEligibleForStaging(targetTrip) && (
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-200/70 border border-slate-300/70">
+                    <button
+                      type="button"
+                      onClick={() => stagedPlanner.setDriverPickerMode('send_to_driver')}
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
+                        stagedPlanner.driverPickerMode !== 'stage_hold'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                    >
+                      Send to Driver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => stagedPlanner.setDriverPickerMode('stage_hold')}
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
+                        stagedPlanner.driverPickerMode === 'stage_hold'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'text-slate-700 hover:text-slate-900'
+                      }`}
+                    >
+                      📌 Stage Driver (Hold)
+                    </button>
+                  </div>
+                )}
                 <div className="relative">
                   <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
@@ -722,7 +755,13 @@ export function DispatchDriverSheets({
                   </div>
                 ) : (
                   filteredPickerDrivers.map((drv) => {
-                    const isCurrent = targetTrip.assignedDriverId === drv.id;
+                    const isStagePicker =
+                      stagedPlanner &&
+                      stagedPlanner.driverPickerMode === 'stage_hold' &&
+                      isTripEligibleForStaging(targetTrip);
+                    const isCurrent = isStagePicker
+                      ? targetTrip.plannedDriverId === drv.id
+                      : targetTrip.assignedDriverId === drv.id;
                     const isDisabled = Boolean(drv.isBlacklisted || drv.zone === 'Suspended');
                     const palette = FLEET_STATUS_COLORS[drv.mapStatus] || FLEET_STATUS_COLORS.offline;
                     const statusLabel = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
@@ -738,12 +777,18 @@ export function DispatchDriverSheets({
                         type="button"
                         disabled={isDisabled}
                         onClick={() => {
-                          onQuickAssignDriver(targetTrip.id, drv.id);
+                          if (isStagePicker && stagedPlanner) {
+                            void stagedPlanner.stageTripDriver(targetTrip, drv.id);
+                          } else {
+                            void onQuickAssignDriver(targetTrip.id, drv.id);
+                          }
                           onCloseDriverPicker();
                         }}
                         className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
                           isCurrent
-                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
+                            ? isStagePicker
+                              ? 'bg-indigo-50 border-dashed border-indigo-500 ring-1 ring-indigo-500'
+                              : 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
                             : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]'
                         }`}
                       >
@@ -783,8 +828,8 @@ export function DispatchDriverSheets({
                 )}
               </div>
 
-              {/* Sticky Footer: Unassign if currently assigned */}
-              <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+              {/* Sticky Footer: Unassign or Send/Clear Staged */}
+              <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0 flex-wrap">
                 {targetTrip.assignedDriverId ? (
                   <button
                     type="button"
@@ -796,8 +841,35 @@ export function DispatchDriverSheets({
                   >
                     Unassign Driver
                   </button>
+                ) : hasStagedDriver(targetTrip) && stagedPlanner ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void stagedPlanner.sendStagedTrip(targetTrip);
+                        onCloseDriverPicker();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs cursor-pointer"
+                    >
+                      Send to Driver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void stagedPlanner.clearTripStage(targetTrip);
+                        onCloseDriverPicker();
+                      }}
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 border border-slate-300 text-rose-600 font-bold text-xs cursor-pointer"
+                    >
+                      Clear Stage
+                    </button>
+                  </div>
                 ) : (
-                  <span className="text-[11px] text-slate-500 font-medium">Tap any driver to assign</span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {stagedPlanner?.driverPickerMode === 'stage_hold'
+                      ? 'Tap any driver to stage (held in Dispatch)'
+                      : 'Tap any driver to send immediately'}
+                  </span>
                 )}
                 <button
                   type="button"

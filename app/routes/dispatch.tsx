@@ -24,6 +24,7 @@ import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
+import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import {
   useDispatchFleet,
   type LiveFleetDriver,
@@ -50,6 +51,7 @@ import {
   useDispatchFleetAlerts,
   useDispatchPanelResize,
   useDispatchSlaCascadeLoop,
+  useDispatchStagedPlanner,
   useDispatchTripTriageActions,
   useDispatchWorkspaceSync,
   type ConfirmModalConfigState,
@@ -283,6 +285,7 @@ export default function DispatchRoute() {
     setSettings,
     user,
     showDispatchToast,
+    onPublishTacticalAlert: fleetAlerts.pushSystemAlert,
   });
 
   // Softphone HUD & Mobile View State
@@ -639,6 +642,27 @@ export default function DispatchRoute() {
   const someFilteredSelected =
     filteredTrips.some((t) => selectedTripIds.includes(t.id)) && !allFilteredSelected;
 
+  const stagedPlanner = useDispatchStagedPlanner({
+    trips,
+    filteredTrips,
+    readyForAutoDispatchTrips,
+    setTrips,
+    setReviewTrip,
+    drivers,
+    dispatchZones,
+    settings,
+    user,
+    selectedTripIds,
+    setSelectedTripIds,
+    batchAssignDriverId,
+    setBatchAssignDriverId,
+    setIsBatchAssignOpen,
+    rawConfirmBatchAssign: handleConfirmBatchAssign,
+    rawStartAutoOffer: handleStartAutoOffer,
+    rawRunAutoDispatchSweep: handleRunAutoDispatchSweep,
+    showDispatchToast,
+  });
+
   const handleToggleSelectAll = () => {
     if (allFilteredSelected) {
       const filteredIds = new Set(filteredTrips.map((t) => t.id));
@@ -712,6 +736,7 @@ export default function DispatchRoute() {
           prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item))
         );
       } else if (
+        !savedTrip.plannedDriverId &&
         autoOfferContextRef.current.autoOfferOnConfirm &&
         autoOfferContextRef.current.isEligibleForAutoPilot(savedTrip)
       ) {
@@ -1109,11 +1134,12 @@ export default function DispatchRoute() {
             slaSummary={slaSummary}
             slaUrgentOnlyFilter={slaUrgentOnlyFilter}
             onToggleSlaUrgentOnlyFilter={() => setSlaUrgentOnlyFilter((prev) => !prev)}
-            onStartAutoOffer={handleStartAutoOffer}
+            onStartAutoOffer={stagedPlanner.requestAutoOfferWithStagedCheck}
             onCancelAutoOffer={handleCancelAutoOffer}
             readyAutoDispatchCount={readyForAutoDispatchTrips.length}
             isRunningAutoDispatchSweep={isRunningReadySweep}
-            onRunAutoDispatchSweep={handleRunAutoDispatchSweep}
+            onRunAutoDispatchSweep={stagedPlanner.requestReadySweepWithStagedCheck}
+            stagedPlanner={stagedPlanner}
           />
         </div>
 
@@ -1326,7 +1352,7 @@ export default function DispatchRoute() {
             onOpenCompleteTripModal={handleOpenCompleteTripModal}
             onCloseCompleteTripModal={() => setCompleteTripTarget(null)}
             onQuickAssignDriver={handleQuickAssignDriver}
-            onStartAutoOffer={handleStartAutoOffer}
+            onStartAutoOffer={stagedPlanner.requestAutoOfferWithStagedCheck}
             onCancelAutoOffer={handleCancelAutoOffer}
             onPromptCancelTrip={handlePromptCancelTrip}
             onReactivateTrip={handleReactivateTrip}
@@ -1342,6 +1368,7 @@ export default function DispatchRoute() {
               setActiveMobileTab('booking');
             }}
             onShowToast={showDispatchToast}
+            stagedPlanner={stagedPlanner}
           />
         </Suspense>
       )}
@@ -1369,6 +1396,9 @@ export default function DispatchRoute() {
           onUnassignTrip={async (tripId) => {
             await handleQuickAssignDriver(tripId, 'unassigned');
           }}
+          onSendStagedTrip={stagedPlanner.sendStagedTrip}
+          onUnstageTrip={(trip) => stagedPlanner.clearTripStage(trip)}
+          onSendAllStagedTrips={stagedPlanner.sendAllStagedForDriver}
           onOpenEditTrip={(tripId) => {
             const found = trips.find((t) => t.id === tripId);
             if (found) {
@@ -1450,8 +1480,9 @@ export default function DispatchRoute() {
           setSelectedTripIds((prev) => (prev.includes(tripId) ? prev : [...prev, tripId]));
         }}
         onPromptCancelTrip={handlePromptCancelTrip}
-        onStartAutoOffer={handleStartAutoOffer}
+        onStartAutoOffer={stagedPlanner.requestAutoOfferWithStagedCheck}
         onCancelAutoOffer={handleCancelAutoOffer}
+        stagedPlanner={stagedPlanner}
         sheetStyle={dispatchSheetDrag.sheetStyle}
         dragHandlers={dispatchSheetDrag.dragHandlers}
       />
@@ -1484,9 +1515,12 @@ export default function DispatchRoute() {
           setActiveMobileTab('booking');
         }}
         onShowToast={showDispatchToast}
+        stagedPlanner={stagedPlanner}
         sheetStyle={dispatchSheetDrag.sheetStyle}
         dragHandlers={dispatchSheetDrag.dragHandlers}
       />
+
+      <DispatchStagedPlannerModals stagedPlanner={stagedPlanner} trips={trips} />
 
       {/* Non-Blocking Dispatch Toast Notification */}
       {dispatchToast && (

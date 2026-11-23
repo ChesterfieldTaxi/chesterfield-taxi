@@ -240,10 +240,23 @@ export function useDispatchTripTriageActions({
         : tripToUpdate.status;
 
       const drvObj = isUnassigning ? undefined : drivers.find((d) => d.id === driverId);
+      const hadStagedDriver = Boolean(!isUnassigning && tripToUpdate.plannedDriverId);
       const updates: Partial<Trip> = {
         assignedDriverId: isUnassigning ? null : driverId,
         status: nextStatus,
-        ...(isUnassigning ? {} : { offeredToIds: [] }),
+        ...(isUnassigning
+          ? {}
+          : {
+              offeredToIds: [],
+              ...(hadStagedDriver
+                ? {
+                    plannedDriverId: null,
+                    plannedDriverLabel: null,
+                    plannedAt: null,
+                    plannedBy: null,
+                  }
+                : {}),
+            }),
         ...(!isUnassigning && tripToUpdate.offerCascade?.state === 'active'
           ? {
               offerCascade: {
@@ -260,6 +273,12 @@ export function useDispatchTripTriageActions({
                 ...(tripToUpdate.metadata || {}),
                 assignedDriverName: drvObj.name,
                 assignedDriverPhone: drvObj.phone,
+                ...(hadStagedDriver
+                  ? {
+                      previouslyPlannedDriverId: tripToUpdate.plannedDriverId,
+                      previouslyPlannedDriverLabel: tripToUpdate.plannedDriverLabel,
+                    }
+                  : {}),
               },
             }
           : {}),
@@ -273,6 +292,15 @@ export function useDispatchTripTriageActions({
             actorRole: 'admin',
             reason: `Assigned to driver ${driverId} by dispatcher`,
           });
+          if (hadStagedDriver && bookingService.updateTrip) {
+            await bookingService.updateTrip(tripId, {
+              plannedDriverId: null,
+              plannedDriverLabel: null,
+              plannedAt: null,
+              plannedBy: null,
+              metadata: updates.metadata,
+            });
+          }
         } else if (bookingService.updateTrip) {
           await bookingService.updateTrip(tripId, updates);
         }

@@ -99,6 +99,7 @@ export interface UseDispatchDraftSyncParams {
     bypassSurge: boolean;
     company: string;
     driverId: string;
+    driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
     notesForAll: string;
     internalNotes: string;
     returnTrip: boolean;
@@ -399,6 +400,7 @@ export function useDispatchDraftSync({
       discount: v.discount,
       company: v.company,
       driverId: v.driverId,
+      driverAssignmentMode: v.driverAssignmentMode,
       notesForAll: v.notesForAll,
       internalNotes: v.internalNotes,
       returnDetails: {
@@ -605,6 +607,7 @@ export function useDispatchDraftSync({
     s.setSelectedRuleId('');
     s.setDiscount('None');
     s.setDriverId('unassigned');
+    s.setDriverAssignmentMode?.('send_to_driver');
     s.setNotesForAll('');
     s.setInternalNotes('');
     s.setReturnTrip(false);

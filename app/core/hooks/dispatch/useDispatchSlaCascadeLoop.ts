@@ -15,8 +15,11 @@ import {
   buildTripSlaStatusPatch,
   cancelOfferCascade,
   executeAutoDispatch,
+  formatShortTripNumber,
+  getDueStagedTripsForAutoRelease,
   getReadyForAutoDispatchTrips,
   isTripEligibleForAutoPilot,
+  releaseDueStagedTrips,
   runReadyAutoDispatchSweep,
   scanUpcomingUnassignedSlaTrips,
   shouldAdvanceActiveCascade,
@@ -36,6 +39,7 @@ export interface UseDispatchSlaCascadeLoopParams {
   setSettings?: React.Dispatch<React.SetStateAction<AppSettings>>;
   user: AdminUser | null;
   showDispatchToast: (text: string, type?: 'success' | 'error' | 'info') => void;
+  onPublishTacticalAlert?: (text: string, toLabel?: string) => void;
 }
 
 export interface UseDispatchSlaCascadeLoopResult {
@@ -49,6 +53,7 @@ export interface UseDispatchSlaCascadeLoopResult {
   handleUpdateDispatchLeadWindows: (updates: {
     scheduledDispatchLeadMinutes: number;
     airportExtraLeadMinutes: number;
+    autoReleaseStagedDrivers?: boolean;
     stagedAutoReleaseLeadMinutes?: number;
   }) => Promise<void>;
   autoOfferStartedIdsRef: React.MutableRefObject<Set<string>>;
@@ -73,11 +78,14 @@ export function useDispatchSlaCascadeLoop({
   setSettings,
   user,
   showDispatchToast,
+  onPublishTacticalAlert,
 }: UseDispatchSlaCascadeLoopParams): UseDispatchSlaCascadeLoopResult {
   // Deterministic SSR initial timestamp (0 = scan uses default Date.now() once hydrated)
   const [slaClockTick, setSlaClockTick] = useState<number>(0);
   const [isRunningReadySweep, setIsRunningReadySweep] = useState<boolean>(false);
   const inFlightCascadeIdsRef = useRef<Set<string>>(new Set());
+  const inFlightStagedReleaseRef = useRef<boolean>(false);
+  const stagedReleaseAlertedKeysRef = useRef<Set<string>>(new Set());
   const slaNotifiedLevelsRef = useRef<Map<string, 'warning' | 'critical'>>(new Map());
   const autoOfferStartedIdsRef = useRef<Set<string>>(new Set());
 
@@ -338,6 +346,7 @@ export function useDispatchSlaCascadeLoop({
     async (updates: {
       scheduledDispatchLeadMinutes: number;
       airportExtraLeadMinutes: number;
+      autoReleaseStagedDrivers?: boolean;
       stagedAutoReleaseLeadMinutes?: number;
     }) => {
       const prevConfig = normalizeDispatchAutomationConfig(settings.dispatchAutomation);
@@ -353,6 +362,9 @@ export function useDispatchSlaCascadeLoop({
         ...prevConfig,
         scheduledDispatchLeadMinutes: updates.scheduledDispatchLeadMinutes,
         airportExtraLeadMinutes: updates.airportExtraLeadMinutes,
+        ...(updates.autoReleaseStagedDrivers !== undefined
+          ? { autoReleaseStagedDrivers: updates.autoReleaseStagedDrivers }
+          : {}),
         ...(updates.stagedAutoReleaseLeadMinutes !== undefined
           ? { stagedAutoReleaseLeadMinutes: updates.stagedAutoReleaseLeadMinutes }
           : {}),
@@ -367,7 +379,7 @@ export function useDispatchSlaCascadeLoop({
         operatorEmail: user?.email || actorIdentity,
         tab: 'rules',
         section: 'auto_dispatch',
-        action: `Updated Pre-Pickup Lead Window to ${nextConfig.scheduledDispatchLeadMinutes}m (+${nextConfig.airportExtraLeadMinutes}m airport) from Dispatch Console`,
+        action: `Updated Lead Windows (${nextConfig.scheduledDispatchLeadMinutes}m standard · +${nextConfig.airportExtraLeadMinutes}m airport · Staged Auto-Release ${nextConfig.autoReleaseStagedDrivers ? `${nextConfig.stagedAutoReleaseLeadMinutes}m` : 'Off'}) from Dispatch Console`,
         ipAddress: 'dispatch_console',
         changes: {
           scheduledDispatchLeadMinutes: {
@@ -377,6 +389,14 @@ export function useDispatchSlaCascadeLoop({
           airportExtraLeadMinutes: {
             before: prevConfig.airportExtraLeadMinutes,
             after: nextConfig.airportExtraLeadMinutes,
+          },
+          autoReleaseStagedDrivers: {
+            before: prevConfig.autoReleaseStagedDrivers,
+            after: nextConfig.autoReleaseStagedDrivers,
+          },
+          stagedAutoReleaseLeadMinutes: {
+            before: prevConfig.stagedAutoReleaseLeadMinutes,
+            after: nextConfig.stagedAutoReleaseLeadMinutes,
           },
         },
       };
@@ -388,7 +408,11 @@ export function useDispatchSlaCascadeLoop({
         });
         setSettings?.(updatedSettings);
         showDispatchToast(
-          `Saved Pre-Pickup Lead Window (${nextConfig.scheduledDispatchLeadMinutes}m · +${nextConfig.airportExtraLeadMinutes}m airport).`,
+          `Saved Lead Windows (${nextConfig.scheduledDispatchLeadMinutes}m · Staged Release: ${
+            nextConfig.autoReleaseStagedDrivers
+              ? `${nextConfig.stagedAutoReleaseLeadMinutes}m`
+              : 'Off'
+          }).`,
           'success'
         );
       } catch (err) {
@@ -423,6 +447,7 @@ export function useDispatchSlaCascadeLoop({
     dispatchZones,
     settings,
     showDispatchToast,
+    onPublishTacticalAlert,
   });
   coordinatorStateRef.current = {
     trips,
@@ -430,6 +455,7 @@ export function useDispatchSlaCascadeLoop({
     dispatchZones,
     settings,
     showDispatchToast,
+    onPublishTacticalAlert,
   };
 
   useEffect(() => {
@@ -440,6 +466,7 @@ export function useDispatchSlaCascadeLoop({
         dispatchZones: latestZones,
         settings: latestSettings,
         showDispatchToast: toastFn,
+        onPublishTacticalAlert: publishAlertFn,
       } = coordinatorStateRef.current;
 
       if (!latestTrips || latestTrips.length === 0) return;
@@ -579,10 +606,75 @@ export function useDispatchSlaCascadeLoop({
           });
       }
 
+      // 2.5. Staged Driver Auto-Release Window Pass (Phase 51)
+      if (!inFlightStagedReleaseRef.current) {
+        const dueStaged = getDueStagedTripsForAutoRelease(
+          latestTrips,
+          latestSettings.dispatchAutomation,
+          nowMs
+        ).filter((t) => !inFlightCascadeIdsRef.current.has(t.id));
+
+        if (dueStaged.length > 0) {
+          inFlightStagedReleaseRef.current = true;
+          releaseDueStagedTrips({
+            trips: latestTrips,
+            drivers: latestDrivers,
+            settings: latestSettings,
+            actorName: 'Staged Auto-Release',
+            nowMs,
+          })
+            .then((relRes) => {
+              if (relRes.releasedTrips.length > 0) {
+                const releasedMap = new Map(relRes.releasedTrips.map((t) => [t.id, t]));
+                setTrips((prev) => prev.map((t) => releasedMap.get(t.id) || t));
+                setReviewTrip((prev) => (prev ? releasedMap.get(prev.id) || prev : null));
+
+                for (const rt of relRes.releasedTrips) {
+                  const prevLabel =
+                    (rt.metadata as Record<string, any> | undefined)
+                      ?.previouslyPlannedDriverLabel ||
+                    (rt.metadata as Record<string, any> | undefined)?.assignedDriverName ||
+                    rt.assignedDriverId ||
+                    'driver';
+                  toastFn(
+                    `Auto-released staged Trip #${formatShortTripNumber(rt.id)} to ${prevLabel}.`,
+                    'success'
+                  );
+                }
+              }
+
+              for (const alert of relRes.alerts) {
+                const dedupKey = `${alert.tripId}:${alert.driverId}:${alert.reason}`;
+                if (stagedReleaseAlertedKeysRef.current.has(dedupKey)) continue;
+                stagedReleaseAlertedKeysRef.current.add(dedupKey);
+
+                soundNotificationService.playSlaWarningChime();
+                toastFn(alert.message, 'error');
+                publishAlertFn?.(alert.message, 'Staged Auto-Release');
+                void pushNotificationService.notifyDispatchAlert({
+                  title: `Staged Driver Alert — Trip #${formatShortTripNumber(alert.tripId)}`,
+                  body: alert.message,
+                  url: `/app/dispatch?tripId=${encodeURIComponent(alert.tripId)}`,
+                  tag: `ct-staged-alert-${alert.tripId}-${alert.reason}`,
+                  requireInteraction: true,
+                });
+              }
+            })
+            .catch((err) => {
+              console.warn('[Dispatch] Staged auto-release tick warning:', err);
+            })
+            .finally(() => {
+              inFlightStagedReleaseRef.current = false;
+            });
+        }
+      }
+
       // 3. Auto-Pilot Continuous Pre-Pickup Lead-Window Sweep (when active & unpaused)
       if (latestDrivers.length > 0) {
         for (const trip of latestTrips) {
           if (inFlightCascadeIdsRef.current.has(trip.id)) continue;
+          // Trips with an active staged driver placeholder are managed by Staged Auto-Release above
+          if (trip.plannedDriverId) continue;
           if (!isTripEligibleForAutoPilot(trip, latestSettings.dispatchAutomation, nowMs)) {
             continue;
           }

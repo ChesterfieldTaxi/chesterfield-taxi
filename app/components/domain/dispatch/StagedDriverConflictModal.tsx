@@ -1,0 +1,407 @@
+import React from 'react';
+import type { Trip } from '../../../core/types/trip';
+import type { DispatchStagedPlannerController } from '../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import {
+  formatShortTripNumber,
+  type AutoStageSuggestionItem,
+  type StagedConflictResolutionStrategy,
+} from '../../../core/services/dispatch/staged-driver-planner.service';
+import {
+  AlertTriangleIcon,
+  BoltIcon,
+  CarIcon,
+  CheckIcon,
+  ClockIcon,
+  SparklesIcon,
+  XIcon,
+} from '../../ui/Icons';
+
+export interface StagedDriverConflictModalProps {
+  isOpen: boolean;
+  sourceLabel: string;
+  stagedTrips: Trip[];
+  unstagedTrips: Trip[];
+  isResolving?: boolean;
+  onResolve: (strategy: StagedConflictResolutionStrategy) => void | Promise<void>;
+  onClose: () => void;
+}
+
+export function StagedDriverConflictModal({
+  isOpen,
+  sourceLabel,
+  stagedTrips,
+  unstagedTrips,
+  isResolving = false,
+  onResolve,
+  onClose,
+}: StagedDriverConflictModalProps) {
+  if (!isOpen || stagedTrips.length === 0) return null;
+
+  const totalCount = stagedTrips.length + unstagedTrips.length;
+
+  return (
+    <div
+      className="fixed inset-0 z-[135] bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+      onClick={() => {
+        if (!isResolving) onClose();
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="staged-conflict-modal-title"
+      >
+        {/* Header */}
+        <div className="bg-slate-900 text-white px-5 py-4 flex items-start justify-between gap-3 shrink-0">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-indigo-500/25 border border-indigo-400/40 flex items-center justify-center shrink-0">
+                <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-300" />
+              </span>
+              <h3 id="staged-conflict-modal-title" className="text-sm font-black tracking-tight">
+                Staged Driver Placeholder{stagedTrips.length === 1 ? '' : 's'} Detected
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              <strong>{stagedTrips.length}</strong> of <strong>{totalCount}</strong> target trip
+              {totalCount === 1 ? '' : 's'} in <strong>{sourceLabel}</strong> already{' '}
+              {stagedTrips.length === 1 ? 'has a' : 'have'} pre-planned staged driver
+              {stagedTrips.length === 1 ? '' : 's'}. How should Dispatch handle staged assignments?
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isResolving}
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+            aria-label="Close staged conflict prompt"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Staged Trips Preview List */}
+        <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <span>Trips with Staged Drivers ({stagedTrips.length})</span>
+              {unstagedTrips.length > 0 && (
+                <span className="text-slate-400 font-semibold normal-case">
+                  + {unstagedTrips.length} unstaged trip{unstagedTrips.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+
+            <div className="max-h-44 overflow-y-auto space-y-1.5 pr-0.5">
+              {stagedTrips.map((t) => {
+                const paxName =
+                  [t.passenger?.firstName, t.passenger?.lastName].filter(Boolean).join(' ').trim() ||
+                  'Guest';
+                const pickupStr = t.scheduledPickupTime
+                  ? new Date(t.scheduledPickupTime).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
+                  : 'ASAP';
+                return (
+                  <div
+                    key={t.id}
+                    className="px-3 py-2 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-black text-slate-900">
+                          #{formatShortTripNumber(t.id)}
+                        </span>
+                        <span className="font-bold text-slate-800 truncate">{paxName}</span>
+                        <span className="text-[10.5px] text-slate-500 font-semibold shrink-0">
+                          · {pickupStr}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate">
+                        {t.pickupLocation?.address} → {t.dropoffLocation?.address}
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-indigo-400 bg-white text-indigo-800 font-extrabold text-[10.5px] shrink-0">
+                      <span>📌 {t.plannedDriverLabel || t.plannedDriverId}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3 Explicit Resolution Choices */}
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              disabled={isResolving}
+              onClick={() => void onResolve('keep_staged')}
+              className="w-full p-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-left transition-colors cursor-pointer shadow-sm space-y-0.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold flex items-center gap-1.5">
+                  <CarIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>Keep Staged (Send to Staged Driver)</span>
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/80 border border-indigo-300/40">
+                  Recommended
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-100 leading-snug">
+                Sends {stagedTrips.length === 1 ? 'this staged trip' : `all ${stagedTrips.length} staged trips`}{' '}
+                directly to {stagedTrips.length === 1 ? 'its' : 'their'} planned driver
+                {unstagedTrips.length > 0
+                  ? ` and runs Auto-Dispatch on the remaining ${unstagedTrips.length} unstaged trip(s).`
+                  : '.'}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              disabled={isResolving}
+              onClick={() => void onResolve('skip_staged')}
+              className="w-full p-3 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-50 border border-slate-300 text-slate-900 text-left transition-colors cursor-pointer space-y-0.5"
+            >
+              <div className="text-xs font-extrabold flex items-center gap-1.5">
+                <ClockIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                <span>Skip Staged Trips</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-snug">
+                Leaves {stagedTrips.length === 1 ? 'this staged trip' : `these ${stagedTrips.length} staged trips`}{' '}
+                held in Dispatch untouched
+                {unstagedTrips.length > 0
+                  ? ` and runs Auto-Dispatch only on ${unstagedTrips.length} unstaged trip(s).`
+                  : '.'}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              disabled={isResolving}
+              onClick={() => void onResolve('override_staged')}
+              className="w-full p-3 rounded-xl bg-amber-50/80 hover:bg-amber-100/80 disabled:opacity-50 border border-amber-300 text-amber-950 text-left transition-colors cursor-pointer space-y-0.5"
+            >
+              <div className="text-xs font-extrabold flex items-center gap-1.5">
+                <BoltIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Override Staged &amp; Re-Rank</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-snug">
+                Clears the staged driver placeholder{stagedTrips.length === 1 ? '' : 's'} and runs fresh
+                Auto-Dispatch candidate ranking across all {totalCount} trip{totalCount === 1 ? '' : 's'}.
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end shrink-0">
+          <button
+            type="button"
+            disabled={isResolving}
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface AutoStageSuggestionsModalProps {
+  isOpen: boolean;
+  suggestions: AutoStageSuggestionItem[];
+  unmatchedTripIds: string[];
+  trips: Trip[];
+  isApplying?: boolean;
+  onConfirmApply: () => void | Promise<void>;
+  onClose: () => void;
+}
+
+export function AutoStageSuggestionsModal({
+  isOpen,
+  suggestions,
+  unmatchedTripIds,
+  trips,
+  isApplying = false,
+  onConfirmApply,
+  onClose,
+}: AutoStageSuggestionsModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[135] bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+      onClick={() => {
+        if (!isApplying) onClose();
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[88dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auto-stage-modal-title"
+      >
+        <div className="bg-slate-900 text-white px-5 py-4 flex items-start justify-between gap-3 shrink-0">
+          <div className="space-y-1">
+            <h3 id="auto-stage-modal-title" className="text-sm font-black flex items-center gap-2">
+              <SparklesIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span>Auto-Stage Shift Suggestions ({suggestions.length})</span>
+            </h3>
+            <p className="text-xs text-slate-300">
+              Non-conflicting driver shift placeholders (&ge;15m turnaround buffer). Held in Dispatch
+              with zero driver alerts until you click <strong>Send to Driver</strong> or enter the
+              Auto-Release window.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isApplying}
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center cursor-pointer shrink-0"
+            aria-label="Close auto-stage preview"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1">
+          {suggestions.length === 0 ? (
+            <div className="p-6 rounded-xl border border-dashed border-slate-300 text-center space-y-1.5">
+              <p className="text-xs font-bold text-slate-800">
+                No Non-Conflicting Driver Placeholders Found
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {unmatchedTripIds.length > 0
+                  ? `${unmatchedTripIds.length} open scheduled ride(s) could not be paired without creating a < 15m turnaround conflict or vehicle mismatch.`
+                  : 'There are currently no open unstaged scheduled trips in this view.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {suggestions.map((item) => {
+                const fullTrip = trips.find((t) => t.id === item.tripId);
+                const pax =
+                  [fullTrip?.passenger?.firstName, fullTrip?.passenger?.lastName]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim() || 'Passenger';
+                const pickupLabel = new Date(item.scheduledPickupTime).toLocaleString([], {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                });
+
+                return (
+                  <div
+                    key={item.tripId}
+                    className="p-3 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/50 flex items-center justify-between gap-2.5 text-xs"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-black text-slate-900">
+                          #{item.tripNumber}
+                        </span>
+                        <span className="font-bold text-slate-800 truncate">{pax}</span>
+                        <span className="text-[10.5px] font-semibold text-slate-500">
+                          · {pickupLabel}
+                        </span>
+                      </div>
+                      {fullTrip && (
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {fullTrip.pickupLocation?.address} → {fullTrip.dropoffLocation?.address}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-dashed border-indigo-400 text-indigo-800 font-extrabold text-[11px]">
+                        📌 {item.driverLabel}
+                      </span>
+                      <span className="text-[10px] font-semibold text-emerald-700">
+                        {item.bufferMinutesAfterPrior !== null
+                          ? `+${item.bufferMinutesAfterPrior}m buffer`
+                          : 'First shift leg'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {unmatchedTripIds.length > 0 && suggestions.length > 0 && (
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-medium">
+              Note: {unmatchedTripIds.length} open ride(s) were skipped to avoid &lt;15m turnaround
+              overlaps or vehicle capacity mismatches.
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 sm:px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+          <button
+            type="button"
+            disabled={isApplying}
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer"
+          >
+            Cancel
+          </button>
+          {suggestions.length > 0 && (
+            <button
+              type="button"
+              disabled={isApplying}
+              onClick={() => void onConfirmApply()}
+              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-extrabold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {isApplying
+                  ? 'Staging...'
+                  : `Stage ${suggestions.length} Trip${suggestions.length === 1 ? '' : 's'} (Hold)`}
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DispatchStagedPlannerModals({
+  stagedPlanner,
+  trips,
+}: {
+  stagedPlanner: DispatchStagedPlannerController;
+  trips: Trip[];
+}) {
+  return (
+    <>
+      <StagedDriverConflictModal
+        isOpen={stagedPlanner.conflictModal.isOpen}
+        sourceLabel={stagedPlanner.conflictModal.sourceLabel}
+        stagedTrips={stagedPlanner.conflictModal.stagedTrips}
+        unstagedTrips={stagedPlanner.conflictModal.unstagedTrips}
+        isResolving={stagedPlanner.isResolvingConflict}
+        onResolve={stagedPlanner.resolveConflictModal}
+        onClose={stagedPlanner.closeConflictModal}
+      />
+      <AutoStageSuggestionsModal
+        isOpen={stagedPlanner.autoStageModal.isOpen}
+        suggestions={stagedPlanner.autoStageModal.suggestions}
+        unmatchedTripIds={stagedPlanner.autoStageModal.unmatchedTripIds}
+        trips={trips}
+        isApplying={stagedPlanner.isAutoStaging}
+        onConfirmApply={stagedPlanner.confirmApplyAutoStageSuggestions}
+        onClose={stagedPlanner.closeAutoStageModal}
+      />
+    </>
+  );
+}

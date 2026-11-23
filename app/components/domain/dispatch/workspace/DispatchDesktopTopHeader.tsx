@@ -115,12 +115,13 @@ export interface DispatchDesktopTopHeaderProps {
   dispatchWakeLock: DispatchWakeLockInfo;
   dispatchPush: DispatchPushInfo;
 
-  // Phase 50: Auto-Pilot Switch & Pre-Pickup Lead Window Quick Control
+  // Phase 50/51: Auto-Pilot Switch, Pre-Pickup Lead Window & Staged Auto-Release Quick Control
   user?: AdminUser | null;
   onToggleAutoPilotPause?: () => void | Promise<void>;
   onUpdateLeadWindows?: (updates: {
     scheduledDispatchLeadMinutes: number;
     airportExtraLeadMinutes: number;
+    autoReleaseStagedDrivers?: boolean;
     stagedAutoReleaseLeadMinutes?: number;
   }) => void | Promise<void>;
 }
@@ -189,12 +190,25 @@ export function DispatchDesktopTopHeader({
   const [draftAirportExtraMinutes, setDraftAirportExtraMinutes] = useState<number>(
     autoConfig.airportExtraLeadMinutes
   );
+  const [draftAutoReleaseStaged, setDraftAutoReleaseStaged] = useState<boolean>(
+    autoConfig.autoReleaseStagedDrivers
+  );
+  const [draftStagedReleaseMinutes, setDraftStagedReleaseMinutes] = useState<number>(
+    autoConfig.stagedAutoReleaseLeadMinutes
+  );
   const [isSavingLeadWindow, setIsSavingLeadWindow] = useState<boolean>(false);
 
   useEffect(() => {
     setDraftLeadMinutes(autoConfig.scheduledDispatchLeadMinutes);
     setDraftAirportExtraMinutes(autoConfig.airportExtraLeadMinutes);
-  }, [autoConfig.scheduledDispatchLeadMinutes, autoConfig.airportExtraLeadMinutes]);
+    setDraftAutoReleaseStaged(autoConfig.autoReleaseStagedDrivers);
+    setDraftStagedReleaseMinutes(autoConfig.stagedAutoReleaseLeadMinutes);
+  }, [
+    autoConfig.scheduledDispatchLeadMinutes,
+    autoConfig.airportExtraLeadMinutes,
+    autoConfig.autoReleaseStagedDrivers,
+    autoConfig.stagedAutoReleaseLeadMinutes,
+  ]);
 
   return (
     <>
@@ -826,7 +840,7 @@ export function DispatchDesktopTopHeader({
                     </div>
 
                     {canEditLeadWindows ? (
-                      <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2">
+                      <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="text-[10.5px] font-bold text-slate-700 block mb-0.5">
@@ -861,6 +875,45 @@ export function DispatchDesktopTopHeader({
                             />
                           </div>
                         </div>
+
+                        {/* Staged Auto-Release Window Controls (Phase 51) */}
+                        <div className="pt-2 border-t border-blue-200/80 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10.5px] font-extrabold text-indigo-950">
+                              📌 Auto-Release Staged Drivers
+                            </span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={draftAutoReleaseStaged}
+                              onClick={() => setDraftAutoReleaseStaged((v) => !v)}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold cursor-pointer transition-colors ${
+                                draftAutoReleaseStaged
+                                  ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              }`}
+                            >
+                              {draftAutoReleaseStaged ? 'On' : 'Off'}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <label className="text-[10.5px] font-bold text-slate-700">
+                              Staged Release Lead (15–240m)
+                            </label>
+                            <input
+                              type="number"
+                              min={15}
+                              max={240}
+                              disabled={!draftAutoReleaseStaged}
+                              value={draftStagedReleaseMinutes}
+                              onChange={(e) =>
+                                setDraftStagedReleaseMinutes(parseInt(e.target.value, 10) || 45)
+                              }
+                              className="w-20 h-7 px-2 rounded-lg border border-indigo-300 bg-white disabled:opacity-50 text-xs font-bold text-indigo-950"
+                            />
+                          </div>
+                        </div>
+
                         <div className="flex items-center justify-between gap-2 pt-0.5">
                           <span className="text-[10px] text-slate-600">
                             STL/SUS: <strong>T &minus; {draftLeadMinutes + draftAirportExtraMinutes}m</strong>
@@ -875,6 +928,8 @@ export function DispatchDesktopTopHeader({
                                 await onUpdateLeadWindows({
                                   scheduledDispatchLeadMinutes: draftLeadMinutes,
                                   airportExtraLeadMinutes: draftAirportExtraMinutes,
+                                  autoReleaseStagedDrivers: draftAutoReleaseStaged,
+                                  stagedAutoReleaseLeadMinutes: draftStagedReleaseMinutes,
                                 });
                               } finally {
                                 setIsSavingLeadWindow(false);
@@ -887,7 +942,7 @@ export function DispatchDesktopTopHeader({
                         </div>
                       </div>
                     ) : (
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                         <div>
                           <span className="font-bold text-slate-800 block leading-tight">
                             {autoConfig.scheduledDispatchLeadMinutes}m Standard · +
@@ -897,6 +952,12 @@ export function DispatchDesktopTopHeader({
                             Scheduled rides hold in CONFIRMED until T &minus;{' '}
                             {autoConfig.scheduledDispatchLeadMinutes}m
                           </span>
+                        </div>
+                        <div className="pt-1 border-t border-slate-200/80 text-[10.5px] font-semibold text-indigo-800">
+                          📌 Staged Auto-Release:{' '}
+                          {autoConfig.autoReleaseStagedDrivers
+                            ? `On (T − ${autoConfig.stagedAutoReleaseLeadMinutes}m)`
+                            : 'Off (Manual Send to Driver)'}
                         </div>
                       </div>
                     )}

@@ -1306,6 +1306,50 @@ export interface PassengerAccount {
   - Top header renders `⚡ Auto-Pilot: ON` / `⏸ Auto-Pilot: PAUSED` (when `dispatchMode !== 'manual_1tap'`) and `⚙️` Console Settings Pre-Pickup Lead Window editor/viewer (`canOperatorConfigureLeadWindows`), appending `ConfigAuditEntry` records (`tab: 'rules'`, `section: 'auto_dispatch'`).
   - `useDispatchSlaCascadeLoop.ts` drives continuous 3s `isTripEligibleForAutoPilot` dispatch + `handleRunAutoDispatchSweep`; `TripQueueToolbar.tsx` renders `⚡ Auto-Dispatch Ready (N)`; `DispatchCascadePill` renders `⚡ Pool (K cars) • Ns` for `broadcast_pool`.
 
+## 40. Phase 51 Architecture (Wave 4 Phase 2): Staged Driver Shift Planner, `DriverQueueWindow` Turnaround/Overlap Checker, `Send to Driver` / `Send` Actions, Authorized-Dispatcher Auto-Release Window & Staged Override Prompt
+
+### 40.1 Security, Wording & Monolith Guardrails (`constitution.md`)
+- **Zero `/app/driver` Leak (`firestore.rules` Untouched)**:
+  - Staging writes `plannedDriverId`, `plannedDriverLabel`, `plannedAt`, `plannedBy`, and `DRIVER_STAGED` in `auditLog` while strictly preserving `assignedDriverId: null`, `offeredToIds: []`, and excluding `plannedDriverId` from `multiCarDriverIds`. Because `firestore.rules` scopes driver reads to `assignedDriverId == request.auth.uid`, `request.auth.uid in offeredToIds`, or `request.auth.uid in multiCarDriverIds`, staged trips are cryptographically invisible to `/app/driver` with zero push/SMS side effects.
+- **Strict Operator Wording**:
+  - Primary/drawer/modal/batch/booking buttons use **`Send to Driver`**; compact row/card inline triggers use **`Send`** (`title="Send to Driver"`). Zero `"HUD Now"` labels anywhere in `app/`.
+- **Monolith & Bundle Budgets**:
+  - Extract `app/components/domain/dispatch/queue/DispatchTripQueueSheets.tsx` (re-exported from `DispatchTripQueuePane.tsx`) and pass a single `stagedPlanner` controller object (`app/core/hooks/dispatch/useDispatchStagedPlanner.ts`) so `DispatchTripQueuePane.tsx` stays well `< 900` lines, `dispatch.tsx < 2,000` lines (`< 1,600`L target), `AdminRulesTab.tsx < 1,400` lines, `LiveFleetMap.tsx < 1,350` lines, `TripQueueTableView.tsx` keeps exact `10` `<th>` columns, and all `api.*.js` client chunks stay `0.00 kB`.
+
+### 40.2 Pure Staged Driver Domain Service (`app/core/services/dispatch/staged-driver-planner.service.ts`)
+- **Placeholder & Live Promotion Lifecycle**:
+  - `isTripEligibleForStaging(trip)`: `true` when `!trip.assignedDriverId` and `!['completed', 'cancelled', 'declined', 'DECLINED', 'en_route', 'arrived', 'in_progress'].includes(trip.status)`.
+  - `stageDriverForTrip({ trip, tripId, driver, actorName, actorId, actorRole, bookingService, nowMs })`: Resolves `plannedDriverLabel` via `formatDriverAssignmentLabel`, patches `plannedDriverId`, `plannedDriverLabel`, `plannedAt`, `plannedBy` (keeping `assignedDriverId: null`, `offeredToIds: []`), and appends `DRIVER_STAGED`.
+  - `clearStagedDriver({ trip, tripId, actorName, actorId, actorRole, reason, bookingService, nowMs })`: Sets `plannedDriverId: null`, `plannedDriverLabel: null`, `plannedAt: null`, `plannedBy: null` and appends `DRIVER_UNSTAGED`.
+  - `sendStagedTripToDriver({ trip, drivers, actorName, actorId, actorRole, mode = 'direct_assign', fleetVehicles, bookingService, sendPush, nowMs })`: Validates `trip.plannedDriverId`, rejects blacklisted/suspended drivers with a descriptive error, resolves `assignedVehicle` via `resolveDriverFrozenVehicleSnapshot`, promotes `plannedDriverId -> assignedDriverId` (`status: 'assigned'` when currently `pending | confirmed | CONFIRMED | UNCONFIRMED | unconfirmed | accepted | offered`, or `status: 'offered'` + `offeredToIds: [driver.id]` when `mode === 'offer_first'`), clears `plannedDriverId` / `plannedDriverLabel` / `plannedAt` / `plannedBy` while preserving `previouslyPlannedDriverId` in `metadata`, appends `DRIVER_ASSIGNED` (`DISPATCH_OFFERED` for `offer_first`), and fires push notification.
+  - `sendMultipleStagedTripsToDrivers({ trips, drivers, actorName, actorId, actorRole, fleetVehicles, bookingService, sendPush, nowMs })`: Processes staged trips sequentially, returning `{ sentCount, skippedOfflineOrInvalid, updatedTrips, results }`.
+- **Chronological Schedule & Turnaround / Overlap Checker (`computeDriverScheduleTimeline`)**:
+  - Collects both live assigned (`t.assignedDriverId === driverId`) and staged (`!t.assignedDriverId && t.plannedDriverId === driverId`) non-terminal trips.
+  - Orders active (`en_route | arrived | in_progress`) rides first, then upcoming legs chronologically by `scheduledPickupTime` (with `queueOrder` tie-breaker).
+  - Resolves leg duration (`trip.pricing?.durationMinutes` or `(trip as any).route?.durationMinutes` or distance fallback, min `15m`), projected pickup/dropoff timestamps, `bufferMinutesAfterPrior = Math.round((pickupMs - priorDropoffMs) / 60_000)`, and `conflictStatus`: `'overlap'` (`< 0`), `'tight_turnaround'` (`0..tightBufferMinutes - 1`, default `15m`), or `'ok'`.
+- **Non-Conflicting `computeAutoStageSuggestions` & Automatic Release (`getDueStagedTripsForAutoRelease`, `releaseDueStagedTrips`, `partitionTripsByStagedConflict`)**:
+  - `computeAutoStageSuggestions`: Filters open unstaged scheduled rides (`CONFIRMED | confirmed | accepted | pending` with `scheduledPickupTime`, `!assignedDriverId`, `!plannedDriverId`), sorts chronologically, evaluates non-blacklisted vehicle-compatible drivers (`evaluateDriverVehicleCompatibility`), and simulates adding each candidate trip into `computeDriverScheduleTimeline` so chosen assignments never create `< 15m` turnaround overlaps against existing `Assigned` or `Staged` rides.
+  - `getDueStagedTripsForAutoRelease` & `releaseDueStagedTrips`: Identifies open staged rides inside `[-240m, stagedAutoReleaseLeadMinutes + airportExtra]` when `autoReleaseStagedDrivers && !isPaused`; auto-sends when the staged driver is `on_duty` and free of active/timeline overlap, or returns `{ trip, driverId, driverLabel, reason: 'staged_driver_offline' | 'staged_driver_conflict', message }` alerts.
+  - `partitionTripsByStagedConflict(targetTrips)` + `executeStagedConflictResolution` (`'keep_staged' | 'skip_staged' | 'override_staged'`).
+
+### 40.3 `useDispatchStagedPlanner.ts`, `DriverQueueWindow.tsx`, Queue Surfaces, Drawer & Booking Form
+- **`app/core/hooks/dispatch/useDispatchStagedPlanner.ts`**:
+  - Encapsulates stage, unstage, send single, send batch, batch stage, auto-stage preview/apply, and `StagedDriverConflictModal` interception state, returning a compact `DispatchStagedPlannerController` passed as a single `stagedPlanner` prop.
+- **`DriverQueueWindow.tsx`**:
+  - Uses `computeDriverScheduleTimeline` to render interleaved `Assigned` + `📌 Staged` timelines, header pills (`Assigned (A)` · `📌 Staged (S)` · `❌ N Overlap` · `⚠️ N Tight (<15m)`), **`Send All Staged (S)`**, dashed indigo staged cards, between-leg buffer/overlap callouts, and per-card **`Send to Driver`** & **`Unstage`**.
+- **Queue, Sheets, Drawer & Booking Engine**:
+  - Adds `'has_staged_driver'` (`Staged Only`) to `QueueFilterType`, `TripQueueToolbar.tsx`, and `filterDispatchQueueTrips` (plus matching `plannedDriverId` / `plannedDriverLabel` in search and `driver` filter).
+  - Table / Cards / Compact / Driver Picker / `TripActionDropdown` / `TripDrawerOverviewSection` render dashed indigo `📌 Staged: <label>` badges, inline **`Send`** (`title="Send to Driver"`), quick clear `×`, and **Stage Driver (Hold)** vs **Send to Driver** mode selectors.
+  - `DispatchPaymentAssignmentSection.tsx` + `DispatchBookingEngine.tsx` + `useDispatchBookingSubmission.ts` add the **`Send to Driver`** | **`Stage (Hold)`** pill (auto-defaulting to `Stage (Hold)` when `timingType === 'later'` is outside the Pre-Pickup Lead Window, overrideable in 1 click, and hydrating `plannedDriverId` into `Stage (Hold)` on edit).
+
+### 40.4 Authorized-Dispatcher Auto-Release Controls, `StagedDriverConflictModal.tsx` & Background Loop
+- **`DispatchDesktopTopHeader.tsx` & `AdminAutoDispatchControlPanel.tsx`**:
+  - Adds `Auto-Release Staged Drivers` toggle and `Staged Release Lead (15–240m)` input to the `⚙️` Console Settings `Pre-Pickup Lead Window` card for Admins and `authorizedLeadWindowDispatcherIds` operators, persisting `ConfigAuditEntry` items (`Set by Admin` read-only summary otherwise).
+- **`StagedDriverConflictModal.tsx`, `useDispatchSlaCascadeLoop.ts` & `auto-dispatch.server.ts`**:
+  - `StagedDriverConflictModal.tsx` intercepts manual sweeps and single/batch auto-offers when `stagedTrips.length > 0` with `Keep Staged (Send to Staged Driver)`, `Skip Staged Trips`, and `Override Staged & Re-Rank`.
+  - `useDispatchSlaCascadeLoop.ts`, `auto-dispatch.server.ts`, and `sla-cron.server.ts` invoke `releaseDueStagedTrips` cleanly with deduplicated Dispatch alerts when due staged drivers are offline or conflicted.
+
+
 
 
 

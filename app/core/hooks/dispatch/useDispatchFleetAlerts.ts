@@ -211,6 +211,35 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
     setIsAddingPreset(false);
   }, [newPresetText, tacticalPresets]);
 
+  const pushSystemAlert = useCallback(
+    (text: string, toLabel: string = 'Dispatch Operations') => {
+      if (!text.trim()) return;
+      const now = Date.now();
+      const item: DispatchMessageItem = {
+        id: `sys-alert-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        to: toLabel,
+        text: text.trim(),
+        timestamp: new Date(now).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        createdAt: now,
+        priority: 'urgent',
+        isPinned: false,
+        isRead: false,
+      };
+      setMessages((prev) => {
+        if (prev.some((m) => m.text === item.text && !m.isRead)) return prev;
+        const next = [item, ...prev].slice(0, 100);
+        try {
+          localStorage.setItem('chesterfield_dispatch_alerts', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    },
+    []
+  );
+
   const activeAndSortedMessages = useMemo(() => {
     const now = Date.now();
     const ttlMs = alertDismissMinutes * 60 * 1000;
@@ -265,5 +294,6 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
     handleUpdateAlertDismissMinutes,
     handleSendMessage,
     handleSaveNewPreset,
+    pushSystemAlert,
   };
 }

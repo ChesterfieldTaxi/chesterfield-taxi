@@ -64,6 +64,8 @@ export interface DispatchPaymentAssignmentSectionProps {
   setCompany: (val: string) => void;
   driverId: string;
   setDriverId: (val: string) => void;
+  driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
+  onChangeDriverAssignmentMode?: (mode: 'send_to_driver' | 'stage_hold') => void;
   driverOptions: DriverRosterItem[];
   notesForAll: string;
   setNotesForAll: (val: string) => void;
@@ -114,6 +116,8 @@ export function DispatchPaymentAssignmentSection({
   setCompany,
   driverId,
   setDriverId,
+  driverAssignmentMode = 'send_to_driver',
+  onChangeDriverAssignmentMode,
   driverOptions,
   notesForAll,
   setNotesForAll,
@@ -528,7 +532,11 @@ export function DispatchPaymentAssignmentSection({
             <select
               value={driverId}
               onChange={(e) => setDriverId(e.target.value)}
-              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
+              className={`w-full px-2 py-1.5 bg-white border rounded text-xs focus:ring-1 focus:ring-blue-500 ${
+                driverId !== 'unassigned' && driverAssignmentMode === 'stage_hold'
+                  ? 'border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-950 font-semibold'
+                  : 'border-slate-300 text-slate-800'
+              }`}
             >
               <option value="unassigned">Unassigned</option>
               {driverOptions.map((d) => (
@@ -543,6 +551,45 @@ export function DispatchPaymentAssignmentSection({
             </select>
           </div>
         </div>
+
+        {driverId !== 'unassigned' && onChangeDriverAssignmentMode && (
+          <div className="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                Driver Delivery Mode
+              </span>
+              <div className="inline-flex rounded-lg bg-slate-200/85 p-0.5 border border-slate-300">
+                <button
+                  type="button"
+                  onClick={() => onChangeDriverAssignmentMode('send_to_driver')}
+                  className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-colors cursor-pointer ${
+                    driverAssignmentMode === 'send_to_driver'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Send to Driver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeDriverAssignmentMode('stage_hold')}
+                  className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-colors cursor-pointer ${
+                    driverAssignmentMode === 'stage_hold'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  📌 Stage (Hold)
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-snug">
+              {driverAssignmentMode === 'stage_hold'
+                ? 'Held privately in Dispatch as a planned shift placeholder — zero driver visibility or alerts until sent.'
+                : 'Assigns and sends live to the driver immediately on Book / Save.'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Notes (All & Internal) */}

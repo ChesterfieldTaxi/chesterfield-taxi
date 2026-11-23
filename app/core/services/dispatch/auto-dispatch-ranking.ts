@@ -221,7 +221,7 @@ function resolveDriverVehicleCapacity(
   };
 }
 
-function evaluateDriverVehicleCompatibility(
+export function evaluateDriverVehicleCompatibility(
   trip: Partial<Trip>,
   driverTierRaw: string,
   vehicleTiers?: ReadonlyArray<VehicleTierConfig>

@@ -8,12 +8,15 @@ import {
   PhoneIcon,
   CarIcon,
   CalendarIcon,
-  ChevronDownIcon,
   StarIcon,
   LuggageIcon,
   SparklesIcon,
   DocumentTextIcon,
 } from '../../ui/Icons';
+import {
+  computeDriverScheduleTimeline,
+  type DriverScheduleTimelineItem,
+} from '../../../core/services/dispatch/staged-driver-planner.service';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import type { Trip, TripPassenger } from '../../../core/types/trip';
 
@@ -24,19 +27,13 @@ export interface DriverQueueWindowProps {
   trips: Trip[];
   onReorderQueue: (driverId: string, reorderedTripIds: string[]) => Promise<void> | void;
   onUnassignTrip?: (tripId: string) => Promise<void> | void;
+  onSendStagedTrip?: (trip: Trip) => Promise<void> | void;
+  onUnstageTrip?: (trip: Trip) => Promise<void> | void;
+  onSendAllStagedTrips?: (driverId: string) => Promise<void> | void;
   onOpenEditTrip?: (tripId: string) => void;
   onFocusTripOnMap?: (tripId: string) => void;
   onCallPassenger?: (phone: string, name?: string) => void;
   onAssignActiveDraft?: (driver: DriverRosterItem) => void;
-}
-
-interface ProjectedTripSchedule {
-  trip: Trip;
-  estimatedArrivalLabel: string;
-  estimatedDropoffLabel: string;
-  durationMinutes: number;
-  bufferMinutesAfterPrior?: number;
-  projectedDropoffMs: number;
 }
 
 function getPassengerDisplayName(passenger?: TripPassenger | null): string {
@@ -47,7 +44,16 @@ function getPassengerDisplayName(passenger?: TripPassenger | null): string {
 }
 
 function getTripTotalFare(trip: Trip): number {
-  return trip.pricing?.totalFare ?? (trip.pricing as any)?.estimatedTotal ?? trip.pricing?.subtotal ?? 0;
+  return (
+    trip.pricing?.totalFare ??
+    (trip.pricing as any)?.estimatedTotal ??
+    trip.pricing?.subtotal ??
+    0
+  );
+}
+
+function formatSignedMinutes(mins: number): string {
+  return mins >= 0 ? `+${mins}m` : `${mins}m`;
 }
 
 export function DriverQueueWindow({
@@ -57,179 +63,102 @@ export function DriverQueueWindow({
   trips,
   onReorderQueue,
   onUnassignTrip,
+  onSendStagedTrip,
+  onUnstageTrip,
+  onSendAllStagedTrips,
   onOpenEditTrip,
   onFocusTripOnMap,
   onCallPassenger,
   onAssignActiveDraft,
 }: DriverQueueWindowProps) {
-  // Local list of upcoming trips to support instant, optimistic re-ordering
-  const [localUpcomingOrder, setLocalUpcomingOrder] = useState<Trip[]>([]);
+  const [localOrderOverrides, setLocalOrderOverrides] = useState<Record<string, number>>({});
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
+  const [isSendingAll, setIsSendingAll] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
-  // Filter all non-completed/non-cancelled trips assigned to this driver
-  const allAssignedTrips = useMemo(() => {
-    if (!driver) return [];
-    return trips.filter(
-      (t) =>
-        t.assignedDriverId === driver.id &&
-        !['completed', 'cancelled', 'declined', 'DECLINED'].includes(t.status)
-    );
-  }, [trips, driver]);
-
-  // Determine active in-progress trip (en_route, arrived, in_progress)
-  const activeTrip = useMemo(() => {
-    if (!driver) return null;
-    return (
-      allAssignedTrips.find((t) =>
-        ['en_route', 'arrived', 'in_progress'].includes(t.status)
-      ) ||
-      allAssignedTrips.find((t) => t.id === driver.currentTripId) ||
-      null
-    );
-  }, [allAssignedTrips, driver]);
-
-  // Synchronize local upcoming trips from incoming trips props
   useEffect(() => {
-    if (!driver) {
-      setLocalUpcomingOrder([]);
-      return;
-    }
+    setLocalOrderOverrides({});
+  }, [driver?.id]);
 
-    const upcoming = allAssignedTrips.filter(
-      (t) => !activeTrip || t.id !== activeTrip.id
-    );
-
-    // Sort by explicit queueOrder first, then scheduled time
-    const sorted = [...upcoming].sort((a, b) => {
-      const orderA = a.queueOrder ?? (a.metadata?.driverQueueOrder as number) ?? 999;
-      const orderB = b.queueOrder ?? (b.metadata?.driverQueueOrder as number) ?? 999;
-      if (orderA !== orderB) return orderA - orderB;
-
-      const timeA = a.scheduledPickupTime ? new Date(a.scheduledPickupTime).getTime() : 0;
-      const timeB = b.scheduledPickupTime ? new Date(b.scheduledPickupTime).getTime() : 0;
-      return timeA - timeB;
-    });
-
-    setLocalUpcomingOrder(sorted);
-  }, [allAssignedTrips, activeTrip, driver]);
-
-  // Auto-dismiss toast
   useEffect(() => {
     if (!feedbackToast) return;
-    const t = setTimeout(() => setFeedbackToast(null), 2500);
+    const t = setTimeout(() => setFeedbackToast(null), 2800);
     return () => clearTimeout(t);
   }, [feedbackToast]);
 
-  // Helper to format timestamp into 12-hour format
-  const formatTimeStr = (date: Date): string => {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const effectiveTripsForTimeline = useMemo(() => {
+    if (Object.keys(localOrderOverrides).length === 0) return trips;
+    return trips.map((t) =>
+      localOrderOverrides[t.id] !== undefined
+        ? { ...t, queueOrder: localOrderOverrides[t.id] }
+        : t
+    );
+  }, [trips, localOrderOverrides]);
+
+  const timeline = useMemo(() => {
+    if (!driver) {
+      return computeDriverScheduleTimeline('', []);
+    }
+    return computeDriverScheduleTimeline(driver.id, effectiveTripsForTimeline);
+  }, [driver, effectiveTripsForTimeline]);
+
+  const activeItem: DriverScheduleTimelineItem | null = useMemo(
+    () => timeline.items.find((it) => it.assignmentState === 'active') || null,
+    [timeline.items]
+  );
+
+  const upcomingItems: DriverScheduleTimelineItem[] = useMemo(
+    () => timeline.items.filter((it) => it.assignmentState !== 'active'),
+    [timeline.items]
+  );
+
+  const formatTimeStr = (ms: number): string => {
+    return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
 
-  // Compute chained estimated arrival and dropoff timelines
-  const { activeTripSchedule, projectedUpcomingSchedules } = useMemo(() => {
-    const now = Date.now();
-    let currentDropoffMs = now;
-
-    let activeSched: ProjectedTripSchedule | null = null;
-    if (activeTrip) {
-      const duration = activeTrip.pricing?.durationMinutes || 20;
-      const durationMs = duration * 60 * 1000;
-
-      let arrivalLabel = 'Immediate';
-      if (activeTrip.status === 'in_progress') {
-        arrivalLabel = 'Passenger in vehicle';
-        currentDropoffMs = now + Math.round(durationMs * 0.6);
-      } else if (activeTrip.status === 'arrived') {
-        arrivalLabel = 'Driver on scene';
-        currentDropoffMs = now + durationMs;
-      } else {
-        const etaMins = (activeTrip as any).etaMinutes || 8;
-        const arrivalDate = new Date(now + etaMins * 60 * 1000);
-        arrivalLabel = `~${etaMins}m (${formatTimeStr(arrivalDate)})`;
-        currentDropoffMs = arrivalDate.getTime() + durationMs;
-      }
-
-      activeSched = {
-        trip: activeTrip,
-        estimatedArrivalLabel: arrivalLabel,
-        estimatedDropoffLabel: `~${formatTimeStr(new Date(currentDropoffMs))}`,
-        durationMinutes: duration,
-        projectedDropoffMs: currentDropoffMs,
-      };
+  const formatDateAndTimeStr = (ms: number): string => {
+    const d = new Date(ms);
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    if (sameDay) {
+      return formatTimeStr(ms);
     }
+    return d.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
 
-    const upcomingScheds: ProjectedTripSchedule[] = [];
-    let priorEndMs = activeSched ? activeSched.projectedDropoffMs : now;
-
-    for (let i = 0; i < localUpcomingOrder.length; i++) {
-      const trip = localUpcomingOrder[i];
-      const duration = trip.pricing?.durationMinutes || 20;
-      const durationMs = duration * 60 * 1000;
-      const transitBufferMs = 10 * 60 * 1000; // 10 min transit buffer between trips
-
-      let scheduledMs = trip.scheduledPickupTime ? new Date(trip.scheduledPickupTime).getTime() : 0;
-      if (isNaN(scheduledMs) || scheduledMs < now) {
-        scheduledMs = 0;
-      }
-
-      // Projected pickup is either scheduled time or prior trip end + transit buffer
-      const projectedArrivalMs = scheduledMs > priorEndMs + transitBufferMs
-        ? scheduledMs
-        : priorEndMs + transitBufferMs;
-
-      const projectedDropoffMs = projectedArrivalMs + durationMs;
-      const bufferMinutes = Math.max(0, Math.round((projectedArrivalMs - priorEndMs) / (60 * 1000)));
-
-      upcomingScheds.push({
-        trip,
-        estimatedArrivalLabel: formatTimeStr(new Date(projectedArrivalMs)),
-        estimatedDropoffLabel: `~${formatTimeStr(new Date(projectedDropoffMs))}`,
-        durationMinutes: duration,
-        bufferMinutesAfterPrior: bufferMinutes,
-        projectedDropoffMs,
-      });
-
-      priorEndMs = projectedDropoffMs;
-    }
-
-    return {
-      activeTripSchedule: activeSched,
-      projectedUpcomingSchedules: upcomingScheds,
-    };
-  }, [activeTrip, localUpcomingOrder]);
-
-  // Total summary metrics
-  const totalQueueFare = useMemo(() => {
-    return allAssignedTrips.reduce((acc, t) => acc + getTripTotalFare(t), 0);
-  }, [allAssignedTrips]);
-
-  const totalDurationMinutes = useMemo(() => {
-    return allAssignedTrips.reduce((acc, t) => acc + (t.pricing?.durationMinutes || 20), 0);
-  }, [allAssignedTrips]);
-
-  // Handle re-arranging trips up or down
   const handleMoveTrip = async (index: number, direction: 'up' | 'down') => {
     if (!driver) return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= localUpcomingOrder.length) return;
+    if (targetIndex < 0 || targetIndex >= upcomingItems.length) return;
 
-    const newOrder = [...localUpcomingOrder];
-    const [moved] = newOrder.splice(index, 1);
-    newOrder.splice(targetIndex, 0, moved);
+    const reordered = upcomingItems.map((it) => it.trip);
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
 
-    // Optimistically update local view
-    setLocalUpcomingOrder(newOrder);
+    const nextOverrides: Record<string, number> = {};
+    reordered.forEach((t, idx) => {
+      nextOverrides[t.id] = idx;
+    });
+    setLocalOrderOverrides(nextOverrides);
     setFeedbackToast(`Moved Trip #${moved.id.slice(-6)} to position #${targetIndex + 1}`);
 
     try {
       setIsUpdatingOrder(true);
-      const reorderedTripIds = newOrder.map((t) => t.id);
-      await onReorderQueue(driver.id, reorderedTripIds);
+      await onReorderQueue(
+        driver.id,
+        reordered.map((t) => t.id)
+      );
     } catch (err) {
       console.error('Failed to update driver queue order:', err);
-      // Revert on failure
-      setLocalUpcomingOrder(localUpcomingOrder);
+      setLocalOrderOverrides({});
       setFeedbackToast('Failed to save new queue order');
     } finally {
       setIsUpdatingOrder(false);
@@ -237,6 +166,14 @@ export function DriverQueueWindow({
   };
 
   if (!isOpen || !driver) return null;
+
+  const activeArrivalLabel = activeItem
+    ? activeItem.trip.status === 'in_progress'
+      ? 'Passenger in vehicle'
+      : activeItem.trip.status === 'arrived'
+      ? 'Driver on scene'
+      : `~${formatTimeStr(activeItem.projectedPickupMs)}`
+    : '';
 
   return (
     <FloatingWindow
@@ -251,12 +188,12 @@ export function DriverQueueWindow({
           </span>
         </div>
       }
-      subtitle={`Live schedule timeline & queued dispatch orders (${allAssignedTrips.length} assigned)`}
+      subtitle={`Interleaved live & staged shift timeline (${timeline.assignedCount} assigned · ${timeline.stagedCount} staged)`}
       icon={<CarIcon className="w-4 h-4 text-blue-400" />}
-      initialSize={{ width: 620, height: 680 }}
-      minWidth={440}
-      minHeight={340}
-      hasBackdrop={false} // Modeless: doesn't block background map, table, or softphone!
+      initialSize={{ width: 640, height: 700 }}
+      minWidth={450}
+      minHeight={360}
+      hasBackdrop={false}
       isDraggable={true}
       isResizable={true}
       headerExtra={
@@ -270,15 +207,34 @@ export function DriverQueueWindow({
         <div className="p-3 bg-white flex flex-wrap items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
             <span>
-              Total Queue: <strong>${totalQueueFare.toFixed(2)}</strong>
+              Total Schedule: <strong>${timeline.totalFare.toFixed(2)}</strong>
             </span>
             <span>•</span>
             <span>
-              ~<strong>{totalDurationMinutes} mins</strong> drive time
+              ~<strong>{timeline.totalDurationMinutes} mins</strong> drive time
             </span>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            {timeline.stagedCount > 0 && onSendAllStagedTrips && (
+              <button
+                type="button"
+                disabled={isSendingAll}
+                onClick={async () => {
+                  setIsSendingAll(true);
+                  try {
+                    await onSendAllStagedTrips(driver.id);
+                    setFeedbackToast(`Sent ${timeline.stagedCount} staged trip(s) to ${driver.name}`);
+                  } finally {
+                    setIsSendingAll(false);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold transition-colors cursor-pointer"
+                title="Send all staged trips to driver"
+              >
+                {isSendingAll ? 'Sending...' : `Send All Staged (${timeline.stagedCount})`}
+              </button>
+            )}
             {onAssignActiveDraft && (
               <button
                 type="button"
@@ -304,15 +260,15 @@ export function DriverQueueWindow({
       }
     >
       <div className="p-4 space-y-4">
-        {/* DRIVER SUMMARY BANNER */}
+        {/* DRIVER SUMMARY BANNER + STAGED / OVERLAP PILLS */}
         <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-black text-sm border border-blue-100">
                 {driver.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-slate-900 text-sm">{driver.name}</span>
                   {driver.driverScore !== undefined && (
                     <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
@@ -349,7 +305,9 @@ export function DriverQueueWindow({
                   })()}
                 </div>
                 <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span>{driver.vehicle} ({driver.tier})</span>
+                  <span>
+                    {driver.vehicle} ({driver.tier})
+                  </span>
                   <span>•</span>
                   <span className="inline-flex items-center gap-1">
                     <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" />
@@ -371,31 +329,51 @@ export function DriverQueueWindow({
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
-            <div className="bg-slate-50 p-2 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Ride</span>
-              <span className="text-xs font-black text-slate-800">
-                {activeTrip ? `#${activeTrip.id.slice(-6)}` : 'None'}
+          {/* Summary & Sanity Check Pills Bar */}
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-extrabold">
+                Assigned ({timeline.assignedCount})
               </span>
-            </div>
-            <div className="bg-slate-50 p-2 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Queued Trips</span>
-              <span className="text-xs font-black text-blue-600">
-                {localUpcomingOrder.length} upcoming
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-dashed border-indigo-400 font-extrabold">
+                📌 Staged ({timeline.stagedCount})
               </span>
+              {timeline.overlapCount > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-extrabold">
+                  ❌ {timeline.overlapCount} Overlap
+                </span>
+              )}
+              {timeline.tightTurnaroundCount > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-extrabold">
+                  ⚠️ {timeline.tightTurnaroundCount} Tight (&lt;15m)
+                </span>
+              )}
             </div>
-            <div className="bg-slate-50 p-2 rounded-lg">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">Est. Revenue</span>
-              <span className="text-xs font-black text-emerald-600">
-                ${totalQueueFare.toFixed(2)}
-              </span>
-            </div>
+
+            {timeline.stagedCount > 0 && onSendAllStagedTrips && (
+              <button
+                type="button"
+                disabled={isSendingAll}
+                onClick={async () => {
+                  setIsSendingAll(true);
+                  try {
+                    await onSendAllStagedTrips(driver.id);
+                    setFeedbackToast(`Sent ${timeline.stagedCount} staged trip(s) to ${driver.name}`);
+                  } finally {
+                    setIsSendingAll(false);
+                  }
+                }}
+                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-extrabold shadow-2xs transition-colors cursor-pointer"
+                title="Send all staged trips to driver"
+              >
+                {isSendingAll ? 'Sending...' : `Send All Staged (${timeline.stagedCount})`}
+              </button>
+            )}
           </div>
         </div>
 
         {/* 1. ACTIVE TRIP CARD (IF ANY) */}
-        {activeTripSchedule && (
+        {activeItem && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px] font-black text-emerald-800 uppercase tracking-wide px-1">
               <span className="flex items-center gap-1.5">
@@ -403,7 +381,7 @@ export function DriverQueueWindow({
                 <span>Current Active Trip</span>
               </span>
               <span className="text-slate-500 font-mono text-[10px]">
-                ID: {activeTripSchedule.trip.id}
+                ID: {activeItem.trip.id}
               </span>
             </div>
 
@@ -412,62 +390,58 @@ export function DriverQueueWindow({
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-extrabold text-slate-900">
-                      {getPassengerDisplayName(activeTripSchedule.trip.passenger)}
+                      {getPassengerDisplayName(activeItem.trip.passenger)}
                     </span>
                     <button
                       type="button"
                       onClick={() =>
                         onCallPassenger?.(
-                          activeTripSchedule.trip.passenger.phone,
-                          getPassengerDisplayName(activeTripSchedule.trip.passenger)
+                          activeItem.trip.passenger.phone,
+                          getPassengerDisplayName(activeItem.trip.passenger)
                         )
                       }
                       className="font-mono text-[11px] text-emerald-800 hover:underline font-bold"
                     >
-                      {activeTripSchedule.trip.passenger.phone}
+                      {activeItem.trip.passenger.phone}
                     </button>
                   </div>
                   <Badge variant="info">
-                    {activeTripSchedule.trip.status.replace('_', ' ').toUpperCase()}
+                    {activeItem.trip.status.replace('_', ' ').toUpperCase()}
                   </Badge>
                 </div>
 
                 <div className="text-right shrink-0">
                   <span className="text-sm font-black text-emerald-900 block">
-                    ${getTripTotalFare(activeTripSchedule.trip).toFixed(2)}
+                    ${getTripTotalFare(activeItem.trip).toFixed(2)}
                   </span>
                   <span className="text-[10px] text-emerald-700 font-medium">
-                    ~{activeTripSchedule.durationMinutes} min trip
+                    ~{activeItem.durationMinutes} min trip
                   </span>
                 </div>
               </div>
 
-              {/* Route */}
               <div className="bg-white/80 rounded-lg p-2.5 space-y-1.5 border border-emerald-200 text-xs">
                 <div className="flex items-start gap-2">
                   <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
                   <span className="text-slate-700 line-clamp-1">
-                    {activeTripSchedule.trip.pickupLocation.address}
+                    {activeItem.trip.pickupLocation.address}
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
                   <FlagIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
                   <span className="text-slate-700 line-clamp-1">
-                    {activeTripSchedule.trip.dropoffLocation.address}
+                    {activeItem.trip.dropoffLocation.address}
                   </span>
                 </div>
               </div>
 
-              {/* Vehicle Class, Cargo & Custom Extras Strip */}
               {(() => {
-                const meta = (activeTripSchedule.trip.metadata || {}) as Record<string, any>;
+                const meta = (activeItem.trip.metadata || {}) as Record<string, any>;
                 const vehLabel =
-                  meta.vehicleDisplayName ||
-                  meta.vehicleTypeId ||
-                  activeTripSchedule.trip.vehicleTier;
+                  meta.vehicleDisplayName || meta.vehicleTypeId || activeItem.trip.vehicleTier;
                 const oversized = meta.oversizedItemsSummary as string | undefined;
                 const customExtras = meta.customExtrasSummary as string | undefined;
-                const specialReq = activeTripSchedule.trip.passenger?.specialRequests;
+                const specialReq = activeItem.trip.passenger?.specialRequests;
                 return (
                   <div className="flex flex-wrap items-center gap-1 text-[10px]">
                     {vehLabel && (
@@ -498,29 +472,25 @@ export function DriverQueueWindow({
                 );
               })()}
 
-              {/* Arrival & Dropoff Times */}
               <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/80">
                 <div className="flex items-center gap-1.5">
                   <ClockIcon className="w-3.5 h-3.5 text-emerald-700" />
                   <span className="text-slate-600 font-medium">Status / Arrival:</span>
-                  <span className="font-black text-emerald-900">
-                    {activeTripSchedule.estimatedArrivalLabel}
-                  </span>
+                  <span className="font-black text-emerald-900">{activeArrivalLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-600 font-medium">Est. Dropoff:</span>
                   <span className="font-black text-emerald-900">
-                    {activeTripSchedule.estimatedDropoffLabel}
+                    ~{formatTimeStr(activeItem.projectedDropoffMs)}
                   </span>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 pt-1">
                 {onFocusTripOnMap && (
                   <button
                     type="button"
-                    onClick={() => onFocusTripOnMap(activeTripSchedule.trip.id)}
+                    onClick={() => onFocusTripOnMap(activeItem.trip.id)}
                     className="px-2.5 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-300 transition-colors cursor-pointer"
                   >
                     Focus Map
@@ -529,7 +499,7 @@ export function DriverQueueWindow({
                 {onOpenEditTrip && (
                   <button
                     type="button"
-                    onClick={() => onOpenEditTrip(activeTripSchedule.trip.id)}
+                    onClick={() => onOpenEditTrip(activeItem.trip.id)}
                     className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
                   >
                     Open Details
@@ -540,187 +510,271 @@ export function DriverQueueWindow({
           </div>
         )}
 
-        {/* 2. UPCOMING QUEUED TRIPS WITH RE-ARRANGING */}
+        {/* 2. INTERLEAVED UPCOMING ASSIGNED + STAGED QUEUE */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px] font-black text-slate-700 uppercase tracking-wide px-1">
-            <span>Upcoming Queue ({localUpcomingOrder.length})</span>
+            <span>Upcoming Schedule ({upcomingItems.length})</span>
             <span className="text-[10px] text-slate-400 normal-case font-normal">
-              Use ▲ / ▼ buttons to re-order sequence
+              Assigned &amp; 📌 Staged interleaved chronologically
             </span>
           </div>
 
-          {projectedUpcomingSchedules.length === 0 ? (
+          {upcomingItems.length === 0 ? (
             <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-300 p-6 space-y-2">
               <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-700">No Upcoming Trips in Queue</p>
+              <p className="text-xs font-bold text-slate-700">No Upcoming Trips Scheduled</p>
               <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                This driver currently has no additional scheduled bookings queued. Assign an active
-                draft or assign trips from the dispatch board.
+                Stage shift placeholders ahead of time or send live bookings from the Dispatch
+                queue.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {projectedUpcomingSchedules.map((item, idx) => {
+              {upcomingItems.map((item, idx) => {
                 const isFirst = idx === 0;
-                const isLast = idx === projectedUpcomingSchedules.length - 1;
+                const isLast = idx === upcomingItems.length - 1;
+                const isStaged = item.assignmentState === 'staged';
 
                 return (
-                  <div
-                    key={item.trip.id}
-                    className="bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-blue-300 transition-all overflow-hidden"
-                  >
-                    {/* Header bar of trip card */}
-                    <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-600 text-white font-mono">
-                          #{idx + 1}
+                  <React.Fragment key={item.trip.id}>
+                    {/* Between-Leg Turnaround / Overlap Callout Banner */}
+                    {item.bufferMinutesAfterPrior !== null && item.conflictStatus !== 'ok' && (
+                      <div
+                        className={`px-3 py-1.5 rounded-lg border text-[11px] font-extrabold flex items-center justify-between gap-2 ${
+                          item.conflictStatus === 'overlap'
+                            ? 'bg-rose-50 border-rose-300 text-rose-900'
+                            : 'bg-amber-50 border-amber-300 text-amber-900'
+                        }`}
+                      >
+                        <span>
+                          {item.conflictStatus === 'overlap'
+                            ? `❌ Time Overlap (${formatSignedMinutes(item.bufferMinutesAfterPrior)})`
+                            : `⚠️ Tight Turnaround (${formatSignedMinutes(
+                                item.bufferMinutesAfterPrior
+                              )})`}
                         </span>
-                        <span className="text-xs font-bold text-slate-800">
-                          {getPassengerDisplayName(item.trip.passenger)}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          ID: {item.trip.id.slice(-6)}
+                        <span className="text-[10px] font-semibold opacity-80">
+                          {item.conflictStatus === 'overlap'
+                            ? 'Pickup starts before prior dropoff completes'
+                            : 'Less than 15m transit buffer after prior dropoff'}
                         </span>
                       </div>
+                    )}
 
-                      {/* Re-order Up / Down Controls */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          disabled={isFirst || isUpdatingOrder}
-                          onClick={() => handleMoveTrip(idx, 'up')}
-                          className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                            isFirst
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200'
-                          }`}
-                          title="Move earlier in queue"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLast || isUpdatingOrder}
-                          onClick={() => handleMoveTrip(idx, 'down')}
-                          className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                            isLast
-                              ? 'text-slate-300 cursor-not-allowed'
-                              : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200'
-                          }`}
-                          title="Move later in queue"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Card Body */}
-                    <div className="p-3.5 space-y-2.5">
-                      <div className="flex items-start justify-between gap-2 text-xs">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-start gap-1.5 text-slate-800">
-                            <MapPinIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
-                            <span className="line-clamp-1">{item.trip.pickupLocation.address}</span>
-                          </div>
-                          <div className="flex items-start gap-1.5 text-slate-800">
-                            <FlagIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
-                            <span className="line-clamp-1">{item.trip.dropoffLocation.address}</span>
-                          </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="font-extrabold text-slate-900 text-xs block">
-                            ${getTripTotalFare(item.trip).toFixed(2)}
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            ~{item.durationMinutes} mins
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Timelines: Estimated Arrival & Dropoff */}
-                      <div className="bg-slate-50 rounded-lg p-2 flex items-center justify-between text-xs border border-slate-100">
-                        <div className="flex items-center gap-1.5">
-                          <ClockIcon className="w-3.5 h-3.5 text-blue-600" />
-                          <span className="text-slate-500 font-medium">Est. Arrival:</span>
-                          <span className="font-black text-slate-900">
-                            {item.estimatedArrivalLabel}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-500 font-medium">Est. Dropoff:</span>
-                          <span className="font-black text-slate-900">
-                            {item.estimatedDropoffLabel}
-                          </span>
-                        </div>
-
-                        {item.bufferMinutesAfterPrior !== undefined && (
+                    <div
+                      className={`rounded-xl shadow-2xs transition-all overflow-hidden ${
+                        isStaged
+                          ? 'bg-indigo-50/35 border-2 border-dashed border-indigo-400 hover:border-indigo-500'
+                          : 'bg-white border border-slate-200/90 hover:border-blue-300'
+                      }`}
+                    >
+                      {/* Header bar of trip card */}
+                      <div
+                        className={`px-3.5 py-2 border-b flex items-center justify-between gap-2 flex-wrap ${
+                          isStaged
+                            ? 'bg-indigo-50/80 border-indigo-200/90'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                              item.bufferMinutesAfterPrior < 10
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-200/70 text-slate-700'
+                            className={`text-xs font-black px-2 py-0.5 rounded font-mono ${
+                              isStaged ? 'bg-indigo-700 text-white' : 'bg-blue-600 text-white'
                             }`}
-                            title="Transit buffer between prior dropoff and this pickup"
                           >
-                            <ClockIcon className="w-2.5 h-2.5 shrink-0" />
-                            <span>{item.bufferMinutesAfterPrior}m buffer</span>
+                            #{idx + 1}
                           </span>
-                        )}
-                      </div>
+                          <span className="text-xs font-bold text-slate-800">
+                            {getPassengerDisplayName(item.trip.passenger)}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-500">
+                            ID: {item.trip.id.slice(-6)}
+                          </span>
+                          {isStaged ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white border border-dashed border-indigo-400 text-indigo-800">
+                              📌 Staged (Held in Dispatch)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                              Assigned
+                            </span>
+                          )}
+                        </div>
 
-                      {/* Card Action footer */}
-                      <div className="flex items-center justify-between pt-1 text-xs">
-                        <div className="flex items-center gap-2">
+                        {/* Re-order Up / Down Controls */}
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() =>
-                              onCallPassenger?.(
-                                item.trip.passenger.phone,
-                                getPassengerDisplayName(item.trip.passenger)
-                              )
-                            }
-                            className="text-[11px] text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                            disabled={isFirst || isUpdatingOrder}
+                            onClick={() => void handleMoveTrip(idx, 'up')}
+                            className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                              isFirst
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 bg-white'
+                            }`}
+                            title="Move earlier in queue"
                           >
-                            <PhoneIcon className="w-3 h-3 text-blue-600" />
-                            <span>{item.trip.passenger.phone}</span>
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLast || isUpdatingOrder}
+                            onClick={() => void handleMoveTrip(idx, 'down')}
+                            className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                              isLast
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 bg-white'
+                            }`}
+                            title="Move later in queue"
+                          >
+                            ▼
                           </button>
                         </div>
+                      </div>
 
-                        <div className="flex items-center gap-1.5">
-                          {onUnassignTrip && (
+                      {/* Card Body */}
+                      <div className="p-3.5 space-y-2.5 bg-white/85">
+                        <div className="flex items-start justify-between gap-2 text-xs">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-start gap-1.5 text-slate-800">
+                              <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                              <span className="line-clamp-1">
+                                {item.trip.pickupLocation.address}
+                              </span>
+                            </div>
+                            <div className="flex items-start gap-1.5 text-slate-800">
+                              <FlagIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
+                              <span className="line-clamp-1">
+                                {item.trip.dropoffLocation.address}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="font-extrabold text-slate-900 text-xs block">
+                              ${getTripTotalFare(item.trip).toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              ~{item.durationMinutes} mins
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Timelines: Pickup, Dropoff & Buffer */}
+                        <div className="bg-slate-50 rounded-lg p-2 flex flex-wrap items-center justify-between gap-2 text-xs border border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            <ClockIcon className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="text-slate-500 font-medium">Pickup:</span>
+                            <span className="font-black text-slate-900">
+                              {formatDateAndTimeStr(item.projectedPickupMs)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-500 font-medium">Est. Dropoff:</span>
+                            <span className="font-black text-slate-900">
+                              ~{formatTimeStr(item.projectedDropoffMs)}
+                            </span>
+                          </div>
+
+                          {item.bufferMinutesAfterPrior !== null && (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
+                                item.conflictStatus === 'overlap'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : item.conflictStatus === 'tight_turnaround'
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              }`}
+                              title="Transit buffer between prior dropoff and this pickup"
+                            >
+                              <ClockIcon className="w-2.5 h-2.5 shrink-0" />
+                              <span>
+                                {item.conflictStatus === 'overlap'
+                                  ? `Overlap ${formatSignedMinutes(item.bufferMinutesAfterPrior)}`
+                                  : `${formatSignedMinutes(item.bufferMinutesAfterPrior)} buffer`}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Card Action footer */}
+                        <div className="flex items-center justify-between pt-1 text-xs flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => onUnassignTrip(item.trip.id)}
-                              className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold transition-colors cursor-pointer"
-                              title="Unassign this trip from driver"
+                              onClick={() =>
+                                onCallPassenger?.(
+                                  item.trip.passenger.phone,
+                                  getPassengerDisplayName(item.trip.passenger)
+                                )
+                              }
+                              className="text-[11px] text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                             >
-                              Unassign
+                              <PhoneIcon className="w-3 h-3 text-blue-600" />
+                              <span>{item.trip.passenger.phone}</span>
                             </button>
-                          )}
-                          {onFocusTripOnMap && (
-                            <button
-                              type="button"
-                              onClick={() => onFocusTripOnMap(item.trip.id)}
-                              className="px-2 py-0.5 rounded text-[10px] text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold transition-colors cursor-pointer"
-                            >
-                              Map
-                            </button>
-                          )}
-                          {onOpenEditTrip && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenEditTrip(item.trip.id)}
-                              className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-colors cursor-pointer"
-                            >
-                              Edit Trip
-                            </button>
-                          )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isStaged ? (
+                              <>
+                                {onSendStagedTrip && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void onSendStagedTrip(item.trip)}
+                                    className="px-2.5 py-0.5 rounded text-[10.5px] bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold transition-colors cursor-pointer shadow-2xs"
+                                    title="Send to Driver"
+                                  >
+                                    Send to Driver
+                                  </button>
+                                )}
+                                {onUnstageTrip && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void onUnstageTrip(item.trip)}
+                                    className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold transition-colors cursor-pointer"
+                                    title="Clear staged driver placeholder"
+                                  >
+                                    Unstage
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              onUnassignTrip && (
+                                <button
+                                  type="button"
+                                  onClick={() => void onUnassignTrip(item.trip.id)}
+                                  className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold transition-colors cursor-pointer"
+                                  title="Unassign this trip from driver"
+                                >
+                                  Unassign
+                                </button>
+                              )
+                            )}
+                            {onFocusTripOnMap && (
+                              <button
+                                type="button"
+                                onClick={() => onFocusTripOnMap(item.trip.id)}
+                                className="px-2 py-0.5 rounded text-[10px] text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold transition-colors cursor-pointer"
+                              >
+                                Map
+                              </button>
+                            )}
+                            {onOpenEditTrip && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenEditTrip(item.trip.id)}
+                                className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-colors cursor-pointer"
+                              >
+                                Edit Trip
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
