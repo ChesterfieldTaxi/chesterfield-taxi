@@ -4,6 +4,12 @@ import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
+import {
+  buildTripItineraryTooltip,
+  formatShortStopPreview,
+  getTripIntermediateStopCount,
+  getTripIntermediateStops,
+} from '../../../../core/utils/route-markers.util';
 import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { TripActionDropdown } from '../TripActionDropdown';
 import {
@@ -156,6 +162,10 @@ export function TripQueueTableView({
                 : 'ASAP';
 
               const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
+              const stops = getTripIntermediateStops(trip);
+              const stopCount = getTripIntermediateStopCount(trip);
+              const firstStopPreview = stops[0] ? formatShortStopPreview(stops[0].address) : '';
+              const itineraryTooltip = stopCount > 0 ? buildTripItineraryTooltip(trip) : undefined;
 
               return (
                 <tr
@@ -230,8 +240,23 @@ export function TripQueueTableView({
                       )}
                     </div>
                   </td>
-                  <td className="py-2 px-3 truncate max-w-[160px]" title={trip.pickupLocation.address}>
-                    {trip.pickupLocation.address}
+                  <td className="py-2 px-3 max-w-[160px]">
+                    <div className="truncate" title={trip.pickupLocation.address}>
+                      {trip.pickupLocation.address}
+                    </div>
+                    {stopCount > 0 && (
+                      <div
+                        className="max-w-[156px] bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5"
+                        title={itineraryTooltip}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                        <span className="truncate">
+                          {firstStopPreview
+                            ? `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'} · ${firstStopPreview}`
+                            : `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'}`}
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 px-3 truncate max-w-[160px]" title={trip.dropoffLocation.address}>
                     {trip.dropoffLocation.address}

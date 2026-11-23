@@ -7,9 +7,10 @@ import { formatDisplayPhone } from '../../../../core/services/telephony.service'
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import { DispatchHeaderCallHud } from '../DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../FleetAlertCard';
-import type {
-  DesktopDockTab,
-  DispatchMobileTab,
+import {
+  useDispatchMapPreferences,
+  type DesktopDockTab,
+  type DispatchMobileTab,
 } from '../../../../core/hooks/dispatch';
 import {
   CarIcon,
@@ -23,6 +24,7 @@ import {
   ClockIcon,
   SunIcon,
   SettingsIcon,
+  MapPinIcon,
 } from '../../../ui/Icons';
 
 const AppSuiteLauncher = React.lazy(() =>
@@ -158,6 +160,8 @@ export function DispatchDesktopTopHeader({
   dispatchWakeLock,
   dispatchPush,
 }: DispatchDesktopTopHeaderProps) {
+  const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
+
   return (
     <>
       {/* ─── INCOMING WEBRTC SOFTPHONE CALL ALERT BANNER ─── */}
@@ -571,12 +575,12 @@ export function DispatchDesktopTopHeader({
             </button>
 
             {showDeviceSettingsMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="absolute right-0 mt-2 w-80 sm:w-[348px] max-h-[84vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 sticky top-0 z-10">
                   <div className="flex items-center gap-2">
                     <SettingsIcon className="w-4 h-4 text-blue-400" />
                     <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
-                      Console &amp; Alert Settings
+                      Console &amp; Map Settings
                     </span>
                   </div>
                   <button
@@ -687,6 +691,66 @@ export function DispatchDesktopTopHeader({
                         {dispatchPush.alertsEnabled ? 'Enabled' : 'Paused'}
                       </button>
                     )}
+                  </div>
+
+                  {/* Map & Route Display Section */}
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center gap-1.5 px-0.5">
+                      <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500">
+                        Map &amp; Route Display
+                      </span>
+                    </div>
+
+                    {(
+                      [
+                        {
+                          key: 'casedRouteWithArrows',
+                          label: 'Cased Route & Arrows',
+                          subtitle: 'High-contrast border & travel direction chevrons',
+                        },
+                        {
+                          key: 'interactiveRoutePinPopovers',
+                          label: 'Interactive Route Pins',
+                          subtitle: 'Click Green/Orange/Red pins to view stop details',
+                        },
+                        {
+                          key: 'showRouteSummaryPill',
+                          label: 'Route Summary Pill',
+                          subtitle: 'Floating leg count, mileage & 1-click Clear Route',
+                        },
+                      ] as const
+                    ).map((opt) => {
+                      const active = mapPrefs[opt.key];
+                      return (
+                        <div
+                          key={opt.key}
+                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-800 block leading-tight">
+                              {opt.label}
+                            </span>
+                            <span className="text-[11px] text-slate-500 block leading-snug">
+                              {opt.subtitle}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={active}
+                            onClick={() => toggleMapPref(opt.key)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
+                              active
+                                ? 'bg-blue-600 text-white hover:bg-blue-500'
+                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            }`}
+                          >
+                            {active ? 'On' : 'Off'}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

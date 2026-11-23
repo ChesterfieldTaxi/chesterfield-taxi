@@ -106,6 +106,7 @@ const FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; label: string }> 
   { key: 'payment_type', label: 'Payment Type' },
   { key: 'tariff', label: 'Tariff' },
   { key: 'has_car_seat', label: 'Has Car Seat' },
+  { key: 'has_stops', label: 'Has Stops' },
 ];
 
 export interface TripQueueToolbarProps {
@@ -435,6 +436,21 @@ export function TripQueueToolbar({
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
                       className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
                       title="Remove Car Seat filter"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {activeFilterKeys.includes('has_stops') && (
+                  <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded-full px-2 py-0.5 text-xs font-bold text-amber-900 shadow-2xs shrink-0 h-6">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                    <span className="text-[11px]">Has Stops</span>
+                    <button
+                      type="button"
+                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_stops'))}
+                      className="text-amber-600 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                      title="Remove Has Stops filter"
                     >
                       ✕
                     </button>
@@ -789,6 +805,20 @@ export function TripQueueToolbar({
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
                 className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {activeFilterKeys.includes('has_stops') && (
+            <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded-full px-2 py-0.5 text-xs font-bold text-amber-900 shadow-2xs shrink-0 h-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              <span className="text-[11px]">Has Stops</span>
+              <button
+                type="button"
+                onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_stops'))}
+                className="text-amber-600 hover:text-red-600 font-bold text-[11px] cursor-pointer"
               >
                 ✕
               </button>

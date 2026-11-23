@@ -8,6 +8,7 @@ import {
 } from '../core/hooks/useDispatchFleet';
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
+import { getTripIntermediateStopCount } from '../core/utils/route-markers.util';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { SpinnerIcon } from '../components/ui/Icons';
 
@@ -236,15 +237,30 @@ export default function DispatchPopoutRoute() {
             <div className="h-full overflow-y-auto p-4 space-y-4">
               <h2 className="text-base font-extrabold text-slate-900">Active Trips Queue (Detached)</h2>
               <div className="space-y-2">
-                {trips.map((tr) => (
-                  <div key={tr.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-                    <div>
-                      <span className="font-mono font-bold text-xs text-slate-900 block">{tr.id}</span>
-                      <span className="text-xs text-slate-600">{tr.pickupLocation?.address} → {tr.dropoffLocation?.address}</span>
+                {trips.map((tr) => {
+                  const stopCount = getTripIntermediateStopCount(tr);
+                  return (
+                    <div key={tr.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold text-xs text-slate-900 block">{tr.id}</span>
+                        <span className="text-xs text-slate-600 inline-flex items-center gap-1 flex-wrap">
+                          <span>{tr.pickupLocation?.address}</span>
+                          <span>→</span>
+                          {stopCount > 0 && (
+                            <>
+                              <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold">
+                                +{stopCount} stop{stopCount === 1 ? '' : 's'}
+                              </span>
+                              <span>→</span>
+                            </>
+                          )}
+                          <span>{tr.dropoffLocation?.address}</span>
+                        </span>
+                      </div>
+                      <span className="font-bold text-xs text-emerald-700 shrink-0">${tr.pricing?.totalFare?.toFixed(2)}</span>
                     </div>
-                    <span className="font-bold text-xs text-emerald-700">${tr.pricing?.totalFare?.toFixed(2)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -256,6 +272,7 @@ export default function DispatchPopoutRoute() {
               selectedTrip={selectedMapTrip}
               shouldZoom={Boolean(selectedMapTrip)}
               onSelectTrip={(trip) => setSelectedMapTrip(trip)}
+              onClearSelectedTrip={() => setSelectedMapTrip(null)}
               onChangeDriverDutyStatus={(driverId, duty) => setDriverDutyStatus(driverId, duty)}
               onCallDriver={(phone, name) => {
                 workspaceBus.publish('CALL_OUTBOUND_STARTED', {

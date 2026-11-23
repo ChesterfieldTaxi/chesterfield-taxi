@@ -757,6 +757,26 @@
   - [x] 48.4.1 Create and pass `scripts/test-pricing-audit-trail.ts` verifying `surcharge_enabled` -> `surcharge_disabled` `activeDurationMinutes` (`136` / `'2h 16m'`), pre-toggle and post-toggle notes (`updateAuditEventNote`), zero noisy no-op events, 4-pillar `{ before → after }` diffs, RFC-4180 CSV escaping, zero PII in `/pricingConfig/*`, and `firestore.rules` `/config/{document=**}` dispatcher lockdown.
   - [x] 48.4.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors, mark Phase 48 complete in `tasks.md`, and leave Phase 48 changes uncommitted for Control-Tower code review.
 
+## Phase 49 (Wave 3 Phase 6): Multi-Stop Queue Indicators, Color-Coded Map Route Teardrop Pins & Dispatch Map Preferences
+- [x] 49.0 Baseline Hygiene & Specification Sync:
+  - [x] 49.0.1 Commit reviewed Phase 48 + live DOM table overflow fix baseline cleanly on `main` (`feat(phase-48): pricing & surcharge audit trail plus live DOM table overflow auto-cards`).
+  - [x] 49.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 49 scope, zero-column-addition table guardrails, and map monolith budgets before writing code.
+- [x] 49.1 Shared Route Waypoint Pin SVG Builder, Multi-Stop Helpers & Map Preferences Hook:
+  - [x] 49.1.1 Create `app/core/utils/route-markers.util.ts` (`buildRouteWaypointPinDataUrl`, `getTripIntermediateStops`, `getTripIntermediateStopCount`, `formatShortStopPreview`, `buildTripItineraryTooltip`).
+  - [x] 49.1.2 Create `app/core/hooks/dispatch/useDispatchMapPreferences.ts` (`DispatchMapPreferences`, `DEFAULT_DISPATCH_MAP_PREFERENCES`, `parseDispatchMapPreferences`, SSR-safe `ct_dispatch_map_prefs_v1` persistence, and same-window + cross-window `storage` sync) and export from `app/core/hooks/dispatch/index.ts`.
+- [x] 49.2 Multi-Stop Queue Indicators & `Has Stops` Filter:
+  - [x] 49.2.1 Upgrade `TripQueueTableView.tsx` (zero new columns — 2nd-line amber `+N stop(s)` sub-pill inside `PICKUP`), `TripQueueCardsGrid.tsx` (Green → collapsible/expandable Orange `1..N` → Red route box), and `TripQueueCompactList.tsx` (inline `+N stop(s)` amber badge).
+  - [x] 49.2.2 Add `'has_stops'` to `QueueFilterType` (`trip-queue-layout.util.ts`), `FILTER_MENU_ITEMS` & active filter pills (`TripQueueToolbar.tsx`), and `filterDispatchQueueTrips` (`dispatch-workspace.util.ts`).
+- [x] 49.3 Map Route Teardrop Pins, Cased Directional Polylines, HUD & Customer Tracking Upgrade:
+  - [x] 49.3.1 Create `app/components/domain/dispatch/map/route-map-sync.ts` and `app/components/domain/dispatch/map/MapRouteOverlayHud.tsx`, refactor `LiveFleetMap.tsx` (`1,335`L `< 1,350`L, `suppressMarkers: true`), and wire `onClearSelectedTrip` through `DispatchLiveMapPane.tsx`, `dispatch.tsx` (`1,517`L `< 1,600`L), and `dispatch.popout.tsx`.
+  - [x] 49.3.2 Upgrade `CustomerTelemetryMap.tsx` pickup, intermediate stop `1..N`, and dropoff markers to `buildRouteWaypointPinDataUrl` (`32×40`, bottom-tip anchored).
+- [x] 49.4 Dispatch Console Map & Route Display Preferences UI:
+  - [x] 49.4.1 Add the **"Map & Route Display"** toggle group (`Cased Route & Arrows`, `Interactive Route Pins`, `Route Summary Pill`) to `DispatchDesktopTopHeader.tsx` (`⚙️` menu) and `DispatchNavigationShell.tsx` (slide-out drawer).
+- [x] 49.5 Automated Verification Suite & Master Regression Gates:
+  - [x] 49.5.1 Create and pass `scripts/test-multi-stop-and-route-pins.ts` verifying `buildRouteWaypointPinDataUrl`, multi-stop helpers, `useDispatchMapPreferences` defaults/resilience, 10-column `TripQueueTableView.tsx` invariant, `suppressMarkers: true`, `LiveFleetMap.tsx < 1350`L, and `DispatchTripQueuePane.tsx < 900`L.
+  - [x] 49.5.2 Pass `npx tsx scripts/test-trip-queue-responsive.ts`, `npm run typecheck`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors, mark Phase 49 complete in `tasks.md`, and leave Phase 49 changes uncommitted for Control-Tower review.
+
+
 
 
 

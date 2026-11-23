@@ -7,6 +7,12 @@ import {
 } from '../../../../core/hooks/useDispatchFleet';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
+import {
+  buildTripItineraryTooltip,
+  formatShortStopPreview,
+  getTripIntermediateStopCount,
+  getTripIntermediateStops,
+} from '../../../../core/utils/route-markers.util';
 import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { TripActionDropdown } from '../TripActionDropdown';
 import {
@@ -94,9 +100,22 @@ export function TripQueueCardsGrid({
   onCancelAutoOffer,
 }: TripQueueCardsGridProps) {
   const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
+  const [expandedStopTripIds, setExpandedStopTripIds] = useState<Set<string>>(() => new Set());
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredTripIdRef = useRef<string | null>(null);
+
+  const toggleExpandedStops = useCallback((tripId: string) => {
+    setExpandedStopTripIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tripId)) {
+        next.delete(tripId);
+      } else {
+        next.add(tripId);
+      }
+      return next;
+    });
+  }, []);
 
   const cancelTripCardLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -189,6 +208,11 @@ export function TripQueueCardsGrid({
             ? FLEET_STATUS_COLORS[assignedDriverObj.mapStatus] || FLEET_STATUS_COLORS.offline
             : null;
           const isLongPressing = longPressingTripId === trip.id;
+          const stops = getTripIntermediateStops(trip);
+          const stopCount = getTripIntermediateStopCount(trip);
+          const isStopsExpanded = expandedStopTripIds.has(trip.id);
+          const firstStopPreview = stops[0] ? formatShortStopPreview(stops[0].address) : '';
+          const itineraryTooltip = stopCount > 0 ? buildTripItineraryTooltip(trip) : undefined;
 
           return (
             <div
@@ -335,6 +359,59 @@ export function TripQueueCardsGrid({
                       {trip.pickupLocation.address}
                     </span>
                   </div>
+
+                  {stopCount > 0 && (
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (stops.length > 0) {
+                            toggleExpandedStops(trip.id);
+                          }
+                        }}
+                        title={itineraryTooltip}
+                        className={`w-full text-left flex items-center justify-between gap-1.5 px-1.5 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100/90 border border-amber-300/90 text-amber-900 text-[11px] font-bold transition-colors ${
+                          stops.length > 0 ? 'cursor-pointer' : 'cursor-default'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9.5px] font-black flex items-center justify-center shrink-0">
+                            {stopCount}
+                          </span>
+                          <span className="truncate">
+                            {firstStopPreview
+                              ? `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'} · ${firstStopPreview}`
+                              : `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'}`}
+                          </span>
+                        </span>
+                        {stops.length > 0 && (
+                          <span className="text-[10px] text-amber-700 shrink-0 leading-none">
+                            {isStopsExpanded ? '▴' : '▾'}
+                          </span>
+                        )}
+                      </button>
+
+                      {isStopsExpanded && stops.length > 0 && (
+                        <div className="pl-1.5 space-y-1 pt-0.5">
+                          {stops.map((stop, idx) => (
+                            <div
+                              key={`${trip.id}-stop-${idx}`}
+                              className="flex items-start gap-1.5 text-[11px] text-amber-950"
+                            >
+                              <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center mt-0.5 shrink-0">
+                                {idx + 1}
+                              </span>
+                              <span className="truncate font-medium" title={stop.address}>
+                                {stop.address}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-1.5">
                     <MapPinIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
                     <span className="truncate font-medium" title={trip.dropoffLocation.address}>

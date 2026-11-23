@@ -779,6 +779,10 @@ export default function DispatchRoute() {
     setSelectedQueueTripId(trip.id);
     setShouldZoomMap(true);
   }, []);
+  const stableClearSelectedMapTrip = useCallback(() => {
+    setSelectedMapTrip(null);
+    setSelectedQueueTripId(null);
+  }, []);
 
   const stableCommsTabChange = useCallback((tab: any) => setCommsActiveTab(tab), []);
   const stableCommsPopOut = useCallback(() => getWorkspaceBus().popOutModule('comms'), []);
@@ -992,6 +996,7 @@ export default function DispatchRoute() {
             onCallDriver={stableCallDriverFromMap}
             onChangeDriverDutyStatus={stableChangeDriverDutyStatus}
             onSelectTrip={stableSelectMapTrip}
+            onClearSelectedTrip={stableClearSelectedMapTrip}
             onSwitchToRoster={stableSwitchToRoster}
           />
 

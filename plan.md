@@ -1233,6 +1233,45 @@ export interface PassengerAccount {
   - `PricingAuditDrawer` renders inside `AdminSlideOverDrawer` with `All · Surcharges On/Off · Surcharges (All) · Rates · Rules · Extras` filter pills, surcharge item dropdown, search bar, 1-click CSV download, color-coded timeline badges, `{ before → after }` diff chips, and inline note editing.
   - `PricingAdminWorkspace` wires all 4 pillar save/toggle/delete/migrate handlers into `PricingAuditService` and mounts the `Audit History` button (with live count badge) beside `Live Fare Preview`.
 
+## 38. Phase 49 Architecture (Wave 3 Phase 6): Multi-Stop Queue Indicators, Color-Coded Map Route Teardrop Pins & Dispatch Map Preferences
+
+### 38.1 Shared Route Waypoint Pin SVG Builder & Multi-Stop Helpers (`app/core/utils/route-markers.util.ts`)
+- **Memoized Teardrop Pin Data URL Builder (`buildRouteWaypointPinDataUrl`)**:
+  - Palette matching `DispatchLocationInput.tsx`:
+    - `pickup`: fill `#10b981`, border `#047857`, inner white circle dot.
+    - `stop`: fill `#f59e0b`, border `#b45309`, bold centered white stop number (`1..99`, safely clamped/escaped).
+    - `dropoff`: fill `#ef4444`, border `#b91c1c`, inner white rounded-square destination glyph.
+  - Dimensions `width="34" height="42"` with bottom tip cleanly anchored at `(17, 40)`, crisp white outer stroke, drop shadow, optional `isSelected` halo ring, and bounded `Map` cache (`<= 256` entries) for zero-allocation re-renders.
+- **Pure Trip Multi-Stop Helpers**:
+  - `getTripIntermediateStops(trip)`: Returns `TripLocation[]` filtered to non-empty trimmed `address`.
+  - `getTripIntermediateStopCount(trip)`: Uses `getTripIntermediateStops(trip).length`, falling back to `trip.pricing?.intermediateStopsCount || 0` when only summary pricing metadata is populated.
+  - `formatShortStopPreview(address)`: Concise street/venue segment prior to the first comma (clamped cleanly).
+  - `buildTripItineraryTooltip(trip)`: Multi-line ordered `Pickup: ...` → `Stop 1..N: ...` → `Dropoff: ...` tooltip text.
+
+### 38.2 SSR-Safe Cross-Window Map Preferences Hook (`app/core/hooks/dispatch/useDispatchMapPreferences.ts`)
+- **State & Defaults**:
+  - `DEFAULT_DISPATCH_MAP_PREFERENCES = { casedRouteWithArrows: true, interactiveRoutePinPopovers: true, showRouteSummaryPill: true }`.
+  - Storage key `ct_dispatch_map_prefs_v1` with resilient JSON parsing (`parseDispatchMapPreferences`) and deterministic SSR initial `useState(DEFAULT_DISPATCH_MAP_PREFERENCES)` hydrated inside `useEffect`.
+- **Real-Time Multi-Surface & Pop-Out Sync**:
+  - Updates notify an in-memory subscriber `Set` (instant sync between `DispatchDesktopTopHeader`, `DispatchNavigationShell`, and `LiveFleetMap` in the same tab) and listen to `window.addEventListener('storage', ...)` so detached `?module=map` pop-out windows reflect toggle changes live.
+
+### 38.3 Queue Views (`TripQueueTableView`, `TripQueueCardsGrid`, `TripQueueCompactList`, `TripQueueToolbar`)
+- **Zero-Column-Addition Table Sub-Pill (`TripQueueTableView.tsx`)**:
+  - Preserves exact 10 `<th>` columns and `scroller.scrollWidth > scroller.clientWidth + 1` live overflow detection; embeds the compact amber `+N stop(s) · preview` pill as line 2 inside the `PICKUP` `<td>` (`max-w-[160px]`).
+- **Uniform-Height Collapsible Card Route List (`TripQueueCardsGrid.tsx`)**:
+  - Renders Emerald Pickup → collapsible Amber `+N stop(s) · preview ▾` row (`expandedStopTripIds` local `Set<string>` toggling numbered `1..N` stop rows with `e.stopPropagation()`) → Rose Dropoff.
+- **Compact List & `has_stops` Filter (`TripQueueCompactList.tsx`, `TripQueueToolbar.tsx`, `dispatch-workspace.util.ts`)**:
+  - Inline `+N stop(s)` amber badge in Compact view; `has_stops` filter option + active amber filter chip in Desktop & Mobile toolbars; predicate in `filterDispatchQueueTrips`.
+
+### 38.4 Modular Map Route Sync, Overlay HUD & Customer Tracking Parity (`app/components/domain/dispatch/map/*`, `LiveFleetMap.tsx`, `CustomerTelemetryMap.tsx`)
+- **`app/components/domain/dispatch/map/route-map-sync.ts`**:
+  - Extracts `ResolvedRouteWaypoint`, `ResolvedRouteMetrics`, waypoint extraction from `selectedTrip` / `activeFormValues` / `activeTrip`, Google `DirectionsResult` leg coordinate snapping + total distance/duration aggregation, pooled route waypoint `google.maps.Marker` sync (`buildRouteWaypointPinDataUrl`), and cased + arrow-chevron `google.maps.Polyline` rendering + teardown so `LiveFleetMap.tsx` stays `< 1,350` lines and `dispatch.tsx` stays `< 1,600` lines.
+- **`app/components/domain/dispatch/map/MapRouteOverlayHud.tsx`**:
+  - Renders the interactive floating waypoint popover card (`🟢 Pickup` / `🟠 Stop #N` / `🔴 Dropoff`, full address, location/driver notes, close `✕`) when `interactiveRoutePinPopovers` is enabled, and the bottom-left floating route summary pill (leg chain, passenger/`#TRIP`, distance & ETA, and 1-click `✕` Clear Route wired via `onClearSelectedTrip`) when `showRouteSummaryPill` is enabled.
+- **`CustomerTelemetryMap.tsx`**:
+  - Upgrades pickup, intermediate stop `1..N`, and dropoff markers to `buildRouteWaypointPinDataUrl` (`scaledSize: 32×40`, `anchor: (16, 38)`).
+
+
 
 
 

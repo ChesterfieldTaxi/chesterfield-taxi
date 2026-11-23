@@ -25,7 +25,8 @@ import {
 } from '../../../core/services/maps/google-maps-loader';
 import { hasValidRoutePair } from '../../../core/hooks/useDebounceRoute';
 import { isRealtimeRoutingEnabled } from '../../../core/services/config/admin-config.service';
-import { resolveMockCoordinates } from '../../../core/services/maps/mock-routing';
+import { useDispatchMapPreferences } from '../../../core/hooks/dispatch/useDispatchMapPreferences';
+import { getTripIntermediateStopCount } from '../../../core/utils/route-markers.util';
 import {
   FLEET_STATUS_COLORS,
   getMapStatusLabel,
@@ -33,6 +34,18 @@ import {
 } from '../../../core/hooks/useDispatchFleet';
 import { PhoneIcon, CarIcon, MapPinIcon, UsersIcon, XIcon, CheckIcon } from '../../ui/Icons';
 import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
+import { MapRouteOverlayHud } from './map/MapRouteOverlayHud';
+import {
+  clearRoutePolylines,
+  clearRouteWaypointMarkers,
+  extractDirectionsRouteSnapshot,
+  resolveActiveRouteContext,
+  syncRoutePolylines,
+  syncRouteWaypointMarkers,
+  type ResolvedRouteMetrics,
+  type ResolvedRouteWaypoint,
+  type RoutePolylineHandles,
+} from './map/route-map-sync';
 
 export interface LiveFleetMapProps {
   fleet: LiveFleetDriver[];
@@ -48,6 +61,7 @@ export interface LiveFleetMapProps {
   onCallDriver?: (phone: string, name?: string) => void;
   onChangeDriverDutyStatus?: (driverId: string, dutyStatus: DriverDutyStatus) => void | Promise<void>;
   onSelectTrip?: (trip: Trip) => void;
+  onClearSelectedTrip?: () => void;
   onSwitchToRoster?: () => void;
   className?: string;
 }
@@ -168,20 +182,30 @@ function LiveFleetMapComponent({
   onCallDriver,
   onChangeDriverDutyStatus,
   onSelectTrip,
+  onClearSelectedTrip,
   onSwitchToRoster,
   className = '',
 }: LiveFleetMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const mockPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const routePolylineHandlesRef = useRef<RoutePolylineHandles>({
+    casingPolyline: null,
+    mainPolyline: null,
+  });
+  const routeWaypointMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const markersByIdRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const directionsSeqRef = useRef<number>(0);
 
+  const { preferences: mapPreferences } = useDispatchMapPreferences();
   const [mapReady, setMapReady] = useState(false);
   const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>('loading');
   const [statusFilter, setStatusFilter] = useState<MapFilterKey>('all');
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
+  const [snappedWaypoints, setSnappedWaypoints] = useState<ResolvedRouteWaypoint[] | null>(null);
+  const [routePath, setRoutePath] = useState<GeoPoint[]>([]);
+  const [routeMetrics, setRouteMetrics] = useState<ResolvedRouteMetrics | null>(null);
   const [showAwaitingGps, setShowAwaitingGps] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
@@ -250,6 +274,7 @@ function LiveFleetMapComponent({
 
           map.addListener('click', () => {
             setSelectedDriverId(null);
+            setSelectedWaypointId(null);
             onClearFocusedDriver?.();
           });
 
@@ -257,13 +282,9 @@ function LiveFleetMapComponent({
 
           directionsRendererRef.current = new gMaps.maps.DirectionsRenderer({
             map,
-            suppressMarkers: false,
+            suppressMarkers: true,
+            suppressPolylines: true,
             preserveViewport: true,
-            polylineOptions: {
-              strokeColor: '#2563eb',
-              strokeWeight: 5,
-              strokeOpacity: 0.85,
-            },
           });
 
           setMapReady(true);
@@ -282,12 +303,8 @@ function LiveFleetMapComponent({
         } catch {}
         directionsRendererRef.current = null;
       }
-      if (mockPolylineRef.current) {
-        try {
-          mockPolylineRef.current.setMap(null);
-        } catch {}
-        mockPolylineRef.current = null;
-      }
+      clearRoutePolylines(routePolylineHandlesRef.current);
+      clearRouteWaypointMarkers(routeWaypointMarkersRef.current);
       markersByIdRef.current.forEach((m) => {
         try {
           if (typeof google !== 'undefined' && google?.maps?.event) {
@@ -432,129 +449,78 @@ function LiveFleetMapComponent({
     });
   }, [mapReady, visibleWithGps, selectedDriverId]);
 
-  // Compute a stable route signature so Google Directions ONLY re-runs when the actual route changes
-  // (prevents map blinking/re-routing on unrelated form keystrokes like passenger name or notes!)
-  const resolvedRouteSpec = useMemo(() => {
-    let origin: any = null;
-    let destination: any = null;
-    let waypoints: any[] = [];
+  const stopsSig = [
+    ...(selectedTrip?.intermediateStops || []),
+    ...(Array.isArray(activeFormValues?.intermediateStops) ? activeFormValues.intermediateStops : []),
+    ...(activeTrip?.intermediateStops || []),
+  ]
+    .map((s: any) => `${s?.address || ''}|${s?.coordinates?.lat ?? ''},${s?.coordinates?.lng ?? ''}`)
+    .join(';');
 
-    if (selectedTrip?.pickupLocation?.address && selectedTrip?.dropoffLocation?.address) {
-      origin = selectedTrip.pickupLocation.coordinates || selectedTrip.pickupLocation.address;
-      destination = selectedTrip.dropoffLocation.coordinates || selectedTrip.dropoffLocation.address;
-      waypoints = (selectedTrip.intermediateStops || [])
-        .map((s) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc) => ({ location: loc, stopover: true }));
-    } else if (activeFormValues?.pickupAddress && activeFormValues?.dropoffAddress) {
-      origin = activeFormValues.pickupCoordinates || activeFormValues.pickupAddress;
-      destination = activeFormValues.dropoffCoordinates || activeFormValues.dropoffAddress;
-      waypoints = (activeFormValues.intermediateStops || [])
-        .map((s: any) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc: any) => ({ location: loc, stopover: true }));
-    } else if (activeTrip?.pickupLocation?.address && activeTrip?.dropoffLocation?.address) {
-      origin = activeTrip.pickupLocation.coordinates || activeTrip.pickupLocation.address;
-      destination = activeTrip.dropoffLocation.coordinates || activeTrip.dropoffLocation.address;
-      waypoints = (activeTrip.intermediateStops || [])
-        .map((s) => s.coordinates || s.address)
-        .filter(Boolean)
-        .map((loc) => ({ location: loc, stopover: true }));
-    }
-
-    const locKey = (val: any): string => {
-      if (!val) return '';
-      if (typeof val === 'string') return val.trim();
-      if (typeof val.lat === 'number' && typeof val.lng === 'number') {
-        return `${val.lat.toFixed(5)},${val.lng.toFixed(5)}`;
-      }
-      return String(val);
-    };
-
-    const signature = [
-      locKey(origin),
-      locKey(destination),
-      waypoints.map((w) => locKey(w.location)).join('|'),
-      shouldZoom ? '1' : '0',
-    ].join('=>');
-
-    return { origin, destination, waypoints, signature };
-  }, [
-    selectedTrip?.id,
-    selectedTrip?.pickupLocation?.address,
-    selectedTrip?.pickupLocation?.coordinates?.lat,
-    selectedTrip?.pickupLocation?.coordinates?.lng,
-    selectedTrip?.dropoffLocation?.address,
-    selectedTrip?.dropoffLocation?.coordinates?.lat,
-    selectedTrip?.dropoffLocation?.coordinates?.lng,
-    selectedTrip?.intermediateStops?.length,
-    activeFormValues?.pickupAddress,
-    activeFormValues?.pickupCoordinates?.lat,
-    activeFormValues?.pickupCoordinates?.lng,
-    activeFormValues?.dropoffAddress,
-    activeFormValues?.dropoffCoordinates?.lat,
-    activeFormValues?.dropoffCoordinates?.lng,
-    activeFormValues?.intermediateStops?.length,
-    activeTrip?.id,
-    activeTrip?.pickupLocation?.address,
-    activeTrip?.dropoffLocation?.address,
-    shouldZoom,
-  ]);
+  const activeRoute = useMemo(
+    () => resolveActiveRouteContext({ selectedTrip, activeFormValues, activeTrip, shouldZoom }),
+    [
+      selectedTrip?.id,
+      selectedTrip?.pickupLocation?.address,
+      selectedTrip?.pickupLocation?.coordinates?.lat,
+      selectedTrip?.pickupLocation?.coordinates?.lng,
+      selectedTrip?.dropoffLocation?.address,
+      selectedTrip?.dropoffLocation?.coordinates?.lat,
+      selectedTrip?.dropoffLocation?.coordinates?.lng,
+      activeFormValues?.pickupAddress,
+      activeFormValues?.pickupCoordinates?.lat,
+      activeFormValues?.pickupCoordinates?.lng,
+      activeFormValues?.dropoffAddress,
+      activeFormValues?.dropoffCoordinates?.lat,
+      activeFormValues?.dropoffCoordinates?.lng,
+      activeTrip?.id,
+      activeTrip?.pickupLocation?.address,
+      activeTrip?.dropoffLocation?.address,
+      stopsSig,
+      shouldZoom,
+    ]
+  );
 
   const lastRenderedRouteSigRef = useRef<string>('');
 
-  // Update Route Polyline (with mapReady dependency, routeSignature stability & cancellation guard)
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current) return;
-    if (lastRenderedRouteSigRef.current === resolvedRouteSpec.signature) return;
-    lastRenderedRouteSigRef.current = resolvedRouteSpec.signature;
+    const nextSig = activeRoute?.signature || '';
+    if (lastRenderedRouteSigRef.current === nextSig) return;
+    lastRenderedRouteSigRef.current = nextSig;
+    setSelectedWaypointId(null);
 
-    const { origin, destination, waypoints } = resolvedRouteSpec;
-
-    if (!isRealtimeRoutingEnabled()) {
+    if (!activeRoute) {
+      directionsSeqRef.current += 1;
+      setSnappedWaypoints(null);
+      setRoutePath([]);
+      setRouteMetrics(null);
       try {
         directionsRendererRef.current?.setDirections({ routes: [] } as any);
       } catch {}
-      if (mockPolylineRef.current) {
-        mockPolylineRef.current.setMap(null);
-        mockPolylineRef.current = null;
-      }
-      if (origin && destination && window.google?.maps?.Polyline) {
-        const originCoord = resolveMockCoordinates(origin);
-        const destCoord = resolveMockCoordinates(destination);
-        const wpCoords = waypoints.map((w) => resolveMockCoordinates(w.location));
-        const path = [originCoord, ...wpCoords, destCoord];
-
-        mockPolylineRef.current = new window.google.maps.Polyline({
-          path,
-          strokeColor: '#2563eb',
-          strokeWeight: 5,
-          strokeOpacity: 0.85,
-          map: mapInstanceRef.current,
-        });
-
-        if (shouldZoom && window.google?.maps?.LatLngBounds) {
-          const bounds = new window.google.maps.LatLngBounds();
-          path.forEach((pt) => bounds.extend(pt));
-          mapInstanceRef.current.fitBounds(bounds);
-        }
-      }
+      clearRoutePolylines(routePolylineHandlesRef.current);
+      clearRouteWaypointMarkers(routeWaypointMarkersRef.current);
       return;
     }
 
-    if (mockPolylineRef.current) {
-      mockPolylineRef.current.setMap(null);
-      mockPolylineRef.current = null;
-    }
+    const fallbackPath = activeRoute.waypoints.map((w) => w.coordinates);
+    setSnappedWaypoints(null);
+    setRoutePath(fallbackPath);
+    setRouteMetrics(null);
 
-    if (!origin || !destination || !hasValidRoutePair(origin, destination)) {
+    if (
+      !isRealtimeRoutingEnabled() ||
+      !hasValidRoutePair(activeRoute.originInput, activeRoute.destinationInput) ||
+      typeof window.google?.maps?.DirectionsService !== 'function'
+    ) {
       try {
         directionsRendererRef.current?.setDirections({ routes: [] } as any);
       } catch {}
-      return;
-    }
-
-    if (typeof window.google?.maps?.DirectionsService !== 'function' || !directionsRendererRef.current) {
+      if (shouldZoom && window.google?.maps?.LatLngBounds && fallbackPath.length >= 2) {
+        const bounds = new window.google.maps.LatLngBounds();
+        fallbackPath.forEach((pt) => bounds.extend(pt));
+        mapInstanceRef.current.fitBounds(bounds, 56);
+      }
       return;
     }
 
@@ -563,28 +529,88 @@ function LiveFleetMapComponent({
       const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
-          origin,
-          destination,
-          waypoints,
+          origin: activeRoute.originInput,
+          destination: activeRoute.destinationInput,
+          waypoints: activeRoute.waypointInputs,
           travelMode: window.google.maps.TravelMode.DRIVING,
         },
         (result, status) => {
           if (requestSeq !== directionsSeqRef.current) return;
-          if (status === window.google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
-            directionsRendererRef.current.setOptions({
-              preserveViewport: !shouldZoom,
-            });
-            directionsRendererRef.current.setDirections(result);
-            if (shouldZoom && result?.routes?.[0]?.bounds && mapInstanceRef.current) {
+          if (status === window.google.maps.DirectionsStatus.OK && result) {
+            const snapshot = extractDirectionsRouteSnapshot(result, activeRoute.waypoints);
+            setSnappedWaypoints(snapshot.snappedWaypoints);
+            setRoutePath(snapshot.path);
+            setRouteMetrics(snapshot.metrics);
+            if (shouldZoom && result.routes?.[0]?.bounds && mapInstanceRef.current) {
               mapInstanceRef.current.fitBounds(result.routes[0].bounds);
             }
           }
         }
       );
-    }, 650);
+    }, 450);
 
     return () => clearTimeout(timer);
-  }, [mapReady, resolvedRouteSpec, shouldZoom]);
+  }, [mapReady, activeRoute, shouldZoom]);
+
+  const effectiveWaypoints = useMemo(
+    () => snappedWaypoints || activeRoute?.waypoints || [],
+    [snappedWaypoints, activeRoute]
+  );
+
+  useEffect(() => {
+    if (!mapReady) return;
+    syncRoutePolylines({
+      map: mapInstanceRef.current,
+      handles: routePolylineHandlesRef.current,
+      path: routePath,
+      casedRouteWithArrows: mapPreferences.casedRouteWithArrows,
+    });
+  }, [mapReady, routePath, mapPreferences.casedRouteWithArrows]);
+
+  const interactivePopoversRef = useRef(mapPreferences.interactiveRoutePinPopovers);
+  interactivePopoversRef.current = mapPreferences.interactiveRoutePinPopovers;
+
+  const handleSelectWaypoint = useCallback((waypointId: string) => {
+    if (!interactivePopoversRef.current) return;
+    setSelectedWaypointId((prev) => (prev === waypointId ? null : waypointId));
+  }, []);
+
+  useEffect(() => {
+    if (!mapPreferences.interactiveRoutePinPopovers && selectedWaypointId) {
+      setSelectedWaypointId(null);
+    }
+  }, [mapPreferences.interactiveRoutePinPopovers, selectedWaypointId]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    syncRouteWaypointMarkers({
+      map: mapInstanceRef.current,
+      pool: routeWaypointMarkersRef.current,
+      waypoints: effectiveWaypoints,
+      selectedWaypointId,
+      interactiveRoutePinPopovers: mapPreferences.interactiveRoutePinPopovers,
+      onSelectWaypoint: handleSelectWaypoint,
+    });
+  }, [
+    mapReady,
+    effectiveWaypoints,
+    selectedWaypointId,
+    mapPreferences.interactiveRoutePinPopovers,
+    handleSelectWaypoint,
+  ]);
+
+  const selectedWaypoint = useMemo(
+    () =>
+      selectedWaypointId ? effectiveWaypoints.find((w) => w.id === selectedWaypointId) || null : null,
+    [effectiveWaypoints, selectedWaypointId]
+  );
+
+  const handlePanToWaypoint = useCallback((waypoint: ResolvedRouteWaypoint) => {
+    if (!mapInstanceRef.current) return;
+    mapInstanceRef.current.panTo(waypoint.coordinates);
+    const currentZoom = mapInstanceRef.current.getZoom?.() || 12;
+    if (currentZoom < 14) mapInstanceRef.current.setZoom(14);
+  }, []);
 
   // Fit all visible cars on map
   const handleFitFleet = useCallback(() => {
@@ -1188,6 +1214,15 @@ function LiveFleetMapComponent({
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span className="truncate">{selectedDriver.activeTrip.pickupLocation?.address}</span>
               </div>
+              {getTripIntermediateStopCount(selectedDriver.activeTrip) > 0 && (
+                <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-amber-800">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span>
+                    +{getTripIntermediateStopCount(selectedDriver.activeTrip)}{' '}
+                    {getTripIntermediateStopCount(selectedDriver.activeTrip) === 1 ? 'stop' : 'stops'}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
                 <MapPinIcon className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                 <span className="truncate">{selectedDriver.activeTrip.dropoffLocation?.address}</span>
@@ -1279,6 +1314,19 @@ function LiveFleetMapComponent({
           </div>
         </div>
       )}
+
+      {/* ─── ROUTE WAYPOINT POPOVER & BOTTOM-LEFT SUMMARY PILL HUD ─── */}
+      <MapRouteOverlayHud
+        activeRoute={activeRoute}
+        waypoints={effectiveWaypoints}
+        selectedWaypoint={selectedWaypoint}
+        metrics={routeMetrics}
+        preferences={mapPreferences}
+        hasSelectedDriverHud={Boolean(selectedDriver)}
+        onCloseWaypointPopover={() => setSelectedWaypointId(null)}
+        onPanToWaypoint={handlePanToWaypoint}
+        onClearSelectedTrip={onClearSelectedTrip}
+      />
     </div>
   );
 }

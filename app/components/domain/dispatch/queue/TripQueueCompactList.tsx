@@ -3,6 +3,10 @@ import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
+import {
+  buildTripItineraryTooltip,
+  getTripIntermediateStopCount,
+} from '../../../../core/utils/route-markers.util';
 import { TripActionDropdown } from '../TripActionDropdown';
 import {
   DispatchCascadePill,
@@ -76,6 +80,8 @@ export function TripQueueCompactList({
               minute: '2-digit',
             })
           : 'ASAP';
+        const stopCount = getTripIntermediateStopCount(trip);
+        const itineraryTooltip = stopCount > 0 ? buildTripItineraryTooltip(trip) : undefined;
 
         return (
           <div
@@ -126,12 +132,30 @@ export function TripQueueCompactList({
                   Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
                 </button>
               )}
-              <span
-                className="text-slate-500 truncate max-w-[200px]"
-                title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}
-              >
-                {trip.pickupLocation.address} → {trip.dropoffLocation.address}
-              </span>
+              {stopCount > 0 ? (
+                <span
+                  className="inline-flex items-center gap-1 text-slate-500 min-w-0 max-w-[260px]"
+                  title={itineraryTooltip}
+                >
+                  <span className="truncate max-w-[95px]">{trip.pickupLocation.address}</span>
+                  <span className="shrink-0">→</span>
+                  <span
+                    className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold shrink-0"
+                    title={itineraryTooltip}
+                  >
+                    +{stopCount} stop{stopCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="shrink-0">→</span>
+                  <span className="truncate max-w-[95px]">{trip.dropoffLocation.address}</span>
+                </span>
+              ) : (
+                <span
+                  className="text-slate-500 truncate max-w-[200px]"
+                  title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}
+                >
+                  {trip.pickupLocation.address} → {trip.dropoffLocation.address}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">

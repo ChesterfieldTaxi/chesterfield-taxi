@@ -1,6 +1,7 @@
 import type { Trip } from '../../types/trip';
 import type { SlaScanSummary } from '../../services/dispatch/sla-monitor.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
+import { getTripIntermediateStopCount } from '../../utils/route-markers.util';
 import type { DispatchFormValues } from '../../../components/domain/dispatch/DispatchBookingEngine';
 import type { DateTimeRange } from '../../../components/domain/dispatch/CustomDateTimePicker';
 import type { QueueFilterType } from '../../../components/domain/dispatch/DispatchTripQueuePane';
@@ -394,6 +395,10 @@ export function filterDispatchQueueTrips({
       if (!hasSeat) return false;
     }
 
+    if (activeFilterKeys.includes('has_stops') && getTripIntermediateStopCount(trip) <= 0) {
+      return false;
+    }
+
     if (activeFilterKeys.includes('company') && selectedCompanyFilter !== 'all') {
       const companyStr = `${meta.corporateOrgName || ''} ${
         meta.corporateDetails?.corporateAccount || ''
@@ -421,6 +426,9 @@ export function filterDispatchQueueTrips({
         (normSearchDigits.length >= 3 && rawPhone.replace(/\D/g, '').includes(normSearchDigits));
       const matchPickup = (trip.pickupLocation?.address || '').toLowerCase().includes(term);
       const matchDropoff = (trip.dropoffLocation?.address || '').toLowerCase().includes(term);
+      const matchStops = (trip.intermediateStops || []).some((s) =>
+        (s.address || '').toLowerCase().includes(term)
+      );
       const matchDriver = (trip.assignedDriverId || '').toLowerCase().includes(term);
       const matchGroup = (trip.multiCarGroupId || '').toLowerCase().includes(term);
       const matchFlight =
@@ -435,6 +443,7 @@ export function filterDispatchQueueTrips({
         !matchPhone &&
         !matchPickup &&
         !matchDropoff &&
+        !matchStops &&
         !matchDriver &&
         !matchGroup &&
         !matchFlight

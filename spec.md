@@ -969,6 +969,26 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Pure deterministic diff calculators (`diffSurchargesConfig`, `diffTariffChange`, `diffPricingRuleChange`, `diffUniversalExtrasChange`) emit structured `{ field, label, before, after }` diffs across Surcharges, Service Rates, Pricing Rules (`rule_enabled` / `rule_disabled` with active duration + `surchargeActions` directives), and Universal Extras while suppressing no-op saves (`diffs.length === 0`).
   - Slide-over `PricingAuditDrawer` mounted alongside `Live Fare Preview` in `PricingAdminWorkspace.tsx` featuring `All · Surcharges On/Off · Surcharges (All) · Rates · Rules · Extras` filter pills, per-surcharge dropdown filter, instant text search, color-coded timeline cards with `{ before → after }` diff chips, inline note editing, and RFC-4180 `Export CSV` (`chesterfield-pricing-audit-YYYY-MM-DD.csv`).
 
+## 49. Phase 49 (Wave 3 Phase 6): Multi-Stop Queue Indicators, Color-Coded Map Route Teardrop Pins & Dispatch Map Preferences
+- **Unified Green / Amber / Rose Route Color Language (`route-markers.util.ts`)**:
+  - Aligns route pins and queue indicators across Dispatch Booking (`DispatchLocationInput.tsx`), Trips Queue, Live Fleet Map (`LiveFleetMap.tsx`), Detached Map Pop-out (`dispatch.popout.tsx`), and Customer Live Tracking (`CustomerTelemetryMap.tsx`):
+    - **Pickup**: Emerald `#10b981` (border `#047857`) teardrop pin with inner white circle dot.
+    - **Intermediate Stop (`1..N`)**: Amber/Orange `#f59e0b` (border `#b45309`) teardrop pin with bold centered white stop number (`1`, `2`, `3`, ...).
+    - **Dropoff**: Rose/Red `#ef4444` (border `#b91c1c`) teardrop pin with inner white rounded square destination glyph.
+- **Zero-Width-Regression Multi-Stop Queue Indicators & `Has Stops` Filter**:
+  - **Trips Table (`TripQueueTableView.tsx` — Zero New Columns)**: Keeps the exact 10-column table structure and live `scrollWidth > clientWidth` auto-cards overflow detection, rendering a compact second-line amber pill (`+1 stop · Chesterfield Mall` / `+2 stops · ...`) inside the existing `PICKUP` `<td>` (`max-w-[160px]`) with full ordered itinerary hover tooltip (`buildTripItineraryTooltip`).
+  - **Trip Cards (`TripQueueCardsGrid.tsx`)**: Upgrades the route box into a vertical **Green → Orange → Red** list where intermediate stops render as a single uniform-height clickable amber row (`+N stop(s) · preview ▾`) that expands inline on click to reveal numbered orange rows (`1..N`) between Pickup and Dropoff without selecting/opening the card.
+  - **Compact List (`TripQueueCompactList.tsx`)**: Renders an inline compact `+N stop(s)` amber pill between Pickup and Dropoff with ordered itinerary tooltip.
+  - **Queue Filter (`TripQueueToolbar.tsx` & `dispatch-workspace.util.ts`)**: Adds `has_stops` (`Has Stops`) to `QueueFilterType` and `FILTER_MENU_ITEMS`, renders an active amber filter pill (`Has Stops ✕`), and filters `filteredTrips` via `getTripIntermediateStopCount(trip) > 0` (plus matching intermediate stop addresses in text search).
+- **Custom Teardrop Map Pins, Cased Directional Polyline & Live `DispatchMapPreferences`**:
+  - Retires Google's generic red `A > B > C` `DirectionsRenderer` markers (`suppressMarkers: true`, `suppressPolylines: true`) in favor of pooled custom teardrop SVG markers (`34×42`, tip-anchored at `(17, 40)`) and managed polylines across both Google Directions mode and Mock Routing mode (`LiveFleetMap.tsx < 1,350`L via extracted `app/components/domain/dispatch/map/route-map-sync.ts` & `MapRouteOverlayHud.tsx`).
+  - Persists SSR-deterministic `DispatchMapPreferences` (`ct_dispatch_map_prefs_v1`, all `true` by default, synced instantly across same-window components and detached `?module=map` pop-outs) exposed in both the Top-Right `⚙️` Console Settings Menu (`DispatchDesktopTopHeader.tsx`) and Slide-Out Operations Drawer (`DispatchNavigationShell.tsx`):
+    1. `casedRouteWithArrows` (`true`): Outer dark navy casing (`#1e3a8a`) + inner `#2563eb` route line with periodic `FORWARD_CLOSED_ARROW` directional chevrons (`repeat: '90px'`).
+    2. `interactiveRoutePinPopovers` (`true`): Clicking any Green / Orange `#1..#N` / Red route pin opens a floating waypoint details card with color badge, full street address, and location/driver notes.
+    3. `showRouteSummaryPill` (`true`): Compact bottom-left floating route summary pill showing `🟢 Pickup → 🟠 N Stop(s) → 🔴 Dropoff`, passenger/`#TRIP` tag, resolved mileage/ETA, and 1-click **`✕`** Clear Route (`onClearSelectedTrip`).
+  - Upgrades `CustomerTelemetryMap.tsx` pickup/stop/dropoff markers from default `'P'`/`'1'`/`'D'` markers to the shared `buildRouteWaypointPinDataUrl` teardrop SVG pins (`32×40`).
+
+
 
 
 

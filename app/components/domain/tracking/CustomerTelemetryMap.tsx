@@ -5,6 +5,7 @@ import type { PublicTripTrackingProjection } from '../../../core/utils/tracking-
 import { loadGoogleMaps, CHESTERFIELD_CENTER } from '../../../core/services/maps/google-maps-loader';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
+import { buildRouteWaypointPinDataUrl } from '../../../core/utils/route-markers.util';
 import { buildFleetCarMarkerDataUrl } from '../dispatch/LiveFleetMap';
 import { CarIcon, MapPinIcon, RadioIcon, ShieldCheckIcon, ClockIcon, PhoneIcon, ChatBubbleLeftRightIcon } from '../../ui/Icons';
 
@@ -263,15 +264,23 @@ export function CustomerTelemetryMap({
 
     // Pickup marker (only when real coordinates exist)
     if (normalized.pickupCoord) {
+      const pickupIcon: google.maps.Icon = {
+        url: buildRouteWaypointPinDataUrl({ kind: 'pickup' }),
+        scaledSize: new gMaps.Size(32, 40),
+        anchor: new gMaps.Point(16, 38),
+      };
       if (!markerPickupRef.current) {
         markerPickupRef.current = new gMaps.Marker({
           position: normalized.pickupCoord,
           map,
           title: `Pickup: ${normalized.pickupAddress}`,
-          label: { text: 'P', color: '#ffffff', fontWeight: 'bold' },
+          icon: pickupIcon,
+          zIndex: 210,
+          optimized: false,
         });
       } else {
         markerPickupRef.current.setPosition(normalized.pickupCoord);
+        markerPickupRef.current.setIcon(pickupIcon);
         markerPickupRef.current.setMap(map);
       }
     } else if (markerPickupRef.current) {
@@ -280,15 +289,23 @@ export function CustomerTelemetryMap({
 
     // Dropoff marker
     if (normalized.dropoffCoord) {
+      const dropoffIcon: google.maps.Icon = {
+        url: buildRouteWaypointPinDataUrl({ kind: 'dropoff' }),
+        scaledSize: new gMaps.Size(32, 40),
+        anchor: new gMaps.Point(16, 38),
+      };
       if (!markerDropoffRef.current) {
         markerDropoffRef.current = new gMaps.Marker({
           position: normalized.dropoffCoord,
           map,
           title: `Destination: ${normalized.dropoffAddress}`,
-          label: { text: 'D', color: '#ffffff', fontWeight: 'bold' },
+          icon: dropoffIcon,
+          zIndex: 205,
+          optimized: false,
         });
       } else {
         markerDropoffRef.current.setPosition(normalized.dropoffCoord);
+        markerDropoffRef.current.setIcon(dropoffIcon);
         markerDropoffRef.current.setMap(map);
       }
     } else if (markerDropoffRef.current) {
@@ -303,7 +320,13 @@ export function CustomerTelemetryMap({
           position: s.coordinates,
           map,
           title: `Stop ${i + 1}: ${s.address}`,
-          label: { text: String(i + 1), color: '#ffffff', fontWeight: 'bold' },
+          icon: {
+            url: buildRouteWaypointPinDataUrl({ kind: 'stop', stopNumber: i + 1 }),
+            scaledSize: new gMaps.Size(32, 40),
+            anchor: new gMaps.Point(16, 38),
+          },
+          zIndex: 195 + i,
+          optimized: false,
         })
     );
 
@@ -418,7 +441,11 @@ export function CustomerTelemetryMap({
                   map,
                 });
               } else {
-                fallbackPolylineRef.current.setPath([routeOrigin!, routeDest!]);
+                fallbackPolylineRef.current.setPath([
+                  routeOrigin!,
+                  ...normalized.stops.map((s) => s.coordinates),
+                  routeDest!,
+                ]);
                 fallbackPolylineRef.current.setMap(map);
               }
             }
@@ -433,6 +460,7 @@ export function CustomerTelemetryMap({
     normalized.pickupCoord?.lng,
     normalized.dropoffCoord?.lat,
     normalized.dropoffCoord?.lng,
+    normalized.stops.length,
     liveVehicleCoord?.lat,
     liveVehicleCoord?.lng,
     carMapStatus,

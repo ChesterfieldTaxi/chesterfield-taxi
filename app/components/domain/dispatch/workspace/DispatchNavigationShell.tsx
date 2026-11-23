@@ -6,10 +6,11 @@ import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import { UserDropdown } from '../../common/UserDropdown';
-import type {
-  DesktopDockTab,
-  DispatchMobileTab,
-  DraftTab,
+import {
+  useDispatchMapPreferences,
+  type DesktopDockTab,
+  type DispatchMobileTab,
+  type DraftTab,
 } from '../../../../core/hooks/dispatch';
 import type { DispatchPushInfo, DispatchWakeLockInfo } from './DispatchDesktopTopHeader';
 import {
@@ -98,6 +99,8 @@ export function DispatchNavigationShell({
   dispatchPush,
   onSignOut,
 }: DispatchNavigationShellProps) {
+  const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
+
   return (
     <>
       {/* ─── SLIDE-OUT OPERATIONS & PROFILE DRAWER ─── */}
@@ -515,6 +518,63 @@ export function DispatchNavigationShell({
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Map & Route Display Preferences */}
+            <div className="py-3 border-b border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                Map &amp; Route Display
+              </span>
+
+              {(
+                [
+                  {
+                    key: 'casedRouteWithArrows',
+                    label: 'Cased Route & Arrows',
+                    subtitle: 'High-contrast border & travel direction chevrons',
+                  },
+                  {
+                    key: 'interactiveRoutePinPopovers',
+                    label: 'Interactive Route Pins',
+                    subtitle: 'Click Green/Orange/Red pins to view stop details',
+                  },
+                  {
+                    key: 'showRouteSummaryPill',
+                    label: 'Route Summary Pill',
+                    subtitle: 'Floating leg count, mileage & 1-click Clear Route',
+                  },
+                ] as const
+              ).map((opt) => {
+                const active = mapPrefs[opt.key];
+                return (
+                  <div
+                    key={opt.key}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-semibold text-slate-200 block leading-tight">
+                        {opt.label}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block leading-snug">
+                        {opt.subtitle}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={active}
+                      onClick={() => toggleMapPref(opt.key)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 transition-colors cursor-pointer ${
+                        active
+                          ? 'bg-blue-600 text-white hover:bg-blue-500'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {active ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Quick Links */}

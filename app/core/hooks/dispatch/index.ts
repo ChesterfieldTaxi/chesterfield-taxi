@@ -1,4 +1,5 @@
 export * from './dispatch-workspace.util';
+export * from './useDispatchMapPreferences';
 export * from './useDispatchPanelResize';
 export * from './useDispatchSlaCascadeLoop';
 export * from './useDispatchFleetAlerts';
