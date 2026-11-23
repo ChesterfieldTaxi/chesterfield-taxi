@@ -1042,3 +1042,14 @@ The booking portal will guide the user through a sequential, config-driven flow:
 
 
 
+
+## 53. Phase 53 (Wave 4 Phase 4): Driver App Multi-Stop Progression, Full-Route Waypoints Navigation (`&waypoints=`) & Live Stop Free-Wait Timer (`/app/driver`)
+- **Multi-Stop & Active-Leg Navigation URL Builders (`app/core/utils/driver-ui.util.ts`)**:
+  - Pure, SSR-safe `formatNavTarget`, `buildSinglePointNavigationUrl`, `buildMultiStopNavigationUrl`, and `openTripRouteNavigation` (preserving 100% backward compatibility on `openMapNavigation`).
+  - **Google Maps (`app === 'google'`)**: Builds `&waypoints=` URLs (`[Pickup, ...AllStops] -> Dropoff` before `in_progress`, or `RemainingUncompletedStops -> Dropoff` during `in_progress`, and direct `Dropoff` once all stops are completed/skipped).
+  - **Apple Maps (`app === 'apple'`) & Waze (`app === 'waze'`)**: Resolves the next active leg (`Pickup` before `in_progress`, first uncompleted `Stop #k` during `in_progress`, or `Destination` once all stops are completed).
+- **Stop Progression & Live Free-Wait Timer Engine (`driver-stop-progress.ts` & `useDriverMultiStopProgress.ts`)**:
+  - Persists per-stop `DriverStopStepStatus` (`'pending' | 'arrived' | 'completed' | 'skipped'`), timestamps, waited seconds, and `waitFeeExtraId` inside `Trip.metadata.stopProgress` via `bookingService.updateTrip` without modifying `firestore.rules`.
+  - Computes live free-wait grace countdown (`intermediateStopFreeWaitingMinutes`, default `5m`) and excess billable minutes (`Math.ceil(excessSeconds / 60) * curbWaitingRatePerMinute`, default `$0.50/min`) via `getUniversalExtrasService()`, with idempotent canonical `pricing.driverExtras` / `pricing.breakdown` / `meterExtras` synchronization and 1-tap `Undo` reversal.
+- **Color-Coded Route Timeline & Dispatcher Visibility (`DriverRouteTimelineCard.tsx`, `DriverLiveMeterCard.tsx`, `DriverOfferSheet.tsx`, `TripDrawerOverviewSection.tsx`)**:
+  - Visualizes Emerald Pickup (`●`) → Amber Numbered Intermediate Stops (`1..N`) → Rose Destination (`■`) across compact offer/queue cards and interactive active-trip cards, plus read-only live stop status pills in Dispatch's `TripDrawerOverviewSection.tsx`.

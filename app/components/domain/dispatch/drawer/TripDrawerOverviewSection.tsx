@@ -7,6 +7,7 @@ import {
   hasStagedDriver,
   isTripEligibleForStaging,
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
+import { summarizeTripStopProgress } from '../../../../core/services/driver/driver-stop-progress';
 import {
   formatVehicleTier,
   formatVehicleTierDisplay,
@@ -650,32 +651,90 @@ export function TripDrawerOverviewSection({
 
       {/* Route */}
       <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-        <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Route</div>
-        <div className="space-y-1.5">
-          <div className="flex items-start gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-            <div>
-              <span className="font-bold text-slate-800">Pickup: </span>
-              <span className="text-slate-700">{reviewTrip.pickupLocation.address}</span>
-            </div>
-          </div>
-          {reviewTrip.intermediateStops && reviewTrip.intermediateStops.length > 0 && (
-            <div className="pl-4 space-y-1 text-[11px] text-slate-600 border-l-2 border-slate-200 ml-1">
-              {reviewTrip.intermediateStops.map((stop, i) => (
-                <div key={i}>
-                  Stop {i + 1}: {stop.address}
+        {(() => {
+          const hasSavedStopProgress =
+            Array.isArray(tripMeta.stopProgress) && tripMeta.stopProgress.length > 0;
+          const stopSummary = hasSavedStopProgress ? summarizeTripStopProgress(reviewTrip) : null;
+          const progressByIndex = new Map(
+            (stopSummary?.entries || []).map((entry) => [entry.stopIndex, entry])
+          );
+
+          return (
+            <>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                  Route
                 </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-start gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
-            <div>
-              <span className="font-bold text-slate-800">Dropoff: </span>
-              <span className="text-slate-700">{reviewTrip.dropoffLocation.address}</span>
-            </div>
-          </div>
-        </div>
+                {stopSummary && stopSummary.totalStops > 0 && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      stopSummary.allStopsCompleted
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}
+                  >
+                    Stops: {stopSummary.completedCount}/{stopSummary.totalStops} Completed
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-bold text-slate-800">Pickup: </span>
+                    <span className="text-slate-700">{reviewTrip.pickupLocation.address}</span>
+                  </div>
+                </div>
+                {reviewTrip.intermediateStops && reviewTrip.intermediateStops.length > 0 && (
+                  <div className="pl-4 space-y-1.5 text-[11px] text-slate-600 border-l-2 border-amber-300/80 ml-1">
+                    {reviewTrip.intermediateStops.map((stop, i) => {
+                      const entry = progressByIndex.get(i);
+                      return (
+                        <div key={i} className="flex items-center justify-between gap-2 flex-wrap">
+                          <span>
+                            <strong className="text-amber-800">Stop {i + 1}:</strong> {stop.address}
+                          </span>
+                          {entry && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                                entry.status === 'arrived'
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : entry.status === 'completed'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : entry.status === 'skipped'
+                                  ? 'bg-slate-200 text-slate-700 border-slate-300'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                              }`}
+                            >
+                              {entry.status === 'arrived'
+                                ? `At Stop #${i + 1}`
+                                : entry.status === 'completed'
+                                ? `Completed${
+                                    entry.waitFeeAdded && entry.waitFeeAdded > 0
+                                      ? ` (+$${entry.waitFeeAdded.toFixed(2)})`
+                                      : ''
+                                  }`
+                                : entry.status === 'skipped'
+                                ? 'Skipped'
+                                : 'Pending'}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex items-start gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-bold text-slate-800">Dropoff: </span>
+                    <span className="text-slate-700">{reviewTrip.dropoffLocation.address}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Equipment & Child Seats Breakdown */}

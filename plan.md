@@ -1392,3 +1392,12 @@ export interface PassengerAccount {
 
 
 
+
+## 42. Phase 53 Architecture: Driver App Multi-Stop Progression, Full-Route Waypoints Navigation & Live Stop Free-Wait Timer
+- **Navigation URL Layer (`app/core/utils/driver-ui.util.ts`)**:
+  - `formatNavTarget`, `buildSinglePointNavigationUrl`, `buildMultiStopNavigationUrl`, and `openTripRouteNavigation` provide pure, SSR-testable URL construction across Google Maps (`&waypoints=`), Apple Maps (`maps.apple.com/?daddr=`), and Waze (`waze.com/ul`).
+- **Stop State & Wait-Fee Engine (`app/core/services/driver/driver-stop-progress.ts` & `app/core/hooks/useDriverMultiStopProgress.ts`)**:
+  - `normalizeTripStopProgress`, `summarizeTripStopProgress`, `computeStopWaitTimerState`, `buildStopWaitDriverExtra`, and pure state-transition builders (`buildArriveAtStopUpdate`, `buildCompleteStopUpdate`, `buildSkipStopUpdate`, `buildResetStopToPendingUpdate`) keep `app/routes/driver.tsx` `< 1,900`L.
+  - `useDriverMultiStopProgress` runs a `1000ms` ticker strictly while `activeTrip.status === 'in_progress'` and an intermediate stop has `status === 'arrived'`.
+- **Route Timeline UI (`app/components/domain/driver/DriverRouteTimelineCard.tsx`)**:
+  - Replaces inline route blocks in `DriverLiveMeterCard.tsx` (`< 1,080`L) and `DriverOfferSheet.tsx` (`< 400`L), and surfaces live read-only stop status pills in `TripDrawerOverviewSection.tsx`.

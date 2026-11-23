@@ -3,8 +3,8 @@ import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import { DriverTripManifest } from './DriverTripManifest';
 import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
+import { DriverRouteTimelineCard } from './DriverRouteTimelineCard';
 import {
-  openMapNavigation,
   resolveCallPassengerHref,
   type PreferredNavApp,
 } from '../../../core/utils/driver-ui.util';
@@ -118,25 +118,11 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
                   {/* Full Manifest on Offer Cards too! */}
                   <DriverTripManifest trip={offer} adminVehicles={adminVehicles} compact />
 
-                  <div className="space-y-2 text-xs bg-slate-950/50 p-3 rounded-2xl border border-slate-800/80">
-                    <div className="flex items-start gap-2">
-                      <span className="text-emerald-400 font-bold shrink-0">Pickup:</span>
-                      <span className="text-slate-200">{offer.pickupLocation?.address}</span>
-                    </div>
-                    {offer.intermediateStops && offer.intermediateStops.length > 0 && (
-                      <div className="pl-3 border-l border-dashed border-slate-700 space-y-1">
-                        {offer.intermediateStops.map((s, i) => (
-                          <div key={i} className="text-slate-300">
-                            <span className="text-blue-400 font-bold">Stop {i + 1}:</span> {s.address}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex items-start gap-2">
-                      <span className="text-rose-400 font-bold shrink-0">Dest:</span>
-                      <span className="text-slate-200">{offer.dropoffLocation?.address}</span>
-                    </div>
-                  </div>
+                  <DriverRouteTimelineCard
+                    trip={offer}
+                    preferredNavApp={preferredNavApp}
+                    variant="compact"
+                  />
 
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button
@@ -252,59 +238,12 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
                 {/* Manifest on Scheduled cards */}
                 <DriverTripManifest trip={trip} adminVehicles={adminVehicles} compact />
 
-                <div className="space-y-2 text-xs bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <span className="text-emerald-400 font-bold block text-[10px] uppercase">Pickup:</span>
-                      <span className="text-slate-200">{trip.pickupLocation?.address}</span>
-                    </div>
-                    {trip.pickupLocation?.address && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openMapNavigation(
-                            trip.pickupLocation.address,
-                            preferredNavApp,
-                            trip.pickupLocation.coordinates
-                          )
-                        }
-                        className="px-3 py-2 min-h-[40px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold shrink-0 cursor-pointer"
-                      >
-                        Maps
-                      </button>
-                    )}
-                  </div>
-                  {trip.intermediateStops && trip.intermediateStops.length > 0 && (
-                    <div className="pl-2.5 border-l border-dashed border-slate-700 space-y-1">
-                      {trip.intermediateStops.map((s, sIdx) => (
-                        <div key={sIdx} className="text-slate-300">
-                          <span className="text-blue-400 font-bold">Stop {sIdx + 1}:</span> {s.address}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between gap-2 pt-1.5 border-t border-slate-800">
-                    <div className="flex-1">
-                      <span className="text-rose-400 font-bold block text-[10px] uppercase">Destination:</span>
-                      <span className="text-slate-200">{trip.dropoffLocation?.address}</span>
-                    </div>
-                    {trip.dropoffLocation?.address && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openMapNavigation(
-                            trip.dropoffLocation.address,
-                            preferredNavApp,
-                            trip.dropoffLocation.coordinates
-                          )
-                        }
-                        className="px-3 py-2 min-h-[40px] bg-rose-500/15 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-bold shrink-0 cursor-pointer"
-                      >
-                        Maps
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <DriverRouteTimelineCard
+                  trip={trip}
+                  preferredNavApp={preferredNavApp}
+                  variant="compact"
+                  showPointNavButtons
+                />
 
                 <button
                   type="button"

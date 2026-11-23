@@ -42,6 +42,7 @@ import {
   DollarSignIcon,
 } from '../components/ui/Icons';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
+import { useDriverMultiStopProgress } from '../core/hooks/useDriverMultiStopProgress';
 import { useWakeLock } from '../core/hooks/useWakeLock';
 import { usePushNotifications } from '../core/hooks/usePushNotifications';
 import { validatePhoneNumber } from '../core/utils/phone';
@@ -500,6 +501,24 @@ export default function DriverAppRoute() {
           driver.dutyStatus === 'on_break' ||
           (activeTrip && ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(activeTrip.status)))
     ),
+  });
+
+  // Phase 53: Intermediate Stop Progression & Live Free-Wait Timer Engine
+  const handleMultiStopSuccess = useCallback((msg: string) => {
+    setSuccessNotice(msg);
+    setTimeout(() => setSuccessNotice(null), 3500);
+  }, []);
+
+  const handleMultiStopError = useCallback((msg: string) => {
+    setErrorNotice(msg);
+    setTimeout(() => setErrorNotice(null), 4000);
+  }, []);
+
+  const multiStop = useDriverMultiStopProgress({
+    activeTrip,
+    setAllDriverTrips,
+    onSuccessNotice: handleMultiStopSuccess,
+    onErrorNotice: handleMultiStopError,
   });
 
   // Phase 34: Screen Wake Lock (automatically enabled whenever driver is On-Duty) & Web Push Alerts
@@ -1616,6 +1635,7 @@ export default function DriverAppRoute() {
               meterWaitSeconds={meterWaitSeconds}
               meterDistance={meterDistance}
               actionLoading={actionLoading}
+              multiStop={multiStop}
               showNoShowModal={showNoShowModal}
               noShowReason={noShowReason}
               showSmsModal={showSmsModal}

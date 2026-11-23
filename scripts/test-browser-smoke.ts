@@ -305,6 +305,7 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     { relFile: 'app/components/domain/BookingEngineV2.tsx', maxLines: 1800 },
     { relFile: 'app/components/domain/dispatch/DispatchBookingEngine.tsx', maxLines: 1800 },
     { relFile: 'app/routes/dispatch.tsx', maxLines: 2000 },
+    { relFile: 'app/routes/driver.tsx', maxLines: 2000 },
     { relFile: 'app/components/domain/dispatch/LiveFleetMap.tsx', maxLines: 1350 },
     { relFile: 'app/components/domain/dispatch/DispatchTripQueuePane.tsx', maxLines: 1200 },
     { relFile: 'app/components/domain/dispatch/DispatchTripDetailsDrawer.tsx', maxLines: 1500 },

@@ -847,3 +847,16 @@
 
 
 
+
+## Phase 53 (Wave 4 Phase 4): Driver App Multi-Stop Progression, Full-Route Waypoints Navigation (`&waypoints=`) & Live Stop Free-Wait Timer (`/app/driver`)
+- [x] 53.1 Multi-Stop & Active-Leg Navigation URL Builders (`app/core/utils/driver-ui.util.ts`):
+  - [x] 53.1.1 Add pure, SSR-safe `formatNavTarget`, `buildSinglePointNavigationUrl`, `buildMultiStopNavigationUrl` (Google Maps full `&waypoints=` pre-pickup & remaining-stops routing; Apple Maps & Waze next-active-leg resolution across `Pickup` → `Stop #k` → `Destination`), and `openTripRouteNavigation`, keeping `openMapNavigation` 100% backward-compatible.
+- [x] 53.2 Pure Stop Progression & Free-Wait Engine (`app/core/services/driver/driver-stop-progress.ts` & `app/core/hooks/useDriverMultiStopProgress.ts`):
+  - [x] 53.2.1 Create `app/core/services/driver/driver-stop-progress.ts` defining `DriverStopStepStatus`, `TripStopProgressEntry` (`Trip.metadata.stopProgress`), `normalizeTripStopProgress`, `summarizeTripStopProgress`, `computeStopWaitTimerState` (`intermediateStopFreeWaitingMinutes` & `curbWaitingRatePerMinute`), `buildStopWaitDriverExtra`, and idempotent canonical pricing/extra state builders.
+  - [x] 53.2.2 Create `app/core/hooks/useDriverMultiStopProgress.ts` subscribing to `getUniversalExtrasService()`, running a `1000ms` ticker strictly while `activeTrip.status === 'in_progress'` with an `'arrived'` stop, and persisting `arriveAtStop`, `completeStopAndResume` (`applySuggestedWaitFee`), `skipStop`, and `resetStopToPending` via `bookingService.updateTrip`.
+- [x] 53.3 Color-Coded Route Timeline & Live Stop Controls (`DriverRouteTimelineCard.tsx`, `DriverLiveMeterCard.tsx`, `DriverOfferSheet.tsx`, `TripDrawerOverviewSection.tsx`):
+  - [x] 53.3.1 Create `app/components/domain/driver/DriverRouteTimelineCard.tsx` (`variant="compact"` & `variant="interactive"`) with Emerald Pickup (`●`) → Amber Numbered Stops (`1..N`) → Rose Destination (`■`), `Stops: X/N Completed` + `Full Route Nav` / `Navigate Next Leg`, `Arrived at Stop #k` / `Skip`, live Free-Wait Countdown & Overtime Fee actions (`Resume + Add $X.XX Wait Fee` / `Resume Without Fee`), and `Undo`.
+  - [x] 53.3.2 Wire `DriverRouteTimelineCard` & `useDriverMultiStopProgress` into `app/routes/driver.tsx` (`< 1,900`L), `DriverLiveMeterCard.tsx` (`< 1,080`L, with `🟠 N Stops` lineup chip badge & non-blocking open-stop completion reminder), `DriverOfferSheet.tsx` (`< 400`L), and read-only stop status pills in Dispatch's `TripDrawerOverviewSection.tsx`.
+- [x] 53.4 Automated Verification Suite (`scripts/test-driver-multi-stop.ts`) & Master Regression Gate:
+  - [x] 53.4.1 Create and pass `scripts/test-driver-multi-stop.ts` covering Google/Apple/Waze URL builders, `computeStopWaitTimerState` boundary math (`0s`, `299s`, `300s`, `301s`, `361s` + custom config), `waitFeeExtraId` idempotency, monolith line budgets, untouched `firestore.rules` & `vercel.json`, and zero `"HUD Now"` wording.
+  - [x] 53.4.2 Pass `npm run typecheck`, `npx tsx scripts/test-driver-multi-stop.ts`, `npx tsx scripts/test-multi-stop-and-route-pins.ts`, `npx tsx scripts/test-dispatch-queue-and-map-sync.ts`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors.

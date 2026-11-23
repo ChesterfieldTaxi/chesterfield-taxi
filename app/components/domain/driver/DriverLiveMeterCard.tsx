@@ -3,14 +3,17 @@ import type { DriverProfile, DriverMeterExtra } from '../../../core/types/driver
 import type { Trip, TripStatus } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
+import type { DriverMultiStopProgressController } from '../../../core/hooks/useDriverMultiStopProgress';
+import { summarizeTripStopProgress } from '../../../core/services/driver/driver-stop-progress';
+import { getTripIntermediateStopCount } from '../../../core/utils/route-markers.util';
 import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { DriverTripManifest } from './DriverTripManifest';
 import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
+import { DriverRouteTimelineCard } from './DriverRouteTimelineCard';
 import {
   formatCabUnitLabel,
   formatTimer,
   maskPhoneForDisplay,
-  openMapNavigation,
   resolveCallPassengerHref,
   type DriverTab,
   type PreferredNavApp,
@@ -58,6 +61,7 @@ export interface DriverLiveMeterCardProps {
   meterWaitSeconds: number;
   meterDistance: number;
   actionLoading: string | null;
+  multiStop?: DriverMultiStopProgressController;
   // Active-trip modals state
   showNoShowModal: boolean;
   noShowReason: string;
@@ -108,6 +112,7 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
   meterWaitSeconds,
   meterDistance,
   actionLoading,
+  multiStop,
   showNoShowModal,
   noShowReason,
   showSmsModal,
@@ -162,6 +167,7 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
           <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
             {scheduledTrips.map((trip, idx) => {
               const isSelected = activeTrip?.id === trip.id;
+              const stopCount = getTripIntermediateStopCount(trip);
               const pickupTime = trip.scheduledPickupTime
                 ? new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
                     hour: 'numeric',
@@ -187,9 +193,16 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
                       {trip.status.replace('_', ' ').slice(0, 10)}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-white truncate max-w-[130px]">
-                    {trip.passenger?.firstName} {trip.passenger?.lastName}
-                  </span>
+                  <div className="flex items-center justify-between gap-1.5 w-full">
+                    <span className="text-xs font-semibold text-white truncate max-w-[115px]">
+                      {trip.passenger?.firstName} {trip.passenger?.lastName}
+                    </span>
+                    {stopCount > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded-full font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                        🟠 {stopCount} {stopCount === 1 ? 'Stop' : 'Stops'}
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -324,111 +337,13 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
           {/* Complete Operational Manifest (Vehicle, Payment/PO, Car Seats, Cargo, Aviation, Booker, Gate Code, Notes, Breakdown) */}
           <DriverTripManifest trip={activeTrip} adminVehicles={adminVehicles} />
 
-          {/* Route Details with Turn-by-Turn Navigation */}
-          <div className="space-y-3 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/80">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                  P
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">
-                    Pickup Location
-                  </span>
-                  <p className="text-sm font-semibold text-white leading-snug">
-                    {activeTrip.pickupLocation?.address}
-                  </p>
-                  {activeTrip.pickupLocation?.driverNotes && (
-                    <p className="text-xs text-blue-300 mt-1 italic">
-                      Pickup Note: {activeTrip.pickupLocation.driverNotes}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {activeTrip.pickupLocation?.address && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    openMapNavigation(
-                      activeTrip.pickupLocation.address,
-                      preferredNavApp,
-                      activeTrip.pickupLocation.coordinates
-                    )
-                  }
-                  className="px-3 py-2 min-h-[44px] bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <MapPinIcon className="w-4 h-4 text-emerald-400" />
-                  <span>Directions</span>
-                </button>
-              )}
-            </div>
-
-            {/* Intermediate Stops */}
-            {activeTrip.intermediateStops && activeTrip.intermediateStops.length > 0 && (
-              <div className="pl-9 space-y-2 border-l-2 border-dashed border-slate-700 ml-3.5">
-                {activeTrip.intermediateStops.map((stop, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-slate-300 min-w-0">
-                      <span className="text-blue-400 font-bold">Stop {idx + 1}:</span> {stop.address}
-                      {stop.unitOrApt ? ` (${stop.unitOrApt})` : ''}
-                      {stop.driverNotes ? (
-                        <span className="block text-[11px] text-slate-400 italic">{stop.driverNotes}</span>
-                      ) : null}
-                    </div>
-                    {stop.address && (
-                      <button
-                        type="button"
-                        onClick={() => openMapNavigation(stop.address, preferredNavApp, stop.coordinates)}
-                        className="px-3 py-2 min-h-[40px] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-600/35 text-blue-300 rounded-xl text-xs font-bold shrink-0 cursor-pointer"
-                      >
-                        Nav
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Dropoff */}
-            <div className="flex items-start justify-between gap-2 pt-2 border-t border-slate-800/80">
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">
-                  D
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block">
-                    Destination
-                  </span>
-                  <p className="text-sm font-semibold text-white leading-snug">
-                    {activeTrip.dropoffLocation?.address}
-                  </p>
-                  {activeTrip.dropoffLocation?.driverNotes && (
-                    <p className="text-xs text-rose-200 mt-1 italic">
-                      Dropoff Note: {activeTrip.dropoffLocation.driverNotes}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {activeTrip.dropoffLocation?.address && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    openMapNavigation(
-                      activeTrip.dropoffLocation.address,
-                      preferredNavApp,
-                      activeTrip.dropoffLocation.coordinates
-                    )
-                  }
-                  className="px-3 py-2 min-h-[44px] bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <MapPinIcon className="w-4 h-4 text-rose-400" />
-                  <span>Directions</span>
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Route Timeline & Multi-Stop Progression */}
+          <DriverRouteTimelineCard
+            trip={activeTrip}
+            preferredNavApp={preferredNavApp}
+            variant="interactive"
+            multiStop={multiStop}
+          />
 
           {/* Fare Summary Card */}
           <div className="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
@@ -649,6 +564,25 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
               </div>
             ) : activeTrip.status === 'in_progress' ? (
               <div className="space-y-2">
+                {(() => {
+                  const stopSummary =
+                    multiStop?.activeSummary ?? summarizeTripStopProgress(activeTrip);
+                  if (stopSummary.totalStops === 0 || stopSummary.allStopsCompleted) return null;
+                  const arrivedOrdinal = stopSummary.activeArrivedEntry
+                    ? stopSummary.entries.findIndex(
+                        (e) => e.stopIndex === stopSummary.activeArrivedEntry?.stopIndex
+                      ) + 1
+                    : 0;
+                  return (
+                    <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-semibold leading-snug">
+                      {stopSummary.activeArrivedEntry
+                        ? `Stop #${arrivedOrdinal} wait timer still open — tap Resume above or proceed to final checkout.`
+                        : `${stopSummary.openCount} intermediate ${
+                            stopSummary.openCount === 1 ? 'stop' : 'stops'
+                          } still open — tap Resume/Skip above or proceed to final checkout.`}
+                    </div>
+                  );
+                })()}
                 <button
                   type="button"
                   disabled={Boolean(actionLoading)}
