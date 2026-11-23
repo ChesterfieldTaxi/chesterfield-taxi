@@ -31,6 +31,7 @@ export interface DispatchTripQueuePaneProps {
   activeMobileTab: string;
   settings: AppSettings;
   drivers: LiveFleetDriver[];
+  trips?: ReadonlyArray<Trip>;
   filteredTrips: Trip[];
   unconfirmedCount: number;
   displayLayout: DisplayLayout;
@@ -84,6 +85,7 @@ export interface DispatchTripQueuePaneProps {
   onToggleSelectTrip: (tripId: string) => void;
   onBatchConfirmTrips: () => void;
   onBatchAssignDriver: () => void;
+  onBatchCompleteTrips?: () => void;
   onBatchExportCsv: () => void;
   onBatchCancelTrips: () => void;
 
@@ -124,6 +126,7 @@ export function DispatchTripQueuePane({
   activeMobileTab,
   settings,
   drivers,
+  trips,
   filteredTrips,
   unconfirmedCount,
   displayLayout,
@@ -169,6 +172,7 @@ export function DispatchTripQueuePane({
   onToggleSelectTrip,
   onBatchConfirmTrips,
   onBatchAssignDriver,
+  onBatchCompleteTrips,
   onBatchExportCsv,
   onBatchCancelTrips,
   selectedQueueTripId,
@@ -220,6 +224,7 @@ export function DispatchTripQueuePane({
     <div
       ref={queueContainerRef}
       data-queue-layout={effectiveDisplayLayout}
+      data-queue-saved-layout={displayLayout}
       data-queue-auto-cards={isAutoCardsFallback ? 'true' : 'false'}
       data-queue-width={queueWidthPx}
       data-queue-min-table-width={effectiveMinTableWidthPx}
@@ -233,6 +238,9 @@ export function DispatchTripQueuePane({
       }`}
     >
       <TripQueueToolbar
+        isDesktop={isDesktop}
+        queueWidthPx={queueWidthPx}
+        trips={trips ?? filteredTrips}
         settings={settings}
         drivers={drivers}
         filteredTripsCount={filteredTrips.length}
@@ -281,6 +289,7 @@ export function DispatchTripQueuePane({
         onToggleSelectAll={onToggleSelectAll}
         onBatchConfirmTrips={onBatchConfirmTrips}
         onBatchAssignDriver={onBatchAssignDriver}
+        onBatchCompleteTrips={onBatchCompleteTrips}
         onBatchExportCsv={onBatchExportCsv}
         onBatchCancelTrips={onBatchCancelTrips}
         slaSummary={slaSummary}
@@ -388,7 +397,9 @@ export function DispatchTripQueuePane({
           onCancelAutoOffer={onCancelAutoOffer}
           onOpenDriverPickerForTrip={onOpenDriverPickerForTrip}
           stagedPlanner={stagedPlanner}
-          onTableOverflowDetected={handleTableOverflowDetected}
+          onTableOverflowDetected={
+            displayLayout === 'auto' ? handleTableOverflowDetected : undefined
+          }
         />
       )}
     </div>

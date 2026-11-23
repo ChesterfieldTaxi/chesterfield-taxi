@@ -7,3 +7,4 @@ export * from './DispatchExtrasVehicleSection';
 export * from './DispatchPaymentAssignmentSection';
 export * from './DispatchReturnRepeatSection';
 export * from './DispatchBookingFooterBar';
+export * from './DispatchBookingConflictGuard';

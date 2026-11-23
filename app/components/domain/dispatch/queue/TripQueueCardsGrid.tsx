@@ -24,12 +24,10 @@ import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
   DispatchSlaBadge,
-  canTripTriggerAutoOffer,
   isTripCascadeActive,
 } from '../DispatchCascadeSlaBadges';
 import {
   ChevronDownIcon,
-  BoltIcon,
   ClockIcon,
   PhoneIcon,
   MapPinIcon,
@@ -482,7 +480,7 @@ export function TripQueueCardsGrid({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {isTripCascadeActive(trip) ? (
+                    {isTripCascadeActive(trip) && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -494,20 +492,7 @@ export function TripQueueCardsGrid({
                       >
                         Cancel Cascade
                       </button>
-                    ) : canTripTriggerAutoOffer(trip) && !isUnconfirmedTrip ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onStartAutoOffer(trip);
-                        }}
-                        className="px-2 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0"
-                        title="Start sequential Auto-Offer Cascade"
-                      >
-                        <BoltIcon className="w-3 h-3 shrink-0" />
-                        <span>Auto-Offer</span>
-                      </button>
-                    ) : null}
+                    )}
 
                     <button
                       type="button"
@@ -708,33 +693,7 @@ export function TripQueueCardsGrid({
                       ))}
                     </select>
 
-                    {!trip.assignedDriverId && stagedPlanner && isTripEligibleForStaging(trip) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          stagedPlanner.setQueueAssignMode(
-                            stagedPlanner.queueAssignMode === 'stage_hold'
-                              ? 'send_to_driver'
-                              : 'stage_hold'
-                          );
-                        }}
-                        className={`px-2 py-1.5 rounded-lg border text-[10.5px] font-extrabold cursor-pointer shrink-0 transition-colors ${
-                          stagedPlanner.queueAssignMode === 'stage_hold'
-                            ? 'bg-indigo-600 text-white border-indigo-700'
-                            : 'bg-white hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border-slate-300'
-                        }`}
-                        title={
-                          stagedPlanner.queueAssignMode === 'stage_hold'
-                            ? 'Mode: Stage Driver (Hold in Dispatch) — click to switch to Send to Driver'
-                            : 'Mode: Send to Driver — click to switch dropdown to Stage Driver (Hold)'
-                        }
-                      >
-                        {stagedPlanner.queueAssignMode === 'stage_hold' ? '📌 Hold' : 'Stage'}
-                      </button>
-                    )}
-
-                    {isTripCascadeActive(trip) ? (
+                    {isTripCascadeActive(trip) && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -746,20 +705,7 @@ export function TripQueueCardsGrid({
                       >
                         Cancel
                       </button>
-                    ) : canTripTriggerAutoOffer(trip) ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onStartAutoOffer(trip);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0 transition-colors"
-                        title="Start 1-tap sequential Auto-Offer Cascade"
-                      >
-                        <BoltIcon className="w-3 h-3 shrink-0" />
-                        <span>Auto-Offer</span>
-                      </button>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               )}

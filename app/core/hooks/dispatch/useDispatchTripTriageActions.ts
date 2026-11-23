@@ -9,9 +9,27 @@ import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
 import { getTelephonyService, sanitizePhoneNumber } from '../../services/telephony.service';
 import type { AppSettings } from '../../types/config';
 import type { Trip, TripStatus } from '../../types/trip';
-import { formatVehicleTier } from '../../utils/vehicle-tier-format.util';
+import { formatVehicleTier, formatVehicleTierDisplay } from '../../utils/vehicle-tier-format.util';
 import type { LiveFleetDriver } from '../useDispatchFleet';
 import type { DraftTab } from './dispatch-workspace.util';
+
+const TERMINAL_BATCH_STATUSES = new Set<string>([
+  'completed',
+  'cancelled',
+  'declined',
+  'DECLINED',
+]);
+
+export function getBatchCompletableTrips(
+  trips: ReadonlyArray<Trip>,
+  selectedTripIds: ReadonlyArray<string>
+): Trip[] {
+  if (selectedTripIds.length === 0) return [];
+  const selectedSet = new Set(selectedTripIds);
+  return trips.filter(
+    (t) => selectedSet.has(t.id) && !TERMINAL_BATCH_STATUSES.has(String(t.status || ''))
+  );
+}
 
 export interface ConfirmModalConfigState {
   isOpen: boolean;
@@ -392,6 +410,227 @@ export function useDispatchTripTriageActions({
     URL.revokeObjectURL(url);
   }, [selectedTripIds, trips]);
 
+  const handleBatchCompleteTrips = useCallback(() => {
+    if (selectedTripIds.length === 0) return;
+    const completableTrips = getBatchCompletableTrips(trips, selectedTripIds);
+    if (completableTrips.length === 0) {
+      showDispatchToast('All selected trip(s) are already completed or cancelled.', 'info');
+      return;
+    }
+
+    const skippedCount = selectedTripIds.length - completableTrips.length;
+    const totalFareSum = completableTrips.reduce(
+      (sum, t) => sum + Math.max(0, t.pricing?.totalFare ?? 0) + Math.max(0, t.payment?.tipAmount ?? 0),
+      0
+    );
+    const autoReceipts = settings.billingSettings?.autoEmailReceipts !== false;
+
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Complete ${completableTrips.length} Selected ${
+        completableTrips.length === 1 ? 'Trip' : 'Trips'
+      }`,
+      message: `Mark ${completableTrips.length} trip(s) as Completed ($${totalFareSum.toFixed(
+        2
+      )} total)?${
+        skippedCount > 0 ? ` (${skippedCount} already-closed trip(s) will be skipped.)` : ''
+      }${
+        autoReceipts
+          ? ' Receipts will be emailed automatically to passengers with email on file.'
+          : ''
+      }`,
+      confirmText: `Complete ${completableTrips.length} ${
+        completableTrips.length === 1 ? 'Trip' : 'Trips'
+      }`,
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }));
+        const bookingService = getBookingService();
+        const emailService = getEmailDispatchService();
+        const telephonyService = getTelephonyService();
+        const nowIso = new Date().toISOString();
+        let actorLabel = 'Dispatcher';
+        try {
+          const current = getAdminAuthService().getCurrentUser?.();
+          if (current?.email) actorLabel = current.email;
+        } catch {}
+
+        const completedPatches = new Map<string, Partial<Trip>>();
+        let completedCount = 0;
+        let grandTotalSum = 0;
+
+        try {
+          for (const trip of completableTrips) {
+            const subtotalFare = Math.max(0, trip.pricing?.totalFare ?? 0);
+            const tipAmount = Math.max(0, trip.payment?.tipAmount ?? 0);
+            const grandTotal = Number((subtotalFare + tipAmount).toFixed(2));
+            const rawMethod = trip.payment?.method;
+            const mappedPaymentMethod: 'cash' | 'card' | 'corporate' =
+              rawMethod === 'corporate' || rawMethod === 'account'
+                ? 'corporate'
+                : rawMethod === 'card'
+                ? 'card'
+                : 'cash';
+            const paymentStatus: 'paid' | 'pending' =
+              mappedPaymentMethod === 'corporate' ? 'pending' : 'paid';
+            const completionPaymentType =
+              mappedPaymentMethod === 'corporate'
+                ? 'corporate_account'
+                : mappedPaymentMethod === 'card'
+                ? 'card_terminal'
+                : 'cash';
+
+            const updatedPricing = {
+              ...(trip.pricing || {
+                baseFare: subtotalFare,
+                distanceFare: 0,
+                timeFare: 0,
+                surcharges: 0,
+                distanceMiles: 0,
+                durationMinutes: 0,
+                currency: 'USD',
+              }),
+              totalFare: subtotalFare,
+            };
+            const updatedPayment = {
+              ...(trip.payment || {}),
+              method: mappedPaymentMethod,
+              status: paymentStatus,
+              amount: grandTotal,
+              tipAmount,
+              paidAt: nowIso,
+            };
+            const updatedMetadata = {
+              ...(trip.metadata || {}),
+              completedByDispatcher: actorLabel,
+              dispatchCompletionPaymentType: completionPaymentType,
+              batchCompleted: true,
+            };
+
+            if (bookingService.updateTrip) {
+              await bookingService.updateTrip(trip.id, {
+                pricing: updatedPricing,
+                payment: updatedPayment,
+                completedAt: nowIso,
+                metadata: updatedMetadata,
+              } as any);
+            }
+
+            if (bookingService.updateTripStatus) {
+              await bookingService.updateTripStatus(trip.id, 'completed', {
+                actorRole: 'admin',
+                reason: `Batch completed via Dispatch Console (${actorLabel})`,
+              });
+            } else if (bookingService.updateTrip) {
+              await bookingService.updateTrip(trip.id, { status: 'completed' });
+            }
+
+            telephonyService.closeMaskedSession(trip.id).catch(() => {});
+
+            if (autoReceipts && trip.passenger?.email) {
+              const meta = updatedMetadata as Record<string, any>;
+              const assignedDriver = trip.assignedDriverId
+                ? drivers.find((d) => d.id === trip.assignedDriverId)
+                : undefined;
+              emailService
+                .sendTripReceipt({
+                  tripId: trip.id,
+                  completedAt: new Date(nowIso).toLocaleString(),
+                  passenger: {
+                    firstName: trip.passenger.firstName,
+                    lastName: trip.passenger.lastName,
+                    email: trip.passenger.email,
+                    phone: trip.passenger.phone,
+                  },
+                  pickupAddress: trip.pickupLocation?.address || '',
+                  intermediateStops: trip.intermediateStops?.map((s) => ({ address: s.address })),
+                  dropoffAddress: trip.dropoffLocation?.address || '',
+                  pickupTime:
+                    trip.actualPickupTime || trip.scheduledPickupTime
+                      ? new Date(trip.actualPickupTime || trip.scheduledPickupTime!).toLocaleString()
+                      : new Date(trip.createdAt).toLocaleString(),
+                  vehicleTier: trip.vehicleTier,
+                  vehicleDisplayName:
+                    (typeof meta.vehicleDisplayName === 'string' && meta.vehicleDisplayName) ||
+                    formatVehicleTierDisplay(
+                      (meta.vehicleTypeId as string) || trip.vehicleTier,
+                      settings.vehicles,
+                      meta.vehicleDisplayName
+                    ),
+                  driverName:
+                    assignedDriver?.name ||
+                    (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName) ||
+                    'Assigned Driver',
+                  vehicleUnit: assignedDriver?.cabNumber,
+                  distanceMiles: updatedPricing.distanceMiles,
+                  durationMinutes: updatedPricing.durationMinutes,
+                  subtotalFare,
+                  tipAmount,
+                  grandTotal,
+                  currency: updatedPricing.currency || 'USD',
+                  breakdown: updatedPricing.breakdown,
+                  paymentMethod: completionPaymentType,
+                  cardLast4: trip.payment?.cardLast4,
+                  paymentStatus:
+                    mappedPaymentMethod === 'corporate' ? 'corporate_direct_bill' : 'paid',
+                  corporateAccountName:
+                    meta.corporateDetails?.corporateAccount || meta.corporateOrgName,
+                  poNumber: meta.corporateDetails?.billingPo || meta.billingPo,
+                  companySettings: {
+                    name: settings.company?.name,
+                    phone: settings.company?.phone,
+                    address: settings.company?.address,
+                    email: settings.company?.email,
+                  },
+                })
+                .catch((err) => console.warn('[Dispatch] Batch receipt email skipped:', err));
+            }
+
+            completedPatches.set(trip.id, {
+              status: 'completed',
+              pricing: updatedPricing,
+              payment: updatedPayment as any,
+              completedAt: nowIso,
+              metadata: updatedMetadata,
+            });
+            completedCount += 1;
+            grandTotalSum += grandTotal;
+          }
+
+          setTrips((prev) =>
+            prev.map((t) => {
+              const patch = completedPatches.get(t.id);
+              return patch ? ({ ...t, ...patch } as Trip) : t;
+            })
+          );
+          setReviewTrip((prev) => {
+            if (!prev) return prev;
+            const patch = completedPatches.get(prev.id);
+            return patch ? ({ ...prev, ...patch } as Trip) : prev;
+          });
+          setSelectedTripIds([]);
+          showDispatchToast(
+            `Completed ${completedCount} trip(s) ($${grandTotalSum.toFixed(2)} total).`,
+            'success'
+          );
+        } catch (err) {
+          console.error('Failed to batch complete trips:', err);
+          showDispatchToast('Failed to complete selected trips. Please try again.', 'error');
+        }
+      },
+    });
+  }, [
+    selectedTripIds,
+    trips,
+    drivers,
+    settings,
+    setConfirmModalConfig,
+    setTrips,
+    setReviewTrip,
+    setSelectedTripIds,
+    showDispatchToast,
+  ]);
+
   const handleBatchCancelTrips = useCallback(() => {
     if (selectedTripIds.length === 0) return;
     setConfirmModalConfig({
@@ -607,6 +846,7 @@ export function useDispatchTripTriageActions({
     handleBatchAssignDriver,
     handleQuickAssignDriver,
     handleConfirmBatchAssign,
+    handleBatchCompleteTrips,
     handleBatchExportCsv,
     handleBatchCancelTrips,
     handlePromptCancelTrip,

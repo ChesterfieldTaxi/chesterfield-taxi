@@ -20,21 +20,22 @@ import {
   Squares2X2Icon,
   TableCellsIcon,
   ListBulletIcon,
-  CheckIcon,
   BoltIcon,
-  UsersIcon,
-  DocumentTextIcon,
-  BanIcon,
-  XIcon,
   ClockIcon,
   MapPinIcon,
   CarIcon,
   AlertTriangleIcon,
+  RadarBroadcastIcon,
 } from '../../../ui/Icons';
 import {
   TABLE_OVERFLOW_MIN_WIDTH_PX,
   type QueueFilterType,
 } from './trip-queue-layout.util';
+import {
+  TripAddFilterDropdown,
+  TripStatusMultiSelectDropdown,
+} from './TripQueueFilterPopovers';
+import { TripQueueBatchActionBar } from './TripQueueBatchActionBar';
 
 export function getDispatchStatusBadge(status: TripStatus) {
   switch (status) {
@@ -98,23 +99,15 @@ export function getDispatchStatusBadge(status: TripStatus) {
       return <Badge variant="success">Completed</Badge>;
     case 'cancelled':
       return <Badge variant="danger">Cancelled</Badge>;
-    default:
+  default:
       return <Badge variant="neutral">{status}</Badge>;
   }
 }
 
-const FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; label: string }> = [
-  { key: 'driver', label: 'Driver' },
-  { key: 'has_staged_driver', label: 'Staged Only' },
-  { key: 'vehicle', label: 'Vehicle' },
-  { key: 'company', label: 'Company' },
-  { key: 'payment_type', label: 'Payment Type' },
-  { key: 'tariff', label: 'Tariff' },
-  { key: 'has_car_seat', label: 'Has Car Seat' },
-  { key: 'has_stops', label: 'Has Stops' },
-];
-
 export interface TripQueueToolbarProps {
+  isDesktop?: boolean;
+  queueWidthPx?: number;
+  trips?: ReadonlyArray<Trip>;
   settings: AppSettings;
   drivers: LiveFleetDriver[];
   filteredTripsCount: number;
@@ -171,6 +164,7 @@ export interface TripQueueToolbarProps {
   onToggleSelectAll: () => void;
   onBatchConfirmTrips: () => void;
   onBatchAssignDriver: () => void;
+  onBatchCompleteTrips?: () => void;
   onBatchExportCsv: () => void;
   onBatchCancelTrips: () => void;
 
@@ -192,6 +186,9 @@ export interface TripQueueToolbarProps {
 }
 
 export function TripQueueToolbar({
+  isDesktop = true,
+  queueWidthPx = 0,
+  trips,
   settings,
   drivers,
   filteredTripsCount,
@@ -240,6 +237,7 @@ export function TripQueueToolbar({
   onToggleSelectAll,
   onBatchConfirmTrips,
   onBatchAssignDriver,
+  onBatchCompleteTrips,
   onBatchExportCsv,
   onBatchCancelTrips,
   slaSummary,
@@ -260,17 +258,23 @@ export function TripQueueToolbar({
     autoConfig.dispatchMode !== 'manual_1tap'
       ? autoConfig.dispatchMode
       : autoConfig.sweepExecutionMode;
-  const layoutTriggerLabel = isAutoCardsFallback
-    ? 'Cards (Auto)'
-    : effectiveDisplayLayout === 'cards'
-    ? 'Cards'
-    : effectiveDisplayLayout === 'table'
-    ? 'Table'
-    : 'Compact';
+  const layoutTriggerLabel =
+    displayLayout === 'auto'
+      ? isAutoCardsFallback
+        ? 'Cards (Auto)'
+        : 'Table (Auto)'
+      : effectiveDisplayLayout === 'cards'
+      ? 'Cards'
+      : effectiveDisplayLayout === 'table'
+      ? 'Table'
+      : 'Compact';
 
-  const layoutTriggerTooltip = isAutoCardsFallback
-    ? `Auto-switched to Cards because Trips table would overflow horizontally (${effectiveMinTableWidthPx}px needed). Table view restores automatically when widened.`
-    : `Queue Layout: ${displayLayout}. Click to change.`;
+  const layoutTriggerTooltip =
+    displayLayout === 'auto'
+      ? isAutoCardsFallback
+        ? `Auto Layout: switched to Cards because Trips table would overflow horizontally (${effectiveMinTableWidthPx}px needed). Select "Table" to force 10-column table.`
+        : 'Auto Layout (Table ↔ Cards): showing Table while wide enough.'
+      : `Queue Layout: ${layoutTriggerLabel}. Click to change.`;
 
   return (
     <>
@@ -349,80 +353,20 @@ export function TripQueueToolbar({
               />
             </div>
 
-            {/* 2. Unified Status Dropdown */}
-            <div className="relative shrink-0">
-              <select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange(e.target.value)}
-                className={`h-7 pl-2 pr-6 bg-white border rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 shadow-2xs cursor-pointer max-w-[125px] sm:max-w-[155px] md:max-w-[180px] truncate ${
-                  statusFilter.toLowerCase() === 'unconfirmed'
-                    ? 'border-amber-400 bg-amber-50 text-amber-900 font-bold ring-1 ring-amber-300'
-                    : unconfirmedCount > 0 && statusFilter === 'all'
-                    ? 'border-amber-300 text-slate-800'
-                    : 'border-slate-300 text-slate-700'
-                }`}
-              >
-                <option value="all">
-                  {unconfirmedCount > 0 ? `All (${unconfirmedCount} new)` : 'All Status'}
-                </option>
-                <option value="unconfirmed">Unconfirmed ({unconfirmedCount})</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="pending">Pending</option>
-                <option value="offered">Offered</option>
-                <option value="assigned">Assigned</option>
-                <option value="accepted">Accepted</option>
-                <option value="en_route">En Route</option>
-                <option value="arrived">Arrived</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="declined">Declined</option>
-              </select>
-              {unconfirmedCount > 0 && statusFilter.toLowerCase() !== 'unconfirmed' && (
-                <span
-                  className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse pointer-events-none"
-                  title={`${unconfirmedCount} unconfirmed booking(s)`}
-                />
-              )}
-            </div>
+            {/* 2. Multi-Select Status Checkboxes Popover */}
+            <TripStatusMultiSelectDropdown
+              statusFilter={statusFilter}
+              unconfirmedCount={unconfirmedCount}
+              onStatusFilterChange={onStatusFilterChange}
+            />
 
             {/* Desktop Only: Add Filter & Active Filter Pills */}
-            <div className="hidden md:flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-              {/* 3. + Add Filter Dropdown */}
-              <div className="relative shrink-0" ref={addFilterRef}>
-                <button
-                  type="button"
-                  onClick={() => onAddFilterOpenChange(!isAddFilterOpen)}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-7"
-                >
-                  <FunnelIcon className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Filter</span>
-                  <span className="text-[10px] text-slate-400">▾</span>
-                </button>
-
-                {isAddFilterOpen && (
-                  <div className="absolute bottom-full left-0 mb-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
-                    {FILTER_MENU_ITEMS.map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => {
-                          if (!activeFilterKeys.includes(item.key)) {
-                            onActiveFilterKeysChange([...activeFilterKeys, item.key]);
-                          }
-                          onAddFilterOpenChange(false);
-                        }}
-                        className={`w-full text-left px-3 py-1.5 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition-colors cursor-pointer ${
-                          activeFilterKeys.includes(item.key) ? 'text-blue-600 font-bold bg-blue-50/50' : ''
-                        }`}
-                      >
-                        <span>{item.label}</span>
-                        {activeFilterKeys.includes(item.key) && <span>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="hidden md:flex items-center gap-2 min-w-0 flex-1">
+              {/* 3. Portal Filter Checkboxes Dropdown (never clipped by overflow) */}
+              <TripAddFilterDropdown
+                activeFilterKeys={activeFilterKeys}
+                onActiveFilterKeysChange={onActiveFilterKeysChange}
+              />
 
               {/* Active Filter Pills on Desktop */}
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 py-0.5">
@@ -603,8 +547,38 @@ export function TripQueueToolbar({
             </div>
           </div>
 
-          {/* Right Side: Auto-Stage Open, Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
+          {/* Right Side: Non-Table Stage Mode Pill, Auto-Stage Open, Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {stagedPlanner && effectiveDisplayLayout !== 'table' && (
+              <div
+                className="hidden sm:inline-flex items-center rounded-lg border border-slate-300 bg-white p-0.5 h-7 shadow-2xs"
+                title="Choose whether driver dropdowns send immediately or stage (hold in Dispatch)"
+              >
+                <button
+                  type="button"
+                  onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
+                  className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
+                    stagedPlanner.queueAssignMode === 'send_to_driver'
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Send
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stagedPlanner.setQueueAssignMode('stage_hold')}
+                  className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
+                    stagedPlanner.queueAssignMode === 'stage_hold'
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-600 hover:text-indigo-700'
+                  }`}
+                >
+                  📌 Hold
+                </button>
+              </div>
+            )}
+
             {stagedPlanner && stagedPlanner.openScheduledUnstagedCount > 0 && (
               <button
                 type="button"
@@ -686,27 +660,33 @@ export function TripQueueToolbar({
               </button>
 
               {isLayoutDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
                   <button
                     type="button"
                     onClick={() => {
-                      onDisplayLayoutChange('cards');
+                      onDisplayLayoutChange('auto');
                       onLayoutDropdownOpenChange(false);
                     }}
                     className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
-                      displayLayout === 'cards' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                      displayLayout === 'auto' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Squares2X2Icon className="w-4 h-4 text-slate-500" />
-                      <span>Cards</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <BoltIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                      <div className="flex flex-col leading-tight">
+                        <span>Auto</span>
+                        <span className="text-[10px] font-medium text-slate-400">
+                          Table ↔ Cards
+                        </span>
+                      </div>
                     </div>
-                    {displayLayout === 'cards' ? (
-                      <span>✓</span>
-                    ) : isAutoCardsFallback ? (
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                        Auto
-                      </span>
+                    {displayLayout === 'auto' ? (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[9.5px] font-bold text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded">
+                          {isAutoCardsFallback ? 'Cards' : 'Table'}
+                        </span>
+                        <span>✓</span>
+                      </div>
                     ) : null}
                   </button>
 
@@ -725,6 +705,23 @@ export function TripQueueToolbar({
                       <span>Table</span>
                     </div>
                     {displayLayout === 'table' && <span>✓</span>}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDisplayLayoutChange('cards');
+                      onLayoutDropdownOpenChange(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
+                      displayLayout === 'cards' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Squares2X2Icon className="w-4 h-4 text-slate-500" />
+                      <span>Cards</span>
+                    </div>
+                    {displayLayout === 'cards' && <span>✓</span>}
                   </button>
 
                   <button
@@ -817,39 +814,11 @@ export function TripQueueToolbar({
       {/* Mobile Sub-Toolbar: Filter Controls & Active Pills (visible if filters active or expanded on mobile) */}
       {!isSearchExpanded && (activeFilterKeys.length > 0 || isMobileFiltersOpen) && (
         <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 animate-in fade-in duration-100">
-          <div className="relative shrink-0" ref={addFilterRef}>
-            <button
-              type="button"
-              onClick={() => onAddFilterOpenChange(!isAddFilterOpen)}
-              className="flex items-center gap-1 px-2.5 py-0.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs transition-colors cursor-pointer h-6 shrink-0"
-            >
-              <FunnelIcon className="w-3 h-3 text-slate-500" />
-              <span>+ Filter</span>
-            </button>
-
-            {isAddFilterOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100">
-                {FILTER_MENU_ITEMS.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      if (!activeFilterKeys.includes(item.key)) {
-                        onActiveFilterKeysChange([...activeFilterKeys, item.key]);
-                      }
-                      onAddFilterOpenChange(false);
-                    }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition-colors cursor-pointer ${
-                      activeFilterKeys.includes(item.key) ? 'text-blue-600 font-bold bg-blue-50/50' : ''
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    {activeFilterKeys.includes(item.key) && <span>✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <TripAddFilterDropdown
+            activeFilterKeys={activeFilterKeys}
+            onActiveFilterKeysChange={onActiveFilterKeysChange}
+            compactMobile
+          />
 
           {activeFilterKeys.includes('driver') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
@@ -1093,7 +1062,7 @@ export function TripQueueToolbar({
                       className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shadow-2xs cursor-pointer inline-flex items-center gap-1 transition-colors"
                       title="Start 1-tap sequential Auto-Offer Cascade for most urgent ride"
                     >
-                      <BoltIcon className="w-3 h-3 shrink-0" />
+                      <RadarBroadcastIcon className="w-3 h-3 shrink-0" />
                       <span>Auto-Offer</span>
                     </button>
                   )}
@@ -1115,107 +1084,22 @@ export function TripQueueToolbar({
         );
       })()}
 
-      {/* ─── Dedicated Batch Selection Actions Bar ─── */}
-      {selectedTripIds.length > 0 && (
-        <div className="px-3 py-2 bg-slate-900 text-white border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold shrink-0 animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="flex items-center gap-2">
-            <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[11px] font-extrabold flex items-center gap-1 shrink-0">
-              <CheckIcon className="w-3 h-3 shrink-0" />
-              <span>{selectedTripIds.length} Selected</span>
-            </span>
-            <button
-              type="button"
-              onClick={onToggleSelectAll}
-              className="text-[11px] font-semibold text-slate-300 hover:text-white underline cursor-pointer"
-            >
-              {allFilteredSelected ? 'Deselect All' : 'Select All'}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={onBatchConfirmTrips}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="Confirm all selected trips"
-            >
-              <BoltIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Confirm</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                stagedPlanner?.setBatchAssignMode('send_to_driver');
-                onBatchAssignDriver();
-              }}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="Assign driver to selected trips"
-            >
-              <UsersIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Assign</span>
-            </button>
-            {stagedPlanner && stagedPlanner.selectedStageableCount > 0 && (
-              <button
-                type="button"
-                onClick={() => stagedPlanner.openBatchStageDriverModal()}
-                className="px-2.5 py-1 bg-indigo-950/90 hover:bg-indigo-900 border border-dashed border-indigo-400 rounded-lg text-indigo-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                title="Stage driver placeholder on selected trips (held in Dispatch)"
-              >
-                <span>📌 Stage Driver</span>
-              </button>
-            )}
-            {stagedPlanner && stagedPlanner.selectedStagedCount > 0 && (
-              <button
-                type="button"
-                onClick={() => void stagedPlanner.sendSelectedStagedTrips()}
-                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-extrabold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                title="Send selected staged trips live to their planned drivers"
-              >
-                <CarIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Send to Driver ({stagedPlanner.selectedStagedCount})</span>
-              </button>
-            )}
-            {stagedPlanner && stagedPlanner.selectedAutoDispatchableCount > 0 && (
-              <button
-                type="button"
-                onClick={() => void stagedPlanner.requestBatchAutoDispatchWithStagedCheck()}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-indigo-500/40 rounded-lg text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                title="Run Auto-Dispatch across selected open trips"
-              >
-                <BoltIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>Auto-Dispatch</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onBatchExportCsv}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="Export selected trips as CSV"
-            >
-              <DocumentTextIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xs:inline sm:inline">Export</span>
-            </button>
-            <button
-              type="button"
-              onClick={onBatchCancelTrips}
-              className="px-2.5 py-1 bg-rose-950/90 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              title="Cancel selected trips"
-            >
-              <BanIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>Cancel</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClearSelectedTripIds}
-              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer shrink-0"
-              title="Clear selection"
-              aria-label="Clear selection"
-            >
-              <XIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ─── Responsive Multi-Select Batch Actions Bar + Portal Dropdown ─── */}
+      <TripQueueBatchActionBar
+        isDesktop={isDesktop}
+        queueWidthPx={queueWidthPx}
+        trips={trips}
+        selectedTripIds={selectedTripIds}
+        allFilteredSelected={allFilteredSelected}
+        onToggleSelectAll={onToggleSelectAll}
+        onClearSelectedTripIds={onClearSelectedTripIds}
+        onBatchConfirmTrips={onBatchConfirmTrips}
+        onBatchAssignDriver={onBatchAssignDriver}
+        onBatchCompleteTrips={onBatchCompleteTrips}
+        onBatchExportCsv={onBatchExportCsv}
+        onBatchCancelTrips={onBatchCancelTrips}
+        stagedPlanner={stagedPlanner}
+      />
     </>
   );
 }

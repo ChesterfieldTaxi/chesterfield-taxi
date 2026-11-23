@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type DisplayLayout = 'cards' | 'table' | 'compact';
+export type DisplayLayout = 'auto' | 'cards' | 'table' | 'compact';
+
+export function isValidDisplayLayout(value: unknown): value is DisplayLayout {
+  return value === 'auto' || value === 'cards' || value === 'table' || value === 'compact';
+}
 
 export interface UseDisplayLayoutOptions {
   storageKey?: string;
@@ -9,7 +13,7 @@ export interface UseDisplayLayoutOptions {
 }
 
 /**
- * Hook for managing layout presentation (cards vs table vs compact list).
+ * Hook for managing layout presentation (auto vs cards vs table vs compact list).
  * - Initializes deterministically to `defaultLayout` for React 19 SSR hydration parity.
  * - Restores persisted operator preference from `localStorage` (or mobile viewport fallback) post-mount.
  */
@@ -24,8 +28,8 @@ export function useDisplayLayout(
     if (typeof window === 'undefined') return;
 
     try {
-      const stored = localStorage.getItem(storageKey) as DisplayLayout | null;
-      if (stored && (stored === 'cards' || stored === 'table' || stored === 'compact')) {
+      const stored = localStorage.getItem(storageKey);
+      if (isValidDisplayLayout(stored)) {
         setLayoutState(stored);
         return;
       }

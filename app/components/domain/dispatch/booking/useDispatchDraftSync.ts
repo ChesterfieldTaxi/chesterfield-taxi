@@ -353,8 +353,10 @@ export function useDispatchDraftSync({
       scheduledTime: v.scheduledTime,
       pickupAddress: v.pickupAddress,
       pickupCoordinates: v.pickupCoordinates,
+      pickupPlaceId: v.pickupPlaceId,
       dropoffAddress: v.dropoffAddress,
       dropoffCoordinates: v.dropoffCoordinates,
+      dropoffPlaceId: v.dropoffPlaceId,
       intermediateStops: v.intermediateStops,
       passengerName: v.passengerName,
       phone: v.phone,
@@ -565,10 +567,13 @@ export function useDispatchDraftSync({
 
   const handleClear = () => {
     const s = settersRef.current;
+    s.setTimingType('asap');
     s.setPickupAddress('');
     s.setPickupCoordinates(undefined);
+    s.setPickupPlaceId(undefined);
     s.setDropoffAddress('');
     s.setDropoffCoordinates(undefined);
+    s.setDropoffPlaceId(undefined);
     s.setIntermediateStops([]);
     s.setPassengerName('');
     s.setPhone('');
@@ -606,13 +611,19 @@ export function useDispatchDraftSync({
     s.setTariff('Standard');
     s.setSelectedRuleId('');
     s.setDiscount('None');
+    s.setManualDiscountDollars('');
+    s.setWaiveAirportFee(false);
+    s.setWaiveMultiStopFees(false);
+    s.setBypassSurge(false);
     s.setDriverId('unassigned');
     s.setDriverAssignmentMode?.('send_to_driver');
     s.setNotesForAll('');
     s.setInternalNotes('');
     s.setReturnTrip(false);
     s.setReturnPickupAddress('');
+    s.setReturnPickupCoordinates(undefined);
     s.setReturnDropoffAddress('');
+    s.setReturnDropoffCoordinates(undefined);
     s.setReturnIntermediateStops([]);
     s.setReturnPassengers(1);
     s.setReturnCarryOnBags(0);
@@ -628,6 +639,7 @@ export function useDispatchDraftSync({
     s.setReturnVehicles(['any']);
     s.setRepeat(false);
     s.setEstimatedFare(0);
+    s.setOutboundPricing(null);
     s.setReturnEstimatedFare(0);
     s.setReturnEstimatedDurationMinutes(0);
     s.setReturnEstimatedDistanceMiles(0);
@@ -652,6 +664,7 @@ export function useDispatchDraftSync({
     s.setOutboundFlightTelemetry(null);
     s.setReturnFlightTelemetry(null);
     s.setSubmitError(null);
+    setDraftSavedAt(null);
 
     try {
       localStorage.removeItem(draftStorageKey);

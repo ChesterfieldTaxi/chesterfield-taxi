@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type React from 'react';
+import {
+  evaluateDispatchBookingConflicts,
+  type BookingConflictCheckSummary,
+} from '../../../../core/services/dispatch/booking-conflict-checker.service';
 import type {
   Trip,
   TripPricing,
@@ -119,9 +123,11 @@ export interface DispatchFormValues {
   scheduledTime: string;
   pickupAddress: string;
   pickupCoordinates?: GeoPoint;
+  pickupPlaceId?: string;
   dropoffAddress: string;
   dropoffCoordinates?: GeoPoint;
-  intermediateStops: Array<{ address: string; coordinates?: GeoPoint }>;
+  dropoffPlaceId?: string;
+  intermediateStops: Array<{ address: string; coordinates?: GeoPoint; placeId?: string }>;
   passengerName: string;
   phone: string;
   email: string;
@@ -1010,6 +1016,8 @@ export interface UseDispatchBookingSubmissionParams {
   dispatchVehicleOptions: DispatchVehicleOption[];
   vehicleCapacities: Record<string, VehicleCapacityInfo>;
   validateDispatchAccount: typeof validateDispatchCorporateSubmission;
+  allTrips?: ReadonlyArray<Trip>;
+  onResetAfterCreate?: () => void;
   onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
 }
 
@@ -1143,6 +1151,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     dispatchVehicleOptions,
     vehicleCapacities,
     validateDispatchAccount,
+    allTrips,
+    onResetAfterCreate,
     onBookingSuccess,
   } = params;
 
@@ -1162,6 +1172,60 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
   const submitErrorRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isConflictPromptOpen, setIsConflictPromptOpen] = useState(false);
+
+  const bookingConflictSummary: BookingConflictCheckSummary = useMemo(
+    () =>
+      evaluateDispatchBookingConflicts({
+        timingType,
+        scheduledDate,
+        scheduledTime,
+        pickupAddress,
+        dropoffAddress,
+        estimatedDurationMinutes,
+        passengerName,
+        phone,
+        email,
+        driverId,
+        driverAssignmentMode,
+        drivers: driverOptions,
+        returnTrip,
+        autoCreateReturnTrip,
+        returnDate,
+        returnTime,
+        returnPickupAddress,
+        returnDropoffAddress,
+        returnEstimatedDurationMinutes,
+        allTrips: allTrips || [],
+        excludeTripId: isEditMode ? initialTrip?.id : null,
+        excludeMultiCarGroupId: isEditMode ? initialTrip?.multiCarGroupId : null,
+      }),
+    [
+      timingType,
+      scheduledDate,
+      scheduledTime,
+      pickupAddress,
+      dropoffAddress,
+      estimatedDurationMinutes,
+      passengerName,
+      phone,
+      email,
+      driverId,
+      driverAssignmentMode,
+      driverOptions,
+      returnTrip,
+      autoCreateReturnTrip,
+      returnDate,
+      returnTime,
+      returnPickupAddress,
+      returnDropoffAddress,
+      returnEstimatedDurationMinutes,
+      allTrips,
+      isEditMode,
+      initialTrip?.id,
+      initialTrip?.multiCarGroupId,
+    ]
+  );
 
   useEffect(() => {
     if (submitError && submitErrorRef.current) {
@@ -1500,8 +1564,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     returnAirportDetection.isAirportTrip,
   ]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeBookingSubmission = async (allowConflictOverride: boolean) => {
     setSubmitError(null);
 
     if (!pickupAddress.trim()) {
@@ -1541,6 +1604,12 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       }
     }
 
+    if (!allowConflictOverride && bookingConflictSummary.hasConflicts) {
+      setIsConflictPromptOpen(true);
+      return;
+    }
+
+    setIsConflictPromptOpen(false);
     setIsSubmitting(true);
     const service = getBookingService();
 
@@ -2865,6 +2934,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           localStorage.removeItem(draftStorageKey);
         } catch {}
 
+        onResetAfterCreate?.();
         onBookingSuccess?.(createdTrip, false);
       }
     } catch (err: any) {
@@ -2872,6 +2942,19 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeBookingSubmission(false);
+  };
+
+  const confirmConflictOverrideAndSubmit = () => {
+    void executeBookingSubmission(true);
+  };
+
+  const cancelConflictPrompt = () => {
+    setIsConflictPromptOpen(false);
   };
 
   return {
@@ -2899,6 +2982,10 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     isSubmitting,
     submitError,
     setSubmitError,
+    bookingConflictSummary,
+    isConflictPromptOpen,
+    confirmConflictOverrideAndSubmit,
+    cancelConflictPrompt,
     handleSubmit,
   };
 }

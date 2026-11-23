@@ -1349,6 +1349,43 @@ export interface PassengerAccount {
   - `StagedDriverConflictModal.tsx` intercepts manual sweeps and single/batch auto-offers when `stagedTrips.length > 0` with `Keep Staged (Send to Staged Driver)`, `Skip Staged Trips`, and `Override Staged & Re-Rank`.
   - `useDispatchSlaCascadeLoop.ts`, `auto-dispatch.server.ts`, and `sla-cron.server.ts` invoke `releaseDueStagedTrips` cleanly with deduplicated Dispatch alerts when due staged drivers are offline or conflicted.
 
+## 41. Phase 52 Architecture (Wave 4 Phase 3): Dispatch Queue Layout Override (`Table` vs `Auto-Cards`) & Live Booking-Form Map Route Sync
+
+### 41.1 Monolith, Bundle & SSR Guardrails (`constitution.md`)
+- **Strict File-Size & Bundle Ceilings**:
+  - `app/components/domain/dispatch/LiveFleetMap.tsx` MUST stay `< 1,350` lines (targeted `< 1,320` lines by delegating Directions LRU caching, Geocoder fallback, and viewport framing helpers to `app/components/domain/dispatch/map/route-map-sync.ts`).
+  - `app/routes/dispatch.tsx` MUST stay `< 1,600` lines (delegating active-draft location signature tracking to `app/core/hooks/dispatch/dispatch-workspace.util.ts`).
+  - `app/components/domain/dispatch/DispatchTripQueuePane.tsx < 900` lines, `AdminRulesTab.tsx < 1,400` lines, `TripQueueTableView.tsx` exact `10` `<th>` columns, all `/api/*` client chunks `0.00 kB`, deterministic SSR `useState` initializers, `"Send to Driver"` / `"Send"` terminology, and `vercel.json` `"0 10 * * *"` preserved.
+
+### 41.2 4-Mode Queue Layout (`'auto' | 'table' | 'cards' | 'compact'`) & Compact Table (`useDisplayLayout.ts`, `trip-queue-layout.util.ts`, `TripQueueToolbar.tsx`, `TripQueueTableView.tsx`)
+- **`useDisplayLayout.ts`**:
+  - Extends `DisplayLayout = 'auto' | 'cards' | 'table' | 'compact'` and accepts `'auto'` when hydrating from `localStorage`.
+- **`trip-queue-layout.util.ts`**:
+  - Sets `TABLE_OVERFLOW_MIN_WIDTH_PX = 920` and `TABLE_OVERFLOW_HYSTERESIS_PX = 8`.
+  - `resolveEffectiveQueueDisplayLayout`:
+    - Mobile (`!isDesktop`) -> `{ effectiveDisplayLayout: 'cards', isAutoCardsFallback: false, effectiveMinTableWidthPx }`.
+    - Desktop `displayLayout === 'table'` -> `{ effectiveDisplayLayout: 'table', isAutoCardsFallback: false, effectiveMinTableWidthPx }` unconditionally across all widths.
+    - Desktop `displayLayout === 'auto'` -> `{ effectiveDisplayLayout: 'cards', isAutoCardsFallback: true, effectiveMinTableWidthPx }` when `0 < queueWidthPx < effectiveMinTableWidthPx`, else `{ effectiveDisplayLayout: 'table', isAutoCardsFallback: false, effectiveMinTableWidthPx }`.
+    - Desktop `'cards'` / `'compact'` -> unchanged (`isAutoCardsFallback: false`).
+  - `useResponsiveQueueLayout` & `DispatchTripQueuePane.tsx` attach/execute `handleTableOverflowDetected` only when `displayLayout === 'auto'`.
+- **`TripQueueToolbar.tsx` & `TripQueueTableView.tsx`**:
+  - Dropdown exposes `Auto` (`Table ↔ Cards`), `Table`, `Cards`, and `Compact`; trigger badge displays `Table (Auto)` / `Cards (Auto)` in `'auto'` mode and `Table` / `Cards` / `Compact` in explicit modes.
+  - `TripQueueTableView.tsx` uses `min-w-[900px]`, `px-2 py-2` cells, `max-w-[155px] xl:max-w-[210px]` truncated `PICKUP`/`DROPOFF` cells (`title={fullAddress}`, `+N stop(s)` sub-pill intact), and `max-w-[138px]` `DRIVER` `<select>` across exact `10` `<th>` columns.
+
+### 41.3 Live Booking-Form Pin & Road-Snapped Route Sync (`dispatch-workspace.util.ts`, `dispatch.tsx`, `route-map-sync.ts`, `MapRouteOverlayHud.tsx`, `LiveFleetMap.tsx`)
+- **Draft Location Signature Sync (`computeActiveDraftLocationState` & `useSyncDraftLocationsToMap` in `dispatch-workspace.util.ts`)**:
+  - Computes `{ signature, hasAnyLocation }` from `activeDraft.id`, `pickupAddress`, `pickupCoordinates`, `dropoffAddress`, `dropoffCoordinates`, and `intermediateStops`.
+  - When `signature` changes and `hasAnyLocation === true`, clears `selectedMapTrip(null)` and `selectedQueueTripId(null)` and sets `shouldZoomMap(true)`.
+- **Partial / Single-Pin Context, Geocoder Cache & Directions LRU Cache (`route-map-sync.ts`)**:
+  - `resolveActiveRouteContext` supports both full routes (`hasFullRoute: true`) and partial/single-endpoint `'draft_form'` previews (`hasFullRoute: false`, e.g., Pickup-only Emerald pin or Dropoff-only Rose pin + any stops), tracking `hasExplicitCoordinates` on each `ResolvedRouteWaypoint` and a deterministic `locationSignature`.
+  - In-memory Directions LRU cache (`DIRECTIONS_CACHE_MAX_ENTRIES = 50`: `getCachedDirectionsResult`, `setCachedDirectionsResult`, `clearCachedDirectionsResults`) stores `{ snappedWaypoints, path, metrics, bounds }` keyed by `locationSignature` (`Map` insertion-order refresh on hit, oldest-key eviction above `50`).
+  - In-memory Geocoder cache (`getCachedGeocodePoint`, `setCachedGeocodePoint`, `geocodeAddressWithCache`) resolves coordinates (`450ms` debounce) for single/partial draft waypoints lacking explicit Places coordinates when `window.google?.maps?.Geocoder` is available.
+  - Viewport framing helper (`frameRouteViewportOnMap`) executes `fitBounds(..., 56)` for `>= 2` waypoints / Directions bounds or `panTo` + `zoom >= 13` for single-waypoint pins once per distinct framed signature.
+- **`LiveFleetMap.tsx` & `MapRouteOverlayHud.tsx`**:
+  - Queries `window.google.maps.DirectionsService` (`350ms` debounce on cache miss, `0ms` instant apply on LRU cache hit) whenever `DirectionsService` is loaded and `canQueryDirectionsForRoute(activeRoute)` is `true`—removing the `!isRealtimeRoutingEnabled()` blocker.
+  - Tracks `dismissedRouteSig` so clicking `✕` on `MapRouteOverlayHud` hides `'draft_form'` or `'selected_trip'` map overlays until `locationSignature` changes, without clearing `DispatchBookingEngine` inputs.
+
+
 
 
 

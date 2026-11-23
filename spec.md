@@ -1022,6 +1022,21 @@ The booking portal will guide the user through a sequential, config-driven flow:
   - Adds `StagedDriverConflictModal.tsx` intercepting `⚡ Auto-Dispatch Ready (N)`, single-trip `⚡ Auto-Offer`, and batch auto-dispatch whenever target trips include staged drivers, offering **`Keep Staged (Send to Staged Driver)`** (recommended), **`Skip Staged Trips`**, and **`Override Staged & Re-Rank`**.
   - Wires `releaseDueStagedTrips` into `useDispatchSlaCascadeLoop.ts` and server-side `/api/auto-dispatch` / `sla-cron.server.ts` with deduplicated tactical alerts when a due staged driver is offline or has a schedule overlap.
 
+## 52. Phase 52 (Wave 4 Phase 3): Dispatch Queue Layout Override (`Table` vs `Auto-Cards`) & Live Booking-Form Map Route Sync
+- **4-Mode `DisplayLayout` Contract (`'auto' | 'table' | 'cards' | 'compact'`) & Compact 10-Column Table**:
+  - Extends `DisplayLayout` (`app/core/hooks/useDisplayLayout.ts`) with `'auto'` alongside `'table' | 'cards' | 'compact'` (validated on `localStorage` hydration; deterministic `'table'` SSR default preserved).
+  - Separates explicit **`Table`** from responsive **`Auto`** in `resolveEffectiveQueueDisplayLayout` (`app/components/domain/dispatch/queue/trip-queue-layout.util.ts`):
+    - Desktop **`'table'`** **always** renders `{ effectiveDisplayLayout: 'table', isAutoCardsFallback: false }` regardless of container width or `scrollWidth` (horizontally scrollable when narrower than `min-w-[900px]`, with zero `onTableOverflowDetected` escalation loop).
+    - Desktop **`'auto'`** performs non-destructive responsive `Table ↔ Cards` switching (`TABLE_OVERFLOW_MIN_WIDTH_PX = 920` + live `scrollWidth > clientWidth + 1` escalation + `TABLE_OVERFLOW_HYSTERESIS_PX = 8`), showing `Table (Auto)` or `Cards (Auto)` in `TripQueueToolbar.tsx`.
+    - Desktop `'cards'` and `'compact'` pass through unchanged; mobile (`!isDesktop`) continues rendering `'cards'`.
+  - Tightens `TripQueueTableView.tsx` to `min-w-[900px]` with `px-2 py-2` cell padding, `max-w-[155px] xl:max-w-[210px]` truncated `PICKUP` / `DROPOFF` cells (`title={fullAddress}`, preserving the `+N stop(s)` amber sub-pill in `PICKUP`), and compact `max-w-[138px]` `DRIVER` `<select>` while keeping the exact `10` `<th>` columns.
+- **Live Booking-Form Waypoint Pin & Road-Snapped Route Sync on `LiveFleetMap`**:
+  - **Active Draft Priority Over Stale `selectedMapTrip`**: Tracks a deterministic location signature for the active booking draft (`activeDraftId`, `pickupAddress`, `pickupCoordinates`, `dropoffAddress`, `dropoffCoordinates`, `intermediateStops`); whenever the active draft's location signature changes with at least one location present, clears `selectedMapTrip` and `selectedQueueTripId` and enables map framing (`shouldZoomMap = true`) so `'draft_form'` renders immediately.
+  - **Single-Endpoint Pin Preview + Debounced Geocoder Fallback**: `resolveActiveRouteContext` (`route-map-sync.ts`) emits `'draft_form'` contexts as soon as **only Pickup** (Emerald Green teardrop pin) or **only Dropoff** (Rose Red teardrop pin, plus any intermediate stops) is entered (`hasFullRoute: false`), smoothly panning/zooming (`zoom >= 13`) to explicit Places/preset coordinates immediately or resolving freeform typed text via cached `google.maps.Geocoder` (`450ms` debounce, offline `resolveMockCoordinates` fallback).
+  - **Dismissible Route Overlay (`✕`) Without Clearing Form Inputs**: Clicking `✕` on `MapRouteOverlayHud` dismisses either `'selected_trip'` or `'draft_form'` map previews (via `dismissedRouteSig` until the draft's location signature changes again) without erasing booking form fields.
+  - **Cached Live `DirectionsService` Road Polylines**: Removes the `!isRealtimeRoutingEnabled()` gate in `LiveFleetMap.tsx` whenever `window.google.maps.DirectionsService` is loaded on the live map, adding a `50`-entry in-memory LRU cache (`getCachedDirectionsResult` / `setCachedDirectionsResult` in `route-map-sync.ts`) for `0ms` repeat renders, `350ms` debounced `DirectionsService.route(...)` calls for uncached routes, cased directional polylines + Green / Orange `1..N` / Red pins, and once-per-signature `fitBounds(..., 56)` framing (`LiveFleetMap.tsx < 1,350`L, `dispatch.tsx < 1,600`L).
+
+
 
 
 

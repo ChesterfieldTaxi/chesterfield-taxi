@@ -1,6 +1,7 @@
 /// <reference types="google.maps" />
 
 import type { GeoPoint, Trip, TripLocation } from '../../../../core/types/trip';
+import { hasValidRoutingEndpoint } from '../../../../core/hooks/useDebounceRoute';
 import { resolveMockCoordinates } from '../../../../core/services/maps/mock-routing';
 import {
   ROUTE_WAYPOINT_PIN_ANCHOR_X,
@@ -20,6 +21,8 @@ export interface ResolvedRouteWaypoint {
   address: string;
   notes?: string;
   coordinates: GeoPoint;
+  hasExplicitCoordinates?: boolean;
+  placeId?: string;
 }
 
 export interface ResolvedRouteMetrics {
@@ -29,14 +32,18 @@ export interface ResolvedRouteMetrics {
 
 export interface ActiveRouteContext {
   source: 'selected_trip' | 'draft_form' | 'active_trip';
+  hasFullRoute: boolean;
   tripId?: string;
   passengerLabel?: string;
   originInput: GeoPoint | string;
   destinationInput: GeoPoint | string;
+  originPlaceId?: string;
+  destinationPlaceId?: string;
   waypointInputs: Array<{ location: GeoPoint | string; stopover: boolean }>;
   waypoints: ResolvedRouteWaypoint[];
   stopCount: number;
   fallbackMetrics: ResolvedRouteMetrics | null;
+  locationSignature: string;
   signature: string;
 }
 
@@ -45,7 +52,134 @@ export interface RoutePolylineHandles {
   mainPolyline: google.maps.Polyline | null;
 }
 
-function isValidGeoPoint(pt?: GeoPoint | null): pt is GeoPoint {
+export const DIRECTIONS_CACHE_MAX_ENTRIES = 50;
+const GEOCODE_CACHE_MAX_ENTRIES = 100;
+
+export interface CachedDirectionsRouteEntry {
+  snappedWaypoints: ResolvedRouteWaypoint[];
+  path: GeoPoint[];
+  metrics: ResolvedRouteMetrics | null;
+  bounds?: google.maps.LatLngBounds | google.maps.LatLngBoundsLiteral | null;
+}
+
+const directionsLruCache = new Map<string, CachedDirectionsRouteEntry>();
+const geocodeLruCache = new Map<string, GeoPoint>();
+
+/**
+ * Retrieves a cached road-snapped Directions snapshot by route signature (O(1) LRU touch).
+ */
+export function getCachedDirectionsResult(signature: string): CachedDirectionsRouteEntry | null {
+  const key = typeof signature === 'string' ? signature.trim() : '';
+  if (!key || !directionsLruCache.has(key)) return null;
+  const entry = directionsLruCache.get(key)!;
+  directionsLruCache.delete(key);
+  directionsLruCache.set(key, entry);
+  return entry;
+}
+
+/**
+ * Stores a road-snapped Directions snapshot in the bounded LRU cache (`maxEntries` default `50`).
+ */
+export function setCachedDirectionsResult(
+  signature: string,
+  entry: CachedDirectionsRouteEntry,
+  maxEntries: number = DIRECTIONS_CACHE_MAX_ENTRIES
+): void {
+  const key = typeof signature === 'string' ? signature.trim() : '';
+  if (!key) return;
+  const cap = Math.max(1, Math.floor(maxEntries));
+  if (directionsLruCache.has(key)) {
+    directionsLruCache.delete(key);
+  }
+  directionsLruCache.set(key, entry);
+  while (directionsLruCache.size > cap) {
+    const oldestKey = directionsLruCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      directionsLruCache.delete(oldestKey);
+    } else {
+      break;
+    }
+  }
+}
+
+export function clearCachedDirectionsResults(): void {
+  directionsLruCache.clear();
+}
+
+export function getDirectionsCacheSize(): number {
+  return directionsLruCache.size;
+}
+
+export function applyCachedDirectionsToWaypoints(
+  cached: CachedDirectionsRouteEntry,
+  baseWaypoints: ResolvedRouteWaypoint[]
+): ResolvedRouteWaypoint[] {
+  return baseWaypoints.map((wp, idx) => {
+    const snapped = cached.snappedWaypoints[idx];
+    return snapped
+      ? { ...wp, coordinates: snapped.coordinates, hasExplicitCoordinates: true }
+      : wp;
+  });
+}
+
+export function getCachedGeocodeCoordinates(address: string): GeoPoint | null {
+  const key = typeof address === 'string' ? address.trim().toLowerCase() : '';
+  if (!key || !geocodeLruCache.has(key)) return null;
+  const pt = geocodeLruCache.get(key)!;
+  geocodeLruCache.delete(key);
+  geocodeLruCache.set(key, pt);
+  return pt;
+}
+
+export function setCachedGeocodeCoordinates(address: string, point: GeoPoint): void {
+  const key = typeof address === 'string' ? address.trim().toLowerCase() : '';
+  if (!key || !isValidGeoPoint(point)) return;
+  if (geocodeLruCache.has(key)) {
+    geocodeLruCache.delete(key);
+  }
+  geocodeLruCache.set(key, point);
+  while (geocodeLruCache.size > GEOCODE_CACHE_MAX_ENTRIES) {
+    const oldest = geocodeLruCache.keys().next().value;
+    if (oldest !== undefined) geocodeLruCache.delete(oldest);
+    else break;
+  }
+}
+
+/**
+ * Resolves freeform address text via `window.google.maps.Geocoder` when loaded,
+ * caching results by normalized address string. Returns `null` when unavailable.
+ */
+export function geocodeAddressCached(address: string): Promise<GeoPoint | null> {
+  const trimmed = typeof address === 'string' ? address.trim() : '';
+  if (trimmed.length < 4) return Promise.resolve(null);
+  const hit = getCachedGeocodeCoordinates(trimmed);
+  if (hit) return Promise.resolve(hit);
+
+  if (typeof window === 'undefined' || typeof window.google?.maps?.Geocoder !== 'function') {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: trimmed }, (results, status) => {
+        if (status === 'OK' && results && results[0]?.geometry?.location) {
+          const pt = latLngToGeoPoint(results[0].geometry.location);
+          if (pt) {
+            setCachedGeocodeCoordinates(trimmed, pt);
+            resolve(pt);
+            return;
+          }
+        }
+        resolve(null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+export function isValidGeoPoint(pt?: GeoPoint | null): pt is GeoPoint {
   return Boolean(
     pt &&
       typeof pt.lat === 'number' &&
@@ -53,6 +187,20 @@ function isValidGeoPoint(pt?: GeoPoint | null): pt is GeoPoint {
       Number.isFinite(pt.lat) &&
       Number.isFinite(pt.lng) &&
       !(pt.lat === 0 && pt.lng === 0)
+  );
+}
+
+export function isRoutableMapEndpoint(endpoint: unknown, placeId?: string): boolean {
+  if (hasValidRoutingEndpoint(endpoint, placeId)) return true;
+  if (typeof endpoint === 'string' && endpoint.trim().length >= 4) return true;
+  return false;
+}
+
+export function isRoutableMapRoute(route: ActiveRouteContext | null | undefined): boolean {
+  if (!route || !route.hasFullRoute) return false;
+  return (
+    isRoutableMapEndpoint(route.originInput, route.originPlaceId) &&
+    isRoutableMapEndpoint(route.destinationInput, route.destinationPlaceId)
   );
 }
 
@@ -87,6 +235,23 @@ function haversineMiles(a: GeoPoint, b: GeoPoint): number {
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function resolveBestInitialCoords(coords: GeoPoint | undefined | null, address: string): {
+  coordinates: GeoPoint;
+  hasExplicitCoordinates: boolean;
+} {
+  if (isValidGeoPoint(coords)) {
+    return { coordinates: coords, hasExplicitCoordinates: true };
+  }
+  const geocoded = getCachedGeocodeCoordinates(address);
+  if (geocoded) {
+    return { coordinates: geocoded, hasExplicitCoordinates: true };
+  }
+  return {
+    coordinates: resolveMockCoordinates(address || 'Chesterfield, MO'),
+    hasExplicitCoordinates: false,
+  };
 }
 
 export function estimateFallbackRouteMetrics(
@@ -140,50 +305,53 @@ function buildWaypointsFromTrip(trip: Trip): {
     stopover: true,
   }));
 
+  const pickupResolved = resolveBestInitialCoords(pickupLoc.coordinates, pickupLoc.address);
+  const dropoffResolved = resolveBestInitialCoords(dropoffLoc.coordinates, dropoffLoc.address);
+
   const waypoints: ResolvedRouteWaypoint[] = [
     {
       id: 'pickup',
       kind: 'pickup',
       badgeLabel: 'Pickup',
-      address: pickupLoc.address.trim(),
+      address: (pickupLoc.address || '').trim() || 'Selected Pickup',
       notes: combineLocationNotes(
         pickupLoc.unitOrApt ? `Unit/Apt: ${pickupLoc.unitOrApt}` : undefined,
         pickupLoc.notes,
         pickupLoc.flightNotes || trip.flightNotes,
         pickupLoc.driverNotes || trip.driverNotes
       ),
-      coordinates: isValidGeoPoint(pickupLoc.coordinates)
-        ? pickupLoc.coordinates
-        : resolveMockCoordinates(pickupLoc.address),
+      coordinates: pickupResolved.coordinates,
+      hasExplicitCoordinates: pickupResolved.hasExplicitCoordinates,
     },
-    ...stops.map((stop, idx) => ({
-      id: `stop-${idx + 1}`,
-      kind: 'stop' as const,
-      stopNumber: idx + 1,
-      badgeLabel: `Stop #${idx + 1}`,
-      address: stop.address.trim(),
-      notes: combineLocationNotes(
-        stop.unitOrApt ? `Unit/Apt: ${stop.unitOrApt}` : undefined,
-        stop.notes,
-        stop.driverNotes
-      ),
-      coordinates: isValidGeoPoint(stop.coordinates)
-        ? stop.coordinates
-        : resolveMockCoordinates(stop.address),
-    })),
+    ...stops.map((stop, idx) => {
+      const stopResolved = resolveBestInitialCoords(stop.coordinates, stop.address);
+      return {
+        id: `stop-${idx + 1}`,
+        kind: 'stop' as const,
+        stopNumber: idx + 1,
+        badgeLabel: `Stop #${idx + 1}`,
+        address: (stop.address || '').trim(),
+        notes: combineLocationNotes(
+          stop.unitOrApt ? `Unit/Apt: ${stop.unitOrApt}` : undefined,
+          stop.notes,
+          stop.driverNotes
+        ),
+        coordinates: stopResolved.coordinates,
+        hasExplicitCoordinates: stopResolved.hasExplicitCoordinates,
+      };
+    }),
     {
       id: 'dropoff',
       kind: 'dropoff',
       badgeLabel: 'Dropoff',
-      address: dropoffLoc.address.trim(),
+      address: (dropoffLoc.address || '').trim() || 'Selected Dropoff',
       notes: combineLocationNotes(
         dropoffLoc.unitOrApt ? `Unit/Apt: ${dropoffLoc.unitOrApt}` : undefined,
         dropoffLoc.notes,
         dropoffLoc.driverNotes
       ),
-      coordinates: isValidGeoPoint(dropoffLoc.coordinates)
-        ? dropoffLoc.coordinates
-        : resolveMockCoordinates(dropoffLoc.address),
+      coordinates: dropoffResolved.coordinates,
+      hasExplicitCoordinates: dropoffResolved.hasExplicitCoordinates,
     },
   ];
 
@@ -191,8 +359,10 @@ function buildWaypointsFromTrip(trip: Trip): {
 }
 
 /**
- * Resolves the active route context from `selectedTrip`, `activeFormValues`, or `activeTrip`
- * with a deterministic signature so Google Directions only re-queries when locations change.
+ * Resolves the active route context from `selectedTrip`, `activeFormValues`, or `activeTrip`:
+ * - Supports full routes (`hasFullRoute: true`) across all 3 sources.
+ * - Supports single-endpoint / partial `'draft_form'` previews (`hasFullRoute: false`) when
+ *   only Pickup (Emerald pin) or only Dropoff (Rose pin) + optional stops are entered.
  */
 export function resolveActiveRouteContext(params: {
   selectedTrip?: Trip | null;
@@ -202,22 +372,35 @@ export function resolveActiveRouteContext(params: {
 }): ActiveRouteContext | null {
   const { selectedTrip, activeFormValues, activeTrip, shouldZoom = false } = params;
 
-  if (selectedTrip?.pickupLocation?.address?.trim() && selectedTrip?.dropoffLocation?.address?.trim()) {
+  const hasSelectedPickup = Boolean(
+    selectedTrip?.pickupLocation?.address?.trim() ||
+      isValidGeoPoint(selectedTrip?.pickupLocation?.coordinates)
+  );
+  const hasSelectedDropoff = Boolean(
+    selectedTrip?.dropoffLocation?.address?.trim() ||
+      isValidGeoPoint(selectedTrip?.dropoffLocation?.coordinates)
+  );
+
+  if (selectedTrip && hasSelectedPickup && hasSelectedDropoff) {
     const built = buildWaypointsFromTrip(selectedTrip);
     const passengerName = `${selectedTrip.passenger?.firstName || ''} ${
       selectedTrip.passenger?.lastName || ''
     }`.trim();
-    const signature = [
-      'selected',
-      selectedTrip.id,
+    const locationSignature = [
       locSignatureToken(built.originInput),
       locSignatureToken(built.destinationInput),
       built.waypointInputs.map((w) => locSignatureToken(w.location)).join('|'),
+    ].join('=>');
+    const signature = [
+      'selected',
+      selectedTrip.id,
+      locationSignature,
       shouldZoom ? '1' : '0',
     ].join('=>');
 
     return {
       source: 'selected_trip',
+      hasFullRoute: true,
       tripId: selectedTrip.id,
       passengerLabel: passengerName || undefined,
       ...built,
@@ -227,89 +410,133 @@ export function resolveActiveRouteContext(params: {
         selectedTrip.pricing?.distanceMiles,
         selectedTrip.pricing?.durationMinutes
       ),
+      locationSignature,
       signature,
     };
   }
 
-  if (activeFormValues?.pickupAddress?.trim() && activeFormValues?.dropoffAddress?.trim()) {
-    const pickupAddr = String(activeFormValues.pickupAddress).trim();
-    const dropoffAddr = String(activeFormValues.dropoffAddress).trim();
+  if (activeFormValues) {
+    const pickupAddr =
+      typeof activeFormValues.pickupAddress === 'string'
+        ? activeFormValues.pickupAddress.trim()
+        : '';
+    const dropoffAddr =
+      typeof activeFormValues.dropoffAddress === 'string'
+        ? activeFormValues.dropoffAddress.trim()
+        : '';
+    const hasDraftPickup = Boolean(pickupAddr || isValidGeoPoint(activeFormValues.pickupCoordinates));
+    const hasDraftDropoff = Boolean(
+      dropoffAddr || isValidGeoPoint(activeFormValues.dropoffCoordinates)
+    );
     const rawStops: Array<any> = Array.isArray(activeFormValues.intermediateStops)
       ? activeFormValues.intermediateStops.filter(
-          (s: any) => typeof s?.address === 'string' && s.address.trim().length > 0
+          (s: any) =>
+            (typeof s?.address === 'string' && s.address.trim().length > 0) ||
+            isValidGeoPoint(s?.coordinates)
         )
       : [];
 
-    const originInput: GeoPoint | string = isValidGeoPoint(activeFormValues.pickupCoordinates)
-      ? activeFormValues.pickupCoordinates
-      : pickupAddr;
-    const destinationInput: GeoPoint | string = isValidGeoPoint(activeFormValues.dropoffCoordinates)
-      ? activeFormValues.dropoffCoordinates
-      : dropoffAddr;
-    const waypointInputs = rawStops.map((s) => ({
-      location: isValidGeoPoint(s.coordinates) ? s.coordinates : String(s.address).trim(),
-      stopover: true,
-    }));
-
-    const waypoints: ResolvedRouteWaypoint[] = [
-      {
-        id: 'pickup',
-        kind: 'pickup',
-        badgeLabel: 'Pickup',
-        address: pickupAddr,
-        notes: combineLocationNotes(activeFormValues.notesForAll),
-        coordinates: isValidGeoPoint(activeFormValues.pickupCoordinates)
+    if (hasDraftPickup || hasDraftDropoff || rawStops.length > 0) {
+      const hasFullRoute = hasDraftPickup && hasDraftDropoff;
+      const originInput: GeoPoint | string = hasDraftPickup
+        ? isValidGeoPoint(activeFormValues.pickupCoordinates)
           ? activeFormValues.pickupCoordinates
-          : resolveMockCoordinates(pickupAddr),
-      },
-      ...rawStops.map((s, idx) => {
-        const addr = String(s.address).trim();
-        return {
+          : pickupAddr
+        : '';
+      const destinationInput: GeoPoint | string = hasDraftDropoff
+        ? isValidGeoPoint(activeFormValues.dropoffCoordinates)
+          ? activeFormValues.dropoffCoordinates
+          : dropoffAddr
+        : '';
+      const waypointInputs = rawStops.map((s) => ({
+        location: isValidGeoPoint(s.coordinates) ? s.coordinates : String(s.address || '').trim(),
+        stopover: true,
+      }));
+
+      const waypoints: ResolvedRouteWaypoint[] = [];
+      if (hasDraftPickup) {
+        const pRes = resolveBestInitialCoords(activeFormValues.pickupCoordinates, pickupAddr);
+        waypoints.push({
+          id: 'pickup',
+          kind: 'pickup',
+          badgeLabel: 'Pickup',
+          address:
+            pickupAddr ||
+            `${pRes.coordinates.lat.toFixed(4)}, ${pRes.coordinates.lng.toFixed(4)}`,
+          notes: combineLocationNotes(activeFormValues.notesForAll),
+          coordinates: pRes.coordinates,
+          hasExplicitCoordinates: pRes.hasExplicitCoordinates,
+          placeId: activeFormValues.pickupPlaceId,
+        });
+      }
+
+      rawStops.forEach((s, idx) => {
+        const addr = String(s.address || '').trim();
+        const sRes = resolveBestInitialCoords(s.coordinates, addr);
+        waypoints.push({
           id: `stop-${idx + 1}`,
           kind: 'stop' as const,
           stopNumber: idx + 1,
           badgeLabel: `Stop #${idx + 1}`,
-          address: addr,
+          address: addr || `${sRes.coordinates.lat.toFixed(4)}, ${sRes.coordinates.lng.toFixed(4)}`,
           notes: combineLocationNotes(s.notes),
-          coordinates: isValidGeoPoint(s.coordinates)
-            ? s.coordinates
-            : resolveMockCoordinates(addr),
-        };
-      }),
-      {
-        id: 'dropoff',
-        kind: 'dropoff',
-        badgeLabel: 'Dropoff',
-        address: dropoffAddr,
-        coordinates: isValidGeoPoint(activeFormValues.dropoffCoordinates)
-          ? activeFormValues.dropoffCoordinates
-          : resolveMockCoordinates(dropoffAddr),
-      },
-    ];
+          coordinates: sRes.coordinates,
+          hasExplicitCoordinates: sRes.hasExplicitCoordinates,
+          placeId: s.placeId,
+        });
+      });
 
-    const signature = [
-      'draft',
-      locSignatureToken(originInput),
-      locSignatureToken(destinationInput),
-      waypointInputs.map((w) => locSignatureToken(w.location)).join('|'),
-      shouldZoom ? '1' : '0',
-    ].join('=>');
+      if (hasDraftDropoff) {
+        const dRes = resolveBestInitialCoords(activeFormValues.dropoffCoordinates, dropoffAddr);
+        waypoints.push({
+          id: 'dropoff',
+          kind: 'dropoff',
+          badgeLabel: 'Dropoff',
+          address:
+            dropoffAddr ||
+            `${dRes.coordinates.lat.toFixed(4)}, ${dRes.coordinates.lng.toFixed(4)}`,
+          coordinates: dRes.coordinates,
+          hasExplicitCoordinates: dRes.hasExplicitCoordinates,
+          placeId: activeFormValues.dropoffPlaceId,
+        });
+      }
 
-    return {
-      source: 'draft_form',
-      passengerLabel: activeFormValues.passengerName?.trim() || 'Booking Draft',
-      originInput,
-      destinationInput,
-      waypointInputs,
-      waypoints,
-      stopCount: rawStops.length,
-      fallbackMetrics: estimateFallbackRouteMetrics(
+      const locationSignature = [
+        locSignatureToken(originInput),
+        locSignatureToken(destinationInput),
+        waypointInputs.map((w) => locSignatureToken(w.location)).join('|'),
+      ].join('=>');
+      const signature = [
+        'draft',
+        hasFullRoute ? 'full' : 'partial',
+        locationSignature,
+        shouldZoom ? '1' : '0',
+      ].join('=>');
+
+      return {
+        source: 'draft_form',
+        hasFullRoute,
+        passengerLabel: activeFormValues.passengerName?.trim() || 'Booking Draft',
+        originInput,
+        destinationInput,
+        originPlaceId: activeFormValues.pickupPlaceId,
+        destinationPlaceId: activeFormValues.dropoffPlaceId,
+        waypointInputs,
         waypoints,
-        activeFormValues.estimatedDistanceMiles,
-        activeFormValues.estimatedDurationMinutes
-      ),
-      signature,
-    };
+        stopCount: rawStops.length,
+        fallbackMetrics: hasFullRoute
+          ? estimateFallbackRouteMetrics(
+              waypoints,
+              activeFormValues.estimatedDistanceMiles,
+              activeFormValues.estimatedDurationMinutes
+            )
+          : waypoints.length >= 2
+          ? estimateFallbackRouteMetrics(waypoints)
+          : null,
+        locationSignature,
+        signature,
+      };
+    }
   }
 
   if (activeTrip?.pickupLocation?.address?.trim() && activeTrip?.dropoffLocation?.address?.trim()) {
@@ -317,17 +544,21 @@ export function resolveActiveRouteContext(params: {
     const passengerName = `${activeTrip.passenger?.firstName || ''} ${
       activeTrip.passenger?.lastName || ''
     }`.trim();
-    const signature = [
-      'active',
-      activeTrip.id,
+    const locationSignature = [
       locSignatureToken(built.originInput),
       locSignatureToken(built.destinationInput),
       built.waypointInputs.map((w) => locSignatureToken(w.location)).join('|'),
+    ].join('=>');
+    const signature = [
+      'active',
+      activeTrip.id,
+      locationSignature,
       shouldZoom ? '1' : '0',
     ].join('=>');
 
     return {
       source: 'active_trip',
+      hasFullRoute: true,
       tripId: activeTrip.id,
       passengerLabel: passengerName || undefined,
       ...built,
@@ -337,6 +568,7 @@ export function resolveActiveRouteContext(params: {
         activeTrip.pricing?.distanceMiles,
         activeTrip.pricing?.durationMinutes
       ),
+      locationSignature,
       signature,
     };
   }
@@ -381,15 +613,15 @@ export function extractDirectionsRouteSnapshot(
     if (legs.length === 0) return wp;
     if (idx === 0) {
       const startPt = latLngToGeoPoint(legs[0]?.start_location);
-      return startPt ? { ...wp, coordinates: startPt } : wp;
+      return startPt ? { ...wp, coordinates: startPt, hasExplicitCoordinates: true } : wp;
     }
     if (idx === baseWaypoints.length - 1) {
       const endPt = latLngToGeoPoint(legs[legs.length - 1]?.end_location);
-      return endPt ? { ...wp, coordinates: endPt } : wp;
+      return endPt ? { ...wp, coordinates: endPt, hasExplicitCoordinates: true } : wp;
     }
     // Intermediate stop idx (1..N) corresponds to legs[idx - 1].end_location
     const legEndPt = latLngToGeoPoint(legs[idx - 1]?.end_location);
-    return legEndPt ? { ...wp, coordinates: legEndPt } : wp;
+    return legEndPt ? { ...wp, coordinates: legEndPt, hasExplicitCoordinates: true } : wp;
   });
 
   const stepPoints: GeoPoint[] = [];
@@ -424,6 +656,41 @@ export function extractDirectionsRouteSnapshot(
     path: overviewPoints.length >= 2 ? overviewPoints : snappedWaypoints.map((w) => w.coordinates),
     metrics,
   };
+}
+
+/**
+ * Frames either a single waypoint pin (`panTo` + `zoom >= 13`) or a multi-point route
+ * (`fitBounds` with `56px` padding) on the Google Map instance.
+ */
+export function frameRouteViewportOnMap(params: {
+  map: google.maps.Map | null;
+  waypoints: ResolvedRouteWaypoint[];
+  path?: GeoPoint[];
+  bounds?: google.maps.LatLngBounds | google.maps.LatLngBoundsLiteral | null;
+}): void {
+  const { map, waypoints, path = [], bounds } = params;
+  if (!map) return;
+
+  if (waypoints.length === 1 && isValidGeoPoint(waypoints[0].coordinates)) {
+    map.panTo(waypoints[0].coordinates);
+    const currentZoom = map.getZoom?.() ?? 11;
+    if (currentZoom < 13) {
+      map.setZoom(14);
+    }
+    return;
+  }
+
+  if (bounds) {
+    map.fitBounds(bounds, 56);
+    return;
+  }
+
+  const pts = path.length >= 2 ? path : waypoints.map((w) => w.coordinates);
+  if (pts.length >= 2 && typeof window !== 'undefined' && window.google?.maps?.LatLngBounds) {
+    const computed = new window.google.maps.LatLngBounds();
+    pts.forEach((pt) => computed.extend(pt));
+    map.fitBounds(computed, 56);
+  }
 }
 
 export function clearRoutePolylines(handles: RoutePolylineHandles): void {

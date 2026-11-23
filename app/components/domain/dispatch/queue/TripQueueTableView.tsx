@@ -1,7 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
+import {
+  sortDispatchQueueTrips,
+  type QueueSortMode,
+} from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import {
   hasStagedDriver,
@@ -21,10 +25,12 @@ import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
   DispatchSlaBadge,
-  canTripTriggerAutoOffer,
 } from '../DispatchCascadeSlaBadges';
-import { BoltIcon, PhoneIcon } from '../../../ui/Icons';
-import { getDriverDropdownDot } from './trip-queue-layout.util';
+import { PhoneIcon } from '../../../ui/Icons';
+import {
+  getDriverDropdownDot,
+  splitAddressForTwoLineCell,
+} from './trip-queue-layout.util';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
 export interface TripQueueTableViewProps {
@@ -99,6 +105,18 @@ export function TripQueueTableView({
 }: TripQueueTableViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
+  const [sortMode, setSortMode] = useState<QueueSortMode>('smart');
+
+  const displayedTrips = useMemo(
+    () => (sortMode === 'smart' ? filteredTrips : sortDispatchQueueTrips(filteredTrips, sortMode)),
+    [filteredTrips, sortMode]
+  );
+
+  const cycleSortMode = () => {
+    setSortMode((prev) =>
+      prev === 'smart' ? 'date_asc' : prev === 'date_asc' ? 'date_desc' : 'smart'
+    );
+  };
 
   useIsomorphicLayoutEffect(() => {
     const scroller = scrollContainerRef.current;
@@ -130,10 +148,10 @@ export function TripQueueTableView({
 
   return (
     <div ref={scrollContainerRef} className="flex-1 overflow-auto custom-scrollbar text-xs">
-      <table ref={tableRef} className="w-full text-left border-collapse min-w-[1020px]">
+      <table ref={tableRef} className="w-full text-left border-collapse min-w-[900px]">
           <thead className="bg-slate-100/90 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px] z-10">
             <tr>
-              <th className="py-2 px-3 w-8 text-center">
+              <th className="py-2 px-2 w-8 text-center">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -145,22 +163,79 @@ export function TripQueueTableView({
                   title="Select/Deselect All Filtered Trips"
                 />
               </th>
-              <th className="py-2 px-3 whitespace-nowrap">DATE/TIME ▲</th>
-              <th className="py-2 px-3 whitespace-nowrap">PASSENGER</th>
-              <th className="py-2 px-3 whitespace-nowrap">PICKUP</th>
-              <th className="py-2 px-3 whitespace-nowrap">DROPOFF</th>
-              <th className="py-2 px-3 whitespace-nowrap">DRIVER</th>
-              <th className="py-2 px-3 whitespace-nowrap">VEHICLE</th>
-              <th className="py-2 px-3 whitespace-nowrap">PRICE</th>
-              <th className="py-2 px-3 whitespace-nowrap">STATUS</th>
-              <th className="py-2 px-3 text-center whitespace-nowrap">ACTION</th>
+              <th className="py-2 px-2 whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={cycleSortMode}
+                  className="inline-flex items-center gap-1 hover:text-blue-700 cursor-pointer transition-colors"
+                  title={
+                    sortMode === 'smart'
+                      ? 'Smart Operational Order (Open ASAP & Soonest Scheduled first, Closed below) — click for Oldest → Newest'
+                      : sortMode === 'date_asc'
+                      ? 'Chronological Ascending (Oldest → Newest) — click for Newest → Oldest'
+                      : 'Chronological Descending (Newest → Oldest) — click for Smart Operational Order'
+                  }
+                >
+                  <span>DATE/TIME</span>
+                  {sortMode === 'smart' ? (
+                    <span className="px-1 py-0.1 rounded bg-blue-100 text-blue-700 text-[9.5px] font-extrabold">
+                      Live
+                    </span>
+                  ) : (
+                    <span>{sortMode === 'date_asc' ? '▲' : '▼'}</span>
+                  )}
+                </button>
+              </th>
+              <th className="py-2 px-2 whitespace-nowrap">PASSENGER</th>
+              <th className="py-2 px-2 whitespace-nowrap">PICKUP</th>
+              <th className="py-2 px-2 whitespace-nowrap">DROPOFF</th>
+              <th className="py-2 px-2 whitespace-nowrap">
+                <div className="inline-flex items-center gap-1.5">
+                  <span>DRIVER</span>
+                  {stagedPlanner && (
+                    <span
+                      className="inline-flex items-center rounded-md border border-slate-300 bg-white p-0.5 text-[9.5px] font-extrabold shadow-2xs"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Toggle whether unassigned driver dropdowns Send immediately or Stage (Hold in Dispatch)"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
+                        className={`px-1.5 py-0.2 rounded cursor-pointer transition-colors ${
+                          stagedPlanner.queueAssignMode === 'send_to_driver'
+                            ? 'bg-slate-900 text-white'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Send
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => stagedPlanner.setQueueAssignMode('stage_hold')}
+                        className={`px-1.5 py-0.2 rounded cursor-pointer transition-colors ${
+                          stagedPlanner.queueAssignMode === 'stage_hold'
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-slate-600 hover:text-indigo-700'
+                        }`}
+                      >
+                        📌 Hold
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </th>
+              <th className="py-2 px-2 whitespace-nowrap">VEHICLE</th>
+              <th className="py-2 px-2 whitespace-nowrap">PRICE</th>
+              <th className="py-2 px-2 whitespace-nowrap">STATUS</th>
+              <th className="py-2 px-2 text-center whitespace-nowrap">ACTION</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-800">
-            {filteredTrips.map((trip) => {
+            {displayedTrips.map((trip) => {
               const isSelected = selectedQueueTripId === trip.id;
               const isChecked = selectedTripIds.includes(trip.id);
-              const pickupTimeStr = trip.scheduledPickupTime
+              const isAsapRow = trip.bookingType === 'asap' || !trip.scheduledPickupTime;
+              const pickupTimeStr = !isAsapRow && trip.scheduledPickupTime
                 ? `${new Date(trip.scheduledPickupTime).toLocaleDateString([], {
                     month: 'short',
                     day: 'numeric',
@@ -169,12 +244,29 @@ export function TripQueueTableView({
                     minute: '2-digit',
                   })}`
                 : 'ASAP';
+              const asapCreatedSubStr =
+                isAsapRow && trip.createdAt
+                  ? (() => {
+                      const d = new Date(trip.createdAt);
+                      if (isNaN(d.getTime())) return null;
+                      const now = new Date();
+                      const sameDay =
+                        d.getFullYear() === now.getFullYear() &&
+                        d.getMonth() === now.getMonth() &&
+                        d.getDate() === now.getDate();
+                      return sameDay
+                        ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+                    })()
+                  : null;
 
               const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
               const stops = getTripIntermediateStops(trip);
               const stopCount = getTripIntermediateStopCount(trip);
               const firstStopPreview = stops[0] ? formatShortStopPreview(stops[0].address) : '';
               const itineraryTooltip = stopCount > 0 ? buildTripItineraryTooltip(trip) : undefined;
+              const pickupTwoLine = splitAddressForTwoLineCell(trip.pickupLocation.address);
+              const dropoffTwoLine = splitAddressForTwoLineCell(trip.dropoffLocation.address);
 
               return (
                 <tr
@@ -192,7 +284,7 @@ export function TripQueueTableView({
                   }`}
                   title="Click to view route on map. Double-click to edit trip & zoom in."
                 >
-                  <td className="py-2 px-3 w-8 text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className="py-2 px-2 w-8 text-center" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -200,14 +292,21 @@ export function TripQueueTableView({
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </td>
-                  <td className="py-2 px-3 font-semibold text-slate-700 whitespace-nowrap">
-                    <div className="flex flex-col items-start gap-1">
-                      <span>{pickupTimeStr}</span>
+                  <td className="py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                    <div className="flex flex-col items-start gap-0.5">
+                      <span className={isAsapRow ? 'font-extrabold text-slate-900' : ''}>
+                        {pickupTimeStr}
+                      </span>
+                      {asapCreatedSubStr && (
+                        <span className="text-[10px] font-medium text-slate-400">
+                          {asapCreatedSubStr}
+                        </span>
+                      )}
                       <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
                       <DispatchFlightTelemetryPill trip={trip} compact />
                     </div>
                   </td>
-                  <td className="py-2 px-3 font-medium">
+                  <td className="py-2 px-2 font-medium">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="whitespace-nowrap">
                         {trip.passenger.firstName} {trip.passenger.lastName}
@@ -249,31 +348,69 @@ export function TripQueueTableView({
                       )}
                     </div>
                   </td>
-                  <td className="py-2 px-3 max-w-[160px]">
-                    <div className="truncate" title={trip.pickupLocation.address}>
-                      {trip.pickupLocation.address}
-                    </div>
-                    {stopCount > 0 && (
+                  <td className="py-2 px-2 max-w-[185px] xl:max-w-[240px]">
+                    {stopCount > 0 ? (
+                      <>
+                        <div className="truncate font-medium text-slate-800" title={trip.pickupLocation.address}>
+                          {pickupTwoLine.primary}
+                        </div>
+                        <div
+                          className="max-w-full bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5"
+                          title={itineraryTooltip}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span className="truncate">
+                            {firstStopPreview
+                              ? `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'} · ${firstStopPreview}`
+                              : `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'}`}
+                          </span>
+                        </div>
+                      </>
+                    ) : pickupTwoLine.secondary ? (
+                      <div className="leading-tight" title={trip.pickupLocation.address}>
+                        <div className="truncate font-medium text-slate-800">
+                          {pickupTwoLine.primary}
+                        </div>
+                        <div className="truncate text-[10.5px] text-slate-500">
+                          {pickupTwoLine.secondary}
+                        </div>
+                      </div>
+                    ) : (
                       <div
-                        className="max-w-[156px] bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5"
-                        title={itineraryTooltip}
+                        className="line-clamp-2 whitespace-normal break-words leading-snug font-medium text-slate-800"
+                        title={trip.pickupLocation.address}
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                        <span className="truncate">
-                          {firstStopPreview
-                            ? `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'} · ${firstStopPreview}`
-                            : `+${stopCount} ${stopCount === 1 ? 'stop' : 'stops'}`}
-                        </span>
+                        {pickupTwoLine.primary}
                       </div>
                     )}
                   </td>
-                  <td className="py-2 px-3 truncate max-w-[160px]" title={trip.dropoffLocation.address}>
-                    {trip.dropoffLocation.address}
+                  <td
+                    className="py-2 px-2 max-w-[185px] xl:max-w-[240px]"
+                    title={trip.dropoffLocation.address}
+                  >
+                    {stopCount > 0 ? (
+                      <div className="truncate font-medium text-slate-800">
+                        {dropoffTwoLine.primary}
+                      </div>
+                    ) : dropoffTwoLine.secondary ? (
+                      <div className="leading-tight">
+                        <div className="truncate font-medium text-slate-800">
+                          {dropoffTwoLine.primary}
+                        </div>
+                        <div className="truncate text-[10.5px] text-slate-500">
+                          {dropoffTwoLine.secondary}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="line-clamp-2 whitespace-normal break-words leading-snug font-medium text-slate-800">
+                        {dropoffTwoLine.primary}
+                      </div>
+                    )}
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-2">
                     <div className="flex flex-col items-start gap-1">
                       {hasStagedDriver(trip) && (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-dashed border-indigo-400 bg-indigo-50 text-indigo-900 text-[10.5px] font-extrabold max-w-[195px]">
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-dashed border-indigo-400 bg-indigo-50 text-indigo-900 text-[10.5px] font-extrabold max-w-[185px]">
                           <span className="truncate" title={`Staged driver placeholder: ${trip.plannedDriverLabel || trip.plannedDriverId}`}>
                             📌 Staged: {trip.plannedDriverLabel || trip.plannedDriverId}
                           </span>
@@ -308,97 +445,55 @@ export function TripQueueTableView({
                         </div>
                       )}
 
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={
-                            trip.assignedDriverId ||
-                            (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
-                              ? trip.plannedDriverId
-                              : 'unassigned')
+                      <select
+                        value={
+                          trip.assignedDriverId ||
+                          (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
+                            ? trip.plannedDriverId
+                            : 'unassigned')
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const val = e.target.value;
+                          if (
+                            !trip.assignedDriverId &&
+                            stagedPlanner?.queueAssignMode === 'stage_hold'
+                          ) {
+                            void stagedPlanner.stageTripDriver(trip, val);
+                          } else {
+                            void onQuickAssignDriver(trip.id, val);
                           }
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            const val = e.target.value;
-                            if (
-                              !trip.assignedDriverId &&
-                              stagedPlanner?.queueAssignMode === 'stage_hold'
-                            ) {
-                              void stagedPlanner.stageTripDriver(trip, val);
-                            } else {
-                              void onQuickAssignDriver(trip.id, val);
-                            }
-                          }}
-                          className={`text-xs font-semibold rounded-lg border py-1 px-2 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[145px] truncate ${
-                            trip.assignedDriverId
-                              ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
-                              : stagedPlanner?.queueAssignMode === 'stage_hold'
-                              ? 'bg-indigo-50/90 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-                              : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
-                          }`}
-                          title={
-                            !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                              ? 'Select driver to stage (Hold in Dispatch)'
-                              : 'Select driver to send immediately'
-                          }
-                        >
-                          <option value="unassigned">
-                            {!trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                              ? '📌 Stage Driver...'
-                              : 'Unassigned'}
+                        }}
+                        className={`text-xs font-semibold rounded-lg border py-1 px-1.5 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[155px] truncate ${
+                          trip.assignedDriverId
+                            ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
+                            : stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? 'bg-indigo-50/90 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
+                            : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
+                        }`}
+                        title={
+                          !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? 'Select driver to stage (Hold in Dispatch)'
+                            : 'Select driver to send immediately'
+                        }
+                      >
+                        <option value="unassigned">
+                          {!trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? '📌 Stage Driver...'
+                            : 'Unassigned'}
+                        </option>
+                        {drivers.map((drv) => (
+                          <option
+                            key={drv.id}
+                            value={drv.id}
+                            disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                          >
+                            {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                           </option>
-                          {drivers.map((drv) => (
-                            <option
-                              key={drv.id}
-                              value={drv.id}
-                              disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                            >
-                              {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-                            </option>
-                          ))}
-                        </select>
+                        ))}
+                      </select>
 
-                        {!trip.assignedDriverId && stagedPlanner && isTripEligibleForStaging(trip) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              stagedPlanner.setQueueAssignMode(
-                                stagedPlanner.queueAssignMode === 'stage_hold'
-                                  ? 'send_to_driver'
-                                  : 'stage_hold'
-                              );
-                            }}
-                            className={`px-1.5 py-1 rounded-md border text-[10px] font-extrabold cursor-pointer shrink-0 transition-colors ${
-                              stagedPlanner.queueAssignMode === 'stage_hold'
-                                ? 'bg-indigo-600 text-white border-indigo-700'
-                                : 'bg-white hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border-slate-300'
-                            }`}
-                            title={
-                              stagedPlanner.queueAssignMode === 'stage_hold'
-                                ? 'Mode: Stage Driver (Hold in Dispatch) — click to switch to Send to Driver'
-                                : 'Mode: Send to Driver — click to switch dropdown to Stage Driver (Hold)'
-                            }
-                          >
-                            {stagedPlanner.queueAssignMode === 'stage_hold' ? '📌 Hold' : 'Stage'}
-                          </button>
-                        )}
-
-                        {canTripTriggerAutoOffer(trip) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onStartAutoOffer(trip);
-                            }}
-                            className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] shadow-2xs cursor-pointer inline-flex items-center gap-1 shrink-0 transition-colors"
-                            title="Start 1-tap sequential Auto-Offer Cascade"
-                          >
-                            <BoltIcon className="w-3 h-3 shrink-0" />
-                            <span>Auto-Offer</span>
-                          </button>
-                        )}
-                      </div>
                       <DispatchCascadePill
                         trip={trip}
                         compact
@@ -406,8 +501,8 @@ export function TripQueueTableView({
                       />
                     </div>
                   </td>
-                  <td className="py-2 px-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                  <td className="py-2 px-2 whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
                       {formatVehicleTierDisplay(
                         (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
                         settings.vehicles,
@@ -415,11 +510,11 @@ export function TripQueueTableView({
                       )}
                     </span>
                   </td>
-                  <td className="py-2 px-3 font-bold text-slate-900">
+                  <td className="py-2 px-2 font-bold text-slate-900 whitespace-nowrap">
                     ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                   </td>
-                  <td className="py-2 px-3">{getDispatchStatusBadge(trip.status)}</td>
-                  <td className="py-2 px-3 text-center">
+                  <td className="py-2 px-2 whitespace-nowrap">{getDispatchStatusBadge(trip.status)}</td>
+                  <td className="py-2 px-2 text-center whitespace-nowrap">
                     <div className="flex items-center justify-center gap-1.5">
                       {isUnconfirmedTrip && (
                         <button
@@ -476,7 +571,7 @@ export function TripQueueTableView({
                 </tr>
               );
             })}
-            {filteredTrips.length === 0 && (
+            {displayedTrips.length === 0 && (
               <tr>
                 <td colSpan={10} className="py-12 text-center text-slate-500 font-semibold text-xs">
                   No trips found.

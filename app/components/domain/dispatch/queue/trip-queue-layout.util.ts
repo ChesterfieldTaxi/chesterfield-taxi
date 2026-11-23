@@ -13,18 +13,20 @@ export type QueueFilterType =
   | 'has_staged_driver';
 
 /**
- * Baseline minimum Trips Queue outer width (in CSS pixels) required to render
- * the 10-column Table layout (`min-w-[1020px]` + vertical scrollbar) without
- * horizontal clipping. When rendered rows contain wider controls (e.g. `Auto-Offer`,
- * `SLA`, or `Review` actions pushing `table.scrollWidth` to ~1180–1280px), live DOM
- * `scrollWidth > clientWidth` detection escalates `requiredTableWidthPx` dynamically.
+ * Baseline minimum Trips Queue outer width (in CSS pixels) required in `'auto'` mode
+ * to render the compact 10-column Table layout (`min-w-[900px]` + vertical scrollbar)
+ * without horizontal clipping. When `'auto'` mode is active and rendered rows contain
+ * wider controls pushing `table.scrollWidth` above `clientWidth`, live DOM detection
+ * escalates `requiredTableWidthPx` dynamically.
  */
-export const TABLE_OVERFLOW_MIN_WIDTH_PX = 1040;
+export const TABLE_OVERFLOW_MIN_WIDTH_PX = 920;
 export const TABLE_OVERFLOW_HYSTERESIS_PX = 8;
 
 export const CARD_GRID_TWO_COL_MIN_PX = 580;
 export const CARD_GRID_THREE_COL_MIN_PX = 900;
 export const CARD_GRID_FOUR_COL_MIN_PX = 1220;
+
+export type EffectiveQueueDisplayLayout = Exclude<DisplayLayout, 'auto'>;
 
 const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
@@ -37,7 +39,7 @@ export interface ResolveEffectiveQueueLayoutParams {
 }
 
 export interface ResolvedEffectiveQueueLayout {
-  effectiveDisplayLayout: DisplayLayout;
+  effectiveDisplayLayout: EffectiveQueueDisplayLayout;
   isAutoCardsFallback: boolean;
   effectiveMinTableWidthPx: number;
 }
@@ -47,10 +49,13 @@ export interface ResolvedEffectiveQueueLayout {
  * Never mutates the operator's saved `displayLayout` preference.
  *
  * - Mobile (`!isDesktop`) always uses `'cards'` (`isAutoCardsFallback = false`).
- * - Desktop `'table'` with measured `0 < queueWidthPx < effectiveMinTableWidthPx`
- *   (where `effectiveMinTableWidthPx = max(1040, requiredTableWidthPx)`) switches
- *   non-destructively to `'cards'` (`isAutoCardsFallback = true`), and automatically
- *   restores `'table'` once `queueWidthPx >= effectiveMinTableWidthPx`.
+ * - Desktop explicit `'table'` ALWAYS returns `'table'` (`isAutoCardsFallback = false`)
+ *   regardless of `queueWidthPx` or `requiredTableWidthPx`, giving operators 100% manual
+ *   control with clean horizontal scrolling on narrow panes.
+ * - Desktop `'auto'` performs responsive overflow switching: renders `'table'`
+ *   (`isAutoCardsFallback = false`) when `queueWidthPx === 0 || queueWidthPx >= effectiveMinTableWidthPx`,
+ *   and switches to `'cards'` (`isAutoCardsFallback = true`) when
+ *   `0 < queueWidthPx < effectiveMinTableWidthPx`.
  * - Desktop `'cards'` and `'compact'` pass through unchanged.
  */
 export function resolveEffectiveQueueDisplayLayout({
@@ -76,15 +81,29 @@ export function resolveEffectiveQueueDisplayLayout({
     };
   }
 
-  if (
-    displayLayout === 'table' &&
-    Number.isFinite(queueWidthPx) &&
-    queueWidthPx > 0 &&
-    queueWidthPx < effectiveMinTableWidthPx
-  ) {
+  if (displayLayout === 'table') {
     return {
-      effectiveDisplayLayout: 'cards',
-      isAutoCardsFallback: true,
+      effectiveDisplayLayout: 'table',
+      isAutoCardsFallback: false,
+      effectiveMinTableWidthPx,
+    };
+  }
+
+  if (displayLayout === 'auto') {
+    if (
+      Number.isFinite(queueWidthPx) &&
+      queueWidthPx > 0 &&
+      queueWidthPx < effectiveMinTableWidthPx
+    ) {
+      return {
+        effectiveDisplayLayout: 'cards',
+        isAutoCardsFallback: true,
+        effectiveMinTableWidthPx,
+      };
+    }
+    return {
+      effectiveDisplayLayout: 'table',
+      isAutoCardsFallback: false,
       effectiveMinTableWidthPx,
     };
   }
@@ -186,18 +205,22 @@ export function useResponsiveQueueLayout({
     setRequiredTableWidthPx(0);
   }, [displayLayout, filterSignature]);
 
-  const handleTableOverflowDetected = useCallback((overflowDeltaPx: number) => {
-    if (!Number.isFinite(overflowDeltaPx) || overflowDeltaPx <= 1) return;
-    const liveOuterWidth = Math.round(
-      queueContainerRef.current?.getBoundingClientRect().width || queueWidthRef.current
-    );
-    if (liveOuterWidth <= 0) return;
+  const handleTableOverflowDetected = useCallback(
+    (overflowDeltaPx: number) => {
+      if (displayLayout !== 'auto') return;
+      if (!Number.isFinite(overflowDeltaPx) || overflowDeltaPx <= 1) return;
+      const liveOuterWidth = Math.round(
+        queueContainerRef.current?.getBoundingClientRect().width || queueWidthRef.current
+      );
+      if (liveOuterWidth <= 0) return;
 
-    const neededOuterWidth = Math.ceil(
-      liveOuterWidth + overflowDeltaPx + TABLE_OVERFLOW_HYSTERESIS_PX
-    );
-    setRequiredTableWidthPx((prev) => (neededOuterWidth > prev ? neededOuterWidth : prev));
-  }, []);
+      const neededOuterWidth = Math.ceil(
+        liveOuterWidth + overflowDeltaPx + TABLE_OVERFLOW_HYSTERESIS_PX
+      );
+      setRequiredTableWidthPx((prev) => (neededOuterWidth > prev ? neededOuterWidth : prev));
+    },
+    [displayLayout]
+  );
 
   const resolved = resolveEffectiveQueueDisplayLayout({
     displayLayout,
@@ -227,4 +250,37 @@ export function getDriverDropdownDot(driver: LiveFleetDriver): string {
     default:
       return '[Off]';
   }
+}
+
+export interface TwoLineAddressParts {
+  primary: string;
+  secondary: string | null;
+}
+
+/**
+ * Splits a street/venue address cleanly for a 2-line Trips Table cell:
+ * - Strips redundant trailing ", USA" / ", United States".
+ * - When a comma exists, places Street/Venue on line 1 and City/State/ZIP on line 2.
+ * - When comma-less, returns `{ primary, secondary: null }` for natural 2-line word wrapping (`line-clamp-2`).
+ */
+export function splitAddressForTwoLineCell(address?: string | null): TwoLineAddressParts {
+  const cleaned = String(address || '')
+    .trim()
+    .replace(/,\s*(USA|United States)\s*$/i, '')
+    .trim();
+
+  if (!cleaned) {
+    return { primary: '—', secondary: null };
+  }
+
+  const firstCommaIdx = cleaned.indexOf(',');
+  if (firstCommaIdx > 0 && firstCommaIdx < cleaned.length - 1) {
+    const primary = cleaned.slice(0, firstCommaIdx).trim();
+    const secondary = cleaned.slice(firstCommaIdx + 1).trim();
+    if (primary && secondary) {
+      return { primary, secondary };
+    }
+  }
+
+  return { primary: cleaned, secondary: null };
 }

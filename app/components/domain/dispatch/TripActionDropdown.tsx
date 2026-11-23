@@ -11,6 +11,7 @@ import {
   MapPinIcon,
   DocumentTextIcon,
   BoltIcon,
+  RadarBroadcastIcon,
   CarIcon,
   PlusIcon,
   ShieldCheckIcon,
@@ -330,7 +331,7 @@ export function TripActionDropdown({
                 }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50/90 transition-colors cursor-pointer"
               >
-                <BoltIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <RadarBroadcastIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>
                   {trip.offerCascade?.state === 'exhausted' ? 'Retry Auto-Offer' : 'Auto-Offer Cascade'}
                 </span>

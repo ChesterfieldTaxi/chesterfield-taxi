@@ -34,9 +34,13 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
   if (!activeRoute) return null;
 
   const resolvedMetrics = metrics || activeRoute.fallbackMetrics;
-  const stopCount = Math.max(0, waypoints.length - 2);
+  const hasPickupPin = waypoints.some((w) => w.kind === 'pickup');
+  const hasDropoffPin = waypoints.some((w) => w.kind === 'dropoff');
+  const stopCount = waypoints.filter((w) => w.kind === 'stop').length;
+  const singlePinAddress = waypoints.length === 1 ? waypoints[0].address : null;
   const canClearSelectedTrip =
-    activeRoute.source === 'selected_trip' && typeof onClearSelectedTrip === 'function';
+    (activeRoute.source === 'selected_trip' || activeRoute.source === 'draft_form') &&
+    typeof onClearSelectedTrip === 'function';
 
   const shortTripTag = activeRoute.tripId
     ? `#${activeRoute.tripId.slice(-6).toUpperCase()}`
@@ -111,13 +115,17 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
       {preferences.showRouteSummaryPill && !hasSelectedDriverHud && (
         <div className="absolute bottom-6 left-2.5 z-20 max-w-[calc(100%-132px)] sm:max-w-lg pointer-events-auto animate-in fade-in slide-in-from-bottom-1 duration-150">
           <div className="bg-slate-900/94 backdrop-blur-md text-white border border-slate-700/80 shadow-xl rounded-full px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold">
-            {/* Chain Summary: Pickup -> Optional Stops -> Dropoff */}
+            {/* Chain Summary: Pickup -> Optional Stops -> Dropoff (supports partial single-pin preview) */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                <span className="hidden xs:inline sm:inline">Pickup</span>
-              </span>
-              <span className="text-slate-500 text-[10px]">→</span>
+              {hasPickupPin && (
+                <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="hidden xs:inline sm:inline">Pickup</span>
+                </span>
+              )}
+              {hasPickupPin && (stopCount > 0 || hasDropoffPin) && (
+                <span className="text-slate-500 text-[10px]">→</span>
+              )}
               {stopCount > 0 && (
                 <>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-extrabold text-[10.5px]">
@@ -126,14 +134,22 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
                       {stopCount} {stopCount === 1 ? 'Stop' : 'Stops'}
                     </span>
                   </span>
-                  <span className="text-slate-500 text-[10px]">→</span>
+                  {hasDropoffPin && <span className="text-slate-500 text-[10px]">→</span>}
                 </>
               )}
-              <span className="inline-flex items-center gap-1 text-rose-300 font-bold">
-                <span className="w-2 h-2 rounded-[2px] bg-rose-400 shrink-0" />
-                <span className="hidden xs:inline sm:inline">Dropoff</span>
-              </span>
+              {hasDropoffPin && (
+                <span className="inline-flex items-center gap-1 text-rose-300 font-bold">
+                  <span className="w-2 h-2 rounded-[2px] bg-rose-400 shrink-0" />
+                  <span className="hidden xs:inline sm:inline">Dropoff</span>
+                </span>
+              )}
             </div>
+
+            {singlePinAddress && (
+              <span className="truncate max-w-[160px] text-slate-200 font-medium border-l border-slate-700 pl-2">
+                {singlePinAddress}
+              </span>
+            )}
 
             {/* Passenger / #TRIP context */}
             {(shortTripTag || activeRoute.passengerLabel) && (

@@ -17,6 +17,7 @@ import type { DispatchStagedPlannerController } from '../../../../core/hooks/dis
 import {
   CheckIcon,
   BoltIcon,
+  RadarBroadcastIcon,
   UsersIcon,
   DocumentTextIcon,
   BanIcon,
@@ -522,7 +523,7 @@ export function DispatchTripQueueSheets({
                         className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
-                          <BoltIcon className="w-4 h-4 text-indigo-600" />
+                          <RadarBroadcastIcon className="w-4 h-4 text-indigo-600" />
                           <span>
                             {sheetTrip.offerCascade?.state === 'exhausted'
                               ? 'Retry Auto-Offer Cascade'

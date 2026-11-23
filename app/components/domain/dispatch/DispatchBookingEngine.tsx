@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { GeoPoint } from '../../../core/types';
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
@@ -58,6 +58,8 @@ import {
   DispatchPaymentAssignmentSection,
   DispatchReturnRepeatSection,
   DispatchBookingFooterBar,
+  DispatchInlineConflictBanner,
+  DispatchBookingConflictModal,
   type ContactPersonDetails,
   type CardDetails,
   type CorporateAccountDetails,
@@ -576,6 +578,8 @@ function DispatchBookingEngineComponent({
     airportDetection.isAirportTrip,
   ]);
 
+  const resetAfterCreateRef = useRef<(() => void) | null>(null);
+
   const {
     estimatedFare,
     setEstimatedFare,
@@ -600,6 +604,10 @@ function DispatchBookingEngineComponent({
     isSubmitting,
     submitError,
     setSubmitError,
+    bookingConflictSummary,
+    isConflictPromptOpen,
+    confirmConflictOverrideAndSubmit,
+    cancelConflictPrompt,
     handleSubmit,
   } = useDispatchBookingSubmission({
     isEditMode,
@@ -730,6 +738,8 @@ function DispatchBookingEngineComponent({
     dispatchVehicleOptions,
     vehicleCapacities,
     validateDispatchAccount,
+    allTrips: lookupTrips,
+    onResetAfterCreate: () => resetAfterCreateRef.current?.(),
     onBookingSuccess,
   });
 
@@ -988,6 +998,11 @@ function DispatchBookingEngineComponent({
     onCloneBooking,
   });
 
+  resetAfterCreateRef.current = () => {
+    handleClear();
+    setHasManualDriverModeOverride(false);
+  };
+
   // Seed return leg from outbound when enabled
   useEffect(() => {
     if (returnTrip) {
@@ -1202,6 +1217,11 @@ function DispatchBookingEngineComponent({
           submitError={submitError}
           submitErrorRef={submitErrorRef}
           onOpenLinkedTrip={onOpenLinkedTrip}
+        />
+
+        <DispatchInlineConflictBanner
+          summary={bookingConflictSummary}
+          onOpenTrip={onOpenLinkedTrip}
         />
 
         <DispatchRoutingTimingSection
@@ -1509,6 +1529,16 @@ function DispatchBookingEngineComponent({
         onCopyBooking={handleCopyBooking}
         onConfirmClear={() => setIsClearModalOpen(true)}
         onClear={handleClear}
+      />
+
+      <DispatchBookingConflictModal
+        isOpen={isConflictPromptOpen}
+        isEditMode={isEditMode}
+        isSubmitting={isSubmitting}
+        conflicts={bookingConflictSummary.conflicts}
+        onCancel={cancelConflictPrompt}
+        onConfirmBookAnyway={confirmConflictOverrideAndSubmit}
+        onOpenTrip={onOpenLinkedTrip}
       />
     </form>
   );

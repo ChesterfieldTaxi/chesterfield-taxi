@@ -54,6 +54,7 @@ import {
   useDispatchStagedPlanner,
   useDispatchTripTriageActions,
   useDispatchWorkspaceSync,
+  useSyncDraftLocationsToMap,
   type ConfirmModalConfigState,
   type DesktopDockTab,
   type DispatchMobileTab,
@@ -456,6 +457,7 @@ export default function DispatchRoute() {
     handleBatchAssignDriver,
     handleQuickAssignDriver,
     handleConfirmBatchAssign,
+    handleBatchCompleteTrips,
     handleBatchExportCsv,
     handleBatchCancelTrips,
     handlePromptCancelTrip,
@@ -684,6 +686,12 @@ export default function DispatchRoute() {
   ).length;
 
   const activeDraft = drafts.find((d) => d.id === activeDraftId);
+  useSyncDraftLocationsToMap({
+    activeDraft,
+    setSelectedMapTrip,
+    setSelectedQueueTripId,
+    setShouldZoomMap,
+  });
 
   // Ref-backed stable callbacks for memoized sub-panes
   const panelCallbacksRef = useRef({
@@ -715,6 +723,10 @@ export default function DispatchRoute() {
 
   const stableDraftBookingSuccess = useCallback(
     (draftId: string, savedTrip: Trip, isEdit: boolean) => {
+      const shortTripNo = savedTrip.id.slice(-6).toUpperCase();
+      const paxName =
+        `${savedTrip.passenger?.firstName || ''} ${savedTrip.passenger?.lastName || ''}`.trim() ||
+        'Passenger';
       if (savedTrip.multiCarGroupId && (savedTrip.multiCarTotal || 1) > 1) {
         panelCallbacksRef.current.showDispatchToast(
           `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${
@@ -723,8 +735,10 @@ export default function DispatchRoute() {
           'success'
         );
       } else if (isEdit) {
+        panelCallbacksRef.current.showDispatchToast(`Trip #${shortTripNo} updated.`, 'success');
+      } else {
         panelCallbacksRef.current.showDispatchToast(
-          `Trip #${savedTrip.id.slice(-6).toUpperCase()} updated.`,
+          `Booked Trip #${shortTripNo} (${paxName}) — form cleared for next booking.`,
           'success'
         );
       }
@@ -735,12 +749,23 @@ export default function DispatchRoute() {
         setDrafts((prev) =>
           prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item))
         );
-      } else if (
-        !savedTrip.plannedDriverId &&
-        autoOfferContextRef.current.autoOfferOnConfirm &&
-        autoOfferContextRef.current.isEligibleForAutoPilot(savedTrip)
-      ) {
-        void autoOfferContextRef.current.handleStartAutoOffer(savedTrip);
+      } else {
+        try {
+          localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`);
+        } catch {}
+        setDrafts((prev) =>
+          prev.map((item) => (item.id === draftId ? { ...item, formValues: undefined } : item))
+        );
+        setSelectedQueueTripId(savedTrip.id);
+        setSelectedMapTrip(savedTrip);
+        setShouldZoomMap(true);
+        if (
+          !savedTrip.plannedDriverId &&
+          autoOfferContextRef.current.autoOfferOnConfirm &&
+          autoOfferContextRef.current.isEligibleForAutoPilot(savedTrip)
+        ) {
+          void autoOfferContextRef.current.handleStartAutoOffer(savedTrip);
+        }
       }
     },
     [autoOfferContextRef]
@@ -1036,6 +1061,7 @@ export default function DispatchRoute() {
             activeMobileTab={activeMobileTab}
             settings={settings}
             drivers={drivers}
+            trips={trips}
             filteredTrips={filteredTrips}
             unconfirmedCount={unconfirmedCount}
             displayLayout={displayLayout}
@@ -1085,6 +1111,7 @@ export default function DispatchRoute() {
             onToggleSelectTrip={handleToggleSelectTrip}
             onBatchConfirmTrips={handleBatchConfirmTrips}
             onBatchAssignDriver={handleBatchAssignDriver}
+            onBatchCompleteTrips={handleBatchCompleteTrips}
             onBatchExportCsv={handleBatchExportCsv}
             onBatchCancelTrips={handleBatchCancelTrips}
             selectedQueueTripId={selectedQueueTripId}

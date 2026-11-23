@@ -17,9 +17,7 @@ import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
   DispatchSlaBadge,
-  canTripTriggerAutoOffer,
 } from '../DispatchCascadeSlaBadges';
-import { BoltIcon } from '../../../ui/Icons';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
 export interface TripQueueCompactListProps {
@@ -83,11 +81,15 @@ export function TripQueueCompactList({
         const isSelected = selectedQueueTripId === trip.id;
         const isChecked = selectedTripIds.includes(trip.id);
         const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
-        const pickupTimeStr = trip.scheduledPickupTime
-          ? new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
+        const isAsapRow = trip.bookingType === 'asap' || !trip.scheduledPickupTime;
+        const pickupTimeStr = !isAsapRow && trip.scheduledPickupTime
+          ? `${new Date(trip.scheduledPickupTime).toLocaleDateString([], {
+              month: 'short',
+              day: 'numeric',
+            })}, ${new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
-            })
+            })}`
           : 'ASAP';
         const stopCount = getTripIntermediateStopCount(trip);
         const itineraryTooltip = stopCount > 0 ? buildTripItineraryTooltip(trip) : undefined;
@@ -116,7 +118,7 @@ export function TripQueueCompactList({
                 }}
                 className="rounded border-slate-300 text-blue-600 cursor-pointer"
               />
-              <span className="font-semibold text-slate-700 shrink-0 w-16">{pickupTimeStr}</span>
+              <span className="font-semibold text-slate-700 shrink-0 whitespace-nowrap">{pickupTimeStr}</span>
               <span className="font-bold text-slate-900 shrink-0 max-w-[120px] truncate">
                 {trip.passenger.firstName} {trip.passenger.lastName}
               </span>
@@ -263,20 +265,6 @@ export function TripQueueCompactList({
                     title="Review customer web booking"
                   >
                     Review
-                  </button>
-                )}
-                {canTripTriggerAutoOffer(trip) && !isUnconfirmedTrip && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStartAutoOffer(trip);
-                    }}
-                    className="px-1.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] cursor-pointer inline-flex items-center gap-0.5"
-                    title="Start 1-tap sequential Auto-Offer Cascade"
-                  >
-                    <BoltIcon className="w-2.5 h-2.5 shrink-0" />
-                    <span>Auto</span>
                   </button>
                 )}
                 <TripActionDropdown

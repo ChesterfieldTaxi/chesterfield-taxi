@@ -1,4 +1,5 @@
-import type { Trip } from '../../types/trip';
+import React, { useEffect, useRef } from 'react';
+import type { GeoPoint, Trip } from '../../types/trip';
 import type { SlaScanSummary } from '../../services/dispatch/sla-monitor.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
 import { getTripIntermediateStopCount } from '../../utils/route-markers.util';
@@ -101,7 +102,13 @@ export function mergePopulateBookingIntoDraftForm(
     phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
     email: payload.passengerEmail || payload.email || currentForm.email || '',
     pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
+    pickupCoordinates: payload.pickupAddress
+      ? payload.pickupCoordinates
+      : currentForm.pickupCoordinates,
     dropoffAddress: payload.dropoffAddress || currentForm.dropoffAddress || '',
+    dropoffCoordinates: payload.dropoffAddress
+      ? payload.dropoffCoordinates
+      : currentForm.dropoffCoordinates,
     vehicle: (payload.vehicleTier || payload.vehicle || currentForm.vehicle || 'any') as any,
     selectedVehicles: payload.vehicleTier
       ? [payload.vehicleTier as any]
@@ -243,6 +250,178 @@ export function cloneTripToDispatchFormValues(trip: Trip): DispatchFormValues {
   };
 }
 
+export type CanonicalQueueStatusKey =
+  | 'unconfirmed'
+  | 'confirmed'
+  | 'pending'
+  | 'offered'
+  | 'assigned'
+  | 'accepted'
+  | 'en_route'
+  | 'arrived'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'declined';
+
+export const ALL_QUEUE_STATUS_KEYS: ReadonlyArray<CanonicalQueueStatusKey> = [
+  'unconfirmed',
+  'confirmed',
+  'pending',
+  'offered',
+  'assigned',
+  'accepted',
+  'en_route',
+  'arrived',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'declined',
+];
+
+export const ACTIVE_QUEUE_STATUS_KEYS: ReadonlyArray<CanonicalQueueStatusKey> = [
+  'unconfirmed',
+  'confirmed',
+  'pending',
+  'offered',
+  'assigned',
+  'accepted',
+  'en_route',
+  'arrived',
+  'in_progress',
+];
+
+const VALID_QUEUE_STATUS_SET = new Set<string>(ALL_QUEUE_STATUS_KEYS);
+const TERMINAL_QUEUE_STATUS_SET = new Set<string>([
+  'completed',
+  'cancelled',
+  'declined',
+  'DECLINED',
+]);
+
+export type QueueSortMode = 'smart' | 'date_asc' | 'date_desc';
+
+export function parseStatusFilterSelection(statusFilter: string): Set<CanonicalQueueStatusKey> {
+  const clean = String(statusFilter || '').trim().toLowerCase();
+  if (!clean || clean === 'all') {
+    return new Set<CanonicalQueueStatusKey>(ALL_QUEUE_STATUS_KEYS);
+  }
+  if (clean === 'none') {
+    return new Set<CanonicalQueueStatusKey>();
+  }
+  const tokens = clean
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s): s is CanonicalQueueStatusKey => VALID_QUEUE_STATUS_SET.has(s));
+  return new Set<CanonicalQueueStatusKey>(tokens);
+}
+
+export function serializeStatusFilterSelection(
+  selected: ReadonlySet<string> | ReadonlyArray<string>
+): string {
+  const set = selected instanceof Set ? selected : new Set(selected);
+  const ordered = ALL_QUEUE_STATUS_KEYS.filter((k) => set.has(k));
+  if (ordered.length === 0) return 'none';
+  if (ordered.length >= ALL_QUEUE_STATUS_KEYS.length) return 'all';
+  return ordered.join(',');
+}
+
+export function matchesQueueStatusFilter(tripStatus: string | undefined, statusFilter: string): boolean {
+  const cleanFilter = String(statusFilter || '').trim().toLowerCase();
+  if (!cleanFilter || cleanFilter === 'all') return true;
+  if (cleanFilter === 'none') return false;
+  const selectedSet = parseStatusFilterSelection(cleanFilter);
+  const normalizedTripStatus = String(tripStatus || '').trim().toLowerCase();
+  return selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey);
+}
+
+export function resolveTripEffectiveTimeMs(trip: Trip): number {
+  if (trip.scheduledPickupTime && trip.bookingType !== 'asap') {
+    const schedMs = Date.parse(trip.scheduledPickupTime);
+    if (Number.isFinite(schedMs)) return schedMs;
+  }
+  if (trip.createdAt) {
+    const createdMs = Date.parse(trip.createdAt);
+    if (Number.isFinite(createdMs)) return createdMs;
+  }
+  if (trip.scheduledPickupTime) {
+    const fallbackSched = Date.parse(trip.scheduledPickupTime);
+    if (Number.isFinite(fallbackSched)) return fallbackSched;
+  }
+  if (trip.updatedAt) {
+    const updMs = Date.parse(trip.updatedAt);
+    if (Number.isFinite(updMs)) return updMs;
+  }
+  return 0;
+}
+
+/**
+ * Deterministic Trips Queue sorter:
+ * - `'smart'` (default):
+ *   1. Open / Live operational trips first (`ASAP` immediate requests newest-first at top,
+ *      followed by scheduled rides in strict chronological `Soonest -> Furthest` pickup order).
+ *   2. Closed / Terminal trips (`completed`, `cancelled`, `declined`) below active work,
+ *      sorted most-recent first (`Newest -> Oldest`).
+ * - `'date_asc'`: Strict chronological ascending (`Oldest -> Newest`) across all filtered rows.
+ * - `'date_desc'`: Strict chronological descending (`Newest/Furthest -> Oldest`) across all filtered rows.
+ */
+export function sortDispatchQueueTrips(
+  list: ReadonlyArray<Trip>,
+  sortMode: QueueSortMode = 'smart'
+): Trip[] {
+  const copy = [...list];
+
+  if (sortMode === 'date_asc') {
+    return copy.sort((a, b) => {
+      const diff = resolveTripEffectiveTimeMs(a) - resolveTripEffectiveTimeMs(b);
+      if (diff !== 0) return diff;
+      return (a.id || '').localeCompare(b.id || '');
+    });
+  }
+
+  if (sortMode === 'date_desc') {
+    return copy.sort((a, b) => {
+      const diff = resolveTripEffectiveTimeMs(b) - resolveTripEffectiveTimeMs(a);
+      if (diff !== 0) return diff;
+      return (b.id || '').localeCompare(a.id || '');
+    });
+  }
+
+  // Default: 'smart' operational dispatch order
+  return copy.sort((a, b) => {
+    const termA = TERMINAL_QUEUE_STATUS_SET.has(String(a.status || ''));
+    const termB = TERMINAL_QUEUE_STATUS_SET.has(String(b.status || ''));
+    if (termA !== termB) {
+      return termA ? 1 : -1;
+    }
+
+    // Both terminal/historical: sort newest -> oldest
+    if (termA && termB) {
+      const diff = resolveTripEffectiveTimeMs(b) - resolveTripEffectiveTimeMs(a);
+      if (diff !== 0) return diff;
+      return (b.id || '').localeCompare(a.id || '');
+    }
+
+    // Both open/live operational trips: ASAP rides first (newest request first), then scheduled chronological ascending
+    const isAsapA = a.bookingType === 'asap' || !a.scheduledPickupTime;
+    const isAsapB = b.bookingType === 'asap' || !b.scheduledPickupTime;
+    if (isAsapA !== isAsapB) {
+      return isAsapA ? -1 : 1;
+    }
+
+    if (isAsapA && isAsapB) {
+      const diff = resolveTripEffectiveTimeMs(b) - resolveTripEffectiveTimeMs(a);
+      if (diff !== 0) return diff;
+      return (b.id || '').localeCompare(a.id || '');
+    }
+
+    // Both scheduled active/upcoming trips: chronological ascending (soonest pickup first)
+    const diff = resolveTripEffectiveTimeMs(a) - resolveTripEffectiveTimeMs(b);
+    if (diff !== 0) return diff;
+    return (a.id || '').localeCompare(b.id || '');
+  });
+}
+
 export interface FilterDispatchQueueTripsInput {
   trips: Trip[];
   statusFilter: string;
@@ -259,6 +438,7 @@ export interface FilterDispatchQueueTripsInput {
   searchTerm: string;
   slaUrgentOnlyFilter: boolean;
   slaSummary: SlaScanSummary;
+  sortMode?: QueueSortMode;
 }
 
 export function filterDispatchQueueTrips({
@@ -277,6 +457,7 @@ export function filterDispatchQueueTrips({
   searchTerm,
   slaUrgentOnlyFilter,
   slaSummary,
+  sortMode = 'smart',
 }: FilterDispatchQueueTripsInput): Trip[] {
   const normSearchDigits = searchTerm.replace(/\D/g, '');
   const term = searchTerm.trim().toLowerCase();
@@ -290,7 +471,7 @@ export function filterDispatchQueueTrips({
     return `${String(h).padStart(2, '0')}:${String(parseInt(t.minute, 10)).padStart(2, '0')}`;
   };
 
-  return trips.filter((trip) => {
+  const matched = trips.filter((trip) => {
     const meta = (trip.metadata || {}) as Record<string, any>;
 
     if (slaUrgentOnlyFilter) {
@@ -298,10 +479,8 @@ export function filterDispatchQueueTrips({
       if (!sla || !sla.isEligible || sla.level === 'normal') return false;
     }
 
-    if (statusFilter !== 'all') {
-      const tripStatusLower = (trip.status || '').toLowerCase();
-      const filterLower = statusFilter.toLowerCase();
-      if (tripStatusLower !== filterLower) return false;
+    if (!matchesQueueStatusFilter(trip.status, statusFilter)) {
+      return false;
     }
 
     if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') {
@@ -466,4 +645,96 @@ export function filterDispatchQueueTrips({
     }
     return true;
   });
+
+  return sortDispatchQueueTrips(matched, sortMode);
+}
+
+export interface ActiveDraftLocationState {
+  signature: string;
+  hasAnyLocation: boolean;
+}
+
+function formatDraftGeoToken(pt?: GeoPoint | null): string {
+  if (
+    !pt ||
+    typeof pt.lat !== 'number' ||
+    typeof pt.lng !== 'number' ||
+    !Number.isFinite(pt.lat) ||
+    !Number.isFinite(pt.lng) ||
+    (pt.lat === 0 && pt.lng === 0)
+  ) {
+    return '';
+  }
+  return `${pt.lat.toFixed(5)},${pt.lng.toFixed(5)}`;
+}
+
+/**
+ * Pure deterministic location signature for the active Dispatch booking draft.
+ * Detects changes to `activeDraft.id`, Pickup, Intermediate Stops, or Dropoff
+ * (both text addresses and explicit coordinates).
+ */
+export function computeActiveDraftLocationState(
+  activeDraft?: DraftTab | null
+): ActiveDraftLocationState {
+  if (!activeDraft) {
+    return { signature: '', hasAnyLocation: false };
+  }
+  const fv = activeDraft.formValues;
+  const pickupAddr = fv?.pickupAddress?.trim() || '';
+  const pickupCoords = formatDraftGeoToken(fv?.pickupCoordinates);
+  const dropoffAddr = fv?.dropoffAddress?.trim() || '';
+  const dropoffCoords = formatDraftGeoToken(fv?.dropoffCoordinates);
+  const stopTokens = Array.isArray(fv?.intermediateStops)
+    ? fv.intermediateStops
+        .map((s) => {
+          const addr = s?.address?.trim() || '';
+          const coords = formatDraftGeoToken(s?.coordinates);
+          return addr || coords ? `${addr}@${coords}` : '';
+        })
+        .filter(Boolean)
+    : [];
+
+  const hasAnyLocation = Boolean(
+    pickupAddr || pickupCoords || dropoffAddr || dropoffCoords || stopTokens.length > 0
+  );
+
+  const signature = [
+    activeDraft.id,
+    pickupAddr,
+    pickupCoords,
+    dropoffAddr,
+    dropoffCoords,
+    stopTokens.join('|'),
+  ].join('::');
+
+  return {
+    signature,
+    hasAnyLocation,
+  };
+}
+
+/**
+ * Clears stale `selectedMapTrip` / `selectedQueueTripId` and enables `shouldZoomMap`
+ * whenever the active booking draft's location signature changes with >= 1 location,
+ * ensuring `LiveFleetMap` immediately renders `'draft_form'` pins & routes.
+ */
+export function useSyncDraftLocationsToMap(params: {
+  activeDraft?: DraftTab | null;
+  setSelectedMapTrip: React.Dispatch<React.SetStateAction<Trip | null>>;
+  setSelectedQueueTripId: React.Dispatch<React.SetStateAction<string | null>>;
+  setShouldZoomMap: React.Dispatch<React.SetStateAction<boolean>>;
+}): void {
+  const { activeDraft, setSelectedMapTrip, setSelectedQueueTripId, setShouldZoomMap } = params;
+  const { signature, hasAnyLocation } = computeActiveDraftLocationState(activeDraft);
+  const prevSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prevSignatureRef.current === signature) return;
+    prevSignatureRef.current = signature;
+    if (hasAnyLocation) {
+      setSelectedMapTrip(null);
+      setSelectedQueueTripId(null);
+      setShouldZoomMap(true);
+    }
+  }, [signature, hasAnyLocation, setSelectedMapTrip, setSelectedQueueTripId, setShouldZoomMap]);
 }
