@@ -12,6 +12,7 @@ import { PhoneIcon, SpinnerIcon, SearchIcon, ShieldCheckIcon, CheckIcon, ClockIc
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { getEffectiveRoles } from '../core/utils/workspace-routing.util';
 import { CustomerTelemetryMap } from '../components/domain/tracking/CustomerTelemetryMap';
+import { GuestManageRidePanel } from '../components/domain/tracking/GuestManageRidePanel';
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
@@ -610,6 +611,17 @@ export default function BookingStatusRoute() {
             </div>
           </div>
         </div>
+
+        {/* Self-Service Guest / Owner "Manage Your Ride" Panel (Phase 56) */}
+        <GuestManageRidePanel
+          trackingToken={activeTrackingToken || trip?.trackingToken || ''}
+          trip={trip}
+          publicTracking={publicTracking}
+          initialPhoneLast4={phoneLast4Input}
+          isAuthenticatedOwner={Boolean(trip && currentUser)}
+          onTrackingUpdated={(nextTracking) => setPublicTracking(nextTracking)}
+          onTripUpdated={setTrip}
+        />
 
         {/* Canonical Itemized Fare Breakdown (Authenticated Owner / Staff Only) */}
         {trip?.pricing && (

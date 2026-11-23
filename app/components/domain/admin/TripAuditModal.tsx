@@ -428,6 +428,7 @@ export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
       isResizable={true}
       isMinimizable={true}
       isMaximizable={true}
+      zIndex={135}
       footer={
         <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end items-center text-xs text-slate-500">
           <Button type="button" variant="outline" size="sm" onClick={onClose} className="cursor-pointer">

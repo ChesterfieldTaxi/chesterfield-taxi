@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import { getBookingService } from '../../../../core/services/booking';
 import {
   hasStagedDriver,
   isTripEligibleForStaging,
@@ -12,6 +13,10 @@ import {
   hasAcknowledgedDriverUpdate,
   hasUnacknowledgedDriverUpdate,
 } from '../../../../core/services/dispatch/trip-update-ack.service';
+import {
+  getPendingGuestChangeRequest,
+  resolveDispatcherGuestChangeDecision,
+} from '../../../../core/services/tracking/guest-manage-ride';
 import { summarizeTripStopProgress } from '../../../../core/services/driver/driver-stop-progress';
 import {
   formatVehicleTier,
@@ -24,6 +29,7 @@ import {
   DispatchFlightTelemetryPill,
   DispatchSlaBadge,
   canTripTriggerAutoOffer,
+  getTripCascadeExhaustedTooltip,
   isTripCascadeActive,
 } from '../DispatchCascadeSlaBadges';
 import { evaluateTripSlaUrgency } from '../../../../core/services/dispatch/sla-monitor.service';
@@ -40,6 +46,7 @@ import {
   AlertTriangleIcon,
   BoltIcon,
   CarIcon,
+  CheckIcon,
   ClockIcon,
   LockIcon,
   LuggageIcon,
@@ -69,6 +76,9 @@ export interface TripDrawerOverviewSectionProps {
   onRefreshTripFlight: (trip: Trip) => void | Promise<void>;
   onAdjustPickupToFlightEta: (trip: Trip) => void | Promise<void>;
   stagedPlanner?: DispatchStagedPlannerController;
+  actorEmail?: string;
+  onTripsChange?: React.Dispatch<React.SetStateAction<Trip[]>>;
+  onShowToast?: (text: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export function TripDrawerOverviewSection({
@@ -87,7 +97,52 @@ export function TripDrawerOverviewSection({
   onRefreshTripFlight,
   onAdjustPickupToFlightEta,
   stagedPlanner,
+  actorEmail,
+  onTripsChange,
+  onShowToast,
 }: TripDrawerOverviewSectionProps) {
+  const [guestDecisionBusy, setGuestDecisionBusy] = useState<'approve' | 'decline' | null>(null);
+  const [guestResolutionNote, setGuestResolutionNote] = useState<string>('');
+  const pendingGuestReq = getPendingGuestChangeRequest(reviewTrip);
+
+  const handleResolveGuestChange = async (decision: 'approve' | 'decline') => {
+    if (!pendingGuestReq || pendingGuestReq.status !== 'pending') return;
+    setGuestDecisionBusy(decision);
+    try {
+      const resolved = resolveDispatcherGuestChangeDecision({
+        trip: reviewTrip,
+        decision,
+        actorEmail: actorEmail || 'Dispatcher',
+        resolutionNote: guestResolutionNote.trim() || undefined,
+      });
+
+      let savedTrip = resolved.updatedTrip;
+      const bookingService = getBookingService();
+      if (bookingService.updateTrip) {
+        savedTrip = await bookingService.updateTrip(reviewTrip.id, resolved.tripPatch);
+      }
+
+      onReviewTripChange(savedTrip);
+      onTripsChange?.((prev) => prev.map((t) => (t.id === savedTrip.id ? savedTrip : t)));
+      setGuestResolutionNote('');
+
+      if (decision === 'approve') {
+        onShowToast?.(
+          resolved.pendingDriverUpdateAck
+            ? `Approved rider edit request for #${reviewTrip.id} & alerted assigned driver.`
+            : `Approved rider edit request for #${reviewTrip.id}.`,
+          'success'
+        );
+      } else {
+        onShowToast?.(`Declined rider edit request for #${reviewTrip.id}.`, 'info');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resolve passenger edit request.';
+      onShowToast?.(msg, 'error');
+    } finally {
+      setGuestDecisionBusy(null);
+    }
+  };
   const tripMeta = (reviewTrip.metadata || {}) as Record<string, any>;
   const carSeatsBreakdown = (tripMeta.carSeatsBreakdown || {}) as {
     rearFacing?: number;
@@ -131,6 +186,161 @@ export function TripDrawerOverviewSection({
 
   return (
     <>
+      {/* Pending Passenger Self-Service Change Request Card (Phase 56 — 1-Tap Approve / Decline) */}
+      {pendingGuestReq && pendingGuestReq.status === 'pending' && (
+        <div className="bg-violet-50 border-2 border-violet-400 rounded-xl p-4 space-y-3 text-violet-950 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-ping shrink-0" />
+              <span className="font-black text-xs uppercase tracking-wider text-violet-900">
+                📝 Rider Edit Request — Pending Dispatch Confirmation
+              </span>
+            </div>
+            {pendingGuestReq.requestedAt &&
+              Number.isFinite(Date.parse(pendingGuestReq.requestedAt)) && (
+                <span className="font-mono text-[10.5px] font-bold bg-white px-2 py-0.5 rounded border border-violet-200 text-violet-800">
+                  Requested{' '}
+                  {new Date(pendingGuestReq.requestedAt).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+              )}
+          </div>
+
+          <div className="bg-white/90 rounded-lg border border-violet-200 p-3 space-y-1.5 text-xs">
+            {pendingGuestReq.requestedScheduledPickupTime &&
+              pendingGuestReq.requestedScheduledPickupTime !== reviewTrip.scheduledPickupTime && (
+                <div className="flex flex-wrap items-baseline gap-1.5">
+                  <span className="font-bold text-slate-600">Pickup Time:</span>
+                  <span className="line-through text-slate-400">
+                    {reviewTrip.scheduledPickupTime
+                      ? new Date(reviewTrip.scheduledPickupTime).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })
+                      : 'ASAP'}
+                  </span>
+                  <span className="text-violet-700 font-black">→</span>
+                  <span className="font-extrabold text-violet-950">
+                    {new Date(pendingGuestReq.requestedScheduledPickupTime).toLocaleString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              )}
+
+            {pendingGuestReq.requestedPickupAddress &&
+              pendingGuestReq.requestedPickupAddress !== reviewTrip.pickupLocation.address && (
+                <div className="flex flex-wrap items-baseline gap-1.5">
+                  <span className="font-bold text-slate-600">Pickup:</span>
+                  <span className="line-through text-slate-400">
+                    {reviewTrip.pickupLocation.address}
+                  </span>
+                  <span className="text-violet-700 font-black">→</span>
+                  <span className="font-extrabold text-violet-950">
+                    {pendingGuestReq.requestedPickupAddress}
+                  </span>
+                </div>
+              )}
+
+            {pendingGuestReq.requestedDropoffAddress &&
+              pendingGuestReq.requestedDropoffAddress !== reviewTrip.dropoffLocation.address && (
+                <div className="flex flex-wrap items-baseline gap-1.5">
+                  <span className="font-bold text-slate-600">Dropoff:</span>
+                  <span className="line-through text-slate-400">
+                    {reviewTrip.dropoffLocation.address}
+                  </span>
+                  <span className="text-violet-700 font-black">→</span>
+                  <span className="font-extrabold text-violet-950">
+                    {pendingGuestReq.requestedDropoffAddress}
+                  </span>
+                </div>
+              )}
+
+            {typeof pendingGuestReq.estimatedNewFare === 'number' && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="font-bold text-slate-600">Estimated Fare:</span>
+                <span className="font-mono font-bold text-slate-700">
+                  ${(reviewTrip.pricing?.totalFare || 0).toFixed(2)}
+                </span>
+                <span className="text-violet-700 font-black">→</span>
+                <span className="font-mono font-extrabold text-emerald-700">
+                  ${pendingGuestReq.estimatedNewFare.toFixed(2)}
+                </span>
+                {typeof pendingGuestReq.fareDelta === 'number' &&
+                  Math.abs(pendingGuestReq.fareDelta) >= 0.01 && (
+                    <span className="text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-900">
+                      {pendingGuestReq.fareDelta > 0 ? '+' : ''}
+                      ${pendingGuestReq.fareDelta.toFixed(2)}
+                    </span>
+                  )}
+              </div>
+            )}
+
+            {pendingGuestReq.customerReason && (
+              <div className="pt-1 border-t border-violet-100 text-[11.5px] text-violet-900">
+                <span className="font-bold">Rider Note:</span> &ldquo;
+                {pendingGuestReq.customerReason}&rdquo;
+              </div>
+            )}
+          </div>
+
+          <input
+            type="text"
+            value={guestResolutionNote}
+            onChange={(e) => setGuestResolutionNote(e.target.value)}
+            placeholder="Optional note to passenger (shown on /track if declined or approved)..."
+            className="w-full px-3 py-1.5 text-xs bg-white border border-violet-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={guestDecisionBusy !== null}
+              onClick={() => void handleResolveGuestChange('approve')}
+              className="flex-1 min-w-[190px] py-2 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-xs cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5"
+            >
+              {guestDecisionBusy === 'approve' ? (
+                <>
+                  <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                  <span>Approving...</span>
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>✓ Approve &amp; Notify Driver</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              disabled={guestDecisionBusy !== null}
+              onClick={() => void handleResolveGuestChange('decline')}
+              className="py-2 px-3.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 font-extrabold text-xs cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {guestDecisionBusy === 'decline' ? (
+                <>
+                  <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                  <span>Declining...</span>
+                </>
+              ) : (
+                <>
+                  <XIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>✕ Decline Request</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Linked Multi-Car Convoy Banner Card */}
       {(() => {
         const mMeta = (reviewTrip.metadata || {}) as Record<string, any>;
@@ -910,9 +1120,16 @@ export function TripDrawerOverviewSection({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-dashed border-indigo-400">
                 📌 Staged: {reviewTrip.plannedDriverLabel || reviewTrip.plannedDriverId}
               </span>
+            ) : reviewTrip.offerCascade?.state === 'exhausted' ? (
+              <span
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300 inline-flex items-center gap-1"
+                title={getTripCascadeExhaustedTooltip(reviewTrip) || undefined}
+              >
+                <AlertTriangleIcon className="w-3 h-3 text-rose-600 shrink-0" />
+                <span>Unassigned</span>
+              </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 inline-flex items-center gap-1">
-                <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 inline-flex items-center gap-1">
                 <span>Unassigned</span>
               </span>
             )}
@@ -1071,6 +1288,23 @@ export function TripDrawerOverviewSection({
                     ''
                 ).trim() || null
               }
+              stagedDriverId={hasStagedDriver(reviewTrip) ? reviewTrip.plannedDriverId : null}
+              stagedDriverLabel={hasStagedDriver(reviewTrip) ? reviewTrip.plannedDriverLabel : null}
+              onSendStaged={
+                stagedPlanner && hasStagedDriver(reviewTrip)
+                  ? () => void stagedPlanner.sendStagedTrip(reviewTrip)
+                  : undefined
+              }
+              onClearStaged={
+                stagedPlanner && hasStagedDriver(reviewTrip)
+                  ? () => void stagedPlanner.clearTripStage(reviewTrip)
+                  : undefined
+              }
+              isSendBusy={Boolean(stagedPlanner?.busyTripIds.has(reviewTrip.id))}
+              isCascadeExhausted={
+                !reviewTrip.assignedDriverId && reviewTrip.offerCascade?.state === 'exhausted'
+              }
+              cascadeExhaustedTooltip={getTripCascadeExhaustedTooltip(reviewTrip)}
               unassignedLabel="Unassigned (No driver assigned)"
               onChange={(newDriverId) => {
                 if (

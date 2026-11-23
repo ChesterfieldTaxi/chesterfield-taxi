@@ -12,6 +12,7 @@ export interface ConfirmationModalProps {
   confirmVariant?: 'danger' | 'primary' | 'warning';
   isLoading?: boolean;
   hasBackdrop?: boolean;
+  zIndex?: number;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -25,6 +26,7 @@ export function ConfirmationModal({
   confirmVariant = 'danger',
   isLoading = false,
   hasBackdrop = false,
+  zIndex = 150,
   onConfirm,
   onCancel,
 }: ConfirmationModalProps) {
@@ -70,6 +72,7 @@ export function ConfirmationModal({
       isResizable={false}
       isMinimizable={true}
       isMaximizable={false}
+      zIndex={zIndex}
       footer={
         <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
           <Button

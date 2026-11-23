@@ -54,16 +54,27 @@ export const DispatchSlaBadge = React.memo(function DispatchSlaBadge({
   );
 });
 
+export function getTripCascadeExhaustedTooltip(trip: Trip): string | null {
+  const cascade = trip.offerCascade;
+  if (trip.assignedDriverId || cascade?.state !== 'exhausted') {
+    return null;
+  }
+  const attemptedCount = cascade.attemptedDriverIds?.length || cascade.cascadeAttempt || 0;
+  return `Auto-Offer Cascade exhausted (${attemptedCount}/${cascade.maxAttempts} attempts) — assign a driver manually or retry Auto-Offer.`;
+}
+
 export interface DispatchCascadePillProps {
   trip: Trip;
   onCancel?: () => void;
   compact?: boolean;
+  hideExhausted?: boolean;
 }
 
 export const DispatchCascadePill = React.memo(function DispatchCascadePill({
   trip,
   onCancel,
   compact = false,
+  hideExhausted = false,
 }: DispatchCascadePillProps) {
   const cascade = trip.offerCascade;
   const isActive = isTripCascadeActive(trip);
@@ -137,7 +148,7 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
     );
   }
 
-  if (isExhausted && cascade) {
+  if (isExhausted && cascade && !hideExhausted) {
     const attemptedCount = cascade.attemptedDriverIds?.length || cascade.cascadeAttempt || 0;
     return (
       <span

@@ -1,12 +1,14 @@
 /**
- * Serverless Resource Route: Secure Guest Trip Tracking (/api/track)
+ * Serverless Resource Route: Secure Guest Trip Tracking & Self-Service Manage Ride (/api/track)
  *
- * Serves strictly zero-PII live tracking projections for guests:
+ * Serves strictly zero-PII live tracking projections and verified self-service mutations for guests:
  * 1. Direct token resolution (`GET /api/track?token=trk_...` or `POST { trackingToken }`)
  *    reads `/tripTracking/{trackingToken}`.
  * 2. Manual reservation lookup (`POST { tripId, phoneLast4 }`) applies strict
  *    per-IP+trip rate limiting and resolves `/tripTrackingLookup/{tripId}_{hash}`
  *    before returning `{ trackingToken, tracking }`.
+ * 3. Self-service guest manage-ride intents (`POST { intent, trackingToken, phoneLast4, ... }`)
+ *    delegate to `handleGuestManageRidePost` in `guest-manage-ride.server.ts`.
  *
  * Raw `/trips/{tripId}` documents containing PII (email, phone, gate codes,
  * corporate PO numbers, billing records) are NEVER exposed to unauthenticated callers.
@@ -19,35 +21,20 @@ import {
   getRequestClientIp,
 } from '../core/services/auth/server-auth.server';
 import {
+  handleGuestManageRidePost,
+  resolvePublicTrackingByTokenServer,
+} from '../core/services/tracking/guest-manage-ride.server';
+import {
   computeTripPhoneLookupKey,
   extractPhoneLast4,
+  sanitizePublicTrackingProjection,
   type PublicTripTrackingProjection,
 } from '../core/utils/tracking-token.util';
 
 const TOKEN_PATTERN = /^trk_[a-zA-Z0-9_-]{16,80}$/;
 
 function sanitizeOutProjection(doc: Record<string, any>): PublicTripTrackingProjection {
-  return {
-    trackingToken: String(doc.trackingToken || ''),
-    tripId: String(doc.tripId || ''),
-    status: doc.status,
-    bookingType: doc.bookingType === 'asap' ? 'asap' : 'scheduled',
-    scheduledPickupTime: typeof doc.scheduledPickupTime === 'string' ? doc.scheduledPickupTime : undefined,
-    pickupDisplay: String(doc.pickupDisplay || 'Scheduled Pickup'),
-    dropoffDisplay: String(doc.dropoffDisplay || 'Scheduled Destination'),
-    pickupCoordinates: doc.pickupCoordinates,
-    dropoffCoordinates: doc.dropoffCoordinates,
-    intermediateStops: Array.isArray(doc.intermediateStops) ? doc.intermediateStops : undefined,
-    vehicleTier: doc.vehicleTier || 'any',
-    vehicleDisplayName: typeof doc.vehicleDisplayName === 'string' ? doc.vehicleDisplayName : undefined,
-    assignedDriverFirstName:
-      typeof doc.assignedDriverFirstName === 'string' ? doc.assignedDriverFirstName : undefined,
-    assignedVehicle: doc.assignedVehicle || undefined,
-    driverTelemetry: doc.driverTelemetry || undefined,
-    etaMinutes: typeof doc.etaMinutes === 'number' ? doc.etaMinutes : undefined,
-    proxyPhone: String(doc.proxyPhone || ''),
-    updatedAt: String(doc.updatedAt || new Date().toISOString()),
-  };
+  return sanitizePublicTrackingProjection(doc);
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -68,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     );
   }
 
-  const doc = await fetchFirestoreDocumentRest('tripTracking', token);
+  const doc = await resolvePublicTrackingByTokenServer(token);
   if (!doc) {
     return Response.json(
       { success: false, error: 'Tracking session not found or expired.' },
@@ -97,10 +84,17 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const body = (await request.json()) as {
+      intent?: string;
       trackingToken?: string;
       tripId?: string;
       phoneLast4?: string;
+      [key: string]: unknown;
     };
+
+    // Mode 0 (Phase 56): Self-service Manage Ride intent (`preview_cancel`, `update_notes_flight`, `modify_time_route`, `confirm_cancel`)
+    if (typeof body?.intent === 'string' && body.intent.trim()) {
+      return handleGuestManageRidePost(request, { parsedBody: body });
+    }
 
     // Mode 1: Direct high-entropy tracking token lookup
     if (body?.trackingToken) {
@@ -119,7 +113,7 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
 
-      const doc = await fetchFirestoreDocumentRest('tripTracking', token);
+      const doc = await resolvePublicTrackingByTokenServer(token);
       if (!doc) {
         return Response.json(
           { success: false, error: 'Live tracking link was not found.' },
@@ -180,7 +174,8 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     const lookupDoc = await fetchFirestoreDocumentRest('tripTrackingLookup', lookupKey);
-    const resolvedToken = typeof lookupDoc?.trackingToken === 'string' ? lookupDoc.trackingToken : '';
+    const resolvedToken =
+      typeof lookupDoc?.trackingToken === 'string' ? lookupDoc.trackingToken : '';
 
     if (!resolvedToken || !TOKEN_PATTERN.test(resolvedToken)) {
       return Response.json(
@@ -193,7 +188,7 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    const trackingDoc = await fetchFirestoreDocumentRest('tripTracking', resolvedToken);
+    const trackingDoc = await resolvePublicTrackingByTokenServer(resolvedToken);
     if (!trackingDoc) {
       return Response.json(
         { success: false, error: 'Tracking data is not yet available for this reservation.' },

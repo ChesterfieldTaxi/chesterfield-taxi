@@ -12,17 +12,25 @@ import {
   LuggageIcon,
   SparklesIcon,
   DocumentTextIcon,
+  CheckIcon,
 } from '../../ui/Icons';
 import {
   computeDriverScheduleTimeline,
+  hasStagedDriver,
+  isTripEligibleForStaging,
   type DriverScheduleTimelineItem,
 } from '../../../core/services/dispatch/staged-driver-planner.service';
+import {
+  TripActionDropdown,
+  type DispatchUniversalTripActions,
+} from './TripActionDropdown';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import type { Trip, TripPassenger } from '../../../core/types/trip';
 
 export interface DriverQueueWindowProps {
   driver: DriverRosterItem | null;
   isOpen: boolean;
+  isDesktop?: boolean;
   onClose: () => void;
   trips: Trip[];
   onReorderQueue: (driverId: string, reorderedTripIds: string[]) => Promise<void> | void;
@@ -34,6 +42,7 @@ export interface DriverQueueWindowProps {
   onFocusTripOnMap?: (tripId: string) => void;
   onCallPassenger?: (phone: string, name?: string) => void;
   onAssignActiveDraft?: (driver: DriverRosterItem) => void;
+  tripActions?: DispatchUniversalTripActions;
 }
 
 function getPassengerDisplayName(passenger?: TripPassenger | null): string {
@@ -59,6 +68,7 @@ function formatSignedMinutes(mins: number): string {
 export function DriverQueueWindow({
   driver,
   isOpen,
+  isDesktop = true,
   onClose,
   trips,
   onReorderQueue,
@@ -70,6 +80,7 @@ export function DriverQueueWindow({
   onFocusTripOnMap,
   onCallPassenger,
   onAssignActiveDraft,
+  tripActions,
 }: DriverQueueWindowProps) {
   const [localOrderOverrides, setLocalOrderOverrides] = useState<Record<string, number>>({});
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
@@ -196,6 +207,7 @@ export function DriverQueueWindow({
       hasBackdrop={false}
       isDraggable={true}
       isResizable={true}
+      zIndex={90}
       headerExtra={
         feedbackToast && (
           <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-700 text-white font-bold animate-in fade-in">
@@ -486,24 +498,76 @@ export function DriverQueueWindow({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-end gap-1.5 flex-wrap pt-1">
+                {tripActions && (
+                  <button
+                    type="button"
+                    onClick={() => tripActions.onCompleteTrip(activeItem.trip)}
+                    className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <CheckIcon className="w-3 h-3 shrink-0" />
+                    <span>Complete Trip</span>
+                  </button>
+                )}
+                {tripActions ? (
+                  <button
+                    type="button"
+                    onClick={() => tripActions.onReview(activeItem.trip, 'details')}
+                    className="px-2.5 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] border border-emerald-300 transition-colors cursor-pointer"
+                  >
+                    Details &amp; Audit
+                  </button>
+                ) : (
+                  onOpenEditTrip && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenEditTrip(activeItem.trip.id)}
+                      className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                    >
+                      Open Details
+                    </button>
+                  )
+                )}
                 {onFocusTripOnMap && (
                   <button
                     type="button"
                     onClick={() => onFocusTripOnMap(activeItem.trip.id)}
                     className="px-2.5 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-300 transition-colors cursor-pointer"
                   >
-                    Focus Map
+                    Map
                   </button>
                 )}
-                {onOpenEditTrip && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenEditTrip(activeItem.trip.id)}
-                    className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
-                  >
-                    Open Details
-                  </button>
+                {tripActions && (
+                  <TripActionDropdown
+                    trip={activeItem.trip}
+                    isUnconfirmed={
+                      activeItem.trip.status === 'UNCONFIRMED' ||
+                      activeItem.trip.status === 'unconfirmed'
+                    }
+                    isDesktop={isDesktop}
+                    compact
+                    showEditOnDesktop
+                    showFocusMapOnDesktop
+                    onReview={() => tripActions.onReview(activeItem.trip, 'details')}
+                    onEdit={() => tripActions.onEdit(activeItem.trip)}
+                    onFare={() => tripActions.onFare(activeItem.trip)}
+                    onAudit={() => tripActions.onReview(activeItem.trip, 'audit')}
+                    onClone={() => tripActions.onClone(activeItem.trip)}
+                    onFocusMap={() => tripActions.onFocusMap(activeItem.trip)}
+                    onStartAutoOffer={
+                      tripActions.onStartAutoOffer
+                        ? () => void tripActions.onStartAutoOffer?.(activeItem.trip)
+                        : undefined
+                    }
+                    onCancelAutoOffer={
+                      tripActions.onCancelAutoOffer
+                        ? () => void tripActions.onCancelAutoOffer?.(activeItem.trip)
+                        : undefined
+                    }
+                    onCompleteTrip={() => tripActions.onCompleteTrip(activeItem.trip)}
+                    onCancelTrip={() => tripActions.onCancelTrip(activeItem.trip)}
+                    onReactivateTrip={() => tripActions.onReactivateTrip(activeItem.trip)}
+                  />
                 )}
               </div>
             </div>
@@ -752,23 +816,87 @@ export function DriverQueueWindow({
                                 </button>
                               )
                             )}
-                            {onFocusTripOnMap && (
+                            {tripActions ? (
                               <button
                                 type="button"
-                                onClick={() => onFocusTripOnMap(item.trip.id)}
-                                className="px-2 py-0.5 rounded text-[10px] text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold transition-colors cursor-pointer"
+                                onClick={() => tripActions.onReview(item.trip, 'details')}
+                                className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 font-bold transition-colors cursor-pointer"
                               >
-                                Map
+                                Details
                               </button>
+                            ) : (
+                              <>
+                                {onFocusTripOnMap && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onFocusTripOnMap(item.trip.id)}
+                                    className="px-2 py-0.5 rounded text-[10px] text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold transition-colors cursor-pointer"
+                                  >
+                                    Map
+                                  </button>
+                                )}
+                                {onOpenEditTrip && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenEditTrip(item.trip.id)}
+                                    className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-colors cursor-pointer"
+                                  >
+                                    Edit Trip
+                                  </button>
+                                )}
+                              </>
                             )}
-                            {onOpenEditTrip && (
-                              <button
-                                type="button"
-                                onClick={() => onOpenEditTrip(item.trip.id)}
-                                className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-colors cursor-pointer"
-                              >
-                                Edit Trip
-                              </button>
+                            {tripActions && (
+                              <TripActionDropdown
+                                trip={item.trip}
+                                isUnconfirmed={
+                                  item.trip.status === 'UNCONFIRMED' ||
+                                  item.trip.status === 'unconfirmed'
+                                }
+                                isDesktop={isDesktop}
+                                compact
+                                showEditOnDesktop
+                                showFocusMapOnDesktop
+                                onReview={() => tripActions.onReview(item.trip, 'details')}
+                                onEdit={() => tripActions.onEdit(item.trip)}
+                                onFare={() => tripActions.onFare(item.trip)}
+                                onAudit={() => tripActions.onReview(item.trip, 'audit')}
+                                onClone={() => tripActions.onClone(item.trip)}
+                                onFocusMap={() => tripActions.onFocusMap(item.trip)}
+                                onStartAutoOffer={
+                                  tripActions.onStartAutoOffer
+                                    ? () => void tripActions.onStartAutoOffer?.(item.trip)
+                                    : undefined
+                                }
+                                onCancelAutoOffer={
+                                  tripActions.onCancelAutoOffer
+                                    ? () => void tripActions.onCancelAutoOffer?.(item.trip)
+                                    : undefined
+                                }
+                                onSendStagedToDriver={
+                                  onSendStagedTrip && hasStagedDriver(item.trip)
+                                    ? () => void onSendStagedTrip(item.trip)
+                                    : undefined
+                                }
+                                onStageDriver={
+                                  tripActions.stagedPlanner &&
+                                  isTripEligibleForStaging(item.trip) &&
+                                  tripActions.onOpenDriverPicker
+                                    ? () => {
+                                        tripActions.stagedPlanner?.setDriverPickerMode('stage_hold');
+                                        tripActions.onOpenDriverPicker?.(item.trip);
+                                      }
+                                    : undefined
+                                }
+                                onClearStagedDriver={
+                                  onUnstageTrip && hasStagedDriver(item.trip)
+                                    ? () => void onUnstageTrip(item.trip)
+                                    : undefined
+                                }
+                                onCompleteTrip={() => tripActions.onCompleteTrip(item.trip)}
+                                onCancelTrip={() => tripActions.onCancelTrip(item.trip)}
+                                onReactivateTrip={() => tripActions.onReactivateTrip(item.trip)}
+                              />
                             )}
                           </div>
                         </div>

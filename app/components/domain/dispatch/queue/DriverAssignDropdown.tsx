@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { FLEET_STATUS_COLORS } from '../../../../core/hooks/useDispatchFleet';
 import type { LiveDriverMapStatus } from '../../../../core/types/driver';
-import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from '../../../ui/Icons';
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  SearchIcon,
+  XIcon,
+} from '../../../ui/Icons';
 
 export interface DriverDropdownOptionItem {
   id: string;
@@ -168,6 +174,13 @@ export interface DriverAssignDropdownProps {
   mode?: 'send_to_driver' | 'stage_hold';
   isAssigned?: boolean;
   fallbackAssignedLabel?: string | null;
+  stagedDriverId?: string | null;
+  stagedDriverLabel?: string | null;
+  onSendStaged?: () => void;
+  onClearStaged?: () => void;
+  isSendBusy?: boolean;
+  isCascadeExhausted?: boolean;
+  cascadeExhaustedTooltip?: string | null;
   unassignedValue?: string;
   unassignedLabel?: string;
   size?: 'xs' | 'sm' | 'md';
@@ -186,6 +199,13 @@ export function DriverAssignDropdown({
   mode = 'send_to_driver',
   isAssigned = false,
   fallbackAssignedLabel,
+  stagedDriverId,
+  stagedDriverLabel,
+  onSendStaged,
+  onClearStaged,
+  isSendBusy = false,
+  isCascadeExhausted = false,
+  cascadeExhaustedTooltip,
   unassignedValue = 'unassigned',
   unassignedLabel,
   size = 'sm',
@@ -209,12 +229,26 @@ export function DriverAssignDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const isSelected = Boolean(value && value !== unassignedValue && value !== 'unassigned');
+  const hasStaged = Boolean(
+    !isAssigned && stagedDriverId && stagedDriverId !== unassignedValue && stagedDriverId !== 'unassigned'
+  );
   const isStageMode = mode === 'stage_hold' && !isAssigned;
+  const effectiveValue = isAssigned
+    ? value
+    : hasStaged
+    ? (stagedDriverId as string)
+    : isStageMode
+    ? value
+    : unassignedValue;
+  const isSelected = Boolean(
+    effectiveValue && effectiveValue !== unassignedValue && effectiveValue !== 'unassigned'
+  );
+  const showSplitSend = hasStaged && Boolean(onSendStaged);
+  const showExhaustedAlert = !isSelected && !isStageMode && Boolean(isCascadeExhausted);
 
   const selectedDriver = useMemo(
-    () => (isSelected ? drivers.find((d) => d.id === value) : undefined),
-    [drivers, isSelected, value]
+    () => (isSelected ? drivers.find((d) => d.id === effectiveValue) : undefined),
+    [drivers, isSelected, effectiveValue]
   );
 
   const selectedVisual = useMemo(
@@ -228,7 +262,7 @@ export function DriverAssignDropdown({
   );
 
   const visibleDrivers = useMemo(() => {
-    const base = drivers.filter((d) => !d.isArchived || d.id === value);
+    const base = drivers.filter((d) => !d.isArchived || d.id === effectiveValue);
     return base
       .map((drv, idx) => ({
         drv,
@@ -244,7 +278,7 @@ export function DriverAssignDropdown({
         }
         return a.idx - b.idx;
       });
-  }, [drivers, value]);
+  }, [drivers, effectiveValue]);
 
   const filteredDrivers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -362,30 +396,43 @@ export function DriverAssignDropdown({
 
   const sizeClasses =
     size === 'xs'
-      ? 'py-1 px-2 text-[11px] rounded-lg gap-1.5'
+      ? `py-1 px-2 text-[11px] ${showSplitSend ? 'rounded-l-lg rounded-r-none' : 'rounded-lg'} gap-1.5`
       : size === 'md'
-      ? 'py-1.5 px-2.5 text-xs rounded-lg gap-2 min-h-[34px]'
-      : 'py-1.5 px-2.5 text-[11.5px] rounded-lg gap-1.5';
+      ? `py-1.5 px-2.5 text-xs ${showSplitSend ? 'rounded-l-lg rounded-r-none' : 'rounded-lg'} gap-2 min-h-[34px]`
+      : `py-1.5 px-2.5 text-[11.5px] ${showSplitSend ? 'rounded-l-lg rounded-r-none' : 'rounded-lg'} gap-1.5`;
 
   const stateClasses = isSelected
-    ? isStageMode
+    ? hasStaged || isStageMode
       ? 'bg-indigo-50/90 text-indigo-950 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-      : 'bg-blue-50/90 text-blue-900 border-blue-200 font-semibold hover:bg-blue-100/80'
+      : 'bg-white text-slate-900 border-slate-300 font-semibold hover:bg-slate-50 shadow-2xs'
     : isStageMode
     ? 'bg-indigo-50/90 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-    : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80';
+    : showExhaustedAlert
+    ? 'bg-rose-50 text-rose-800 border-rose-400 font-bold hover:bg-rose-100/80'
+    : 'bg-blue-50/90 text-blue-800 border-blue-300 font-bold hover:bg-blue-100/80';
 
   const resolvedTriggerText = isSelected
     ? selectedParsed?.triggerLabel ||
+      (hasStaged && stagedDriverLabel ? stagedDriverLabel.trim() : '') ||
       (fallbackAssignedLabel && fallbackAssignedLabel.trim()) ||
-      `Driver #${value.slice(-4)}`
+      `Driver #${effectiveValue.slice(-4)}`
     : isStageMode
     ? '📌 Stage Driver...'
     : unassignedLabel || 'Unassigned';
 
+  const resolvedTooltip =
+    showExhaustedAlert && cascadeExhaustedTooltip
+      ? cascadeExhaustedTooltip
+      : hasStaged
+      ? `Staged hold: ${resolvedTriggerText} — click to change or clear stage, or click Send`
+      : title ||
+        (isStageMode
+          ? 'Select driver to stage (Hold in Dispatch)'
+          : 'Select driver to send immediately');
+
   return (
     <div
-      className={`relative ${fullWidth ? 'w-full block' : 'inline-block'} ${maxWidthClass || ''}`}
+      className={`relative ${fullWidth ? 'w-full flex' : 'inline-flex'} items-stretch ${maxWidthClass || ''}`}
       onClick={(e) => e.stopPropagation()}
     >
       <button
@@ -395,27 +442,22 @@ export function DriverAssignDropdown({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
-        title={
-          title ||
-          (isStageMode
-            ? 'Select driver to stage (Hold in Dispatch)'
-            : 'Select driver to send immediately')
-        }
+        title={resolvedTooltip}
         onClick={(e) => {
           e.stopPropagation();
           if (disabled) return;
           setIsOpen((prev) => !prev);
         }}
         className={`${
-          fullWidth ? 'w-full' : 'max-w-full'
-        } border inline-flex items-center justify-between transition-all cursor-pointer outline-hidden focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClasses} ${stateClasses} ${
+          fullWidth ? 'flex-1 min-w-0' : 'max-w-full min-w-0'
+        } border ${showSplitSend ? 'border-r-0' : ''} inline-flex items-center justify-between transition-all cursor-pointer outline-hidden focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClasses} ${stateClasses} ${
           isOpen ? 'ring-2 ring-blue-500/25' : ''
         }`}
       >
         <span className="inline-flex items-center gap-1.5 min-w-0 truncate">
           {isSelected ? (
             <>
-              {isStageMode && <span className="shrink-0">📌</span>}
+              {(hasStaged || isStageMode) && <span className="shrink-0">📌</span>}
               <span
                 className={`shrink-0 ${
                   selectedVisual
@@ -425,6 +467,8 @@ export function DriverAssignDropdown({
                 aria-hidden="true"
               />
             </>
+          ) : showExhaustedAlert ? (
+            <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
           ) : null}
           <span className="truncate">{resolvedTriggerText}</span>
         </span>
@@ -434,6 +478,27 @@ export function DriverAssignDropdown({
           }`}
         />
       </button>
+
+      {showSplitSend && (
+        <button
+          type="button"
+          disabled={disabled || isSendBusy}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSendStaged?.();
+          }}
+          className={`shrink-0 rounded-r-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black transition-colors cursor-pointer inline-flex items-center justify-center border border-indigo-600 ${
+            size === 'xs'
+              ? 'px-2 text-[10px]'
+              : size === 'md'
+              ? 'px-3 text-xs'
+              : 'px-2.5 text-[11px]'
+          }`}
+          title={`Send to Driver (${resolvedTriggerText})`}
+        >
+          {isSendBusy ? '...' : 'Send'}
+        </button>
+      )}
 
       {isOpen &&
         coords !== null &&
@@ -483,28 +548,105 @@ export function DriverAssignDropdown({
               </div>
             )}
 
-            {/* Top Action Row: Unassigned */}
-            <div className="p-1 border-b border-slate-100">
-              <button
-                type="button"
-                role="option"
-                aria-selected={!isSelected}
-                onClick={() => {
-                  onChange(unassignedValue);
-                  closeDropdown();
-                }}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                  !isSelected
-                    ? 'bg-amber-50/90 text-amber-950 font-bold'
-                    : 'text-slate-700 hover:bg-slate-50 font-semibold'
+            {/* Mode & Exhausted Context Banner */}
+            {(hasStaged || isStageMode || showExhaustedAlert) && (
+              <div
+                className={`px-3 py-1.5 border-b text-[10.5px] font-bold flex items-center justify-between gap-2 ${
+                  showExhaustedAlert
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                    : 'bg-indigo-50/80 text-indigo-900 border-indigo-200'
                 }`}
               >
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full border-2 border-amber-400 bg-amber-100 shrink-0" />
-                  <span>{unassignedLabel || 'Unassigned'}</span>
+                <span className="truncate">
+                  {showExhaustedAlert
+                    ? cascadeExhaustedTooltip || 'Auto-Offer Cascade exhausted'
+                    : hasStaged
+                    ? `📌 Staged Hold: ${resolvedTriggerText}`
+                    : '📌 Hold Mode: Selecting stages driver'}
                 </span>
-                {!isSelected && <CheckIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />}
-              </button>
+                {hasStaged && (
+                  <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-white border border-indigo-200 text-indigo-700 shrink-0">
+                    {isStageMode ? 'Pick = Swap Hold' : 'Pick = Send Live'}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Top Action Row: Staged Quick Actions or Unassigned */}
+            <div className="p-1 border-b border-slate-100 space-y-0.5">
+              {hasStaged && onSendStaged && (
+                <button
+                  type="button"
+                  disabled={isSendBusy}
+                  onClick={() => {
+                    closeDropdown();
+                    onSendStaged();
+                  }}
+                  className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold transition-colors cursor-pointer"
+                >
+                  <span className="truncate">Send to {resolvedTriggerText} Now</span>
+                  <span className="text-[10px] uppercase tracking-wider bg-white/20 px-1.5 py-0.2 rounded shrink-0">
+                    Send
+                  </span>
+                </button>
+              )}
+
+              {hasStaged ? (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => {
+                    if (onClearStaged) {
+                      onClearStaged();
+                    } else {
+                      onChange(unassignedValue);
+                    }
+                    closeDropdown();
+                  }}
+                  className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-rose-700 hover:bg-rose-50 font-bold transition-colors cursor-pointer"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <XIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>Clear Staged Hold (Return to Unassigned)</span>
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!isSelected}
+                  onClick={() => {
+                    onChange(unassignedValue);
+                    closeDropdown();
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    !isSelected
+                      ? showExhaustedAlert
+                        ? 'bg-rose-50 text-rose-900 font-bold'
+                        : 'bg-blue-50/90 text-blue-900 font-bold'
+                      : 'text-slate-700 hover:bg-slate-50 font-semibold'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full border-2 shrink-0 ${
+                        showExhaustedAlert
+                          ? 'border-rose-400 bg-rose-100'
+                          : 'border-blue-400 bg-blue-100'
+                      }`}
+                    />
+                    <span>{unassignedLabel || 'Unassigned'}</span>
+                  </span>
+                  {!isSelected && (
+                    <CheckIcon
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        showExhaustedAlert ? 'text-rose-700' : 'text-blue-700'
+                      }`}
+                    />
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Scrollable Colored-Dot Driver Roster */}
@@ -515,7 +657,7 @@ export function DriverAssignDropdown({
                 </div>
               ) : (
                 filteredDrivers.map(({ drv, visual, parsed, isDisabled }) => {
-                  const isRowSelected = isSelected && drv.id === value;
+                  const isRowSelected = isSelected && drv.id === effectiveValue;
                   return (
                     <button
                       key={drv.id}

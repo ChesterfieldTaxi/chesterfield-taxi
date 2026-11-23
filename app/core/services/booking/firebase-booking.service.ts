@@ -49,6 +49,7 @@ import {
   generateTrackingToken,
   computeTripPhoneLookupKey,
   buildSanitizedTrackingProjection,
+  toFirestoreClientRuleProjection,
 } from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
 import { getCommsThreadService } from '../comms/comms-thread.service';
@@ -557,8 +558,11 @@ export class FirebaseBookingService implements IBookingService {
     try {
       const projection = buildSanitizedTrackingProjection(trip);
       if (!projection) return;
-      const sanitizedProjection = sanitizePayload(projection);
-      await setDoc(doc(this.db, 'tripTracking', projection.trackingToken), sanitizedProjection, { merge: true });
+      const trackingRef = doc(this.db, 'tripTracking', projection.trackingToken);
+      const clientCompatibleProjection = sanitizePayload(
+        toFirestoreClientRuleProjection(projection)
+      );
+      await setDoc(trackingRef, clientCompatibleProjection, { merge: true });
 
       if (isInitialCreate && trip.passenger?.phone) {
         const lookupKey = await computeTripPhoneLookupKey(trip.id, trip.passenger.phone);
@@ -1796,8 +1800,12 @@ export class FirebaseBookingService implements IBookingService {
       });
     }
 
-    let updatedAuditLog: TripAuditEvent[] = trip.auditLog ? [...trip.auditLog] : [];
-    if (fieldChanges.length > 0) {
+    let updatedAuditLog: TripAuditEvent[] = Array.isArray(updates.auditLog)
+      ? [...updates.auditLog]
+      : trip.auditLog
+      ? [...trip.auditLog]
+      : [];
+    if (!Array.isArray(updates.auditLog) && fieldChanges.length > 0) {
       const refSuffix = Math.floor(1000 + Math.random() * 9000);
       updatedAuditLog.push({
         action: 'TRIP_MODIFIED',

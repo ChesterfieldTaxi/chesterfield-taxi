@@ -8,11 +8,16 @@ import {
 } from '../../../core/services/dispatch/dispatch-trip-email.util';
 import type { LiveFleetDriver } from '../../../core/hooks/useDispatchFleet';
 import type { DispatchStagedPlannerController } from '../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../core/services/dispatch/staged-driver-planner.service';
 import { FloatingWindow } from '../../ui/FloatingWindow';
 import { TripAuditModal, TripAuditTimeline } from '../admin/TripAuditModal';
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
+  BanIcon,
   CheckIcon,
   CopyIcon,
   DocumentTextIcon,
@@ -23,6 +28,10 @@ import {
   ShieldCheckIcon,
   SpinnerIcon,
 } from '../../ui/Icons';
+import {
+  TripActionDropdown,
+  type DispatchUniversalTripActions,
+} from './TripActionDropdown';
 import {
   DispatchCompleteTripModal,
   DispatchDriverFareModal,
@@ -74,6 +83,7 @@ export interface DispatchTripDetailsDrawerProps {
   onEditTripFromReview: (trip: Trip) => void;
   onShowToast: (text: string, type: 'success' | 'error' | 'info') => void;
   stagedPlanner?: DispatchStagedPlannerController;
+  tripActions?: DispatchUniversalTripActions;
 }
 
 export function DispatchTripDetailsDrawer({
@@ -107,6 +117,7 @@ export function DispatchTripDetailsDrawer({
   onEditTripFromReview,
   onShowToast,
   stagedPlanner,
+  tripActions,
 }: DispatchTripDetailsDrawerProps) {
   const {
     reviewDeclineMode,
@@ -243,35 +254,91 @@ export function DispatchTripDetailsDrawer({
               isMaximizable={true}
               zIndex={120}
             >
-              {/* Navigation Tabs Header */}
-              <div className="bg-slate-900/95 px-4 sm:px-6 border-b border-slate-800 flex items-center gap-2 shrink-0 sticky top-0 z-10 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => onReviewModalTabChange('details')}
-                  className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
-                    reviewModalTab === 'details'
-                      ? 'border-blue-500 text-white bg-slate-800/60'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-                  }`}
-                >
-                  <DocumentTextIcon className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Booking Details</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReviewModalTabChange('audit')}
-                  className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
-                    reviewModalTab === 'audit'
-                      ? 'border-purple-500 text-white bg-slate-800/60'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-                  }`}
-                >
-                  <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Audit Trail</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
-                    {reviewTrip.auditLog?.length || 0}
-                  </span>
-                </button>
+              {/* Navigation Tabs Header + Full Actions Suite */}
+              <div className="bg-slate-900/95 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-10">
+                <div className="flex items-center gap-2 overflow-x-auto min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => onReviewModalTabChange('details')}
+                    className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
+                      reviewModalTab === 'details'
+                        ? 'border-blue-500 text-white bg-slate-800/60'
+                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    }`}
+                  >
+                    <DocumentTextIcon className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Booking Details</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onReviewModalTabChange('audit')}
+                    className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
+                      reviewModalTab === 'audit'
+                        ? 'border-purple-500 text-white bg-slate-800/60'
+                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    }`}
+                  >
+                    <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Audit Trail</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+                      {reviewTrip.auditLog?.length || 0}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="py-1.5 shrink-0">
+                  <TripActionDropdown
+                    trip={reviewTrip}
+                    isUnconfirmed={isUnconfirmedTrip}
+                    isDesktop={isDesktop}
+                    variant="dark"
+                    compact
+                    showEditOnDesktop
+                    showFocusMapOnDesktop={Boolean(tripActions?.onFocusMap)}
+                    hideReview={reviewModalTab === 'details'}
+                    onReview={() => onReviewModalTabChange('details')}
+                    onEdit={() => {
+                      const target = reviewTrip;
+                      onReviewTripChange(null);
+                      onEditTripFromReview(target);
+                    }}
+                    onFare={() => tripActions?.onFare(reviewTrip)}
+                    onAudit={() => onReviewModalTabChange('audit')}
+                    onClone={() => {
+                      const target = reviewTrip;
+                      onReviewTripChange(null);
+                      onCloneBookingFromReview(target);
+                    }}
+                    onFocusMap={() => tripActions?.onFocusMap(reviewTrip)}
+                    onStartAutoOffer={
+                      onStartAutoOffer ? () => void onStartAutoOffer(reviewTrip) : undefined
+                    }
+                    onCancelAutoOffer={
+                      onCancelAutoOffer ? () => void onCancelAutoOffer(reviewTrip) : undefined
+                    }
+                    onSendStagedToDriver={
+                      stagedPlanner && hasStagedDriver(reviewTrip)
+                        ? () => void stagedPlanner.sendStagedTrip(reviewTrip)
+                        : undefined
+                    }
+                    onStageDriver={
+                      stagedPlanner && isTripEligibleForStaging(reviewTrip) && tripActions?.onOpenDriverPicker
+                        ? () => {
+                            stagedPlanner.setDriverPickerMode('stage_hold');
+                            tripActions.onOpenDriverPicker?.(reviewTrip);
+                          }
+                        : undefined
+                    }
+                    onClearStagedDriver={
+                      stagedPlanner && hasStagedDriver(reviewTrip)
+                        ? () => void stagedPlanner.clearTripStage(reviewTrip)
+                        : undefined
+                    }
+                    onCompleteTrip={() => onOpenCompleteTripModal(reviewTrip)}
+                    onCancelTrip={() => onPromptCancelTrip(reviewTrip)}
+                    onReactivateTrip={() => onReactivateTrip(reviewTrip)}
+                  />
+                </div>
               </div>
 
               {/* Notification alert banner */}
@@ -315,6 +382,9 @@ export function DispatchTripDetailsDrawer({
                     onRefreshTripFlight={handleRefreshTripFlight}
                     onAdjustPickupToFlightEta={handleAdjustPickupToFlightEta}
                     stagedPlanner={stagedPlanner}
+                    actorEmail={user?.email || 'Dispatcher'}
+                    onTripsChange={onTripsChange}
+                    onShowToast={onShowToast}
                   />
 
                   <TripDrawerPricingPaymentSection
@@ -616,7 +686,6 @@ export function DispatchTripDetailsDrawer({
                             const isCancelledOrDeclined =
                               normStatus === 'cancelled' || normStatus === 'declined';
                             const isCompletedStatus = normStatus === 'completed';
-                            const isInProgressStatus = normStatus === 'in_progress';
                             const ctxEmail = getContextualEmailMeta(reviewTrip.status);
                             return (
                               <>
@@ -663,16 +732,28 @@ export function DispatchTripDetailsDrawer({
                                       </span>
                                     </button>
 
-                                    {isInProgressStatus && (
-                                      <button
-                                        type="button"
-                                        disabled={isProcessingReview}
-                                        onClick={() => onOpenCompleteTripModal(reviewTrip)}
-                                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                                      >
-                                        <CheckIcon className="w-3.5 h-3.5 shrink-0" />
-                                        <span>Complete Trip</span>
-                                      </button>
+                                    {!isCompletedStatus && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          disabled={isProcessingReview}
+                                          onClick={() => onPromptCancelTrip(reviewTrip)}
+                                          className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                        >
+                                          <BanIcon className="w-3.5 h-3.5 shrink-0" />
+                                          <span>Cancel Trip</span>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          disabled={isProcessingReview}
+                                          onClick={() => onOpenCompleteTripModal(reviewTrip)}
+                                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                        >
+                                          <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                                          <span>Complete Trip</span>
+                                        </button>
+                                      </>
                                     )}
 
                                     <button

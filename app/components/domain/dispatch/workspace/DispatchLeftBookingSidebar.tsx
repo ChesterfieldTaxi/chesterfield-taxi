@@ -3,6 +3,17 @@ import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DispatchFormValues } from '../DispatchBookingEngine';
 import { MemoizedDraftBookingPane } from '../MemoizedDraftBookingPane';
+import { getTripCascadeExhaustedTooltip } from '../DispatchCascadeSlaBadges';
+import {
+  TripActionDropdown,
+  type DispatchUniversalTripActions,
+} from '../TripActionDropdown';
+import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
+import { getDispatchStatusBadge } from '../queue/TripQueueToolbar';
+import {
+  hasStagedDriver,
+  isTripEligibleForStaging,
+} from '../../../../core/services/dispatch/staged-driver-planner.service';
 import {
   getDraftTabLabel,
   type DispatchMobileTab,
@@ -46,6 +57,8 @@ export interface DispatchLeftBookingSidebarProps {
   onClearDraftById: (draftId: string) => void;
   onCloneBooking: (values: DispatchFormValues) => void;
   onOpenLinkedTrip: (linkedTripId: string) => Promise<void>;
+  onQuickAssignDriver?: (tripId: string, driverId: string) => void | Promise<void>;
+  tripActions?: DispatchUniversalTripActions;
 }
 
 export function DispatchLeftBookingSidebar({
@@ -73,7 +86,17 @@ export function DispatchLeftBookingSidebar({
   onClearDraftById,
   onCloneBooking,
   onOpenLinkedTrip,
+  onQuickAssignDriver,
+  tripActions,
 }: DispatchLeftBookingSidebarProps) {
+  const activeDraft = drafts.find((d) => d.id === activeDraftId) || null;
+  const activeEditTrip =
+    activeDraft && !activeDraft.isNew
+      ? trips.find((t) => t.id === (activeDraft.tripId || activeDraft.trip?.id)) ||
+        activeDraft.trip ||
+        null
+      : null;
+  const stagedPlanner = tripActions?.stagedPlanner;
   return (
     <>
       <aside
@@ -351,6 +374,134 @@ export function DispatchLeftBookingSidebar({
             </div>
           </div>
         </div>
+
+        {/* Sticky Edit-Mode Trip Lifecycle & Actions Context Bar */}
+        {activeEditTrip && tripActions && (
+          <div className="px-2.5 py-1.5 bg-blue-50/90 border-b border-blue-200/80 flex items-center justify-between gap-1.5 shrink-0 text-xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-mono font-extrabold text-[11px] text-blue-900 shrink-0">
+                #{activeEditTrip.id.slice(-6).toUpperCase()}
+              </span>
+              {getDispatchStatusBadge(activeEditTrip.status)}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onQuickAssignDriver && (
+                <DriverAssignDropdown
+                  value={
+                    activeEditTrip.assignedDriverId ||
+                    (stagedPlanner?.queueAssignMode === 'stage_hold' &&
+                    activeEditTrip.plannedDriverId
+                      ? activeEditTrip.plannedDriverId
+                      : 'unassigned')
+                  }
+                  drivers={drivers}
+                  mode={
+                    !activeEditTrip.assignedDriverId &&
+                    stagedPlanner?.queueAssignMode === 'stage_hold'
+                      ? 'stage_hold'
+                      : 'send_to_driver'
+                  }
+                  isAssigned={Boolean(activeEditTrip.assignedDriverId)}
+                  fallbackAssignedLabel={
+                    String(
+                      (activeEditTrip.metadata as Record<string, unknown> | undefined)
+                        ?.assignedDriverName ||
+                        activeEditTrip.plannedDriverLabel ||
+                        ''
+                    ).trim() || null
+                  }
+                  stagedDriverId={
+                    hasStagedDriver(activeEditTrip) ? activeEditTrip.plannedDriverId : null
+                  }
+                  stagedDriverLabel={
+                    hasStagedDriver(activeEditTrip) ? activeEditTrip.plannedDriverLabel : null
+                  }
+                  onSendStaged={
+                    stagedPlanner && hasStagedDriver(activeEditTrip)
+                      ? () => void stagedPlanner.sendStagedTrip(activeEditTrip)
+                      : undefined
+                  }
+                  onClearStaged={
+                    stagedPlanner && hasStagedDriver(activeEditTrip)
+                      ? () => void stagedPlanner.clearTripStage(activeEditTrip)
+                      : undefined
+                  }
+                  isSendBusy={Boolean(stagedPlanner?.busyTripIds.has(activeEditTrip.id))}
+                  isCascadeExhausted={
+                    !activeEditTrip.assignedDriverId &&
+                    activeEditTrip.offerCascade?.state === 'exhausted'
+                  }
+                  cascadeExhaustedTooltip={getTripCascadeExhaustedTooltip(activeEditTrip)}
+                  onChange={(val) => {
+                    if (
+                      !activeEditTrip.assignedDriverId &&
+                      stagedPlanner?.queueAssignMode === 'stage_hold'
+                    ) {
+                      void stagedPlanner.stageTripDriver(activeEditTrip, val);
+                    } else {
+                      void onQuickAssignDriver(activeEditTrip.id, val);
+                    }
+                  }}
+                  size="xs"
+                  maxWidthClass="max-w-[165px]"
+                  isDesktop={isDesktop}
+                />
+              )}
+
+              <TripActionDropdown
+                trip={activeEditTrip}
+                isUnconfirmed={
+                  activeEditTrip.status === 'UNCONFIRMED' ||
+                  activeEditTrip.status === 'unconfirmed'
+                }
+                isDesktop={isDesktop}
+                compact
+                hideEdit
+                showFocusMapOnDesktop
+                onReview={() => tripActions.onReview(activeEditTrip, 'details')}
+                onEdit={() => tripActions.onEdit(activeEditTrip)}
+                onFare={() => tripActions.onFare(activeEditTrip)}
+                onAudit={() => tripActions.onReview(activeEditTrip, 'audit')}
+                onClone={() => tripActions.onClone(activeEditTrip)}
+                onFocusMap={() => tripActions.onFocusMap(activeEditTrip)}
+                onStartAutoOffer={
+                  tripActions.onStartAutoOffer
+                    ? () => void tripActions.onStartAutoOffer?.(activeEditTrip)
+                    : undefined
+                }
+                onCancelAutoOffer={
+                  tripActions.onCancelAutoOffer
+                    ? () => void tripActions.onCancelAutoOffer?.(activeEditTrip)
+                    : undefined
+                }
+                onSendStagedToDriver={
+                  stagedPlanner && hasStagedDriver(activeEditTrip)
+                    ? () => void stagedPlanner.sendStagedTrip(activeEditTrip)
+                    : undefined
+                }
+                onStageDriver={
+                  stagedPlanner &&
+                  isTripEligibleForStaging(activeEditTrip) &&
+                  tripActions.onOpenDriverPicker
+                    ? () => {
+                        stagedPlanner.setDriverPickerMode('stage_hold');
+                        tripActions.onOpenDriverPicker?.(activeEditTrip);
+                      }
+                    : undefined
+                }
+                onClearStagedDriver={
+                  stagedPlanner && hasStagedDriver(activeEditTrip)
+                    ? () => void stagedPlanner.clearTripStage(activeEditTrip)
+                    : undefined
+                }
+                onCompleteTrip={() => tripActions.onCompleteTrip(activeEditTrip)}
+                onCancelTrip={() => tripActions.onCancelTrip(activeEditTrip)}
+                onReactivateTrip={() => tripActions.onReactivateTrip(activeEditTrip)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Persistent Draft / Edit Form Container */}
         <div className="flex-1 overflow-hidden relative">

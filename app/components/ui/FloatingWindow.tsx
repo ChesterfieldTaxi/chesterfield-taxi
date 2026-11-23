@@ -2,6 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { XIcon } from './Icons';
 import { useBottomSheetDragToClose } from '../../core/hooks/useBottomSheetDragToClose';
 
+interface OpenFloatingWindowEntry {
+  instanceId: symbol;
+  getZIndex: () => number;
+}
+
+const openFloatingWindowStack: OpenFloatingWindowEntry[] = [];
+
 export interface FloatingWindowProps {
   id?: string;
   isOpen: boolean;
@@ -66,6 +73,16 @@ export function FloatingWindow({
   const [isMaximized, setIsMaximized] = useState(false);
   const [preMaxState, setPreMaxState] = useState<{ position: { x: number; y: number }; size: { width: number; height: number } } | null>(null);
   const [activeZ, setActiveZ] = useState(zIndex);
+  const activeZRef = useRef(activeZ);
+  activeZRef.current = activeZ;
+  const instanceIdRef = useRef<symbol | null>(null);
+  if (!instanceIdRef.current) {
+    instanceIdRef.current = Symbol(id);
+  }
+
+  useEffect(() => {
+    setActiveZ(zIndex);
+  }, [zIndex]);
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
@@ -102,14 +119,37 @@ export function FloatingWindow({
     }
   }, [isOpen, initialPosition, getDefaultPosition]);
 
-  // Escape key handler
+  // Escape key handler (closes only the topmost open FloatingWindow)
   useEffect(() => {
     if (!isOpen || !closeOnEsc) return;
+    const instanceId = instanceIdRef.current!;
+    const entry: OpenFloatingWindowEntry = {
+      instanceId,
+      getZIndex: () => activeZRef.current,
+    };
+    openFloatingWindowStack.push(entry);
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      let topEntry: OpenFloatingWindowEntry | null = null;
+      for (const candidate of openFloatingWindowStack) {
+        if (!topEntry || candidate.getZIndex() >= topEntry.getZIndex()) {
+          topEntry = candidate;
+        }
+      }
+      if (topEntry?.instanceId === instanceId) {
+        e.stopPropagation();
+        onClose();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      const idx = openFloatingWindowStack.findIndex((it) => it.instanceId === instanceId);
+      if (idx >= 0) {
+        openFloatingWindowStack.splice(idx, 1);
+      }
+    };
   }, [isOpen, closeOnEsc, onClose]);
 
   // Window drag handlers

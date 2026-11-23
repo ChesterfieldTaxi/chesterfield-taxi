@@ -658,13 +658,18 @@ export function useDispatchTripTriageActions({
               selectedTripIds.includes(t.id) ? { ...t, status: 'cancelled' as TripStatus } : t
             )
           );
+          setReviewTrip((prev) =>
+            prev && selectedTripIds.includes(prev.id)
+              ? { ...prev, status: 'cancelled' as TripStatus }
+              : prev
+          );
           setSelectedTripIds([]);
         } catch (err) {
           console.error('Failed to batch cancel trips:', err);
         }
       },
     });
-  }, [selectedTripIds, setConfirmModalConfig, setTrips, setSelectedTripIds]);
+  }, [selectedTripIds, setConfirmModalConfig, setTrips, setReviewTrip, setSelectedTripIds]);
 
   const handlePromptCancelTrip = useCallback(
     (trip: Trip) => {
@@ -689,15 +694,38 @@ export function useDispatchTripTriageActions({
               await bookingService.updateTrip(trip.id, { status: 'cancelled' });
             }
             setTrips((prev) =>
-              prev.map((t) => (t.id === trip.id ? { ...t, status: 'cancelled' as TripStatus } : t))
+              prev.map((t) =>
+                t.id === trip.id
+                  ? {
+                      ...t,
+                      status: 'cancelled' as TripStatus,
+                      assignedDriverId: null,
+                      plannedDriverId: null,
+                      plannedDriverLabel: null,
+                    }
+                  : t
+              )
             );
+            setReviewTrip((prev) =>
+              prev && prev.id === trip.id
+                ? {
+                    ...prev,
+                    status: 'cancelled' as TripStatus,
+                    assignedDriverId: null,
+                    plannedDriverId: null,
+                    plannedDriverLabel: null,
+                  }
+                : prev
+            );
+            showDispatchToast(`Trip #${trip.id.slice(-6).toUpperCase()} cancelled.`, 'info');
           } catch (err) {
             console.error('Failed to cancel trip:', err);
+            showDispatchToast('Failed to cancel trip.', 'error');
           }
         },
       });
     },
-    [setConfirmModalConfig, setTrips]
+    [setConfirmModalConfig, setTrips, setReviewTrip, showDispatchToast]
   );
 
   const handleReactivateTrip = useCallback(

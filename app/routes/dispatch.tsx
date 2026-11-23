@@ -24,6 +24,7 @@ import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
+import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import {
   useDispatchFleet,
@@ -862,6 +863,65 @@ export default function DispatchRoute() {
     });
   }, []);
 
+  const stableEditTripFromWorkspace = useCallback(
+    (trip: Trip) => {
+      setSelectedQueueTripId(trip.id);
+      setSelectedMapTrip(trip);
+      setShouldZoomMap(true);
+      handleOpenEditTrip(trip);
+      setActiveMobileTab('booking');
+    },
+    [handleOpenEditTrip]
+  );
+  const stableFocusTripOnMapFromWorkspace = useCallback((trip: Trip) => {
+    setSelectedQueueTripId(trip.id);
+    setSelectedMapTrip(trip);
+    setShouldZoomMap(true);
+    setActiveMobileTab('map');
+  }, []);
+  const stableCloneTripFromWorkspace = useCallback(
+    (trip: Trip) => {
+      handleCloneBooking(trip);
+      setActiveMobileTab('booking');
+    },
+    [handleCloneBooking]
+  );
+  const stableOpenDriverPickerFromWorkspace = useCallback((trip: Trip) => {
+    setDriverPickerSearch('');
+    setDriverPickerFilter('all');
+    setDriverPickerTrip(trip);
+  }, []);
+
+  const universalTripActions = useMemo<DispatchUniversalTripActions>(
+    () => ({
+      onReview: handleOpenReviewModal,
+      onEdit: stableEditTripFromWorkspace,
+      onFare: handleOpenDriverModal,
+      onClone: stableCloneTripFromWorkspace,
+      onFocusMap: stableFocusTripOnMapFromWorkspace,
+      onStartAutoOffer: stagedPlanner.requestAutoOfferWithStagedCheck,
+      onCancelAutoOffer: handleCancelAutoOffer,
+      onOpenDriverPicker: stableOpenDriverPickerFromWorkspace,
+      onCompleteTrip: handleOpenCompleteTripModal,
+      onCancelTrip: handlePromptCancelTrip,
+      onReactivateTrip: handleReactivateTrip,
+      stagedPlanner,
+    }),
+    [
+      handleOpenReviewModal,
+      stableEditTripFromWorkspace,
+      handleOpenDriverModal,
+      stableCloneTripFromWorkspace,
+      stableFocusTripOnMapFromWorkspace,
+      stagedPlanner,
+      handleCancelAutoOffer,
+      stableOpenDriverPickerFromWorkspace,
+      handleOpenCompleteTripModal,
+      handlePromptCancelTrip,
+      handleReactivateTrip,
+    ]
+  );
+
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
@@ -1025,6 +1085,8 @@ export default function DispatchRoute() {
           onClearDraftById={stableClearDraftById}
           onCloneBooking={stableCloneBooking}
           onOpenLinkedTrip={stableOpenLinkedTrip}
+          onQuickAssignDriver={handleQuickAssignDriver}
+          tripActions={universalTripActions}
         />
 
         {/* Center Column: Map Stage + Bottom Responsive Trips Queue */}
@@ -1119,35 +1181,17 @@ export default function DispatchRoute() {
             onOpenTripActionIdChange={setOpenTripActionId}
             mobileCardGestureMode={mobileCardGestureMode}
             onOpenMobileActionSheetTrip={setMobileActionSheetTrip}
-            onOpenDriverPickerForTrip={(trip) => {
-              setDriverPickerSearch('');
-              setDriverPickerFilter('all');
-              setDriverPickerTrip(trip);
-            }}
+            onOpenDriverPickerForTrip={stableOpenDriverPickerFromWorkspace}
             onSelectTripOnQueue={(trip, shouldZoom) => {
               setSelectedQueueTripId(trip.id);
               setSelectedMapTrip(trip);
               setShouldZoomMap(shouldZoom);
             }}
-            onEditTripFromQueue={(trip) => {
-              setSelectedQueueTripId(trip.id);
-              setSelectedMapTrip(trip);
-              setShouldZoomMap(true);
-              handleOpenEditTrip(trip);
-              setActiveMobileTab('booking');
-            }}
-            onFocusTripOnMapFromQueue={(trip) => {
-              setSelectedQueueTripId(trip.id);
-              setSelectedMapTrip(trip);
-              setShouldZoomMap(true);
-              setActiveMobileTab('map');
-            }}
+            onEditTripFromQueue={stableEditTripFromWorkspace}
+            onFocusTripOnMapFromQueue={stableFocusTripOnMapFromWorkspace}
             onOpenReviewModal={handleOpenReviewModal}
             onOpenDriverModal={handleOpenDriverModal}
-            onCloneBookingFromQueue={(trip) => {
-              handleCloneBooking(trip);
-              setActiveMobileTab('booking');
-            }}
+            onCloneBookingFromQueue={stableCloneTripFromWorkspace}
             onOpenCompleteTripModal={handleOpenCompleteTripModal}
             onPromptCancelTrip={handlePromptCancelTrip}
             onReactivateTrip={handleReactivateTrip}
@@ -1383,19 +1427,11 @@ export default function DispatchRoute() {
             onCancelAutoOffer={handleCancelAutoOffer}
             onPromptCancelTrip={handlePromptCancelTrip}
             onReactivateTrip={handleReactivateTrip}
-            onCloneBookingFromReview={(trip) => {
-              handleCloneBooking(trip);
-              setActiveMobileTab('booking');
-            }}
-            onEditTripFromReview={(trip) => {
-              setSelectedQueueTripId(trip.id);
-              setSelectedMapTrip(trip);
-              setShouldZoomMap(true);
-              handleOpenEditTrip(trip);
-              setActiveMobileTab('booking');
-            }}
+            onCloneBookingFromReview={stableCloneTripFromWorkspace}
+            onEditTripFromReview={stableEditTripFromWorkspace}
             onShowToast={showDispatchToast}
             stagedPlanner={stagedPlanner}
+            tripActions={universalTripActions}
           />
         </Suspense>
       )}
@@ -1417,37 +1453,25 @@ export default function DispatchRoute() {
         <DriverQueueWindow
           driver={queueDriver}
           isOpen={Boolean(queueDriver)}
+          isDesktop={isDesktop}
           onClose={() => setQueueDriver(null)}
           trips={trips}
           onReorderQueue={handleReorderDriverQueue}
-          onUnassignTrip={async (tripId) => {
-            await handleQuickAssignDriver(tripId, 'unassigned');
-          }}
+          onUnassignTrip={(tripId) => handleQuickAssignDriver(tripId, 'unassigned')}
           onSendStagedTrip={stagedPlanner.sendStagedTrip}
           onUnstageTrip={(trip) => stagedPlanner.clearTripStage(trip)}
           onSendAllStagedTrips={stagedPlanner.sendAllStagedForDriver}
-          onOpenEditTrip={(tripId) => {
-            const found = trips.find((t) => t.id === tripId);
-            if (found) {
-              handleOpenEditTrip(found);
-              setActiveMobileTab('booking');
-            }
-          }}
+          onOpenEditTrip={stableCommsOpenEditTrip}
           onFocusTripOnMap={(tripId) => {
             const found = trips.find((t) => t.id === tripId);
-            if (found) {
-              setSelectedMapTrip(found);
-              setSelectedQueueTripId(found.id);
-              setShouldZoomMap(true);
-            }
+            if (found) stableFocusTripOnMapFromWorkspace(found);
           }}
           onCallPassenger={(phone, name) => {
             void handleStartCall(phone, name);
             setActiveDockTab('phone');
           }}
-          onAssignActiveDraft={(driver) => {
-            handleAssignDriverToDraft(driver);
-          }}
+          onAssignActiveDraft={handleAssignDriverToDraft}
+          tripActions={universalTripActions}
         />
       )}
 
@@ -1463,31 +1487,18 @@ export default function DispatchRoute() {
         onConfirmBatchAssign={handleConfirmBatchAssign}
         mobileActionSheetTrip={mobileActionSheetTrip}
         onCloseMobileActionSheetTrip={() => setMobileActionSheetTrip(null)}
-        onSendReceiptForTrip={(sheetTrip) => {
+        onSendReceiptForTrip={(sheetTrip) =>
           sendDispatchContextualTripEmail({
             targetTrip: sheetTrip,
             drivers,
             settings,
             onToast: showDispatchToast,
-          });
-        }}
+          })
+        }
         onReactivateTrip={handleReactivateTrip}
-        onOpenDriverPickerForTrip={(sheetTrip) => {
-          setDriverPickerSearch('');
-          setDriverPickerFilter('all');
-          setDriverPickerTrip(sheetTrip);
-        }}
-        onEditTripFromQueue={(sheetTrip) => {
-          setSelectedQueueTripId(sheetTrip.id);
-          setSelectedMapTrip(sheetTrip);
-          setShouldZoomMap(true);
-          handleOpenEditTrip(sheetTrip);
-          setActiveMobileTab('booking');
-        }}
-        onCloneBookingFromQueue={(sheetTrip) => {
-          handleCloneBooking(sheetTrip);
-          setActiveMobileTab('booking');
-        }}
+        onOpenDriverPickerForTrip={stableOpenDriverPickerFromWorkspace}
+        onEditTripFromQueue={stableEditTripFromWorkspace}
+        onCloneBookingFromQueue={stableCloneTripFromWorkspace}
         onOpenCompleteTripModal={handleOpenCompleteTripModal}
         onOpenReviewModal={handleOpenReviewModal}
         onCallPassengerFromQueue={(phone, passengerFullName) => {
@@ -1497,12 +1508,7 @@ export default function DispatchRoute() {
           setActiveMobileTab('phone');
         }}
         onOpenDriverModal={handleOpenDriverModal}
-        onFocusTripOnMapFromQueue={(sheetTrip) => {
-          setSelectedQueueTripId(sheetTrip.id);
-          setSelectedMapTrip(sheetTrip);
-          setShouldZoomMap(true);
-          setActiveMobileTab('map');
-        }}
+        onFocusTripOnMapFromQueue={stableFocusTripOnMapFromWorkspace}
         onAddTripToMultiSelect={(tripId) => {
           setSelectedTripIds((prev) => (prev.includes(tripId) ? prev : [...prev, tripId]));
         }}

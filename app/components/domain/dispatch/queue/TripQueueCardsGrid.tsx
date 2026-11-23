@@ -14,6 +14,10 @@ import {
   getPendingDriverUpdateAck,
   hasUnacknowledgedDriverUpdate,
 } from '../../../../core/services/dispatch/trip-update-ack.service';
+import {
+  getPendingGuestChangeRequest,
+  hasPendingGuestChangeRequest,
+} from '../../../../core/services/tracking/guest-manage-ride';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import {
@@ -28,9 +32,11 @@ import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
   DispatchSlaBadge,
+  getTripCascadeExhaustedTooltip,
   isTripCascadeActive,
 } from '../DispatchCascadeSlaBadges';
 import {
+  AlertTriangleIcon,
   ChevronDownIcon,
   ClockIcon,
   PhoneIcon,
@@ -291,6 +297,27 @@ export function TripQueueCardsGrid({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {getDispatchStatusBadge(trip.status)}
+                    {hasPendingGuestChangeRequest(trip) &&
+                      (() => {
+                        const guestReq = getPendingGuestChangeRequest(trip);
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenReviewModal(trip, 'details');
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
+                            title={
+                              guestReq?.customerReason
+                                ? `Passenger requested itinerary change (${guestReq.customerReason}) — click to Approve or Decline`
+                                : 'Passenger requested itinerary change on /track — click to Approve or Decline'
+                            }
+                          >
+                            📝 Rider Edit Req
+                          </button>
+                        );
+                      })()}
                     {hasUnacknowledgedDriverUpdate(trip) &&
                       (() => {
                         const pendingAck = getPendingDriverUpdateAck(trip);
@@ -337,6 +364,7 @@ export function TripQueueCardsGrid({
                     <DispatchFlightTelemetryPill trip={trip} compact />
                     <DispatchCascadePill
                       trip={trip}
+                      hideExhausted
                       onCancel={() => onCancelAutoOffer(trip)}
                     />
                     {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
@@ -447,42 +475,6 @@ export function TripQueueCardsGrid({
               {!isDesktop ? (
                 /* Mobile-Native Card Footer */
                 <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
-                  {hasStagedDriver(trip) && (
-                    <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/80 text-[11px]">
-                      <span className="font-extrabold text-indigo-900 truncate">
-                        📌 Staged: {trip.plannedDriverLabel || trip.plannedDriverId}
-                      </span>
-                      {stagedPlanner && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void stagedPlanner.sendStagedTrip(trip);
-                            }}
-                            className="px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer"
-                            title="Send to Driver"
-                          >
-                            Send
-                          </button>
-                          <button
-                            type="button"
-                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void stagedPlanner.clearTripStage(trip);
-                            }}
-                            className="px-1 text-indigo-500 hover:text-rose-600 font-black text-xs cursor-pointer"
-                            title="Clear staged driver"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
@@ -512,28 +504,71 @@ export function TripQueueCardsGrid({
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        stagedPlanner?.setDriverPickerMode('send_to_driver');
-                        onOpenDriverPickerForTrip(trip);
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all active:scale-95 cursor-pointer max-w-[140px] ${
-                        assignedDriverLabel
-                          ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                          : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                      }`}
-                      title="Tap to assign or stage driver"
-                    >
-                      {assignedDriverStatusPalette ? (
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${assignedDriverStatusPalette.dotClass}`} />
-                      ) : (
-                        <CarIcon className="w-3 h-3 text-amber-600 shrink-0" />
-                      )}
-                      <span className="truncate">{assignedDriverLabel || 'Unassigned'}</span>
-                      <ChevronDownIcon className="w-3 h-3 opacity-60 shrink-0" />
-                    </button>
+                    {hasStagedDriver(trip) ? (
+                      <div className="inline-flex items-stretch max-w-[180px]">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            stagedPlanner?.setDriverPickerMode('stage_hold');
+                            onOpenDriverPickerForTrip(trip);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-l-full border border-r-0 border-dashed border-indigo-400 bg-indigo-50 text-indigo-950 text-[11px] font-bold transition-all active:scale-95 cursor-pointer min-w-0"
+                          title={`Staged hold: ${trip.plannedDriverLabel || trip.plannedDriverId}`}
+                        >
+                          <span className="shrink-0">📌</span>
+                          <span className="truncate">
+                            {trip.plannedDriverLabel || trip.plannedDriverId}
+                          </span>
+                          <ChevronDownIcon className="w-3 h-3 opacity-60 shrink-0" />
+                        </button>
+                        {stagedPlanner && (
+                          <button
+                            type="button"
+                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stagedPlanner.sendStagedTrip(trip);
+                            }}
+                            className="px-2 py-1 rounded-r-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-black cursor-pointer shrink-0 border border-indigo-600"
+                            title="Send to Driver"
+                          >
+                            Send
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          stagedPlanner?.setDriverPickerMode('send_to_driver');
+                          onOpenDriverPickerForTrip(trip);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all active:scale-95 cursor-pointer max-w-[145px] ${
+                          assignedDriverLabel
+                            ? 'bg-white text-slate-900 border-slate-300 shadow-2xs hover:bg-slate-50'
+                            : !trip.assignedDriverId && trip.offerCascade?.state === 'exhausted'
+                            ? 'bg-rose-50 text-rose-800 border-rose-400 hover:bg-rose-100'
+                            : 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
+                        }`}
+                        title={
+                          getTripCascadeExhaustedTooltip(trip) || 'Tap to assign or stage driver'
+                        }
+                      >
+                        {assignedDriverStatusPalette ? (
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${assignedDriverStatusPalette.dotClass}`}
+                          />
+                        ) : !trip.assignedDriverId && trip.offerCascade?.state === 'exhausted' ? (
+                          <AlertTriangleIcon className="w-3 h-3 text-rose-600 shrink-0" />
+                        ) : (
+                          <CarIcon className="w-3 h-3 text-blue-600 shrink-0" />
+                        )}
+                        <span className="truncate">{assignedDriverLabel || 'Unassigned'}</span>
+                        <ChevronDownIcon className="w-3 h-3 opacity-60 shrink-0" />
+                      </button>
+                    )}
 
                     {isUnconfirmedTrip && (
                       <button
@@ -554,44 +589,6 @@ export function TripQueueCardsGrid({
               ) : (
                 /* Desktop Card Footer */
                 <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
-                  {hasStagedDriver(trip) && (
-                    <div className="flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/80 text-[11px]">
-                      <span
-                        className="font-extrabold text-indigo-900 truncate"
-                        title={`Staged driver placeholder: ${trip.plannedDriverLabel || trip.plannedDriverId}`}
-                      >
-                        📌 Staged: {trip.plannedDriverLabel || trip.plannedDriverId}
-                      </span>
-                      {stagedPlanner && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void stagedPlanner.sendStagedTrip(trip);
-                            }}
-                            className="px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black cursor-pointer disabled:opacity-50"
-                            title="Send to Driver"
-                          >
-                            Send
-                          </button>
-                          <button
-                            type="button"
-                            disabled={stagedPlanner.busyTripIds.has(trip.id)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void stagedPlanner.clearTripStage(trip);
-                            }}
-                            className="px-1 text-indigo-500 hover:text-rose-600 font-black text-xs leading-none cursor-pointer"
-                            title="Clear staged driver"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -684,6 +681,23 @@ export function TripQueueCardsGrid({
                               ''
                           ).trim() || null
                         }
+                        stagedDriverId={hasStagedDriver(trip) ? trip.plannedDriverId : null}
+                        stagedDriverLabel={hasStagedDriver(trip) ? trip.plannedDriverLabel : null}
+                        onSendStaged={
+                          stagedPlanner && hasStagedDriver(trip)
+                            ? () => void stagedPlanner.sendStagedTrip(trip)
+                            : undefined
+                        }
+                        onClearStaged={
+                          stagedPlanner && hasStagedDriver(trip)
+                            ? () => void stagedPlanner.clearTripStage(trip)
+                            : undefined
+                        }
+                        isSendBusy={Boolean(stagedPlanner?.busyTripIds.has(trip.id))}
+                        isCascadeExhausted={
+                          !trip.assignedDriverId && trip.offerCascade?.state === 'exhausted'
+                        }
+                        cascadeExhaustedTooltip={getTripCascadeExhaustedTooltip(trip)}
                         onChange={(val) => {
                           if (
                             !trip.assignedDriverId &&

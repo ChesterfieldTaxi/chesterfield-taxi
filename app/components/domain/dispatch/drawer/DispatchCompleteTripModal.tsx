@@ -248,7 +248,7 @@ export function DispatchCompleteTripModal({
 
   return (
     <div
-      className="fixed inset-0 z-[125] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[135] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
       onClick={() => {
         if (!isCompletingTrip) onCloseCompleteTripModal();
       }}

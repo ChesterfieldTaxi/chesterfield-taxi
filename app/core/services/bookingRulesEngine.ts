@@ -749,3 +749,90 @@ export function getBookingRulesEngine(): BookingRulesEngine {
   }
   return instance;
 }
+
+export interface EvaluateBookingRulesOptions {
+  config?: Partial<BookingRulesConfig>;
+  customer?: PassengerAccount;
+  driver?: DriverProfile;
+  blacklistedLocations?: BlacklistedLocation[];
+  /**
+   * When true (e.g., modifying an already-confirmed reservation pre-dispatch),
+   * static initial-intake tags and triggers already vetted on `priorTrip` do not
+   * re-hold the reservation unless the edit introduces a new operational risk trigger
+   * (e.g., shifting into late-night hours, adding an airport pickup, or spiking fare).
+   */
+  preservePriorConfirmation?: boolean;
+  priorTrip?: BookingEvaluationTripInput;
+}
+
+export interface EvaluatedBookingRulesDecision extends BookingRuleEvaluationResult {
+  action: 'auto_confirm' | 'require_review' | 'block';
+}
+
+const ONBOARDING_ONLY_REVIEW_TAGS = new Set<string>([
+  'UNRATED_GUEST',
+  'PAYMENT_METHOD_REVIEW',
+  'PAYMENT_NOT_AUTO_CONFIRMED',
+  'LOW_CUSTOMER_SCORE',
+]);
+
+export function evaluateBookingRules(
+  tripInput: BookingEvaluationTripInput,
+  options?: EvaluateBookingRulesOptions
+): EvaluatedBookingRulesDecision {
+  const engine = options?.config
+    ? new BookingRulesEngine(options.config)
+    : getBookingRulesEngine();
+  const res = engine.evaluateBookingRequest(
+    tripInput,
+    options?.customer,
+    options?.driver,
+    options?.blacklistedLocations
+  );
+
+  if (res.mode === 'BLACKLIST_BLOCK') {
+    return {
+      ...res,
+      action: 'block',
+    };
+  }
+
+  if (res.mode === 'AUTO_CONFIRM') {
+    return {
+      ...res,
+      action: 'auto_confirm',
+    };
+  }
+
+  if (options?.preservePriorConfirmation) {
+    const priorEval = options.priorTrip
+      ? engine.evaluateBookingRequest(
+          options.priorTrip,
+          options.customer,
+          options.driver,
+          options.blacklistedLocations
+        )
+      : null;
+    const alreadyVettedTags = new Set<string>([
+      ...ONBOARDING_ONLY_REVIEW_TAGS,
+      ...(priorEval?.matchedRuleTags || []),
+    ]);
+
+    const tags = res.matchedRuleTags || [];
+    const introducedNewTrigger =
+      tags.length === 0 || tags.some((tag) => !alreadyVettedTags.has(tag));
+    if (!introducedNewTrigger) {
+      return {
+        ...res,
+        mode: 'AUTO_CONFIRM',
+        action: 'auto_confirm',
+        reason: 'Preserved prior dispatch confirmation (no new route, time, or fare risk trigger).',
+      };
+    }
+  }
+
+  return {
+    ...res,
+    action: 'require_review',
+  };
+}
